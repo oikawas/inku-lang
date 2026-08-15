@@ -3524,6 +3524,9 @@ def _surface_line_angle(surface: SurfaceSpec) -> float:
 
 
 SURFACE_MARK_MAX = 90
+# Far past the row index a hatch layer can reach (80 rows, 4096 per layer), so
+# the second span of a row never lands on another row's stroke seed.
+HATCH_SPAN_SEED_STRIDE = 1048576
 SURFACE_DAB_SAMPLES = 5
 SURFACE_WASH_LAYERS = 2
 SURFACE_BLEED_RINGS = 3
@@ -3817,51 +3820,79 @@ def _render_surface_vectors(
                     + _hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12
                 )
                 ox, oy = lnx * offset, lny * offset
-                start = (cx + ox - lux * span / 2, cy + oy - luy * span / 2)
-                end = (cx + ox + lux * span / 2, cy + oy + luy * span / 2)
                 line_width = max(0.45, canvas.unit * 0.0016)
                 hatch_class = f"hatch-spacing-{spacing * gradient:.3f}"
-                if not _uses_hand_stroke(ins.weight):
+                # A surface belongs to the shape that carries it, so the row is
+                # cut where the shape ends instead of running the fixed 1.3x
+                # diagonal it was laid out on. Nothing above this line moves:
+                # the angle, the pitch, the gradient and the per-row jitter
+                # still decide where a row sits and how it leans -- only its two
+                # ends do. `_line_spans` returns entry/exit pairs, so a concave
+                # form gives several spans and each one is drawn on its own; a
+                # row never crosses the void. A row that misses the contour
+                # returns no span and draws nothing.
+                # Not a clipPath: the compat profile emits none (SPEC 1180), and
+                # a cut that only display can see is not a cut.
+                row_point = (cx + ox, cy + oy)
+                stroke_index = i + layer_index * 4096
+                for span_index, (t0, t1) in enumerate(
+                    _line_spans(contour, row_point, (lux, luy))
+                ):
+                    chord = t1 - t0
+                    if chord <= 0.0:
+                        continue
+                    start = (row_point[0] + lux * t0, row_point[1] + luy * t0)
+                    end = (row_point[0] + lux * t1, row_point[1] + luy * t1)
+                    if not _uses_hand_stroke(ins.weight):
+                        group.add(
+                            dwg.line(
+                                start=start,
+                                end=end,
+                                stroke=color,
+                                stroke_width=line_width,
+                                stroke_opacity=opacity,
+                                stroke_linecap="round",
+                                class_=hatch_class,
+                            )
+                        )
+                        continue
+                    # ハッチも版の筆致であって幾何直線ではない。中心線・角度・間隔は
+                    # そのままに、描画だけ材質エンジンを通す。
+                    # The sample count follows the length actually travelled --
+                    # a two-pixel corner span given the whole diagonal's samples
+                    # is not the same stroke the material engine was asked for.
+                    count_samples = max(2, _stroke_sample_count(chord, canvas))
+                    centerline = [
+                        (
+                            start[0] + (end[0] - start[0]) * sample / (count_samples - 1),
+                            start[1] + (end[1] - start[1]) * sample / (count_samples - 1),
+                        )
+                        for sample in range(count_samples)
+                    ]
+                    # The first span of a row keeps the row's own stroke seed,
+                    # so a convex shape -- every corpus case is one -- performs
+                    # each row exactly as it was asked to. Later spans, which
+                    # only a concave form has, take their own.
+                    hatch_stroke = synthesize_along(
+                        centerline,
+                        line_width,
+                        ins.weight,
+                        _fill_stroke_seed(
+                            seed, stroke_index + span_index * HATCH_SPAN_SEED_STRIDE
+                        ),
+                        closed=False,
+                        grid_step=_grid_step_px(ins.weight, canvas),
+                        wild=wild,
+                    )
                     group.add(
-                        dwg.line(
-                            start=start,
-                            end=end,
-                            stroke=color,
-                            stroke_width=line_width,
-                            stroke_opacity=opacity,
-                            stroke_linecap="round",
-                            class_=hatch_class,
+                        dwg.path(
+                            d=contour_stroke_path(hatch_stroke),
+                            fill=color,
+                            fill_opacity=opacity,
+                            stroke="none",
+                            class_=f"surface-stroke-v1 {hatch_class}",
                         )
                     )
-                    continue
-                # ハッチも版の筆致であって幾何直線ではない。中心線・角度・間隔は
-                # そのままに、描画だけ材質エンジンを通す。
-                count_samples = max(2, _stroke_sample_count(span, canvas))
-                centerline = [
-                    (
-                        start[0] + (end[0] - start[0]) * i / (count_samples - 1),
-                        start[1] + (end[1] - start[1]) * i / (count_samples - 1),
-                    )
-                    for i in range(count_samples)
-                ]
-                hatch_stroke = synthesize_along(
-                    centerline,
-                    line_width,
-                    ins.weight,
-                    _fill_stroke_seed(seed, i + layer_index * 4096),
-                    closed=False,
-                    grid_step=_grid_step_px(ins.weight, canvas),
-                    wild=wild,
-                )
-                group.add(
-                    dwg.path(
-                        d=contour_stroke_path(hatch_stroke),
-                        fill=color,
-                        fill_opacity=opacity,
-                        stroke="none",
-                        class_=f"surface-stroke-v1 {hatch_class}",
-                    )
-                )
     elif surface.texture == "aquatint":
         steps = surface.tone_steps
         band = w / steps

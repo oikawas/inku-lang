@@ -112,7 +112,14 @@ def _surface_stroke_paths(instruction: dict, *, wild: bool) -> list[str]:
 
 
 def test_wild_reaches_the_hatch_inside_a_surface() -> None:
-    for texture, tool, expected in (("hatch", "pen", 39), ("crosshatch", "pencil", 78)):
+    """⚠ 本数は engine 35 で 39 → 29・78 → 58 に減った。
+
+    行を輪郭で切った版なので、**輪郭と交わらない行が 1 本も描かれなくなった**
+    (10 本 / 20 本)。**寸法は変わっていない。減ったのは本数だけである。**
+    この検査が測っているのは「wild が面の中のハッチまで届くこと」で、そちらは
+    本数が変わっても同じ —— 描かれた全部が wild で別の `d` になる。
+    """
+    for texture, tool, expected in (("hatch", "pen", 29), ("crosshatch", "pencil", 58)):
         instruction = {
             "primitive": "square", "weight": tool, "filled": False,
             **GEOMETRY["square"], "surface": {**BASE_SURFACE, "texture": texture},

@@ -25,8 +25,10 @@ import inku_server.renderer as renderer
 import inku_server.stroke_engine as stroke_engine
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import (
+    _line_spans,
     _point_in_polygon,
     _surface_contour,
+    _surface_line_angle,
     render,
 )
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
@@ -88,7 +90,16 @@ def _current_cases() -> dict[str, dict]:
 
 
 def _surface_body(svg: str) -> str:
-    match = re.search(r'<g id="surface_000_000_[a-z_]+">(.*?)</g>', svg, flags=re.S)
+    """面の群の中身。
+
+    ⚠ 群に属性が 1 つ増えただけで空を返してはならない。`id` の前に属性が付くと
+    (svgwrite は属性を名前順に書くので `clip-path` は `id` の前に来る) 古い形の
+    正規表現は 1 文字も拾わず、墨を数える検査が全部「墨が無い」で落ちていた ——
+    どれも赤くはなるが、赤の理由が実装ではなく道具になる。
+    """
+    match = re.search(
+        r'<g[^>]*id="surface_000_000_[a-z_]+"[^>]*>(.*?)</g>', svg, flags=re.S
+    )
     return match.group(1) if match else ""
 
 
@@ -175,18 +186,25 @@ def test_s1_performed_surface_reaches_every_hand_tool(texture: str) -> None:
     assert "surface-stroke-v1" not in _render(SQUARE, texture, weight="rotring")
 
 
-# --- S-2 陰性: hatch / crosshatch は engine 15 と 1 バイトも変わらない ------ #
+# --- S-2 母集団: engine 15 の hatch / crosshatch 8 件が現行と一致すること ---- #
 
 
-def test_s2_hatch_and_crosshatch_cases_are_not_touched_by_the_surface_stroke() -> None:
-    """段 1 の帰属の担保。ここが動いたら既に正しかった経路を壊している。
+def test_s2_the_engine_15_hatch_cases_replay_to_the_current_corpus() -> None:
+    """engine 15 の入力 8 件を現行の renderer で描き直し、現行コーパスと突き合わせる。
+
+    **⚠ 名前が変わった。engine 35 まではここは
+    `test_s2_hatch_and_crosshatch_cases_are_not_touched_by_the_surface_stroke` で、
+    「ハッチは engine 15 から 1 バイトも変わらない」と名乗っていた。engine 35 が
+    ハッチの行を輪郭で切ったので、その名前と docstring は偽になった** ——
+    検査の中身は 1 行も変えていない。**⚠ 中身は engine 28 の時点で既に
+    「engine 15 のバイトとの比較」ではなくなっていた**（下記）。
 
     engine 28 で作り直した。ここは engine 15 の凍結バイトを物差しにし、後から載った
     層（太さの軸）を無効化して比べていた。engine 28 は材質層の作り方と揺らぎの
     物差しの両方を動かしたので、engine 15 のバイトは実演では二度と再現できない ——
     **同じやり方を続けるには engine 16〜27 を丸ごと作り直すことになる。**
 
-    **⚠ この半分は検査ではなく焼き直される記録になった。** 帰属を留めていたのは
+    **⚠ これは検査ではなく焼き直される記録である。** 帰属を留めていたのは
     「engine 15 の seed 材料へ戻せば engine 15 のバイトが出る」という装置で、
     その装置は engine 28 の変更まではカバーできない。engine 15 と 16 の manifest を
     直接比べても 8 件とも digest が違う（差は太さの軸で、surface のストロークでは
@@ -230,12 +248,19 @@ def test_s2_the_other_surface_cases_did_move() -> None:
 # --- S-3 形: 粒が図形の外に出ないこと -------------------------------------- #
 
 
-@pytest.mark.parametrize("texture", ("stipple", "grain", "paper_grain", "aquatint"))
+@pytest.mark.parametrize(
+    "texture", ("stipple", "grain", "paper_grain", "aquatint", "hatch", "crosshatch")
+)
 def test_s3_grains_stay_inside_a_triangle(texture: str) -> None:
     """bbox 一様乱数をやめた直接の証拠。三角形の bbox の半分は図形の外である。
 
     editable プロファイルで見る (display の clipPath が隠してくれないので、
     engine 15 の実装ではここが落ちる)。
+
+    engine 35 が `hatch` と `crosshatch` をこの一覧へ入れた。この 2 語だけは粒系と
+    違う理由で外へ出ていた —— 行が bbox の対角の 1.3 倍という固定長で、輪郭との
+    交点を 1 度も取っていなかった。起点 `189fedc7` の実測は 413.9px / 423.3px で、
+    ここの限度 20.0px の 20 倍である。
     """
     svg = _render(TRIANGLE, texture, profile="editable")
     instruction = Instruction.model_validate(
@@ -348,3 +373,220 @@ def test_s6_filled_cases_carry_no_surface_layer() -> None:
     assert "fill-underlay-v1" in filled
     assert "fill-underlay-v1" not in surfaced
     assert "surface-stroke-v1" in surfaced
+
+
+# --- S-7 面: 平行線・交差線が図形の中に収まること (engine 35) --------------- #
+#
+# 起点 `189fedc7` の実測: 三角形 413.9px / 四角 353.5px (hatch)、423.3px / 353.5px
+# (crosshatch)。限度は `CANVAS.unit * 0.02` = 20.0px なので 20 倍だった。行の長さが
+# bbox の対角の 1.3 倍という固定値で、輪郭との交点を 1 度も取っていなかった。
+
+
+# 凹んだ雲形。`primitive` で凹形を名乗れるのは `cloudform` だけで、輪郭は演奏 seed
+# から生えるので「凹んでいる個体」は掃引で選ぶしかない。この組は 30 行のうち 2 行が
+# 空洞をまたぎ、2 本目の区間はどちらも 78px 以上ある (2026-08-15 実測)。判別力は
+# テスト自身が数える (`multi_span_rows >= 2`) ので、選んだ値が腐れば赤くなる。
+CONCAVE = {"primitive": "cloudform", "center": [0.5, 0.5], "size": [0.7, 0.5]}
+CONCAVE_SEED = 99
+CONCAVE_SURFACE = {"direction": "horizontal", "density": 0.8}
+
+
+def _hatch_spacings(body: str) -> list[str]:
+    """描かれた順の `hatch-spacing-*` の値。製品が自分で書いた間隔である。"""
+    return re.findall(r"hatch-spacing-([0-9.]+)", body)
+
+
+def _hatch_axes(surface: dict) -> tuple[tuple[float, float], tuple[float, float]]:
+    """行の向き `u` と行を並べる向き `n`。"""
+    instruction = Instruction.model_validate(
+        dict(SQUARE, weight="pen", filled=False, surface=surface)
+    )
+    assert instruction.surface is not None
+    angle = _surface_line_angle(instruction.surface)
+    return (math.cos(angle), math.sin(angle)), (-math.sin(angle), math.cos(angle))
+
+
+def _row_offsets(
+    points: list[tuple[float, float]],
+    normal: tuple[float, float],
+    spacing: float,
+) -> list[float]:
+    """墨そのものから行を数える。
+
+    行の位置を製品の式から引き写すと、式を壊した実装でも同じ答えが出る。墨を
+    `n` へ射影して間隔の 0.4 倍より広い切れ目で割ると、行は墨だけから出る。
+    """
+    projected = sorted(p[0] * normal[0] + p[1] * normal[1] for p in points)
+    clusters: list[list[float]] = [[projected[0]]]
+    for value in projected[1:]:
+        if value - clusters[-1][-1] > spacing * 0.4:
+            clusters.append([value])
+        else:
+            clusters[-1].append(value)
+    return [(cluster[0] + cluster[-1]) / 2 for cluster in clusters]
+
+
+@pytest.mark.parametrize("texture", ("hatch", "crosshatch"))
+def test_s7_hatch_stays_inside_a_square(texture: str) -> None:
+    """T-2。三角形 (S-3) だけで測ると図形が 1 つしかない。
+
+    engine 25 の摂動 4 本が空振りしたのは 5 つの layout を全部 `circle` で測って
+    いたからで、形の主張は形を替えて 2 度測らないと担保にならない。
+    起点の実測はどちらの語も 353.5px。
+    """
+    svg = _render(SQUARE, texture, profile="editable")
+    instruction = Instruction.model_validate(
+        dict(SQUARE, weight="pen", filled=False, surface={**BASE_SURFACE, "texture": texture})
+    )
+    contour = _surface_contour(
+        instruction, CANVAS, render_seed=12345, ins_idx=0, mark_idx=0
+    )
+    assert contour == [(280.0, 280.0), (720.0, 280.0), (720.0, 720.0), (280.0, 720.0)]
+    points = _ink_points(_surface_body(svg))
+    assert len(points) >= 200, len(points)
+    excursion = max(_distance_outside(p, contour) for p in points)
+    assert excursion <= CANVAS.unit * 0.02, excursion
+
+
+def test_s7_no_row_crosses_the_void_of_a_concave_form() -> None:
+    """T-3。輪郭の外に出ないことと、内側の空洞に入らないことは別の主張である。
+
+    凸形なら交点は 2 つしかないので、「最初と最後の交点で切る」実装でも T-1/T-2 は
+    緑になる。空洞をまたぐ行があって初めて、区間ごとに描いているかが測れる。
+    ここは 3 つを測る —— 空洞をまたぐ行が実在すること (判別力)、墨が自分の行の
+    区間の中にあること (またいでいない)、長い区間に墨があること (捨てていない)。
+    """
+    surface = {**BASE_SURFACE, "texture": "hatch", **CONCAVE_SURFACE}
+    svg = _render(
+        CONCAVE, "hatch", profile="editable", render_seed=CONCAVE_SEED, **CONCAVE_SURFACE
+    )
+    body = _surface_body(svg)
+    instruction = Instruction.model_validate(
+        dict(CONCAVE, weight="pen", filled=False, surface=surface)
+    )
+    contour = _surface_contour(
+        instruction, CANVAS, render_seed=CONCAVE_SEED, ins_idx=0, mark_idx=0
+    )
+    assert contour is not None and len(contour) > 3
+    spacings = {float(value) for value in _hatch_spacings(body)}
+    assert len(spacings) == 1, spacings
+    spacing = spacings.pop()
+    unit, normal = _hatch_axes(surface)
+    points = _ink_points(body)
+    assert len(points) >= 200, len(points)
+
+    multi_span_rows = 0
+    for offset in _row_offsets(points, normal, spacing):
+        spans = _line_spans(
+            contour, (normal[0] * offset, normal[1] * offset), unit
+        )
+        assert spans, offset
+        if len(spans) > 1:
+            multi_span_rows += 1
+        on_this_row = [
+            p[0] * unit[0] + p[1] * unit[1]
+            for p in points
+            if abs(p[0] * normal[0] + p[1] * normal[1] - offset) <= spacing * 0.4
+        ]
+        # またいでいない: 墨は自分の行のどれかの区間の中にある。1 本で空洞を
+        # またぐと、空洞のぶんだけどの区間からも外れる。
+        for along in on_this_row:
+            assert min(
+                max(start - along, 0.0, along - end) for start, end in spans
+            ) <= 1.0, (offset, along, spans)
+        # 捨てていない: 長い区間には墨がある。2 本目以降を落とす実装はここで落ちる
+        # (この個体の 2 本目はどちらも 78px 以上ある)。
+        for start, end in spans:
+            if end - start > 40.0:
+                assert [
+                    along for along in on_this_row if start + 2.0 <= along <= end - 2.0
+                ], (offset, start, end)
+    assert multi_span_rows >= 2, multi_span_rows
+
+
+def test_s7_spacing_gradient_still_leans_the_pitch() -> None:
+    """T-4。切る書き換えで濃さの傾きを落としていないことの担保。
+
+    **⚠ コーパスの hatch / crosshatch 9 件は全部 `spacing_gradient="none"` なので、
+    入力はここに書く**(2026-08-15 実測)。コーパスの焼き直しでは緑にならない。
+    `_scanline_segments` へ置き換える実装はここで落ちる —— あれは一様間隔しか
+    作れない。
+    """
+    for gradient, rising in (("coarse_to_dense", False), ("dense_to_coarse", True)):
+        body = _surface_body(
+            _render(SQUARE, "hatch", profile="editable", spacing_gradient=gradient)
+        )
+        values = [float(value) for value in _hatch_spacings(body)]
+        assert len(set(values)) >= 2, (gradient, set(values))
+        ordered = (
+            all(a <= b for a, b in zip(values, values[1:]))
+            if rising
+            else all(a >= b for a, b in zip(values, values[1:]))
+        )
+        assert ordered, (gradient, values[:8], values[-8:])
+        assert max(values) / min(values) > 1.5, (gradient, min(values), max(values))
+
+
+def test_s7_spacing_gradient_none_keeps_the_pitch_of_the_branch_point() -> None:
+    """T-5。裁定 3 の担保 —— 間隔は動かしていない。
+
+    作者は「図形の中に収めたとき、線の引き方は規則的なまま残す」と裁定した
+    (2026-08-14)。1 本ごとの揺らぎを足す改良はここで落ちる。21.250 は起点
+    `189fedc7` のコーパス `C-surface-hatch-pen` が持っていた値そのものである。
+    """
+    for texture in ("hatch", "crosshatch"):
+        body = _surface_body(_render(SQUARE, texture, profile="editable"))
+        assert set(_hatch_spacings(body)) == {"21.250"}, texture
+
+
+def test_s7_every_row_that_meets_the_contour_is_drawn() -> None:
+    """T-6。「外を消す」だけで「中を減らす」をしていないことの担保。
+
+    行は輪郭の端から端まで、自分が名乗った間隔で並んでいる。輪郭と交わる行を
+    落とす実装 (短い区間を閾値で捨てる、など) はここで落ちる。間隔は製品が書いた
+    `hatch-spacing-*` から読む —— 製品の式を書き写すと、式を壊した実装でも同じ
+    答えが出る。
+    """
+    body = _surface_body(_render(SQUARE, "hatch", profile="editable"))
+    spacings = {float(value) for value in _hatch_spacings(body)}
+    assert len(spacings) == 1, spacings
+    spacing = spacings.pop()
+    instruction = Instruction.model_validate(
+        dict(SQUARE, weight="pen", filled=False, surface={**BASE_SURFACE, "texture": "hatch"})
+    )
+    contour = _surface_contour(
+        instruction, CANVAS, render_seed=12345, ins_idx=0, mark_idx=0
+    )
+    unit, normal = _hatch_axes({**BASE_SURFACE, "texture": "hatch"})
+    offsets = _row_offsets(_ink_points(body), normal, spacing)
+    # 1 行 = 1 本。凸形は交点が 2 つしかないので、行と描かれた要素は 1 対 1 である。
+    assert len(offsets) == body.count("surface-stroke-v1"), len(offsets)
+    projected = [p[0] * normal[0] + p[1] * normal[1] for p in contour]
+    low, high = min(projected), max(projected)
+    assert offsets[0] - low <= spacing * 1.4, offsets[0] - low
+    assert high - offsets[-1] <= spacing * 1.4, high - offsets[-1]
+    gaps = [b - a for a, b in zip(offsets, offsets[1:])]
+    assert max(gaps) <= spacing * 1.4, max(gaps)
+
+
+@pytest.mark.parametrize("texture", ("hatch", "crosshatch"))
+def test_s7_hatch_stays_inside_in_the_compat_profile(texture: str) -> None:
+    """T-7。`clipPath` で切った実装はここで落ちる。
+
+    `compat` は clip-path を 1 つも出せない (SPEC §1180)。display だけで測る受入は
+    clip の実装を素通りさせるので、同じ物差しを profile を替えてもう 1 度当てる。
+    """
+    for shape in (SQUARE, TRIANGLE):
+        svg = _render(shape, texture, profile="compat")
+        body = _surface_body(svg)
+        assert "clip-path" not in body
+        instruction = Instruction.model_validate(
+            dict(shape, weight="pen", filled=False, surface={**BASE_SURFACE, "texture": texture})
+        )
+        contour = _surface_contour(
+            instruction, CANVAS, render_seed=12345, ins_idx=0, mark_idx=0
+        )
+        points = _ink_points(body)
+        assert len(points) >= 200, len(points)
+        excursion = max(_distance_outside(p, contour) for p in points)
+        assert excursion <= CANVAS.unit * 0.02, (texture, excursion)

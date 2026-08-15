@@ -6,7 +6,7 @@
   "schema_version": "0.1.0",
   "color_map_digest": "065211c7811816e73749afd5538f0754",
   "frozen_at": "2026-08-14",
-  "commit": "f793323560ebc5b7ffec574a4ef0e47e2fa7e88e",
+  "commit": "e8c2a6f430caf18f8d8fbb3606db7a181abbd1c2",
   "reason": "the ground is a support you can name. The support a work is made on was drawn by a mechanism chosen by profile -- a `feTurbulence` rectangle for `display`, a scatter of nine dots for `editable` and `compat` -- so the same work came out on a different sheet depending on which file you exported, and the six materials differed only in the shape of that noise. All seven supports are now tiled `<pattern>` layers built from what the support physically is: kozo fibre and the marks of the su for washi, the passes of a brush and their tide lines for an ink wash, ridges and the charcoal caught on them, a plain weave with its slubs for canvas, an even tooth and the formation clouds for drawing paper, and the rocker's criss-crossing lattices on a black plate for mezzotint. A pattern is neither a filter nor a clip path, so all three profiles carry the same one and the ground layer is byte-identical across them. `canvas` and `drawing_paper` are new values, and the two `C-ground-*` cases holding them are new; the eleven ground cases that carried a material other than `plain` all move because the mechanism under them was replaced. `C-ground-plain` does not move and must not: asking for no ground is not asking for a ground, and every case in this corpus without a ground is byte-identical.",
   "changed_from_previous": [
     "C-ground-canvas",
@@ -14727,8 +14727,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "869b6c4bf9882260c5545484dbcac16e",
-      "bytes": 35048,
+      "digest": "219eb575e8f2da621584038debd19c3e",
+      "bytes": 35045,
       "counts": {
         "path": 1,
         "polyline": 24,
@@ -14810,8 +14810,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "1d27f1a180bcffccbdb8409ecb93bbbd",
-      "bytes": 24853,
+      "digest": "75cd8c683db9bd2d17bf6228de34da47",
+      "bytes": 24850,
       "counts": {
         "path": 1,
         "polyline": 24,
@@ -15059,8 +15059,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "5411348890736a60ecdaf4cd9b08493c",
-      "bytes": 24853,
+      "digest": "5519b637c9d0f1f7a1dd6be99e014fdd",
+      "bytes": 24850,
       "counts": {
         "path": 1,
         "polyline": 24,
@@ -15308,7 +15308,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "2c78c8190982a2e903bab66556fa4e03",
+      "digest": "1af3affdd21ea8f1826edd04ef2db022",
       "bytes": 24855,
       "counts": {
         "path": 1,
@@ -15391,8 +15391,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "1e0b40f21f0b7cc3af062173ed79e9d1",
-      "bytes": 24843,
+      "digest": "b9fdf9c08dc4029269dc99625954239f",
+      "bytes": 24840,
       "counts": {
         "path": 1,
         "polyline": 24,
@@ -15474,8 +15474,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "c81b130bb85980d1b8c82f79d864bcea",
-      "bytes": 24843,
+      "digest": "07b1f148d5a7fef8d24a82483d0e87ed",
+      "bytes": 24840,
       "counts": {
         "path": 1,
         "polyline": 24,

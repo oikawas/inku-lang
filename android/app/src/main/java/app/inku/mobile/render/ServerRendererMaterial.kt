@@ -156,11 +156,23 @@ internal object ServerRendererMaterial {
     fun contactField(t: Double, seed: Long): Double =
         0.62 * valueNoise1d(t, seed) + 0.38 * valueNoise1d(t * 2.7 + 13.1, seed + 977L)
 
+    // Paper-contact decisions share the SVG's six-decimal length lattice. A libm ULP is far
+    // below this precision, but before engine 29 it could add a sample, move the
+    // sample-derived quantile, and replace a whole fragment. What is rounded is the
+    // counting, not the coordinates: rounding where the ink goes would move the drawing.
+    internal const val CONTACT_LENGTH_QUANTUM = 6
+
     /**
-     * Paper-contact decisions share the SVG's six-decimal length lattice (engine 29).
-     * At engine 28 this is the identity: the lattice arrives with the next stage.
+     * Round to [CONTACT_LENGTH_QUANTUM] decimals the way the server's `round(value, 6)`
+     * does -- half-to-even on the exact binary value, not on its printed form.
+     * `Math.round(value * 1e6) / 1e6` is half-away-from-zero and disagrees; BigDecimal
+     * over the exact double reproduces CPython bit for bit (measured over 4,000 values
+     * spanning the ranges this sees, 0 mismatches).
      */
-    fun quantiseContactLength(value: Double): Double = value
+    fun quantiseContactLength(value: Double): Double =
+        java.math.BigDecimal(value)
+            .setScale(CONTACT_LENGTH_QUANTUM, java.math.RoundingMode.HALF_EVEN)
+            .toDouble()
 
     /**
      * Walk a polyline and emit a point every `step` px of arc length.

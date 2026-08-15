@@ -28,6 +28,7 @@ ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.
 ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.json"
 ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.json"
 ENGINE_33_MANIFEST = SERVER_ROOT / "reference" / "render-engine-33" / "manifest.json"
+ENGINE_34_MANIFEST = SERVER_ROOT / "reference" / "render-engine-34" / "manifest.json"
 
 
 def _generator():
@@ -312,11 +313,11 @@ def test_engine_34_moves_only_the_ground_cases() -> None:
     すべて changed に数えられるので、判別力を持つのは残りの 11 件と、
     動かなかった 575 件のほうである。
 
-    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
-    いる実装ではなく別の実装の記録になる。
+    ⚠ engine 35 が出たので、物差しは現行 manifest から engine 34 の凍結 manifest へ
+    移した（engine 33 の検査と同じ形）。版の一致は engine 35 の検査が見る。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "34" == current_render_engine().version
+    manifest = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "34"
     assert set(manifest["changed_from_previous"]) == ENGINE_34_GROUND_CASES
     assert "C-ground-plain" not in ENGINE_34_GROUND_CASES
     previous = json.loads(ENGINE_33_MANIFEST.read_text(encoding="utf-8"))["cases"]
@@ -328,6 +329,109 @@ def test_engine_34_moves_only_the_ground_cases() -> None:
         assert case["digest"] == previous[case_id]["digest"], case_id
         carried += 1
     assert carried == 575
+
+
+# 平行線・交差線を持つ 9 件。**case 名ではなく
+# `input.score.instructions[].surface.texture` で数えた** —— 名前で数えると
+# `C-ground-ink_wash` `C-ground-washi` `C-groundseed-auto-washi` が `wash` に
+# 混ざり、薄墨の 6 件が 8 件に見える。9 件とも `square` で、9 件とも
+# `spacing_gradient` は `none` である (2026-08-15 実測)。
+ENGINE_35_HATCH_CASES = {
+    "C-display-surface-hatch-pen",
+    "C-surface-hatch-pen",
+    "C-surface-hatch-pencil",
+    "E-wild-surface-hatch-pen",
+    "E-wild-surface-hatch-pencil",
+    "C-surface-crosshatch-pen",
+    "C-surface-crosshatch-pencil",
+    "E-wild-surface-crosshatch-pen",
+    "E-wild-surface-crosshatch-pencil",
+}
+# 薄墨の 6 件。作者は 2026-08-14 に「薄墨は縞に見える」とも裁定したが、
+# **それは別契約である**（あるべき形の現物がまだ 1 つも無い）。engine 35 が
+# 薄墨に触っていないことを、動かなかった側から明示的に留める。
+ENGINE_35_WASH_CASES = {
+    "C-display-surface-wash-pen",
+    "C-surface-wash-pen",
+    "C-surface-wash-pencil",
+    "E-wild-surface-wash-pen",
+    "E-wild-surface-wash-pencil",
+    "G-fade-surface-edge",
+}
+
+
+def test_engine_35_moves_only_the_hatch_cases() -> None:
+    """engine 35 が動かしたのは、平行線・交差線を持つ 9 件だけである。
+
+    行を輪郭で切った版なので、**面の質感が hatch / crosshatch でない 579 件は
+    バイト一致するのが正しい**。1 件でも動いていたら、切る処理が他の枝へ
+    伸びている（`_scanline_segments` を触ると薄墨と塗りが道連れになる）。
+
+    新規 ID は 1 件も無い。**したがってこの 9 件は全部が判別力を持つ** ——
+    地の版 (engine 34) と違い、changed の側も測れる版である。
+
+    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
+    いる実装ではなく別の実装の記録になる。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "35" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_35_HATCH_CASES
+    previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_35_HATCH_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 579
+
+
+def test_engine_35_leaves_the_wash_cases_alone() -> None:
+    """薄墨の 6 件は前の版とバイト一致する。
+
+    上の検査に含まれてはいるが、**裁定 1（薄墨は縞に見える）が別契約である**
+    ことをここで明示的に留める。薄墨に同じ切り方を当てた実装は、579 件の中に
+    紛れずにこの 1 本で落ちる。
+    """
+    manifest = _manifest()
+    previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    checked = 0
+    for case_id in sorted(ENGINE_35_WASH_CASES):
+        assert case_id in manifest["cases"], case_id
+        assert manifest["cases"][case_id]["digest"] == previous[case_id]["digest"], case_id
+        checked += 1
+    assert checked == 6
+    assert not ENGINE_35_WASH_CASES & ENGINE_35_HATCH_CASES
+
+
+def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:
+    """動いた 9 件でも、間隔は 1 つも動いていない。
+
+    作者の裁定 3 は「図形の中に収めたとき、線の引き方は規則的なまま残す」で
+    ある。**間隔の値は `hatch-spacing-*` として class に出るので、裁定は
+    コーパスからも読める** —— digest が動いたことと、間隔が動いたことは別の
+    量である。`C-surface-hatch-pen` は起点 `189fedc7` でも 21.250 だった。
+    """
+    manifest = _manifest()
+    previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    for case_id in sorted(ENGINE_35_HATCH_CASES):
+        now = {
+            value
+            for entry in manifest["cases"][case_id]["classes"]
+            for value in re.findall(r"hatch-spacing-[0-9.]+", entry)
+        }
+        before = {
+            value
+            for entry in previous[case_id]["classes"]
+            for value in re.findall(r"hatch-spacing-[0-9.]+", entry)
+        }
+        assert now and now == before, (case_id, sorted(before), sorted(now))
+    assert "hatch-spacing-21.250" in {
+        value
+        for entry in manifest["cases"]["C-surface-hatch-pen"]["classes"]
+        for value in re.findall(r"hatch-spacing-[0-9.]+", entry)
+    }
 
 
 def test_engine_32_cases_match_the_current_renderer() -> None:

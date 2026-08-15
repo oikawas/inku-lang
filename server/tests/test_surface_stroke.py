@@ -90,7 +90,16 @@ def _current_cases() -> dict[str, dict]:
 
 
 def _surface_body(svg: str) -> str:
-    match = re.search(r'<g id="surface_000_000_[a-z_]+">(.*?)</g>', svg, flags=re.S)
+    """面の群の中身。
+
+    ⚠ 群に属性が 1 つ増えただけで空を返してはならない。`id` の前に属性が付くと
+    (svgwrite は属性を名前順に書くので `clip-path` は `id` の前に来る) 古い形の
+    正規表現は 1 文字も拾わず、墨を数える検査が全部「墨が無い」で落ちていた ——
+    どれも赤くはなるが、赤の理由が実装ではなく道具になる。
+    """
+    match = re.search(
+        r'<g[^>]*id="surface_000_000_[a-z_]+"[^>]*>(.*?)</g>', svg, flags=re.S
+    )
     return match.group(1) if match else ""
 
 

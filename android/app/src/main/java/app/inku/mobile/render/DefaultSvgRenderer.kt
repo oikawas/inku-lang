@@ -195,7 +195,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * Math.PI * r, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialCircleOutline(ins, attrs, cx, cy, r, unit)
@@ -239,7 +245,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = approxPerimeter, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)
@@ -284,7 +296,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * (w + h), center = (x + w / 2.0) to (y + h / 2.0), renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialRectOutline(ins, attrs, x, y, w, h, unit)
@@ -2337,14 +2355,13 @@ class DefaultSvgRenderer(
         }
 
         if (usesMaterialOutline(weight)) {
-            if (wild) {
-                val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-                val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
-                val performed = stroke.samples.map { it.x to it.y }
-                sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
-            } else {
-                sb.append(materialArcOutline(ins, attrs, cx, cy, r, startDeg, endDeg, unit))
-            }
+            // engine 28: the band's own samples, not the ideal arc. The geometric helper
+            // stayed on `r + offset` and was left behind whenever the ink wandered, which
+            // is the ghost the author saw beside the mark.
+            val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
+            val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
+            val performed = stroke.samples.map { it.x to it.y }
+            sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
         }
 
         sb.append("</g>")

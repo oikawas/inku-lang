@@ -143,8 +143,14 @@ internal object ServerRendererStyle {
         )
     }
 
+    // engine 28: a null dash strips the body's own broken quality (the tool's
+    // `textureDash`, e.g. pencil "1,3") instead of inheriting it. While this
+    // helper always overwrote the value there was nothing to strip; now that
+    // contact decides where the outline exists, an inherited pattern would cut
+    // the fragments a second time on a fixed cadence -- exactly the regularity
+    // the fragments are there to remove.
     fun outlineAttrs(attrs: SvgAttrs, strokeWidth: Double, opacity: Double, dash: String?): SvgAttrs {
-        return attrs.copy(strokeWidth = strokeWidth, strokeOpacity = opacity, fill = "none", fillOpacity = null, dash = dash ?: attrs.dash)
+        return attrs.copy(strokeWidth = strokeWidth, strokeOpacity = opacity, fill = "none", fillOpacity = null, dash = dash)
     }
 
     fun strokeWidth(weight: String, unit: Double, thinness: String? = null): Double {

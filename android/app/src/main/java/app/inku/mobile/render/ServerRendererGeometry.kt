@@ -136,15 +136,28 @@ internal object ServerRendererGeometry {
         return kotlin.math.max(representativeSizePx(ins, width, height, unit), unit * 0.02)
     }
 
+    // The wander, unlike the bleed, is measured in stroke widths (engine 28).
+    // It is a property of the tool meeting the paper, not of how big the figure
+    // is: scaling it by the figure made a large arc leave its own line by eleven
+    // widths while a small one stayed on it, because the same 8% of a radius is
+    // invisible under a brush and a different line under a pencil. The
+    // vocabulary is unchanged (fine/medium/broad); only the ruler moved.
+    // `PRIMITIVE_AMP_GAIN` is the server's per-primitive calibration hook and is
+    // empty there, so every primitive multiplies by 1.0.
+    internal val amplitudeWidths = mapOf("fine" to 0.35, "medium" to 0.6, "broad" to 2.0)
+
     fun amplitudePx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val strokeWidthPx = ServerRendererStyle.strokeWidth(
+            ins.optString("weight", "pen"),
+            unit,
+            ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        )
         val rep = clampedRepresentativePx(ins, width, height, unit)
         val ampStr = variation.optString("amplitude", "medium")
-        val ratio = when (ampStr) {
-            "fine" -> 0.025
-            "broad" -> 0.18
-            else -> 0.08
-        }
-        return kotlin.math.min(ratio * rep, 0.40 * rep)
+        val amp = amplitudeWidths[ampStr] ?: amplitudeWidths.getValue("medium")
+        // The representative-size clamp stays: it is the safety valve that keeps
+        // a figure smaller than its own mark from wandering further than it is wide.
+        return kotlin.math.min(amp * strokeWidthPx, 0.40 * rep)
     }
 
     fun blurStdPx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {

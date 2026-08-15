@@ -138,4 +138,83 @@ class ASpreadKeepsItsFormTest {
         assertEquals("a square canvas leaves the grid's region as stated", squareW, squareH, 1e-6)
         assertEquals("and that region is 0.4 of the paper, three cells wide", 300.0, squareW, 1e-6)
     }
+
+    private fun anchorsFor(json: String, canvas: CanvasSize): List<Pair<Double, Double>> {
+        val renderer = renderer()
+        return renderer.expandArrangement(JSONObject(json.trimIndent()), seed, canvas, seed)
+            .map { renderer.anchor(it) }
+    }
+
+    /** T-81: the wave's cross-axis swing is the same pixels on either paper. */
+    @Test
+    fun testWaveCrossSpreadIsConstantInPixels() {
+        val wave = """
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.01,
+             "arrangement":{"layout":"horizontal","count":40,"path":"wave","margin":0.1}}
+        """
+        val (_, squarePx) = pxBounds(anchorsFor(wave, square), square)
+        val (_, obanPx) = pxBounds(anchorsFor(wave, oban), oban)
+        assertTrue("the wave must actually swing, or this gate measures nothing", squarePx > 100.0)
+        assertEquals(
+            "the wave's swing must be the same pixels on paper of either shape",
+            squarePx,
+            obanPx,
+            0.01,
+        )
+    }
+
+    /**
+     * T-82: the cluster's band keeps its own pixel extent on either paper.
+     *
+     * One cluster, so what is measured is the band and not the spread of the
+     * centres; `path` is left unstated so the centre comes from the scatter,
+     * which no canvas touches.
+     */
+    @Test
+    fun testClusterBandExtentIsConstantInPixels() {
+        val band = """
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.01,
+             "arrangement":{"layout":"scatter","count":24,"cluster_count":1,"density":"high","margin":0.1}}
+        """
+        val (squareW, squareH) = pxBounds(anchorsFor(band, square), square)
+        val (obanW, obanH) = pxBounds(anchorsFor(band, oban), oban)
+        assertTrue("the band must have an extent to measure", squareW > 10.0 && squareH > 10.0)
+        assertEquals("the band's width in pixels must not follow the paper", squareW, obanW, 0.01)
+        assertEquals("the band's height in pixels must not follow the paper", squareH, obanH, 0.01)
+    }
+
+    /**
+     * T-83: and the cluster's CENTRE is not levelled -- the reverse of T-82.
+     *
+     * R3 (author, 2026-08-12): where a cluster sits is not a shape. The centres
+     * are laid out proportionally, so the spread of the centres in normalized
+     * coordinates is the same on either paper -- which is what forwarding the
+     * canvas into that one pathPosition call would destroy. Without this half,
+     * an implementation that levels everything passes T-82.
+     */
+    @Test
+    fun testClusterCentresStayProportional() {
+        val centres = """
+            {"primitive":"circle","center":[0.5,0.5],"radius":0.01,
+             "arrangement":{"layout":"horizontal","count":6,"cluster_count":6,"path":"wave",
+                            "density":"low","margin":0.1}}
+        """
+        fun normalizedYSpread(canvas: CanvasSize): Double {
+            val ys = anchorsFor(centres, canvas).map { it.second }
+            return ys.maxOrNull()!! - ys.minOrNull()!!
+        }
+        val squareSpread = normalizedYSpread(square)
+        val obanSpread = normalizedYSpread(oban)
+        assertTrue("the centres must actually be spread out", squareSpread > 0.3)
+        // Six clusters of one member each: the band's own offsets are the only
+        // levelled part left in the reading, and at density "low" they are under
+        // 0.025 of the spread. Levelling the centres too would cut this by a
+        // third, which is far outside the tolerance.
+        assertEquals(
+            "the spread of the cluster centres must not follow the paper's shape",
+            squareSpread,
+            obanSpread,
+            squareSpread * 0.08,
+        )
+    }
 }

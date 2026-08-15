@@ -958,19 +958,22 @@ class DefaultSvgRenderer(
         val t = rhythmT(i, count, seed, rhythmSpacing)
         val jitterA = hash01(i, seed, "a") - 0.5
         val jitterB = hash01(i, seed, "b") - 0.5
+        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
         return when (path) {
             "diagonal" -> {
                 val x = margin + t * span
                 val y = 1.0 - margin - t * span
-                clamp01(x + jitterA * 0.08) to clamp01(y + jitterB * 0.08)
+                clamp01(x + jitterA * 0.08 * scaleX) to clamp01(y + jitterB * 0.08 * scaleY)
             }
             "wave" -> {
                 val x = margin + t * span
-                val y = 0.5 + sin(t * Math.PI * 2.0) * 0.22 + jitterB * 0.08
+                // The swing and the jitter are added first and levelled second:
+                // both are the shape of the path, so both cross the short side.
+                val y = 0.5 + (sin(t * Math.PI * 2.0) * 0.22 + jitterB * 0.08) * scaleY
                 clamp01(x) to clamp01(y)
             }
-            "top_to_bottom" -> clamp01(0.5 + jitterA * 0.30) to clamp01(margin + t * span)
-            "left_to_right" -> clamp01(margin + t * span) to clamp01(0.5 + jitterB * 0.30)
+            "top_to_bottom" -> clamp01(0.5 + jitterA * 0.30 * scaleX) to clamp01(margin + t * span)
+            "left_to_right" -> clamp01(margin + t * span) to clamp01(0.5 + jitterB * 0.30 * scaleY)
             "right_half" -> clamp01(0.56 + hash01(i, seed, "x") * (0.44 - margin)) to clamp01(margin + hash01(i, seed, "y") * span)
             else -> scatterPosition(i, margin, seed)
         }
@@ -1025,8 +1028,16 @@ class DefaultSvgRenderer(
         val along = centered * longSpan + (hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
         val cross = (hash01(i, seed, "cluster-cross-jitter") - 0.5) * crossSpan * (1.25 - 0.45 * kotlin.math.abs(centered))
         val bend = sin(localT * Math.PI) * (hash01(clusterIndex, seed, "cluster-bend") - 0.5) * radius * 0.55
-        val x = center.first + tx * along + nx * (cross + bend)
-        val y = center.second + ty * along + ny * (cross + bend)
+        // The band is built in a rotated frame, so the offset is rotated first
+        // and put on the short side second. Scaling `along` and `cross` before
+        // the rotation would turn the rotation itself into a shear on a canvas
+        // that is not square, and the band would come out neither its own shape
+        // nor the canvas's.
+        val offX = tx * along + nx * (cross + bend)
+        val offY = ty * along + ny * (cross + bend)
+        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
+        val x = center.first + offX * scaleX
+        val y = center.second + offY * scaleY
         return clamp01(x) to clamp01(y)
     }
 

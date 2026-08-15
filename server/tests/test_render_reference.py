@@ -387,6 +387,30 @@ def test_engine_35_moves_only_the_hatch_cases() -> None:
     assert carried == 579
 
 
+def test_engine_35_hatch_cases_match_the_current_renderer() -> None:
+    """動いた 9 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+
+    **⚠ 上の検査は manifest どうしの比較で、1 バイトも描き直さない。** 実測で
+    確かめた —— ハッチの描画を壊す摂動 7 本 (P-1〜P-7) を当てても、上の検査は
+    1 本も赤くならなかった。**あれは焼き直される記録であって、renderer の検査では
+    ない。** ここが「この版の 9 件は、いまの木が描くものと同じである」を測る。
+
+    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
+    やめた日にこの検査だけが古い呼び方で緑になる。
+    """
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_35_HATCH_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == (
+            manifest["cases"][case_id]["digest"]
+        ), case_id
+        checked += 1
+    assert checked == 9
+
+
 def test_engine_35_leaves_the_wash_cases_alone() -> None:
     """薄墨の 6 件は前の版とバイト一致する。
 

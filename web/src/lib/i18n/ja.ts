@@ -868,6 +868,8 @@ export const ja: LangPack = {
 	provenanceHintCanvas: '作品の縦横比。',
 	provenanceHintCanvasRatio: 'その比率の実数値。',
 	provenanceHintSvgSize: 'SVG のデータ量。演奏の重さの目安。',
+	provenanceHintSvgObjects: 'SVG が持つ図形の数。入れ物と注記（svg・defs・title・desc・metadata）は数えない。',
+	provenanceHintSvgPoints: 'その図形が持つ点の数。同じデータ量でも、点が多いほど線が細かい。',
 	provenanceHintRenderHash: 'この刷りの同一性 ID。同じ hash なら同じ絵。',
 	provenanceHintDescriptionHash: '記述の指紋。同じ言葉から来た作品を束ねる。',
 	provenanceHintRenderEngine: '演奏を行った engine の版。',

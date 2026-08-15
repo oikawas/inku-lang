@@ -849,6 +849,8 @@ export interface LangPack {
 	provenanceHintCanvas: string;
 	provenanceHintCanvasRatio: string;
 	provenanceHintSvgSize: string;
+	provenanceHintSvgObjects: string;
+	provenanceHintSvgPoints: string;
 	provenanceHintRenderHash: string;
 	provenanceHintDescriptionHash: string;
 	provenanceHintRenderEngine: string;

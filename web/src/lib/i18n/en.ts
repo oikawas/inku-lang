@@ -868,6 +868,8 @@ export const en: LangPack = {
 	provenanceHintCanvas: 'The proportion of the work.',
 	provenanceHintCanvasRatio: 'That proportion as a number.',
 	provenanceHintSvgSize: 'How heavy the SVG is — a rough measure of the performance.',
+	provenanceHintSvgObjects: 'How many shapes the SVG holds. Containers and notes (svg, defs, title, desc, metadata) are not shapes.',
+	provenanceHintSvgPoints: 'How many points those shapes are drawn from. The same size of file can be far finer lines.',
 	provenanceHintRenderHash: 'The identity of this impression. The same hash is the same picture.',
 	provenanceHintDescriptionHash: 'A fingerprint of the description. It ties together works that came from the same words.',
 	provenanceHintRenderEngine: 'The version of the engine that performed the score.',

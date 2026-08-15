@@ -1,6 +1,8 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.ReferenceCorpus
+import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -198,7 +200,8 @@ class ServerRendererCloudformAndRelationsTest {
         val resolveMethod = DefaultSvgRenderer::class.java.getDeclaredMethod(
             "resolvePerformanceScore",
             JSONArray::class.java,
-            java.lang.Long::class.java
+            java.lang.Long::class.java,
+            CanvasSize::class.java,
         ).apply { isAccessible = true }
 
         for (i in 0 until list.length()) {
@@ -209,7 +212,12 @@ class ServerRendererCloudformAndRelationsTest {
             val expectedScoreOut = item.getJSONObject("score_out")
 
             val instructionsIn = scoreIn.getJSONArray("instructions")
-            val actualResolvedIns = resolveMethod.invoke(renderer, instructionsIn, perfSeed) as JSONArray
+            val actualResolvedIns = resolveMethod.invoke(
+                renderer,
+                instructionsIn,
+                perfSeed,
+                CanvasAspects.sizeFor("square"),
+            ) as JSONArray
 
             val expectedInstructionsOut = expectedScoreOut.getJSONArray("instructions")
             assertEquals("Resolved instruction count mismatch for $name", expectedInstructionsOut.length(), actualResolvedIns.length())

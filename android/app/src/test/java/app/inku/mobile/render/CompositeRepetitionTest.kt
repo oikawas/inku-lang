@@ -1,6 +1,7 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -60,8 +61,9 @@ class CompositeRepetitionTest {
             "resolvePerformanceScore",
             JSONArray::class.java,
             java.lang.Long::class.java,
+            CanvasSize::class.java,
         ).apply { isAccessible = true }
-        val resolved = resolve.invoke(renderer, expanded, 17L) as JSONArray
+        val resolved = resolve.invoke(renderer, expanded, 17L, CanvasAspects.sizeFor("square")) as JSONArray
         for (index in 1 until resolved.length() step 2) {
             val member = resolved.getJSONObject(index)
             assertFalse(member.has("relation"))

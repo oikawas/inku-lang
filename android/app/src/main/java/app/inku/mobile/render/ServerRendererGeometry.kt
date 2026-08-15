@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.data.model.CanvasSize
 import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.floor
@@ -490,6 +491,72 @@ internal object ServerRendererGeometry {
             sb.append(" L ${fmt(variedPts[i].first)} ${fmt(variedPts[i].second)}")
         }
         return sb.toString()
+    }
+
+    /**
+     * Per-axis factors that put a normalized extent on the short edge.
+     *
+     * Engine 30 did this for a mark's own size; engine 31 does it for what the
+     * arrangement layer spreads -- the ring and the region -- and engine 32 for
+     * the cluster's band and a path's cross-axis spread. A normalized extent
+     * becomes pixels through the canvas width on x and the canvas height on y,
+     * so on a non-square canvas the same number means a different number of
+     * pixels per axis. Scaling each axis by `unit / that axis` makes both come
+     * out `unit` pixels, which is what keeps a ring round and a square region
+     * square.
+     */
+    fun shortSideScales(canvas: CanvasSize?): Pair<Double, Double> {
+        if (canvas == null) return 1.0 to 1.0
+        return shortSideScales(canvas.width.toDouble(), canvas.height.toDouble(), canvas.unit.toDouble())
+    }
+
+    fun shortSideScales(width: Double, height: Double, unit: Double): Pair<Double, Double> =
+        (unit / width) to (unit / height)
+
+    /**
+     * R3: the region's centre stays put, its extent goes to short-side units.
+     *
+     * The centre is deliberately left proportional -- "upper right" is the upper
+     * right of any canvas -- so only the half-extents are scaled.
+     */
+    fun regionInShortSideUnits(region: List<Double>, canvas: CanvasSize?): List<Double> {
+        val (sx, sy) = shortSideScales(canvas)
+        if (sx == 1.0 && sy == 1.0) {
+            // A square canvas has to come out byte-identical, and centre +/-
+            // half-extent does not round-trip in floating point: on the server
+            // [0.6, 0.18, 0.82, 0.4] moved y0 by 2.78e-17, enough to cross a
+            // rounding boundary downstream and change a frozen square case.
+            return region
+        }
+        val x0 = region[0]
+        val y0 = region[1]
+        val x1 = region[2]
+        val y1 = region[3]
+        val cx = (x0 + x1) / 2.0
+        val cy = (y0 + y1) / 2.0
+        val hx = (x1 - x0) / 2.0
+        val hy = (y1 - y0) / 2.0
+        return listOf(cx - hx * sx, cy - hy * sy, cx + hx * sx, cy + hy * sy)
+    }
+
+    /** Ramanujan's second approximation, which is what the server measures with. */
+    fun ellipsePerimeter(rx: Double, ry: Double): Double {
+        val a = kotlin.math.abs(rx)
+        val b = kotlin.math.abs(ry)
+        if (a + b <= 0.0) return 0.0
+        val d = (a - b) / (a + b)
+        val h = d * d
+        return Math.PI * (a + b) * (1.0 + 3.0 * h / (10.0 + sqrt(4.0 - 3.0 * h)))
+    }
+
+    /** 1:1 with renderer.py `_polygon_points`: sides clamped to 5..8, first vertex at -90 degrees. */
+    fun polygonPoints(cx: Double, cy: Double, r: Double, sides: Int, rotationDeg: Double): List<Pair<Double, Double>> {
+        val count = min(max(sides, 5), 8)
+        val start = Math.toRadians(rotationDeg - 90.0)
+        return (0 until count).map { i ->
+            val a = start + Math.PI * 2.0 * i / count
+            (cx + cos(a) * r) to (cy + sin(a) * r)
+        }
     }
 
     fun fillScanAngle(seed: Any): Double {

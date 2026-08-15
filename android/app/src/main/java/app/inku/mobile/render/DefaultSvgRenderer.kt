@@ -18,6 +18,10 @@ import org.json.JSONObject
 
 internal const val FILL_DAB_SAMPLES = 5
 internal const val FILL_DAB_MIN_TRAVEL = 0.90
+// Far past the row index a hatch layer can reach (80 rows, 4096 per layer), so
+// the second span of a row never lands on another row's stroke seed.
+internal const val HATCH_SPAN_SEED_STRIDE = 1048576
+
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
 
@@ -89,7 +93,7 @@ class DefaultSvgRenderer(
             renderSeed,
             canvas,
         )
-        val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed)
+        val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed, canvas)
         val structured = request.svgProfile == "editable"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
@@ -192,7 +196,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("circle", ins, attrs, regionFill, cx, cy, r, r, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -218,7 +222,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val outline = if (usesMaterialOutline(weight)) materialCircleOutline(ins, attrs, cx, cy, r, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -243,7 +247,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("ellipse", ins, attrs, regionFill, cx, cy, rx, ry, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -268,7 +272,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val outline = if (usesMaterialOutline(weight)) materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -293,7 +297,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else emptyList()
                     val body = renderBodyShape("square", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, x, y, w, h, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -319,7 +323,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val outline = if (usesMaterialOutline(weight)) materialRectOutline(ins, attrs, x, y, w, h, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -342,7 +346,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else points
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     // engine 15: this function had no material-outline call at all, so triangle
                     // and polygon were the only closed figures left bare across all five tools
@@ -372,7 +376,7 @@ class DefaultSvgRenderer(
                         points
                     }
                     val base = polygon(pts, fill, common)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     if (surfaceGroup.isNotEmpty()) """<g>$base$surfaceGroup</g>""" else base
                 }
             }
@@ -395,7 +399,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else rawPoints
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     // engine 15: this function had no material-outline call at all, so triangle
                     // and polygon were the only closed figures left bare across all five tools
@@ -421,7 +425,7 @@ class DefaultSvgRenderer(
                         rawPoints
                     }
                     val base = polygon(pts, fill, common)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
                     if (surfaceGroup.isNotEmpty()) """<g>$base$surfaceGroup</g>""" else base
                 }
             }
@@ -696,7 +700,10 @@ class DefaultSvgRenderer(
                 val atObj = ins.getJSONObject("at")
                 val reg = atObj.optJSONArray("region")
                 if (reg != null && reg.length() >= 4) {
-                    listOf(reg.getDouble(0), reg.getDouble(1), reg.getDouble(2), reg.getDouble(3))
+                    ServerRendererGeometry.regionInShortSideUnits(
+                        listOf(reg.getDouble(0), reg.getDouble(1), reg.getDouble(2), reg.getDouble(3)),
+                        canvas,
+                    )
                 } else {
                     listOf(margin, margin, 1.0 - margin, 1.0 - margin)
                 }
@@ -778,9 +785,10 @@ class DefaultSvgRenderer(
                     preserveSpace = preserveSpace,
                     seed = seed,
                     rhythmSpacing = rhythmSpacing,
+                    canvas = canvas,
                 )
             } else if (path != "none") {
-                pathPosition(i, count, margin, path, seed, rhythmSpacing)
+                pathPosition(i, count, margin, path, seed, rhythmSpacing, canvas)
             } else {
                 when (layout) {
                     "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
@@ -799,7 +807,16 @@ class DefaultSvgRenderer(
                         val declaredRadius = arr.optDouble("radius", 0.0)
                         val r = if (declaredRadius != 0.0) declaredRadius else 0.3
                         layoutCenter = cx to cy
-                        (cx + r * cos(a)) to (cy - r * sin(a))
+                        // engine 31: the stated radius is one length, so it has
+                        // to buy the same number of pixels on both axes. Written
+                        // straight, `r` in normalized coordinates becomes
+                        // `r * width` across and `r * height` down, and the ring
+                        // came out with the canvas's own aspect. The radius stays
+                        // the description's; only its trip to pixels is levelled.
+                        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
+                        val rx = r * scaleX
+                        val ry = r * scaleY
+                        (cx + rx * cos(a)) to (cy - ry * sin(a))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
                 }
@@ -925,24 +942,42 @@ class DefaultSvgRenderer(
         }
     }
 
-    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String, rhythmSpacing: String = "none"): Pair<Double, Double> {
+    /**
+     * Where member `i` of a path-following group lands, in normalized space.
+     *
+     * engine 32: the cross-axis spread goes on the short side. A path has two
+     * quantities and they are not the same kind. Along its line,
+     * `margin + t * span` says how much of the paper the group uses -- that is
+     * the paper's own length and stays proportional. Across it, the wave's swing
+     * and the jitter are the shape of the path, and written straight they became
+     * `0.22 * width` across and `0.22 * height` down, so the same wave came out
+     * with a swing of 220px on the square canvas and 44px on the pillar. Only
+     * the second is levelled here; `margin` and `span` are untouched.
+     *
+     * `canvas` is stated by every caller on purpose -- a default would let a new
+     * call site keep the old behaviour without saying so.
+     */
+    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String, rhythmSpacing: String, canvas: CanvasSize?): Pair<Double, Double> {
         val span = 1.0 - 2.0 * margin
         val t = rhythmT(i, count, seed, rhythmSpacing)
         val jitterA = hash01(i, seed, "a") - 0.5
         val jitterB = hash01(i, seed, "b") - 0.5
+        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
         return when (path) {
             "diagonal" -> {
                 val x = margin + t * span
                 val y = 1.0 - margin - t * span
-                clamp01(x + jitterA * 0.08) to clamp01(y + jitterB * 0.08)
+                clamp01(x + jitterA * 0.08 * scaleX) to clamp01(y + jitterB * 0.08 * scaleY)
             }
             "wave" -> {
                 val x = margin + t * span
-                val y = 0.5 + sin(t * Math.PI * 2.0) * 0.22 + jitterB * 0.08
+                // The swing and the jitter are added first and levelled second:
+                // both are the shape of the path, so both cross the short side.
+                val y = 0.5 + (sin(t * Math.PI * 2.0) * 0.22 + jitterB * 0.08) * scaleY
                 clamp01(x) to clamp01(y)
             }
-            "top_to_bottom" -> clamp01(0.5 + jitterA * 0.30) to clamp01(margin + t * span)
-            "left_to_right" -> clamp01(margin + t * span) to clamp01(0.5 + jitterB * 0.30)
+            "top_to_bottom" -> clamp01(0.5 + jitterA * 0.30 * scaleX) to clamp01(margin + t * span)
+            "left_to_right" -> clamp01(margin + t * span) to clamp01(0.5 + jitterB * 0.30 * scaleY)
             "right_half" -> clamp01(0.56 + hash01(i, seed, "x") * (0.44 - margin)) to clamp01(margin + hash01(i, seed, "y") * span)
             else -> scatterPosition(i, margin, seed)
         }
@@ -957,7 +992,8 @@ class DefaultSvgRenderer(
         density: String,
         preserveSpace: Boolean,
         seed: String,
-        rhythmSpacing: String = "none",
+        rhythmSpacing: String,
+        canvas: CanvasSize?,
     ): Pair<Double, Double> {
         val nClusters = clusterCount.coerceIn(1, count)
         val clusterIndex = i % nClusters
@@ -967,7 +1003,12 @@ class DefaultSvgRenderer(
         val center = if (path == "none") {
             scatterPosition(clusterIndex, centerMargin, seedForCluster(seed))
         } else {
-            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed), rhythmSpacing)
+            // R3 (author, 2026-08-12): where the cluster sits is not a shape, so
+            // the canvas is deliberately NOT forwarded to this one call.
+            // Forwarding it would level the centres too, and "the middle cluster
+            // is above the others" would stop meaning the same thing on paper of
+            // a different shape.
+            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed), rhythmSpacing, null)
         }
         val axisAngle = when (path) {
             "diagonal" -> -Math.PI / 4.0
@@ -991,8 +1032,16 @@ class DefaultSvgRenderer(
         val along = centered * longSpan + (hash01(i, seed, "cluster-along") - 0.5) * radius * 0.20
         val cross = (hash01(i, seed, "cluster-cross-jitter") - 0.5) * crossSpan * (1.25 - 0.45 * kotlin.math.abs(centered))
         val bend = sin(localT * Math.PI) * (hash01(clusterIndex, seed, "cluster-bend") - 0.5) * radius * 0.55
-        val x = center.first + tx * along + nx * (cross + bend)
-        val y = center.second + ty * along + ny * (cross + bend)
+        // The band is built in a rotated frame, so the offset is rotated first
+        // and put on the short side second. Scaling `along` and `cross` before
+        // the rotation would turn the rotation itself into a shear on a canvas
+        // that is not square, and the band would come out neither its own shape
+        // nor the canvas's.
+        val offX = tx * along + nx * (cross + bend)
+        val offY = ty * along + ny * (cross + bend)
+        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
+        val x = center.first + offX * scaleX
+        val y = center.second + offY * scaleY
         return clamp01(x) to clamp01(y)
     }
 
@@ -1808,6 +1857,84 @@ class DefaultSvgRenderer(
 
     private fun jsonString(value: String): String = JSONObject.quote(value)
 
+    /**
+     * The closed contour a surface follows, in pixels.
+     *
+     * Geometry itself: `variation` is deliberately not applied, so the profile
+     * makes no difference to where the surface sits. Only the cloudform needs
+     * the performance seed, because its contour is generated rather than derived
+     * from the stated numbers.
+     */
+    private fun surfaceContour(
+        ins: JSONObject,
+        width: Double,
+        height: Double,
+        unit: Double,
+        renderSeed: Long?,
+        insIdx: Int,
+        markIdx: Int
+    ): List<Pair<Double, Double>>? {
+        val primitive = ins.optString("primitive", "")
+        val center = ins.optJSONArray("center")
+        val size = ins.optJSONArray("size")
+        val position = ins.optJSONArray("position")
+        val hasRadius = ins.has("radius") && !ins.isNull("radius")
+        if (primitive == "circle" && center != null && hasRadius) {
+            val cx = px(center.optDouble(0, 0.5), width)
+            val cy = px(center.optDouble(1, 0.5), height)
+            val r = ins.optDouble("radius") * unit
+            return ServerRendererGeometry.circlePoints(
+                cx, cy, r, r, ServerRendererGeometry.strokeSampleCount(2.0 * Math.PI * r, unit)
+            )
+        }
+        if (primitive == "ellipse" && center != null && size != null) {
+            val cx = px(center.optDouble(0, 0.5), width)
+            val cy = px(center.optDouble(1, 0.5), height)
+            val (sw, sh) = ServerRendererGeometry.sizePx(size.optDouble(0), size.optDouble(1), width, height, unit)
+            val rx = sw / 2.0
+            val ry = sh / 2.0
+            return ServerRendererGeometry.circlePoints(
+                cx, cy, rx, ry,
+                ServerRendererGeometry.strokeSampleCount(ServerRendererGeometry.ellipsePerimeter(rx, ry), unit)
+            )
+        }
+        if (primitive in setOf("square", "triangle") && position != null && size != null) {
+            val x = px(position.optDouble(0), width)
+            val y = px(position.optDouble(1), height)
+            val (w, h) = ServerRendererGeometry.sizePx(size.optDouble(0), size.optDouble(1), width, height, unit)
+            return if (primitive == "square") {
+                listOf(x to y, (x + w) to y, (x + w) to (y + h), x to (y + h))
+            } else {
+                listOf((x + w / 2.0) to y, (x + w) to (y + h), x to (y + h))
+            }
+        }
+        if (primitive == "polygon" && center != null && hasRadius) {
+            val cx = px(center.optDouble(0, 0.5), width)
+            val cy = px(center.optDouble(1, 0.5), height)
+            return ServerRendererGeometry.polygonPoints(
+                cx, cy, ins.optDouble("radius") * unit,
+                if (ins.has("sides") && !ins.isNull("sides")) ins.optInt("sides") else 5,
+                ins.optDouble("rotation", 0.0)
+            )
+        }
+        if (primitive == "cloudform" && center != null && size != null) {
+            val cx = px(center.optDouble(0, 0.5), width)
+            val cy = px(center.optDouble(1, 0.5), height)
+            val (sw, sh) = ServerRendererGeometry.sizePx(size.optDouble(0), size.optDouble(1), width, height, unit)
+            val contour = ServerRendererGeometry.generateCloudformContour(
+                center = cx to cy,
+                size = sw to sh,
+                performanceSeed = seedForInstruction(ins, renderSeed),
+                instructionIndex = insIdx,
+                markIndex = markIdx,
+                variation = ins.optJSONObject("variation"),
+                weight = ins.optString("weight", "pen")
+            )
+            return ServerRendererGeometry.sampleClosedCatmullRom(contour.points)
+        }
+        return null
+    }
+
     private fun renderSurfaceVectors(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -1815,8 +1942,10 @@ class DefaultSvgRenderer(
         width: Double,
         height: Double,
         unit: Double,
-        renderSeed: Long? = null,
-        wild: Boolean = false
+        renderSeed: Long?,
+        wild: Boolean,
+        insIdx: Int,
+        markIdx: Int
     ): String {
         val surface = ins.optJSONObject("surface") ?: return ""
         val texture = surface.optString("texture", "none")
@@ -1832,6 +1961,13 @@ class DefaultSvgRenderer(
         val density = kotlin.math.max(0.02, surface.optDouble("density", 0.5))
 
         if (texture in setOf("hatch", "crosshatch")) {
+            // A surface belongs to the shape that carries it, so a row is cut
+            // where the shape ends instead of running the fixed 1.3x diagonal it
+            // was laid out on (engine 35). Nothing above this decision moves: the
+            // angle, the pitch, the gradient and the per-row jitter still decide
+            // where a row sits and how it leans -- only its two ends do.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
             val angle = ServerRendererGeometry.surfaceLineAngle(surface.optString("direction", "diagonal_falling"))
             val spacing = max(5.0, unit * (0.010 + (1.0 - density) * 0.025))
             val span = kotlin.math.hypot(w, h) * 1.3
@@ -1864,24 +2000,44 @@ class DefaultSvgRenderer(
                     val offset = i * spacing * gradient + ServerRendererGeometry.hashToUnit(i + layerIndex * 401 + 500, seedStr) * spacing * 0.12
                     val ox = lnx * offset
                     val oy = lny * offset
-                    val p1x = cx + ox - lux * span / 2.0
-                    val p1y = cy + oy - luy * span / 2.0
-                    val p2x = cx + ox + lux * span / 2.0
-                    val p2y = cy + oy + luy * span / 2.0
                     val lineWidth = max(0.45, unit * 0.0016)
                     val hatchClass = "hatch-spacing-%.3f".format(java.util.Locale.US, spacing * gradient)
                     val opacityStr = fmt(opacity)
                     val strokeWidthStr = fmt(lineWidth)
+                    // `lineSpans` returns entry/exit pairs, so a concave form gives
+                    // several spans and each one is drawn on its own; a row never
+                    // crosses the void, and a row that misses the contour draws
+                    // nothing. Not a clipPath: the compat profile emits none, and a
+                    // cut that only display can see is not a cut.
+                    val rowX = cx + ox
+                    val rowY = cy + oy
+                    val strokeIndex = i + layerIndex * 4096
+                    for ((spanIndex, rowSpan) in ServerRendererFill.lineSpans(contour, rowX to rowY, lux to luy).withIndex()) {
+                        val chord = rowSpan.second - rowSpan.first
+                        if (chord <= 0.0) continue
+                        val p1x = rowX + lux * rowSpan.first
+                        val p1y = rowY + luy * rowSpan.first
+                        val p2x = rowX + lux * rowSpan.second
+                        val p2y = rowY + luy * rowSpan.second
 
-                    if (!usesHand) {
-                        sb.append("""<line class="surface-stroke-v1 $hatchClass" x1="${fmt(p1x)}" y1="${fmt(p1y)}" x2="${fmt(p2x)}" y2="${fmt(p2y)}" stroke="$color" stroke-width="$strokeWidthStr" stroke-opacity="$opacityStr" stroke-linecap="round"/>""")
-                    } else {
-                        val countSamples = max(2, ServerRendererGeometry.strokeSampleCount(span, unit))
+                        if (!usesHand) {
+                            sb.append("""<line class="surface-stroke-v1 $hatchClass" x1="${fmt(p1x)}" y1="${fmt(p1y)}" x2="${fmt(p2x)}" y2="${fmt(p2y)}" stroke="$color" stroke-width="$strokeWidthStr" stroke-opacity="$opacityStr" stroke-linecap="round"/>""")
+                            continue
+                        }
+                        // The sample count follows the length actually travelled --
+                        // a two-pixel corner span given the whole diagonal's samples
+                        // is not the stroke the material engine was asked for.
+                        val countSamples = max(2, ServerRendererGeometry.strokeSampleCount(chord, unit))
                         val centerline = (0 until countSamples).map { k ->
                             val t = k.toDouble() / (countSamples - 1).toDouble()
                             (p1x + (p2x - p1x) * t) to (p1y + (p2y - p1y) * t)
                         }
-                        val strokeSeed = ServerRendererGeometry.fillStrokeSeed(seedStr, i + layerIndex * 4096)
+                        // The first span of a row keeps the row's own stroke seed,
+                        // so a convex shape performs each row exactly as before.
+                        // Later spans, which only a concave form has, take their own.
+                        val strokeSeed = ServerRendererGeometry.fillStrokeSeed(
+                            seedStr, strokeIndex + spanIndex * HATCH_SPAN_SEED_STRIDE
+                        )
                         val gridStep = gridStepPx(weight, unit)
                         val hatchStroke = ServerStrokeEngine.synthesizeAlong(centerline, lineWidth, weight, strokeSeed, closed = false, gridStep = gridStep, wild = wild)
                         val pathD = ServerStrokeEngine.contourStrokePath(hatchStroke)
@@ -2480,7 +2636,7 @@ class DefaultSvgRenderer(
             }
             var preparedHead = copyJsonObject(head)
             if (performanceSeed != null) {
-                preparedHead = resolveAtRegion(preparedHead, performanceSeed, index)
+                preparedHead = resolveAtRegion(preparedHead, performanceSeed, index, canvas)
             }
             val copies = expandArrangement(preparedHead, placementSeed, canvas, performanceSeed)
             val sourceAnchor = anchor(preparedHead)
@@ -2511,7 +2667,7 @@ class DefaultSvgRenderer(
         return result
     }
 
-    private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?): JSONArray {
+    private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?, canvas: CanvasSize?): JSONArray {
         if (renderSeed == null) return instructions
         val result = JSONArray()
         val resolved = mutableListOf<JSONObject>()
@@ -2522,7 +2678,7 @@ class DefaultSvgRenderer(
             if (arr != null && arr.optString("layout") == "grid") {
                 ins.remove("relation")
             } else {
-                ins = resolveAtRegion(ins, renderSeed, i)
+                ins = resolveAtRegion(ins, renderSeed, i, canvas)
                 ins = resolveRelation(ins, resolved, renderSeed, i)
             }
             resolved.add(ins)
@@ -2531,14 +2687,18 @@ class DefaultSvgRenderer(
         return result
     }
 
-    private fun resolveAtRegion(ins: JSONObject, seed: Long, index: Int): JSONObject {
+    internal fun resolveAtRegion(ins: JSONObject, seed: Long, index: Int, canvas: CanvasSize?): JSONObject {
         val at = ins.optJSONObject("at") ?: return ins
         val region = at.optJSONArray("region") ?: return ins
         if (region.length() < 4) return ins
-        val x0 = region.getDouble(0)
-        val y0 = region.getDouble(1)
-        val x1 = region.getDouble(2)
-        val y1 = region.getDouble(3)
+        val scaled = ServerRendererGeometry.regionInShortSideUnits(
+            listOf(region.getDouble(0), region.getDouble(1), region.getDouble(2), region.getDouble(3)),
+            canvas,
+        )
+        val x0 = scaled[0]
+        val y0 = scaled[1]
+        val x1 = scaled[2]
+        val y1 = scaled[3]
         val x = x0 + (x1 - x0) * ServerRendererGeometry.hash01(index, seed, "region-x")
         val y = y0 + (y1 - y0) * ServerRendererGeometry.hash01(index, seed, "region-y")
         return moveAnchorTo(ins, x to y, keepRelation = true)

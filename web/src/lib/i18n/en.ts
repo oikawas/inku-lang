@@ -476,7 +476,7 @@ export const en: LangPack = {
 	},
 	settingsRenderLimitGroupTooltips: {
 		capability:
-			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at drawing engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.',
+			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.',
 		legibility:
 			'The line between a number small enough to draw as stated and one too large to count, which is shown as a band instead.\n\nA faster machine does not make an eye faster, so this family is deliberately not tied to the one above.\n\nWhat should stay steady here is the look — how much ink sits in one cluster — rather than the threshold digits. Moving the band ends moves that look too.',
 		safety:

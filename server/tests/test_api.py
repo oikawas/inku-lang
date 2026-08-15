@@ -657,6 +657,58 @@ def test_current_user_batch_prompt_history_is_persisted(auth_context):
         db.delete_user(other_user["id"])
 
 
+def test_a_saved_work_records_how_its_catalog_was_asked_for(auth_context):
+    """[I-257]: `auto` resolves per description, so the resolved id cannot say it.
+
+    The batch resume puts back the conditions the last work was drawn under. For
+    every other condition the row already held the answer; for the catalog it
+    held only what `auto` happened to pick for that one line, which would pin a
+    resumed run to one catalog. The mode is stored beside the id, and a work
+    saved without one records NULL -- "older than the column", not "not auto".
+    """
+    headers, user, _group = auth_context
+    payload = {
+        "input": "月が昇る",
+        "ddl": "中心に円",
+        "score": {"instructions": []},
+        "svg": "<svg></svg>",
+        "at": 1_700_000_100_000,
+    }
+
+    asked_auto = client.post("/api/history", json={**payload, "catalog_mode": "auto"}, headers=headers)
+    assert asked_auto.status_code == 200
+    assert asked_auto.json()["catalog_mode"] == "auto"
+
+    chosen = client.post(
+        "/api/history",
+        json={**payload, "at": payload["at"] + 1, "catalog_mode": "fixed"},
+        headers=headers,
+    )
+    assert chosen.status_code == 200
+    assert chosen.json()["catalog_mode"] == "fixed"
+
+    # A caller that has never heard of the field is not recorded as "fixed".
+    # The response drops null fields (response_model_exclude_none), so absent
+    # here is the shape null takes on the wire.
+    silent = client.post("/api/history", json={**payload, "at": payload["at"] + 2}, headers=headers)
+    assert silent.status_code == 200
+    assert silent.json().get("catalog_mode") is None
+
+    # And it survives the round trip through the listing, which is where the
+    # resume reads it: the work is fetched, not remembered from the response.
+    listed = client.get("/api/history", headers=headers, params={"limit": 100, "include_svg": "false"})
+    assert listed.status_code == 200
+    modes = {item["id"]: item.get("catalog_mode") for item in listed.json()["items"]}
+    assert modes[asked_auto.json()["id"]] == "auto"
+    assert modes[chosen.json()["id"]] == "fixed"
+    assert modes[silent.json()["id"]] is None
+
+    # The shared fixture refuses to delete a user who still has works.
+    db.delete_items(
+        user["id"],
+        [asked_auto.json()["id"], chosen.json()["id"], silent.json()["id"]],
+    )
+
 def test_current_user_instruction_caption_setting_is_persisted(auth_context):
     headers, _, _ = auth_context
     updated = client.patch("/api/auth/me/settings", headers=headers, json={"model_settings": {"instruction_caption_visible": False}})

@@ -298,3 +298,56 @@ def test_t6_the_draw_reaches_more_than_one_catalog(monkeypatch):
     }
     assert len(drawn) > 1
     assert REQUESTED not in drawn
+
+
+# --- I-257: the row remembers which of these two questions was asked ---------
+
+
+def _stored_work(headers: dict[str, str], history_id: str) -> dict:
+    """The saved work, read back through the listing the resume reads."""
+    listed = client.get("/api/history", headers=headers, params={"limit": 100, "include_svg": "false"})
+    assert listed.status_code == 200, listed.text
+    for item in listed.json()["items"]:
+        if item["id"] == history_id:
+            return item
+    raise AssertionError(f"the painted work is not in the listing: {history_id}")
+
+
+def _forget(headers: dict[str, str], history_id: str) -> None:
+    """The shared fixtures refuse to delete a user who still has works."""
+    me = client.get("/api/auth/me", headers=headers)
+    assert me.status_code == 200, me.text
+    db.delete_items(me.json()["id"], [history_id])
+
+
+def test_a_painted_work_records_auto_beside_the_catalog_auto_chose(monkeypatch, headers):
+    """The resolved id and the mode answer different questions.
+
+    `auto` reads every description anew, so the id on the row is what this one
+    line happened to get -- it cannot say the author let the server choose. The
+    batch resume needs the question, not only the answer, or an interrupted
+    `auto` run comes back pinned to whatever the last line resolved to.
+    """
+    _answer(monkeypatch, f'{{"catalog_id": "{ANSWERED}"}}')
+    painted = _paint(headers, catalog_mode="auto", save_history=True)
+    work = _stored_work(headers, painted["history_id"])
+
+    assert work["catalog_mode"] == "auto"
+    # Both are kept, and they are not the same fact: the id is the catalog this
+    # line was drawn in, the mode is what was asked for.
+    assert work["render_color_catalog_id"] == ANSWERED
+    assert ANSWERED != REQUESTED
+
+    _forget(headers, painted["history_id"])
+
+
+def test_a_painted_work_that_named_its_catalog_records_fixed(monkeypatch, headers):
+    calls = _counting_selector(monkeypatch, real=False)
+    painted = _paint(headers, save_history=True)
+    assert calls == []
+
+    work = _stored_work(headers, painted["history_id"])
+    assert work["catalog_mode"] == "fixed"
+    assert work["render_color_catalog_id"] == REQUESTED
+
+    _forget(headers, painted["history_id"])

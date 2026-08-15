@@ -93,6 +93,7 @@ export const en: LangPack = {
 	batchHistoryLabel: 'Batch description history',
 	batchHistoryPlaceholder: 'Select from history',
 	batchHistoryApply: 'Restore',
+	batchResumeBtn: 'Resume where it stopped',
 	colorCatalogAuto: 'From the description',
 	colorCatalogAutoSub: 'the server reads each description and picks',
 	colorCatalogRetired: 'retired',

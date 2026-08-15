@@ -42,6 +42,9 @@
 		actionDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		/** Set when the last run stopped before the end of its prompt. */
+		canResumeBatch: boolean;
+		onResumeBatch: () => void;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -78,6 +81,8 @@
 		actionDisabled,
 		error,
 		batchPromptHistory,
+		canResumeBatch,
+		onResumeBatch,
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
@@ -90,6 +95,8 @@
 	let batchScrollTop = $state(0);
 	let batchScrollLeft = $state(0);
 	let selectedHistoryPrompt = $state('');
+	let historyMenuOpen = $state(false);
+	let historyMenuWrapEl = $state<HTMLDivElement | null>(null);
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
 	function normalizePrompt(text: string): string {
 		return text.trim().replace(/\r\n/g, '\n');
@@ -101,9 +108,22 @@
 		void onRememberBatchPrompt(prompt);
 	}
 
-	function restoreSelectedHistoryPrompt() {
-		if (!selectedHistoryPrompt || batchRunning) return;
-		batchInput = selectedHistoryPrompt;
+	function restoreHistoryPrompt(prompt: string) {
+		historyMenuOpen = false;
+		if (!prompt || batchRunning) return;
+		selectedHistoryPrompt = prompt;
+		batchInput = prompt;
+	}
+
+	/** What a stored batch is called in the picker: its first line. */
+	function historyPromptLabel(prompt: string): string {
+		return prompt.split('\n')[0];
+	}
+
+	function closeHistoryMenuOnOutsideClick(event: MouseEvent) {
+		if (!historyMenuOpen) return;
+		if (historyMenuWrapEl?.contains(event.target as Node)) return;
+		historyMenuOpen = false;
 	}
 
 	function submitAndRemember() {
@@ -115,6 +135,11 @@
 		return `${input ?? '-'}→${output ?? '-'}tok`;
 	}
 </script>
+
+<svelte:window
+	onclick={closeHistoryMenuOnOutsideClick}
+	onkeydown={(event) => { if (event.key === 'Escape') historyMenuOpen = false; }}
+/>
 
 <div class="batch-label">
 	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong>{t().batchSectionHint}</span>
@@ -156,19 +181,39 @@
 {#if batchNonEmpty > 0 && !batchRunning}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 
 <!-- Restoring a past batch refills the input box, so the picker sits directly
-     under it rather than down with the run options. -->
+     under it rather than down with the run options.
+
+     A list of our own, not a native dropdown: how tall the browser opens one is
+     the browser's to decide, and fifty stored batches want a list bounded to
+     half the window with a bar to scroll it. Same shape as the aspect menu. -->
 {#if !batchRunning && batchPromptHistory.length > 0}
-	<div class="batch-history">
-		<select
-			bind:value={selectedHistoryPrompt}
+	<div class="batch-history" bind:this={historyMenuWrapEl}>
+		<button
+			type="button"
+			class="batch-history-trigger"
+			aria-haspopup="listbox"
+			aria-expanded={historyMenuOpen}
 			aria-label={t().batchHistoryLabel}
-			onchange={restoreSelectedHistoryPrompt}
+			onclick={() => (historyMenuOpen = !historyMenuOpen)}
 		>
-			<option value="">{t().batchHistoryPlaceholder}</option>
-			{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
-				<option value={prompt}>{prompt.split('\n')[0]}</option>
-			{/each}
-		</select>
+			<span class="batch-history-current">
+				{selectedHistoryPrompt ? historyPromptLabel(selectedHistoryPrompt) : t().batchHistoryPlaceholder}
+			</span>
+			<span class="batch-history-caret" aria-hidden="true">▾</span>
+		</button>
+		{#if historyMenuOpen}
+			<div class="batch-history-menu" role="listbox" aria-label={t().batchHistoryLabel}>
+				{#each batchPromptHistory as prompt, i (`${i}-${prompt}`)}
+					<button
+						type="button"
+						role="option"
+						aria-selected={prompt === selectedHistoryPrompt}
+						class:selected={prompt === selectedHistoryPrompt}
+						onclick={() => restoreHistoryPrompt(prompt)}
+					>{historyPromptLabel(prompt)}</button>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -190,7 +235,16 @@
 		/>
 	</div>
 {:else}
-	<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
+	<!-- Left of the paint button, and only while there is something to finish:
+	     the last run stopped part-way through the batch it was given. -->
+	<div class="batch-actions">
+		{#if canResumeBatch}
+			<button type="button" class="ghost-btn batch-resume-btn" onclick={onResumeBatch} disabled={actionDisabled}>
+				{t().batchResumeBtn}
+			</button>
+		{/if}
+		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
+	</div>
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
@@ -325,21 +379,87 @@
 	}
 	.batch-info { font-size: 11px; color: var(--fg3); }
 	.batch-history {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 5px;
 		flex-wrap: wrap;
 	}
-	.batch-history select {
+	.batch-history-trigger {
 		flex: 1;
 		min-width: min(220px, 100%);
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		padding: 4px 7px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
+		text-align: left;
+		cursor: pointer;
+	}
+	.batch-history-trigger:hover { background: var(--bg2); }
+	.batch-history-current {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.batch-history-caret { flex: 0 0 auto; color: var(--fg3); }
+	.batch-history-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		z-index: 80;
+		/* Half the window is the ceiling the author asked for; past it the list
+		   scrolls rather than growing. */
+		max-height: 50vh;
+		overflow: auto;
+		padding: 4px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r-lg);
+		background: var(--panel);
+		box-shadow: 0 10px 32px rgba(0,0,0,0.18);
+	}
+	.batch-history-menu button {
+		width: 100%;
+		display: block;
+		padding: 6px 8px;
+		border: none;
+		border-radius: var(--r);
+		background: transparent;
+		color: var(--fg);
+		font-family: inherit;
+		font-size: var(--btn-sm-font-size);
+		text-align: left;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		cursor: pointer;
+	}
+	.batch-history-menu button:hover { background: var(--bg2); }
+	.batch-history-menu button.selected {
+		background: var(--bg2);
+		box-shadow: inset 3px 0 0 var(--fg2);
+	}
+	.batch-actions {
+		display: flex;
+		align-items: stretch;
+		gap: 6px;
+	}
+	/* The paint button carries the row's top margin; the one beside it matches. */
+	.batch-actions .batch-resume-btn {
+		flex: 0 0 auto;
+		margin-top: 8px;
+	}
+	.batch-actions :global(.paint-btn.block) {
+		flex: 1;
+		width: auto;
 	}
 	.batch-sketch-body {
 		white-space: pre-wrap;

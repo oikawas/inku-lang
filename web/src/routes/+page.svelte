@@ -62,13 +62,21 @@
 	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
-	import { colorCatalogOverride } from '$lib/features/color-catalog/render';
+	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
 	import { loadPersistedSettings } from '$lib/features/persisted-settings';
 	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
+	import {
+		batchStoppedPartWay,
+		conditionsOfWork,
+		latestBatchWork,
+		linesToResume,
+		numberedBatchLines,
+		type NumberedLine
+	} from '$lib/features/batch/resume';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -124,7 +132,10 @@
 		if (Number.isNaN(stamp.getTime())) return null;
 		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
 	});
-	const BATCH_PROMPT_HISTORY_LIMIT = 20;
+	// Matches _BATCH_PROMPT_HISTORY_LIMIT in server/src/inku_server/db.py: the
+	// server cuts the list on both the read and the write, so the shorter of the
+	// two numbers is what the picker ever shows.
+	const BATCH_PROMPT_HISTORY_LIMIT = 50;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
 	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
@@ -390,6 +401,10 @@
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchPromptHistory = $state<string[]>([]);
+	// Set when the newest batch work says its run stopped before the end of the
+	// prompt it came from -- what the resume button offers to finish. Null the
+	// rest of the time, which is what withholds the button.
+	let batchResume = $state<{ prompt: string; lines: NumberedLine[]; runId: string | null; work: Iteration } | null>(null);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
 	// Which line the observer block is showing. Not batchActiveLine: that one is
@@ -1214,6 +1229,113 @@
 			batchPromptHistory = [];
 			console.warn('failed to load batch prompt history', e);
 		}
+	}
+
+	// ── Resuming a batch that stopped part-way ──────────────
+	// A page of works without their drawings is a few hundred kilobytes, so the
+	// two questions are asked at different depths. Whether to offer the button
+	// needs only the newest work carrying a batch number, and is asked every time
+	// the batch tab is shown; which lines are missing needs the whole run, and is
+	// asked once, after the button is pressed.
+	const BATCH_RESUME_PROBE_LIMIT = 20;
+	const BATCH_RESUME_SCAN_PAGE = 100;
+	const BATCH_RESUME_SCAN_MAX = 500;
+
+	async function fetchWorksPage(offset: number, limit: number): Promise<Iteration[]> {
+		const params = new URLSearchParams({
+			offset: String(offset),
+			limit: String(limit),
+			include_svg: 'false',
+		});
+		const r = await apiFetch(`/api/history?${params.toString()}`, { cache: 'no-store' });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		const data = await r.json() as { items?: Iteration[] };
+		return Array.isArray(data.items) ? data.items : [];
+	}
+
+	/** Whether the newest stored batch has lines the last run never reached. */
+	async function refreshBatchResume() {
+		const prompt = batchPromptHistory[0] ?? '';
+		if (!currentUser || !prompt) { batchResume = null; return; }
+		const lines = numberedBatchLines(prompt, (text) => !!pipelineDescription(text).trim());
+		if (lines.length === 0) { batchResume = null; return; }
+		try {
+			const work = latestBatchWork(await fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT));
+			batchResume = work && batchStoppedPartWay(lines, work)
+				? { prompt, lines, runId: work.batch_run_id ?? null, work }
+				: null;
+		} catch (e) {
+			batchResume = null;
+			console.warn('failed to check whether the last batch reached its end', e);
+		}
+	}
+
+	/** Every work of one batch run, paged back until the run has been walked past. */
+	async function collectBatchRunWorks(runId: string | null, need: number): Promise<Iteration[]> {
+		const collected: Iteration[] = [];
+		for (let offset = 0; offset < BATCH_RESUME_SCAN_MAX; offset += BATCH_RESUME_SCAN_PAGE) {
+			const page = await fetchWorksPage(offset, BATCH_RESUME_SCAN_PAGE);
+			if (page.length === 0) break;
+			const mine = page.filter((item) =>
+				typeof item.batch_line_number === 'number'
+				&& (runId === null || (item.batch_run_id ?? null) === runId));
+			collected.push(...mine);
+			// The run's works sit together, so a page without one means the listing
+			// has walked past it -- but only once one has been seen. Works made
+			// after the run sit above it, and a page of those is not the end.
+			if (mine.length === 0 && collected.length > 0) break;
+			if (collected.length >= need) break;
+			if (page.length < BATCH_RESUME_SCAN_PAGE) break;
+		}
+		return collected;
+	}
+
+	/** Put back the conditions the last work of the stopped run was drawn under. */
+	function applyBatchRunConditions(work: Iteration) {
+		const conditions = conditionsOfWork(work);
+		if (conditions.stage1Model) {
+			const ref = splitModelRef(conditions.stage1Model, availableModelCatalog);
+			if (ref.provider) stage1Provider = ref.provider;
+			stage1Model = ref.model;
+		}
+		if (conditions.stage2Model) {
+			const ref = splitModelRef(conditions.stage2Model, availableModelCatalog);
+			if (ref.provider) stage2Provider = ref.provider;
+			stage2Model = ref.model;
+		}
+		// `auto` reads each description anew, so a run made under it must resume
+		// under it -- the resolved id is what the last line happened to get, not
+		// what was asked for. A work older than the column records no mode, and
+		// then the resolved id is the best that was ever stored.
+		if (conditions.catalogMode === 'auto') colorCatalogSettings.selected = AUTO_CATALOG_ID;
+		else if (conditions.catalogId) colorCatalogSettings.selected = conditions.catalogId;
+		// Not conditional: a work with no prose was drawn with the layer off, and
+		// leaving the switch where it is would resume under other conditions.
+		sketchMode = sketchModeOf(conditions.sketchGrain);
+		if (conditions.wild !== null) wildSettings.set(conditions.wild);
+		if (conditions.canvasAspectId) canvasAspectId = normalizeCanvasAspectId(conditions.canvasAspectId);
+	}
+
+	async function resumeInterruptedBatch() {
+		const resume = batchResume;
+		if (!resume || loading || variationGridBusy) return;
+		let works: Iteration[];
+		try {
+			works = await collectBatchRunWorks(resume.runId, resume.lines.length);
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+			return;
+		}
+		const remaining = linesToResume(resume.lines, works, resume.runId);
+		// Nothing missing after all: the listing knows more than the probe did.
+		if (remaining.length === 0) { batchResume = null; return; }
+		applyBatchRunConditions(resume.work);
+		// The box is refilled with the whole batch, not with what is left of it:
+		// the resumed lines keep the numbers the prompt gave them, and the numbers
+		// are what the works are named by.
+		batchInput = resume.prompt;
+		batchResume = null;
+		await submit({ resumeLines: remaining });
 	}
 
 	function normalizeDemoSettings(settings: DemoSettings): DemoSettings {
@@ -3417,7 +3539,12 @@ if (unreadWords.length > 0) {
 		void submit();
 	}
 
-	async function submit() {
+	/**
+	 * `resumeLines` finishes a batch that stopped part-way: the lines it names are
+	 * painted in place of the whole box, each keeping the number the prompt gave
+	 * it. Everything else about the run is unchanged.
+	 */
+	async function submit(options: { resumeLines?: NumberedLine[] } = {}) {
 		if (!canSubmit || loading || variationGridBusy) return;
 		resetTargetScopedState();
 		try {
@@ -3533,10 +3660,13 @@ if (unreadWords.length > 0) {
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => pipelineDescription(item.input).trim());
+				// Resuming paints the lines the stopped run never reached, each keeping
+				// the number the prompt gave it; an ordinary run paints the whole box.
+				const paintLines = options.resumeLines ?? lines;
 				// The report's `total` is how many lines the batch had. batchTotal drives
 				// the progress readouts and is re-pointed at each retry round, so the
 				// report keeps its own copy.
-				const batchLineTotal = lines.length;
+				const batchLineTotal = paintLines.length;
 				batchTotal = batchLineTotal; outputTab = 'canvas';
 				let batchInterrupted = false;
 
@@ -3590,15 +3720,15 @@ if (unreadWords.length > 0) {
 					);
 				};
 
-				for (let i = 0; i < lines.length; i++) {
+				for (let i = 0; i < paintLines.length; i++) {
 					if (submitStopRequested) { batchInterrupted = true; break; }
 					batchCurrent = i + 1;
-					const outcome = await paintBatchLine(lines[i]);
+					const outcome = await paintBatchLine(paintLines[i]);
 					if (outcome === null) { batchInterrupted = true; break; }
 					if (outcome !== true) {
 						batchFailures = [
 							...batchFailures,
-							{ line: lines[i].line, input: lines[i].input, message: outcome },
+							{ line: paintLines[i].line, input: paintLines[i].input, message: outcome },
 						];
 					}
 					publishFailureReport();
@@ -3642,6 +3772,9 @@ if (unreadWords.length > 0) {
 				elapsedTotalMs = Date.now() - _timerStart;
 				await refreshHistoryAfterRun();
 				publishFailureReport();
+				// A run that was stopped leaves lines to finish; one that reached the
+				// end leaves none. Either way the answer is now different.
+				await refreshBatchResume();
 			}
 		} catch (e) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
@@ -4187,7 +4320,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, catalog_mode: it.catalog_mode ?? (colorCatalogSettings.isAuto ? 'auto' : 'fixed'), render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -6369,6 +6502,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		} else if (wasMode === 'batch') {
 			batchAutoFollowLatest = false;
 		}
+		// Asked on arrival rather than kept up to date: works are saved from other
+		// windows too, and the answer is only ever read here.
+		if (mode === 'batch') void untrack(refreshBatchResume);
 	});
 </script>
 
@@ -6456,6 +6592,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{liveMs}
 						batchFailureReport={batchFailureReportStore.report}
 						{batchPromptHistory}
+						canResumeBatch={batchResume !== null}
+						onResumeBatch={() => void resumeInterruptedBatch()}
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}

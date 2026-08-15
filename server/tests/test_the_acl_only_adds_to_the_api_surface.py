@@ -97,7 +97,11 @@ ADDED_SCHEMAS = {
 # honest: any OTHER movement in HistoryItem, and any movement at all in the
 # remaining 81, still fails.
 CHANGED_SCHEMAS = {
-    "HistoryItem": {"added": {"shared"}, "removed": set()},
+    # [I-257] adds `catalog_mode` here: how the catalog was asked for, beside
+    # the id it resolved to. `auto` reads each description anew, so the id
+    # alone cannot say what was asked for.
+    "HistoryItem": {"added": {"shared", "catalog_mode"}, "removed": set()},
+    "HistoryPostBody": {"added": {"catalog_mode"}, "removed": set()},
     # Contract 2: the client asks for the second thumbnail size only where the
     # server keeps it, and /api/info is where it learns that.
     "AppInfoResponse": {"added": {"thumbnail_hidpi"}, "removed": set()},

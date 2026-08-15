@@ -103,6 +103,7 @@ test('T-63  the conditions are read off the work that was drawn last', () => {
 			stage1_model: 'nvidia:gemma-4',
 			stage2_model: 'nvidia:gemma-4',
 			render_color_catalog_id: 'sumi',
+			catalog_mode: 'fixed',
 			sketch_grain: 'coarse',
 			render_wild: true,
 			render_canvas_aspect_id: 'tate',
@@ -111,6 +112,7 @@ test('T-63  the conditions are read off the work that was drawn last', () => {
 			stage1Model: 'nvidia:gemma-4',
 			stage2Model: 'nvidia:gemma-4',
 			catalogId: 'sumi',
+			catalogMode: 'fixed',
 			sketchGrain: 'coarse',
 			wild: true,
 			canvasAspectId: 'tate',
@@ -126,9 +128,25 @@ test('T-63  a condition the work never recorded is not invented', () => {
 		stage1Model: null,
 		stage2Model: null,
 		catalogId: null,
+		catalogMode: null,
 		sketchGrain: null,
 		wild: null,
 		canvasAspectId: null,
 	});
 	assert.equal(conditionsOfWork({ render_wild: false }).wild, false);
+});
+
+test('T-66  a run made under auto says so, beside the catalog it resolved to', () => {
+	// [I-257]. `auto` reads each description anew, so the resolved id is what the
+	// last line happened to get. Both are kept: the mode says what was asked for,
+	// the id is still what that line was drawn in.
+	const auto = conditionsOfWork({ catalog_mode: 'auto', render_color_catalog_id: 'sumi' });
+	assert.equal(auto.catalogMode, 'auto');
+	assert.equal(auto.catalogId, 'sumi');
+});
+
+test('T-66  a work older than the column is not called "not auto"', () => {
+	// Null, not 'fixed'. Reading an absent column as a chosen catalog would tell
+	// the resume to pin every batch drawn before the column to one catalog.
+	assert.equal(conditionsOfWork({ render_color_catalog_id: 'sumi' }).catalogMode, null);
 });

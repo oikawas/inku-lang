@@ -2048,6 +2048,10 @@ def _paint_events(
             tokens_in=(interpret_detail_result.tokens_in or 0) + (compose_detail.tokens_in or 0) or None,
             tokens_out=(interpret_detail_result.tokens_out or 0) + (compose_detail.tokens_out or 0) or None,
             catalog_id=artifact_catalog_id,
+            # The request's own word, not the resolved id: `auto` picks a
+            # different catalog for every description, so the id alone cannot
+            # say the author let the server read the words.
+            catalog_mode=req.catalog_mode,
             save_artifacts=save_artifacts,
             render_metadata=render_metadata,
             source_text=req.history_source_text or req.description,

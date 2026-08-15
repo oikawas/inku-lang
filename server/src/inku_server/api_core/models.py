@@ -26,6 +26,9 @@ class HistoryPostBody(BaseModel):
     tokens_in: int | None = None
     tokens_out: int | None = None
     catalog_id: str | None = None
+    # How the catalog was asked for (fixed / auto / random), kept beside the
+    # resolved id so a work can say whether the author chose one.
+    catalog_mode: str | None = None
     ddl_version: str | None = None
     ddl_engine_version: str | None = None
     render_build_number: str | None = None

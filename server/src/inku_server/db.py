@@ -113,6 +113,15 @@ class HistoryRow(Base):
     tokens_in    = Column(Integer,    nullable=True)
     tokens_out   = Column(Integer,    nullable=True)
     catalog_id   = Column(String,     nullable=True)
+    # How the catalog was asked for, not which one came back: `auto` resolves to
+    # a different catalog for every description, so the resolved id below cannot
+    # say whether the author chose one or let the server read the words. Null on
+    # every work saved before this column, which means "older than the field",
+    # never "was not auto".
+    # ⚠ Deliberately absent from the render-hash payloads: the hash is the
+    # identity of a drawing, and adding a term would rebuild it for every work
+    # already stored.
+    catalog_mode = Column(String,     nullable=True)
     ddl_version = Column(String, nullable=True)
     ddl_engine_version = Column(String, nullable=True)
     render_build_number = Column(String, nullable=True)
@@ -383,6 +392,7 @@ _UNSET = object()
 _HISTORY_COLUMN_MIGRATIONS = {
     "user_id": "ALTER TABLE history ADD COLUMN user_id VARCHAR",
     "catalog_id": "ALTER TABLE history ADD COLUMN catalog_id VARCHAR",
+    "catalog_mode": "ALTER TABLE history ADD COLUMN catalog_mode VARCHAR",
     "ddl_version": "ALTER TABLE history ADD COLUMN ddl_version VARCHAR",
     "ddl_engine_version": "ALTER TABLE history ADD COLUMN ddl_engine_version VARCHAR",
     "stage1_prompt_digest": "ALTER TABLE history ADD COLUMN stage1_prompt_digest VARCHAR",
@@ -2498,6 +2508,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "tokens_in":    row.tokens_in,
         "tokens_out":   row.tokens_out,
         "catalog_id":   row.catalog_id,
+        "catalog_mode": row.catalog_mode,
         "render_hash":  row.render_hash,
         "render_hash_short": render_hash_short(row.render_hash),
         "trashed":      bool(row.trashed),
@@ -2771,6 +2782,7 @@ def add_item(item: dict) -> dict:
         stage1_prompt_base_digest=item.get("stage1_prompt_base_digest"),
         stage2_prompt_digest=item.get("stage2_prompt_digest"),
         tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
+        catalog_mode=item.get("catalog_mode"),
         ddl_version=item.get("ddl_version"), ddl_engine_version=item.get("ddl_engine_version"),
         render_build_number=item.get("render_build_number"),
         render_color_profile=json.dumps(item.get("render_color_profile"), ensure_ascii=False) if item.get("render_color_profile") is not None else None,

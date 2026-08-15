@@ -58,3 +58,31 @@ test('T-65  the answer is asked for again when a run ends', () => {
 	assert.match(PAGE, /await refreshBatchResume\(\);/, 'the resume state is not refreshed after a run');
 	assert.match(PAGE, /if \(mode === 'batch'\) void untrack\(refreshBatchResume\)/, 'the batch tab does not ask on arrival');
 });
+
+test('T-66  resuming an auto run resumes under auto, not under what it resolved to', () => {
+	// [I-257]. The order matters: testing the resolved id first would pin the
+	// catalog before the mode was ever looked at.
+	assert.match(PAGE, /if \(conditions\.catalogMode === 'auto'\) colorCatalogSettings\.selected = AUTO_CATALOG_ID;/);
+	assert.match(PAGE, /else if \(conditions\.catalogId\) colorCatalogSettings\.selected = conditions\.catalogId;/);
+	assert.ok(
+		PAGE.indexOf("conditions.catalogMode === 'auto'") < PAGE.indexOf('else if (conditions.catalogId)'),
+		'the resolved id is tested after the catalog it resolved to, so auto can never win',
+	);
+});
+
+test('T-66  the mode reaches the row it is read from', () => {
+	// A field the client never sends is a column that is always null, and the
+	// gate above would then be green while nothing was ever restored.
+	const DB = readFileSync(
+		fileURLToPath(new URL('../../../../server/src/inku_server/db.py', import.meta.url)),
+		'utf8',
+	);
+	const RENDER = readFileSync(
+		fileURLToPath(new URL('../../../../server/src/inku_server/api_core/routers/render.py', import.meta.url)),
+		'utf8',
+	);
+	assert.match(DB, /^ {4}catalog_mode = Column\(String, +nullable=True\)$/m, 'the row has no column for it');
+	assert.match(DB, /"catalog_mode": "ALTER TABLE history ADD COLUMN catalog_mode VARCHAR"/, 'an existing database never gets the column');
+	assert.match(DB, /"catalog_mode": row\.catalog_mode,/, 'the column is stored but never handed back');
+	assert.match(RENDER, /catalog_mode=req\.catalog_mode,/, 'the paint route drops the mode on the way to the row');
+});

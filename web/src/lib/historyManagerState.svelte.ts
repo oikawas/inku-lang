@@ -43,6 +43,9 @@ export type HistoryItem = {
 	tokens_in?: number | null;
 	tokens_out?: number | null;
 	catalog_id?: string | null;
+	// How the catalog was asked for (fixed / auto / random). Absent on works
+	// saved before the column, which means "older than the field".
+	catalog_mode?: string | null;
 	render_build_number?: string | null;
 	render_color_profile?: Record<string, string> | null;
 	render_engine_id?: string | null;

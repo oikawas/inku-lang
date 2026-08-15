@@ -26,6 +26,7 @@ export type BatchWork = {
 	stage2_model?: string | null;
 	render_color_catalog_id?: string | null;
 	catalog_id?: string | null;
+	catalog_mode?: string | null;
 	sketch_grain?: string | null;
 	render_wild?: boolean | null;
 	render_canvas_aspect_id?: string | null;
@@ -130,6 +131,8 @@ export type BatchRunConditions = {
 	stage1Model: string | null;
 	stage2Model: string | null;
 	catalogId: string | null;
+	/** How the catalog was asked for, when the work records it: `auto` and the rest. */
+	catalogMode: string | null;
 	sketchGrain: string | null;
 	wild: boolean | null;
 	canvasAspectId: string | null;
@@ -148,6 +151,7 @@ export function conditionsOfWork(work: BatchWork): BatchRunConditions {
 		stage1Model: work.stage1_model ?? null,
 		stage2Model: work.stage2_model ?? null,
 		catalogId: work.render_color_catalog_id ?? work.catalog_id ?? null,
+		catalogMode: work.catalog_mode ?? null,
 		sketchGrain: work.sketch_grain ?? null,
 		wild: typeof work.render_wild === 'boolean' ? work.render_wild : null,
 		canvasAspectId: work.render_canvas_aspect_id ?? work.render_canvas_aspect ?? null,

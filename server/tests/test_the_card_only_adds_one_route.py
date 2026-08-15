@@ -46,6 +46,12 @@ ADDED_SCHEMAS = {"CardExportBody", "HistoryStateResponse"}
 # uses, mirrored here for the same reason. Any OTHER movement in a declared
 # schema, and any movement at all in an undeclared one, still fails.
 CHANGED_SCHEMAS = {
+    # [I-257]: a work records how its color catalog was asked for, beside the id
+    # it resolved to. `auto` reads each description anew, so the resolved id
+    # cannot say whether the author chose a catalog or let the server read the
+    # words -- which is what the batch resume needs to put back.
+    "HistoryItem": {"added": {"catalog_mode"}, "removed": set()},
+    "HistoryPostBody": {"added": {"catalog_mode"}, "removed": set()},
     # v2.14: whether a plugin expands is decided by prose. A work authored
     # straight in DDL has no description and must not be given one to make one
     # expand, so the prose rides in its own optional key. Callers that never

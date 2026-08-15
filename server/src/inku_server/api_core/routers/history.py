@@ -411,6 +411,7 @@ def api_history_post(
         tokens_in=body.tokens_in,
         tokens_out=body.tokens_out,
         catalog_id=None if catalog_id == "default" else catalog_id,
+        catalog_mode=body.catalog_mode,
         save_artifacts=body.save_artifacts,
         render_metadata=render_metadata,
         source_text=body.source_text,

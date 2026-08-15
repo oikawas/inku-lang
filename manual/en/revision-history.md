@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.24 unreleased baseline (Web Build 911)
+
+Updated the thirteen places that name a version to v2.13.24 / Build 911. **No screen interaction changed. What changed is how a surface texture is drawn.**
+
+- **`surface: hatch` and `surface: crosshatch` are now drawn only inside the shape.** Until now the lines ran past the shape as well, and more than six tenths of the ink laid fell outside it.
+- **How the lines are drawn has not changed.** The angle, the spacing, and the density gradient are the same; only the part that ran past the outline is gone.
+- **On a concave shape such as a cloudform, no line crosses the hollow any more.**
+- **The export format makes no difference.** All three formats keep the texture inside the shape.
+- No word you can write in a description was added or removed.
+
 ## 2026-08-15 — v2.13.23 unreleased baseline (Web Build 910)
 
 The thirteen places that name a version were updated to v2.13.23 / Build 910. **The `Details` pane of the provenance gained two rows, so chapter 11 of "Create an Image" was revised.**

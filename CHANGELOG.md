@@ -6831,3 +6831,49 @@ raises the constant one step at a time, porting that step's mechanism in the sam
   strata since engine 28** (its regex demands an exact `class="material-outline"`, and the engine 30
   corpus holds **zero** exact matches against **3,867** `stratum-N` ones — verified by the accepting
   side). **None of the three reddens anything in the frozen corpus.**
+
+### v2.13.24 — A surface belongs to the shape that carries it (Build 911, 2026-08-16, render engine 35, ledger I-259)
+
+**`surface: hatch` and `surface: crosshatch` were laying their lines across the whole sheet.**
+A surface texture says what a shape is made of; it is not a pattern on the paper.
+Until now each hatch row was drawn to the length of the bounding box's diagonal and never stopped at
+the outline, so **more than six tenths of the ink it laid fell outside the shape**
+(measured in pixels: circle 62.2%, triangle 84.6%, square 64.1%).
+This version **clips only the ends of each row** to the outline.
+
+- **Only the ends moved; nothing about how the rows are drawn changed** — the angle, the spacing,
+  `spacing_gradient`, the per-row jitter, and the ceiling of 80 rows are all as they were.
+  **A regularly drawn line stays regular, and now stays inside the shape.**
+  On a concave shape (cloudform) a row never spans the hollow: each span is drawn as its own stroke.
+- **No `clipPath` is used.** The clipping happens in the coordinates before anything is drawn, so
+  **the `compat` profile, which uses no filters, keeps the texture inside the shape just the same.**
+- **Excursion measured** (the limit is 20.0px against the short edge) —
+  `hatch` goes **413.9px → 0.7px** on a triangle and **353.5px → 0.5px** on a square;
+  `crosshatch` goes **423.3px → 0.7px** and **353.5px → 0.6px**.
+  **The controls `wash` (11.0 / 12.3px) and `stipple` (7.1 / 3.5px) are unchanged to the first digit**,
+  which is the measurement showing no other surface word was touched.
+- **The spacing did not move.** For works with `spacing_gradient="none"` the spacing class holds the
+  same value as the previous version, and the `coarse_to_dense` gradient still works.
+  **Only the outside was removed; nothing inside was thinned.**
+- **Nine of the 588 reference cases moved** (5 `hatch`, 4 `crosshatch`).
+  **The other 579 are byte-identical with the previous version, and so are the six wash cases.**
+- **⚠ One test came along with the version bump** — the check that a wild performance reaches the
+  hatch inside a surface had frozen the **number of rows** at 39 and 78. Rows that never cross the
+  outline are no longer drawn, so it is **29 and 58**. **No mark changed size; only the count fell**
+  (the claim is the same, so the expectation was corrected to the measured value).
+- **⚠ Two instances of "a regenerated record is not a gate" showed up** — the two acceptance tests the
+  implementation wrote first **compared two manifests against each other** and stayed green under all
+  seven perturbations that break the drawing. **Both now also draw with the current renderer and
+  compare against the digest**, which is what gives them teeth.
+- **Eleven perturbations** (the contract's ten plus one the implementation added). **One was a
+  no-op**, because **the wash branch is already clipped to the outline**, so applying the same
+  clipping moves no byte — not a hole in the acceptance tests, but a wire with no discriminating power.
+- **Left for later (untouched here)** — that a wash reads as stripes, that `bleed` reaches past the
+  outline (reaching past it is what the word means), and that a surface texture on a `line` or an
+  `arc` draws no pixel at all.
+- **Verification (re-measured by the accepting side on the merged tree):**
+  **server 3,238 passed / 31 skipped** (3,224 at the branch point, **+14 = this contract's acceptance
+  tests**; the main side touched no server file), **cli 225 passed**, **ruff clean for server and cli**,
+  **frozen corpora byte-identical**, **Android JVM 295 passed / 0 failed**.
+- **The Android reference fixtures gained the 64 files of `render-engine-35/` and no Kotlin source
+  moved** (`android/VERSION` is unchanged). The port reads the directory for the version it declares.

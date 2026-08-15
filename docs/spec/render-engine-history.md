@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **35** | v2.13.24 | 911 | 2026-08-15 | 588 | **9** | **579** |
 | **34** | v2.13.22 | 909 | 2026-08-14 | 588 | **13** | **575** |
 | **33** | v2.13.19 | 906 | 2026-08-13 | 586 | **4** | **582** |
 | **32** | v2.13.13 | 898 | 2026-08-12 | 582 | **13** | **569** |
@@ -132,14 +133,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `34` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `35` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `19` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.23 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.24 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 910 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 911 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -415,6 +416,39 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 35 — a surface belongs to the shape that carries it (v2.13.24)
+
+**Of the nine words for how the inside of a shape looks, `hatch` and `crosshatch` were the only two
+that did not stay in their shape.** Each row was laid at a fixed 1.3x the bounding box's diagonal and
+no intersection with the outline was ever taken, so **a circle asked for parallel lines came out as a
+striped sheet** — **61 to 64 percent** of the surface ink fell outside the form, and the excursion the
+grain gate measures was **413.9px** on a triangle against a **20.0px** limit.
+
+### Only the ends are cut; everything upstream of the cut stays
+
+**Every row is now cut against the contour** (through `_line_spans`, the helper the fill branch
+already uses). A concave form gets one stroke per span, so no row crosses the void, and
+**a row that misses the outline draws nothing.**
+**It is not a clip path** — `compat` emits none, and **a cut only `display` can see is not a cut.**
+
+**Nothing above the cut moves.** The angle, the pitch, the spacing gradient, and the per-row jitter
+still decide where a row sits and how it leans, and **the printed parallel line stays regular**
+(author's ruling, 2026-08-14) — the `hatch-spacing-*` class values are unchanged in all nine cases
+that moved.
+
+### The corpus did not grow, and exactly nine cases moved
+
+**Of the 588 cases, the ones that move are exactly those whose surface texture is `hatch` or
+`crosshatch`** (5 `hatch`, 4 `crosshatch`). **The six `wash` cases do not move** — that a wash reads
+as stripes is a separate ruling, and there is **no approved form of it yet to draw from**, so this
+version leaves it alone.
+
+### Under a wild performance the hatch has fewer rows, not smaller ones
+
+**No mark changed size; only the count fell** (`hatch`/pen 39 → 29, `crosshatch`/pencil 78 → 58).
+Rows that never cross the outline are no longer drawn — a consequence of removing the outside,
+not of thinning the inside.
 
 ## engine 34 — the ground is a support you can name (v2.13.22)
 

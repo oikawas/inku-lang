@@ -2506,7 +2506,13 @@ bands of touch (`class="surface-stroke-v1"`) instead of geometric straight lines
 (centerline, angle, interval, and count unchanged; rotring stays geometric), and
 sways that are not performed were excluded from the seed key so that the presence
 of an inactive sway no longer changes the rendered bytes. The render engine
-version went to 9.
+version went to 9. **In v2.13.24 (render engine 35) the hatch and crosshatch rows became
+cut against the contour** — they go through the same intersection machinery the fill uses, so a row
+stays inside the shape, a concave form gets one stroke per span and never crosses the void, and a row
+that misses the outline draws nothing. No `clipPath` is used, so `compat` keeps the same shape.
+**Nothing above the cut moves** — the angle, the pitch, the `spacing_gradient`, and the per-row jitter
+are unchanged, and so are the spacing class values (only the count of rows that used to fall outside
+the outline goes down).
 
 v2.3.1 made arcs perform as a drawn band too (`class="arc-stroke-v1"`), closing
 the last exception left by v2.2.0. The target weights are every drawn tool except

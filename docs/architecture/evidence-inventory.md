@@ -51,7 +51,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |
 | TEST-SERVER | Server checks | pytest, API surface, authorization, and route ownership | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context | Confirmed |
-| TEST-CORPUS | Frozen corpora | Rebuild and compare 588 Render Engine 34 cases and 49 DDL Engine 19 cases | `server/reference/render-engine-34/manifest.json`; `ddl-engine-19/manifest.json`; workflow | §11, §22 | Confirmed |
+| TEST-CORPUS | Frozen corpora | Rebuild and compare 588 Render Engine 35 cases and 49 DDL Engine 19 cases | `server/reference/render-engine-35/manifest.json`; `ddl-engine-19/manifest.json`; workflow | §11, §22 | Confirmed |
 | TEST-ANDROID | Android reference | Pin Server-version fixtures with manifests | `android/app/src/test/resources/server_reference/`; `test_android_reference_fixtures_are_current.py` | Android specification | Confirmed |
 | TEST-WEBCLI | Web/CLI checks | Svelte checks/unit/lint and CLI pytest | `web/package.json`; Web tests; `cli/tests/test_cli.py` | Project Context | Confirmed |
 | CI-GATES | Current CI | Corpus rebuild, Android design preview, and release-tag container build | `.github/workflows/reference-corpus.yml`; `release.yml` | §11, §22 | Confirmed |

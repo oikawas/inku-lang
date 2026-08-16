@@ -7362,3 +7362,66 @@ protected, then the derivation added, and only then the vocabulary widened — s
   it before writing a line, froze it in its prediction note, and reported it
 - **Numbering**: Android-only, so `APP_VERSION` and `web/BUILD_NUMBER` did not move
   (`android/VERSION` alone went `2.1.4-android.34` → `2.1.4-android.35`). **Nothing was sent to pentala**
+
+---
+
+### v2.13.29 — The tools stand on the drawing they act on (Build 916, 2026-08-16, 5th UI round, **5 stages**)
+
+**The bar under the canvas is gone.**
+A star, a hash, replay, provenance, the saijiki and three separate ways to get the work out
+**sat in a row below the picture and acted on it from a distance**. Every one of them is about the
+work on screen, so they now **stand on it** — the marks a reader puts on a work at the left, beside
+the caption toggle, and the rest at the right, to the left of the fullscreen button that was
+already there. **The three ways out became one door** (SVG, PNG and the share card: the choice
+between them belongs inside the door rather than in front of it).
+
+- **The DDL editor offers its words in the language of the DDL, not of the interface** — someone
+  writing "a thin line" was being handed `円`. **A word taken from there goes into the DDL**, so
+  offering another language is offering the wrong word. The judgement is **a one-for-one port of the
+  server's `resolve_instruction_lang`**, and it **follows the typing**. **The preview's two
+  sentences answer to different languages** (the author's ruling): **the prose about the effect is
+  in the reader's language, the 73 examples are in the DDL's**.
+- **The band above the canvas states the SVG's size** (to the left of the creation time), from
+  **the same single measurement and the same single formatter the drawer uses**. **The generation
+  drawer remembers where it was left, per tab** (the four ways of closing it were brought into one
+  function). **Thousands separators are fixed to `en-US`** — following the interface language would
+  give the same drawing different punctuation in different interfaces, and **screenshots would stop
+  being comparable**.
+- **Nearby works moved off the drawing and into the lineage tab** (what floated over the picture is
+  a row in the flow there, and no longer needs `position: absolute`).
+- **The share mark got a socket and nothing to plug into** (the author's ruling: it is [I-191]'s
+  business) — **nothing is drawn today**. **A flag's presence is decided by whether the field is
+  there, not by its value**: absent means the server does not know the flag, `false` means it knows
+  and none was set. Coercing to a boolean **would make the mark vanish on exactly the works that can
+  carry it**.
+- **⚠ A ruling arrived after stages 1–4 were merged, and became stage 5** — merging the three ways
+  out had **taken the share card out of the simple UI**, because **a merged door cannot be half
+  hidden** and the card had joined a group that the simple UI hides. The ruling: **in a simple UI,
+  show the export button as a button that calls the share card alone**. **No UI mode hides the
+  export button any more**; instead of hiding it, the button **narrows what it opens onto** — it
+  calls the card directly with no menu, **refuses in exactly the two cases the menu entry refuses**
+  (no saved work, card already building), and **announces the card's own label**. The card is not a
+  work tool: it is how a work leaves for someone else.
+- **47 acceptance cases, `T-90`–`T-107`** (43 for stages 1–4, four for stage 5) and **24
+  perturbations** (20 and four). **The implementation session's predictions missed in the same
+  direction all 20 times — the measurement was always the larger** (40 → 52). One type: **a gate it
+  had just written reached further than it predicted.**
+- **⚠ A perturbation gap carried for three rounds closed here** — `T-16`, the English vocabulary
+  guard, **had never been reddened, because no perturbation touched `en.ts`**. Stage 4 added two
+  keys there, so one could be aimed at it: **`T-106`, `T-16` and `T-15` went red.** The gap was
+  closed by measurement, not by argument.
+- **Nine existing cases were rewritten** (six in stages 1–4, three in stage 5). **Only two changed
+  what they claim**, both about the card's doors (**T-7** and "two doors"); the rest moved an
+  expression and claim what they claimed before.
+- **⚠ The `lint:i18n` baseline itself held a phantom** — the rule was **counting the language-code
+  ternary `isJapanese ? 'ja' : 'en'` as an English display string**. The rule was fixed, and
+  **`T-94` measures that it is not vacuous** (that such a ternary is really in the tree).
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3,271 passed
+  / 31 skipped** (no file under `server/` was touched), **cli 227 passed**, **web 422 pass / 0
+  fail** (418 on the tree of stages 1–4), **`check` 265 FILES 0 ERRORS 2 WARNINGS** (the two are the
+  pre-existing a11y ones), **`lint:i18n` 1,066 English strings / 0 errors** (+3 from the branch and
+  a net +1 from main), **ruff clean on server and cli**.
+- **⚠ Nothing was seen on screen** — connecting needs a ruling each round, and this round's ruling
+  was to move on without looking. **What most wants an eye is how the nine icons sit in the
+  corners**: their size was estimated by arithmetic, and the real window widths and the dark/light
+  rendering were not measured.

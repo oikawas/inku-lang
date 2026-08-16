@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.28 (Web Build 915). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.29 (Web Build 916). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -40,7 +40,7 @@ The UI language and the description language are separate. Ordinary painting det
 
 The UI mode can also be switched from the icon on the left of the rail. **The number of dark bars is the mode that is on**: one for simple, two for custom, three for full. The menu is listed in the same order (simple, custom, full).
 
-The user menu, settings, single description and painting, the canvas and the history are always visible. **The history is always there so that a work can be looked at again and taken out as one sheet with `Share card`** (the card has two doors, one on the canvas toolbar and one in the history panel, and both belong to the history side). Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
+The user menu, settings, single description and painting, the canvas and the history are always visible. **The history is always there so that a work can be looked at again and taken out as one sheet with `Share card`** (the card has two doors, one inside `Export` at the top right of the canvas and one in the history panel, and both belong to the history side; in the simple UI the first becomes a card-only button -- v2.13.29). Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
 
@@ -358,10 +358,12 @@ There are two doors.
 
 | Door | What it cards | What one press does |
 |---|---|---|
-| `Share card` in the toolbar under the canvas | the work on the canvas | exports one sheet immediately |
+| `Share card` inside `Export`, at the top right of the canvas | the work on the canvas | exports one sheet immediately (v2.13.29) |
 | `Share card` in history management | the one checked work | enabled only when exactly one work is checked |
 
-Both follow the same layout and seal settings. A work that has not been saved yet has no card, so the button under the canvas cannot be pressed.
+Both follow the same layout and seal settings. A work that has not been saved yet has no card, so the button on the canvas cannot be pressed.
+
+**In the simple UI — and in any custom UI without `refinement, comparison, export, and work actions` — `Export` becomes a card-only button** (v2.13.29). One press exports the card with no menu in between. SVG and PNG belong to that group and are not offered, but the card stays: it is how a work goes to someone else.
 
 | Setting | Choices |
 |---|---|

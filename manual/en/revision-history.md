@@ -2,6 +2,18 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.29 unreleased baseline (Web Build 916)
+
+Updated the thirteen places that name a version to v2.13.29 / Build 916. **The canvas controls moved.**
+
+- **The bar under the drawing is gone, and the tools now stand on the drawing.** The marks a reader puts on a work (star, refinement target) are at the top left; the hash, replay, provenance, saijiki, export and fullscreen are at the top right.
+- **`SVG`, `PNG` and `Share card` merged into one `Export` button.** The order is what it was (SVG, PNG, card); the choice is now in the menu the button opens. **The table in §15.2 was rewritten.**
+- **In the simple UI, `Export` becomes a card-only button.** One press exports the card with no menu in between. SVG and PNG belong to the `refinement, comparison, export, and work actions` group and are not offered, but the card stays: it is how a work goes to someone else.
+- **Saijiki words are now offered in the language of the instructions, not of the interface.** Someone writing in English is no longer handed Japanese words. The prose about a word's effect stays in the reader's language; the examples are in the word's language.
+- **The band above the canvas now states the SVG's size** (to the left of the creation time). The generation drawer remembers where it was left, per tab.
+- **Numbers are shown with thousands separators.** The separator is fixed to `en-US` rather than following the UI language, so that the same drawing's numbers do not read differently in different interfaces.
+- **Nearby works are shown in the `Lineage` tab rather than over the drawing.**
+
 ## 2026-08-16 — v2.13.28 unreleased baseline (Web Build 915)
 
 Updated the thirteen places that name a version to v2.13.28 / Build 915. **The families in the settings `Limits` tab were renamed. Not one of the numbers changed.**

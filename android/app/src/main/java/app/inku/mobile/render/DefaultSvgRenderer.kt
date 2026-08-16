@@ -42,6 +42,10 @@ internal const val SURFACE_WASH_WIDTH_SPAN = 0.60
 // Doubling the width above closes the gaps, which also darkened the wash; the
 // factor comes down from 0.42 so the ink lands back where it was.
 internal const val SURFACE_WASH_OPACITY = 0.22
+// How many bands a `bleed` lays out from the outline. The innermost one sits on
+// the outline itself, so this count is also what decides how far the outermost
+// one reaches: the levels are spread over the count less one.
+internal const val SURFACE_BLEED_RINGS = 3
 
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
@@ -2391,6 +2395,61 @@ class DefaultSvgRenderer(
                         sb.append("""<path class="surface-stroke-v1 $hatchClass" d="$pathD" fill="$color" fill-opacity="$opacityStr" stroke="none"/>""")
                     }
                 }
+            }
+            return sb.toString()
+        }
+
+        if (texture == "bleed") {
+            // "The edge seeps" is a claim about the edge. Up to engine 15 the
+            // server put one ellipse at the centre of the bounding box, so a
+            // triangle and a cloudform got the same ellipse and no edge seeped
+            // at all. Bands pushed out from the outline itself are laid over one
+            // another instead, and how far each vertex is pushed wavers, so the
+            // result reads as a seep rather than as concentric outlines.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val weight = ins.optString("weight", "pen")
+            val blur = max(1.0, unit * (0.010 + surface.optDouble("bleed", 0.0) * 0.030))
+            val normals = ServerStrokeEngine.centerlineNormals(contour, closed = true)
+            val center = pointsCenter(contour)
+            // Which way the normals face is not settled by the shape, so it is
+            // put to a majority vote against the centre rather than fixed here.
+            val outward = contour.zip(normals).sumOf { (point, normal) ->
+                (point.first - center.first) * normal.first + (point.second - center.second) * normal.second
+            }
+            val sign = if (outward >= 0.0) 1.0 else -1.0
+            val sb = StringBuilder()
+            for (ring in 0 until SURFACE_BLEED_RINGS) {
+                // The innermost ring lies on the outline. A seep happens on both
+                // sides of an edge, so the band rises from the edge itself rather
+                // than floating at a distance from the shape.
+                val level = if (SURFACE_BLEED_RINGS > 1) ring.toDouble() / (SURFACE_BLEED_RINGS - 1).toDouble() else 0.0
+                val pushed = contour.zip(normals).mapIndexed { i, (point, normal) ->
+                    val seep = sign * blur * level *
+                        (0.55 + ServerRendererGeometry.hash01(i + ring * 613, seedStr, "bleed-seep") * 0.9)
+                    (point.first + normal.first * seep) to (point.second + normal.second * seep)
+                }
+                val ringOpacity = kotlin.math.min(0.30, opacity * 0.55) * (1.0 - level * 0.55)
+                val ringWidth = max(1.2, blur * (1.05 - level * 0.45))
+                if (!usesHandStroke(weight)) {
+                    val ptsStr = pushed.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    sb.append(
+                        """<polygon points="$ptsStr" fill="none" stroke="$color" stroke-width="${fmt(ringWidth)}" stroke-opacity="${fmt(ringOpacity)}"/>"""
+                    )
+                    continue
+                }
+                val stroke = ServerStrokeEngine.synthesizeAlong(
+                    pushed,
+                    ringWidth,
+                    weight,
+                    ServerRendererGeometry.surfaceStrokeSeed(seedStr, 90000 + ring),
+                    closed = true,
+                    gridStep = gridStepPx(weight, unit),
+                    wild = wild
+                )
+                sb.append(
+                    """<path class="surface-stroke-v1 bleed-ring-${ring + 1}" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="${fmt(ringOpacity)}" fill-rule="evenodd" stroke="none"${textureFilterAttr(weight, useFilters)}/>"""
+                )
             }
             return sb.toString()
         }

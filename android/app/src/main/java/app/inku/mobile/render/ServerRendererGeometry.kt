@@ -645,6 +645,24 @@ internal object ServerRendererGeometry {
     }
 
     /**
+     * One surface stroke's seed, so the surface layer does not share a waveform
+     * with the fill or the contour.
+     *
+     * The same shape as [fillStrokeSeed] with the label the server uses, which
+     * is what keeps the two apart: the label is the only thing separating a
+     * sweep's hand from a fill stroke's at the same index.
+     */
+    fun surfaceStrokeSeed(seed: Any, index: Int): Long {
+        val seedStr = formatSeed(seed)
+        val digest = MessageDigest.getInstance("SHA-256").digest("$seedStr:surface-stroke:$index".toByteArray(Charsets.UTF_8))
+        var raw = 0L
+        for (offset in 0 until 8) {
+            raw = raw or ((digest[offset].toLong() and 0xffL) shl (8 * offset))
+        }
+        return raw
+    }
+
+    /**
      * `jitter` is the full width of the uniform pitch multiplier, so the
      * coefficient of variation of the gaps is `jitter / sqrt(12)`. The default
      * is the engine-21 value; the fill branch passes its own, drawn from the

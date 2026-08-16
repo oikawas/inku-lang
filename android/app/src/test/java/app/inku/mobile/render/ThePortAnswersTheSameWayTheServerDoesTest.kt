@@ -182,12 +182,12 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
 
     /**
      * How many points the varied arc is sampled at. The port writes them into a
-     * `d`, one `L` per point after the opening `M`.
+     * `<polyline points>` now, the way the server does; before the arc contract
+     * it wrote them into a `d`, one `L` per point after the opening `M`.
      */
     private fun variedArcPointCount(svg: String): Int {
-        val d = Regex(" d=\"([^\"]*)\"").findAll(svg).map { it.groupValues[1] }.firstOrNull { it.contains(" L ") }
-            ?: return 0
-        return countOccurrences(d, " L ") + 1
+        val pts = Regex(" points=\"([^\"]*)\"").find(svg)?.groupValues?.get(1) ?: return 0
+        return pts.split(" ").size
     }
 
     /**
@@ -208,14 +208,15 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
             pencil.contains("arc-stroke-v1 controls-72 events-0"),
         )
 
-        // The server's own count here is 148: it puts one point on top of
-        // `_segment_count`, and it writes them into a <polyline> rather than a
-        // <path>. Both of those are separate divergences, reported and left
-        // alone by this contract; what is measured here is the length that
-        // decides the sampling, 1466.0766 px -> 147.
+        // 148 = `_segment_count` of that length plus the server's extra point.
+        // The extra point and the <polyline> were the two divergences this
+        // contract reported and left alone; the beat/arc/sheet contract closed
+        // them, so the count read here is 148 and not 147. What is still
+        // measured is the length that decides the sampling, 1466.0766 px -> 147
+        // segments.
         assertEquals(
             "the varied arc is sampled at the length the server measures",
-            147,
+            148,
             variedArcPointCount(renderScore(rotringVariedArc(300.0, 20.0), "square")),
         )
     }
@@ -236,8 +237,8 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
             pencil.contains("arc-stroke-v1 controls-72 events-0"),
         )
         assertEquals(
-            "and the same 147 sample points",
-            147,
+            "and the same 148 sample points",
+            148,
             variedArcPointCount(renderScore(rotringVariedArc(20.0, 300.0), "square")),
         )
     }
@@ -327,8 +328,13 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
      * to explain, up to the two constants the cluster contributes.
      *
      * `path` is `left_to_right`, so the band's axis is x and this is read off the
-     * anchor's x alone; the cross-axis terms land on y. The first and last member
-     * are dropped, where `t` is 0 and 1 and the beat is clamped.
+     * anchor's x alone; the cross-axis terms land on y. The two members at each
+     * end are dropped, because that is how far `clamp01` reaches: the beat's
+     * jitter is the server's flat 0.16, so it swings +-0.08 either way, and with
+     * twenty members `base` steps by 1/19 = 0.0526. Members 1 and 18 can
+     * therefore still be pushed past 0 or 1, where `t` stops being affine and
+     * nothing about the beat can be read off it. Members 2..17 start at 0.105,
+     * which no swing reaches.
      */
     private fun bandPositions(spacing: String, clusterIndex: Int): List<Double> {
         val renderer = DefaultSvgRenderer()
@@ -337,7 +343,7 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
         val xs = renderer.expandArrangement(ins, seed, null, seed).map { renderer.anchor(it).first }
         // density "medium" with preserve_space unstated: `_density_radius` = 0.060.
         val radius = 0.060
-        return (1 until localTotal - 1).map { j ->
+        return (2 until localTotal - 2).map { j ->
             val i = j * 3 + clusterIndex
             xs[i] - (ServerRendererGeometry.hash01(i, seedText, "cluster-along") - 0.5) * radius * 0.20
         }
@@ -381,7 +387,7 @@ class ThePortAnswersTheSameWayTheServerDoesTest {
      * these gates ask about.
      */
     private fun beatAt(seedText: String): List<Double> =
-        detrended((1 until localTotal - 1).map { j ->
+        detrended((2 until localTotal - 2).map { j ->
             ServerRendererGeometry.hash01(j, seedText, "rhythm-loose") - 0.5
         })
 

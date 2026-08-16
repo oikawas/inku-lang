@@ -41,13 +41,21 @@ object CanvasAspects {
         return aspect.ratioW / aspect.ratioH
     }
 
+    /**
+     * The paper's pixel width, rounded the way the server rounds it.
+     *
+     * `canvas_size_for_aspect` is `round(CANVAS_BASE_PX * ratio)` and Python's
+     * `round` sends a half to the even neighbour. Truncating instead put `oban`
+     * at 666 px where the server puts it at 667, and every coordinate on that
+     * sheet followed the width. `Math.rint` is the half-to-even one;
+     * `Math.round` and `kotlin.math.round` send a half upwards and would move
+     * `vertical` from 562 to 563, trading one disagreement for another.
+     *
+     * The server states the same expression in both of its branches, so there
+     * is one branch here.
+     */
     fun sizeFor(id: String?): CanvasSize {
-        val aspect = byId.getValue(normalize(id))
         val ratio = ratioFor(id)
-        return if (ratio >= 1.0) {
-            CanvasSize(width = (basePx * ratio).toInt(), height = basePx)
-        } else {
-            CanvasSize(width = (basePx * ratio).toInt(), height = basePx)
-        }
+        return CanvasSize(width = Math.rint(basePx * ratio).toInt(), height = basePx)
     }
 }

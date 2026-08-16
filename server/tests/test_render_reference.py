@@ -348,12 +348,13 @@ ENGINE_35_HATCH_CASES = {
     "E-wild-surface-crosshatch-pen",
     "E-wild-surface-crosshatch-pencil",
 }
-# 薄墨の 6 件。**case 名ではなく
-# `input.score.instructions[].surface.texture` で数えた** —— 名前で数えると
-# `C-ground-ink_wash` `C-ground-washi` `C-groundseed-auto-washi` が混ざり、
-# 6 件が 8 件に見える。engine 33 / 34 / 35 の 3 版とも同じ 6 件で、engine 36 が
-# 動かすのがこの 6 件である。**2 つの検査が両側からこの集合を使う** —— engine 35
-# は動かさなかった側から、engine 36 は動かした側から。
+# The six wash cases. **Counted from
+# `input.score.instructions[].surface.texture`, not from the case name** -- by
+# name, `C-ground-ink_wash`, `C-ground-washi` and `C-groundseed-auto-washi` mix
+# in and six look like eight. Engines 33 / 34 / 35 all hold the same six, and
+# these are the six engine 36 moves. **Two tests use this set from opposite
+# sides** -- engine 35 from the side that left them alone, engine 36 from the
+# side that moved them.
 ENGINE_36_WASH_CASES = {
     "C-display-surface-wash-pen",
     "C-surface-wash-pen",
@@ -365,17 +366,21 @@ ENGINE_36_WASH_CASES = {
 
 
 def test_engine_35_moves_only_the_hatch_cases() -> None:
-    """engine 35 が動かしたのは、平行線・交差線を持つ 9 件だけである。
+    """Engine 35 moved only the nine cases that carry hatch or crosshatch.
 
-    行を輪郭で切った版なので、**面の質感が hatch / crosshatch でない 579 件は
-    バイト一致するのが正しい**。1 件でも動いていたら、切る処理が他の枝へ
-    伸びている（`_scanline_segments` を触ると薄墨と塗りが道連れになる）。
+    It is the version that clipped the lines at the contour, so **the 579 cases
+    whose surface texture is neither hatch nor crosshatch are right to be
+    byte-identical**. If even one of them moved, the clipping reached into
+    another branch (touching `_scanline_segments` drags the wash and the fills
+    along with it).
 
-    新規 ID は 1 件も無い。**したがってこの 9 件は全部が判別力を持つ** ——
-    地の版 (engine 34) と違い、changed の側も測れる版である。
+    No case id here is new. **So all nine carry discriminating power** -- unlike
+    the ground version (engine 34), this one can be measured from the changed
+    side as well.
 
-    ⚠ engine 36 が出たので、物差しは現行 manifest から engine 35 の凍結 manifest へ
-    移した（engine 33・34 の検査と同じ形）。版の一致は engine 36 の検査が見る。
+    ⚠ Engine 36 exists now, so the yardstick moved from the current manifest to
+    engine 35's frozen manifest (the same shape as the engine 33 and 34 tests).
+    Version agreement is watched by the engine 36 test.
     """
     manifest = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "35"
@@ -416,17 +421,19 @@ def test_engine_35_hatch_cases_match_the_current_renderer() -> None:
 
 
 def test_engine_35_left_the_wash_cases_alone() -> None:
-    """engine 35 は薄墨の 6 件を動かさなかった。**これは歴史の主張である。**
+    """Engine 35 left the six wash cases alone. **This is a claim about history.**
 
-    engine 35 は行を輪郭で切った版で、切ったのは平行線・交差線だけだった。
-    薄墨に同じ切り方が伸びていれば、579 件の中に紛れずにこの 1 本で落ちる。
+    Engine 35 clipped lines at the contour, and what it clipped was hatch and
+    crosshatch only. Had the same clipping reached the wash, it would not hide
+    among the 579 -- this single test would catch it.
 
-    ⚠ **かつてこの検査は生描きも見ていた** —— 「いまの木が描く薄墨は engine 34 と
-    同じである」。engine 36 が薄墨を動かしたので、生描きの側は
-    `test_engine_36_wash_cases_match_the_current_renderer` が引き取った。
-    **消さずに向け直した**のは、engine 35 の主張そのものは真のままだからである
-    （凍結物は後の版が何をしても動かない）。名前も `leaves` から `left` へ直した
-    —— 現在形のまま残すと、いまの木の話をしている検査に見える。
+    ⚠ **This test used to draw as well** -- "the wash the current tree draws is
+    the wash of engine 34". Engine 36 moved the wash, so the drawing half was
+    taken over by `test_engine_36_wash_cases_match_the_current_renderer`.
+    **It was pointed elsewhere rather than deleted**, because engine 35's own
+    claim stays true (a frozen record does not move whatever later versions do).
+    The name went from `leaves` to `left` for the same reason -- left in the
+    present tense, it reads as a test about the current tree.
     """
     manifest = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))
     previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
@@ -440,16 +447,18 @@ def test_engine_35_left_the_wash_cases_alone() -> None:
 
 
 def test_engine_36_moves_only_the_wash_cases() -> None:
-    """engine 36 が動かしたのは、面の質感が `wash` の 6 件だけである。
+    """Engine 36 moved only the six cases whose surface texture is `wash`.
 
-    掃きの幅と濃さだけを動かした版なので、**薄墨を持たない 582 件はバイト一致する
-    のが正しい**。1 件でも動いていたら、手が薄墨の枝の外へ伸びている
-    （`_scanline_segments` を触ると塗りとハッチが道連れになる）。
+    The version moved the sweep's width and its opacity and nothing else, so
+    **the 582 cases that carry no wash are right to be byte-identical**. If even
+    one of them moved, the hand reached outside the wash branch (touching
+    `_scanline_segments` drags the fills and the hatch along with it).
 
-    新規 ID は 1 件も無い。**したがってこの 6 件は全部が判別力を持つ。**
+    No case id here is new. **So all six carry discriminating power.**
 
-    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
-    いる実装ではなく別の実装の記録になる。
+    Version agreement is watched here too. If `default.py` and the manifest
+    drift apart, the corpus is a record of some implementation other than the
+    one that runs.
     """
     manifest = _manifest()
     assert manifest["engine_version"] == "36" == current_render_engine().version
@@ -466,15 +475,18 @@ def test_engine_36_moves_only_the_wash_cases() -> None:
 
 
 def test_engine_36_wash_cases_match_the_current_renderer() -> None:
-    """動いた 6 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+    """Redraw the six that moved with the live renderer, not the frozen record.
 
-    **⚠ 上の検査は manifest どうしの比較で、1 バイトも描き直さない。** engine 35 の
-    周に実測されている —— 薄墨の濃度を動かす摂動を当てても、manifest どうしの
-    比較は緑のままだった。**あれは焼き直される記録であって、renderer の検査では
-    ない。** ここが「この版の 6 件は、いまの木が描くものと同じである」を測る。
+    **⚠ The test above compares manifest against manifest and redraws not one
+    byte.** That was measured during the engine 35 cycle -- perturbations that
+    move the wash's opacity left the manifest-to-manifest comparison green.
+    **That one is a record that gets rebaked, not a test of the renderer.**
+    This is where "the six of this version are what the current tree draws"
+    gets measured.
 
-    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
-    やめた日にこの検査だけが古い呼び方で緑になる。
+    The drawing goes through bake's own call. Copying the arguments out would
+    leave this test green in the old calling convention on the day the
+    generator stops sending a key.
     """
     generator = _generator()
     manifest = _manifest()

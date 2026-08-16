@@ -594,28 +594,35 @@ def test_s7_hatch_stays_inside_in_the_compat_profile(texture: str) -> None:
         assert excursion <= CANVAS.unit * 0.02, (texture, excursion)
 
 
-# --- S-8 面: 薄墨が縞ではなく面であること (engine 36) ----------------------- #
+# --- S-8 surface: a wash is a field, not a set of stripes (engine 36) ------- #
 #
-# 起点 `5e452f78` の実測: 図形の中の 19.9% (square) / 21.1% (triangle) が紙のまま
-# だった。掃きは全部平行で、間隔は一定で、掃きと掃きのあいだにはどの層も届かない。
-# 薄墨に白地は無い。作者は 2026-08-14 に 14 段の梯子を見て「薄墨に見えるのは掃きを
-# 太くした段」と裁定し、掃き ×2.0・濃さ 0.42 → 0.22 の枡 (`G3`) を選んだ。
+# Measured at the branch point `5e452f78`: 19.9% (square) / 21.1% (triangle) of
+# the inside of the shape was still bare paper. Every sweep was parallel, the
+# pitch was constant, and no layer reached the paper between two sweeps. A wash
+# has no bare paper in it. On 2026-08-14 the author read a 14-rung ladder, ruled
+# that "the rung that reads as a wash is the one where the sweeps got wider",
+# and picked the cell `G3` -- sweeps x2.0, opacity 0.42 -> 0.22.
 #
-# ⚠ ここの物差しはラスタではない。製品が書いた多角形をそのまま読み、図形の中へ
-# 格子を張って「どの掃きにも入らない点」を数える。契約 §0-B は原寸 1618px の
-# ラスタで測っており、両者は輪郭際の扱いだけが違う -- はみ出しの 12.3 / 11.0 px は
-# 2 つの道具で一致したので、ずれるのは縁の 1 画素ぶんである。
+# ⚠ The yardstick here is not a raster. It reads the polygons the product wrote,
+# lays a grid inside the shape and counts the points no sweep reaches. Contract
+# §0-B measured with a raster at the natural width of 1618px; the two differ
+# only in how they treat the very edge of the contour -- the excursion of
+# 12.3 / 11.0 px agreed across both tools, so the gap is one pixel of rim.
 #
-# ⚠ T-1 と T-2 は対で置く。片方だけだと、白地を消すために全部黒く塗る実装が通る。
-# ⚠ T-6 と T-7 は「やり過ぎない」ための受入である。作者裁定 2 は角度を振る案・
-# 間隔をばらつかせる案・下に地を敷く案を退けている。
+# ⚠ T-1 and T-2 are placed as a pair. With only one of them, an implementation
+# that erases the bare paper by painting everything black would pass.
+# ⚠ T-6 and T-7 are the gates against overdoing it. The author's second ruling
+# turned down varying the angle, scattering the pitch, and laying a ground
+# underneath.
 
 WASH_SHAPES = {"square": SQUARE, "triangle": TRIANGLE}
 WASH_SAMPLE_STEP = 3.0
 
-# 起点 `5e452f78` (render engine 35) を下と同じ道具で測った値。T-2 は濃さがこの
-# 水準へ戻ることを、T-6 は間隔・層の数・角度がここから 1 つも動いていないことを
-# 見る。**白地だけは動かす側の量なので、対照として置いてある。**
+# The branch point `5e452f78` (render engine 35), measured with the same tools
+# used below. T-2 watches that the ink comes back to this level; T-6 watches
+# that the pitch, the layer count and the angles moved not at all. **The bare
+# ratio is the one quantity this version does move, so it sits here as the
+# control.**
 WASH_BRANCH_POINT = {
     "square": {
         "layer_angles_deg": (13.0216, 18.9304),
@@ -633,16 +640,17 @@ WASH_BRANCH_POINT = {
 
 
 def _wash_elements(svg: str) -> list[str]:
-    """面の群が置いた要素。種別を問わずそのまま返す (T-7 が種別を見る)。"""
+    """Whatever elements the surface group laid down, kind and all (T-7 reads the kind)."""
     return re.findall(r"<[a-z]+\b[^>]*/>", _surface_body(svg))
 
 
 def _wash_sweeps(svg: str) -> list[dict]:
-    """掃き 1 本 = `<path>` 1 つ。多角形と不透明度と外接矩形を持つ。
+    """One sweep = one `<path>`, carrying its rings, its opacity and its box.
 
-    `polygon_path` は左岸 + 逆順の右岸を 1 つの `d` に書くので、頂点列は幅の
-    測れる対で並んでいる。曲線は 1 つも無い -- ここが多角形として読める理由で、
-    ラスタライザを持ち込まずに面積が測れる。
+    `polygon_path` writes the left bank followed by the right bank reversed into
+    a single `d`, so the vertices come in pairs the width can be read from.
+    There is not one curve in it -- that is why this can be read as a polygon,
+    and why the area is measurable without bringing in a rasterizer.
     """
     sweeps = []
     for element in _wash_elements(svg):
@@ -675,7 +683,7 @@ def _wash_sweeps(svg: str) -> list[dict]:
 
 
 def _sweep_width(ring: list[tuple[float, float]]) -> float:
-    """岸から岸までの距離。端の細りに寄らないよう中央値で取る。"""
+    """Bank to bank. Taken as the median so the tapered ends do not pull it."""
     half = len(ring) // 2
     return statistics.median(
         math.hypot(ring[i][0] - ring[-1 - i][0], ring[i][1] - ring[-1 - i][1])
@@ -684,7 +692,7 @@ def _sweep_width(ring: list[tuple[float, float]]) -> float:
 
 
 def _sweep_axis(ring: list[tuple[float, float]]) -> dict:
-    """掃き 1 本の向きと、中心線の両端。"""
+    """One sweep's bearing, and the two ends of its centre line."""
     half = len(ring) // 2
     head = ((ring[0][0] + ring[-1][0]) / 2, (ring[0][1] + ring[-1][1]) / 2)
     tail = (
@@ -700,10 +708,11 @@ def _sweep_axis(ring: list[tuple[float, float]]) -> dict:
 
 
 def _wash_layers(axes: list[dict]) -> list[list[dict]]:
-    """向きの近い掃きを 1 つの層にまとめる。
+    """Gather sweeps of a near-equal bearing into one layer.
 
-    層と層は 5.9 度離れており、層の中では 1 本も振れていない (起点で実測)。
-    掃き 1 本ごとに角度を振る実装はここで層が割れるので、数だけで見分けられる。
+    Layer to layer is 5.9 degrees apart, and inside a layer not one sweep is
+    off (measured at the branch point). An implementation that varies the angle
+    per sweep splits the layers here, so the count alone tells them apart.
     """
     groups: list[list[dict]] = []
     for entry in sorted(axes, key=lambda item: item["angle"]):
@@ -715,20 +724,24 @@ def _wash_layers(axes: list[dict]) -> list[list[dict]]:
 
 
 def _layer_pitch(group: list[dict]) -> float:
-    """層の中で掃きが並ぶ間隔。中心点を掃きの法線へ射影して測る。"""
+    """The pitch the sweeps sit at inside a layer, read by projecting each mid
+    point onto the sweep's normal."""
     angle = statistics.median(entry["angle"] for entry in group)
     nx, ny = -math.sin(angle), math.cos(angle)
     offsets = sorted(entry["mid"][0] * nx + entry["mid"][1] * ny for entry in group)
     steps = [b - a for a, b in zip(offsets, offsets[1:]) if b - a > 1e-6]
-    assert steps, "層に掃きが 1 本しかない"
+    assert steps, "the layer holds only one sweep"
     return statistics.median(steps)
 
 
 def _wash_coverage(sweeps: list[dict], contour: list[tuple[float, float]]) -> dict:
-    """図形の中の紙と墨。格子の 1 点ずつを、どの掃きが覆うかで数える。
+    """Paper and ink inside the shape, counted one grid point at a time by which
+    sweeps cover it.
 
-    濃さは合成して測る -- 掃きは重なるので、1 本の `fill-opacity` は読者が見る
-    濃さではない。白地を消すために全部黒く塗る実装は、ここが起点から離れる。
+    The ink is measured as a composite -- sweeps overlap, so one sweep's
+    `fill-opacity` is not the ink a reader sees. An implementation that erases
+    the bare paper by painting everything black moves away from the branch
+    point right here.
     """
     xs = [p[0] for p in contour]
     ys = [p[1] for p in contour]
@@ -759,11 +772,11 @@ def _wash_coverage(sweeps: list[dict], contour: list[tuple[float, float]]) -> di
 
 @functools.lru_cache(maxsize=None)
 def _wash_measured(name: str) -> dict:
-    """1 つの図形の薄墨を 1 度だけ測る。S-8 の 8 本が同じ測定を読む。"""
+    """Measure one shape's wash once. All eight S-8 tests read this measurement."""
     shape = WASH_SHAPES[name]
     svg = _render(shape, "wash", profile="editable")
     sweeps = _wash_sweeps(svg)
-    assert sweeps, "面の群に掃きが 1 本も無い"
+    assert sweeps, "the surface group holds not one sweep"
     instruction = Instruction.model_validate(
         dict(shape, weight="pen", filled=False, surface={**BASE_SURFACE, "texture": "wash"})
     )
@@ -805,32 +818,37 @@ def _wash_measured(name: str) -> dict:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_leaves_no_bare_paper_inside_the_shape(name: str) -> None:
-    """T-1。**これが「縞ではない」ことの本体である。**
+    """T-1. **This is the body of the claim that it is not a set of stripes.**
 
-    起点は 19.9% (square) / 21.1% (triangle) が紙のままだった。掃きの幅を間隔まで
-    広げると、残るのは輪郭際の細い縁だけになる -- 実測 0.67% / 1.09% で、残りの
-    紙の深さの中央値は 2.0 / 2.2 px である (掃きは輪郭で切られ、手の筆は端で
-    細るので、いちばん外側の帯だけが薄い)。
+    At the branch point, 19.9% (square) / 21.1% (triangle) was still paper.
+    Widen the sweep to the pitch and what is left is a thin rim along the
+    contour -- measured at 0.67% / 1.09%, with the remaining paper a median of
+    2.0 / 2.2 px deep (the sweeps are clipped at the contour, and a hand tool
+    tapers at its ends, so only the outermost band runs thin).
 
-    ⚠ 限度は 1.5% で、契約が書いた 1% ではない。契約の 18.0% → 0.0% は原寸
-    1618px のラスタで円を測った値で、部分的に覆われた画素を墨と数える。ここは
-    多角形の点判定なので縁が紙に落ちる。**どちらの道具でも、縞が残っていれば
-    間隔の幅の帯が図形を横切る** -- 1.09% はその 1/20 である。
+    ⚠ The limit is 1.5%, not the 1% the contract wrote. The contract's
+    18.0% -> 0.0% was a circle measured on a raster at the natural width of
+    1618px, which counts a partly covered pixel as ink. This one is a
+    point-in-polygon test, so the rim falls to paper. **On either tool, stripes
+    that survive put a band the width of the pitch across the shape** -- 1.09%
+    is a twentieth of that.
     """
     measured = _wash_measured(name)
     assert measured["bare_ratio"] < 0.015, measured["bare_ratio"]
-    # 対照。起点の値がこの限度を通ってしまうなら、限度は何も言っていない。
+    # The control. If the branch point's own value passed this limit, the limit
+    # would be saying nothing at all.
     assert WASH_BRANCH_POINT[name]["bare_ratio"] > 0.015
 
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_keeps_the_ink_of_the_branch_point(name: str) -> None:
-    """T-2。裁定 3「薄墨であれば、もう一段薄くてよい」の担保。
+    """T-2. The gate for ruling 3, "a wash may go one step lighter still".
 
-    作者が前周に見た 2 枚は製品の 1.5 倍と 1.9 倍の濃さだった。隙間が埋まった
-    ぶん濃くなっていたので、裁定 3 は濃さの好みではなく、その副作用を戻す要求で
-    ある。**T-1 と対で置く** -- これが無いと、白地を消すために全部黒く塗る実装が
-    通る。
+    The two sheets the author read the cycle before were 1.5x and 1.9x the
+    product's ink. They had darkened by exactly as much as the gaps had closed,
+    so ruling 3 was not a preference about darkness but a demand to undo that
+    side effect. **Placed as a pair with T-1** -- without it, an implementation
+    that erases the bare paper by painting everything black would pass.
     """
     measured = _wash_measured(name)
     before = WASH_BRANCH_POINT[name]["mean_alpha"]
@@ -842,11 +860,12 @@ def test_s8_wash_keeps_the_ink_of_the_branch_point(name: str) -> None:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_sweeps_are_as_wide_as_the_pitch(name: str) -> None:
-    """T-3。**掃きが間隔より狭ければ、必ず白地が残る。**
+    """T-3. **A sweep narrower than the pitch always leaves bare paper.**
 
-    幅の帯は製品の定数が決める。ここは 2 つのことを見る -- 定数そのものが
-    0.88〜1.48 の帯であることと、**描かれた掃きがその帯の中にあること**。後者が
-    無いと、定数を置いただけで読んでいない実装が通る。
+    The width band is decided by the product's constants. Two things are read
+    here -- that the constants themselves span 0.88 to 1.48, and **that the
+    sweeps actually drawn fall inside that band**. Without the second, an
+    implementation that declares the constants and never reads them passes.
     """
     lo = renderer.SURFACE_WASH_WIDTH_BASE
     hi = lo + renderer.SURFACE_WASH_WIDTH_SPAN
@@ -856,21 +875,26 @@ def test_s8_wash_sweeps_are_as_wide_as_the_pitch(name: str) -> None:
     measured = _wash_measured(name)
     pitches = measured["pitches"]
     widths = measured["widths"]
-    # 岸から岸の中央値は端の細りぶん公称を下回るので、下側に 6% の遊びを取る。
+    # Bank to bank, the median runs under nominal by the taper at the ends, so
+    # 6% of slack is allowed on the low side.
     assert min(widths) / max(pitches) >= lo * 0.94, (min(widths), max(pitches))
     assert max(widths) / min(pitches) <= hi, (max(widths), min(pitches))
 
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_stays_within_half_of_one_sweep(name: str) -> None:
-    """T-4。縁をまたぐのは筆が幅を持つからで、はみ出しは掃き 1 本ぶんに収まる。
+    """T-4. The rim is crossed because a brush has width; the excursion stays
+    inside one sweep.
 
-    ⚠ `test_s3` の絶対値 20.0px はここへ持ってこない。あれは粒 1 つの大きさで
-    決まっていた数字で、薄墨に粒は無い。同じ主張を薄墨の単位で言うと「掃き 1 本の
-    いちばん広い幅の半分」になる。**限度は製品の定数から計算する** -- px を手で
-    書くと、正本が動いた翌日から緑のままズレを守る。
+    ⚠ The absolute 20.0px of `test_s3` is not carried over here. That number was
+    decided by the size of one speck, and a wash has no specks. The same claim
+    in the wash's own unit reads "half of the widest a single sweep gets".
+    **The limit is computed from the product's constants** -- a px written by
+    hand keeps guarding a stale value, green, from the day the source of truth
+    moves.
 
-    起点でも 12.3 / 11.0 px またいでいた (＝当時の掃きの半幅)。
+    The branch point crossed by 12.3 / 11.0 px too (= half the sweep width of
+    the day).
     """
     measured = _wash_measured(name)
     limit = (
@@ -883,11 +907,13 @@ def test_s8_wash_stays_within_half_of_one_sweep(name: str) -> None:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_sweeps_end_at_the_contour(name: str) -> None:
-    """T-5。掃きの端点は輪郭との交点で切られている。
+    """T-5. A sweep's end points are cut where they meet the contour.
 
-    engine 22 が塗りに入れた 3 量目「端点を輪郭の外へ伸ばす」を薄墨には入れない。
-    あれは下地が境界を押さえていたからできたことで、**薄墨に下地は無い** (T-7)。
-    伸ばせば、幅の半分では説明できないはみ出しが出る。
+    The third quantity engine 22 put into the fills -- running the end points
+    past the contour -- is not put into the wash. That was possible there
+    because an underlay held the boundary down, and **a wash has no underlay**
+    (T-7). Run them past, and an excursion appears that half a width cannot
+    explain.
     """
     measured = _wash_measured(name)
     assert measured["endpoint_excursion"] <= 1.0, measured["endpoint_excursion"]
@@ -895,11 +921,13 @@ def test_s8_wash_sweeps_end_at_the_contour(name: str) -> None:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_keeps_the_pitch_the_layers_and_the_angles(name: str) -> None:
-    """T-6。裁定 2 が退けた 3 案を「ついでに」入れていないことの担保。
+    """T-6. The gate against slipping in the three proposals ruling 2 turned down.
 
-    本契約が動かすのは掃きの幅と濃さだけである。**間隔・層の数・角度の作り方は
-    起点と 1 つも変わらない。** 角度は層の中で全部同じで、層と層だけが 5.9 度
-    離れている -- 掃き 1 本ごとに振る案 (裁定 2 が退けた B) はここで層が割れる。
+    This contract moves the sweep's width and its opacity, and nothing else.
+    **The pitch, the layer count and the way the angles are made do not change
+    at all from the branch point.** Inside a layer every angle is the same, and
+    only layer to layer is 5.9 degrees apart -- varying it per sweep (proposal
+    B, turned down by ruling 2) splits the layers right here.
     """
     measured = _wash_measured(name)
     before = WASH_BRANCH_POINT[name]
@@ -915,10 +943,11 @@ def test_s8_wash_keeps_the_pitch_the_layers_and_the_angles(name: str) -> None:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_carries_no_underlay(name: str) -> None:
-    """T-7。下地案 (裁定 2 が退けた D) を入れていないことの担保。
+    """T-7. The gate against the underlay (proposal D, turned down by ruling 2).
 
-    下地は `_fill_underlay` と同じ構えで白地を 0.0% にするが、**縞は残ったまま**
-    である (発行側が実測)。T-1 が緑になっても、それは面になったからではない。
+    An underlay, built the way `_fill_underlay` is, takes the bare paper to
+    0.0% while **the stripes stay exactly where they were** (measured by the
+    issuing side). T-1 would go green, and not because it became a field.
     """
     svg = _wash_measured(name)["svg"]
     assert "fill-underlay-v1" not in svg
@@ -929,10 +958,12 @@ def test_s8_wash_carries_no_underlay(name: str) -> None:
 
 @pytest.mark.parametrize("name", sorted(WASH_SHAPES))
 def test_s8_wash_draws_the_same_sweeps_in_every_profile(name: str) -> None:
-    """T-8。3 つの profile が同じ機構を通る。
+    """T-8. All three profiles go through the same mechanism.
 
-    既存の `test_s5` は要素の種別と数を見るので、**幅か濃さだけを profile で
-    変える実装はそこを素通りする** (実測)。ここは幅と濃さそのものを突き合わせる。
+    The existing `test_s5` reads the kind and the count of the elements, so
+    **an implementation that varies only the width or the opacity by profile
+    walks straight past it** (measured). This one compares the width and the
+    opacity themselves.
     """
     shape = WASH_SHAPES[name]
     faces = {}

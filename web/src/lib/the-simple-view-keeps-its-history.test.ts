@@ -156,31 +156,34 @@ test('T-5: no UI-mode rule hides a whole row of canvas controls', () => {
 test('T-6: the other UI-mode selectors are still there', () => {
 	// A control: T-5 must not be satisfied by deleting the rule.
 	const selectors = hideRuleSelectors(read(PAGE));
-	assert.match(selectors, /\.ui-hide-work-tools :global\(\.canvas-export\)/);
+	assert.match(selectors, /\.ui-hide-work-tools :global\(\.canvas-star-btn\)/);
 	assert.match(selectors, /\.ui-hide-history :global\(\.nav-left\)/);
 });
 
 test('T-7: the canvas card door is inside the export menu, with the other two', () => {
-	// This claim changed on 2026-08-16, and it changed deliberately.
+	// This claim changed twice on 2026-08-16, and both times deliberately.
 	//
 	// It used to read "the card button sits in the bar, not in a hidden group":
 	// SVG and PNG lived in .png-wrap, which the work_tools group hides, and the
 	// card button was their sibling outside it, so a simple UI kept the card
 	// while losing the other two. The three were then merged into one export
-	// button by request, and a merged door cannot be half hidden -- the card
-	// now follows work_tools like the two it joined.
+	// button by request, and a merged door cannot be half hidden.
 	//
-	// What still holds is that the card has somewhere to leave from in every
-	// mode: door one is the history manager, and the history group is on in the
-	// simple UI (asserted below and in the two-doors case).
+	// The author then ruled: in a simple UI the export button stays and calls
+	// the card alone. So the menu holds all three only where the work tools are
+	// shown; T-107 owns the other state. No rule hides .canvas-export any more.
 	const source = read(CANVAS_PANEL);
 	const menu = elementBody(source, 'div', /<div class="export-menu"/);
 	assert.match(menu, /downloadCardFromCanvas\(\)/, 'the card left the export menu');
 	assert.match(menu, /onDownloadSVG\('display'\)/, 'SVG left the export menu');
 	assert.match(menu, /onDownloadPNG\(/, 'PNG left the export menu');
-	// One button opens all three, and it is the one the work_tools rule names.
+	// One button opens all three, and no UI mode takes the button away.
 	assert.match(source, /class="canvas-icon-btn canvas-export-btn"/);
-	assert.match(hideRuleSelectors(read(PAGE)), /\.ui-hide-work-tools :global\(\.canvas-export\)/);
+	assert.doesNotMatch(
+		hideRuleSelectors(read(PAGE)),
+		/:global\(\.canvas-export\)/,
+		'a rule hides the export button again, so the simple UI lost the card'
+	);
 	assert.equal(SIMPLE_UI_VISIBILITY.history, true, 'the always-open door closed');
 });
 

@@ -6840,6 +6840,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:promptStage2Expanded
 				bind:exportMenuOpen
 				bind:exportWrapEl
+				exportCardOnly={!uiVisibility.work_tools}
 				{result}
 				{nearbyHistory}
 				onOpenNearbyHistory={openNearbyHistory}
@@ -7523,7 +7524,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-work-tools :global(.canvas-share-btn),
 	.ui-hide-work-tools :global(.canvas-replay-btn),
 	.ui-hide-work-tools :global(.canvas-saijiki-btn),
-	.ui-hide-work-tools :global(.canvas-export),
+	/* .canvas-export is deliberately absent. Hiding it took the share card with
+	   SVG and PNG when the three merged into one door, and the card is not a
+	   work tool -- it is how a work leaves for someone else. The button stays
+	   and calls the card directly instead; CanvasPanel decides that from
+	   exportCardOnly, so the rule here and the behaviour there must agree. */
 	.ui-hide-history :global(.nav-left),
 	.ui-hide-history :global(.nav-right),
 	.ui-hide-history :global(.nearby-mirror) {

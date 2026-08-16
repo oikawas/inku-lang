@@ -1310,15 +1310,21 @@
 											onChange={(value) => onUpdateRenderLimits({ [field]: value })}
 										/>
 										<small>{renderLimitHint(field)}</small>
-										{@const weight = markWeight(
-											field,
-											settingsStatus.render_limits.limits[field],
-											settingsStatus.render_limits.bytes_per_mark
-										)}
-										{#if weight}
-											<small class="limits-weight"
-												>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
-											>
+										<!-- `{@const}` may only be the immediate child of a block, so the
+										     costs guard hosts it rather than the field div. Both conditions
+										     carry weight: an older server sends no costs at all, and eight
+										     of the nine fields govern no megabytes even when it does. -->
+										{#if settingsStatus.render_limits.bytes_per_mark}
+											{@const weight = markWeight(
+												field,
+												settingsStatus.render_limits.limits[field],
+												settingsStatus.render_limits.bytes_per_mark
+											)}
+											{#if weight}
+												<small class="limits-weight"
+													>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
+												>
+											{/if}
 										{/if}
 									</div>
 								{/each}

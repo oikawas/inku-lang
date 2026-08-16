@@ -313,6 +313,7 @@
 			defaults: Record<string, number>;
 			groups: Record<string, string[]>;
 			absolute_max: number;
+			bytes_per_mark: Record<string, number>;
 			note: string;
 		};
 		log_retention: {

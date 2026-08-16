@@ -470,6 +470,8 @@ export const en: LangPack = {
 		'These decide how many marks a single work may carry. They are not speed tuning: they change how many lines get drawn. The values set here are written into what Stage 1 and Stage 2 tell the model, and recorded on every work drawn under them. The nine numbers fall into three families, and each family answers to something different — the machine, the eye, and a guard against typing mistakes.',
 	settingsRenderLimitsRounding:
 		'Values that contradict each other are rounded, not rejected (a represented band above the literal threshold is lowered to it). What is shown is the rounded set that actually took effect.',
+	settingsRenderLimitsWeight: (low: number, high: number) =>
+		`About ${low}-${high} MB per work at this count (thin to thick tool)`,
 	settingsRenderLimitsReset: 'Restore defaults',
 	settingsRenderLimitsSaved: 'Limits saved',
 	settingsRenderLimitGroups: {

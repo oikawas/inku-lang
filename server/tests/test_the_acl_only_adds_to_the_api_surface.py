@@ -132,7 +132,19 @@ CHANGED_SCHEMAS = {
     "PaintResponse": {"added": {"render_limits_source"}, "removed": set()},
     "ComposeResponse": {"added": {"render_limits_source"}, "removed": set()},
     "RenderScoreResponse": {"added": {"render_limits_source"}, "removed": set()},
+    # I-132: the limits panel converts the total into the weight of a work, so
+    # the settings response carries the measured cost of one mark. One key; a
+    # second one arriving here is still red.
+    "RenderLimitsStatus": {"added": {"bytes_per_mark"}, "removed": set()},
 }
+
+# The whole of what the declared `Arrangement` change may be, beside the
+# property `group_size` names. I-136: `cluster_count` gave up a static bound for
+# the reason `count` never had one -- a maximum no setting can reach is a second,
+# invisible copy of the setting. The movement is inside a property, so the
+# property-set comparison sees nothing and the declaration would otherwise wave
+# the whole schema through.
+CLUSTER_COUNT_BOUND_REMOVED = 12.0
 
 # The whole of what the declared `CanvasGroundSpec` change may be.
 GROUND_MATERIAL_ENUM_ADDED = {"canvas", "drawing_paper"}
@@ -233,6 +245,17 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
             enum_after = set(after_body["properties"]["material"]["enum"])
             assert enum_after - enum_before == GROUND_MATERIAL_ENUM_ADDED
             assert enum_before - enum_after == set()
+        if name == "Arrangement":
+            # Same reason again, with a bound in place of an enum value.
+            def _integer_branch(body: dict) -> dict:
+                branches = body["properties"]["cluster_count"]["anyOf"]
+                return next(b for b in branches if b.get("type") == "integer")
+
+            bound_before = _integer_branch(before_body)
+            bound_after = _integer_branch(after_body)
+            assert bound_before.pop("maximum") == CLUSTER_COUNT_BOUND_REMOVED
+            assert "maximum" not in bound_after, "the bound comes from limits now"
+            assert bound_before == bound_after, "nothing else in the bound may move"
 
     assert len(operations) == PRE_ACL_OPERATION_COUNT - len(CHANGED_OPERATIONS)
     assert len(schemas) == PRE_ACL_SCHEMA_COUNT - len(CHANGED_SCHEMAS)

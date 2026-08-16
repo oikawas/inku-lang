@@ -38,7 +38,13 @@ from inku_server.coerce.normalize import (
     _density_label,
     _with_clustered_density,
 )
-from inku_server.limits import DEFAULT_LIMITS, Limits, max_cluster_count, using_limits
+from inku_server.limits import (
+    BYTES_PER_MARK,
+    DEFAULT_LIMITS,
+    Limits,
+    max_cluster_count,
+    using_limits,
+)
 from inku_server.schema import Instruction, Score
 
 # One of the six markers `_is_literal_grid_request` reads, and no numeral: the
@@ -262,6 +268,43 @@ def test_t124_the_cluster_count_passes_nine_when_the_ceiling_is_raised():
 # The drawn count was already a setting before this contract. Stated here so the
 # pair T-124 measures is visible: it is this half that moved and the cluster
 # count that did not.
+# T-126 -- the settings response carries the conversion, and the conversion is
+# the measurement rather than whatever the code happens to hold. Checking only
+# that the two agree would pass with both of them doubled, which is the same as
+# checking nothing: the panel would then be telling an administrator a weight
+# that no work has.
+def test_t126_the_settings_response_carries_the_measured_bytes_per_mark():
+    import uuid
+
+    from fastapi.testclient import TestClient
+
+    from inku_server import db
+    from inku_server.api import app
+
+    suffix = uuid.uuid4().hex[:8]
+    admin = db.add_user(
+        f"limits-admin-{suffix}",
+        f"limits-admin-{suffix}@example.test",
+        "password-123",
+        ["admins"],
+        None,
+    )
+    headers = {"Authorization": f"Bearer {db.create_session(admin['id'])}"}
+
+    response = TestClient(app).get("/api/settings/status", headers=headers)
+    assert response.status_code == 200
+    carried = response.json()["render_limits"]["bytes_per_mark"]
+
+    assert carried == BYTES_PER_MARK
+    # Measured 2026-08-16 at render engine 35, the 400-mark row of
+    # cli/out2/911-v2.13.24-limits-capability-unit/sweep-engine35.json.
+    assert carried == {"pen": 12924, "brush_thick": 16138}
+    # And they are the weight of the default itself: 400 marks is 5.17 MB with a
+    # pen and 6.46 MB with a thick brush, which is what the panel shows.
+    assert round(400 * carried["pen"] / 1_000_000, 2) == 5.17
+    assert round(400 * carried["brush_thick"] / 1_000_000, 2) == 6.46
+
+
 def test_t124_reverse_the_drawn_count_already_followed_the_ceiling():
     assert _clustered_visual_count(1000, DEFAULT_LIMITS) == 120
     assert _clustered_visual_count(1000, MOVED_CEILINGS["a third"]) == 40

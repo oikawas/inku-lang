@@ -14,6 +14,7 @@
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
+	import { markWeight } from '$lib/markWeight';
 
 	type PluginItem = {
 		name: string;
@@ -91,6 +92,7 @@
 			defaults: Record<string, number>;
 			groups: Record<string, string[]>;
 			absolute_max: number;
+			bytes_per_mark: Record<string, number>;
 			note: string;
 		};
 		log_retention: {
@@ -1308,6 +1310,16 @@
 											onChange={(value) => onUpdateRenderLimits({ [field]: value })}
 										/>
 										<small>{renderLimitHint(field)}</small>
+										{@const weight = markWeight(
+											field,
+											settingsStatus.render_limits.limits[field],
+											settingsStatus.render_limits.bytes_per_mark
+										)}
+										{#if weight}
+											<small class="limits-weight"
+												>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
+											>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -2188,6 +2200,10 @@
 	}
 	.limits-field > span { color: var(--fg2); }
 	.limits-field > small { color: var(--fg3); line-height: 1.4; }
+	/* The conversion answers a different question from the hint above it -- what
+	   this number costs, rather than what it governs -- so it is set apart
+	   rather than reading as a second sentence of the same line. */
+	.limits-field > small.limits-weight { color: var(--fg2); }
 	/* The largest value that can be typed is the absolute ceiling, 100000 -- six
 	   digits. The stepper is sized for that and does not stretch to the card. */
 	.limits-field :global(.number-stepper) { width: min(136px, 100%); }

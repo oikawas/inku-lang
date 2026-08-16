@@ -239,6 +239,21 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
         "PaintResponse": {"render_limits_source"},
         "ComposeResponse": {"render_limits_source"},
         "RenderScoreResponse": {"render_limits_source"},
+        # I-132 added one key to the settings response, by the same rule: the
+        # panel turns the total into the weight of a work, and the measured cost
+        # of one mark comes from the server rather than a copy in the browser.
+        "RenderLimitsStatus": {"bytes_per_mark"},
+    }
+    # I-136 changed a schema by taking a bound OFF a property rather than by
+    # adding or removing one, so `declared_additions` above cannot express it and
+    # the digest would move with nothing named. `Arrangement.cluster_count` gave
+    # up its static maximum for the reason `count` never had one: a bound no
+    # setting can reach is a second, invisible copy of the setting, and twelve
+    # was the real stop on how many clusters a raised ceiling could be split
+    # into. Put it back before hashing, so the frozen digest keeps measuring
+    # everything else byte for byte and a SECOND movement in this schema is red.
+    declared_bound_restorations = {
+        "Arrangement": ("cluster_count", "maximum", 12.0),
     }
     # ddl-engine 18 changed a schema without adding a field to it: a fill became
     # a surface word like the other eight, so `SurfaceTexture` gained a value.
@@ -267,6 +282,13 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
             for field in added:
                 assert field in parsed["properties"], f"{name} was declared to gain {field}"
                 del parsed["properties"][field]
+                # A key with no default is also listed under `required`, and
+                # leaving it there would move the digest with nothing named. The
+                # twelve keys declared before this one were all optional, so the
+                # list never had to be touched; taking the name out of it is a
+                # no-op for them and the whole of the change for a required one.
+                if isinstance(parsed.get("required"), list):
+                    parsed["required"] = [f for f in parsed["required"] if f != field]
             body = _stable(parsed)
         enum_added = declared_enum_additions.get(name)
         if enum_added:
@@ -283,6 +305,15 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
                 assert fragment in description, f"{name}.{field} description"
                 description = description.replace(fragment, "", 1)
             parsed["properties"][field]["description"] = description
+            body = _stable(parsed)
+        bound = declared_bound_restorations.get(name)
+        if bound:
+            field, key, value = bound
+            parsed = json.loads(body)
+            branches = parsed["properties"][field]["anyOf"]
+            branch = next(b for b in branches if b.get("type") == "integer")
+            assert key not in branch, f"{name}.{field} was declared to lose {key}"
+            branch[key] = value
             body = _stable(parsed)
         others[name] = body
     assert (

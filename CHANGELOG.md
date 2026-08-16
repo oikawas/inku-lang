@@ -7277,3 +7277,29 @@ families after who they answer to**.
 - **⚠ This round closed no ledger item.** Neither the branch's commits nor the contract names one, and
   **[I-244] and [I-245] (which tabs the limits panel appears under) are a different matter and remain
   open**.
+
+---
+
+### 2026-08-16 — Six decimals is the specification, not an implementation detail (**no version bump**, SPEC only, ledger I-265)
+
+**The six decimal places every number written into an SVG carries were nowhere in the SPEC.**
+The only record was the implementation's docstring (`master_grid.py`) and a ruling from 2026-07-24, so
+**reading the SPEC alone could not tell whether six digits were the specification or a convenience.**
+The author's 2026-08-16 ruling — **no specification change; six digits are the specification** — is now
+written into SPEC §19.
+
+- **Not one byte of code or corpus moved.** Only `SPEC.ja.md` (+10 lines) and `SPEC.md` (+30 lines)
+  changed, **nothing under `web/`, so there is nothing to send to pentala** (**and no version was
+  taken**).
+- **The reason not to lower the digits is the picture, not the byte count** — dropping a
+  production-scale work to three digits **moves 19.52% of the pixels at the natural width of 1618px**.
+  Keeping only the filter numbers at six digits brings that to **0.50%** (**what had been moving it was
+  two filters and four numbers**). **Two digits move the picture from the coordinates alone** (17.52%
+  on a fill, 48.57% on a production work) — **a coarser grid gathers points that the hand's tremor had
+  scattered onto the same coordinate. What moves is not the amount of ink but where the specks sit.**
+- **⚠ The filing's "14.4% together with gzip" compared a gzipped size against an ungzipped one.**
+  The transport is already gzipped; **gzip against gzip, three digits is 68.1% and two digits 55.9%**.
+- **⚠ The filing's "1,859ms → 533ms" cannot be attributed to the digits** — that build rounded the
+  filters as well. **The main cause of the freeze is still the 24,446 per-element filters.**
+- The text was written by the design session (on the author's override) and **committed by the git
+  session**, since SPEC is outside standing approval.

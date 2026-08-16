@@ -298,4 +298,41 @@ class TheBeatTheArcAndTheSheetAgreeWithTheServerTest {
         )
         assertEquals("and its 55 specks", 55, Regex("<circle[ />]").findAll(plain).count())
     }
+
+    // ---- [I-272] the sheet -----------------------------------------------
+
+    /**
+     * T-131: every paper comes out at the server's pixel width.
+     *
+     * Only one of the ten disagreed -- `oban`, whose 666.6667 the port truncated
+     * to 666 where the server rounds to 667 -- but `vertical` is in the table
+     * for the fix rather than for the bug: its ratio lands exactly on 562.5, so
+     * a half-upwards rounding would answer 563 and a half-to-even one answers
+     * 562, and truncation happened to answer 562 too. Measuring `oban` alone
+     * would accept `Math.round`, which trades one disagreement for another.
+     *
+     * `pixel9_landscape_safe` has no server counterpart -- it is the device's
+     * own paper -- and is here to say it was not deleted along the way.
+     */
+    @Test
+    fun testEveryPaperIsTheServersSize() {
+        val expected = mapOf(
+            "square" to 1000,
+            "golden" to 1618,
+            "a4" to 707,
+            "b4" to 707,
+            "pillar" to 200,
+            "oban" to 667,
+            "wide" to 2350,
+            "byobu" to 2200,
+            "vertical" to 562,
+            "pixel9_landscape_safe" to 1800,
+        )
+        assertEquals("ten papers", expected.size, CanvasAspects.all.size)
+        for ((id, width) in expected) {
+            val size = CanvasAspects.sizeFor(id)
+            assertEquals("$id width", width, size.width)
+            assertEquals("$id height", 1000, size.height)
+        }
+    }
 }

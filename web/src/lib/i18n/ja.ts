@@ -464,15 +464,23 @@ export const ja: LangPack = {
 	settingsDetailHint: '詳細モードでは、プラグイン・その他（サーバー）・制限値・未読語台帳のタブが出ます。',
 	settingsRenderLimitsTitle: '制限値',
 	settingsRenderLimitsIntro:
-		'一枚の作品が何本の墨を持てるかを決める数です。速度の調整ではなく、描かれる線の数そのものが変わります。ここで決めた値は Stage 1 / Stage 2 のプロンプトへ書き込まれ、描いた作品ごとに記録されます。',
+		'一枚の作品が何本の墨を持てるかを決める数です。速度の調整ではなく、描かれる線の数そのものが変わります。ここで決めた値は Stage 1 / Stage 2 のプロンプトへ書き込まれ、描いた作品ごとに記録されます。九つの数は三つの族に分かれ、族ごとに従うべき相手が違います —— 機材に合わせて動かすもの、人の目に合わせて据え置くもの、誤入力を止めるだけのものです。',
 	settingsRenderLimitsRounding:
 		'互いに矛盾する値は拒否せず丸めます（例: 代表化の上限が literal の閾値を超えていれば、閾値まで下げます）。表示されているのは丸めたあとの、実際に効いている値です。',
 	settingsRenderLimitsReset: '既定値へ戻す',
 	settingsRenderLimitsSaved: '制限値を保存しました',
 	settingsRenderLimitGroups: {
-		drawn: '実際に描かれる数',
-		stated: '述べた数の扱い',
-		ceiling: '読み取りと検証の天井'
+		capability: 'この機械が描ける量',
+		legibility: '目で数えられる限界',
+		safety: '誤入力の番人'
+	},
+	settingsRenderLimitGroupTooltips: {
+		capability:
+			'この設置の機材が、一枚にどれだけ描けるかを決めます。速い機械なら上げられる、ここだけが機材に合わせて動かす族です。\n\n実測（エンジン 35・開発機）: 格子の墨 1 本が SVG のおよそ 13 KB（ペン）〜16 KB（太筆）にあたります。既定の 400 本でも、一枚が 5〜6.5 MB・描画に数秒かかります。上げるほど閲覧側が重くなります。\n\n一本あたりの費用は筆致で 25% 変わるので、本数は重さの目安であって重さそのものではありません。',
+		legibility:
+			'そのまま数えて描く数と、数えきれないので群れとして見せる数の境目です。\n\n機械が速くなっても人の目は速くなりません。だからこの族は上の「この機械が描ける量」とは連動させません。\n\nここで保ちたいのは閾値の数字ではなく見え方です —— 一つの群れに入る墨の量が一定に見えること。代表化の上下端を動かすと、その見え方も動きます。',
+		safety:
+			'誤入力と暴走を止めるためだけの数です。ここを動かしても絵は良くなりません。\n\n本番の実績は指示 27 個が最大（中央値 4）なので、既定値は実在の作品に一度も当たっていません。ふつうは既定のままにしてください。'
 	},
 	settingsRenderLimitLabels: {
 		max_expanded_primitives: '一枚あたりの墨の数',
@@ -486,12 +494,12 @@ export const ja: LangPack = {
 		schema_count_max: 'Stage 2 の出力を検証する天井'
 	},
 	settingsRenderLimitHints: {
-		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます',
-		max_expanded_per_instruction: '一つの指示がこれより多くを求めたら間引きます',
-		max_instructions: 'これを超えた指示は切り捨てます',
+		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます。実測では 400 本で SVG 5〜6.5 MB（筆致による）',
+		max_expanded_per_instruction: '一つの指示がこれより多くを求めたら間引きます。一枚の総量より大きい値は総量まで下げます',
+		max_instructions: 'これを超えた指示は切り捨てます。本番の最大は 27（中央値 4）なので、既定の 64 は実在の作品に当たりません',
 		literal_count_threshold: 'これ未満なら述べた数をそのまま描きます。これ以上は数えられないので群れとして見せます',
 		represented_count_min: '群れとして見せるときの下の端',
-		represented_count_max: 'その上の端。そのまま描く上限を超えていれば、そこまで下げます',
+		represented_count_max: 'その上の端。そのまま描く上限を超えていれば、そこまで下げます。ここを動かすと一つの群れに入る墨の量も動きます',
 		ddl_count_max: '記述の中の数字をここまでに丸めます。Stage 1 に教える密度の帯の上端でもあります',
 		ddl_count_max_grid: '文字どおりの格子だけは、通常の配置より高いところまで許します',
 		schema_count_max: 'Stage 2 が返した数がこれを超えていたら、ここまで切り詰めます'

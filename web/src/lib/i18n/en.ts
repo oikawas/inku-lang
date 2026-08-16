@@ -464,15 +464,23 @@ export const en: LangPack = {
 	settingsDetailHint: 'The detailed mode adds the Plugins, Other (server), Limits and Unread-word ledger tabs.',
 	settingsRenderLimitsTitle: 'Limits',
 	settingsRenderLimitsIntro:
-		'These decide how many marks a single work may carry. They are not speed tuning: they change how many lines get drawn. The values set here are written into what Stage 1 and Stage 2 tell the model, and recorded on every work drawn under them.',
+		'These decide how many marks a single work may carry. They are not speed tuning: they change how many lines get drawn. The values set here are written into what Stage 1 and Stage 2 tell the model, and recorded on every work drawn under them. The nine numbers fall into three families, and each family answers to something different — the machine, the eye, and a guard against typing mistakes.',
 	settingsRenderLimitsRounding:
 		'Values that contradict each other are rounded, not rejected (a represented band above the literal threshold is lowered to it). What is shown is the rounded set that actually took effect.',
 	settingsRenderLimitsReset: 'Restore defaults',
 	settingsRenderLimitsSaved: 'Limits saved',
 	settingsRenderLimitGroups: {
-		drawn: 'How much is actually drawn',
-		stated: 'How a stated number is honoured',
-		ceiling: 'Ceilings on reading and validation'
+		capability: 'What this machine can draw',
+		legibility: 'Where counting by eye stops',
+		safety: 'Guards against a typing mistake'
+	},
+	settingsRenderLimitGroupTooltips: {
+		capability:
+			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.',
+		legibility:
+			'The line between a number small enough to draw as stated and one too large to count, which is shown as a band instead.\n\nA faster machine does not make an eye faster, so this family is deliberately not tied to the one above.\n\nWhat should stay steady here is the look — how much ink sits in one cluster — rather than the threshold digits. Moving the band ends moves that look too.',
+		safety:
+			'Numbers that only stop a typing mistake or a runaway. Nothing here makes a drawing better.\n\nThe largest work in production carries 27 instructions (median 4), so the defaults have never bound a real one. Leave the family alone unless something is wrong.'
 	},
 	settingsRenderLimitLabels: {
 		max_expanded_primitives: 'Marks per work',
@@ -486,12 +494,12 @@ export const en: LangPack = {
 		schema_count_max: "Ceiling checked on Stage 2's output"
 	},
 	settingsRenderLimitHints: {
-		max_expanded_primitives: 'Past this the whole work is scaled down to fit',
-		max_expanded_per_instruction: 'An instruction asking for more than this is thinned',
-		max_instructions: 'Instructions past this are dropped',
+		max_expanded_primitives: 'Past this the whole work is scaled down to fit. Measured: 400 marks come to 5-6.5 MB of SVG, depending on the brush',
+		max_expanded_per_instruction: 'An instruction asking for more than this is thinned. A value above the per-work total is lowered to it',
+		max_instructions: 'Instructions past this are dropped. Production has never exceeded 27 (median 4), so the default of 64 has never bound a real work',
 		literal_count_threshold: 'Below this the stated number is drawn as stated; at or above it the group is shown as a band, because it cannot be counted by eye',
 		represented_count_min: 'Low end of the band a too-large group is drawn as',
-		represented_count_max: 'High end of that band. Lowered to the literal threshold if it sits above it',
+		represented_count_max: 'High end of that band. Lowered to the literal threshold if it sits above it. Moving it also moves how much ink lands in one cluster',
 		ddl_count_max: 'A numeral in the description is clamped to this. It is also the top of the density bands Stage 1 is told to use',
 		ddl_count_max_grid: 'Only a literal grid may reach higher than an ordinary arrangement',
 		schema_count_max: "A count Stage 2 returns above this is clamped down to it"

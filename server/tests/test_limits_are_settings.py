@@ -554,11 +554,44 @@ def test_t9_the_limits_tab_carries_all_nine_rows_and_a_reset():
         assert f"{field}:" in block, f"the panel has no row for {field}"
 
     # Three families, named by the server so the panel cannot invent a fourth.
-    assert {name for name, _ in LIMIT_GROUPS} == {"drawn", "stated", "ceiling"}
+    # The names say who each family answers to -- the machine, the eye, and a
+    # typing guard -- because an administrator cannot otherwise tell which
+    # numbers may follow the hardware and which must not.
+    assert {name for name, _ in LIMIT_GROUPS} == {"capability", "legibility", "safety"}
     assert sorted(f for _, fields in LIMIT_GROUPS for f in fields) == sorted(LIMIT_FIELD_NAMES)
-    groups_block = labels.split("settingsRenderLimitGroups: {")[1].split("}")[0]
-    for name, _ in LIMIT_GROUPS:
-        assert f"{name}:" in groups_block
+
+    # Membership, not just the names: a field that drifts into the wrong family
+    # would leave the heading and the tooltip claiming something untrue about it.
+    # `max_instructions` is the one that moved -- it is a runaway guard, not a
+    # statement about how much this machine can afford to draw.
+    membership = {name: set(fields) for name, fields in LIMIT_GROUPS}
+    assert membership["capability"] == {
+        "max_expanded_primitives",
+        "max_expanded_per_instruction",
+    }
+    assert membership["legibility"] == {
+        "literal_count_threshold",
+        "represented_count_min",
+        "represented_count_max",
+    }
+    assert membership["safety"] == {
+        "max_instructions",
+        "ddl_count_max",
+        "ddl_count_max_grid",
+        "schema_count_max",
+    }
+
+    english = (WEB_ROOT / "src" / "lib" / "i18n" / "en.ts").read_text(encoding="utf-8")
+    for pack in (labels, english):
+        groups_block = pack.split("settingsRenderLimitGroups: {")[1].split("}")[0]
+        tips_block = pack.split("settingsRenderLimitGroupTooltips: {")[1].split("}")[0]
+        for name, _ in LIMIT_GROUPS:
+            assert f"{name}:" in groups_block
+            # A family whose heading cannot say what it answers to is back to
+            # being one of nine unrelated numbers.
+            assert f"{name}:" in tips_block
+
+    assert "renderLimitGroupTooltip(groupName)" in panel
 
     # Deleting the reset control must turn this red: an adjustment device you
     # cannot put back is not usable.

@@ -6936,3 +6936,57 @@ version moves three: **31, 32 and 35**.
   `cli/tests` and `web/src` only), so the inventory was counted by hand.
 - **⚠ Neither `APP_VERSION` nor `web/BUILD_NUMBER` moved.** `android/` is permanently excluded from every
   sync path, so this cycle sends nothing to pentala.
+
+---
+
+### v2.13.25 — A heavy work opens without freezing the page (Build 912, 2026-08-16, ledger I-264 groundwork)
+
+**Opening the heaviest work in production left the page unusable for several seconds.**
+The work that started this is **11,068,576 bytes and 39,789 elements**; putting that markup into
+the page **blocked the main thread for 3,387 ms and left 39,788 nodes behind**, which every later
+layout and style pass then walked. This version fixes two things: **how much travels** and **how it
+is placed**.
+
+- **The canvas takes the drawing as an image.** Instead of putting the work's markup into the page,
+  it makes a blob URL and draws it with `<img>`. **The browser rasterises it once and the page keeps
+  one node.** For the same work, **blocking went from 921 ms to 681 ms and time to paint from
+  1,859 ms to 17 ms** (784 px frame, blank page). **Zoom and the presentation view are unchanged** --
+  both are CSS transforms on the boxes around the drawing, so it stays sharp at high zoom.
+  **The URL is released when the work changes.**
+- **⚠ The reason this is safe was counted across every work in production** -- across all **3,485
+  works there is no `currentColor`, no CSS variable, no `<style>`, no `<script>` and no external
+  URL**. An image cannot receive what the page was supplying, and the page was supplying nothing.
+  1,833 works carry a `class` attribute, but those 314 names are engine provenance marks and
+  **not one of them matches any CSS in the web app**.
+- **Counting the trash carried a hundred drawings.** The listing call that only wants a number never
+  said `include_svg=false`. **None of those drawings was ever read** -- nothing reads `trashItems`.
+- **The API answers with gzip.** A drawing is text, so it goes to **26.4%** (11,068,576 → 2,917,551
+  bytes at level 6). **Level 9 is 0.9% smaller for 204 ms more**, so it is not used.
+  **Already-compressed types are excluded one at a time** -- a thumbnail PNG went 115,167 → 115,026
+  bytes (99.9%), all of the work and none of the saving. **The `image/` family is deliberately not
+  excluded as a family**: a drawing leaves as `image/svg+xml`, so a family prefix would have turned
+  this off for the very body it was added for.
+- **⚠ Acceptance found and fixed one regression** -- **the gzip layer was holding the progress events
+  back**. `/api/paint/stream` writes a stage event as soon as interpretation finishes, and the page
+  reads it to name the stage that is running. **A compressor emits nothing until it has enough**, so
+  five events put **10 / 0 / 0 / 0 / 117 bytes** on the wire (the ten being the gzip header) and
+  **not one arrived before the drawing was finished**. This version flushes after each event.
+  **Nothing is given up** -- compression continues and the large final body still shrinks.
+  **The content was never wrong; only its timing was.**
+- **⚠ None of the three existing gates reddened for that regression** (the layer was there, and both
+  compression and exclusion worked). **A gate that measures whether the bytes leave was added**,
+  reading the ASGI messages, because the test client joins the body up and would answer the same
+  either way.
+- **⚠ Coordinate precision and per-element filters are untouched** -- **554,720 of a drawing's
+  554,721 numbers carry six decimals** (ledger I-265), and its **24,446 filter references account for
+  roughly four fifths of the time to display it** (ledger I-264). **Both are out of scope here and are
+  on the ledger.** The page no longer freezes, but the wait before the drawing appears remains.
+- **Production distribution** (3,485 works): SVG **median 65,768 bytes, mean 346,834, p90 814,584,
+  p99 4,420,887, max 24,513,938**. **255 works are over 1 MB.**
+- **Six perturbations** (five from the implementation, one from acceptance). **All six matched their
+  predictions.**
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3,242 passed /
+  31 skipped** (branch point 3,224; **+14 from main**, the engine 35 contract, **+4 from this
+  version**), **cli 225 passed**, **web 373 pass / 0 fail** (371 at the branch point, +2),
+  **`npm run check` 261 FILES / 0 ERRORS / 2 WARNINGS** (unchanged), **`lint:i18n` 0 errors**,
+  **ruff clean for both server and cli**.

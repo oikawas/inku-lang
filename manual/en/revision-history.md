@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.25 unreleased baseline (Web Build 912)
+
+Updated the thirteen places that name a version to v2.13.25 / Build 912. **No screen interaction changed. What changed is the wait when a heavy work is opened.**
+
+- **Opening a heavy work no longer freezes the page.** A work with many elements used to leave the page unusable for several seconds. The drawing is now placed as an image, so the page keeps responding.
+- **Zoom and the presentation view look the same.** The drawing stays sharp at high zoom.
+- **Less travels over the network.** The server now compresses a work on the way out, which is about a quarter of the size for a large one. Images that are already compressed, such as photographs, are still sent as they are.
+- **The progress shown while a drawing is being made still changes stage by stage.** This was checked against the new compression.
+- **⚠ The wait before the drawing appears is still there.** The page no longer stops responding, but a very heavy work still takes time to show.
+- No word you can write in a description was added or removed.
+
 ## 2026-08-16 — v2.13.24 unreleased baseline (Web Build 911)
 
 Updated the thirteen places that name a version to v2.13.24 / Build 911. **No screen interaction changed. What changed is how a surface texture is drawn.**

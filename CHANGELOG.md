@@ -7354,7 +7354,8 @@ protected, then the derivation added, and only then the vocabulary widened — s
   shape goes out as-is. **`05_circle_rotring` comes out filled when it should not be** (measured by
   the implementation session). **The 51-case parity walk compares `d` / `points` /
   `stroke-dasharray` and never `fill`, so no gate catches it.** Older than this contract, so it was
-  left alone and filed in the ledger
+  left alone; it is ledger [I-280] (**⚠ eight is the number of roads, not the number of breaks** —
+  only `05_circle_rotring` was measured broken)
 - **⚠ One claim in the contract was wrong** (the issuing session's error) — it said the judgement
   "is overridden by `renderBodyShape`, so it never reaches the page", **having counted the callers
   of `renderBodyShape` but not the branches that never call it.** The implementation session found

@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .texture_fold import fold_texture_runs, should_fold
+
 BACKEND_RESVG = "resvg"
 
 
@@ -112,4 +114,10 @@ def svg_to_png(
         raise RasterizerUnavailable(
             "resvg-py is not installed, and it is the only supported SVG rasterizer"
         )
+    # Decided here rather than by the callers: there are nine places that
+    # rasterize, and a flag any one of them could forget is a flag some of them
+    # would. The size is only known here anyway. See `texture_fold` for what the
+    # boundary is and what was measured to put it there.
+    if should_fold(width, height):
+        svg = fold_texture_runs(svg)
     return render(svg, width, height, font_files, skip_system_fonts)

@@ -7456,8 +7456,8 @@ time it was opened. **A redraw now runs under the limits the work was drawn unde
 - **⚠ The repair path's scatter-density budget ignored the setting and ran at 240** (the shipping
   value of `max_expanded_per_instruction`). **The effective limits are now threaded through it. At
   the default settings not one bit changes; on an installation that changed the setting, the
-  behaviour does.** This is a **fourth** hard-coded value, distinct from the three found earlier,
-  and it is filed as [I-281].
+  behaviour does.** This is a **fifth** hard-coded value, distinct from the four found earlier,
+  and it is filed as [I-282].
 - **The three frozen API-surface guards were told, by name, which key each of six schemas gained**
   (**not a blank cheque** — the declared key is taken back out before hashing, so **a second key
   arriving in any of them is still red**).

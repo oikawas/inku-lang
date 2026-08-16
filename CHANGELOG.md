@@ -7703,3 +7703,153 @@ words); the rest arrived on main after the branch point.
 - **The version literals were four, not the three the contract measured** (`test_api.py`); the DDL
   side has four as well.
 - **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).
+
+### v2.13.32 — a raised ceiling reaches the page (Build 919, 2026-08-16, ledger I-132 and I-136)
+
+An administrator could raise the ceiling on how much a work may hold and see no more ink on the page. **Three places never read the raised value; each of them had the shipping number written straight into it.**
+
+- **A tiling with no number in it follows the ceiling.** A description that names no count -- "fine lines tiled
+  across the whole sheet" -- decided how far to expand from the shipping 400. On an installation set to 1200 it
+  **stayed at 400**; it now draws **1200**. There are two call sites and **both are handed the limits**, because
+  leaving one on the default would keep the old behaviour for whatever came through that road.
+- **The representation bands became ratios of the ceiling.** The boundaries that pick how dense a group reads
+  and how many clusters it is split into (180 / 80 and 500 / 240 / 120 by default) were constants that assumed
+  the shipping ceiling of 120. **Held as integer ratios, they land on exactly today's numbers at the defaults
+  and move with the setting when it moves.**
+- **The cap on cluster count follows the ceiling.** **What actually held it was the `le=12` written on
+  `Arrangement.cluster_count`.** At three times the ceiling one group carries 360 marks, and keeping a cluster
+  at 24 marks needs fifteen clusters or more. **The static bound is gone and the composer writes the effective
+  one (`represented_count_max // 10`) back into the tool schema** -- which is what the same file already does
+  for `count`. **At the defaults it is exactly 12 again and the tool JSON is byte-identical.**
+  **Marks per cluster stay inside the default band of 13.3-24.0 at a third of the ceiling and at three times
+  it**, where today they ran to 4.4 and 42.9.
+- **The number on the stepper says what it weighs.** The stepper counts marks; what reaches a reader is a file.
+  **The server sends the measured cost of one mark** (`bytes_per_mark`: 12,924 for a pen and 16,138 for a thick
+  brush, measured 2026-08-16 on the 400-mark row, which is the default itself), **and the settings panel prints
+  `≈ 5.2-6.5 MB` under the total and nowhere else.** **No seconds** -- that measurement was CLI round-trip wall
+  clock, not drawing time. **The other eight rows carry none**, because they are per-instruction bounds,
+  legibility thresholds and typo guards, and none of them governs megabytes.
+- **Nothing moves at the defaults.** `check_frozen_corpora.py` is byte-identical, and neither
+  `render_engine_version` nor `ddl_engine_version` was raised.
+
+**All four guards over the frozen API surface moved**, because **two schemas changed** rather than one:
+`RenderLimitsStatus` gained a key and `Arrangement` lost a bound. **Only the record was regenerated; the other
+three were given declarations.** **The declaration mechanism was widened twice**: a key with no default is also
+listed under `required`, so a declared key is now taken out of that list as well (the twelve declared before
+this one were all optional, so nobody had hit it); and **a bound that left cannot be expressed by a property
+that arrived or departed**, so a restoration is put back before hashing. **The card and ACL guards already held
+`Arrangement` through a `group_size` declaration and, comparing only property sets, waved the vanished
+`maximum` through -- two named checks now close that.**
+
+**Verification, measured by the accepting session on the merged tree, all green**:
+**server 3,350 passed / 31 skipped (517.63 s)**, **cli 235 passed (15.73 s)**,
+**web 431 pass / 0 fail / 0 skipped (5.61 s)**, **`npm run check` 0 errors / 2 warnings** (the two known a11y),
+**`lint:i18n` 0 warnings / 0 errors**, **`check_frozen_corpora.py` byte-identical**, **ruff clean**.
+**The +35 on the server is exactly the branch's** (8 new functions, 35 cases) and matches the main-side
+increment one for one.
+
+- **The 8 acceptance checks and 11 perturbations were run by the implementing session**, with the prediction
+  frozen in a commit before any code. **Three came out differently**: the roles of the two call sites had not
+  been measured beforehand (+1), the web suite's full-run meta gate came along (+1), and the frozen corpus
+  turns out to touch the 240 boundary in no case at all (-2). **That last one means a single acceptance check
+  is the only guard on that boundary.**
+- **After the merge the accepting session fixed two web defects** (on the author's ruling, committed to the
+  branch and merged a second time with `--no-ff`): **(1) the `{@const}` sat directly inside an element, so the
+  panel did not compile at all** (`npm run check` reported 2 errors; neither the contract's list of runs nor
+  the branch's own covered that surface, and `node:test` reads the file as text so it stayed green), and
+  **(2) `+page.svelte` declares its own type and had been left behind as the other half of the pair.**
+- **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).
+
+---
+
+### Android — A grain is one touch, and a band is made of them (android `2.1.4-android.37`, 2026-08-16, ledger I-285)
+
+**Of the ten surface textures the port offers the model, three could actually be drawn. Seven can now,
+and the words that are offered while drawing nothing went from five to one — `bleed`.** The four that
+landed are `stipple`, `grain`, `paper_grain` and `aquatint`, and **they fit in one round because the
+server draws all four the same way**: scatter positions inside the contour, then touch the tool down
+once at each point. The touching-down part (`_surface_dab`, 73 lines on the server) is ported once and
+serves all four.
+
+- **A grain is not a circle:** one point is one stroke, and it becomes a circle only for a machine pole
+  like `rotring` or `computer`. A hand tool gets one stroke from the material engine, and **its width is
+  the greater of the tool's stroke width and the grain's own size** — the server's docstring carries the
+  measurement showing the surface disappears when only the stroke width decides. **Both paths were
+  ported.**
+- **`svgProfile` was threaded down to the surface layer (stage 1):** the server reads `use_filters` in
+  four branches — the three grain words, `wash`, `aquatint` and `bleed` — and **`hatch` is the one that
+  does not**. **The single branch the port already had was that `hatch`, which is why it had gone this
+  far without the profile.** It now reaches all eleven call sites of `renderSurfaceVectors`, and **since
+  all eleven sit inside one function (`renderInstruction`), that function took an argument too**. **No
+  default value was given** — a default would let a new call site pick the old behaviour silently. **The
+  folded form is `useFilters: Boolean`, folded only after reading the server's two steps one-to-one and
+  confirming their composition is exactly `profile == "display"`.**
+- **⚠ The `wash` filter the previous round deliberately left unconditional is now cut by profile.**
+  **That line had never emitted a single byte** — the tools with a texture filter are `pencil`, `crayon`,
+  `chalk`, `brush_thin` and `brush_thick`, **`pen` writes none, and all eight gates from the previous
+  round run on `pen`**. The new gate uses `pencil` for exactly this reason; on `pen` the perturbation
+  would have hit nothing.
+- **`aquatint` does not scatter twice:** it scatters once, then decides each grain's opacity from which
+  horizontal band the point fell into. The step number goes into an `aquatint-step-N` class. **A grain
+  nudged past the contour is put back** — **without that, one point on the square and two to four on the
+  triangle land outside** (measured; perturbation P-6 really did go red).
+- **Nine gates were placed as properties (T-157 to T-165):** **only two instructions in the 51-picture
+  frozen corpus carry a surface, both `hatch`, and these four words have zero cases**, so the gates read
+  no corpus picture and measure a square and a triangle instead.
+- **⚠ Two vacuous-gate traps were avoided:** T-158 writes the ceiling of 90 on the test's side as
+  `statedMarkCeiling` and **checks the product's `SURFACE_MARK_MAX` against it on a separate line** (the
+  shape that made T-154 vacuous last round). **A ceiling alone would pass an implementation where the
+  ceiling always binds**, so a thin surface (density 0.05, measured 30–32 marks) and a dense one
+  (density 1.0, measured 89–90) are placed as a pair. T-161 compares against the `tone_steps` the score
+  asked for and reads no product constant at all.
+- **⚠ The implementing session corrected one of its own pre-work predictions:** it had predicted the
+  ceiling of 90 would not bind on the contract's triangle, so a larger shape would be needed. **The area
+  factor comes from `shapeBbox`'s `w * h`, not from the triangle's area.** **The square and the triangle
+  share a bbox, so both get the same factor of 1.0755 and both hit the ceiling at density 0.55.** No
+  larger shape was needed; the two shapes the contract named were enough.
+- **⚠ The three grain words agree only in the surface layer:** T-159 was going to assert that the three
+  produce identical SVG, and **measurement said otherwise** — an instruction's own seed is a hash of the
+  instruction's dump, and the texture word is inside that dump, so the shape's own contour stroke differs
+  between the three. **The server has the same shape, so this is not a defect in the port.** T-159
+  compares only what the surface layer wrote (measured: 89 elements on the square, 90 on the triangle,
+  identical across all three words).
+- **⚠ `pencil` writes 66 `<circle>` elements that do not belong to the surface layer:** the material
+  layer's circles carry no class, and **the port's grain circles carry none either, exactly as on the
+  server**, so markup cannot tell them apart. **The contract named `pencil` for T-160; it was changed to
+  `pen`** — `pen` is a hand tool that writes no circles at all, and `rotring` writes circles that are all
+  grains. **That pair is the only one that reads both paths without ambiguity.**
+- **One existing control narrowed from three words to one:** `stipple` and `aquatint` left
+  `ASurfaceKeepsToItsShapeTest.testTheOtherSurfaceWordsAreUntouched`, leaving `bleed`. **This is not a
+  regression but the very claim the contract set out to change** (the contract named this one test
+  before any code was written). **The `@Test` total did not move.**
+- **Six of the seven perturbations matched the prediction; one missed:** **P-4 (kill the `usesHandStroke`
+  branch) was predicted to redden one test and reddened three.** The miss was not about the drawing but
+  about **what the gates read** — T-157 and T-162 read the machine pole through `<circle>`, so sending
+  the machine pole down the stroke path leaves **no circles at all and they fail on "there are no marks"**.
+  **They went red because what they read became empty, not because a centre moved outside.** **Writing
+  function names into the prediction without writing how each one reads was the direct cause.**
+- **⚠ The contract's own perturbation table was wrong in two places, and the implementing session caught
+  both before writing code:** (1) **P-3 also reddens T-164** — the contract listed two tests; T-164 walks
+  all four words, so a `paper_grain` that draws nothing emits no filter even under `display`. (2) **P-7
+  does not reach the previous round's `AWashIsAFieldTest`** — the contract said it might; T-156 reads
+  only sweep width and opacity, never the `filter` attribute, and runs on `pen`. **Both were written into
+  the frozen note with their reasons, and both measured out that way.**
+- **A version was taken:** **what runs on the device changed** (`DefaultSvgRenderer.kt`), so
+  `android/VERSION` is now `2.1.4-android.37`. **⚠ `renderEngineVersion` stays at `"35"`** (the issuing
+  session's decision still stands, and **how the version should be handled remains open for the author to
+  rule on**). `ddlEngineVersion` did not move. **`android/` is permanently excluded from every sync path,
+  so there is nothing to send to pentala.**
+- **Verification (re-measured by the accepting session on the merged tree):** **Android JVM 355 tests /
+  0 failures / 0 errors / 0 skipped** (61 XML files, 44s from `rm -rf app/build`),
+  **`test_android_reference_fixtures_are_current.py` 4 passed**. **The `@Test` total went from 346 at the
+  base to 355 on the branch, +9** (T-157 to T-165) — **no test was deleted and none was renamed**. **⚠
+  `cycle.sh accept` printed "2370 → 2358" and appeared to show twelve tests vanishing; those twelve came
+  from ledger I-132, which landed on main after the branch point, so the branch simply does not carry
+  them** (and the tool counts no file under `android/` at all — ledger I-270).
+- **⚠ One finding outside the contract's scope was filed rather than fixed:** **the port's `wash` and
+  `hatch` take the surface seed at `(0, 0)`** where the server takes it at `(ins_idx, mark_idx)`. **When
+  `surface.seed` is absent, every mark expanded by an `arrangement` ends up with the same texture.** The
+  two branches added this round take it the server's way, so two conventions now live side by side in the
+  port. **The visual difference is unmeasured.**
+- **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — the Android JVM is not among
+  the four jobs in `checks.yml`).

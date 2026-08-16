@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.31 / Build 918**
+**Target version: v2.13.32 / Build 919**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -76,6 +76,12 @@ Do not add implicit time seeds or automatic variation counters.
 Today's settings are used only for a work whose row recorded no limits, and the answer says which of the two drew it.
 A request may lower a limit but never raise one.
 The ceiling belongs to the administrator, not to the caller placing the order.
+- A raised ceiling reaches the page.
+No place keeps a shipping number written into it, and the bands and the cap on cluster count are held as ratios of the setting.
+A ceiling that does not reach the page is a second ceiling the administrator cannot see.
+- The number on a ceiling says what it weighs.
+What is counted is marks; what reaches a reader is a file.
+The conversion comes from the per-mark cost the server measured, with no copy of it kept in the browser.
 - Keep `dh1` description identity, `rh3` work-edition identity (legacy `rh2` values are retained), history IDs, and lineage node IDs distinct.
 - Lineage records explicit derivation operations only.
 Never infer parentage from similarity, time, or matching hashes.
@@ -108,7 +114,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 37 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.36` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.37` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary

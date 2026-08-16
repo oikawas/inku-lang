@@ -77,7 +77,7 @@ class DefaultSvgRendererFillDabTest {
         return renderer.render(
             RenderRequest(
                 scoreJson = score.toString(),
-                colorCatalogId = "default",
+                colorCatalogId = ReferenceRendering.catalogId(entry),
                 canvasAspect = entry.optString("canvas_aspect", canvas),
                 svgProfile = "editable",
                 renderSeed = renderSeed,

@@ -253,7 +253,7 @@ class ServerRendererCloudformAndRelationsTest {
             return renderer.render(
                 RenderRequest(
                     scoreJson = scoreObj.toString(),
-                    colorCatalogId = "default",
+                    colorCatalogId = ReferenceRendering.catalogId(entry),
                     canvasAspect = "square",
                     svgProfile = "editable",
                     renderSeed = renderSeed,

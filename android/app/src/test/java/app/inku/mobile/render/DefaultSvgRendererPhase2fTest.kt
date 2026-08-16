@@ -3,7 +3,6 @@ package app.inku.mobile.render
 import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.data.model.CompatibilityConstants
-import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,45 +21,15 @@ class DefaultSvgRendererPhase2fTest {
         return JSONObject(readReferenceResource("renderer_fill_and_arc.json"))
     }
 
-    private fun renderSvgForReference(key: String): String {
-        val indexJson = readReferenceIndex()
-        val entry = indexJson.getJSONObject(key)
-        val scoreObj = entry.getJSONObject("score")
-        // The corpus keeps the seed beside the Score; so does the server.
-        val renderSeed = if (entry.isNull("render_seed")) null else entry.getLong("render_seed")
-        if (entry.has("wild") && !entry.isNull("wild")) {
-            scoreObj.put("render_wild", entry.getBoolean("wild"))
-        }
-
-        val canvasOpt = scoreObj.opt("canvas")
-        val aspect = when {
-            entry.has("canvas_aspect") -> entry.getString("canvas_aspect")
-            canvasOpt is String -> canvasOpt
-            canvasOpt is JSONObject -> canvasOpt.optString("aspect", "square")
-            else -> "square"
-        }
-        // engine 23: the composition seed travels beside the score, so the
-        // corpus keeps it beside the score too. A walk that dropped it would
-        // draw the one case that states one at the performance seed's placement
-        // and compare it against a picture laid out at another.
-        val compositionSeed = if (entry.has("composition_seed") && !entry.isNull("composition_seed")) {
-            entry.getLong("composition_seed")
-        } else {
-            null
-        }
-        val renderer = DefaultSvgRenderer()
-        val result = renderer.render(
-            RenderRequest(
-                scoreJson = scoreObj.toString(),
-                colorCatalogId = "default",
-                canvasAspect = aspect,
-                svgProfile = "editable",
-                renderSeed = renderSeed,
-                compositionSeed = compositionSeed,
-            )
-        )
-        return result.svg
-    }
+    /**
+     * The drawing this guard compares against the reference.
+     *
+     * The seed beside the Score, the `wild` toggle, the canvas aspect, the
+     * composition seed (engine 23) and -- since this cycle -- the colour catalog
+     * the index declares all live on one road in [ReferenceRendering], which is
+     * also where a perturbation can reach them.
+     */
+    private fun renderSvgForReference(key: String): String = ReferenceRendering.svg(key)
 
     private fun extractGroupPathDList(svg: String, groupClassPrefix: String): List<String> {
         val result = mutableListOf<String>()

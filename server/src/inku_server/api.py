@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import gzip as _gzip
 from .color_catalogs import render_color_map_for_catalog
+from .compression import FlushingGZipMiddleware
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
 from . import db as _db
@@ -195,6 +197,47 @@ app.add_middleware(RequestBodyLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES
 
 
 app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQUESTS)
+
+
+# Starlette's own exclusion list holds one entry, text/event-stream. Everything
+# added here is already compressed, so gzipping it spends the work and returns
+# the same bytes: a thumbnail of 115,167 bytes came back 115,026 after 2.87 ms,
+# measured 2026-08-16, and a listing page draws up to thirty-five of them.
+#
+# ⚠ Named one format at a time, not as `image/`. A drawing leaves here as
+# image/svg+xml, which is text and compresses to 26% -- the very thing this
+# middleware was added for. A family prefix would have excluded it.
+#
+# The check is `startswith` against this tuple, so a bare type covers the
+# `; charset=` forms as well.
+_gzip.DEFAULT_EXCLUDED_CONTENT_TYPES = _gzip.DEFAULT_EXCLUDED_CONTENT_TYPES + (
+    "image/png",
+    "image/apng",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/avif",
+    "video/",
+    "audio/",
+    "application/zip",
+    "application/gzip",
+)
+
+# Added last, so it is the outermost layer and sees the finished response.
+#
+# What it is for: a work's SVG goes out uncompressed today. The largest one in
+# production on 2026-08-16 was 11,068,576 bytes; at level 6 it is 2,917,551
+# (26.4%). Level 9, the library default, spends 572 ms of server time to reach
+# 2,890,540 -- 0.9% smaller for 204 ms more, on every such request. Level 6
+# takes 368 ms and is what this codebase already picked for the animation
+# export, so the two agree.
+#
+# ⚠ Not Starlette's own class. /api/paint/stream writes an event per stage while
+# it works and the page reads them to say which stage is running; the stock
+# responder holds those events inside zlib until the response ends, so they all
+# arrived at once, when the drawing was already there. FlushingGZipMiddleware is
+# the same layer with a flush after each chunk. See compression.py.
+app.add_middleware(FlushingGZipMiddleware, minimum_size=500, compresslevel=6)
 
 
 app.include_router(public.router)

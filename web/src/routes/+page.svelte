@@ -4191,7 +4191,11 @@ if (unreadWords.length > 0) {
 		// answer could put back over a newer one.
 		const requestId = ++trashFetchRequest;
 		try {
-			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true`);
+			// No drawings: what this call is for is the count, and the manager owns
+			// what the trash view puts on screen. Asking for a hundred works with
+			// their pictures cost 11 MB for a single heavy work, and every one of
+			// those bytes was thrown away -- nothing reads `trashItems`.
+			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true&include_svg=false`);
 			if (requestId !== trashFetchRequest) return;
 			if (!r.ok) return;
 			const data = await r.json();

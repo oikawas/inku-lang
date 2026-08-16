@@ -326,6 +326,40 @@
 	}: Props = $props();
 
 	let canvasContentEl: HTMLDivElement | null = null;
+
+	// The drawing goes on the canvas as an image, not as markup.
+	//
+	// Measured against production on 2026-08-16: one work was 11,068,576 bytes
+	// and 39,789 elements, of which 24,446 carried a filter reference. Put in
+	// with {@html} it blocked the main thread for 3,387 ms and left all 39,788
+	// nodes in the page, where every later layout and style pass walks them. As
+	// an image the browser rasterises it once and the page keeps one node: the
+	// same work went from 921 ms blocked and 1,859 ms to paint, down to 681 ms
+	// and 17 ms, measured on a blank page at the 784 px the canvas gives it.
+	//
+	// Safe because the drawing is self-contained -- no currentColor, no CSS
+	// variables, no external references, and no style or script element of its
+	// own -- so an image cannot lose anything the page was supplying. (Do not
+	// write those two tag names out here: the compiler scans this block for
+	// them and reads one inside a comment as the real thing.) Nothing reads the
+	// artwork's nodes either: zoom and pan are CSS transforms on the boxes
+	// around it, svgWeight counts the SVG text, and the PNG and card exports
+	// ask the server. The URL is revoked when the work changes, so holding a
+	// long session open does not accumulate blobs.
+	let artworkUrl = $state<string | null>(null);
+	$effect(() => {
+		const svg = result?.svg;
+		if (!svg) {
+			artworkUrl = null;
+			return;
+		}
+		const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+		artworkUrl = url;
+		return () => {
+			URL.revokeObjectURL(url);
+		};
+	});
+
 	let svgMenuOpen = $state(false);
 	// The card leaves in one press, so the only state it needs is "in flight".
 	let cardExportBusy = $state(false);
@@ -658,7 +692,9 @@
 						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px; transform: scale({actualZoom}); transform-origin: center center; transition: transform 0.15s;"
 					>
 						{#if result}
-							{@html result.svg}
+							{#if artworkUrl}
+								<img class="canvas-art" src={artworkUrl} alt="" />
+							{/if}
 						{:else}
 							<div class="canvas-placeholder-art" aria-label={t().canvasPlaceholder}>
 								<svg viewBox="0 0 {placeholderWidth} {placeholderHeight}" role="img">
@@ -758,7 +794,7 @@
 						<div class="refine-target-column">
 							<div class="refine-target-card">
 								<div class="comparison-label">{t().refineTargetTitle}</div>
-								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if result}{@html result.svg}{/if}</div>
+								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if artworkUrl}<img class="canvas-art" src={artworkUrl} alt="" />{/if}</div>
 								{#if result}<div class="model-target-meta">{seedSummary}</div>{/if}
 							</div>
 							<div class="refine-target-controls">
@@ -1404,7 +1440,10 @@
 	<div class="presentation-overlay" role="dialog" aria-modal="true" aria-label={t().canvasPresentationTitle}>
 		<div class="presentation-stage">
 			<div class="presentation-art">
-				{@html result.svg}
+				<!-- The same work as the canvas, shown larger, so the same reason applies. -->
+				{#if artworkUrl}
+					<img class="canvas-art" src={artworkUrl} alt="" />
+				{/if}
 			</div>
 			{#if instructionCaptionVisible && canShowInstructionCaption}
 				<div class="presentation-caption">{displayInstructionText}</div>
@@ -1954,6 +1993,7 @@
 		overflow: hidden;
 	}
 	.comparison-art :global(> svg) { width: 100%; height: 100%; display: block; }
+	.comparison-art > .canvas-art { width: 100%; height: 100%; display: block; }
 	.model-target-meta { margin-top: 7px; }
 	.model-results-column {
 		display: flex;
@@ -2101,6 +2141,9 @@
 		flex-shrink: 0;
 	}
 	.canvas-box :global(> svg) { width: 100%; height: 100%; display: block; }
+	/* The drawing arrives as an image now; it fills the box the same way the
+	   inline SVG did, so zoom and pan keep working off the boxes around it. */
+	.canvas-box > .canvas-art { width: 100%; height: 100%; display: block; }
 	.canvas-placeholder-art {
 		width: 100%;
 		height: 100%;
@@ -2522,7 +2565,8 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.presentation-art :global(svg) {
+	.presentation-art :global(svg),
+	.presentation-art .canvas-art {
 		max-width: 100%;
 		max-height: 100%;
 		width: auto;

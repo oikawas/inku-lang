@@ -123,6 +123,15 @@ const SENDERS = [
 		what: "the manager's listing",
 		pattern: /limit: String\(pageSize\),[\s\S]{0,200}?include_svg: 'false'/,
 		sendsFalse: true
+	},
+	// ── T-72 ──────────────────────────────────────────────────────────────────
+	// Was named below as the one sender left asking for drawings; ruled on
+	// 2026-08-16 after a work of 11,068,576 bytes was measured in production.
+	{
+		file: '../routes/+page.svelte',
+		what: "the trash count's listing",
+		pattern: /\/api\/history\?offset=0&limit=100&trashed=true&include_svg=false/,
+		sendsFalse: true
 	}
 ];
 
@@ -134,19 +143,30 @@ test('the two listings that draw thumbnails ask for no drawings', () => {
 });
 
 test('every other listing sender is accounted for', () => {
-	// The trash page is the one GET that still asks for drawings, and it asks
-	// for a hundred works at a time. Contract 2 says to leave it alone, so it is
-	// named here rather than silently left out: a fourth sender appearing makes
-	// this fail and has to be decided about.
+	// The roll-call the flag needs, because its default is true: a sender that
+	// writes nothing keeps receiving every drawing and nothing goes wrong loudly.
+	// A fifth sender appearing makes this fail and has to be decided about.
 	const page = readFileSync(fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)), 'utf-8');
 	const manager = readFileSync(fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url)), 'utf-8');
 	const getters = [...page.matchAll(/apiFetch\(`\/api\/history\?/g)].length
 		+ [...manager.matchAll(/apiFetch\(`\/api\/history\?/g)].length;
 	assert.equal(getters, 4, 'four senders ask the listing for works');
 
-	assert.match(page, /\/api\/history\?offset=0&limit=100&trashed=true/, 'the trash page still asks for drawings');
-	// The fourth, decided about here: the sender that reads whether the last
-	// batch reached the end of its prompt, and which lines of it have a work. It
-	// wants two numbers off each work and never its drawing.
+	// The fourth: the sender that reads whether the last batch reached the end of
+	// its prompt, and which lines of it have a work. It wants two numbers off each
+	// work and never its drawing.
 	assert.match(page, /limit: String\(limit\),\s*include_svg: 'false',/, 'the batch resume sender must ask for no drawings');
+	// ── T-72 ──────────────────────────────────────────────────────────────────
+	// Stated as its own claim as well as in the roll-call above: no sender is
+	// left asking the listing for drawings. Only the URLs whose query is spelled
+	// out are read here; the ones built from a URLSearchParams are covered by
+	// their own patterns above, and their text says nothing about what they ask.
+	const spelledOut = [...page.matchAll(/apiFetch\(`\/api\/history\?[^`]*`/g)]
+		.map((m) => m[0])
+		.filter((url) => !url.includes('${'));
+	assert.equal(spelledOut.length, 1, 'one listing URL is spelled out in the page');
+	assert.ok(
+		spelledOut.every((url) => url.includes('include_svg=false')),
+		'a listing URL spelled out in the page must carry include_svg=false'
+	);
 });

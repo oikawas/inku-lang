@@ -30,6 +30,7 @@ ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.
 ENGINE_33_MANIFEST = SERVER_ROOT / "reference" / "render-engine-33" / "manifest.json"
 ENGINE_34_MANIFEST = SERVER_ROOT / "reference" / "render-engine-34" / "manifest.json"
 ENGINE_35_MANIFEST = SERVER_ROOT / "reference" / "render-engine-35" / "manifest.json"
+ENGINE_36_MANIFEST = SERVER_ROOT / "reference" / "render-engine-36" / "manifest.json"
 
 
 def _generator():
@@ -96,11 +97,18 @@ def test_render_reference_case_counts() -> None:
     # now rather than listed in the generator, so a support that joins the enum
     # and is never baked cannot happen; what can happen is a support joining
     # without anyone deciding to re-freeze, and this count is what stops it.
-    assert len(cases) == 588
+    # Engine 37 added nine to C. Every one of the nineteen ground cases above is
+    # drawn with `pen`, whose meeting with the sheet is (0.15, 0.15), and the
+    # arrival probability that carries it is `rate * bias / (n - 4)` -- so small
+    # for a pen that four of the seven supports produced no arrival at all and
+    # left their case byte-identical. Six of the nine change nothing but the
+    # sheet under `brush_thick` (drunk) and `chalk` (refused), two put a mark
+    # word on a line, and one is the combination where the ceiling binds.
+    assert len(cases) == 597
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 66, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 88, "B": 72, "C": 75, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -460,8 +468,12 @@ def test_engine_36_moves_only_the_wash_cases() -> None:
     drift apart, the corpus is a record of some implementation other than the
     one that runs.
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "36" == current_render_engine().version
+    # Read by name, not through `_manifest()`. An attribution is a claim about
+    # one version, and reading the current manifest would swap the subject of
+    # the claim the day the next version froze -- which is what happened here
+    # when engine 37 arrived and this line still said "36".
+    manifest = json.loads(ENGINE_36_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "36"
     assert set(manifest["changed_from_previous"]) == ENGINE_36_WASH_CASES
     previous = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -499,6 +511,101 @@ def test_engine_36_wash_cases_match_the_current_renderer() -> None:
         ), case_id
         checked += 1
     assert checked == 6
+
+
+ENGINE_37_SHEET_CASES = frozenset(
+    {
+        # New: the sheet under the two tools that reach the two quantities.
+        "C-sheet-plain-brush_thick",
+        "C-sheet-washi-brush_thick",
+        "C-sheet-canvas-brush_thick",
+        "C-sheet-plain-chalk",
+        "C-sheet-washi-chalk",
+        "C-sheet-canvas-chalk",
+        # New: a mark word on a line, and the pair the ceiling binds.
+        "C-sheet-line-grain",
+        "C-sheet-line-bleed",
+        "C-sheet-cap",
+        # Carried over and moved: the three ground cases whose pen crossed the
+        # arrival threshold. The other sixteen ground cases did not move.
+        "C-ground-washi",
+        "C-ground-ink_wash",
+        "C-groundseed-auto-washi",
+    }
+)
+
+
+def test_engine_37_moves_only_the_sheet_cases() -> None:
+    """Engine 37 moved the twelve the sheet reaches and nothing else.
+
+    Nine are new and three are carried over. **The three are the measurement,
+    not a gap**: every ground case in this corpus is drawn with `pen`, whose
+    meeting with the sheet is (0.15, 0.15), and the arrival probability that
+    carries the sheet is `rate * bias / (n - 4)`. At a pen's bias that number is
+    around 0.005, so an arrival is rare -- only `washi` and `ink_wash`, the two
+    supports that drink more than paper does, pushed it far enough for a centre
+    to land at all. The four that refuse harder (`charcoal_ground`, `canvas`,
+    `drawing_paper`, `mezzotint`) left their pen case byte-identical, which is
+    exactly why the nine new cases are drawn with `brush_thick` and `chalk`.
+
+    Everything outside the ground is right to be byte-identical: a work that
+    names no ground keeps `DEFAULT_SUPPORT`, and `paper` restates it.
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "37" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_37_SHEET_CASES
+    previous = json.loads(ENGINE_36_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_37_SHEET_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 585
+
+
+def test_engine_37_sheet_cases_match_the_current_renderer() -> None:
+    """Redraw the twelve that moved with the live renderer, not the frozen record.
+
+    **⚠ The test above compares manifest against manifest and redraws not one
+    byte**, the same way engines 35 and 36 found out. This is where "the twelve
+    of this version are what the current tree draws" gets measured, and it is
+    the only place in this file that traverses the sheet at all: the other live
+    redraws here (group G, group F, engine 32, 35 and 36) hold no case that
+    names a ground.
+
+    The drawing goes through bake's own call so a key the generator stops
+    forwarding is seen here instead of being copied into this test too.
+    """
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_37_SHEET_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == (
+            manifest["cases"][case_id]["digest"]
+        ), case_id
+        checked += 1
+    assert checked == 12
+
+
+def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> None:
+    """The six paired cases must not be six copies of one drawing.
+
+    A record where the sheet changed and the digest did not would be a version
+    that says it moved the mark and did not, which is the state engine 34 froze
+    without noticing: its two new supports were `pen` cases and the pen never
+    reached them.
+    """
+    cases = _manifest()["cases"]
+    for tool in ("brush_thick", "chalk"):
+        digests = {
+            material: cases[f"C-sheet-{material}-{tool}"]["digest"]
+            for material in ("plain", "washi", "canvas")
+        }
+        assert len(set(digests.values())) == 3, (tool, digests)
 
 
 def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:

@@ -35,30 +35,30 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-16"
 REASON = (
-    "a wash is a field, not a set of stripes. Saying `surface: wash` drew evenly "
-    "spaced sweeps with bare paper left between them -- 19.9 percent of a "
-    "square's interior and 21.1 percent of a triangle's was never reached by any "
-    "layer -- and a wash has no white in it. Engine 22 took the same symptom out "
-    "of the fill, but none of the three quantities that worked there moves this "
-    "one: measured one at a time, neither a per-sweep angle nor an uneven pitch "
-    "shifts the bare paper (14.7 to 18.3 percent, and at plus or minus 15 "
-    "degrees it rose to 20.9 percent). Only the width of the sweep closes the "
-    "gap. The author read a 14-rung ladder and a 9-square grid and chose G3: the "
-    "sweep width goes from 0.44..0.74 of the pitch to 0.88..1.48, and the "
-    "opacity factor comes down from 0.42 to 0.22 so that closing the gaps does "
-    "not darken the wash -- the composited ink moves by +2.0 and +1.1 percent, "
-    "and the bare paper falls to 0.7 and 1.1 percent. Nothing else moves. The "
-    "pitch, the layer count and the way the angles are made are what they were, "
-    "to the last decimal: ruling 2 rejected the per-sweep angle, the uneven "
-    "spacing and the underlay, and the acceptance keeps all three out. The "
-    "sweeps are still cut at the contour and are not extended past it -- engine "
-    "22 could extend the fill's ends because an underlay held the boundary, and "
-    "the wash has no underlay. The excursion grows from 12.3 / 11.0px to 25.8 / "
-    "21.7px, which is half of one sweep's widest width both before and after; "
-    "the 20.0px grain limit is not the wash's ruler and `wash` stays out of that "
-    "list. No case is new. The six that move are exactly the cases whose surface "
-    "texture is `wash`; the nine `hatch` and `crosshatch` cases moved in engine "
-    "35 and do not move here."
+    "a named sheet changes how the mark runs. `Support` has held the sheet's two "
+    "quantities since engine 19 and `synthesize_stroke` has taken one as an "
+    "argument for just as long, but not one caller passed it: measured "
+    "2026-08-16, `git grep 'support='` returned nothing in `server/src`, so "
+    "every work was drawn on the one constant sheet no matter which ground it "
+    "named. The seven supports the ground field carries now each resolve to a "
+    "sheet -- washi drinks at 2.2 and barely refuses at 0.5, canvas refuses "
+    "hardest at 2.4, mezzotint is a metal plate at (0.2, 0.7) -- and all eleven "
+    "call sites in the renderer hand it down by argument. `paper` restates the "
+    "default, so a work that names it and a work that names no ground draw the "
+    "same bytes. Two of the nine surface words are about the mark rather than "
+    "about an interior: 粒 and にじみ on a line or an arc now stay where the "
+    "sentence put them and raise the sheet's own quantities for that one "
+    "instruction, doubled and capped at 3.0, the far end of the ladder the "
+    "author accepted. Closed shapes are untouched -- their 粒 is their interior, "
+    "drawn by the surface-texture layer, and working the sheet as well would "
+    "draw one word twice. Nine cases are new: the corpus's nineteen ground cases "
+    "are every one of them `pen`, whose meeting with the sheet is (0.15, 0.15), "
+    "so freezing without them would have recorded a version whose change the "
+    "record barely traverses -- the same mistake engines 12, 13 and 15 each "
+    "wrote cases to avoid. Element counts and filter references do not move: "
+    "measured across four subjects and eighteen settings, the sheet rewrites "
+    "widths and breaks before the filter is attached, and a break is a subpath "
+    "inside the same `d`."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -335,6 +335,46 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         ground.update({"material": "paper", "grain": "medium", "seed": None})
         ground.update(changes)
         _case(cases, f"C-groundseed-auto-{suffix}", _instruction("line", weight="pen"), ground=ground)
+
+    # Engine 37. Every ground case above is drawn with `pen`, whose meeting with
+    # the sheet is (0.15, 0.15) -- the sheet moves those marks, but barely, so a
+    # corpus holding only them would freeze a version that reads as "nothing
+    # happened". These carry the two tools the two quantities actually reach:
+    # `brush_thick` is drunk by the sheet (1.00, 0.15) and `chalk` is refused by
+    # it (0.10, 1.30). The instruction and the seed are the same across the row;
+    # only the sheet changes, so the record says what the sheet did and nothing
+    # else. `plain` is the control -- the sheet a work that names no ground gets.
+    for tool in ("brush_thick", "chalk"):
+        for material in ("plain", "washi", "canvas"):
+            ground = copy.deepcopy(BASE_GROUND)
+            ground["material"] = material
+            _case(cases, f"C-sheet-{material}-{tool}",
+                  _instruction("line", weight=tool), ground=ground)
+
+    # The mark words. 粒 and にじみ on a `line` are not an interior, so they raise
+    # the sheet's own two quantities for that one instruction rather than being
+    # moved back to a closed shape. **These three do not reach that decision:**
+    # this generator imports `renderer` directly and never calls `coerce_score`,
+    # so the surface arrives here already sitting on the line. What they measure
+    # is the renderer's half. The coerce half is measured by T-11.
+    for word, tool in (("grain", "chalk"), ("bleed", "brush_thick")):
+        ground = copy.deepcopy(BASE_GROUND)
+        ground["material"] = "paper"
+        surface = copy.deepcopy(BASE_SURFACE)
+        surface["texture"] = word
+        _case(cases, f"C-sheet-line-{word}",
+              _instruction("line", weight=tool, surface=surface), ground=ground)
+
+    # The one combination where the ceiling binds: washi drinks at 2.2 and にじみ
+    # doubles it to 4.4, past the end of the ladder the author accepted. Without
+    # a case here the cap could be raised to any number and the corpus would not
+    # notice.
+    cap_ground = copy.deepcopy(BASE_GROUND)
+    cap_ground["material"] = "washi"
+    cap_surface = copy.deepcopy(BASE_SURFACE)
+    cap_surface["texture"] = "bleed"
+    _case(cases, "C-sheet-cap",
+          _instruction("line", weight="brush_thick", surface=cap_surface), ground=cap_ground)
 
     representatives = {
         "line-pencil": _instruction("line", weight="pencil"),
@@ -728,10 +768,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # out by hand on purpose: the ground cases are read from the enum now, so
     # this line is what makes adding a support a deliberate re-bake instead of a
     # corpus that quietly grew.
-    expected = {"A": 88, "B": 72, "C": 66, "D": 61, "E": 119, "F": 128,
+    # Engine 37 gained nine more to C: six that change nothing but the sheet
+    # under two tools the sheet actually reaches, two that put a mark word on a
+    # line, and one where the ceiling binds.
+    expected = {"A": 88, "B": 72, "C": 75, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 588:
+    if actual != expected or len(cases) != 597:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

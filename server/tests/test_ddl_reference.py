@@ -107,7 +107,20 @@ def test_ddl_reference_versions_and_parts() -> None:
     # closed-shape instructions in this corpus that carry `filled=true` with no
     # surface of their own. No expand or plugin-expand case moves: the change
     # lives inside coerce, like engines 8, 9 and 10.
-    assert DDL_ENGINE_VERSION == "19"
+    # Engine 20 (2026-08-16): two of the nine surface words are about the mark,
+    # not about an interior. 粒 and にじみ on a line or an arc stay where the
+    # sentence put them now, and render engine 37 raises the sheet's own two
+    # quantities for that instruction instead of drawing an interior it has not
+    # got. **`changed_from_previous` is ONE**, and it is not a new case:
+    # `B-surface-with-nowhere-to-move` is the only input in this corpus holding
+    # a mark word on an open shape, and its 粒 used to be dropped for having no
+    # closed shape to go back to. No branch was added, so the other 29 reports
+    # are byte-identical -- the opposite of engines 11, 15 and 18, which listed
+    # every coerce case because a new branch name enters every report whether it
+    # fired or not. The seven interior words did not move: `wash` on a line is
+    # still carried back or dropped, which `B-surface-on-a-line-moves-back`
+    # (`hatch`) and `B-surface-already-on-a-closed-shape` (`wash`) keep saying.
+    assert DDL_ENGINE_VERSION == "20"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -243,11 +256,45 @@ def test_ddl_reference_versions_and_parts() -> None:
     # version added is reachable from any input this corpus states. What moved is
     # what the model is offered; the frozen record of that is the Android prompt
     # fixtures keyed by this number.
-    assert manifest["changed_from_previous"] == []
-    assert set(manifest["cases"]) == set(eighteen["cases"])
-    for case_id, case in manifest["cases"].items():
+    # **Read by name from here down.** Until engine 20 this claim was made against
+    # the current manifest, which meant the subject of the claim changed the day
+    # the next version froze -- the same defect the render corpus carried for its
+    # engine 36 attribution and which is fixed there in the same commit.
+    nineteen = json.loads(
+        (root / "ddl-engine-19" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert nineteen["changed_from_previous"] == []
+    assert set(nineteen["cases"]) == set(eighteen["cases"])
+    for case_id, case in nineteen["cases"].items():
         assert case["digest"] == eighteen["cases"][case_id]["digest"], case_id
         assert case["bytes"] == eighteen["cases"][case_id]["bytes"], case_id
+
+    # Engine 20 (2026-08-16): 粒 and にじみ stay on the open shape the sentence
+    # put them on. **ONE case moves and it is not new.** No branch was added, so
+    # unlike engines 11, 15 and 18 the other twenty-nine reports are untouched --
+    # the arithmetic engine 16 wrote down. The one that moves is the only input
+    # here holding a mark word on a line: its 粒 used to be dropped for having no
+    # closed shape to go back to, and the drop is what the branch report counted.
+    assert manifest["changed_from_previous"] == ["B-surface-with-nowhere-to-move"]
+    assert set(manifest["cases"]) == set(nineteen["cases"])
+    moved_body = json.loads(
+        (root / f"ddl-engine-{DDL_ENGINE_VERSION}" / "b_coerce"
+         / "B-surface-with-nowhere-to-move.json").read_text(encoding="utf-8")
+    )
+    was_body = json.loads(
+        (root / "ddl-engine-19" / "b_coerce"
+         / "B-surface-with-nowhere-to-move.json").read_text(encoding="utf-8")
+    )
+    # The surface is kept where it was, and the repair branch stops counting it.
+    assert was_body["score"]["instructions"][0]["surface"] is None
+    assert moved_body["score"]["instructions"][0]["surface"]["texture"] == "grain"
+    assert was_body["branch_report"]["with_surface_on_a_closed_shape"] == 1
+    assert moved_body["branch_report"]["with_surface_on_a_closed_shape"] == 0
+    for case_id, case in manifest["cases"].items():
+        if case_id == "B-surface-with-nowhere-to-move":
+            continue
+        assert case["digest"] == nineteen["cases"][case_id]["digest"], case_id
+        assert case["bytes"] == nineteen["cases"][case_id]["bytes"], case_id
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()

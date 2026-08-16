@@ -8,7 +8,14 @@ from typing import Any, Callable
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..limits import DEFAULT_LIMITS, Limits, note_limit
-from ..schema import CLOSED_SHAPES, Instruction, Score, SurfaceSpec, fill_is_asked_for
+from ..schema import (
+    CLOSED_SHAPES,
+    MARK_SURFACE_WORDS,
+    Instruction,
+    Score,
+    SurfaceSpec,
+    fill_is_asked_for,
+)
 
 
 def _coerce_marker_values(name: str) -> tuple[Any, ...]:
@@ -294,6 +301,12 @@ def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Ins
     sat on a `line` (739) or an `arc` (59) and was invisible -- `wash` 453,
     `grain` 251, `bleed` 83, `paper_grain` 9, `hatch` 2.
 
+    The nine surface words split in two. `MARK_SURFACE_WORDS` -- 粒 and にじみ --
+    speak about how the mark runs rather than about an interior, so on a line or
+    an arc they are left exactly where the sentence put them and the renderer
+    works the sheet harder for that instruction (render engine 37). The rest are
+    about an interior and are handled below.
+
     So the surface goes back to the nearest closed shape before it, which is the
     shape the sentence was about. Where there is no such shape, or where it
     already carries a surface of its own, the stray one is dropped instead: this
@@ -307,6 +320,12 @@ def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Ins
         if surface is None or surface.texture == "none":
             continue
         if ins.primitive in CLOSED_SHAPES:
+            continue
+        if surface.texture in MARK_SURFACE_WORDS:
+            # Not a misattachment. 粒 and にじみ say how the mark itself runs,
+            # which is what a line has instead of an interior, so the sentence
+            # stays where it landed and the stroke engine works the sheet
+            # harder for this one instruction.
             continue
         repaired[index] = ins.model_copy(update={"surface": None})
         target = next(

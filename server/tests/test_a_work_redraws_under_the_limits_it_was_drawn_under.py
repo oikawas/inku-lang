@@ -120,11 +120,18 @@ def author():
     db.delete_user_group(group["id"])
 
 
-def _save(headers, created, score=None, at=1_785_000_000_000) -> dict:
-    """Save a work the way the browser does, through coerce site 2."""
+def _save(headers, created, score=None, at=1_785_000_000_000, input_text="群れ") -> dict:
+    """Save a work the way the browser does, through coerce site 2.
+
+    `input_text` is a parameter because two saves of one picture are ONE row:
+    the render hash is taken over the input, the Score and the SVG, and a second
+    save that hashes the same replaces the first rather than adding to it. A
+    test wanting two rows has to give them something to differ by, and the input
+    is the field that does not reach the drawing.
+    """
     saved = client.post(
         "/api/history",
-        json={"input": "群れ", "score": score or CROWD_SCORE, "at": at},
+        json={"input": input_text, "score": score or CROWD_SCORE, "at": at},
         headers=headers,
     )
     assert saved.status_code == 200, saved.text
@@ -267,8 +274,10 @@ def test_t98_a_non_display_export_draws_under_the_work_limits(author, stored_lim
     same request, and the only difference is the row.
     """
     headers, _user, created = author
-    recorded = _save(headers, created)
-    forgotten = _save(headers, created, at=1_785_000_001_000)
+    recorded = _save(headers, created, input_text="群れ・記録あり")
+    forgotten = _save(headers, created, at=1_785_000_001_000, input_text="群れ・記録なし")
+    # Two rows, not one row saved twice: see `_save`.
+    assert recorded["id"] != forgotten["id"]
     _forget_the_recorded_limits(forgotten["id"])
 
     # Lower BOTH: the stored score already carries the represented count, so the

@@ -366,7 +366,10 @@ def test_a_mark_word_on_a_line_is_not_walked_back_at_all() -> None:
     leave the test above green and this category's split unmeasured on the side
     that changed.
     """
-    for word in sorted(schema.MARK_SURFACE_WORDS):
+    # Named, not read from the set: a loop over the production set is empty --
+    # and so green -- exactly when the set has been emptied.
+    assert set(schema.MARK_SURFACE_WORDS) == {"grain", "bleed"}
+    for word in ("grain", "bleed"):
         score, report = _coerced(
             [
                 _circle(),

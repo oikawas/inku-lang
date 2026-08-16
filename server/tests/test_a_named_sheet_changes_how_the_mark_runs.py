@@ -29,7 +29,7 @@ from typing import Any, get_args
 
 import pytest
 
-from inku_server import renderer
+from inku_server import renderer, stroke_engine
 from inku_server.coerce import coerce_score
 from inku_server.renderer import render
 from inku_server.schema import CLOSED_SHAPES, MARK_SURFACE_WORDS, GroundMaterial, Score
@@ -240,27 +240,58 @@ def test_t4_the_drafting_pen_is_byte_identical_on_every_sheet() -> None:
 # --- T-5, T-6: the two mark words reach the mark ----------------------------
 
 
-def test_t5_grain_on_a_line_changes_that_line() -> None:
+def _drawn_with_the_word_doing_nothing(score: Score, monkeypatch) -> list[str]:
+    """The same Score, drawn with the mark word's gain turned off.
+
+    **The control has to be this and not "the same line without a surface".**
+    The performance seed is derived from the instruction's own dump, so adding a
+    `surface` field re-rolls it and moves the mark for a reason that has nothing
+    to do with the sheet -- measured 2026-08-16, and it is what made the first
+    version of T-5 and T-6 green under every perturbation that unwired the
+    renderer half. Holding the Score fixed and stopping the mechanism keeps the
+    seed identical, so what is left in the difference is the sheet.
+    """
+    monkeypatch.setattr(stroke_engine, "MARK_SUPPORT_GAIN", 1.0)
+    try:
+        return _marks(_draw(score))
+    finally:
+        monkeypatch.undo()
+
+
+def test_t5_grain_on_a_line_changes_that_line(monkeypatch) -> None:
     """T-5. 面: 粒 on a line is the sheet refusing the tool harder.
 
-    **Through `coerce_score`.** Until engine 20 coerce moved this surface off the
-    line before the renderer saw it, so a gate that built the Score by hand
-    would measure a road production never travelled.
+    Two halves, because the request crosses two layers and either one can drop
+    it. **Through `coerce_score`** -- until ddl-engine 20 coerce moved this
+    surface off the line before the renderer ever saw it, so a gate that built
+    the Score by hand would measure a road production never travelled. **And
+    against the mechanism stopped** -- see `_drawn_with_the_word_doing_nothing`.
     """
     with_word = coerce_score(_score("chalk", texture="grain"))
-    without = coerce_score(_score("chalk"))
-    assert with_word.instructions[0].surface is not None
-    assert with_word.instructions[0].surface.texture == "grain"
-    assert _marks(_draw(with_word)) != _marks(_draw(without))
+    line = with_word.instructions[0]
+    assert line.surface is not None and line.surface.texture == "grain"
+    # The word raises the quantity a refused tool meets, and nothing else.
+    sheet = support_for_ground("paper")
+    raised = support_with_mark_word(sheet, "grain")
+    assert raised.tooth == min(SUPPORT_CAP, sheet.tooth * MARK_SUPPORT_GAIN) > sheet.tooth
+    assert raised.absorb == sheet.absorb
+    assert _marks(_draw(with_word)) != _drawn_with_the_word_doing_nothing(
+        with_word, monkeypatch
+    )
 
 
-def test_t6_bleed_on_a_line_changes_that_line() -> None:
-    """T-6. 面: にじみ on a line is the sheet drinking more. Through coerce too."""
+def test_t6_bleed_on_a_line_changes_that_line(monkeypatch) -> None:
+    """T-6. 面: にじみ on a line is the sheet drinking more. Both halves, as T-5."""
     with_word = coerce_score(_score("brush_thick", texture="bleed"))
-    without = coerce_score(_score("brush_thick"))
-    assert with_word.instructions[0].surface is not None
-    assert with_word.instructions[0].surface.texture == "bleed"
-    assert _marks(_draw(with_word)) != _marks(_draw(without))
+    line = with_word.instructions[0]
+    assert line.surface is not None and line.surface.texture == "bleed"
+    sheet = support_for_ground("paper")
+    raised = support_with_mark_word(sheet, "bleed")
+    assert raised.absorb == min(SUPPORT_CAP, sheet.absorb * MARK_SUPPORT_GAIN) > sheet.absorb
+    assert raised.tooth == sheet.tooth
+    assert _marks(_draw(with_word)) != _drawn_with_the_word_doing_nothing(
+        with_word, monkeypatch
+    )
 
 
 # --- T-7: a closed shape is not worked twice --------------------------------
@@ -391,7 +422,14 @@ def test_t11_coerce_keeps_a_mark_word_on_a_line_and_moves_the_rest() -> None:
     open shape satisfies the first half and loses the repair engine 15 exists
     for, and the second half is what says the decision was made by the word.
     """
-    for word in sorted(MARK_SURFACE_WORDS):
+    # Named here rather than read from the set. Walking `MARK_SURFACE_WORDS`
+    # makes this loop empty the moment the set is emptied, and an empty loop is
+    # green -- measured 2026-08-16, where emptying the set left this gate
+    # passing while every request it guards was being dropped again. The set is
+    # a decision, so the decision is what gets pinned; the wash contract
+    # (render engine 39) adds its word here deliberately.
+    assert set(MARK_SURFACE_WORDS) == {"grain", "bleed"}
+    for word in ("grain", "bleed"):
         kept = coerce_score(_score("chalk", texture=word))
         line = kept.instructions[0]
         assert line.primitive == "line"

@@ -750,12 +750,16 @@
 							<div class="canvas-placeholder-art" aria-label={t().canvasPlaceholder}>
 								<svg viewBox="0 0 {placeholderWidth} {placeholderHeight}" role="img">
 									<rect x="0" y="0" width={placeholderWidth} height={placeholderHeight} rx="6" fill="#fffdf8" />
+									<!-- Mountain, water, moon: three strokes, authored inside the
+									     1000-square PLACEHOLDER_MOTIF frame and placed by one uniform
+									     scale, so the moon stays round and the ridge keeps its angles
+									     at every canvas proportion. No coordinate here is written as a
+									     fraction of the frame -- that is what turned the old triangle
+									     into a needle at Pillar (1:5). -->
 									<g opacity="0.72" transform={placeholderTransform}>
-										<path d="M 160 670 C 260 520 350 780 460 610 S 650 400 830 580" fill="none" stroke="#cfc6b6" stroke-width="7" stroke-linecap="round" />
-										<path d="M 170 380 C 260 320 330 420 410 370 C 490 320 560 220 660 280 C 730 320 780 390 850 360" fill="none" stroke="#ded6c9" stroke-width="4" stroke-linecap="round" stroke-dasharray="18 18" />
-										<circle cx="330" cy="530" r="55" fill="none" stroke="#d8cfc0" stroke-width="6" />
-										<rect x="630" y="480" width="90" height="110" rx="2" fill="none" stroke="#d8cfc0" stroke-width="6" transform="rotate(-12 675 535)" />
-										<path d="M 490 400 L 540 570 L 440 570 Z" fill="none" stroke="#d8cfc0" stroke-width="6" stroke-linejoin="round" />
+										<path d="M 110 645 L 320 360 L 505 545 L 640 445 L 890 645" fill="none" stroke="#cfc6b6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+										<path d="M 110 748 C 215 700 300 800 400 748 C 500 696 585 796 685 748 C 780 700 838 782 890 754" fill="none" stroke="#ded6c9" stroke-width="4" stroke-linecap="round" />
+										<circle cx="690" cy="260" r="80" fill="none" stroke="#d8cfc0" stroke-width="6" />
 									</g>
 								</svg>
 							</div>

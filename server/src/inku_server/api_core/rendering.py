@@ -13,7 +13,13 @@ from ..coerce import coerce_score
 from ..ddl_expander import VARIATION_AMPLITUDES
 from ..interpreter import _sanitize_placement_words
 from ..layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
-from ..limits import Limits, limits_from_settings, using_limits
+from ..limits import (
+    LIMIT_FIELD_NAMES,
+    Limits,
+    limits_from_settings,
+    normalize_limits,
+    using_limits,
+)
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..renderer import SVG_PROFILES, new_render_seed
 from ..render_engines import current_render_engine
@@ -41,6 +47,52 @@ def _effective_limits() -> Limits:
     the count of routes that pass it is a stated number, not an assumption.
     """
     return limits_from_settings(_db.get_render_limit_settings())
+
+
+def _limits_for_render(
+    work: dict | None = None,
+    requested: dict[str, int] | None = None,
+) -> tuple[Limits, str]:
+    """The limits this render runs under, and where they came from.
+
+    Four sources, in the order they bind:
+
+      request           the caller named them. Bounded element-wise by today's
+                        settings below, so a caller cannot raise a ceiling the
+                        administrator lowered.
+      work              the work's own row recorded them. This is what makes a
+                        redraw faithful: the row is already in hand for the
+                        colors, and reading only the colors off it drew the old
+                        work under today's numbers.
+      work_unrecorded   a work is in hand but its row has none. Today's settings
+                        draw it, and the caller is told so rather than left to
+                        read `render_limits` and assume it replayed.
+      settings          no work at all -- a new drawing.
+
+    The work's own values are NOT bounded by today's settings: the server wrote
+    them itself, and clamping them would make a lowered setting silently
+    un-replay every work above it. `normalize_limits` still runs over them,
+    because the row is TEXT that a missing key or a string can come out of.
+    """
+    settings_limits = _effective_limits()
+    if requested is not None:
+        # Element-wise, not "reject if any exceeds": rounding is how every other
+        # limit reader answers a number it cannot honour (`normalize_limits`),
+        # and a request naming one impossible field should not lose the other
+        # eight. LIMIT_ABSOLUTE_MAX alone is not a bound anyone can afford --
+        # 100,000 marks measured ~1.8 GB of SVG.
+        asked = normalize_limits(requested)
+        bounded = {
+            name: min(asked[name], getattr(settings_limits, name))
+            for name in LIMIT_FIELD_NAMES
+        }
+        return Limits(**bounded), LIMITS_SOURCE_REQUEST
+    if work is not None:
+        recorded = work.get("render_limits")
+        if isinstance(recorded, dict) and recorded:
+            return Limits(**normalize_limits(recorded)), LIMITS_SOURCE_WORK
+        return settings_limits, LIMITS_SOURCE_WORK_UNRECORDED
+    return settings_limits, LIMITS_SOURCE_SETTINGS
 
 
 def _output_save_settings() -> dict:
@@ -160,15 +212,20 @@ def _render_score_svg(
     composition_seed: int | None = None,
     wild: bool = False,
     work: dict | None = None,
-) -> tuple[str, str, str]:
+    requested_limits: dict[str, int] | None = None,
+) -> tuple[str, str, str, str]:
     """Render a Score to SVG.
 
-    Returns the SVG, the catalog id that actually decided its colors, and which
-    source that id came from.
+    Returns the SVG, the catalog id that actually decided its colors, which
+    source that id came from, and which source decided the limits.
     """
     # Site 1 of 5. `using_limits` covers Score.model_validate, whose count clamp
     # cannot take an argument; `limits=` covers coerce. Both come from one read.
-    limits = _effective_limits()
+    #
+    # The work is already in hand here for its colors. Reading only the colors
+    # off it and taking the limits from today's settings drew a stored work at
+    # whatever ceiling the installation happens to hold now (ledger I-154).
+    limits, limits_source = _limits_for_render(work, requested_limits)
     # This route redraws a stored Score and hands coerce no DDL, so no count is
     # read here today. The language still travels, and it comes off the work's
     # own row rather than from today's default: a caller that starts handing a
@@ -200,7 +257,7 @@ def _render_score_svg(
             composition_seed=_composition_seed(composition_seed),
             wild=wild,
         ).svg
-    return svg, resolved_catalog_id, color_source
+    return svg, resolved_catalog_id, color_source, limits_source
 
 
 def _history_output_prefix(item: dict) -> Path:
@@ -378,6 +435,21 @@ COLOR_SOURCE_CATALOG = "catalog"
 # the catalog -- the work did -- and cannot otherwise learn which one drew it.
 COLOR_SOURCE_HEADER = "X-Inku-Color-Source"
 COLOR_CATALOG_ID_HEADER = "X-Inku-Color-Catalog-Id"
+
+# What decided the limits of one render, reported for the reason the color
+# source is. `render_limits` says which numbers were used; it does not say
+# whether they came off the work's own row or off today's settings, and a work
+# redrawn under a smaller ceiling than the one it was drawn under is a different
+# picture. Only this tells the two apart.
+LIMITS_SOURCE_REQUEST = "request"
+LIMITS_SOURCE_WORK = "work"
+# The work is in hand but its row records no limits: drawn before they were
+# recorded. It draws at today's settings, which is NOT the same answer as
+# "nobody named a work" -- that one had nothing else to draw at.
+LIMITS_SOURCE_WORK_UNRECORDED = "work_unrecorded"
+LIMITS_SOURCE_SETTINGS = "settings"
+# /api/render-svg answers with the picture itself, so this rides in a header.
+LIMITS_SOURCE_HEADER = "X-Inku-Limits-Source"
 
 
 def _work_for_color_snapshot(actor: dict, work_id: str) -> dict:

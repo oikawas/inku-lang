@@ -8109,3 +8109,67 @@ read one-for-one with the server.
   round fixed only the surface gate, so a middle state remains where the shape is drawn and the
   surface is not**; (2) the duplicated gate above. **Both await a ruling.**
 - **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).
+
+### Android — The guard draws with what the index declares, and compares the colours (android `2.1.4-android.40`, 2026-08-17, ledger I-280)
+
+**The guard that compares against the 51 frozen reference SVGs read none of three declarations in the
+index `svg_index.json`** — `color_catalog_id`, `fill_colors` and `stroke_colors`. **The comparison
+scaffolding wrote `colorCatalogId = "default"` by hand, so the five sheets whose index entry names
+another catalog were redrawn with different equipment than the one the reference was made with.**
+**Colour was never compared at all**, which is why [I-280] — nobody deciding whether the machine pole
+fills an interior — was invisible to every guard.
+
+- **One road to the index, and only one:** a new `ReferenceRendering.kt` (`index()`, `entry(key)`,
+  `catalogId(entry)`, `request(entry)`, `svg(entry)`). **`catalogId` reads with `getString` and
+  supplies no default** — a missing key is a failure, not a silent `"default"`. **All six paths that
+  compare against the references were wired to it** (`DefaultSvgRendererPhase2f`, `Phase2e`,
+  `ServerRendererCloudformAndRelations`, `CornerShapeMaterialLayer`, `DefaultSvgRendererFillDab`,
+  `GroupMembersReachEachEngine`). **A 36-line copy in `Phase2f` became a one-line delegation.**
+- **⚠ Stage 0 measured what stage 1 alone would redden: nothing — 0 tests.** That the existing
+  comparison carries no colour was confirmed by measurement (it compares `d`, `points`,
+  `stroke-dasharray`, classes and element counts). **One sheet of the 51 disagreed on colour**
+  (`05_circle_rotring`, on `fill` only); **zero disagreed on `stroke`; and the reference SVGs and the
+  index declarations disagreed nowhere.**
+- **[I-280] closed in one line:** `val fill = if (ServerRendererGeometry.fillsInterior(ins))
+  attrs.fill else "none"` in `DefaultSvgRenderer.renderInstruction`. **The judgement was already
+  ported as `fillsInterior` (one-for-one with the server's `_fills_interior`) and is read here, not
+  copied.** **All eight places that write this output now pass through the one decision** (seven on
+  the geometric road plus the `polygon()` helper). **The hand road's `renderBodyShape` was already
+  correct through `regionFill` and was not touched.** **A dead probe carrying
+  `@Suppress("UNUSED_VARIABLE")` is gone.**
+- **Six gates (T-176..T-181):** that the guard hands over the catalog the index declares; that the
+  `fill` colours agree with the declaration; that the `stroke` colours do; **that the guard says how
+  many drawings it compared**; that a machine pole does not fill an interior nobody asked to have
+  filled; and **that swapping the declaration changes the colours drawn.** They walk all 51 sheets.
+- **⚠ Two ways of going vacuous were closed:** the count is taken **on what the port actually drew,
+  not on what was declared** — counted on the declaration side it stays at 51 even if the port draws
+  nothing. **The comparison itself returns whether it compared, and the walk counts that**
+  (**perturbation P-4 built exactly the state where 51 sheets are walked and none compared**). And
+  because **46 of the 51 declare `default`**, a road that ignored the declaration entirely would
+  still satisfy the two colour gates on all but five — the sixth gate is what closes that.
+  **The swap is made on an in-memory `JSONObject`; the frozen files are not rewritten.**
+- **⚠ One of the six perturbations missed:** P-2 (making the product ignore the catalog id) was
+  predicted to redden 3 tests and reddened **13** — **ten existing tests came along.** **The cause
+  was counting with the literal `colorCatalogId = "` when writing the prediction**: those ten pass
+  the id through a variable, a `RefinementPlan` or the repository, and match no literal. **When the
+  target is a wide place in the product, the readers are counted as "tests that consume the value",
+  not "lines that write the id".** **⚠ The layers are still told apart** — **P-1 (does the guard read
+  the index) reddens only the four new gates, and under P-2 T-176 stays green.** Measurement kept
+  them distinct.
+- **⚠ One assertion made by the issuing side was false:** the contract said both
+  `05_circle_rotring` and `12_cloudform_rotring` disagreed with their declaration on fill.
+  **`12_cloudform_rotring` already agreed** — `ServerRendererStyle`'s set of closed shapes does not
+  contain `cloudform`, so its fill was already `"none"` (**`ServerRendererGeometry.CLOSED_SHAPES`
+  does contain it: the two sets disagree**).
+- **The full suite went 364 → 370 (+6). On the tree carrying both of today's branches, XML 64 /
+  tests 376 / failures 0 / errors 0 / skipped 0**, and
+  `test_android_reference_fixtures_are_current.py` **4 passed**. **The frozen corpus was not touched.**
+- **⚠ The branch point moved mid-round** — another session fast-forwarded this worktree's branch to
+  the tip of main (`024df278` → `97400d43`). **The `android/` subtree hashes identically at both**, so
+  the baseline measured before the work still holds. **Acceptance read `97400d43..tip`.**
+- **One follow-up filed (unnumbered):** **`ServerRendererStyle.strokeAttrs` does not read the
+  server's `do_fill`** — (1) a shape that is not filled still gets a `fill-opacity`, and (2) writing
+  the same request as `surface.texture="solid"` makes a `cloudform`'s fill disappear. **Neither shows
+  in the frozen corpus** (no `color_hint` there moves `fill-opacity`, and there is no `solid`
+  `cloudform`). **They are latent divergences, not a break in today's drawings.**
+- **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).

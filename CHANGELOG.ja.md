@@ -7307,3 +7307,62 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
   （**本周は面の門だけを直したので「図形は描かれるが面は描かれない」中間状態が残った**）
   ②上の門の重複。**どちらも裁定待ち。**
 - **⚠ GitHub の CI は待っていない**（作者裁定・実行規約 §2-10）。
+
+### Android — 番人は、索引が宣言した道具立てで描き、色を突き合わせる（android `2.1.4-android.40`、2026-08-17・[I-280]）
+
+**51 枚の凍結された参照 SVG と照合する番人が、索引 `svg_index.json` の宣言のうち 3 つ
+（`color_catalog_id` / `fill_colors` / `stroke_colors`）を 1 行も読んでいなかった。**
+**照合の足場は `colorCatalogId = "default"` を直書きしており、索引が `default` 以外を名指す 5 枚は、
+参照を作ったときと違う道具立てで描き直されて比べられていた。**
+**色は 1 度も比べられていなかった**ので、**[I-280]（機械の極が塗るかどうかを誰も決めていない）は
+どの番人にも映っていなかった。**
+
+- **索引を読む道を 1 つだけ作った:** 新規 `ReferenceRendering.kt`（`index()` / `entry(key)` /
+  `catalogId(entry)` / `request(entry)` / `svg(entry)`）。**`catalogId` は `getString` で読み、
+  既定値を置いていない** —— 索引に鍵が無ければ落ちる。
+  **参照と突き合わせている 6 か所すべてを結線した**（`DefaultSvgRendererPhase2f` / `Phase2e` /
+  `ServerRendererCloudformAndRelations` / `CornerShapeMaterialLayer` / `DefaultSvgRendererFillDab` /
+  `GroupMembersReachEachEngine`）。**`Phase2f` の 36 行の複製が 1 行の委譲になった。**
+- **⚠ 段 0 で「段 1 だけを当てると何が赤くなるか」を測った** —— **0 本**。
+  **色を含まない量しか比べていなかったことが実測で裏づいた**（`d` / `points` / `stroke-dasharray` と
+  class・要素数）。**色が食い違った case は 51 枚中 1 枚**（`05_circle_rotring`・`fill` のみ）で、
+  **`stroke` の食い違いは 0 件**、**参照 SVG と索引の宣言の食い違いも 0 件**。
+- **[I-280] を 1 行で閉じた:** `DefaultSvgRenderer.renderInstruction` の
+  `val fill = if (ServerRendererGeometry.fillsInterior(ins)) attrs.fill else "none"`。
+  **判定は移植へ既に入っていた `fillsInterior`（server の `_fills_interior` の 1 対 1 の移植）を
+  読んだだけで、写していない。** **同じ出力を書く 8 か所すべてが 1 つの判定を通る**
+  （幾何の道の 7 か所と `polygon()` ヘルパ）。**手描きの道 `renderBodyShape` は
+  `regionFill` で既に正しかったので触っていない。**
+  **`@Suppress("UNUSED_VARIABLE")` で置かれていた死んだ探り針 1 つが消えた。**
+- **受入 6 本（T-176〜T-181）:** ①番人が索引の宣言したカタログを渡すか ②`fill` の色が宣言と一致するか
+  ③`stroke` の色が一致するか ④**番人が何枚比べたかを言う** ⑤機械の極が求められていない塗りをしないか
+  ⑥**索引の宣言を差し替えると描かれる色が変わるか**。**51 枚を回る形で置いてある。**
+- **⚠ 恒真化を 2 通り塞いだ:** ④は**「比べた側」ではなく「移植が実際に描いた側」で数える** ——
+  宣言の側で数えると移植が何も描かなくても 51 のままになる。**比較そのものが「比べたかどうか」を返し、
+  walk がそれを数える**（**摂動 P-4 が、51 枚を回りながら 1 枚も比べない状態を作って実測した**）。
+  ⑥は**46/51 が `default` を宣言している**ため、**宣言を無視する道でも ②③ は 46 枚で緑になる** ——
+  それを塞ぐ 1 本である。**差し替えたのは記憶の上の `JSONObject` で、凍結ファイルは書き換えていない。**
+- **⚠ 摂動 6 本のうち 1 本が予測を外した:** P-2（製品がカタログ id を使わない形へ戻す）は
+  予測 3 本に対し**実測 13 本** —— **既存の 10 本が道連れになった**。
+  **原因は予測を書くときに `colorCatalogId = "` のリテラルで数えたこと** ——
+  **その 10 本はカタログ id を変数や `RefinementPlan` / repository 経由で渡しており、
+  リテラルの形では 1 件も一致しない**。**当て先が製品の広い場所なら、読み手は
+  「その id を書いた行」ではなく「その値を消費する検査」で数える。**
+  **⚠ 層の見分けは崩れていない** —— **P-1（番人が索引を読むか）では自分の 4 本だけが赤くなり、
+  P-2 では T-176 が緑のまま残る**。**この 2 つは実測で別のものとして分かれた。**
+- **⚠ 発行側（契約）の断定が 1 つ実測と食い違った:** 契約は `05_circle_rotring` と
+  `12_cloudform_rotring` の**両方**が塗りで宣言と食い違うと述べていたが、
+  **`12_cloudform_rotring` は着手前から一致していた**。**`ServerRendererStyle` の閉図形の集合が
+  `cloudform` を含まない**ため、その `fill` は今日すでに `"none"` だった
+  （**`ServerRendererGeometry.CLOSED_SHAPES` には入っており、2 つの集合が食い違っている**）。
+- **満点は 364 → 370（+6）。2 本を入れた木で XML 64 / tests 376 / failures 0 / errors 0 / skipped 0**、
+  `test_android_reference_fixtures_are_current.py` **4 passed**。**凍結コーパスは 1 バイトも書き換えていない。**
+- **⚠ 起点が周の途中で動いた** —— 別のセッションがこの作業場の枝を main の先端へ fast-forward した
+  （`024df278` → `97400d43`）。**`android/` の部分木のハッシュは両者で同一**なので、
+  着手前の満点はそのまま有効である。**受け入れは `97400d43..先端` で読んだ。**
+- **申し送り 1 件を起票した（未採番）:** **`ServerRendererStyle.strokeAttrs` の `fill` は
+  server の `do_fill` を読んでいない** —— ①塗らない図形に `fill-opacity` が付く
+  ②同じ要求を `surface.texture="solid"` で書くと `cloudform` の塗りが消える。
+  **どちらも凍結コーパスには映らない**（`fill-opacity` を動かす `color_hint` は 0 件・
+  `solid` の `cloudform` は 0 件）。**潜在の乖離であって今日の絵の破れではない。**
+- **⚠ GitHub の CI は待っていない**（作者裁定・実行規約 §2-10）。

@@ -2086,6 +2086,64 @@ class DefaultSvgRenderer(
         val opacity = kotlin.math.min(0.75, surface.optDouble("opacity", 0.3))
         val density = kotlin.math.max(0.02, surface.optDouble("density", 0.5))
 
+        if (texture == "wash") {
+            // A wash is a layer, not a scatter of grains. The same shape is swept
+            // twice at nearly the same bearing, and only where the two overlap
+            // does it darken. The scanlines are cut at the contour by the same
+            // mechanism the fill strokes use.
+            //
+            // Engine 36 is one claim -- a wash is a field, not a set of stripes.
+            // Below a sweep width of one pitch the paper between two sweeps is
+            // reached by neither, which measured 19.9% of a square's inside on
+            // the server. Only the width and the one sweep's opacity move for
+            // that: the pitch, the layer count and the way the angles are made
+            // are the branch point's, to the last digit.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val weight = ins.optString("weight", "pen")
+            val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+            val spacing = max(10.0, unit * (0.052 - density * 0.024))
+            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
+            val baseAngle = ServerRendererGeometry.fillScanAngle(seedStr)
+            val minWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
+            val sb = StringBuilder()
+            var index = 0
+            for (layer in 0 until SURFACE_WASH_LAYERS) {
+                // Python adds without wrapping, so the layer's seed is carried in
+                // arbitrary precision rather than in a Long -- the seed is a full
+                // 64-bit unsigned and the sum is what gets hashed.
+                val layerSeed = java.math.BigInteger(seedStr)
+                    .add(java.math.BigInteger.valueOf(layer.toLong() * 7919L))
+                    .toString()
+                // The layers do not turn. The second sweep runs at nearly the
+                // first's bearing, so the overlap reads as depth; at an unrelated
+                // angle the two make a lattice and it reads as cloth.
+                val angle = baseAngle + (ServerRendererGeometry.hash01(layer, seedStr, "wash-angle") - 0.5) * Math.toRadians(16.0)
+                for (segment in ServerRendererGeometry.scanlineSegments(contour, angle, spacing, layerSeed)) {
+                    val sweepWidth = max(
+                        minWidth,
+                        spacing * (SURFACE_WASH_WIDTH_BASE + ServerRendererGeometry.hash01(index, seedStr, "wash-width") * SURFACE_WASH_WIDTH_SPAN)
+                    )
+                    sb.append(
+                        surfaceSweep(
+                            ins,
+                            unit,
+                            segment.second,
+                            segment.third,
+                            sweepWidth,
+                            color,
+                            opacity * SURFACE_WASH_OPACITY,
+                            seedStr,
+                            index,
+                            wild
+                        )
+                    )
+                    index += 1
+                }
+            }
+            return sb.toString()
+        }
+
         if (texture in setOf("hatch", "crosshatch")) {
             // A surface belongs to the shape that carries it, so a row is cut
             // where the shape ends instead of running the fixed 1.3x diagonal it

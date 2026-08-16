@@ -145,7 +145,7 @@ def coerce_score(
         instructions = _without_spontaneous_grid(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
         _branch_before = instructions
-        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang)
+        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang, limits=limits)
         _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
         _branch_before = instructions
         instructions = _drop_invalid_relations(instructions)
@@ -304,7 +304,7 @@ def coerce_score(
     )
     _record_branch_fire(branch_report, "with_stated_count_fidelity", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang)
+    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang, limits=limits)
     _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
     _branch_before = instructions
     instructions = _drop_invalid_relations(instructions)

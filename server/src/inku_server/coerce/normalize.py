@@ -505,22 +505,64 @@ def _with_note(ins: Instruction, note: str) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _density_label(original_count: int) -> str:
-    if original_count >= 180:
-        return "high"
-    if original_count >= 80:
-        return "medium"
+# How dense a group LOOKS and how many clumps it breaks into are questions about
+# the eye, not about the machine, so both are asked relative to the count that
+# may be represented at all rather than against a bare number. Two of the six
+# numbers these bands used to hold (500 and 180) have no setting of their own,
+# which is why they are ratios and not substitutions.
+#
+# Each ratio is an integer pair and the boundary is a floor division, so the
+# defaults land on exactly the integers this file shipped with -- 120 * 25 // 6
+# is 500, and no float multiplier reaches 500 from 120 without landing a hair
+# above or below it.
+_DENSITY_BANDS: tuple[tuple[int, int, str], ...] = (
+    (3, 2, "high"),  # 180 at the default ceiling of 120
+    (2, 3, "medium"),  # 80, which is also today's represented_count_min
+)
+
+_CLUSTER_BANDS: tuple[tuple[int, int, int], ...] = (
+    (25, 6, 9),  # 500
+    (2, 1, 7),  # 240
+    (1, 1, 5),  # 120
+)
+_CLUSTER_BAND_FLOOR = 3
+
+# The most ink one cluster holds at the defaults: 120 marks drawn in 5 clusters.
+# This is the quantity the legibility family exists to keep constant -- a faster
+# machine does not make an eye faster -- so it does NOT scale with the ceiling.
+# Without it the cluster count is blind to the case where the count is drawn
+# literally: there the drawn count is the original, and a band alone cannot
+# bound one cluster's share of it.
+_MAX_MARKS_PER_CLUSTER = 24
+
+
+def _band_threshold(numerator: int, denominator: int, limits: Limits) -> int:
+    return limits.represented_count_max * numerator // denominator
+
+
+def _density_label(original_count: int, limits: Limits = DEFAULT_LIMITS) -> str:
+    for numerator, denominator, label in _DENSITY_BANDS:
+        if original_count >= _band_threshold(numerator, denominator, limits):
+            return label
     return "low"
 
 
-def _cluster_count(original_count: int) -> int:
-    if original_count >= 500:
-        return 9
-    if original_count >= 240:
-        return 7
-    if original_count >= 120:
-        return 5
-    return 3
+def _cluster_count(original_count: int, limits: Limits = DEFAULT_LIMITS) -> int:
+    band = _CLUSTER_BAND_FLOOR
+    for numerator, denominator, value in _CLUSTER_BANDS:
+        if original_count >= _band_threshold(numerator, denominator, limits):
+            band = value
+            break
+
+    # The band says how many clusters a ceiling's worth of ink splits into, and
+    # it was chosen for a ceiling of 120. Scale it, or a raised ceiling draws
+    # more marks into the same nine clusters and one cluster stops being one
+    # cluster. At the defaults the factor is exactly 1.
+    scaled = max(1, band * limits.represented_count_max // DEFAULT_LIMITS.represented_count_max)
+
+    drawn = _clustered_visual_count(original_count, limits)
+    at_most = -(-drawn // _MAX_MARKS_PER_CLUSTER)  # ceil
+    return max(scaled, at_most)
 
 
 def _clustered_visual_count(
@@ -591,8 +633,10 @@ def _with_clustered_density(
     arr_data = dict(data["arrangement"])
     arr_data["count"] = _clustered_visual_count(original_count, limits, notes)
     existing_density = arr_data.get("density", "none")
-    arr_data["density"] = existing_density if existing_density != "none" else _density_label(original_count)
-    arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count)
+    arr_data["density"] = (
+        existing_density if existing_density != "none" else _density_label(original_count, limits)
+    )
+    arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count, limits)
     arr_data["preserve_space"] = True
     arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.18)
     if arr_data.get("fade", "none") == "none":

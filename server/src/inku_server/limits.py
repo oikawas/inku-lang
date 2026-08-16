@@ -97,6 +97,52 @@ LIMIT_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
 )
 
+# How much ink one cluster holds. This is the quantity the legibility family
+# exists to keep constant: what an administrator raising `represented_count_max`
+# wants is a denser picture, not clusters that quietly stop reading as clusters.
+# A faster machine does not make an eye faster, so neither number scales.
+#
+# Both are read off what the tree shipped with, at the default ceiling of 120:
+#   24  the most one cluster ever holds -- 120 marks drawn in 5 clusters
+#   10  the least -- the `le=12` that used to sit on Arrangement.cluster_count
+#       said, at that ceiling, that a cluster below ten marks is not a cluster
+#
+# They are here rather than beside their readers because three layers consult
+# them and a copy in any of them would freeze the day it was copied: coerce
+# picks the cluster count, the schema clamps what the model may declare, and the
+# composer writes the bound into the tool the model is handed.
+MAX_MARKS_PER_CLUSTER = 24
+MIN_MARKS_PER_CLUSTER = 10
+
+
+def max_cluster_count(limits: Limits) -> int:
+    """The most clusters a group may be split into under these limits.
+
+    At the defaults this is 12, which is the number that used to be written
+    straight onto the field. Raise the representation ceiling and it rises with
+    it, which is the whole point: the drawn count already followed the setting
+    and the divisor did not, so one cluster took every extra mark.
+    """
+    return max(1, limits.represented_count_max // MIN_MARKS_PER_CLUSTER)
+
+
+# What one mark costs to open, in bytes of SVG. The capability family is the one
+# an administrator is invited to raise, and the number on the stepper is a count
+# of marks -- which is a proxy for the quantity that actually reaches a reader,
+# and a proxy that is off by 25% depending on the tool. The panel converts, so
+# the person raising the number is told what they are raising it to.
+#
+# Measured 2026-08-16 on the development Mac at render engine 35, sweeping a
+# literal grid of lines from 25 to 3200 marks with the seeds fixed. These two
+# are the 400-mark row, which is the default itself: 5.17 MB with a pen and
+# 6.46 MB with a thick brush. Engine 34 produced the same bytes on all 16 pairs.
+#   run: cli/out2/911-v2.13.24-limits-capability-unit/  (sweep-engine35.json)
+#
+# Not a bound and not read by any drawing code -- a unit conversion, and only
+# the settings panel consumes it. Counts stay the unit coerce works in, because
+# the bytes are not knowable until after the drawing exists.
+BYTES_PER_MARK: dict[str, int] = {"pen": 12_924, "brush_thick": 16_138}
+
 # Not a tuning bound -- a typo guard. Every limit here multiplies into drawing
 # cost (measured at 4.2 ms per mark on the development Mac), so a pasted phone
 # number would hang a request rather than produce a work. 100000 is ~250x the

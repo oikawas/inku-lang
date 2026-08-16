@@ -7303,3 +7303,61 @@ written into SPEC §19.
   filters as well. **The main cause of the freeze is still the 24,446 per-element filters.**
 - The text was written by the design session (on the author's override) and **committed by the git
   session**, since SPEC is outside standing approval.
+
+---
+
+### Android — A fill is one request, however it is written (android `2.1.4-android.35`, 2026-08-16, [I-248])
+
+**"Fill the interior" can be written two ways in a Score** — as `filled: true`, or as
+`surface: {"texture": "solid"}`. **The server treats the two as one request and keeps the
+judgement in a single function** (`fill_is_asked_for`). The port had no such function, and on
+its local path **Stage 2 could not say 塗り at all**: neither the schema it hands the model nor
+the coercer allowlist offered `solid`, and **a model writes what the destination field offers it**.
+
+**⚠ The ledger said there were two copies. Reading the same functions against the server one by
+one found five.** **A ticket records what the person who found it could see.**
+
+- **The judgement of whether an interior is filled** — written out twice, each with its own
+  expression, and **both gave up the moment a `surface` key existed at all**. The server declines
+  to fill only when the texture is neither `none` nor `solid`.
+  **⚠ This one was already on the page before `solid` entered** — a `filled: true` shape carrying
+  `surface: {"texture": "none"}` is filled by the server and not by the port
+- **The performance seed** — the server normalises `texture="solid"` to `filled=true` plus
+  `surface=null` before building the key. **Without it, adding the derivation re-rolls every
+  stroke in every work already saved**
+- **The derivation** between `filled` and `texture="solid"` (closed shapes only) was absent
+- **The coercer allowlist** (nine words) and **the schema enum handed to Stage 2** (nine words) —
+  the two the ticket named
+
+**The order of the stages carries the argument.** Widening the vocabulary first would let `solid`
+arrive somewhere that has neither the judgement nor the seed, which is a different kind of
+breakage: **selectable but not drawable**. So the judgement went into one place, then the seed was
+protected, then the derivation added, and only then the vocabulary widened — six stages.
+
+- **The frozen corpus moves on none of the six stages** — no case states `solid`, no case states
+  `texture: "none"`, and coerce is not on the corpus path. **All ten gates are therefore
+  properties, each with a control beside it**
+- **Eleven perturbations.** `P-11` (make the judgement always false) **is the only one the corpus
+  can see** — through the five cases that state `filled: true`, **which is the evidence that the
+  judgement is reached at all**
+- **⚠ The prediction for P-11 matched in count but missed four names** — three read as red came
+  out green and three unpredicted ones went red, and **−3 and +3 cancelled to ten**. The type of
+  the miss: **the stage-6 wiring the same session had just added was not counted.**
+  **A matching count is not evidence**
+- **Verification**: Android JVM **59 classes / 334 tests / 0 failures / 0 errors / 0 skipped**
+  (from 57 / 325 before the work: **+2 classes, +9 tests**; no existing test was rewritten).
+  On the server side, `test_thinness_declaration_position.py` 7 passed and
+  `test_android_reference_fixtures_are_current.py` 4 passed. **No file under `server/` was touched**
+- **Left for later (not fixed here)** — **on a non-hand-drawn closed shape, nothing decides whether
+  the interior is filled.** There are **eight roads** that never reach `renderBodyShape`; on those
+  the judgement's value is never read and the colour `ServerRendererStyle` puts on every closed
+  shape goes out as-is. **`05_circle_rotring` comes out filled when it should not be** (measured by
+  the implementation session). **The 51-case parity walk compares `d` / `points` /
+  `stroke-dasharray` and never `fill`, so no gate catches it.** Older than this contract, so it was
+  left alone and filed in the ledger
+- **⚠ One claim in the contract was wrong** (the issuing session's error) — it said the judgement
+  "is overridden by `renderBodyShape`, so it never reaches the page", **having counted the callers
+  of `renderBodyShape` but not the branches that never call it.** The implementation session found
+  it before writing a line, froze it in its prediction note, and reported it
+- **Numbering**: Android-only, so `APP_VERSION` and `web/BUILD_NUMBER` did not move
+  (`android/VERSION` alone went `2.1.4-android.34` → `2.1.4-android.35`). **Nothing was sent to pentala**

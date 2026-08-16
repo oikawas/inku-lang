@@ -7915,3 +7915,65 @@ branch's** (T-129 to T-138, twenty functions). **No test disappeared.**
   ruling replaced, **T-136 (no road rasterizes around the fold) had no perturbation aimed at it.** Adding one
   backend import outside the rasterizer reddened exactly that one check and nothing else.
 - **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).
+
+---
+
+### Android — The edge seeps, and every mark carries its own seed (android `2.1.4-android.38`, 2026-08-17, ledger I-285, I-288)
+
+**Of the ten surface textures the port offers the model, the count it offers without drawing went 1 to 0.**
+The last word, `bleed`, went in, so what the docstring in `gen_android_reference.py` states — the port
+must not offer Stage 2 a ground it cannot draw — and the list the port's schema actually offers
+**agree for the first time in ten rounds** (8 words, then 3, then 1, now 0).
+**The same round put the surface seed on the server's footing.**
+
+- **A seep is a claim about the edge:** up to engine 15 the server put one ellipse at the centre of the
+  bounding box, so a triangle and a cloudform got the same ellipse and no edge seeped at all. The
+  mechanism now lays three bands pushed out from the outline itself, and **how far each vertex is pushed
+  wavers**, so it reads as a seep rather than as concentric outlines. **The innermost ring lies on the
+  outline** (`level` is `ring / (rings - 1)`, which is 0 at `ring == 0`). **The body moved is 64 lines**
+  (`renderer.py:3979`–4042. **The ledger and the previous round's contract both said "66 lines"; they
+  drew the boundary differently and the count is 64**).
+- **Only one new part had to be made:** the constant `SURFACE_BLEED_RINGS = 3`. `centerlineNormals`,
+  `pointsCenter`, `usesHandStroke`, `synthesizeAlong`, `surfaceStrokeSeed`, `gridStepPx`,
+  `contourStrokePath` and the texture-filter attribute **were all already in the port** from earlier
+  rounds, and the `useFilters` transport was laid by the previous round's first stage, so **this round
+  laid none of it again**.
+- **Both roads were kept:** the machine pole (`rotring`) gets three `<polygon>` elements carrying no
+  class, a hand tool gets three `<path class="surface-stroke-v1 bleed-ring-N">`. **Which way to push is
+  settled by a majority vote of the normals** — the sign is not a constant, because the normals do not
+  face the same way on every shape.
+- **The surface seed is now made once, before the branches (ledger I-288):** the server makes it once in
+  `_render_surface_texture` and hands it to every branch, while **the port made it four times inside the
+  branches, and two of those — `wash` and `hatch` / `crosshatch` — dropped the mark index**. The call
+  count in production went **4 to 1**, and **the two customs that had been living side by side in the
+  port became one**. A branch added later can no longer pick the wrong one.
+- **⚠ One premise the contract stated did not survive measurement:** the contract said that passing
+  `(0, 0)` makes **every mark an `arrangement` expanded wear the same texture**, but **an expanded mark
+  has its own coordinates, and those coordinates are in the seed's material** (the instruction's dump),
+  so **the marks already had different seeds with `(0, 0)` in place**. **The divergence was real; what
+  was not reaching the seed was `insIdx`** — put two instructions identical in every stated field into
+  one score and their index is the only thing between them. **The gates were set in those two halves**
+  (the `arrangement` half as the contract worded it; the discriminating half is the two identical
+  instructions). **The server has the same structure, so `mark_idx` is redundant with the coordinates
+  there too** — not changed inside an Android contract, filed on the ledger instead (I-291).
+- **Ten gates set as properties (T-166..T-175):** **the frozen corpus holds 0 `bleed` cases** and
+  **0 instructions carrying both an `arrangement` and a surface**, so not one of its 51 sheets can
+  measure this change. **T-166 replaces an existing control** — the check asserting that `bleed` drew
+  nothing **would have become a vacuous loop had its single entry simply been removed**, so the claim
+  was turned over into **"every word the schema offers is a word this layer draws"**. **The list of
+  words is read from the schema, not copied into the check.**
+- **⚠ The mark-to-mark comparison runs on the machine pole:** a hand tool quantises its samples onto a
+  grid anchored at the origin, so **two marks wearing one texture are still never exact translations of
+  one another** (measured: with a stated seed, `pen` gives 24 sweeps falling into 24 distinct shapes,
+  `rotring` gives 24 falling into 8).
+- **The full run went 355 to 364 (+9):** nine checks were added; T-166 replaces one and so does not
+  count. **One check disappeared, and that one became T-166.** **On the merged tree: XML 62 / tests 364
+  / failures 0 / errors 0 / skipped 0**, and `test_android_reference_fixtures_are_current.py`
+  **4 passed**.
+- **The nine perturbations were run by the implementation session on the branch** (the prediction was
+  frozen before any code, overlay `cd678deb`). **One missed** — P-1 (three rings to two) was predicted
+  to redden 1 check and reddened 4, because **three other gates were reading "there are three rings" as
+  a premise** (the type being "failing to count what a check reads").
+- **⚠ `support` is not passed to `synthesizeAlong`** — this is not a divergence this round introduced:
+  **none of the port's nine call sites pass it** (the ground layer itself is not in the port).
+- **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).

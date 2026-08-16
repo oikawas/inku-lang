@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import sqlite3
@@ -3809,8 +3810,27 @@ def _fts_match_query(search: str) -> str:
     return '"' + search.replace('"', '""') + '"'
 
 
+# A whole render hash, with the version prefix (`rh3:`) or without it: a reader
+# who trims the prefix off still means the same work. The prefix is matched
+# loosely rather than spelled `rh3` so that a later version does not silently
+# stop being searchable.
+_WHOLE_RENDER_HASH = re.compile(r"(?:[a-z0-9]+:)?[0-9a-f]{64}", re.IGNORECASE)
+
+
 def _is_render_hash_suffix_search(search: str) -> bool:
-    return len(search) == 4 and search.isascii() and search.isalnum()
+    """Text that can only be a render hash, and so is matched against the end of one.
+
+    Two shapes arrive here. The four characters the UI prints on a work's chip,
+    and the whole hash its copy button puts on the clipboard -- which is what a
+    reader pastes back into the search box, and which used to reach the
+    full-text path instead and find nothing.
+
+    Both are matched as a suffix: that is what the short form is, and the long
+    form is trivially one.
+    """
+    if len(search) == 4 and search.isascii() and search.isalnum():
+        return True
+    return bool(_WHOLE_RENDER_HASH.fullmatch(search))
 
 
 def _history_search_clause(search: str):

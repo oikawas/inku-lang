@@ -789,7 +789,7 @@ export const ja: LangPack = {
 	historyMoveToTrash: '選択削除',
 	historyRestoreSelected: '選択復元',
 	historyPermanentDelete: '完全削除',
-	historySearchLabel: '検索（記述 / ハッシュ値下位4桁）:',
+	historySearchLabel: '検索（記述 / ハッシュ値の全体か下位4桁）:',
 	historyNewer: '← 新しい',
 	historyOlder: '古い →',
 	historyOldest: '最古',

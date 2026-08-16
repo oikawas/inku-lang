@@ -72,11 +72,37 @@ def _vision_chat(
     return (response.choices[0].message.content or "").strip()
 
 
+_FENCED_BODY = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
+
+
+def _json_body(raw: str) -> str:
+    """The JSON an advice answer carries, with the wrapping a chat model adds.
+
+    Two wrappings come off, in that order: a ``` fence, and prose either side of
+    the object. Neither one guesses at the content -- what is left still has to
+    parse, and an answer with no braces in it is handed on untouched so it fails
+    the way it always did.
+
+    The fence strip used to be written as `\\s` inside a raw string, which is a
+    literal backslash followed by zero or more 's' -- so it matched nothing, and
+    every fenced answer became "invalid refinement advice JSON". A vision model
+    fences by default, which made the whole path fail rather than degrade.
+    """
+    text = raw.strip()
+    fenced = _FENCED_BODY.search(text)
+    if fenced:
+        text = fenced.group(1).strip()
+    if text.startswith("{"):
+        return text
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 def _parse_json(raw: str) -> dict[str, Any]:
-    clean = raw.strip()
-    if clean.startswith("```"):
-        clean = re.sub(r"^```(?:json)?\\s*", "", clean, flags=re.IGNORECASE)
-        clean = re.sub(r"\\s*```$", "", clean)
+    clean = _json_body(raw)
     try:
         parsed = json.loads(clean)
     except json.JSONDecodeError as exc:

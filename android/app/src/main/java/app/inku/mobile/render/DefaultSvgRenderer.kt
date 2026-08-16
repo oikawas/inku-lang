@@ -23,6 +23,18 @@ internal const val FILL_DAB_MIN_TRAVEL = 0.90
 // the second span of a row never lands on another row's stroke seed.
 internal const val HATCH_SPAN_SEED_STRIDE = 1048576
 
+internal const val SURFACE_WASH_LAYERS = 2
+// One sweep's width, as a multiple of the pitch the sweeps are laid down at.
+// The band decides whether a wash reads as a field or as a set of stripes: below
+// 1.0 the paper between two sweeps is never reached by either of them.
+internal const val SURFACE_WASH_WIDTH_BASE = 0.88
+internal const val SURFACE_WASH_WIDTH_SPAN = 0.60
+// Each sweep carries this fraction of the surface's stated opacity. The layers
+// overlap, so the ink a reader sees is the composite rather than this number.
+// Doubling the width above closes the gaps, which also darkened the wash; the
+// factor comes down from 0.42 so the ink lands back where it was.
+internal const val SURFACE_WASH_OPACITY = 0.22
+
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
 
@@ -1995,6 +2007,58 @@ class DefaultSvgRenderer(
             return ServerRendererGeometry.sampleClosedCatmullRom(contour.points)
         }
         return null
+    }
+
+    /**
+     * One scanline drawn as one stroke. The wash's layers are made of these.
+     *
+     * A machine pole gets the plain line it would draw; every hand tool gets the
+     * material engine's stroke along the same centreline, seeded by the surface's
+     * own label so a sweep and a fill stroke at the same index do not share a
+     * waveform.
+     */
+    private fun surfaceSweep(
+        ins: JSONObject,
+        unit: Double,
+        start: Pair<Double, Double>,
+        end: Pair<Double, Double>,
+        width: Double,
+        color: String,
+        opacity: Double,
+        seed: Any,
+        index: Int,
+        wild: Boolean
+    ): String {
+        val length = kotlin.math.hypot(end.first - start.first, end.second - start.second)
+        if (length <= 0.0) return ""
+        val weight = ins.optString("weight", "pen")
+        val opacityStr = fmt(opacity)
+        if (!usesHandStroke(weight)) {
+            return """<line class="surface-stroke-v1" x1="${fmt(start.first)}" y1="${fmt(start.second)}" x2="${fmt(end.first)}" y2="${fmt(end.second)}" stroke="$color" stroke-width="${fmt(width)}" stroke-opacity="$opacityStr" stroke-linecap="round"/>"""
+        }
+        val count = max(2, ServerRendererGeometry.strokeSampleCount(length, unit))
+        val centerline = (0 until count).map { i ->
+            val t = i.toDouble() / (count - 1).toDouble()
+            (start.first + (end.first - start.first) * t) to (start.second + (end.second - start.second) * t)
+        }
+        val stroke = ServerStrokeEngine.synthesizeAlong(
+            centerline,
+            width,
+            weight,
+            ServerRendererGeometry.surfaceStrokeSeed(seed, index),
+            closed = false,
+            gridStep = gridStepPx(weight, unit),
+            wild = wild
+        )
+        // The port writes its texture filters unattached to the profile, the way
+        // every other stroke path here does; the defs they point at are only
+        // emitted for `display`, so an editable file carries a reference nothing
+        // resolves and draws the plain path. Keeping that decision in one place
+        // matters more here than mirroring the server's `use_filters` flag,
+        // which no frozen case pins either way.
+        val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
+        val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
+        return """<path class="surface-stroke-v1" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="$opacityStr" stroke="none"$filterAttr/>"""
     }
 
     private fun renderSurfaceVectors(

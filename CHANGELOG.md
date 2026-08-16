@@ -7240,3 +7240,40 @@ paper in it. This version **widens the sweep to the pitch and lightens it by as 
   **the frozen corpora are byte-identical**, **Android JVM 57 classes / 325 passed / 0 failed**.
 - **Android's reference fixtures gained the 64 files of `render-engine-36/` and no Kotlin source moved
   by a line** (`android/VERSION` held steady). The port reads the directory of the version it names.
+
+---
+
+### v2.13.28 — Each limit answers to a different authority (Build 915, 2026-08-16)
+
+**The nine numbers in the limits tab were already split into three families.**
+The families were called `How much is actually drawn`, `How a stated number is honoured` and
+`Ceilings on reading and validation` — none of which **said what to look at when deciding a value**.
+An administrator could not tell which numbers may follow the hardware. This version **renames the
+families after who they answer to**.
+
+- **The three families are now** **`What this machine can draw`** (capability), **`Where counting by
+  eye stops`** (legibility) and **`Guards against a typing mistake`** (safety). **Each family gained a
+  tooltip** saying what it should follow.
+- **⚠ The load-bearing part is what must *not* be linked** — **a faster machine does not make an eye
+  faster**, so **`Where counting by eye stops` must not follow `What this machine can draw`**. What
+  that family holds constant is the *look* — how much ink sits in one cluster — not the threshold
+  digits.
+- **`max_instructions` changed families** — from `How much is actually drawn` to **`Guards against a
+  typing mistake`**. **It is a runaway guard, not a statement about what this machine can afford to
+  draw.** **Production has never exceeded 27 instructions (median 4), so the default of 64 has never
+  bound a real work.**
+- **Not one of the numbers changed.** The defaults, the effect, and what gets written into the prompts
+  are all as they were.
+- **The per-number descriptions gained measurements** — one grid mark costs roughly 13 KB of SVG with
+  a pen and 16 KB with a thick brush, so **the default of 400 already lets one work reach 5–6.5 MB**.
+- **⚠ The test inventory did not grow by one.** No new test function was added; **the existing `test_t9`
+  was strengthened instead** (from one assertion to seven: **per-family membership**, **that both
+  language packs carry the headings and the tooltips**, and **that the panel actually calls the
+  tooltip**).
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3,271 passed /
+  31 skipped** (the same as the previous version, for the reason above), **cli 227 passed**, **web 375
+  pass / `check` 261 FILES 0 ERRORS 2 WARNINGS**, **`lint:i18n` 1,063 English strings / 0 errors**
+  (**+1 from the previous 1,062**, the family tooltips), **ruff clean for both server and cli**.
+- **⚠ This round closed no ledger item.** Neither the branch's commits nor the contract names one, and
+  **[I-244] and [I-245] (which tabs the limits panel appears under) are a different matter and remain
+  open**.

@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.27 (Web Build 914). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.28 (Web Build 915). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -425,6 +425,14 @@ Open the settings from the application rail. Which tabs are visible depends on t
 The settings dialog opens either `Standard` or `Detailed`, switched from the toggle at its top right. **The `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs appear only in `Detailed`.** The choice stays in that browser.
 
 `Limits` is not a speed control: it changes the number of lines actually drawn. The values chosen there are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. See `Server Configuration` for the details.
+
+The nine numbers fall into three families, and **each family answers to a different authority**
+(v2.13.28). `What this machine can draw` is how much the installed hardware can afford to put on one
+work, and it is the only family that should follow the machine. `Where counting by eye stops` is the
+line between a number small enough to draw as stated and one shown as a band instead — **a faster
+machine does not make an eye faster, so do not link it to the family above**. `Guards against a
+typing mistake` only stops a typo or a runaway, and moving it makes no drawing better. Hovering a
+family heading says what that family should follow.
 
 The `Unread-word ledger` collects words whose direct counterpart could not be confirmed when the description was interpreted into DDL. Nothing is promoted from this ledger into the dictionary automatically. Administrators can also see the ledger for everyone.
 

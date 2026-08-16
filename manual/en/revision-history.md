@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.28 unreleased baseline (Web Build 915)
+
+Updated the thirteen places that name a version to v2.13.28 / Build 915. **The families in the settings `Limits` tab were renamed. Not one of the numbers changed.**
+
+- **The three families the nine numbers fall into were renamed.** `How much is actually drawn` became `What this machine can draw`, `How a stated number is honoured` became `Where counting by eye stops`, and `Ceilings on reading and validation` became `Guards against a typing mistake`. **Each family now has a tooltip saying what to look at when deciding its values.**
+- **⚠ Do not link `Where counting by eye stops` to the hardware.** A faster machine does not make an eye faster. What that family holds constant is not the threshold digits but how much ink sits in one cluster.
+- **The instruction ceiling changed families.** It moved from `How much is actually drawn` to `Guards against a typing mistake`, because it is a runaway guard (production has never exceeded 27 instructions, median 4, so the default of 64 has never bound a real work).
+- **Defaults, behaviour, and what each work records are all unchanged.**
+- No word you can write in a description was added or removed.
+
 ## 2026-08-16 — v2.13.27 unreleased baseline (Web Build 914)
 
 Updated the thirteen places that name a version to v2.13.27 / Build 914. **No screen interaction changed. What changed is how `surface: wash` is drawn.**

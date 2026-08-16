@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.26 unreleased baseline (Web Build 913)
+
+Updated the thirteen places that name a version to v2.13.26 / Build 913. **No screen interaction changed. What changed is which APIs answer without a session.**
+
+- **The APIs that answer without logging in went from six to three.** What is left is `/health`, `/api/info`, and `/api/auth/login`.
+- **`/api/prompts`, `/api/color-catalogs`, and `/api/auth/config` now need a session.** They had been public because the login screen was said to need them, but the login screen was measured and receives none of them.
+- **Do not pass `--no-auth` when calling them from the CLI.** It answers 401 if you do. Signed in, the usual form still works.
+- **The Web UI looks the same.** The color catalogs and the prompts are now read again at the moment you sign in.
+- No word you can write in a description was added or removed.
+
 ## 2026-08-16 — v2.13.25 unreleased baseline (Web Build 912)
 
 Updated the thirteen places that name a version to v2.13.25 / Build 912. **No screen interaction changed. What changed is the wait when a heavy work is opened.**

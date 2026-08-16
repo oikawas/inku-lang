@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.25 / Build 912**
+**Target version: v2.13.26 / Build 913**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -275,7 +275,9 @@ Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 lines.
 **Dependencies run one way — `api.py` → routers → shared** — and no router imports `api.py`.
 - Authorization is enforced by router-level default dependencies.
-Every endpoint except the six on the public allowlist sits behind a guard.
+Every endpoint except the three on the public allowlist (`/health`, `/api/info`, `/api/auth/login`)
+sits behind a guard. **Every entry on that list has to give a reason that was measured** (narrowed
+from six in v2.13.26; ledger I-086).
 **A per-route `Depends` remains in only two cases: when the body uses the `actor` value, and when the
 route imposes a stronger guard than the router default (the seven admin-only routes in `plugins`).**
 **Restating the router's own guard as a parameter is a second enforcement point, not defence in depth.**

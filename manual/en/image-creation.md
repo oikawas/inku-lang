@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.25 (Web Build 912). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.26 (Web Build 913). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)

@@ -7055,3 +7055,64 @@ control that must not move**.
   every sync path, so this round has nothing to send to pentala.
 - **The frozen prediction note was taken out of the published tree** (it lives in `no-git-sync/`;
   precedent `a5b07945`).
+
+### v2.13.26 — The public list holds only what login needs (Build 913, 2026-08-16, ledger I-086)
+
+**The public routes went from six to three.** What is left is `/health` (the container liveness probe,
+which returns no data), `/api/info` (build and version plus developer_mode, read by the login screen),
+and `/api/auth/login` (the login endpoint itself). **`/api/prompts`, `/api/color-catalogs` and
+`/api/auth/config` moved behind the authorization guard.**
+
+**They came off because every entry on that list has to give a reason that was measured.**
+`/api/color-catalogs` said it was "needed to render the login screen"; the login screen was then
+measured and receives no catalog at all. **What kept the route public was the startup fetch running
+before anyone had logged in.** Only what logging in genuinely needs stayed.
+
+- **server** — the two routes in `public.py` moved to an authenticated router, and `auth.py` gained one
+  of its own. **`PUBLIC` is three entries now, and the live app is walked so the set of unguarded paths
+  is compared against it** (`test_route_authorization.py`). **No route was added or removed**
+  (`EXPECTED_ROUTE_COUNT = 95` is unchanged).
+- **web** — **the tail of `login()` reads the two lists that stopped being public.** The startup fetch
+  runs before anyone has signed in, so both come back 401 there and the page swallows it. **Unless
+  `login()` asks again, the catalog stays on the fallback and the Prompt tab stays empty until the page
+  is reloaded.** The check is **cut down to the body of `login()`** before it is matched — the page
+  calls both functions in several places (`loadCurrentUser()` has the same list one function above), so
+  **a match against the whole file would be satisfied by an occurrence that has nothing to do with
+  signing in.**
+- **cli** — `_fetch_color_catalogs` stopped opting out of authentication. **The check reads the
+  credential the request actually carried**, rather than grepping the source for the absence of a flag:
+  a recording stub answers the call and the headers it was sent are asserted.
+- **published docs** — the public paths listed in both languages of
+  `docs/architecture/server-components` were narrowed to three, and **a gate now holds that list to a
+  one-to-one match with `PUBLIC`** (**both files are read, so neither half can drift alone**).
+
+**The API surface record was rebaked** (digest `d5d312e1…` → `a925c3de…`).
+**⚠ The declaration the two frozen gates take needed more than the contract's `added_params` /
+`removed_params`** — **a route that carried no arguments has no "validation failed" response, and one
+appears the moment the authorization dependency brings two arguments with it.** (`/api/prompts` already
+had `query:lang:opt`, so it already had a `422`; only its `params` moved.) **Rather than waving
+`responses` through, the declaration gained `added_responses` / `removed_responses`: only the declared
+codes are removed, and everything left is compared byte for byte** — **a window that silently lost its
+200 still reddens.**
+
+- **Eleven gates** (`T-79`–`T-89`) and **ten perturbations**. **Nothing came out differently from the
+  prediction** — every T that should have reddened did, and every T that should have stayed green
+  (`T-85` under `P-2`, `T-79`–`T-82` under `P-4`) did. **`P-4`, which adds one undeclared query
+  argument, reddens `T-83` and `T-84` and nothing else — that is what measures that the declaration
+  mechanism is not a blank cheque.**
+- **⚠ One kind of collateral was missing from the prediction** — a perturbation that reddens web
+  (`P-5`, `P-6`, `P-10`) always also reddens **`T-15`, the metagate that runs the whole suite**. The
+  contract had not said so.
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3253 passed /
+  31 skipped / 0 failed**, **cli 227 passed**, **web 375 pass / 0 fail**, **ruff clean on both trees,
+  `npm run check` 0 errors** (the two warnings are the pre-existing a11y pair), **`lint:i18n` 0 errors,
+  `check_docs.py` consistent**. The deltas matched what the branch had declared, face by face
+  (server +11, cli +2, web +2; **the main side was Android only, so it added none**). **The two checks
+  `accept` reported as missing had gained an argument rather than been deleted**
+  (`test_color_catalogs_are_served_by_api` and `test_the_catalog_list_serves_the_rename_table`;
+  **each was looked up at the branch point to decide**).
+- **Carried forward (untouched here)** — **the "Total: 82" in
+  `docs/architecture/server-components` is stale** (95 as measured). **T-89 reads only the set of
+  allowlist paths and does not look at that number.** **`manual/` says nowhere that these APIs need no
+  authentication, so nothing in it became false** — **no list of public paths was added to it**, since
+  that would be a third hand-copied copy with no gate on it.

@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v2.13.25 (Web Build 912) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade of the unreleased inku v2.13.26 (Web Build 913) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 

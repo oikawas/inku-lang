@@ -7124,3 +7124,64 @@ codes are removed, and everything left is compared byte for byte** — **a windo
 - **Carried forward (untouched here)** — **`manual/` says nowhere that these APIs need no
   authentication, so nothing in it became false** — **no list of public paths was added to it**, since
   that would be a third hand-copied copy with no gate on it.
+
+---
+
+### Android — the same beat, the same points, the same sheet (android `2.1.4-android.34`, 2026-08-16, ledger I-273, I-274, I-272)
+
+**The three divergences the previous version reported and left alone** are what this one closes.
+**None of them reddens a single sheet of the frozen 51**, so **all eleven gates are stated as
+properties** — what is measured is not "it differs from before" but "**it is the value the server
+produces**", each paired with a control that must not move.
+
+- **I-273 — the spacing itself was different.** The previous version fixed the stirring of the beat's
+  seed per cluster, but **the function that receives the seed, `rhythmT`, differed from the server's
+  `_rhythm_t` in four places**: **0.5 against 0.0 for a lone member**, **accelerando as `base²`
+  against `base^1.35`**, **loose jitter divided by the member count** (`0.12/max(n/8,1)` against a flat
+  `0.16` — a factor of 3.3 at twenty members), and **the two syncopated constants** (`0.085`/`−0.055`
+  against `0.09`/`−0.045`). **The five call sites were not touched.**
+- **I-274 — a varied arc differed in its points, its phase, its ends and its element.** With
+  `variation` on an arc that skips hand-stroke synthesis (`rotring`), the port drew **one point fewer**
+  (`segmentCount` against `+1`), **sampled a notch off** (`i/count` against `i/last`), **jittered the
+  end points** (the server pins both, to keep the touching contract), and **emitted `<path>`** where the
+  server emits `<polyline>`. **All four now follow the server.** **⚠ A second function in the same file
+  already agreed with the server** (the hand-stroke path's `arcPointsWithVariation`), so **only one of
+  the two was changed.**
+- **I-272 — the sheet itself was a pixel out.** Turning a ratio into pixels, **the server rounds and the
+  port truncated**, splitting `oban` into 666 and 667. **⚠ `Math.round` would have added a second
+  divergence** — Python's `round` goes **half to even**, so `vertical` (562.5) is 562, while
+  `Math.round` goes **half up** and gives 563. **`Math.rint` is what went in**; truncation had been
+  landing on 562 by luck.
+- **Fifteen perturbations; four missed their predictions.** **P-8** (7 predicted, 5 measured): the beat
+  inside a cluster sits behind `rhythmSpacing != "none"` and never reaches `rhythmT` when the spacing is
+  `none`, and the parity gate that counts elements and classes stays green when only coordinates move.
+  **P-9 and P-10** (+2 each): **the implementation forgot to count the two existing gates it had
+  rewritten in stage 2**. **P-13** (3 predicted, 0 measured) was **a no-op**: across every integer
+  `r` in 50..400 and `Δ` in 1..360, `2πr × (|Δ|/360)` and `r × |radians Δ|` **never split the segment
+  count**.
+- **⚠ Two measurements in the contract were wrong.** ① T-130 asked for `controls-72` on a `pen` arc
+  with `variation`, but **`controls-72` is the figure without variation; a varied arc gives
+  `controls-148`** (the previous version's gate held the two in separate assertions, and folding them
+  into one line mixed them up — **this version measures both separately**). ② The claim that the
+  previous P-7 had measured the corpus reddening when the two arc-length formulas are unified is false:
+  **P-7 switched to the folded formula, which is a different thing**; unification was predicted not to
+  move, **and measured 0**. **What protects the hand-stroke formula, then, is neither a gate nor the
+  corpus but the fact that both forms return the same value.**
+- **⚠ One existing gate had its measurement window narrowed.** With loose jitter going from `0.048` to
+  `0.16`, **the first member in from each end can be pushed into `clamp01` at twenty members spaced
+  1/19**, where `t` stops being affine, so the window for reading the beat moved from `j = 1..18` to
+  **`j = 2..17`** (`base ≥ 0.105 > 0.08`). **The implementation had written this prediction into its
+  frozen note before starting. No gate was added or removed.**
+- **Carried forward (untouched here)** — **the decision of whether variation applies folds the server's
+  two functions into one**: the server treats `quality: "pink"` as a blur and refuses it, the port lets
+  it through, and for lines the server looks at two dimensions where the port looks at three (filed on
+  the ledger). Also I-269, I-266, I-275, engine 34, the surface layer's `surfaceSeed`, and the two
+  ellipse-perimeter formulas.
+- **Verification (re-measured by the accepting session on the merged tree):** **Android JVM 57 classes /
+  325 passed / 0 failed / 0 errors / 0 skipped** (314 at the branch point, **+11, this contract's gates
+  T-121..T-131**; nothing deleted or renamed; zero `^e: ` lines),
+  **`test_android_reference_fixtures_are_current.py` 4 passed**, **the reference fixtures did not move
+  by a byte**. **`server/`, `web/`, `cli/` and `shared/` have no diff.** **⚠ `cycle.sh accept`'s test
+  inventory does not count `android/`** (ledger I-270), so the delta was counted by hand (314 → 325).
+- **⚠ Neither `APP_VERSION` nor `web/BUILD_NUMBER` moved.** `android/` is permanently excluded from
+  every sync path, so this round has nothing to send to pentala.

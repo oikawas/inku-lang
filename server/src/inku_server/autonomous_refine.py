@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import re
 from typing import Any, Callable
 
 from inku_analysis.rasterizer import svg_to_png
@@ -72,33 +71,26 @@ def _vision_chat(
     return (response.choices[0].message.content or "").strip()
 
 
-_FENCED_BODY = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
-
-
 def _json_body(raw: str) -> str:
-    """The JSON an advice answer carries, with the wrapping a chat model adds.
+    """The object an advice answer carries, with whatever a chat model wrapped it in.
 
-    Two wrappings come off, in that order: a ``` fence, and prose either side of
-    the object. Neither one guesses at the content -- what is left still has to
-    parse, and an answer with no braces in it is handed on untouched so it fails
-    the way it always did.
+    One rule, not two: take the first brace to the last. That covers a ``` fence
+    and prose either side of the object alike, so there is no second path whose
+    removal changes nothing. It guesses at no content -- what comes out still has
+    to parse, and an answer with no braces in it is handed on untouched, so it
+    fails exactly where it failed before.
 
-    The fence strip used to be written as `\\s` inside a raw string, which is a
-    literal backslash followed by zero or more 's' -- so it matched nothing, and
-    every fenced answer became "invalid refinement advice JSON". A vision model
-    fences by default, which made the whole path fail rather than degrade.
+    This replaces a fence strip written as `\\s` inside a raw string, which asks
+    for a literal backslash followed by zero or more 's' and so matched nothing.
+    A vision model fences its answer by default, which meant the whole path
+    returned "invalid refinement advice JSON" rather than degrading.
     """
     text = raw.strip()
-    fenced = _FENCED_BODY.search(text)
-    if fenced:
-        text = fenced.group(1).strip()
-    if text.startswith("{"):
-        return text
     start = text.find("{")
     end = text.rfind("}")
-    if start != -1 and end > start:
-        return text[start : end + 1]
-    return text
+    if start == -1 or end <= start:
+        return text
+    return text[start : end + 1]
 
 
 def _parse_json(raw: str) -> dict[str, Any]:

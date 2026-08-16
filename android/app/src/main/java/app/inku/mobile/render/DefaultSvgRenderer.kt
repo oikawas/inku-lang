@@ -23,6 +23,14 @@ internal const val FILL_DAB_MIN_TRAVEL = 0.90
 // the second span of a row never lands on another row's stroke seed.
 internal const val HATCH_SPAN_SEED_STRIDE = 1048576
 
+// The most grains one surface may scatter, however large or dense it is asked
+// to be. Past this the marks stop reading as a grain and start reading as a
+// fill, and the drawing costs more to write than it gains.
+internal const val SURFACE_MARK_MAX = 90
+// A dab's centreline is this many points long. One touch of a tool is short, so
+// the material engine gets the fewest samples that still bend.
+internal const val SURFACE_DAB_SAMPLES = 5
+
 internal const val SURFACE_WASH_LAYERS = 2
 // One sweep's width, as a multiple of the pitch the sweeps are laid down at.
 // The band decides whether a wash reads as a field or as a set of stripes: below
@@ -108,6 +116,11 @@ class DefaultSvgRenderer(
         )
         val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed, canvas)
         val structured = request.svgProfile == "editable"
+        // The server settles this in two steps that read the same condition --
+        // `use_filters = profile == "display"` where the drawing is set up, and
+        // `use_filters and profile == "display"` again on the way into the
+        // surface layer -- so the two compose to exactly this.
+        val useFilters = request.svgProfile == "display"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
         for (i in 0 until resolvedInstructions.length()) {
@@ -120,7 +133,7 @@ class DefaultSvgRenderer(
             val insSb = StringBuilder()
             for ((index, mark) in expanded.withIndex()) {
                 val markId = "mark_${"%03d".format(i)}_${"%03d".format(index)}_${primitive}"
-                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed, wild, index)
+                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed, wild, index, useFilters)
                 if (structured && elem.startsWith("<g ")) {
                     elem = elem.replaceFirst(">", """ id="$markId">""")
                 } else if (structured && elem.startsWith("<path ")) {
@@ -165,7 +178,10 @@ class DefaultSvgRenderer(
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
 
-    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null, wild: Boolean = false, markIndex: Int = 0): String {
+    // `useFilters` carries no default on purpose: the surface layer reads the
+    // profile through it, and a default would let a new caller draw the display
+    // face's filters into an editable file without saying so.
+    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null, wild: Boolean = false, markIndex: Int = 0, useFilters: Boolean): String {
         val primitive = ins.optString("primitive", "line")
         val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
@@ -209,7 +225,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("circle", ins, attrs, regionFill, cx, cy, r, r, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -242,7 +258,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<circle cx="$cx" cy="$cy" r="$r" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val outline = if (usesMaterialOutline(weight)) materialCircleOutline(ins, attrs, cx, cy, r, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -267,7 +283,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("ellipse", ins, attrs, regionFill, cx, cy, rx, ry, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -292,7 +308,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<ellipse cx="$cx" cy="$cy" rx="$rx" ry="$ry" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val outline = if (usesMaterialOutline(weight)) materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -317,7 +333,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else emptyList()
                     val body = renderBodyShape("square", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, x, y, w, h, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         // engine 28: every drawing rides the ink, not only the wild ones.
@@ -343,7 +359,7 @@ class DefaultSvgRenderer(
                     } else {
                         """<rect x="$x" y="$y" width="$w" height="$h" fill="$fill" $common/>"""
                     }
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val outline = if (usesMaterialOutline(weight)) materialRectOutline(ins, attrs, x, y, w, h, unit) else ""
                     if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
@@ -366,7 +382,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else points
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     // engine 15: this function had no material-outline call at all, so triangle
                     // and polygon were the only closed figures left bare across all five tools
@@ -396,7 +412,7 @@ class DefaultSvgRenderer(
                         points
                     }
                     val base = polygon(pts, fill, common)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     if (surfaceGroup.isNotEmpty()) """<g>$base$surfaceGroup</g>""" else base
                 }
             }
@@ -419,7 +435,7 @@ class DefaultSvgRenderer(
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
                     val bodyPts = if (needsPathVariation(variation)) fillContour else rawPoints
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     // engine 15: this function had no material-outline call at all, so triangle
                     // and polygon were the only closed figures left bare across all five tools
@@ -445,7 +461,7 @@ class DefaultSvgRenderer(
                         rawPoints
                     }
                     val base = polygon(pts, fill, common)
-                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                    val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     if (surfaceGroup.isNotEmpty()) """<g>$base$surfaceGroup</g>""" else base
                 }
             }
@@ -518,7 +534,7 @@ class DefaultSvgRenderer(
                 // other shape; here each branch asks for its own, and this one
                 // never did. Its bbox answering null hid that: the layer would
                 // have returned "" anyway.
-                val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                 if (fillGroup == null && !hand && surfaceGroup.isEmpty()) {
                     pathStr
                 } else {
@@ -2027,7 +2043,8 @@ class DefaultSvgRenderer(
         opacity: Double,
         seed: Any,
         index: Int,
-        wild: Boolean
+        wild: Boolean,
+        useFilters: Boolean
     ): String {
         val length = kotlin.math.hypot(end.first - start.first, end.second - start.second)
         if (length <= 0.0) return ""
@@ -2050,15 +2067,82 @@ class DefaultSvgRenderer(
             gridStep = gridStepPx(weight, unit),
             wild = wild
         )
-        // The port writes its texture filters unattached to the profile, the way
-        // every other stroke path here does; the defs they point at are only
-        // emitted for `display`, so an editable file carries a reference nothing
-        // resolves and draws the plain path. Keeping that decision in one place
-        // matters more here than mirroring the server's `use_filters` flag,
-        // which no frozen case pins either way.
+        // The sweep asks the profile now. Until the surface layer was given the
+        // profile it could not, so it wrote the reference unconditionally and an
+        // editable file carried one that nothing resolved; the defs it points at
+        // are only emitted for `display`. The server has read `use_filters` here
+        // all along.
+        return """<path class="surface-stroke-v1" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="$opacityStr" stroke="none"${textureFilterAttr(weight, useFilters)}/>"""
+    }
+
+    /**
+     * The surface layer's texture filter, or nothing.
+     *
+     * `drypoint` declares a filter and is refused one here, the way the server
+     * refuses it: the tool's own bite is already in the stroke's outline, and
+     * the filter on top of it reads as a smudge.
+     */
+    private fun textureFilterAttr(weight: String, useFilters: Boolean): String {
         val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
-        val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
-        return """<path class="surface-stroke-v1" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="$opacityStr" stroke="none"$filterAttr/>"""
+        if (!useFilters || weight !in textureFilterWeights || weight == "drypoint") return ""
+        return """ filter="url(#texture-$weight)""""
+    }
+
+    /**
+     * One grain: one touch of the tool.
+     *
+     * A grain is not a circle. It is the mark a tool leaves where it was set
+     * down once, so a hand tool lays one of the material engine's strokes and
+     * only a machine pole -- `rotring`, `computer` -- gets the geometry.
+     *
+     * The width is the thicker of the tool's line and the grain's own size. Let
+     * the tool's line decide it alone and the surface disappears: the server
+     * measured the mean ink inside a square falling from 1.74 to 0.48 when it
+     * did. The length is the grain's size again, so `surface.scale` is what
+     * carries both.
+     */
+    private fun surfaceDab(
+        ins: JSONObject,
+        unit: Double,
+        point: Pair<Double, Double>,
+        radius: Double,
+        color: String,
+        opacity: Double,
+        seed: Any,
+        index: Int,
+        wild: Boolean,
+        useFilters: Boolean,
+        markClass: String?
+    ): String {
+        val (px, py) = point
+        val weight = ins.optString("weight", "pen")
+        val opacityStr = fmt(opacity)
+        if (!usesHandStroke(weight)) {
+            val classAttr = if (markClass != null) """ class="$markClass"""" else ""
+            return """<circle$classAttr cx="${fmt(px)}" cy="${fmt(py)}" r="${fmt(radius)}" fill="$color" opacity="$opacityStr" stroke="none"/>"""
+        }
+        val angle = ServerRendererGeometry.hash01(index, seed, "surface-dab-angle") * Math.PI
+        val length = radius * (1.9 + ServerRendererGeometry.hash01(index, seed, "surface-dab-length") * 1.6)
+        val ux = cos(angle) * length / 2.0
+        val uy = sin(angle) * length / 2.0
+        // Grouped the way the server groups it -- (2 * u) * i / (n - 1) -- so the
+        // two agree to the last bit rather than to the printed digits.
+        val centerline = (0 until SURFACE_DAB_SAMPLES).map { i ->
+            val steps = (SURFACE_DAB_SAMPLES - 1).toDouble()
+            (px - ux + 2 * ux * i.toDouble() / steps) to (py - uy + 2 * uy * i.toDouble() / steps)
+        }
+        val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        val stroke = ServerStrokeEngine.synthesizeAlong(
+            centerline,
+            max(ServerRendererStyle.strokeWidth(weight, unit, thinness), radius * 1.3),
+            weight,
+            ServerRendererGeometry.surfaceStrokeSeed(seed, index),
+            closed = false,
+            gridStep = gridStepPx(weight, unit),
+            wild = wild
+        )
+        val classAttr = if (markClass != null) "surface-stroke-v1 $markClass" else "surface-stroke-v1"
+        return """<path class="$classAttr" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="$opacityStr" stroke="none"${textureFilterAttr(weight, useFilters)}/>"""
     }
 
     private fun renderSurfaceVectors(
@@ -2071,7 +2155,8 @@ class DefaultSvgRenderer(
         renderSeed: Long?,
         wild: Boolean,
         insIdx: Int,
-        markIdx: Int
+        markIdx: Int,
+        useFilters: Boolean
     ): String {
         val surface = ins.optJSONObject("surface") ?: return ""
         val texture = surface.optString("texture", "none")
@@ -2085,6 +2170,81 @@ class DefaultSvgRenderer(
         val color = colors[colorKey] ?: "#111111"
         val opacity = kotlin.math.min(0.75, surface.optDouble("opacity", 0.3))
         val density = kotlin.math.max(0.02, surface.optDouble("density", 0.5))
+        val scale = kotlin.math.max(0.04, surface.optDouble("scale", 0.5))
+        // How many grains a shape is worth. Tied to the area rather than to the
+        // shape's name, and held between a fifth and not quite twice the count a
+        // shape of the reference area gets.
+        val areaFactor = kotlin.math.max(0.2, kotlin.math.min(1.8, (w * h) / (unit * unit * 0.18)))
+
+        if (texture in setOf("stipple", "grain", "paper_grain")) {
+            // One branch for the three words, because the server holds them in
+            // one set. They are three names for the same act: scatter positions
+            // inside the outline and touch the tool down once at each.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val count = min(SURFACE_MARK_MAX, ((22 + density * 120) * areaFactor).toInt())
+            val radius = max(0.45, unit * (0.002 + scale * 0.004))
+            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
+            val sb = StringBuilder()
+            for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
+                sb.append(
+                    surfaceDab(
+                        ins,
+                        unit,
+                        point,
+                        radius * (0.55 + ServerRendererGeometry.hash01(index, seedStr, "surface-r") * 1.1),
+                        color,
+                        opacity * (0.45 + ServerRendererGeometry.hash01(index, seedStr, "surface-o") * 0.55),
+                        seedStr,
+                        index,
+                        wild,
+                        useFilters,
+                        markClass = null
+                    )
+                )
+            }
+            return sb.toString()
+        }
+
+        if (texture == "aquatint") {
+            // A band is made of grains. The grains are scattered once, from the
+            // outline, exactly as the three words above scatter them; which band
+            // a grain fell into is what decides whether it stays and how dark it
+            // is. Scattering per band instead would put a seam at every border.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val steps = surface.optInt("tone_steps", 3)
+            val band = w / steps
+            val radius = max(0.45, unit * (0.0015 + scale * 0.0025))
+            val count = min(SURFACE_MARK_MAX, max(5, ((18 + density * 90) * areaFactor).toInt()))
+            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
+            val sb = StringBuilder()
+            for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
+                val step = if (band > 0) min(steps - 1, max(0, ((point.first - x) / band).toInt())) else 0
+                // The border between two bands is nudged, once per band, so the
+                // step reads as a tone rather than as a ruled edge. A nudge that
+                // lands outside the outline is given back.
+                val boundaryJitter = (ServerRendererGeometry.hash01(step, seedStr, "aquatint-boundary") - 0.5) * band * 0.08
+                var shifted = (point.first + boundaryJitter) to point.second
+                if (!ServerRendererFill.pointInPolygon(shifted.first, shifted.second, contour)) shifted = point
+                sb.append(
+                    surfaceDab(
+                        ins,
+                        unit,
+                        shifted,
+                        radius,
+                        color,
+                        opacity * (0.35 + 0.65 * (step + 1) / steps),
+                        seedStr,
+                        index,
+                        wild,
+                        useFilters,
+                        markClass = "aquatint-step-${step + 1}"
+                    )
+                )
+            }
+            return sb.toString()
+        }
 
         if (texture == "wash") {
             // A wash is a layer, not a scatter of grains. The same shape is swept
@@ -2135,7 +2295,8 @@ class DefaultSvgRenderer(
                             opacity * SURFACE_WASH_OPACITY,
                             seedStr,
                             index,
-                            wild
+                            wild,
+                            useFilters
                         )
                     )
                     index += 1

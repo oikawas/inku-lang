@@ -130,16 +130,17 @@ class ASurfaceKeepsToItsShapeTest {
      * nothing. Widening the cut to take them in is what P-14 does, and it fails
      * here.
      *
-     * `wash` has since left this list. It is drawn now (render engine 36's
-     * surface layer, ported), and its own gates live in [AWashIsAFieldTest].
-     * Three words are still offered to the model and still draw nothing --
-     * `stipple` and `grain` and `paper_grain` need the server's `_surface_dab`,
-     * `aquatint` needs it too, and `bleed` has its own 65 lines -- so the
-     * control keeps its force for them.
+     * `wash` left this list first, and `stipple` and `aquatint` have now
+     * followed it. All three are drawn: the wash by render engine 36's surface
+     * layer and the grains and the bands by the port of `_surface_dab`, whose
+     * gates live in [AWashIsAFieldTest] and [AGrainIsOneTouchTest]. One word is
+     * still offered to the model and still draws nothing -- `bleed`, which
+     * shares none of that mechanism and has its own 66 lines on the server -- so
+     * the control keeps its force for it.
      */
     @Test
     fun testTheOtherSurfaceWordsAreUntouched() {
-        for (texture in listOf("stipple", "bleed", "aquatint")) {
+        for (texture in listOf("bleed")) {
             val svg = renderSvg(shape("square", texture))
             assertEquals(
                 "$texture must still contribute no surface stroke",

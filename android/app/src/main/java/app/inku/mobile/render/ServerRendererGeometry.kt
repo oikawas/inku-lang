@@ -471,8 +471,11 @@ internal object ServerRendererGeometry {
         if (variation == null || !needsPathVariation(variation)) {
             return arcPathD(cx, cy, r, startDeg, endDeg)
         }
-        val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-        val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
+        // How long the arc is, is the difference between its two ends -- not that
+        // difference folded back into 0..360. The server measures it this way
+        // (`_arc_points_with_variation`), and an arc drawn from 300 to 20 is the
+        // long way round, 4.89 radii, not the 1.40 the folded reading gives.
+        val arcLen = r * Math.abs(Math.toRadians(endDeg) - Math.toRadians(startDeg))
         val count = segmentCount(arcLen, unit)
         val points = arcPoints(cx, cy, r, startDeg, endDeg, count)
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
@@ -667,6 +670,26 @@ internal object ServerRendererGeometry {
                 val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
                 val (w, h) = sizePx(size?.optDouble(0, 0.26) ?: 0.26, size?.optDouble(1, 0.16) ?: 0.16, width, height, unit)
                 doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
+            }
+            // The server asks for both `center` and `size` here and answers None
+            // when either is missing (`_shape_bbox`), so the branch is only taken
+            // when both are stated. Filling them in with defaults would draw a
+            // surface where the server draws none -- that is a different
+            // judgement, not a port of this one.
+            "cloudform" -> {
+                val center = ins.optJSONArray("center")
+                val size = ins.optJSONArray("size")
+                if (center == null || size == null) {
+                    null
+                } else {
+                    val cx = center.optDouble(0, 0.5) * width
+                    val cy = center.optDouble(1, 0.5) * height
+                    // Through sizePx, so the extent lands on the short side the way
+                    // engine 30 put it there; the ellipse and square branches ask
+                    // the same way.
+                    val (w, h) = sizePx(size.optDouble(0, 0.5), size.optDouble(1, 0.34), width, height, unit)
+                    doubleArrayOf(cx - w * 0.56, cy - h * 0.56, w * 1.12, h * 1.12)
+                }
             }
             "square", "triangle" -> {
                 val pos = ins.optJSONArray("position")

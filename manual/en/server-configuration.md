@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.31 (Web Build 918). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.32 (Web Build 919). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -225,6 +225,10 @@ Nine numbers decide how many marks one work may hold. They are not a speed contr
 | | `schema_count_max` | 2000 | A count returned by Stage 2 above this is trimmed |
 
 Mutually inconsistent values are rounded rather than rejected — if the representation ceiling exceeds the literal threshold, it is lowered to that threshold. What the admin UI shows is the rounded, effective value.
+
+**A raised value reaches the page** (v2.13.32). A description that names no count — "fine lines tiled across the whole sheet", say — expands as far as `max_expanded_primitives` allows, and the boundaries that decide how dense a group reads and how many clusters it is split into are held as ratios of `represented_count_max`. The cap on how many clusters a group may be split into moves by the same ratio, so raising the ceiling keeps roughly the same amount of ink in one cluster. **At the default settings all of these land on the values they had before.**
+
+**The `Marks actually drawn` row also says roughly how many megabytes that count is** (v2.13.32). The per-mark cost is measured on the server and sent to the panel, shown as a range from a fine stroke to a thick one (about 5.2–6.5 MB at the default of 400 marks). The other eight rows carry no such figure: they are per-instruction bounds, legibility thresholds and typo guards, and none of them decides the size of the file.
 
 **When a work is redrawn, the values recorded on its own row are the ones that apply** (v2.13.31). Lowering the settings does not change a work already painted: it comes out at the numbers it was painted under. Today's settings are used only for an older work that recorded none, and **the answer names which of the two drew it** (`render_limits_source` = `work` / `settings` / `work_unrecorded`). **A caller may lower a value for one drawing but never raise one** — each element is taken as the smaller of the two.
 

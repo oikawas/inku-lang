@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.32 unreleased baseline (Web Build 919)
+
+Updated the thirteen places that name a version to v2.13.32 / Build 919. **That a raised limit now reaches the page, and that the total says what its count weighs, were written in.**
+
+- **A raised value reaches the page.** A description that names no count expands as far as `max_expanded_primitives` allows, and the boundaries that decide how dense a group reads and how many clusters it is split into are held as ratios of `represented_count_max`. The cap on how many clusters a group may be split into moves by the same ratio, so raising the ceiling keeps roughly the same amount of ink in one cluster. **At the default settings all of these land on the values they had before.** **Written into `Server Configuration` §5.1.**
+- **The `Marks actually drawn` row now says roughly how many megabytes that count is.** The per-mark cost is measured on the server and shown as a range from a fine stroke to a thick one (about 5.2–6.5 MB at the default of 400 marks). **The other eight rows carry no such figure** — they are per-instruction bounds, legibility thresholds and typo guards, and none of them decides the size of the file.
+- **No seconds are shown.** That measurement was CLI round-trip wall clock, not drawing time.
+
 ## 2026-08-16 — v2.13.31 unreleased baseline (Web Build 918)
 
 Updated the thirteen places that name a version to v2.13.31 / Build 918. **That a sheet called by name changes how the mark runs, and that two surface words now stay on a line, were written in.**

@@ -7653,3 +7653,53 @@ offered and still cannot be drawn went from six to five** (`stipple`, `grain`, `
   (ledger I-270).
 - **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — and **the Android JVM is not
   among the four jobs in `checks.yml`** in any case).
+
+### v2.13.31 — a sheet called by name changes how the brush runs (Build 918, 2026-08-16, render engine 37 / ddl engine 20, ledger I-268)
+
+**The seven grounds have been laid since engine 34, and they never reached the mark.**
+The value that stands for the support was a single constant: the parameter was there, and no caller
+ever passed one. **The same description with the same seed now leaves a different mark on washi than
+on canvas.**
+
+- **The sheet reaches all eleven synthesis call sites** — the drawing entry point reads it from the
+  Score once and passes it down as an argument. Thirteen functions take it, **ten of them as
+  keyword-only parameters with no default**, so a forgotten hand-off fails loudly. **A ground name
+  that is not in the table raises rather than falling back to the default.**
+- **`面: 粒` (grain) and `面: にじみ` (bleed) now stay on lines and arcs** (ddl engine 20) — of the
+  nine surface words, these two speak about **how the mark runs rather than how an inside is**.
+  Until now every surface on an unclosed instruction was moved to the closed shape before it or
+  dropped, so **they were never drawn on the 406 works in production that carry them** (283 grain,
+  123 bleed: 49 were being moved, 191 dropped with nowhere to go, 166 dropped because the target
+  already carried its own surface). **Redrawn from today, those 406 show the mark the sheet worked.**
+- **The reinforcement is capped** — a factor of 2.0, **capped at 3.0**. Washi (absorb 2.2) with bleed
+  would be 4.4 and stops at 3.0.
+- **The other seven words (`wash`, `paper_grain`, `hatch`, and the rest) are unchanged.**
+  `wash` is taken by a separate contract (render engine 39) under the ruling of 2026-08-16.
+- **The reference corpus is now 597 cases, twelve of which moved** — the nine new ones and three
+  existing ground cases. **The nine were needed because no case ran through the mechanism**: only
+  four frozen cases use the `display` profile, all four draw with `pen`, and `pen` carries no texture
+  weight. **`pen` barely shows the sheet** (an arrival probability of about 0.005, so only the two
+  supports that absorb more than `paper` cross the threshold), which is why the nine are written with
+  `brush_thick` and `chalk`. **The DDL corpus holds 49 cases and one moved.**
+- **One ruling was taken mid-flight** — a stage was measured before the work began to move one frozen
+  DDL case, and the ruling was to **take `ddl_engine_version` 20 and rebake**. This release moves two
+  layer versions.
+
+**Verification (measured by the accepting session on the merged tree, all green)**:
+**server 3,315 passed / 31 skipped (539.65s)**, **cli 235 passed (14.82s)**,
+**web 427 tests / 427 pass / 0 fail (5.54s)**, **Android JVM 346 tests / 0 failures / 0 errors /
+0 skipped (60 XML files, 36s)**, **`check_frozen_corpora.py` green (32s)**, **ruff green**.
+**The +15 on server is the branch's own** (11 acceptances, 3 corpus checks, 1 control for the mark
+words); the rest arrived on main after the branch point.
+
+- **One merge conflict** (a single import in `coerce/normalize.py`). **Both sides were kept** — the
+  limit notes from main and the mark-word set from the branch — and both were checked by name after
+  the merge (nine `note_limit` call sites, one pass-through branch).
+- **The eleven acceptances and fourteen perturbations were run by the implementing session**
+  (103 reddened, none idle). **Two defects in the acceptances were found by the perturbations and
+  fixed**: a comparison between a line with the mark word and one without stayed green even with the
+  mechanism switched off (the performance seed derives from the instruction's own content), and a
+  loop over the product's own set spun empty — and green — under the perturbation that empties it.
+- **The version literals were four, not the three the contract measured** (`test_api.py`); the DDL
+  side has four as well.
+- **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).

@@ -176,7 +176,13 @@ wide / byobu / vertical.
   amplitude, frequency, and quality. **`dense` and `faint` are relative, never an
   absolute darkness**: the same flat fill varies widely with the tool (measured
   mean luminance 17.4 to 131.1 at the native 1618px). **Paper grain does not
-  belong here** -- it is a quality of the support, and `Ground:` takes it. **An
+  belong here** -- it is a quality of the support, and `Ground:` takes it.
+  **Two of the qualities, `grain` and `bleeding`, are kept when they land on a
+  line or an arc and are read as how that mark runs** (author's ruling of
+  2026-08-16, ddl engine 20 / render engine 37) -- **they speak about the run of
+  the mark rather than about an inside, which is what a line has instead of an
+  inside. The other seven are moved to the closed shape before them as before,
+  and dropped where there is none.** **An
   instruction to fill the background is not about a surface** either; it goes to
   the `background` field.
 - **the grounds category holds the names of supports** (added 2026-08-15, render

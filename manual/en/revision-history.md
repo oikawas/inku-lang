@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.34 unreleased baseline (Web Build 921)
+
+Updated the thirteen places that name a version to v2.13.34 / Build 921. **That the reader chooses what the history strip prints, that history search takes a whole render hash, and that the model picked for AI refinement also draws, were written in.**
+
+- **What is printed under each history thumbnail is chosen under `Other` in `Settings`.** Up to two of generation, model, engine version and file size, and **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **Written into `Creating Images` §14 and §18.**
+- **File size is the size the server reports for the stored work.** The listing that fills the strip does not carry the picture itself, so counting what arrived reports every work as nothing.
+- **History search takes a whole render hash.** Only exactly four characters were recognised as a hash before. The last four still work as they did. **Written into `Creating Images` §14 and `Application Installation` §12.**
+- **The model chosen for autonomous refinement with Vision now draws each generation, not only observes it.** The choice reached the single advice call and nothing else before. **Written into `Creating Images` §9.**
+- **The empty canvas was redrawn as three strokes — a mountain, water and a moon.** A change to what is on screen only; no operation or setting moves.
+
 ## 2026-08-16 — v2.13.33 unreleased baseline (Web Build 920)
 
 Updated the thirteen places that name a version to v2.13.33 / Build 920. **That thumbnails fold texture into runs while baking was written in.**

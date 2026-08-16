@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v2.13.33 (Web Build 920) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade of the unreleased inku v2.13.34 (Web Build 921) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 
@@ -199,7 +199,7 @@ Check in the Web UI:
 - Color catalog, model, canvas, and Wild selection
 - All five refinement elements (Another composition, Another reading, Another catalog, Variation, Another performance) and model comparison
 - Provenance Details, Prompts, and JSON
-- Timeline and By lineage history modes, and search by the last four hash characters
+- Timeline and By lineage history modes, and search by the last four hash characters or a whole render hash
 - SVG and PNG export, contact sheets, and animation
 - Administrators see the `Limits` settings tab and can save it
 

@@ -957,7 +957,9 @@ Major UI areas:
 - DDL editor: editable normalized DDL embedded in the single drawing flow, with
   Saijiki word highlighting and an expanded dialog editor
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
-- History strip: recent works, hover metadata, star markers, pagination
+- History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
+  which facts are printed under each thumbnail** — up to two of generation, model, engine version
+  and file size, and **none is also an answer** (choose nothing and only the pictures are shown)
 - History manager: larger history view, trash, restore, permanent delete, star filter, and
 per-work sharing. The sharing dialog picks a recipient and a permission (read or write) and
 lists who currently holds the work. **A work shared by somebody else carries a mark** — this
@@ -988,6 +990,17 @@ Users can choose independently whether selecting a history item updates the UI's
 current canvas aspect and color catalog to the history item's values, or keeps
 the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
+
+The same tab carries the choice of **which facts the history strip prints**.  Up
+to **two** of generation, model, engine version and file size are chosen, and they
+are printed in the declared order rather than the order they were picked.
+**Choosing none is a stored answer, not a return to the default**, so **an account
+that has not answered and an empty selection are treated as different things**.  A
+third choice is refused rather than allowed to evict an existing one, and the
+limit is shown on screen.  **File size is a quantity the server reports about a
+stored work**, not a count of the SVG the browser received: the listing that fills
+the strip does not carry the picture, so counting what arrived would report every
+work as nothing.
 
 The canvas panel also supports viewing-oriented controls.  A fullscreen icon in
 the drawing tab opens presentation mode, which maximizes the current SVG and

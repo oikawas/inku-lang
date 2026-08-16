@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.33 (Web Build 920). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.34 (Web Build 921). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 

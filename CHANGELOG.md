@@ -7977,3 +7977,70 @@ must not offer Stage 2 a ground it cannot draw — and the list the port's schem
 - **⚠ `support` is not passed to `synthesizeAlong`** — this is not a divergence this round introduced:
   **none of the port's nine call sites pass it** (the ground layer itself is not in the port).
 - **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).
+
+### v2.13.34 — the reader decides what the strip prints (Build 921, 2026-08-17, UI round 6)
+
+The author named seven requests at once and settled them one at a time in conversation. The list
+carried an override at the end — "anything that needs server code or a database change is
+overridden" — and **four of the seven crossed out of `web/`**. One of the seven (making the
+sketch default "fine" when nothing is stated) was withdrawn the same day.
+
+- **The reader chooses what the history strip prints under each thumbnail:** four boxes under
+  `Other` in the settings — **generation, model, engine version, file size** — and **at most two**
+  may be chosen. **None is also an answer**: choose nothing and the strip shows only the pictures.
+  **The rule this turned on is that absence and the empty list are different things.** An account
+  with no column has **not answered**, so it takes the default (the two the strip printed before
+  the column existed); a reader who clears all four **has answered, and the answer is "print
+  nothing"**. **Folding the two into one falsy test makes "print nothing" a setting that cannot be
+  saved** — it returns to the default on reload — **and that breakage reddens no test that looks
+  only at the normal path.**
+- **The file size in the strip read `0 B` for every work but the one on screen:** the listing that
+  fills the strip is fetched with `include_svg=false`, and **the server empties the key rather
+  than dropping it**, so the browser was **measuring the emptied result**. The API now sends
+  `svg_bytes` — UTF-8 bytes, the same quantity as `measureSvgWeight().bytes` and `measure()` in
+  `svg_weight.py` (**neither way of counting was touched**). **⚠ It was first placed on
+  `HistoryPostBody`**, which made it a key a caller could state when saving; the weight is
+  something the server reports about a stored work, so it moved to `HistoryItem`. **The API
+  surface guard is what found it.**
+- **History search takes a whole render hash:** only **exactly four characters** were recognised
+  as a hash before, so pasting a full one fell through to full-text search and found nothing. The
+  last four still work as they did.
+- **AI refinement failed with `invalid refinement advice JSON` every time:** the fence stripper was
+  written as `\s` **inside a raw string**, where that means "one backslash followed by zero or more
+  `s`" rather than whitespace, so **it never matched once**. gemma answers inside a fence, so every
+  answer died there. **⚠ The first fix was redundant** — stripping the fence and then extracting
+  the braces meant that for fenced input **the brace extractor always produced the same result**,
+  so breaking the fence half reddened nothing. **Wiring that always agrees with the existing path
+  has no discriminating power**, so it was folded into **one rule: the first `{` through the
+  last `}`**.
+- **The model picked for AI refinement now draws, not only advises:** the choice reached **the
+  single advice call** and nothing else, so the picture came out of the page's own model setting.
+  The running display names the model it is drawing with.
+- **The word on the batch tab stays on one line during a run:** what wrapped was **the tab's word**,
+  not the progress figures. Measured: `(3/12)` gave a 38px tab and one line, **`(12/12 ↻2)` gave
+  46px and two lines, `(120/120 ↻2)` gave 58px and three**. After the fix it is back to 38px and
+  one line, and **healthy down to a 300px panel**.
+- **The empty canvas was redrawn as three strokes — a mountain, water and a moon:** the mechanism
+  that keeps it from being dragged by the aspect ratio went in on 2026-08-12 and **was not broken**,
+  so the author chose to redraw the figure itself and picked the subject. **All nine ratios were
+  rendered and five were looked at** (square, portrait, wide, banner 5:1, pillar 1:5).
+- **One column was added to the database:** `history_strip_fields TEXT NOT NULL DEFAULT
+  '["generation", "model"]'` on `user_accounts`. **The default is what the strip printed before the
+  column existed, so nobody's strip moves on the day this is deployed.**
+- **On the merged tree: server 3401 passed / 31 skipped, web 446, cli 235 passed.** **`npm run
+  check` gives 268 FILES / 0 ERRORS / 2 WARNINGS** (the two known a11y warnings, unchanged).
+  **Both sides added up:** against 1821 test functions in `server/tests` at the branch point,
+  **the main side added 15 (the fold gates from ledger I-264) and the branch added 15, for 1851
+  after the merge**; collection went **+31 from the branch and +20 from the main side, +51 in all**
+  (the function count and the collected count are two different quantities).
+- **The implementing session ran 13 perturbations on the branch and all 13 reddened** (one missed
+  its prediction: P-3 predicted 2 and measured 4, because adding `g` to a character class reddened
+  a `g`×64 case alongside the three that loosened the digit count). **⚠ The accepting side added
+  one more**: the stage that widened the API surface declarations had no perturbation on it, so an
+  undeclared key was added to `HistoryItem` in the product, and **two guards reddened as expected**.
+- **⚠ What that perturbation showed**: the `HistoryItem` declaration in
+  `test_the_groups_decide_what_you_may_do.py::test_t8` is **inert** — **`HistoryItem` is not among
+  the 78 frozen schema names**, so that line measures nothing. **It has been inert since
+  `catalog_mode` was declared there, and this round only added a word to it** (**the other 14
+  declarations are all live**). **The same schema is held by two other guards, so no hole is open.**
+- **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).

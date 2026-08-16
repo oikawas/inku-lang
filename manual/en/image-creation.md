@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.33 (Web Build 920). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.34 (Web Build 921). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -255,6 +255,8 @@ From the lineage tab the application can build generations on its own.
 
 You choose the number of generations and which refinement elements to use. A direction you write reaches every generation under Vision; under random autonomous refinement it applies only to `Another reading` generations, and not at all if `Another reading` is removed.
 
+**The model chosen for autonomous refinement with Vision is used to draw each generation, not only to observe it** (the running display names the model it is drawing with). Random autonomous refinement chooses no model, so it draws with the model selected on the page.
+
 `Refine manually` lets you specify the kind of refinement, an added Saijiki word or direction, and the color catalog, while looking at the parent work's composition in DDL.
 
 ## 10. Compare Models
@@ -313,7 +315,9 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 
 The history strip at the bottom is for moving quickly back and forth in time. `History management` switches between `Timeline` and `By lineage`.
 
-- Search by description, or by the last four characters of the hash
+**What is printed under each thumbnail is chosen under `Other` in `Settings`** (`Facts under the history thumbnails`). Choose **up to two** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
+
+- Search by description, by the last four characters of the hash, or by **a whole render hash**
 - Filters for starred only and for revision only. Used together, only works matching both remain
 - Switching between ordinary history and trash
 - Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
@@ -423,7 +427,7 @@ Open the settings from the application rail. Which tabs are visible depends on t
 | Limits | The ceilings, such as how many marks one work may hold |
 | Log retention | Log retention and rotation policy |
 | Unread-word ledger | Words interpretation could not map directly |
-| Other | UI mode, theme, mascot, download folder, batch retry |
+| Other | UI mode, theme, mascot, download folder, batch retry, facts under the history thumbnails |
 | Other (server) | Automatic saving of output files, painting concurrency |
 
 The settings dialog opens either `Standard` or `Detailed`, switched from the toggle at its top right. **The `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs appear only in `Detailed`.** The choice stays in that browser.

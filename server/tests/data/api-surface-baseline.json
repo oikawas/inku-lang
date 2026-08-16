@@ -22,10 +22,14 @@
       "path": "/api/auth/config",
       "method": "GET",
       "operationId": "api_auth_config_api_auth_config_get",
-      "params": [],
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
       "requestBody": "null",
       "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Api Auth Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}"
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Api Auth Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
     {
@@ -283,10 +287,14 @@
       "path": "/api/color-catalogs",
       "method": "GET",
       "operationId": "api_color_catalogs_api_color_catalogs_get",
-      "params": [],
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
       "requestBody": "null",
       "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorCatalogsResponse\"}}},\"description\":\"Successful Response\"}"
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorCatalogsResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
     {
@@ -915,6 +923,8 @@
       "method": "GET",
       "operationId": "api_prompts_api_prompts_get",
       "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
         "query:lang:opt"
       ],
       "requestBody": "null",
@@ -1474,5 +1484,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "d5d312e12d7da3b5a118a06dda5562edf7f2f9de8a134c3ebdc9a0c3c54fb287"
+  "digest": "a925c3de330f503c23ee3891fd73f0d0318e27353e3e11c37b6ba10856c46e82"
 }

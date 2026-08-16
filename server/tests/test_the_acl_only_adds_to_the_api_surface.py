@@ -134,8 +134,30 @@ SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 # what may move in them. Contract 2 gave the listing a way to be asked for the
 # metadata without the drawings; the parameter is optional and defaults to the
 # old behaviour, so nothing a caller already sent means anything different.
+#
+# I-086: three routes that were public moved behind the guard, so each gains the
+# two arguments the guard reads. The two that carried no parameter at all also
+# gain a 422, because a route with nothing to validate has no validation error
+# to describe -- every already-guarded route in the frozen file carries both.
+# `added_responses` names that, so an operation losing or changing its 200 is
+# still red; a declaration that waved the whole `responses` map through would
+# excuse exactly the loss this file exists to catch.
 CHANGED_OPERATIONS = {
     "GET /api/history": {"added_params": {"query:include_svg:opt"}, "removed_params": set()},
+    "GET /api/prompts": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+    },
+    "GET /api/color-catalogs": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+        "added_responses": {"422"},
+    },
+    "GET /api/auth/config": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+        "added_responses": {"422"},
+    },
 }
 
 
@@ -164,8 +186,21 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
         after_params = set(after_op["params"])
         assert after_params - before_params == expected_delta["added_params"], key
         assert before_params - after_params == expected_delta["removed_params"], key
-        # Everything else about the operation must still match byte for byte.
-        assert _stable({**after_op, "params": sorted(before_params)}) == _stable(baseline_ops[key]), key
+        before_responses = dict(baseline_ops[key]["responses"])
+        after_responses = dict(after_op["responses"])
+        added_responses = expected_delta.get("added_responses", set())
+        removed_responses = expected_delta.get("removed_responses", set())
+        assert set(after_responses) - set(before_responses) == added_responses, key
+        assert set(before_responses) - set(after_responses) == removed_responses, key
+        # Everything else about the operation must still match byte for byte --
+        # including the body of every response that was already described.
+        for code in added_responses:
+            after_responses.pop(code)
+        for code in removed_responses:
+            before_responses.pop(code)
+        assert _stable(
+            {**after_op, "params": sorted(before_params), "responses": after_responses}
+        ) == _stable({**baseline_ops[key], "responses": before_responses}), key
         operations.pop(key)
     for name, expected in CHANGED_SCHEMAS.items():
         before_body = json.loads(baseline["schemas"][name])

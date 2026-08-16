@@ -646,9 +646,10 @@ print(json.dumps(row))
 # 段 5: the nameplate ---------------------------------------------------------
 
 
-def test_the_catalog_list_serves_the_rename_table():
+def test_the_catalog_list_serves_the_rename_table(actor):
     """A client holding an old id has no other way to name the catalog."""
-    body = client.get("/api/color-catalogs").json()
+    _user, headers = actor
+    body = client.get("/api/color-catalogs", headers=headers).json()
 
     assert body["renamed_catalog_ids"] == EXPECTED_RENAMES
 

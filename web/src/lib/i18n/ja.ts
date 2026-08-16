@@ -351,6 +351,8 @@ export const ja: LangPack = {
 	tooltipHistoryForRevisionOnly: '推敲マークを付けた作品だけを表示します。スターのみと併せると両方に該当する作品だけになります。',
 	forRevisionOn: '推敲マークを外す',
 	forRevisionOff: '推敲マークを付ける',
+	shareTargetOn: '共有対象から外す',
+	shareTargetOff: '共有対象にする',
 
 	promptStage1Input: 'Stage 1 ユーザー入力',
 	promptStage1System: 'Stage 1 システムプロンプト',

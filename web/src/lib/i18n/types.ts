@@ -358,6 +358,8 @@ export interface LangPack {
 	tooltipHistoryForRevisionOnly: string;
 	forRevisionOn: string;
 	forRevisionOff: string;
+	shareTargetOn: string;
+	shareTargetOff: string;
 	historyLineageForRevisionCount: (count: number) => string;
 
 	// Prompts tab

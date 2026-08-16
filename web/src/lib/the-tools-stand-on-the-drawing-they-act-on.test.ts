@@ -176,6 +176,8 @@ test('T-102: the visibility rules name buttons, never a whole corner row', () =>
 		'canvas-provenance-btn': 'ui-hide-detail-status',
 		'canvas-star-btn': 'ui-hide-work-tools',
 		'canvas-revision-btn': 'ui-hide-work-tools',
+		// The share mark's socket -- offered only when I-191 lands (T-105).
+		'canvas-share-btn': 'ui-hide-work-tools',
 		'canvas-replay-btn': 'ui-hide-work-tools',
 		'canvas-saijiki-btn': 'ui-hide-work-tools',
 		'canvas-export': 'ui-hide-work-tools',

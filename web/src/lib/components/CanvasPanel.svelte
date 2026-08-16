@@ -14,6 +14,7 @@
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
+	import { shareTargetOf } from '$lib/shareTarget';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
@@ -33,7 +34,7 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
@@ -117,6 +118,12 @@
 		/** The revision mark of the work on screen, the same flag the history
 		    manager's pencil toggles. */
 		onToggleForRevision: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
+		/**
+		 * The share-target mark. Optional because the flag it stands on does not
+		 * exist yet (ledger I-191): this is the socket, and the mark stays off
+		 * screen until both the field and this handler arrive. See $lib/shareTarget.
+		 */
+		onToggleForShare?: ((item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
 		onReplayCurrent: () => void | Promise<void>;
 		replayDisabled: boolean;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
@@ -261,6 +268,7 @@
 		onCopyStatusHash,
 		onToggleStar,
 		onToggleForRevision,
+		onToggleForShare = null,
 		onReplayCurrent,
 		replayDisabled,
 		onDownloadSVG,
@@ -577,6 +585,9 @@
 	// report uses (see $lib/svgWeight), so the number here and the number there
 	// are the same quantity. HistoryItem carries no `svg`, so this reads `result`
 	// rather than the `statusHistoryItem ?? result` shape the other rows use.
+	// The third mark's socket. `supported` is false everywhere today, so the
+	// button below renders nothing -- see $lib/shareTarget and ledger I-191.
+	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
 	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
 	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
 	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
@@ -805,6 +816,29 @@
 							}}
 						>✎</button>
 					</Tooltip>
+					{#if shareTarget.supported && onToggleForShare}
+						<Tooltip placement="top-right" text={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}>
+							<button
+								type="button"
+								class="canvas-icon-btn canvas-share-btn"
+								class:marked={shareTarget.marked}
+								disabled={!shareTarget.pressable}
+								aria-pressed={shareTarget.marked}
+								aria-label={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}
+								onclick={(event) => {
+									event.stopPropagation();
+									onToggleForShare?.(statusHistoryItem, event);
+								}}
+							>
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<circle cx="17.5" cy="6" r="2.6" />
+									<circle cx="6.5" cy="12" r="2.6" />
+									<circle cx="17.5" cy="18" r="2.6" />
+									<path d="M9 10.7 15 7.3M9 13.3l6 3.4" />
+								</svg>
+							</button>
+						</Tooltip>
+					{/if}
 				</div>
 				<!-- What the bar under the canvas used to hold. It is here rather
 				     than below the picture because every one of these acts on the

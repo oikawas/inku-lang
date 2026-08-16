@@ -351,6 +351,8 @@ export const en: LangPack = {
 	tooltipHistoryForRevisionOnly: 'Show only the works marked for revision. Combined with Starred only it shows the works that carry both marks.',
 	forRevisionOn: 'Remove revision mark',
 	forRevisionOff: 'Mark for revision',
+	shareTargetOn: 'Remove share mark',
+	shareTargetOff: 'Mark for sharing',
 
 	promptStage1Input: 'Stage 1 user input',
 	promptStage1System: 'Stage 1 system prompt',

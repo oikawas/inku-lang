@@ -7520,6 +7520,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-work-tools :global(.zoom-controls),
 	.ui-hide-work-tools :global(.canvas-star-btn),
 	.ui-hide-work-tools :global(.canvas-revision-btn),
+	.ui-hide-work-tools :global(.canvas-share-btn),
 	.ui-hide-work-tools :global(.canvas-replay-btn),
 	.ui-hide-work-tools :global(.canvas-saijiki-btn),
 	.ui-hide-work-tools :global(.canvas-export),

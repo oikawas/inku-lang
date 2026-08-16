@@ -7505,3 +7505,73 @@ ruling that says measure at full size.**
   **cli +8** (3 and 5), **web +5**, **English strings +1**.
 - **⚠ GitHub CI was not waited for** (author's ruling: the push ends the round, and CI is not part
   of it).
+
+---
+
+### Android — A guard says how many it compared (android `2.1.4-android.35`, unchanged, **no version taken**, 2026-08-16, ledger I-266, I-275)
+
+**The port's drawings are guarded by comparing them against 51 frozen reference SVGs. Several of those
+comparisons were reporting a match without ever finding anything to compare.**
+
+There were two reasons. **(1) The shape the guard named changed in engine 28** — the two regular
+expressions that pull out the material layer's outline demand an exact `class="material-outline"`, but
+engine 28 split the layer into contact fragments and the class became `material-outline stratum-N`.
+Since then the pattern matched **neither side, and an empty list compared to an empty list is green**.
+The test named four drawings and compared not one byte of any of them. **(2) The guard walked only part
+of the corpus** — the comparison of element counts and class lists ran over ten drawings, and **the
+powder the arcs drop (`<circle>`) is measured nowhere else**, so the grains in the other 41 were seen
+by nobody.
+
+**No pixel of the product moved this round. What moved is how far the guards reach.**
+
+- **Widened to a prefix (stage 1):** matches any class beginning with `material-outline` rather than
+  spelling out `stratum-N`, so the same hole does not open the next time the strata are numbered
+  differently. Both attribute orders were kept — **the reference writes `class` first, the port writes
+  `points` first**. **Widened, the four drawings really compare 192 point lists, and it was still
+  green** (42 / 40 / 50 / 60). **Reviving the guard did not require fixing the product.**
+- **The guards now say how many they compared (stage 2, T-143 / T-145 / T-146):** the extraction's
+  count is checked against **a second way of counting that walks the elements and reads their attribute
+  table**. **42 / 40 / 50 / 60 are not written into the test** — a hand-copied count is green the day
+  after the corpus moves and goes on guarding the stale figure.
+- **`stroke-dasharray` had vanished from the corpus in engine 28 (newly measured):** per version,
+  **engines 21–25 held 252, 26–27 held 640, and 28–36 hold none**. The third assertion of the
+  corpus-wide comparison is therefore also empty against empty. **It is not fully vacuous, though** —
+  since the reference holds none, **a port that wrote one extra dash would go red today**. Only the
+  direction "the port drops a dash the reference has" is dead, and **that asymmetry is now stated in
+  one test (T-146) instead of being hidden**.
+- **The structure comparison walks the whole corpus (stage 3, T-147):** it now iterates **every key in
+  `svg_index.json`**. **Neither the count nor any drawing's name is written**, so a drawing added to
+  the corpus is walked the day it arrives. **There are 790 `<circle>` across 51 drawings and the ten
+  saw 147** — **643 (81.4%) were compared by nobody** (across all elements, 838 of 6,571, or 12.8%).
+- **The tags counted are read from the index too:** the hand-written list held `path`, `circle`, `rect`,
+  `polygon`, `polyline` and `line` — **it was missing `ellipse` and `g`, both of which the index
+  counts**. **The 24 `<ellipse>` in two drawings were compared by nobody**, and widening to 51 drawings
+  alone would have left them blind.
+- **The guard now states that it read the drawing the index describes (stage 4, T-148):** for each of
+  the 51, the expected side's element counts must agree with the index's `counts`. **No test in the
+  tree read that `counts` field; T-148 is its first reader.**
+- **⚠ One divergence was found outside the contract's scope and raised rather than fixed:** **the port
+  groups its marks differently — the number of `<g>` disagrees in all 51 drawings.** The reference wraps
+  marks in named groups (`inku_artboard`, `layer_10_content`, and others) which **carry no class and so
+  never appear in the class-list comparison**. The direction is not constant: some drawings hold three
+  fewer, some four fewer, one nine more. **No pixel moves, because groups carry no geometry** (`d` and
+  `points` agree). The test holds back `g` — and only `g` — from the reference-versus-port comparison
+  and records the reason and the measurement in a docstring (`g` is still covered by the
+  expected-versus-index check, where all 51 agree).
+- **No version was taken:** **not one line of the implementation that runs on the device changed** (a
+  single test file was touched), so `android/VERSION` stays at `2.1.4-android.35`. Neither
+  `renderEngineVersion` nor `ddlEngineVersion` moved. **`android/` is permanently excluded from every
+  sync path, so there is nothing to send to pentala.**
+- **Verification (re-measured by the accepting session on the merged tree):** **Android JVM 338 tests /
+  0 failures / 0 errors / 0 skipped** (59 XML files), **`test_android_reference_fixtures_are_current.py`
+  4 passed**. **The `@Test` total went from 334 at the base to 338 on the branch, +4** (T-143, T-145,
+  T-146, T-148) — **no test was deleted and none was renamed**. **⚠ `cycle.sh accept` printed
+  "2343 → 2343" because it does not count a single file under `android/`** (ledger I-270).
+- **Six perturbations** (run by the implementing session on the branch, through `perturb.py`; all six
+  restored byte-identically). **Two predictions were wrong, both by undercounting** — **the material
+  layer's outline is emitted from two places, not one** (the open line and the closed contour), and only
+  one was perturbed; and **one existing guard that watches `dasharray` had been missed**. **T-145 cannot
+  be reddened by a single perturbation** (both sides are zero in engine 35), so **two changes were
+  applied together by hand to see it go red**.
+- **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — and **the Android JVM is not
+  among the four jobs in `checks.yml`** in any case).

@@ -740,9 +740,13 @@ internal object ServerRendererGeometry {
      * the fields that place the shape have to be stated, and when either is
      * missing the branch is declined and the walk falls through to `return
      * None`. The one reader of this answer is `renderSurfaceVectors`, whose
-     * `?: return ""` turns a null into "no surface at all" -- so filling a
-     * missing field in with a default here would draw a surface on a shape the
-     * server leaves bare.
+     * `?: return ""` turns a null into "no surface at all".
+     *
+     * Measured 2026-08-17: that reader asks `surfaceContour` first, and it makes
+     * the same demand on the same fields, so while these branches filled a
+     * missing field in with a default the surface was suppressed anyway and no
+     * drawing moved. The two gates agree by hand, not by construction -- this
+     * one is here so the answer matches the server's whoever reads it next.
      *
      * "Missing" means the key is absent or JSON null, never falsy: a `center`
      * of `[0, 0]` and a `radius` of `0` are both stated, and the server reads

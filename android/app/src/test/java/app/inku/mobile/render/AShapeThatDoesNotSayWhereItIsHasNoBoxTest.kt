@@ -16,8 +16,15 @@ import org.junit.Test
  * `center`+`size` for an ellipse and a cloudform, `position`+`size` for a
  * square and a triangle -- and otherwise falls through to `return None`. The
  * port used to fill the missing half in with a default in four of those five
- * branches, so the one reader of the answer, `renderSurfaceVectors` with its
- * `?: return ""`, laid a surface on shapes the server leaves bare.
+ * branches, so it answered a box where the server answers None.
+ *
+ * That never reached the page, and saying so here keeps the next reader from
+ * over-claiming. The one reader of the answer, `renderSurfaceVectors`, first
+ * asks `surfaceContour` (`DefaultSvgRenderer.kt:1962`), which makes exactly the
+ * server's demand on exactly the same fields and answers null when it is not
+ * met -- and every texture branch returns "" on that null before the box is
+ * ever read. What is repaired here is the answer this function gives, not a
+ * mark on the paper.
  *
  * None of this can be gated by the frozen corpus: of the 51 drawings only two
  * carry a surface at all (`06_surface_hatch` and `21_hatch_computer`), and both
@@ -187,16 +194,26 @@ class AShapeThatDoesNotSayWhereItIsHasNoBoxTest {
     }
 
     /**
-     * T-186. And the layer that reads the box draws nothing for a shape that has
-     * none, which is what the null is for.
+     * T-186. And end to end: a shape that never said where it is gets no
+     * surface, while the same shape with the field back does.
      *
-     * Each shape is asked in a pair: once with a field taken away, and once with
+     * Each shape is asked in a pair, once with a field taken away and once with
      * it back. Without the second half, an implementation whose surface layer
      * never runs at all would pass this.
      *
      * The polygon is asked with BOTH `center` and `radius` taken away, so that
      * restoring either substitution on its own still leaves it boxless -- what
      * one substitution at a time does is T-185's question, not this one.
+     *
+     * MEASURED, and worth knowing before this gate is read as evidence: it is
+     * NOT the box that makes these zeros. `surfaceContour`
+     * (`DefaultSvgRenderer.kt:1962`) asks the very same fields in the very same
+     * way and answers null too, and every texture branch drops out on
+     * `contour == null` before it ever reads the box. Restoring any one of the
+     * four default-filling branches leaves this test green (perturbations P-1
+     * through P-5, 2026-08-17). So this states the behaviour the port owes the
+     * server, but the thing that gates `shapeBbox` is T-182..T-185, which ask it
+     * directly.
      */
     @Test
     fun testABoxlessShapeGetsNoSurface() {

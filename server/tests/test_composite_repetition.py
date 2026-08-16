@@ -275,4 +275,7 @@ def test_t9_a_span_the_ceiling_cannot_hold_leaves_marks_not_a_blank_work() -> No
     assert len(limited.instructions) == 1
     head = limited.instructions[0].arrangement
     assert head is not None and head.group_size == 1
-    assert notes == ["instruction list capped at 1; 1 dropped"]
+    # I-154: the line handed back to the caller leads with the setting that
+    # bound. The sentence inside the Score is unchanged -- moving those bytes
+    # would redraw every frozen corpus.
+    assert notes == ["max_instructions: instruction list capped at 1; 1 dropped"]

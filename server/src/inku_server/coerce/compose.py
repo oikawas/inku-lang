@@ -1871,7 +1871,7 @@ def _fallback_instruction_from_clause(
         }
     elif count and (("並べる" in clause) or ("line up" in lower)):
         common["arrangement"] = {
-            "count": _budgeted_count(count, limits),
+            "count": _budgeted_count(count, limits, notes),
             "layout": "horizontal",
             "margin": 0.1,
         }

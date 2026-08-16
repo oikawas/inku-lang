@@ -1989,6 +1989,9 @@ def _paint_payload(
         "variation_amplitude": getattr(args, "variation_amplitude", None),
         "variation_seed": getattr(args, "variation_seed", None),
         "wild": bool(getattr(args, "wild", False)) or None,
+        # None when the flag is absent, so the filter below drops the key: the
+        # server must see no `limits` at all to run at its own settings.
+        "limits": _limits_argument(getattr(args, "limits", None)),
         "catalog_mode": getattr(args, "catalog_mode", None),
         "interpretation_seed": getattr(args, "interpretation_seed", None),
     }
@@ -3892,6 +3895,16 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--wild",
         action="store_true",
         help="remove the amplitude ceiling on the stroke performance, letting the renderer swing further",
+    )
+    parser.add_argument(
+        "--limits",
+        metavar="KEY=VALUE",
+        nargs="+",
+        help=(
+            "draw under these limits instead of the server's settings, e.g. "
+            "--limits represented_count_max=60 max_expanded_primitives=200. Each "
+            "value is capped at today's setting, so this can only draw less"
+        ),
     )
     parser.add_argument(
         "--catalog-mode",

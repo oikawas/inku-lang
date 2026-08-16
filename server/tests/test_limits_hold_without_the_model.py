@@ -93,7 +93,10 @@ def test_t1_the_clause_branch_caps_by_name_not_by_a_bare_literal() -> None:
     assert segment is not None
 
     # The named reference is there, on both the scatter and the horizontal site.
-    assert segment.count("_budgeted_count(count, limits)") == 2
+    # I-154 added the out-parameter the threshold writes its note through.
+    # The reference is still named rather than spelled as a number, which is
+    # the whole of what this line is for.
+    assert segment.count("_budgeted_count(count, limits, notes)") == 2
     assert "limits.schema_count_max" in segment
 
     # And no bare literal is left capping the count. Walk every min(count, ...)

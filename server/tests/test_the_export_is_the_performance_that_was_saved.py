@@ -115,7 +115,7 @@ def test_the_export_uses_the_performance_seed_the_row_carries(auth_context):
 
     # And it is the row's value that arrives, not merely some value: the export
     # matches a render asked for those two seeds by name.
-    expected, _, _ = _render_score_svg(
+    expected, _, _, _ = _render_score_svg(
         _score(),
         catalog_id=None,
         svg_profile="editable",

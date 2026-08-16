@@ -397,7 +397,7 @@ def test_t6b_a_redraw_performs_on_the_paper_the_work_was_drawn_on():
     payload = _score({"aspect": "pillar"}).model_dump()
     # The work was performed on `wide` even though the composition was built
     # for `pillar` -- exactly the disagreement T-6 makes possible.
-    svg, _, _ = _render_score_svg(
+    svg, _, _, _ = _render_score_svg(
         payload,
         catalog_id=None,
         svg_profile="editable",
@@ -407,5 +407,5 @@ def test_t6b_a_redraw_performs_on_the_paper_the_work_was_drawn_on():
     assert 'width="2350"' in svg
 
     # With no row to read, the Score's own declaration still stands.
-    fallback, _, _ = _render_score_svg(payload, catalog_id=None, svg_profile="editable")
+    fallback, _, _, _ = _render_score_svg(payload, catalog_id=None, svg_profile="editable")
     assert 'width="200"' in fallback

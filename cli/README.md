@@ -341,6 +341,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
                       [--variation-seed VARIATION_SEED] [--wild]
+                      [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -409,6 +410,11 @@ options:
                         --variation-amplitude
   --wild                remove the amplitude ceiling on the stroke
                         performance, letting the renderer swing further
+  --limits KEY=VALUE [KEY=VALUE ...]
+                        draw under these limits instead of the server's
+                        settings, e.g. --limits represented_count_max=60
+                        max_expanded_primitives=200. Each value is capped at
+                        today's setting, so this can only draw less
   --catalog-mode {fixed,auto,random}
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and
@@ -454,6 +460,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
                       [--variation-seed VARIATION_SEED] [--wild]
+                      [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
@@ -521,6 +528,11 @@ options:
                         --variation-amplitude
   --wild                remove the amplitude ceiling on the stroke
                         performance, letting the renderer swing further
+  --limits KEY=VALUE [KEY=VALUE ...]
+                        draw under these limits instead of the server's
+                        settings, e.g. --limits represented_count_max=60
+                        max_expanded_primitives=200. Each value is capped at
+                        today's setting, so this can only draw less
   --catalog-mode {fixed,auto,random}
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and

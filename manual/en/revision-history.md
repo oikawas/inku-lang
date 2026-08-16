@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.33 unreleased baseline (Web Build 920)
+
+Updated the thirteen places that name a version to v2.13.33 / Build 920. **That thumbnails fold texture into runs while baking was written in.**
+
+- **At thumbnail widths (256px, and 512px for HiDPI) the texture of marks drawn in a row with one tool is folded into a single run before rasterizing.** It cuts how many times the filter is applied and raises the area it covers, so it only pays while the width is small; the 2160px PNG export default and browser display widths are not folded. **Written into `Server Configuration` §3.1.**
+- **The stored SVG does not change by a single byte.** The fold happens only at bake time, so neither the identity of a work nor the drawing engine version moves.
+- **⚠ Thumbnails already baked are not rebaked.** Staleness is decided from the hash of the stored SVG, and that SVG does not move. What gets faster is what is baked from now on, plus an explicit rebuild from the admin UI.
+
 ## 2026-08-16 — v2.13.32 unreleased baseline (Web Build 919)
 
 Updated the thirteen places that name a version to v2.13.32 / Build 919. **That a raised limit now reaches the page, and that the total says what its count weighs, were written in.**

@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.32 (Web Build 919). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.33 (Web Build 920). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -142,6 +142,8 @@ INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 How many thumbnails the rebuild bakes at once comes from the stored `workers` setting (1..16, default 4). **It is not an environment variable** — the machine is never asked for its core count, so whoever enters it has to know what this machine or container actually has.
 
 Thumbnails do not go into the canonical database; they go into `thumbs.db` beside it. Deleting that file leaves the canonical data whole, and the listing draws from each work's SVG again.
+
+**At thumbnail widths (256px, and 512px for HiDPI) the texture of marks drawn in a row with one tool is folded into a single run before rasterizing** (v2.13.33). **The stored SVG does not change by a single byte** — the fold happens only at bake time. It cuts how many times the filter is applied and raises the area it covers, so it only pays while the width is small; the 2160px PNG export default and browser display widths are not folded. **⚠ Thumbnails already baked are not rebaked** — staleness is decided from the hash of the stored SVG, and that SVG does not move. What gets faster is what is baked from now on, plus an explicit rebuild from the admin UI.
 
 SQLite is the reference single-server setup. History search uses FTS5 when available and falls back to `LIKE` otherwise.
 

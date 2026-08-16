@@ -7853,3 +7853,65 @@ serves all four.
   port. **The visual difference is unmeasured.**
 - **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — the Android JVM is not among
   the four jobs in `checks.yml`).
+
+### v2.13.33 — the texture hangs on the run, not on every mark (Build 920, 2026-08-16, ledger I-264)
+
+One work carried **24,446 individual filter references** and spent roughly four fifths of its display time
+on them. **Marks drawn in a row with the same tool each carry the same texture**, so folding a run into one
+group cuts how many times the filter is applied by about twelve.
+
+**⚠ A ruling during the run changed where this work belongs.** The contract asked for a renderer that emits
+the folded SVG (render engine 38). **Measuring the two production widths, the implementation found that the
+reference count the contract wanted — one where folding is faster at both 256px and 2160px — does not exist
+anywhere between 34 and 26,675 references.** **What decides the sign is not the reference count but the
+width being baked.**
+
+- **Count and area pull opposite ways.** Folding cuts the number of filter applications by about twelve and
+  **raises the total area they cover by 1.35–1.41×** (a run's bounding box is larger than the sum of the
+  boxes it replaces). **Where count dominates, at small widths, it is faster; where area dominates, at large
+  widths, it is slower.** **"Fold only the runs whose area does not grow" was measured and discarded** — the
+  runs worth folding are exactly the ones whose area grows, and with the restriction the byte count went *up*
+  (4,764,476 → 4,770,076 at 12,292 references).
+- **The ruling was "decide by the width at bake time"** (2026-08-16). **The stored SVG does not change by a
+  single byte**, so `render_engine_version` stays at 37 and no reference corpus was rebaked.
+- **The fold lives in `shared/src/inku_analysis/texture_fold.py`, and `svg_to_png` looks at the width and
+  applies it itself** — not a flag each caller passes, because a flag any caller could forget is one some
+  caller would. **The ceiling is 512px**, which takes in both production thumbnail widths (256px and the
+  512px HiDPI one) and leaves out the 2160px PNG export default and any browser display width.
+- **Three things end a run**: a group boundary, a mark with no texture, and a different tool. **No mark
+  changes place** (a run replaces its own span in the document). **A run of one is wrapped too** — it draws
+  the same, and it makes the readable property "a folded document holds no per-element texture reference".
+
+**Speed** (pairs taken inside one round; net = current ÷ (folded + the fold's own time)):
+**1.574–1.973× at 256px**, **0.955–1.207× at 512px**, **0.79–0.95× — slower — at 2160px.**
+**Only 256px is asserted against a clock**; 512px is narrower than the noise and is measured as a property.
+
+**Picture difference** (1:1, mean difference out of 255), at 127 / 378 / 4,616 / 12,292 references:
+**0.058 / 0.184 / 2.010 / 3.685 at 256px** and **0.039 / 0.115 / 1.383 / 2.575 at 512px**.
+**The author judged the 1:1 contact sheet and accepted it** (2026-08-16).
+
+**⚠ Existing thumbnails are not rebaked.** Staleness is decided by `source_render_hash`, and **that hash
+cannot move while the stored SVG does not.** **What gets faster is what is baked from now on, plus an
+explicit rebuild** (`/api/settings/thumbnails/rebuild`).
+
+**Verification, measured by the accepting session on the merged tree, all green**:
+**server 3,370 passed / 31 skipped** (489.93 s), **cli 235 passed** (14.95 s), **ruff clean across server,
+cli and shared**, **`check_frozen_corpora.py` byte-identical**. **The +20 on the server is exactly the
+branch's** (T-129 to T-138, twenty functions). **No test disappeared.**
+
+- **The 10 acceptance checks (20 functions) and 8 perturbations were run by the implementing session**, with
+  the prediction frozen before any code — **and frozen again, still before any code, once the ruling changed
+  the design.** **Two came out differently** (P-2 2→4 and P-4 1→8, both of the "it reached every check that
+  reads the fold's output" kind).
+- **⚠ The reference corpus cannot see this work at all.** P-7 (apply the fold inside `render()` as well)
+  reddened 8 tests and **zero corpus cases**: of the 588 cases only 4 are `display`, all four are `pen`, and
+  `pen` carries no texture filter. **The same held for engine 37's 597.** **A single acceptance check is all
+  that watches for the fold leaking into the renderer** (filed as ledger I-289).
+- **⚠ The sign at 2160px disagrees with the issuing session's measurement** — the issuer measured 1.4× faster
+  at 24,445 references; the implementation measured 0.79× (slower) at 26,675. **Which is right is not
+  settled** (filed as ledger I-290). **This version folds nothing at 2160px under either sign, so the open
+  question changes neither the picture nor the speed.**
+- **⚠ The accepting session added one perturbation.** Of the acceptance checks whose content the mid-run
+  ruling replaced, **T-136 (no road rasterizes around the fold) had no perturbation aimed at it.** Adding one
+  backend import outside the rasterizer reddened exactly that one check and nothing else.
+- **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).

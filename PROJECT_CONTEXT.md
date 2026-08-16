@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.32 / Build 919**
+**Target version: v2.13.33 / Build 920**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -256,7 +256,15 @@ How many run at once is entered by an administrator, since the machine is not as
 count -- in a container the host's is the wrong answer.
 The rasterizing runs in child processes -- the rasterizer holds the GIL, so threads would sit
 on one core -- while the writing stays in the parent, and one work that cannot be baked does
-not stop the rest
+not stop the rest.
+**When the bake is small, the texture of marks drawn in a row with one tool is folded into a
+single run before rasterizing.**
+That cuts how many times the filter is applied and raises the area it covers, so **it only pays
+while the width is small.**
+The door that rasterizes reads the width and decides; it is not a flag the callers pass, because
+a flag any caller could forget is one some caller would.
+**The stored SVG is never folded** -- the fold happens only at bake time, so neither the identity
+of the picture nor the engine version moves
 - Per-work sharing.
 A recipient and a permission (`read` or `write`) are chosen one work at a time, and a shared work
 carries a mark in the list.

@@ -305,7 +305,7 @@ def api_history_svg(
             # The work is already in hand here, so it supplies its own colors:
             # this redraw is the same work, and re-resolving the id would give
             # it today's definition instead of the one it was drawn with.
-            svg, _, _ = _render_score_svg(
+            svg, _, _, _ = _render_score_svg(
                 item.get("score", {}),
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,

@@ -46,7 +46,7 @@ from ...sketch import (
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
-from ..rendering import COLOR_CATALOG_ID_HEADER, COLOR_SOURCE_HEADER, _color_render_metadata, _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude, _work_for_color_snapshot
+from ..rendering import COLOR_CATALOG_ID_HEADER, COLOR_SOURCE_HEADER, LIMITS_SOURCE_HEADER, _color_render_metadata, _effective_limits, _limits_for_render, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude, _work_for_color_snapshot
 from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
@@ -92,6 +92,17 @@ def _provider_failure_detail(operation: str, exc: BaseException | None) -> dict 
 # turns it into the localized message the way it does for "render capacity is
 # full", so the wording stays authored in ja.ts.
 _LABEL_ONLY_DESCRIPTION = "description is only labels"
+
+# One sentence, three request models: the key means the same thing on each, and
+# three copies would drift. What it says is what CHANGES -- a caller that sends
+# it draws under these numbers instead of the installation's, but never above
+# them, so lowering a setting cannot be undone from a request.
+_LIMITS_FIELD_DESCRIPTION = (
+    "Draw under these limits instead of the installation's settings. Missing keys "
+    "keep their default, and each value is capped at today's setting -- a request "
+    "can only lower a limit, never raise one. Omitted means the work's own "
+    "recorded limits (when a work_id is given) or today's settings."
+)
 
 
 def _stage_http_error(operation: str, status_code: int) -> HTTPException:
@@ -236,6 +247,10 @@ class ComposeResponse(BaseModel):
     # The limits that governed this work. Present only when the row recorded
     # them; absent means "drawn before they were recorded", not "the defaults".
     render_limits: dict[str, int] | None = None
+    # Which of the four sources those numbers came from. `render_limits` says
+    # what was used, not whether a redraw replayed the work's own ceiling or ran
+    # at today's setting -- and the two are different pictures (ledger I-154).
+    render_limits_source: str | None = None
     # What the hard ceiling did, when it fired. The first half applied it with
     # nowhere to say so; a work silently reduced from 900 marks to 400 looked
     # like a work that asked for 400.
@@ -352,6 +367,7 @@ class PaintRequest(BaseModel):
     sketch: bool = Field(default=False, description="写生層 (Stage 0.5) を通すか")
     sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら 0.5 を呼び直さない")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine (既定・細かく区切る) / coarse (大きく区切る)")
+    limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
 
 
 class PaintResponse(BaseModel):
@@ -398,6 +414,8 @@ class PaintResponse(BaseModel):
     # The limits that governed this work. Present only when the row recorded
     # them; absent means "drawn before they were recorded", not "the defaults".
     render_limits: dict[str, int] | None = None
+    # Which of the four sources those numbers came from -- see RenderScoreResponse.
+    render_limits_source: str | None = None
     # What the hard ceiling did, when it fired. The first half applied it with
     # nowhere to say so; a work silently reduced from 900 marks to 400 looked
     # like a work that asked for 400.
@@ -446,6 +464,7 @@ class RenderSvgRequest(BaseModel):
     # definition that has since changed, been renamed, or been retired does not
     # silently repaint it. Absent means "a new drawing": catalog_id decides.
     work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
+    limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
@@ -461,6 +480,7 @@ class RenderScoreRequest(BaseModel):
     ddl: str | None = None
     # Same key, same rule as RenderSvgRequest.
     work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
+    limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
@@ -500,6 +520,9 @@ class RenderScoreResponse(BaseModel):
     # The limits that governed this work. Present only when the row recorded
     # them; absent means "drawn before they were recorded", not "the defaults".
     render_limits: dict[str, int] | None = None
+    # Which of the four sources those numbers came from -- see the note above
+    # `render_limits` and ledger I-154.
+    render_limits_source: str | None = None
     # What the hard ceiling did, when it fired. The first half applied it with
     # nowhere to say so; a work silently reduced from 900 marks to 400 looked
     # like a work that asked for 400.
@@ -927,6 +950,10 @@ def _call_compose_detail(
         source_text=plugin_fires_on or original_description,
         lang=lang,
         seed_text=plugin_seed_text or ddl,
+        # The same numbers coerce is about to run under. Without this the
+        # expansion declined counts against the shipping 400 and said so in a
+        # warning, whatever the installation had set.
+        limits=limits,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     variation_report: dict = {}
@@ -1396,7 +1423,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     # Read once for this request and handed to every layer that states or
     # applies a limit: the prompt, coerce, and the count clamp inside
     # Score.model_validate (which reaches it through using_limits).
-    limits = _effective_limits()
+    #
+    # This route composes something new, so there is no work whose row could
+    # answer instead: the source is always `settings`. It goes through the one
+    # resolver anyway, so the response names its source the way the other three
+    # do rather than leaving this one route silent.
+    limits, limits_source = _limits_for_render()
     # Settled before Stage 2 rather than after it: the composition is told which
     # paper it composes for, and it cannot be told a value that has not been
     # decided yet. The 422 for an unsupported id therefore now answers before
@@ -1520,6 +1552,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         sketch_text=req.sketch_text or None,
         sketch_grain=sketch_grain,
         sketch_state=sketch_state,
+        render_limits_source=limits_source,
         render_limit_notes=limit_notes or None,
         **coerce_report,
         trace=_assemble_trace(
@@ -1598,6 +1631,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             # The hash source, not language: the description, so that two runs
             # of the same work resolve the same counts and rotations.
             seed_text=description,
+            limits=_effective_limits(),
         )
         detail.ddl = expand_intermediate_for_lang(
             plugin_expansion.ddl,
@@ -1707,8 +1741,10 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
     # failure to be relabelled 422 by the handler below.
     work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
-        # Site 4 of 5.
-        limits = _effective_limits()
+        # Site 4 of 5. The work is resolved above for its colors; its row also
+        # records the limits it was drawn under, and this is the route a redraw
+        # comes through (ledger I-154).
+        limits, limits_source = _limits_for_render(work, req.limits)
         limit_notes: list[str] = []
         with using_limits(limits):
             score = coerce_score(
@@ -1762,6 +1798,7 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
         svg=svg,
         catalog_id=catalog_id,
         render_color_source=color_source,
+        render_limits_source=limits_source,
         render_limit_notes=limit_notes or None,
         **render_metadata,
     )
@@ -1772,7 +1809,7 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
     render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
     work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
-        svg, resolved_catalog_id, color_source = _render_score_svg(
+        svg, resolved_catalog_id, color_source, limits_source = _render_score_svg(
             req.score,
             catalog_id=req.catalog_id,
             canvas_aspect=req.canvas_aspect,
@@ -1781,19 +1818,22 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
             composition_seed=req.composition_seed,
             wild=req.wild,
             work=work,
+            requested_limits=req.limits,
         )
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("svg render", 422) from e
-    # The body of this endpoint is the SVG itself, so the one thing a caller
-    # cannot read off it -- whether it got the work's own colors -- rides here.
+    # The body of this endpoint is the SVG itself, so the things a caller cannot
+    # read off it -- whether it got the work's own colors, and whether it got the
+    # work's own limits -- ride here.
     return Response(
         content=svg,
         media_type="image/svg+xml; charset=utf-8",
         headers={
             COLOR_SOURCE_HEADER: color_source,
             COLOR_CATALOG_ID_HEADER: resolved_catalog_id,
+            LIMITS_SOURCE_HEADER: limits_source,
         },
     )
 
@@ -1861,7 +1901,11 @@ def _paint_events(
     )
     # Read once for the whole paint: Stage 1, Stage 2 and coerce all state or
     # apply these numbers, and they have to be the same numbers.
-    limits = _effective_limits()
+    #
+    # A paint has no work to read from -- it is making one -- so the request is
+    # the only source that can override today's settings here, and it can only
+    # lower them (see _limits_for_render).
+    limits, limits_source = _limits_for_render(requested=req.limits)
     try:
         # Pure-invocation bypass: an input made of nothing but qualified
         # plugin terms is transcribed rather than interpreted. This is about
@@ -2147,6 +2191,7 @@ def _paint_events(
         sketch_grain=sketch_result.grain if sketch_result is not None else None,
         sketch_fallback_used=sketch_result.fallback_used if sketch_result is not None else False,
         sketch_state=sketch_state,
+        render_limits_source=limits_source,
         render_limit_notes=limit_notes or None,
         **coerce_report,
         trace=paint_trace,

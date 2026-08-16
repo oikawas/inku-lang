@@ -181,6 +181,7 @@ export const en: LangPack = {
 	ddlUnknownNameFires: (namespace, word) => `Drop the “${namespace}.” and it fires as “${word}”`,
 	ddlUnknownNameUnregistered: 'This name is not registered',
 	ddlPluginWarningsTitle: 'Plugin warnings',
+	renderLimitNotesTitle: 'Limits that took effect',
 
 	tabCanvas: 'Work',
 	tabRefine: 'Refine',

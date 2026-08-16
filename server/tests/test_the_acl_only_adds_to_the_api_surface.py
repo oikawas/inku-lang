@@ -122,6 +122,16 @@ CHANGED_SCHEMAS = {
     # `SurfaceSpec` above -- nothing gains a property, so the enum is named
     # rather than left to the property-set comparison.
     "CanvasGroundSpec": {"added": set(), "removed": set()},
+    # I-154: a work is redrawn under the limits it was drawn under. Three
+    # requests gain the key that names limits for one render, and three
+    # responses gain the key that says which of the four sources decided them --
+    # `render_limits` alone cannot tell a faithful replay from today's settings.
+    "PaintRequest": {"added": {"limits"}, "removed": set()},
+    "RenderSvgRequest": {"added": {"limits"}, "removed": set()},
+    "RenderScoreRequest": {"added": {"limits"}, "removed": set()},
+    "PaintResponse": {"added": {"render_limits_source"}, "removed": set()},
+    "ComposeResponse": {"added": {"render_limits_source"}, "removed": set()},
+    "RenderScoreResponse": {"added": {"render_limits_source"}, "removed": set()},
 }
 
 # The whole of what the declared `CanvasGroundSpec` change may be.

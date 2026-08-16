@@ -229,6 +229,16 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
         "AppInfoResponse": {"thumbnail_hidpi"},
         "ComposeRequest": {"fires_on"},
         "Arrangement": {"group_size"},
+        # I-154 added one key to three requests and one to three responses, by
+        # the same rule: named here, taken back out before hashing, so the
+        # frozen digest keeps measuring everything else byte for byte. A second
+        # key arriving in any of the six is still red.
+        "PaintRequest": {"limits"},
+        "RenderSvgRequest": {"limits"},
+        "RenderScoreRequest": {"limits"},
+        "PaintResponse": {"render_limits_source"},
+        "ComposeResponse": {"render_limits_source"},
+        "RenderScoreResponse": {"render_limits_source"},
     }
     # ddl-engine 18 changed a schema without adding a field to it: a fill became
     # a surface word like the other eight, so `SurfaceTexture` gained a value.

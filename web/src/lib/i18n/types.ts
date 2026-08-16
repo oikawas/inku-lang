@@ -164,6 +164,7 @@ export interface LangPack {
 	ddlUnknownNameUnregistered: string;
 	// The same loss, seen after the drawing: the warnings the server recorded.
 	ddlPluginWarningsTitle: string;
+	renderLimitNotesTitle: string;
 
 	// Output tabs
 	tabCanvas: string;

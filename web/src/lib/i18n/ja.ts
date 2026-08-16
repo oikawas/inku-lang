@@ -181,6 +181,7 @@ export const ja: LangPack = {
 	ddlUnknownNameFires: (namespace, word) => `「${namespace}.」を外すと「${word}」として効きます`,
 	ddlUnknownNameUnregistered: 'この名前は登録されていません',
 	ddlPluginWarningsTitle: 'プラグインからの警告',
+	renderLimitNotesTitle: '効いた上限',
 
 	tabCanvas: '作品',
 	tabRefine: '推敲',

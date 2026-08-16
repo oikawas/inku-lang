@@ -17,7 +17,7 @@ from threading import RLock
 from typing import Iterable
 
 from ..counts import _explicit_counts_from_ddl
-from ..limits import DEFAULT_LIMITS
+from ..limits import DEFAULT_LIMITS, Limits
 from ..saijiki import (
     RELATIONS,
     core_grammar_markers as saijiki_core_grammar_markers,
@@ -1085,6 +1085,7 @@ def expand_plugin_ddl(
     lang: str,
     documents: Iterable[PluginDocument],
     seed_text: str | None = None,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> PluginExpansionResult:
     result = ddl
     provenance: list[dict[str, str]] = []
@@ -1186,7 +1187,10 @@ def expand_plugin_ddl(
             expansions = [expansion]
             units = 1
             if requested is not None:
-                budget = DEFAULT_LIMITS.max_expanded_primitives
+                # The budget an administrator set, not the shipping default. The
+                # number is written into the warning below, so reading a constant
+                # here told an installation running at 100 that it had 400.
+                budget = limits.max_expanded_primitives
                 if unit_cost * requested > budget:
                     # A count that cannot be delivered whole is declined, never
                     # trimmed: a trimmed count is neither the one the description
@@ -1568,13 +1572,22 @@ class PluginDocumentManager:
         source_text: str | None,
         lang: str,
         seed_text: str | None = None,
+        limits: Limits = DEFAULT_LIMITS,
     ) -> PluginExpansionResult:
+        """Expand the plugin terms in `ddl`.
+
+        `limits` decides how many marks one term may be asked to spend, and it
+        defaults the way `coerce_score`'s does: a caller outside a request --
+        the reference generators, a test -- runs at the shipping numbers. Both
+        request paths pass the resolved limits by name.
+        """
         return expand_plugin_ddl(
             ddl,
             source_text=source_text,
             lang=lang,
             documents=self.documents(),
             seed_text=seed_text,
+            limits=limits,
         )
 
 

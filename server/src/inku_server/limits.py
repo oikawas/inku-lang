@@ -177,3 +177,30 @@ def using_limits(limits: Limits) -> Iterator[Limits]:
         yield limits
     finally:
         _CURRENT_LIMITS.reset(token)
+
+
+def note_limit(notes: list[str] | None, name: str, detail: str) -> None:
+    """Record that the limit called `name` took effect.
+
+    The name comes first in the line because the reader is an administrator
+    asking which of these nine moved the picture: "the ink halved" was the whole
+    of what the two existing notes could say, and neither of them named a
+    setting. `name` is a field of `Limits`, so the line can be matched by key.
+
+    Recorded once per limit per work. A ceiling that clipped four arrangements
+    bound once; four identical lines answer "which setting" no better than one,
+    and the count of lines would then mean "how many arrangements", which is a
+    different question with a different answer already in the Score.
+
+    `notes` is None wherever coerce runs outside a request -- the reference
+    generators, the tests that call it directly -- and then nothing is recorded
+    and nothing else changes. This never touches the Score: what a limit did to
+    the drawing is already written into the instruction's own note, and moving
+    those bytes would redraw every frozen corpus.
+    """
+    if notes is None:
+        return
+    prefix = f"{name}: "
+    if any(line.startswith(prefix) for line in notes):
+        return
+    notes.append(prefix + detail)

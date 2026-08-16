@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-from .limits import DEFAULT_LIMITS, Limits
+from .limits import DEFAULT_LIMITS, Limits, note_limit
 
 
 _KANJI_NUMBERS: dict[str, int] = {
@@ -78,7 +78,11 @@ def _is_literal_grid_request(ddl: str | None) -> bool:
 
 
 def count_hint_from_ddl(
-    ddl: str, limits: Limits = DEFAULT_LIMITS, *, lang: str | None = None
+    ddl: str,
+    limits: Limits = DEFAULT_LIMITS,
+    *,
+    lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> int | None:
     """Extract a conservative count hint from a normalized DDL fragment."""
     literal_grid = _is_literal_grid_request(ddl)
@@ -93,9 +97,30 @@ def count_hint_from_ddl(
             continue
         value = _parse_small_japanese_number(match.group(1))
         if value is not None:
-            maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
-            return min(max(value, 1), maximum)
-    return _english_count_hint(ddl, limits, lang=lang)
+            return _count_within_the_reading_ceiling(value, limits, literal_grid, notes)
+    return _english_count_hint(ddl, limits, lang=lang, notes=notes)
+
+
+def _count_within_the_reading_ceiling(
+    value: int, limits: Limits, literal_grid: bool, notes: list[str] | None
+) -> int:
+    """The count a numeral in the description is allowed to become.
+
+    Two settings, one for tiling and one for everything else, and only one of
+    them is consulted per reading -- so only the one that was consulted may be
+    named. Naming both would tell an administrator that lowering either would
+    have changed this drawing, and for eight of nine readings that is false.
+    """
+    name = "ddl_count_max_grid" if literal_grid else "ddl_count_max"
+    maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
+    if value > maximum:
+        note_limit(
+            notes,
+            name,
+            f"the description asked for {value}; a number read out of the "
+            f"description stops at {maximum}",
+        )
+    return min(max(value, 1), maximum)
 
 
 ENGLISH_SMALL_NUMBERS: dict[str, int] = {
@@ -135,7 +160,11 @@ ENGLISH_COUNT_UNITS: dict[str, int] = {
 
 
 def _english_count_hint(
-    ddl: str, limits: Limits = DEFAULT_LIMITS, *, lang: str | None = None
+    ddl: str,
+    limits: Limits = DEFAULT_LIMITS,
+    *,
+    lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> int | None:
     """The count this description states first, once the counter pass found none.
 
@@ -154,10 +183,9 @@ def _english_count_hint(
     # read a count from a sentence that asked for no tiling at all.
     clauses = re.split(r"[。.!?]+", ddl)
     candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
-    maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
     for candidate in candidates:
         for _, value in _counts_in_reading_order(candidate, lang=lang):
-            return min(max(value, 1), maximum)
+            return _count_within_the_reading_ceiling(value, limits, literal_grid, notes)
     return None
 
 

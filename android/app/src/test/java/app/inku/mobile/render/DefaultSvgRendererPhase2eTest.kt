@@ -27,7 +27,7 @@ class DefaultSvgRendererPhase2eTest {
         val result = renderer.render(
             RenderRequest(
                 scoreJson = scoreObj.toString(),
-                colorCatalogId = "default",
+                colorCatalogId = ReferenceRendering.catalogId(entry),
                 canvasAspect = "square",
                 svgProfile = "editable",
                 renderSeed = renderSeed,

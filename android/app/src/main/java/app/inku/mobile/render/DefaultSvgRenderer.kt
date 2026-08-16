@@ -191,7 +191,19 @@ class DefaultSvgRenderer(
         val weight = ins.optString("weight", "pen")
         val attrs = strokeAttrs(primitive, weight, colorKey, colors, ins, unit)
         val common = attrs.toSvgAttributes(includeFill = false)
-        val fill = attrs.fill
+        // The fill the geometric road writes onto the element itself.
+        //
+        // The server settles this once, in `_stroke_attrs`: `"fill": color if
+        // do_fill else "none"`, with `do_fill = _fills_interior(ins)`. The hand
+        // road here reaches the same answer inside `renderBodyShape`; the
+        // geometric road never calls it, and wrote `attrs.fill` unconditionally.
+        // That value comes from `ServerRendererStyle`, which only knows whether
+        // the primitive has an inside -- so every closed shape a machine pole
+        // drew came out filled, whether or not the description asked for it, and
+        // the corpus's `05_circle_rotring` was an outline in the reference and a
+        // disc in the port. The judgement is the one already ported from
+        // `_fills_interior`, read here rather than copied (ledger I-280).
+        val fill = if (ServerRendererGeometry.fillsInterior(ins)) attrs.fill else "none"
         val raw = when (primitive) {
             "line" -> {
                 val from = ins.optJSONArray("from")
@@ -247,14 +259,8 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    // The one decision, not a copy of it. Nothing in this branch reads the
-                    // value: the fill attribute below comes from `ServerRendererStyle.fill`,
-                    // which colours every closed shape whether or not it is filled, and
-                    // `renderBodyShape` -- the reader that would override it -- is only
-                    // called on the hand-stroke road. That divergence is its own matter
-                    // (reported this round); the expression itself must not be a second copy.
-                    @Suppress("UNUSED_VARIABLE")
-                    val regionFill = ServerRendererGeometry.fillsInterior(ins)
+                    // `fill` above is the one decision, read once for every branch of
+                    // this road rather than settled again here (ledger I-280).
                     val base = if (needsPathVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }

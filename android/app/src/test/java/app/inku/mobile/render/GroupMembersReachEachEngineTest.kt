@@ -32,7 +32,7 @@ class GroupMembersReachEachEngineTest {
         return renderer.render(
             RenderRequest(
                 scoreJson = entry.getJSONObject("score").toString(),
-                colorCatalogId = "default",
+                colorCatalogId = ReferenceRendering.catalogId(entry),
                 canvasAspect = "square",
                 svgProfile = "editable",
                 renderSeed = entry.getLong("render_seed"),

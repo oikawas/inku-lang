@@ -2335,6 +2335,12 @@ def _render_score_client(info=None, *, info_fails=False, render_headers=None):
                     "render_canvas_aspect_ratio": 1.0,
                     "render_seed": sent.get("render_seed") or 1,
                     "composition_seed": sent.get("composition_seed"),
+                    # I-154: the limits that drew it, which of the four sources
+                    # decided them, and which of them took effect. Mirrored here
+                    # because the server sends all three on this route.
+                    "render_limits": {"represented_count_max": 120},
+                    "render_limits_source": "work" if sent.get("work_id") else "settings",
+                    "render_limit_notes": ["represented_count_max: 600 drawn as 120"],
                 }
                 return response, _FakeResponse(headers)
             raise AssertionError(f"unexpected request: {method} {path}")
@@ -3141,3 +3147,88 @@ def test_the_history_listing_asks_for_the_drawings_unless_told_otherwise(monkeyp
         "writes whatever arrives straight to a file and rasterizes it"
     )
     assert no_svg_query["include_svg"] is False
+
+
+# I-154: what drew this, and under whose numbers ------------------------------
+
+
+def test_render_score_reports_the_limits_and_where_they_came_from(monkeypatch, capsys):
+    """T-105. Three keys, and the middle one is the one that cannot be inferred.
+
+    `render_limits` names numbers; only the source says whether they came off
+    the work's own row or off today's settings, and the artifact this command
+    writes is the only record of which. A run that dropped it would still print
+    a plausible set of limits.
+    """
+    result = _run_render_score(monkeypatch, capsys, _render_score_client())
+
+    assert result["render_limits"] == {"represented_count_max": 120}
+    assert result["render_limits_source"] == "settings"
+    assert result["render_limit_notes"] == ["represented_count_max: 600 drawn as 120"]
+
+
+def test_render_score_from_work_reports_the_work_as_the_limits_source(monkeypatch, capsys):
+    """The reading that makes the key worth carrying: it moves with the request."""
+    client = _render_score_client(render_headers={"X-Inku-Color-Source": "snapshot"})
+    result = _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
+
+    assert result["render_limits_source"] == "work"
+
+
+def test_limits_flag_reaches_the_request(monkeypatch, capsys):
+    """`--limits key=value` is the whole of what a feature test can run through.
+
+    Without the flag the request must carry no `limits` key at all: an empty
+    dict reads as "override with nothing", and the server would then bound it
+    against today's settings instead of letting the work's row decide.
+    """
+    client = _render_score_client()
+    _run_render_score(
+        monkeypatch, capsys, client, "--limits", "represented_count_max=60", "ddl_count_max=500"
+    )
+    assert client.sent[-1]["limits"] == {"represented_count_max": 60, "ddl_count_max": 500}
+
+    client = _render_score_client()
+    _run_render_score(monkeypatch, capsys, client)
+    assert client.sent[-1]["limits"] is None
+
+
+def test_limits_flag_refuses_what_is_not_a_pair():
+    with pytest.raises(cli.CliError):
+        cli._limits_argument(["represented_count_max"])
+    with pytest.raises(cli.CliError):
+        cli._limits_argument(["represented_count_max=lots"])
+
+
+def test_a_non_display_export_names_the_work_it_is_exporting(monkeypatch):
+    """T-106. The export draws under the limits the work was drawn under.
+
+    The browser's export already does this -- it goes through
+    GET /api/history/{id}/svg, which hands the row over -- and this path did
+    not, so the same drawing left the CLI under today's ceiling. Nothing in the
+    SVG says which numbers drew it, so a missing key looks like a working one.
+    """
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def request_text(self, method, path, *, data=None, query=None, auth=True):
+            self.calls.append((method, path, data, query, auth))
+            return "<svg><title>editable</title></svg>"
+
+    client = FakeClient()
+    saved = {
+        "score": {"instructions": []},
+        "svg": "<svg><title>display</title></svg>",
+        "history_id": "history-77",
+    }
+    cli._result_with_svg_profile(client, saved, svg_profile="editable", color_catalog="default")
+    assert client.calls[0][2]["work_id"] == "history-77"
+
+    # A fresh drawing has no row. Sending a null id would only be able to 404,
+    # so the key has to be absent rather than present and empty.
+    client = FakeClient()
+    unsaved = {"score": {"instructions": []}, "svg": "<svg><title>display</title></svg>"}
+    cli._result_with_svg_profile(client, unsaved, svg_profile="editable", color_catalog="default")
+    assert "work_id" not in client.calls[0][2]

@@ -187,13 +187,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -202,6 +202,8 @@ positional arguments:
     batch               generate drawings from a prompt list
     contact-sheet       create a contact sheet from PNG files in a directory
     rasterize           rasterize a directory of SVG files to PNG
+    measure-raster      count the ink of PNG files at the width they already
+                        have
     analyze             analyze generated PNG/JSON outputs
     ddl-compare         compare normalized DDL artifacts side by side
     vision-review       use the configured NIM vision model as a read-only
@@ -583,6 +585,25 @@ options:
                      declares
   --workers WORKERS  rasterize this many files at once; each file still gets
                      its own process
+
+```
+
+### `inku-cli measure-raster`
+
+```
+usage: inku-cli measure-raster [-h] --in INPUT_DIR [--out OUTPUT]
+
+Count every PNG in a directory at the width it already has; it is never shrunk
+before counting. Shrinking blends thin marks into the paper, so a change that
+thins the marks would read as no change and a change that thickens them as
+larger than it is. There is no width or scale flag: to read a record made at
+another width, burn at that width with `rasterize --width` and count the
+result.
+
+options:
+  -h, --help      show this help message and exit
+  --in INPUT_DIR  directory to read .png files from
+  --out OUTPUT    JSON report path (default: INPUT_DIR/raster-metrics.json)
 
 ```
 

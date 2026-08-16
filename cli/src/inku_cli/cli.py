@@ -29,6 +29,7 @@ from inku_analysis import (
     composition_family as _composition_family_from_score,
     motif_signatures as _motif_signatures,
 )
+from inku_analysis.raster_metrics import measure_dir
 from inku_analysis.rasterize_batch import rasterize_dir
 from inku_analysis.rasterizer import (
     RasterizerUnavailable,
@@ -2813,6 +2814,26 @@ def command_rasterize(args: argparse.Namespace) -> int:
     )
     return 1 if report.failed else 0
 
+def command_measure_raster(args: argparse.Namespace) -> int:
+    """Count a directory of PNGs. The rule for how one is counted is not here.
+
+    It is `inku_analysis.raster_metrics`, for the same reason `rasterize` keeps
+    its rule out of this file: the counting rule already had eight copies under
+    `cli/out2/`, four of them halving the image before counting. A ninth written
+    here would be one more place for the ruler to drift.
+    """
+    try:
+        report = measure_dir(Path(args.input_dir))
+    except NotADirectoryError as exc:
+        raise CliError(str(exc)) from exc
+    out_path = Path(args.output) if args.output else Path(args.input_dir) / "raster-metrics.json"
+    _write_json_file(out_path, report)
+    for failure in report["unresolved"]:
+        print(f"UNRESOLVED {failure['source']}: {failure['reason']}", file=sys.stderr)
+    print(f"metrics: {out_path}", file=sys.stderr)
+    _print_json(report)
+    return 1 if report["unresolved"] else 0
+
 def command_analyze(args: argparse.Namespace) -> int:
     if args.census and args.history:
         if args.input_dir:
@@ -3938,6 +3959,30 @@ def build_parser() -> argparse.ArgumentParser:
     rasterize.add_argument("--width", type=int, help="render at this pixel width instead of the width each SVG declares")
     rasterize.add_argument("--workers", type=int, default=1, help="rasterize this many files at once; each file still gets its own process")
     rasterize.set_defaults(func=command_rasterize)
+
+    measure_raster = subparsers.add_parser(
+        "measure-raster",
+        help="count the ink of PNG files at the width they already have",
+        description=(
+            "Count every PNG in a directory at the width it already has; it is never "
+            "shrunk before counting. Shrinking blends thin marks into the paper, so a "
+            "change that thins the marks would read as no change and a change that "
+            "thickens them as larger than it is. There is no width or scale flag: to "
+            "read a record made at another width, burn at that width with `rasterize "
+            "--width` and count the result."
+        ),
+    )
+    measure_raster.add_argument("--in", dest="input_dir", required=True, help="directory to read .png files from")
+    measure_raster.add_argument(
+        "--out",
+        dest="output",
+        help="JSON report path (default: INPUT_DIR/raster-metrics.json)",
+    )
+    # No width, scale or shrink flag, and none may be added: a picture is
+    # measured at the width it was burned at, and the width is chosen when it is
+    # burned (`rasterize --width`), never when it is counted. Reading an older
+    # record at 380px means burning at 380px first.
+    measure_raster.set_defaults(func=command_measure_raster)
 
     analyze = subparsers.add_parser("analyze", help="analyze generated PNG/JSON outputs")
     _add_common_server_args(analyze)

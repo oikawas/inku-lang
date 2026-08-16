@@ -3141,3 +3141,39 @@ def test_the_history_listing_asks_for_the_drawings_unless_told_otherwise(monkeyp
         "writes whatever arrives straight to a file and rasterizes it"
     )
     assert no_svg_query["include_svg"] is False
+
+
+def _subparser(name: str) -> argparse.ArgumentParser:
+    """The parser argparse built for one subcommand, found by walking the root."""
+    for action in cli.build_parser()._actions:
+        if isinstance(action, argparse._SubParsersAction) and name in action.choices:
+            return action.choices[name]
+    raise AssertionError(f"`{name}` is not a subcommand of inku-cli")
+
+
+def test_measure_raster_asks_nothing_of_a_server():
+    """T-118. Counting pixels needs no API, so the server flags are not there.
+
+    A subcommand that accepts `--base-url` invites being pointed at a running
+    inku, and the next question after that is which build's renderer produced
+    the pictures -- which is a question about the PNGs on disk, not the server.
+    """
+    measure_raster = _subparser("measure-raster")
+    declared = {option for action in measure_raster._actions for option in action.option_strings}
+    assert "--base-url" not in declared and "--timeout-seconds" not in declared, declared
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["measure-raster", "--in", "x", "--base-url", "http://localhost:8100"])
+
+
+def test_measure_raster_declares_no_way_to_change_the_width():
+    """T-119. Shrinking is unreachable, not a flag that defaults to off.
+
+    The width belongs to the burning step (`rasterize --width`); the counting
+    step measures what it was handed. A flag here -- even one nobody passes --
+    is the halving line coming back with a name.
+    """
+    measure_raster = _subparser("measure-raster")
+    declared = {option for action in measure_raster._actions for option in action.option_strings}
+    assert declared == {"-h", "--help", "--in", "--out"}, declared
+    forbidden = re.compile(r"width|scale|half|reduce|shrink|resize|thumb|dpi|px", re.I)
+    assert not [option for option in declared if forbidden.search(option)], declared

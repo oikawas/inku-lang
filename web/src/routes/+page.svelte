@@ -37,6 +37,7 @@
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
+	import { normalizeHistoryStripFields, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -375,6 +376,7 @@
 		ui_theme?: 'light' | 'dark';
 		ui_mode?: UiMode;
 		ui_custom?: UiCustomVisibility;
+		history_strip_fields?: HistoryStripField[];
 		tooltips_enabled?: boolean;
 		download_folder_enabled?: boolean;
 		download_folder_name?: string | null;
@@ -914,6 +916,9 @@
 	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
 	let uiModeSaving = $state(false);
 	let uiModeSaveError = $state(false);
+	let historyStripFieldsSaving = $state(false);
+	let historyStripFieldsSaveError = $state(false);
+	const historyStripFields = $derived(normalizeHistoryStripFields(currentUser?.history_strip_fields));
 	const uiMode = $derived(normalizeUiMode(currentUser?.ui_mode));
 	const uiCustom = $derived(normalizeUiCustom(currentUser?.ui_custom));
 	const uiVisibility = $derived(resolveUiVisibility(uiMode, uiCustom));
@@ -1640,6 +1645,43 @@
 			console.warn('failed to update UI mode', e);
 		} finally {
 			uiModeSaving = false;
+		}
+	}
+
+	/** Save which facts the strip prints, and check the server kept them.
+	 *
+	 *  The saved value is compared field by field rather than by length: an
+	 *  empty list is a legitimate answer, and a length check would read the
+	 *  server dropping the key and the reader asking for nothing as the same
+	 *  thing. */
+	async function updateHistoryStripFields(next: HistoryStripField[]) {
+		if (!currentUser || historyStripFieldsSaving) return;
+		const previousUser = currentUser;
+		historyStripFieldsSaving = true;
+		historyStripFieldsSaveError = false;
+		currentUser = { ...currentUser, history_strip_fields: next };
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ history_strip_fields: next })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			const updatedUser = await r.json() as UserItem;
+			const saved = normalizeHistoryStripFields(updatedUser.history_strip_fields);
+			if (saved.length !== next.length || saved.some((field, index) => field !== next[index])) {
+				throw new Error('history strip fields were not persisted by the server');
+			}
+			currentUser = updatedUser;
+		} catch (e) {
+			currentUser = previousUser;
+			historyStripFieldsSaveError = true;
+			console.warn('failed to update history strip fields', e);
+		} finally {
+			historyStripFieldsSaving = false;
 		}
 	}
 
@@ -3102,6 +3144,11 @@
 		// of a saved work replays instead of asking a non-deterministic layer again.
 		sketchMode?: SketchMode;
 		sketchText?: string | null;
+		// Qualified model ids for this run only, when the caller is a dialog that
+		// asked the reader which model to use. Absent means the page's own
+		// setting, which is what every other caller wants.
+		stage1Model?: string;
+		stage2Model?: string;
 		// Called when interpretation finishes, before rendering starts.
 		onStage1?: (event: PaintStage1Event) => void;
 	};
@@ -3180,8 +3227,10 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		activeRunTokensIn = null;
 		activeRunTokensOut = null;
 		const historyInput = options.historyInput ?? text;
-		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
-		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
+		// The effective id, not the raw field: what is sent is what was asked for,
+		// and it is the same value the run status names and the work records.
+		const resolvedStage1Model = options.stage1Model ?? qualifiedModelId(stage1Provider, stage1Model);
+		const resolvedStage2Model = options.stage2Model ?? qualifiedModelId(stage2Provider, stage2Model);
 
 		stage1UserPrompt = text;
 		const resolvedSketchMode = options.sketchMode ?? sketchMode;
@@ -7027,6 +7076,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
 			{developerMode}
+			{historyStripFields}
 		/>
 			{/if}
 	</div><!-- /main-shell -->
@@ -7108,6 +7158,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{uiCustom}
 			{uiModeSaving}
 			{uiModeSaveError}
+			{historyStripFields}
+			{historyStripFieldsSaving}
+			{historyStripFieldsSaveError}
+			onToggleHistoryStripField={(field) => void updateHistoryStripFields(toggleHistoryStripField(historyStripFields, field))}
 			onSetUiMode={(mode) => void updateUiMode(mode)}
 			onSetUiCustomItem={updateUiCustomItem}
 			{userSettingsStatus}

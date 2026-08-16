@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import re
 from typing import Any, Callable
 
 from inku_analysis.rasterizer import svg_to_png
@@ -72,11 +71,30 @@ def _vision_chat(
     return (response.choices[0].message.content or "").strip()
 
 
+def _json_body(raw: str) -> str:
+    """The object an advice answer carries, with whatever a chat model wrapped it in.
+
+    One rule, not two: take the first brace to the last. That covers a ``` fence
+    and prose either side of the object alike, so there is no second path whose
+    removal changes nothing. It guesses at no content -- what comes out still has
+    to parse, and an answer with no braces in it is handed on untouched, so it
+    fails exactly where it failed before.
+
+    This replaces a fence strip written as `\\s` inside a raw string, which asks
+    for a literal backslash followed by zero or more 's' and so matched nothing.
+    A vision model fences its answer by default, which meant the whole path
+    returned "invalid refinement advice JSON" rather than degrading.
+    """
+    text = raw.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        return text
+    return text[start : end + 1]
+
+
 def _parse_json(raw: str) -> dict[str, Any]:
-    clean = raw.strip()
-    if clean.startswith("```"):
-        clean = re.sub(r"^```(?:json)?\\s*", "", clean, flags=re.IGNORECASE)
-        clean = re.sub(r"\\s*```$", "", clean)
+    clean = _json_body(raw)
     try:
         parsed = json.loads(clean)
     except json.JSONDecodeError as exc:

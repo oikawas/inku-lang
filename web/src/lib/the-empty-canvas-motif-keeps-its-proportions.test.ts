@@ -103,3 +103,27 @@ test('T-26: no shape in the motif is written against the frame', () => {
 	assert.match(paper, /width=\{placeholderWidth\}/);
 	assert.match(paper, /height=\{placeholderHeight\}/);
 });
+
+// --- the motif itself (author's choice, 2026-08-17): mountain, water, moon ---
+
+test('T-168  the motif is three strokes, and the moon is a circle', () => {
+	const panel = read('./components/CanvasPanel.svelte');
+	const start = panel.indexOf('<g opacity="0.72"');
+	const motif = panel.slice(start, panel.indexOf('</g>', start));
+
+	// Three, which is what was asked for: the ridge, the water, the moon. A
+	// fourth would not be caught by anything above -- T-26 measures how the
+	// motif is placed, not what is in it.
+	const strokes = motif.match(/<(path|circle|rect|ellipse|line|polyline|polygon)\b/g) ?? [];
+	assert.equal(strokes.length, 3, `motif has ${strokes.length} strokes: ${strokes}`);
+
+	// The moon is a circle and not an ellipse. An ellipse is how a round thing
+	// gets quietly squashed by hand, which is the defect this whole file exists
+	// for -- reached by a different road than writing coordinates against the
+	// frame, and so not covered by the check above.
+	assert.match(motif, /<circle\b/);
+	assert.doesNotMatch(motif, /<ellipse\b/);
+
+	// Two open strokes and no filled shape: the picture is drawn, not blocked in.
+	assert.equal((motif.match(/fill="none"/g) ?? []).length, 3);
+});

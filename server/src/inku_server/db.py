@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import sqlite3
@@ -292,6 +293,7 @@ class UserAccountRow(Base):
     ui_theme      = Column(String, nullable=False, default="dark")
     ui_mode       = Column(String, nullable=False, default="simple")
     ui_custom     = Column(Text, nullable=False, default="{}")
+    history_strip_fields = Column(Text, nullable=False, default='["generation", "model"]')
     tooltips_enabled = Column(Boolean, nullable=False, default=True)
     # Whether this user asked downloads to go to a folder they picked. The
     # directory handle itself cannot come here -- it is a browser object that
@@ -454,6 +456,12 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "ui_mode": "ALTER TABLE user_accounts ADD COLUMN ui_mode VARCHAR NOT NULL DEFAULT 'simple'",
     "ui_custom": "ALTER TABLE user_accounts ADD COLUMN ui_custom TEXT NOT NULL DEFAULT '{}'",
+    # The default is what the strip printed before it could be asked, so an
+    # account that predates the column sees no change.
+    "history_strip_fields": (
+        "ALTER TABLE user_accounts ADD COLUMN history_strip_fields TEXT NOT NULL "
+        "DEFAULT '[\"generation\", \"model\"]'"
+    ),
     "tooltips_enabled": "ALTER TABLE user_accounts ADD COLUMN tooltips_enabled BOOLEAN NOT NULL DEFAULT 1",
     "download_folder_enabled": "ALTER TABLE user_accounts ADD COLUMN download_folder_enabled BOOLEAN NOT NULL DEFAULT 0",
     "download_folder_name": "ALTER TABLE user_accounts ADD COLUMN download_folder_name VARCHAR",
@@ -480,6 +488,43 @@ _UI_CUSTOM_KEYS = {
     "input_modes", "drawing_settings", "ddl_tools", "detail_status",
     "work_tools", "history", "auxiliary",
 }
+# What the history strip prints under each thumbnail. The order is the order the
+# strip reads them in, so it is a list here rather than a set; at most
+# _HISTORY_STRIP_FIELD_LIMIT of them, and an empty list is a choice, not an
+# absence. The web half of this pair is web/src/lib/historyStripFields.ts.
+_HISTORY_STRIP_FIELDS = ("generation", "model", "engine_version", "bytes")
+_HISTORY_STRIP_FIELD_LIMIT = 2
+_HISTORY_STRIP_FIELDS_DEFAULT = ["generation", "model"]
+
+
+def _loads_or_none(raw: str | None):
+    """The stored JSON, or None when there is nothing readable stored.
+
+    None and a stored empty list have to stay apart: the first is an account
+    that never answered and takes the default, the second is an account that
+    asked for nothing.
+    """
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def normalize_history_strip_fields(value) -> list[str]:
+    """Which facts the strip prints, as a list this API can hand to the page.
+
+    Anything that is not a list is an absence and takes the default. A list is
+    taken at its word -- unknown names drop, repeats collapse, the declared
+    order is restored, and at most two survive -- so an empty list comes back
+    empty, which is how "print nothing under the picture" is stored at all.
+    """
+    if not isinstance(value, list):
+        return list(_HISTORY_STRIP_FIELDS_DEFAULT)
+    chosen = {item for item in value if item in _HISTORY_STRIP_FIELDS}
+    ordered = [field for field in _HISTORY_STRIP_FIELDS if field in chosen]
+    return ordered[:_HISTORY_STRIP_FIELD_LIMIT]
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
 _OUTPUT_SAVE_DEFAULT_SETTINGS = {
@@ -2723,6 +2768,9 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         for key, value in ui_custom_raw.items()
         if key in _UI_CUSTOM_KEYS and isinstance(value, bool)
     } if isinstance(ui_custom_raw, dict) else {}
+    history_strip_fields = normalize_history_strip_fields(
+        _loads_or_none(row.history_strip_fields)
+    )
     return {
         "id": row.id,
         "username": row.username,
@@ -2736,6 +2784,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
         "ui_mode": row.ui_mode if row.ui_mode in _UI_MODES else "simple",
         "ui_custom": ui_custom,
+        "history_strip_fields": history_strip_fields,
         "tooltips_enabled": row.tooltips_enabled is not False,
         "download_folder_enabled": row.download_folder_enabled is True,
         "download_folder_name": row.download_folder_name,
@@ -3316,6 +3365,7 @@ def update_user_settings(
     download_folder_name: str | None = None,
     settings_tab: str | None = None,
     model_settings: dict | None = None,
+    history_strip_fields: list | None = None,
 ) -> dict | None:
     from .model_settings import update_user_model_settings
 
@@ -3336,6 +3386,16 @@ def update_user_settings(
         raise ValueError("download folder name is too long")
     if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
         raise ValueError("invalid settings tab")
+    # Refused rather than quietly trimmed: a caller asking for a fifth field or
+    # for three at once has misread the control, and silently storing two of the
+    # three would put a choice on screen that nobody made.
+    if history_strip_fields is not None and (
+        not isinstance(history_strip_fields, list)
+        or any(field not in _HISTORY_STRIP_FIELDS for field in history_strip_fields)
+        or len(set(history_strip_fields)) != len(history_strip_fields)
+        or len(history_strip_fields) > _HISTORY_STRIP_FIELD_LIMIT
+    ):
+        raise ValueError("invalid history strip fields")
     with SessionLocal() as session:
         row = session.get(UserAccountRow, user_id)
         if not row:
@@ -3346,6 +3406,12 @@ def update_user_settings(
             row.ui_mode = ui_mode
         if ui_custom is not None:
             row.ui_custom = json.dumps(ui_custom, ensure_ascii=False, sort_keys=True)
+        if history_strip_fields is not None:
+            # Stored in the declared order, not the order they were ticked, so
+            # the strip reads the same however the reader got there.
+            row.history_strip_fields = json.dumps(
+                normalize_history_strip_fields(history_strip_fields), ensure_ascii=False
+            )
         if tooltips_enabled is not None:
             row.tooltips_enabled = tooltips_enabled
         if download_folder_enabled is not None:
@@ -3809,8 +3875,27 @@ def _fts_match_query(search: str) -> str:
     return '"' + search.replace('"', '""') + '"'
 
 
+# A whole render hash, with the version prefix (`rh3:`) or without it: a reader
+# who trims the prefix off still means the same work. The prefix is matched
+# loosely rather than spelled `rh3` so that a later version does not silently
+# stop being searchable.
+_WHOLE_RENDER_HASH = re.compile(r"(?:[a-z0-9]+:)?[0-9a-f]{64}", re.IGNORECASE)
+
+
 def _is_render_hash_suffix_search(search: str) -> bool:
-    return len(search) == 4 and search.isascii() and search.isalnum()
+    """Text that can only be a render hash, and so is matched against the end of one.
+
+    Two shapes arrive here. The four characters the UI prints on a work's chip,
+    and the whole hash its copy button puts on the clipboard -- which is what a
+    reader pastes back into the search box, and which used to reach the
+    full-text path instead and find nothing.
+
+    Both are matched as a suffix: that is what the short form is, and the long
+    form is trivially one.
+    """
+    if len(search) == 4 and search.isascii() and search.isalnum():
+        return True
+    return bool(_WHOLE_RENDER_HASH.fullmatch(search))
 
 
 def _history_search_clause(search: str):

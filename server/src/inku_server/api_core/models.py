@@ -76,6 +76,15 @@ class HistoryPostBody(BaseModel):
 
 class HistoryItem(HistoryPostBody):
     id: str
+    # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
+    # The listing that draws the strip asks for `include_svg=false`, so a client
+    # cannot count this for itself: what arrives in `svg` is then an empty
+    # string, and measuring it would report every work as nothing.
+    #
+    # It belongs here and not on HistoryPostBody, which this inherits from: the
+    # weight is something the server reports about a stored work, never
+    # something a caller states when saving one.
+    svg_bytes: int = 0
     output_path: str | None = None
     # True when this work is somebody else's, reached through a group scope or an
     # explicit grant. Absent (not false) for one's own, so the ordinary listing
@@ -123,6 +132,10 @@ class UserAccountItem(BaseModel):
     ui_theme: str = "dark"
     ui_mode: str = "simple"
     ui_custom: dict[str, bool] = Field(default_factory=dict)
+    # What the history strip prints under each thumbnail. The default matches
+    # what it printed before it could be asked; an empty list means the reader
+    # asked for nothing, and is not the same as the field being absent.
+    history_strip_fields: list[str] = Field(default_factory=lambda: ["generation", "model"])
     tooltips_enabled: bool = True
     download_folder_enabled: bool = False
     download_folder_name: str | None = None

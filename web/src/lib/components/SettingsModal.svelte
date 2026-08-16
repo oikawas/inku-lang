@@ -13,6 +13,7 @@
 	import type { CardExportSettings } from '$lib/cardExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
+	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
 	import { markWeight } from '$lib/markWeight';
 
@@ -178,6 +179,10 @@
 		uiCustom: UiCustomVisibility;
 		uiModeSaving: boolean;
 		uiModeSaveError: boolean;
+		historyStripFields: HistoryStripField[];
+		historyStripFieldsSaving: boolean;
+		historyStripFieldsSaveError: boolean;
+		onToggleHistoryStripField: (field: HistoryStripField) => void;
 		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onSetUiCustomItem: (key: UiVisibilityKey, visible: boolean) => void;
 		userSettingsStatus: string | null;
@@ -294,6 +299,10 @@
 		uiCustom,
 		uiModeSaving,
 		uiModeSaveError,
+		historyStripFields,
+		historyStripFieldsSaving,
+		historyStripFieldsSaveError,
+		onToggleHistoryStripField,
 		onSetUiMode,
 		onSetUiCustomItem,
 		userSettingsStatus,
@@ -1803,6 +1812,31 @@
 				{#if uiModeSaving}<div class="inline-message">{t().uiModeSaving}</div>{/if}
 				{#if uiModeSaveError}<div class="inline-message error-text">{t().uiModeSaveFailed}</div>{/if}
 			</div>
+			<!-- Two at most, and the unticked boxes go disabled at that point
+			     rather than the third click evicting an earlier choice: the
+			     reader can see why the box will not take, and the two they
+			     picked stay where they put them. -->
+			<div class="popover-group history-strip-fields">
+				<div class="popover-group-label">{t().historyStripFieldsLabel}</div>
+				<div class="db-test-result">{t().historyStripFieldsDescription}</div>
+				<div class="ui-custom-grid">
+					{#each HISTORY_STRIP_FIELDS as field (field)}
+						{@const checked = historyStripFields.includes(field)}
+						<label class="setting-toggle" class:unavailable={!checked && !canAddHistoryStripField(historyStripFields)}>
+							<input
+								type="checkbox"
+								{checked}
+								disabled={historyStripFieldsSaving || (!checked && !canAddHistoryStripField(historyStripFields))}
+								onchange={() => onToggleHistoryStripField(field)}
+							/>
+							<span>{field === 'generation' ? t().historyStripFieldGeneration : field === 'model' ? t().historyStripFieldModel : field === 'engine_version' ? t().historyStripFieldEngineVersion : t().historyStripFieldBytes}</span>
+						</label>
+					{/each}
+				</div>
+				{#if !canAddHistoryStripField(historyStripFields)}<div class="db-test-result">{t().historyStripFieldsFull}</div>{/if}
+				{#if historyStripFieldsSaving}<div class="inline-message">{t().uiModeSaving}</div>{/if}
+				{#if historyStripFieldsSaveError}<div class="inline-message error-text">{t().historyStripFieldsSaveFailed}</div>{/if}
+			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsMascotLabel}</div>
 				<div class="settings-radio-set">
@@ -3171,6 +3205,10 @@
 	.ui-mode-options small { color: var(--fg3); font-size: 11px; font-weight: 400; }
 	.ui-custom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin-top: 8px; }
 	@media (max-width: 720px) { .ui-custom-grid { grid-template-columns: 1fr; } }
+	/* A box that cannot be ticked because two already are. Dimmed rather than
+	   hidden: the fourth choice stays legible, and what is missing is the room
+	   for it, not the option. */
+	.history-strip-fields .setting-toggle.unavailable { color: var(--fg3); cursor: default; }
 
 	.settings-radio-set {
 		display: flex;

@@ -480,13 +480,21 @@
 	}
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
-	.tab-label { line-height: 1; }
+	/* Neither half of a running tab may break across lines. The tab is a third
+	   of the row and the counter reserves its widest form beside the word, which
+	   left the word too little room: 「バッチ」 broke between its characters and
+	   the tab grew a line. Measured at a 1235px window -- (12/12 ↻2) made the
+	   tab 46px instead of 38, and (120/120 ↻2) made it 58 with the word on
+	   three lines. Neither string can break here, so neither does. */
+	.tab-label { line-height: 1; white-space: nowrap; }
 	.tab-progress {
 		line-height: 1;
 		font-size: 11px;
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
 		text-align: center;
+		/* The retry form carries a space, which is a break opportunity. */
+		white-space: nowrap;
 	}
 	.tab-running-dot {
 		width: 6px;

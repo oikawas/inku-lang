@@ -50,7 +50,15 @@ CHANGED_SCHEMAS = {
     # it resolved to. `auto` reads each description anew, so the resolved id
     # cannot say whether the author chose a catalog or let the server read the
     # words -- which is what the batch resume needs to put back.
-    "HistoryItem": {"added": {"catalog_mode"}, "removed": set()},
+    # 2026-08-17: the strip prints a work's file size, and the listing that
+    # fills it asks for `include_svg=false` -- so the weight has to ride
+    # separately from the picture it is the weight of.
+    "HistoryItem": {"added": {"catalog_mode", "svg_bytes"}, "removed": set()},
+    # 2026-08-17: the reader chooses which two facts the history strip prints
+    # under each thumbnail. It is an account setting, so it rides on the account
+    # it belongs to and on the PATCH that changes it.
+    "UserAccountItem": {"added": {"history_strip_fields"}, "removed": set()},
+    "UserSettingsBody": {"added": {"history_strip_fields"}, "removed": set()},
     "HistoryPostBody": {"added": {"catalog_mode"}, "removed": set()},
     # v2.14: whether a plugin expands is decided by prose. A work authored
     # straight in DDL has no description and must not be given one to make one

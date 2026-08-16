@@ -466,6 +466,14 @@ export interface LangPack {
 	uiModeResetSimple: string;
 	uiModeSaving: string;
 	uiModeSaveFailed: string;
+	historyStripFieldsLabel: string;
+	historyStripFieldsDescription: string;
+	historyStripFieldsFull: string;
+	historyStripFieldGeneration: string;
+	historyStripFieldModel: string;
+	historyStripFieldEngineVersion: string;
+	historyStripFieldBytes: string;
+	historyStripFieldsSaveFailed: string;
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
 	settingsTabLimits: string;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { placeholderMotifTransform } from '$lib/canvas-placeholder';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -13,6 +13,8 @@
 	import VariationLanes from './VariationLanes.svelte';
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { measureSvgWeight } from '$lib/svgWeight';
+	import { formatByteSize, groupDigits } from '$lib/formatNumber';
+	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -376,8 +378,36 @@
 	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
-	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
+	let generationInfoTab = $state<DrawerTab>('details');
 	let generationInfoEl = $state<HTMLElement | null>(null);
+	// The pane that scrolls, which is a different element per tab: the details
+	// list is this component's, the other two belong to OutputTabsContent and
+	// only one of them exists at a time.
+	let detailsScrollEl = $state<HTMLElement | null>(null);
+	let tabsScrollEl = $state<HTMLElement | null>(null);
+	let drawerScrollMemory = $state(emptyDrawerScrollMemory());
+	const drawerScroller = (): HTMLElement | null =>
+		generationInfoTab === 'details' ? detailsScrollEl : tabsScrollEl;
+
+	// Every path that closes the drawer goes through here, or the one that does
+	// not would be the one that forgets: there are four (the close button, the
+	// toggle, Escape, and a press outside).
+	function closeGenerationInfo(): void {
+		const pane = drawerScroller();
+		if (pane) drawerScrollMemory = rememberDrawerScroll(drawerScrollMemory, generationInfoTab, pane.scrollTop);
+		generationInfoOpen = false;
+	}
+
+	function openGenerationInfo(): void {
+		generationInfoOpen = true;
+		// After the pane is on screen: the contents may have been rebuilt while
+		// the drawer was away, and a scrollTop set against the old height would
+		// be clamped to it.
+		void tick().then(() => {
+			const pane = drawerScroller();
+			if (pane) pane.scrollTop = drawerScrollToRestore(drawerScrollMemory, generationInfoTab);
+		});
+	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
@@ -546,11 +576,6 @@
 	// rather than the `statusHistoryItem ?? result` shape the other rows use.
 	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
 	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
-	const formatBytes = (bytes: number | null) => {
-		if (bytes == null) return '-';
-		if (bytes < 1024) return `${bytes} B`;
-		return `${(bytes / 1024).toFixed(1)} KB`;
-	};
 	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
 	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
 	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
@@ -607,7 +632,7 @@
 	onkeydown={(event) => {
 		if (event.key !== 'Escape') return;
 		if (refineModalOpen) closeRefineModal();
-		else if (generationInfoOpen) generationInfoOpen = false;
+		else if (generationInfoOpen) closeGenerationInfo();
 		else if (presentationMode) closePresentationMode();
 	}}
 	onpointerdown={(event) => {
@@ -617,7 +642,7 @@
 		if (!target) return;
 		if (generationInfoEl?.contains(target)) return;
 		if (generationInfoToggleEl?.contains(target)) return;
-		generationInfoOpen = false;
+		closeGenerationInfo();
 	}}
 />
 
@@ -654,6 +679,12 @@
 				<span class="render-meta-item render-meta-canvas">
 					<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
 					<strong title={statusCanvasName}>{statusCanvasName}</strong>
+				</span>
+				<!-- The same measurement the drawer shows, formatted by the same
+				     function: one quantity, said in two places. -->
+				<span class="render-meta-item render-meta-svg-size">
+					<span class="render-meta-label">{isJapanese ? 'SVG \u30b5\u30a4\u30ba' : 'SVG size'}</span>
+					<strong>{formatByteSize(detailSvgBytes)}</strong>
 				</span>
 				<span class="render-meta-item render-meta-created">
 					<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>
@@ -1160,7 +1191,7 @@
 	>
 			<header class="generation-info-head">
 				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
-				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
+				<button type="button" class="generation-info-close" onclick={closeGenerationInfo} aria-label="Close">&times;</button>
 			</header>
 			<div class="generation-info-tabs" role="tablist">
 				<button type="button" role="tab" aria-selected={generationInfoTab === 'details'} class:active={generationInfoTab === 'details'} onclick={() => (generationInfoTab = 'details')}>{isJapanese ? '\u8a73\u7d30' : 'Details'}</button>
@@ -1172,7 +1203,7 @@
 					{#snippet term(label: string, hint: string)}
 						<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 					{/snippet}
-					<div class="generation-details">
+					<div class="generation-details" bind:this={detailsScrollEl}>
 						{#if hasSketchDetails}
 							<section class="detail-group">
 								<h4>{t().sketchLabel}</h4>
@@ -1232,9 +1263,9 @@
 								{/if}
 								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
 								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
-								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatBytes(detailSvgBytes)}</dd>
-								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight?.objects ?? '-'}</dd>
-								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight?.points ?? '-'}</dd>
+								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatByteSize(detailSvgBytes)}</dd>
+								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.objects) : '-'}</dd>
+								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.points) : '-'}</dd>
 							</dl>
 						</section>
 						<section class="detail-group">
@@ -1276,13 +1307,14 @@
 							<dl>
 								{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
 								{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
-								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
+								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn == null ? '-' : groupDigits(detailTokensIn)} / {detailTokensOut == null ? '-' : groupDigits(detailTokensOut)}</dd>
 								{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
 							</dl>
 						</section>
 					</div>
 				{:else}
 					<OutputTabsContent
+						bind:scrollEl={tabsScrollEl}
 						outputTab={generationInfoTab}
 						{promptsData}
 						{stage1PromptText}
@@ -1338,7 +1370,7 @@
 				class:active={generationInfoOpen}
 				disabled={!result && !allowEmptyOutputTabs}
 				aria-expanded={generationInfoOpen}
-				onclick={() => (generationInfoOpen = !generationInfoOpen)}
+				onclick={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
 			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</button>
 		</Tooltip>
 		<Tooltip placement="top" text={t().tooltipSaijikiToggle}>
@@ -1568,7 +1600,10 @@
 	.render-meta-model strong { max-width: 220px; }
 	.render-meta-catalog strong { max-width: 130px; }
 	.render-meta-canvas strong { max-width: 100px; }
-	.render-meta-created strong {
+	/* The two numeric items: never ellipsised, and set on the digit grid so a
+	   size and a timestamp do not jitter as the work on screen changes. */
+	.render-meta-created strong,
+	.render-meta-svg-size strong {
 		max-width: none;
 		font-variant-numeric: tabular-nums;
 	}

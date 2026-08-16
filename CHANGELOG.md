@@ -8044,3 +8044,68 @@ sketch default "fine" when nothing is stated) was withdrawn the same day.
   `catalog_mode` was declared there, and this round only added a word to it** (**the other 14
   declarations are all live**). **The same schema is held by two other guards, so no hole is open.**
 - **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).
+
+### Android — A shape that does not say where it is has no box (android `2.1.4-android.39`, 2026-08-17, ledger I-269)
+
+**Four branches of `ServerRendererGeometry.shapeBbox` answered with a box for input the server would
+have declined.** Every branch of the server's `_shape_bbox` is entered only when **both** of the
+fields that place the shape are stated; when either is missing the branch is declined and the walk
+falls through to `return None`. **The port filled the missing field in with a default (`0.5`,
+`0.12`, `0.38`, `0.24` and others) and returned a rectangle.** This round made those four branches
+read one-for-one with the server.
+
+- **The four branches:** `circle` (`center` and `radius`), `ellipse` (`center` and `size`),
+  `square` / `triangle` (`position` and `size`), `polygon` (`center` and `radius`).
+  **`cloudform` was already correct, so its expression was not touched.**
+- **Both of the polygon's substitutions were dropped:** the port built a centre out of `position` +
+  `size` when `center` was absent, and a radius out of `size` when `radius` was absent. **The server
+  builds neither**, so both are gone. **A polygon that states `position` and `size` still has no box
+  unless it states `center` and `radius`.**
+- **Not a falsy test:** array fields are read with `optJSONArray(...) == null` and the number with
+  `isNull("radius")`. **A `center` of `[0, 0]` and a `radius` of `0` are both stated** — the same
+  judgement as the server's `is not None`.
+- **⚠⚠ What the contract assumed turned out to be false when measured:** the contract said the
+  difference between `null` and "a rectangle filled in with defaults" is the difference between
+  drawing a surface and drawing none. **It is not.** The surface layer `renderSurfaceVectors` calls
+  `surfaceContour` (`DefaultSvgRenderer.kt:1962`) before it reads the box, and **that gate demands
+  the same fields, written the same way, by hand.** When they are missing it returns `null` and each
+  texture branch leaves first through `if (contour == null || contour.size < 3) return ""`.
+  **Measured: restoring the `circle` branch to its old shape and drawing the same score leaves the
+  SVG at 11,792 bytes, not one byte different** (zero surface lines either way). **The box gate was
+  never binding, and no shape missing a field has ever been given a surface.** **What was fixed is
+  the answer this function returns, not a mark on the paper.**
+- **⚠ So this round cannot claim that surfaces are now drawn differently.** The same judgement now
+  sits in two places, hand-copied, with only one of them live. **Whether to fold one away or to hold
+  the two to the same answer with a gate is a ruling, and it was filed** (unnumbered).
+- **Six gates (T-182..T-187):** for each of the four branches, the paired claim that a missing field
+  means no box and a stated pair means a box (T-182..T-185); that a boxless shape gets no surface
+  (T-186); and **that a shape which does state its box keeps the box it had** (T-187 — the four
+  numbers of each branch's box written on the test side and compared on two sheets). **None of them
+  read the frozen corpus** (its 51 sheets carry zero cases with a missing field).
+- **⚠ Three of the seven perturbations missed their prediction:** P-1 / P-2 / P-3 predicted T-186
+  would redden alongside; **only the branch's own gate did.** The reason is the duplication above —
+  restoring the box changes nothing because `surfaceContour` declines first. **T-186 was not
+  removed** (its claim is true and its control does work), **but its lack of discriminating power is
+  now written into its KDoc with the measurement.** **The five gates actually holding this change
+  are T-182..T-185 and T-187.** The miss is of the type "failing to count what a test reads" — the
+  same type as the previous round's, missed here two rounds running. **P-4 and P-5 restored the
+  polygon's two substitutions separately and each reddened T-185 on its own. P-6 reddened only the
+  existing T-87**, showing this round did not touch `cloudform`.
+- **The full suite went 364 → 370 (+6):** **on the merged tree, XML 63 / tests 370 / failures 0 /
+  errors 0 / skipped 0**, and `test_android_reference_fixtures_are_current.py` **4 passed**. **No
+  difference from the prediction frozen before the first line was written.**
+- **Five comment lines above the `cloudform` branch are gone** — their content ("the server demands
+  both and answers `None` when either is missing") **now describes all five branches**, so it moved
+  to the function's docstring. **No expression, condition or default in that branch changed** (T-87
+  reddens under P-6 and nowhere else).
+- **⚠ The acceptance side took the frozen prediction out of the public tree** — the implementation
+  had committed one prediction file to the branch under `android/`, but **all twenty frozen
+  predictions live in the overlay**, so the file was copied to the overlay's contract directory
+  (md5 verified) and deleted here. **The freeze itself is
+  held by commit `593f90a6` (07:46:28), two minutes and forty-six seconds ahead of the first product
+  commit `334f6399` (07:49:14).**
+- **Two ledger entries filed (both unnumbered):** (1) the server refuses an instruction missing a
+  field with `ValueError` across seven primitives while the port draws it with defaults — **this
+  round fixed only the surface gate, so a middle state remains where the shape is drawn and the
+  surface is not**; (2) the duplicated gate above. **Both await a ruling.**
+- **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).

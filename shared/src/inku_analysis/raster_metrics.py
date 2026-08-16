@@ -63,8 +63,12 @@ def measure_png(path: Path) -> dict[str, Any]:
     # `getdata()` is deprecated in Pillow 12.3 and goes away in Pillow 14, and a
     # per-pixel Python loop over a 1618x1618 raster is 2.6M iterations. The raw
     # RGB bytes fold into a colour histogram instead, and the arithmetic below
-    # runs once per distinct colour rather than once per pixel. Verified equal to
-    # `vision_metrics.measure` on every fixed material and on 10 sampled works.
+    # runs once per distinct colour rather than once per pixel. Checked against
+    # `vision_metrics.measure` with its halving line removed: the four fixed
+    # materials agree exactly, and ten full-size works of run 851 agree on the
+    # ground and to within 1.42e-12 on the rest -- the rounding of a folded sum
+    # against a per-pixel one, which is a different addition order, not a
+    # different quantity.
     data = img.tobytes()
     counts = Counter(zip(data[0::3], data[1::3], data[2::3]))
     # The ground is the modal colour, ties going to the one seen first -- which

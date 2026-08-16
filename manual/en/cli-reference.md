@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.13.29 (Web Build 916).
+It covers inku v2.13.30 (Web Build 917).
 
 ## Basics
 
@@ -30,6 +30,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | unread-words | Show the user's ledger; administrators may use --all |
 | contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts |
 | rasterize | Burn a folder of SVGs to PNG, one child process per file; `--workers` sets how many run at once |
+| measure-raster | Count the raster measurements of a folder of PNGs (pixel count, ground color, the share of faint and strong marks, mean distance from the ground, saturated marks). **It counts the image it was handed, at the width it was handed, and declares no width or scale flag.** To read a record at another width, burn at that width with `rasterize --width` and count the result. It never contacts a server |
 | vision-review | Run the configured vision model as a read-only mirror |
 | plugin | List, validate, and reload declarative DDL plugins |
 | reference | Dump the implementation vocabulary and constant tables, read-only |
@@ -45,6 +46,7 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 ### Input and output
 
 JSON artifacts record the version of the DDL layer that drew the work in `ddl_version` and `ddl_engine_version`.
+For limits they record the values used in `render_limits`, where those came from in `render_limits_source` (`work` for the work's own row, `settings` for today's settings, `work_unrecorded` for a row that recorded no limits), and the notes of the limits that took effect in `render_limit_notes`.
 
 | Flag | Contents |
 |---|---|
@@ -87,7 +89,7 @@ JSON artifacts record the version of the DDL layer that drew the work in `ddl_ve
 | `--color-catalog ID` | Server color catalog id |
 | `--catalog-id ID` | Legacy alias for `--color-catalog` |
 | `--catalog-mode {fixed,auto,random}` | `fixed` uses `--color-catalog`, `auto` lets the server read the description and pick, `random` draws one other than `--color-catalog` |
-| `--from-work WORK_ID` | `render-score` only. **Draws in the colors that work was drawn in** — the colors recorded on the work's own row, not today's definition of its catalog. **A work whose catalog was renamed or retired still draws.** Cannot be combined with `--color-catalog` / `--catalog-id` |
+| `--from-work WORK_ID` | `render-score` only. **Draws in the colors and under the limits that work was drawn in** — the values recorded on the work's own row, not today's definition of its catalog and not today's settings. **A work whose catalog was renamed or retired still draws.** Cannot be combined with `--color-catalog` / `--catalog-id` |
 | `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | Canvas aspect ratio |
 
 ### Seeds and replay
@@ -98,6 +100,7 @@ JSON artifacts record the version of the DDL layer that drew the work in `ddl_ve
 | `--composition-seed SEED` | Seed for where the marks are placed. Without it the placement follows `--render-seed` (render engine 23 onwards) |
 | `--seed-text TEXT` | Text used only to derive the performance seed; the counterpart of `Another performance` in the Web UI |
 | `--interpretation-seed ID` | Ask Stage 1 for an explicit re-interpretation under this identifier instead of reusing the previous reading |
+| `--limits KEY=VALUE ...` | On `paint` and `render-score`, set limits for this one drawing. **It can only lower them** — each element is taken as the smaller of the given value and the server's current setting, so an administrator's ceiling cannot be exceeded. Without the flag the key is not sent at all (an empty setting reads as a declaration to override, not as leaving things alone) |
 
 ### Models and language
 

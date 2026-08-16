@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.30 unreleased baseline (Web Build 917)
+
+Updated the thirteen places that name a version to v2.13.30 / Build 917. **How the limits take effect, and the path that counts rasters, were written in.**
+
+- **When a work is redrawn, the limits it was drawn under are the ones that apply.** Today's settings are used only for an older work whose row recorded no limits; lowering the settings does not change a work already painted. **Written into `Image Creation` §18 and `Server Configuration` §5.1.**
+- **When a limit takes effect and drops marks, it says under the drawing which limit did it, by name.** It appears in the same place as the plugin warnings.
+- **The CLI gained `--limits KEY=VALUE`** (on `paint` and `render-score`). **It can only lower a limit.**
+- **The CLI gained `measure-raster`**, which counts the raster measurements of a folder of PNGs. **It counts the image it was handed, at the width it was handed, and declares no width or scale flag.** To read at another width, burn at that width with `rasterize --width` first.
+- **`render_limits_source` and `render_limit_notes` in the JSON artifacts are now documented in the `inku-cli Reference`.**
+
 ## 2026-08-16 — v2.13.29 unreleased baseline (Web Build 916)
 
 Updated the thirteen places that name a version to v2.13.29 / Build 916. **The canvas controls moved.**

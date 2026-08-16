@@ -2307,7 +2307,11 @@ threshold of its configuration** — at the defaults, "two hundred thirty-three
 lines" draws 233 lines. **The threshold is a limit setting: move it and the band
 that is drawn as stated moves with it. Which values a work was drawn under is
 recorded on the work** (`history.render_limits`), so the configuration carries
-reproducibility on the same footing as the version.
+reproducibility on the same footing as the version. **A redraw runs under the
+values recorded on the work, and falls back to today's settings only when the row
+recorded none; the answer names which of the two it used** (v2.13.30). A request
+may lower a limit for a single drawing but never raise one — every element is
+bounded against the settings in force.
 
 **A stated count is drawn as stated even when the wording is not "only" or
 "alone" (v2.11.20, ddl-engine 11; the band was widened in v2.12.1, ddl-engine

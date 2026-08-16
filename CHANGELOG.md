@@ -7425,3 +7425,83 @@ between them belongs inside the door rather than in front of it).
   was to move on without looking. **What most wants an eye is how the nine icons sit in the
   corners**: their size was estimated by arithmetic, and the real window widths and the dark/light
   rendering were not measured.
+
+### v2.13.30 — A work redraws under the limits it was drawn under, and the ruler does not shrink what it was given (Build 917, 2026-08-16, ledger I-154 and I-155)
+
+**Redrawing the same work cut it against today's settings.**
+The work's row records the limits it was drawn under, and **nothing that read the row back ever used
+them** — on an installation whose settings were lowered, last year's work came out different every
+time it was opened. **A redraw now runs under the limits the work was drawn under.**
+
+- **The answer says which numbers drew it** — responses carry **`render_limits_source`**, one of
+  **`work`** (off the work's own row), **`settings`** (today's) and **`work_unrecorded`** (a row
+  exists but recorded no limits). **`/api/render-svg` has no body to put it in, so it says the same
+  thing in an `X-Inku-Limits-Source` header.**
+  **⚠ The third value exists so that an old row with no record does not wear the same face as
+  "drawn under the settings".**
+- **A request may now carry `limits`** (`paint`, `render-svg`, `render-score`). **Each element is
+  `min`-ed against today's settings** — **it cannot raise anything.** The ceiling belongs to the
+  administrator, not to the caller placing the order.
+- **Each of the nine limits names itself when it takes effect** — every note now begins with the
+  limit's name (`represented_count_max: 600 drawn as 120`), **one line per limit at most.**
+  **The web and the CLI read the notes now**: they were already in the answer and **neither side
+  looked at them.** **The wording stays English and only the heading is translated**, following
+  what `plugin_warnings` already does.
+- **⚠ By construction the default path does not move a single pixel** — the strings written into a
+  Score's `note` field are byte for byte what they were, and **the name was prefixed only on the
+  copy that is pushed onto the list.** All five reference corpora stayed green and **nothing had to
+  be rebaked.**
+- **The plugin budget follows the setting** — until now it ran at the shipping number whatever the
+  administrator had configured, **and wrote that number into its warning.**
+- **⚠ The repair path's scatter-density budget ignored the setting and ran at 240** (the shipping
+  value of `max_expanded_per_instruction`). **The effective limits are now threaded through it. At
+  the default settings not one bit changes; on an installation that changed the setting, the
+  behaviour does.** This is a **fourth** hard-coded value, distinct from the three found earlier,
+  and it is filed as [I-281].
+- **The three frozen API-surface guards were told, by name, which key each of six schemas gained**
+  (**not a blank cheque** — the declared key is taken back out before hashing, so **a second key
+  arriving in any of them is still red**).
+- **Acceptance is `T-95`–`T-108`, 14 tests**, and **14 perturbations** (the contract's 13 plus one
+  the implementing session added to hit the positive claim). **17 predicted items against 29
+  measured** — the three misses all under-counted how many faces would redden.
+
+**And a second ruler was shrinking what it was given.**
+The per-round tool of the drawing-quality track **halved the image before it began counting** —
+**burned at 1618px, it effectively measured 809px**, and **only the table's heading followed the
+ruling that says measure at full size.**
+
+- **The counting rule now lives in one place under `shared/`** — `measure_png` / `measure_dir`.
+  **It never shrinks** (no `resize`, `thumbnail` or `reduce` anywhere) and **folds the pixels into a
+  colour histogram first**, so it does not walk pixel by pixel.
+- **`inku-cli measure-raster --in <PNGDIR> [--out <JSON>]` was added.**
+  **It declares no width or scale flag at all** — **the width is decided by the burning step
+  (`rasterize --width`), not by the counting step** — and **the absence is held by acceptance**
+  (the declared flags are exactly four). **It takes no server flags either**: counting pixels needs
+  no API.
+- **The agreement with the old implementation was measured here** — **the four fixed materials match
+  exactly**, and on **ten full-size works `ground` matches exactly with the other seven quantities
+  within 1.42e-12** (the rounding of a differently ordered sum).
+  **⚠ Shrinking has no single direction**: among those same ten, `strong` rose in one and fell in
+  another.
+- **`shared/pyproject.toml` now declares `pillow>=12.3.0`** — it had been working as a side effect
+  of an editable install rather than because anything declared it.
+- **Acceptance is `T-109`–`T-120`, 12 tests**, and **12 perturbations** (the contract's 11 plus one).
+  **⚠ One perturbation was a miss** (moving a threshold from 24 to 25 changes nothing when no pixel
+  in the materials falls between them). **To separate "never wired" from "the material never
+  crosses that boundary", a 24 → 300 perturbation was added** — four tests reddened, so the
+  threshold does run through the product's decision.
+- **⚠ This tool exists to fix an evaluation document that is not in this repository, and no
+  acceptance can be placed there.** **That new rounds no longer call the old tool is, for now, held
+  only by that document.**
+
+- **Both were merged into one version** (both branched from the same commit). **There was exactly
+  one conflict** — both had appended to the end of the same test file — **and both sides were
+  kept.** **The CLI manual was regenerated on the second merge** (59 paths, none written by hand).
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3,300 passed
+  / 31 skipped**, **cli 235 passed**, **web 427 pass / 0 fail**, **`check` 266 FILES 0 ERRORS 2
+  WARNINGS** (the two are the pre-existing a11y ones), **`lint:i18n` 1,067 English strings / 0
+  errors**, **`lint:models` 68 checks**, **ruff clean on server and cli**, **frozen corpora
+  byte-identical**. **Every increment was attributed one by one** — **server +29** (10 and 19),
+  **cli +8** (3 and 5), **web +5**, **English strings +1**.
+- **⚠ GitHub CI was not waited for** (author's ruling: the push ends the round, and CI is not part
+  of it).

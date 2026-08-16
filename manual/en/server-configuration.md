@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.29 (Web Build 916). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.30 (Web Build 917). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -225,6 +225,10 @@ Nine numbers decide how many marks one work may hold. They are not a speed contr
 | | `schema_count_max` | 2000 | A count returned by Stage 2 above this is trimmed |
 
 Mutually inconsistent values are rounded rather than rejected — if the representation ceiling exceeds the literal threshold, it is lowered to that threshold. What the admin UI shows is the rounded, effective value.
+
+**When a work is redrawn, the values recorded on its own row are the ones that apply** (v2.13.30). Lowering the settings does not change a work already painted: it comes out at the numbers it was painted under. Today's settings are used only for an older work that recorded none, and **the answer names which of the two drew it** (`render_limits_source` = `work` / `settings` / `work_unrecorded`). **A caller may lower a value for one drawing but never raise one** — each element is taken as the smaller of the two.
+
+**When a limit takes effect and drops marks, the record says which limit did it, by name** (`render_limit_notes`, one line per limit).
 
 **The limits are constant guards for stability, data size, and device performance.** They exist neither to add what the description does not ask for nor to remove what it does.
 

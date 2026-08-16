@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.13.29（Web Build 916）です。
+対象はinku v2.13.30（Web Build 917）です。
 
 ## 基本操作
 
@@ -30,6 +30,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | unread-words | 本人の未読語台帳。管理者は --all で全体集計 |
 | contact-sheet / analyze / ddl-compare | ローカル成果物の比較・解析 |
 | rasterize | SVGのフォルダをPNGへ焼く。1ファイル1子プロセスで、`--workers` で同時に走らせる本数を決める |
+| measure-raster | PNGのフォルダの判定量（画素数・地の色・薄い痕と濃い痕の割合・地からの平均距離・彩度のある痕）を数える。**渡された画像をその幅のまま数え、幅や尺度の旗を持たない。**別の幅で読み直したいときは`rasterize --width`でその幅に焼いてから数える。サーバーには繋がない |
 | vision-review | 設定済みvision modelによる読み取り専用評価 |
 | plugin | 宣言的DDLプラグインの一覧、検証、再読込 |
 | reference | 実装内の語彙・定数テーブルの読み取り専用ダンプ |
@@ -45,6 +46,7 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 ### 入力と出力
 
 JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_engine_version` に記録します。
+制限値については、使われた値を `render_limits`、その出どころを `render_limits_source`（`work`＝作品の行、`settings`＝今日の設定、`work_unrecorded`＝行はあるが制限値が記録されていない）、効いた上限の痕を `render_limit_notes` に記録します。
 
 | 旗 | 内容 |
 |---|---|
@@ -87,7 +89,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--color-catalog ID` | サーバーの色カタログID |
 | `--catalog-id ID` | `--color-catalog` の旧名 |
 | `--catalog-mode {fixed,auto,random}` | `fixed` は `--color-catalog` を使う、`auto` はサーバーが記述を読んで選ぶ、`random` は `--color-catalog` 以外から引く |
-| `--from-work WORK_ID` | `render-score` 専用。**その作品が描かれた当時の色で描く**（カタログの今日の定義ではなく、作品の行に記録された色を使う）。**改名・引退したカタログの作品も描ける。**`--color-catalog` / `--catalog-id` とは併用できない |
+| `--from-work WORK_ID` | `render-score` 専用。**その作品が描かれた当時の色と制限値で描く**（カタログの今日の定義でも今日の設定でもなく、作品の行に記録された値を使う）。**改名・引退したカタログの作品も描ける。**`--color-catalog` / `--catalog-id` とは併用できない |
 | `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | キャンバスの比率 |
 
 ### seed と再現
@@ -98,6 +100,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--composition-seed SEED` | 墨を置く位置のseed。省略すると配置は`--render-seed`に従う（render engine 23〜） |
 | `--seed-text TEXT` | 演奏のseedだけを導く文字列（Web UIの「言葉でタッチを変える」に相当） |
 | `--interpretation-seed ID` | 前の読み取りを使い回さず、この識別子でStage 1へ明示的な読み直しを求める |
+| `--limits KEY=VALUE ...` | `paint` と `render-score` で、その1枚だけ制限値を指定する。**下げることしかできません** —— 要素ごとにサーバーの現行設定と小さいほうが採られるので、管理者の上限を越えられません。旗を書かなければ鍵ごと送りません（空の指定は「何も上書きしない」ではなく上書きの宣言になるため） |
 
 ### モデルと言語
 

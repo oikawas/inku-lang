@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.29 / Build 916**
+**Target version: v2.13.30 / Build 917**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -72,6 +72,10 @@ JSON Score keys remain English.
 It must not inject a house style; invalid optional data should prefer drop-only handling.
 - The same Score and seed reproduce the same work.
 Do not add implicit time seeds or automatic variation counters.
+- A redraw runs under the limits the work was drawn under.
+Today's settings are used only for a work whose row recorded no limits, and the answer says which of the two drew it.
+A request may lower a limit but never raise one.
+The ceiling belongs to the administrator, not to the caller placing the order.
 - Keep `dh1` description identity, `rh3` work-edition identity (legacy `rh2` values are retained), history IDs, and lineage node IDs distinct.
 - Lineage records explicit derivation operations only.
 Never infer parentage from similarity, time, or matching hashes.
@@ -308,6 +312,9 @@ not import server internals.
 When a flag does not exist yet, it is implemented in the CLI first and tested there.
 **An unnamed key is not an error — it is filled with a default — so request fields are counted per
 sender** (`server/tests/test_cli_sender_census.py`).
+**The path that counts raster measurements counts the image it was handed, at the width it was
+handed.** The width is decided by the burning step, not the counting step, so that path declares no
+width or scale flag.
 
 ### android
 

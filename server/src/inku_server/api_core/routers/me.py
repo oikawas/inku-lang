@@ -28,6 +28,7 @@ class UserSettingsBody(BaseModel):
     download_folder_name: str | None = None
     settings_tab: str | None = None
     model_settings: dict | None = None
+    history_strip_fields: list[str] | None = None
 
 
 class BatchPromptHistoryBody(BaseModel):
@@ -105,6 +106,7 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
             download_folder_name=body.download_folder_name,
             settings_tab=body.settings_tab,
             model_settings=body.model_settings,
+            history_strip_fields=body.history_strip_fields,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

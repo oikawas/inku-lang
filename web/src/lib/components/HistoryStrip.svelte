@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import { measureSvgWeight } from '$lib/svgWeight';
+	import type { HistoryStripField } from '$lib/historyStripFields';
 
 	type HistoryItem = {
 		id?: string;
@@ -63,6 +65,8 @@
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
 		developerMode: boolean;
+		/** Up to two, in the order they are declared. Empty means pictures only. */
+		historyStripFields: HistoryStripField[];
 	};
 
 	let {
@@ -96,7 +100,8 @@
 		formatHistoryDate,
 		catalogName,
 		isJapanese,
-		developerMode
+		developerMode,
+		historyStripFields
 	}: Props = $props();
 
 	let historyCollapsed = $state(false);
@@ -104,6 +109,34 @@
 	function lineageGenerationLabel(item: HistoryItem): string {
 		if (!item.lineage_generation) return isJapanese ? '独立作品' : 'Standalone';
 		return isJapanese ? `第${item.lineage_generation}世代` : `Gen. ${item.lineage_generation}`;
+	}
+
+	/** The stored drawing's own size, as the file the reader would export. */
+	function fileSizeLabel(item: HistoryItem): string {
+		const bytes = measureSvgWeight(item.svg || '').bytes;
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	/** What one chosen field says about one work, and what the hover shows.
+	 *
+	 *  The full form is separate because two of the four are cut short on the
+	 *  tile: the model id is long and the strip is a thumbnail wide. */
+	function stripFieldText(field: HistoryStripField, item: HistoryItem): { short: string; full: string } {
+		if (field === 'generation') {
+			const label = lineageGenerationLabel(item);
+			return { short: label, full: label };
+		}
+		if (field === 'model') {
+			return { short: historyModelStage1Short(item), full: historyModelStage1Full(item) };
+		}
+		if (field === 'engine_version') {
+			const version = item.render_engine_version || t().historyVersionNotRecorded;
+			return { short: version, full: version };
+		}
+		const size = fileSizeLabel(item);
+		return { short: size, full: size };
 	}
 
 	function lineageStateLabel(item: HistoryItem): string {
@@ -201,10 +234,17 @@
 							title={it.starred ? t().starOn : t().starOff}
 							aria-label={it.starred ? t().starOn : t().starOff}
 						>★</button>
-						<div class="thumb-meta">
-							<span class="thumb-generation">{lineageGenerationLabel(it)}</span>
-							<span class="thumb-model" title={historyModelStage1Full(it)}>{historyModelStage1Short(it)}</span>
-						</div>
+						<!-- Nothing at all when nothing was chosen: an empty row
+						     would still take its height and leave a gap under
+						     every picture. -->
+						{#if historyStripFields.length > 0}
+							<div class="thumb-meta">
+								{#each historyStripFields as field, index (field)}
+									{@const text = stripFieldText(field, it)}
+									<span class={index === 0 ? 'thumb-meta-first' : 'thumb-meta-second'} title={text.full}>{text.short}</span>
+								{/each}
+							</div>
+						{/if}
 						{#if i === historyCursor}
 							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
 						{/if}
@@ -415,8 +455,11 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	.thumb-generation { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; }
-	.thumb-model { font-size: 9px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	/* The first line reads as the heading of the tile and the second as its
+	   footnote, whichever two facts are in them -- the weight belongs to the
+	   position, not to the fact that used to sit there. */
+	.thumb-meta-first { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-second { font-size: 9px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

@@ -123,6 +123,10 @@ class UserAccountItem(BaseModel):
     ui_theme: str = "dark"
     ui_mode: str = "simple"
     ui_custom: dict[str, bool] = Field(default_factory=dict)
+    # What the history strip prints under each thumbnail. The default matches
+    # what it printed before it could be asked; an empty list means the reader
+    # asked for nothing, and is not the same as the field being absent.
+    history_strip_fields: list[str] = Field(default_factory=lambda: ["generation", "model"])
     tooltips_enabled: bool = True
     download_folder_enabled: bool = False
     download_folder_name: str | None = None

@@ -63,6 +63,7 @@ const RESTRICTED = [
 			'okugakiProgress', 'svgExportDisplayUse', 'svgExportEditableFeature', 'svgExportCompatFeature',
 			'provenanceLabelGeneration', 'provenanceHintGeneration', 'historyGenerationTitle',
 			'settingsDbBackupListGeneration', 'settingsDbBackupEstimatedDiskHint',
+			'historyStripFieldGeneration',
 		],
 		texts: [],
 	},

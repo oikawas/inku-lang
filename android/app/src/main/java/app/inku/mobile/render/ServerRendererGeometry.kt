@@ -18,6 +18,56 @@ internal object ServerRendererGeometry {
     /** Engine 21's pitch jitter, kept as the default `scanlineSegments` uses. */
     const val FILL_SPACING_JITTER: Double = 0.24
 
+    /**
+     * The shapes that have an interior, 1-to-1 with `CLOSED_SHAPES` in `schema.py`.
+     *
+     * `cloudform` belongs here: it is a closed contour like the other five, and the
+     * five-element sets scattered through [DefaultSvgRenderer] are about which
+     * primitives a particular branch draws, not about which ones have an inside.
+     * Copying one of those here would freeze that branch's list on the day it was
+     * copied -- the same reason the server keeps this set in one place.
+     */
+    val CLOSED_SHAPES: Set<String> = setOf("circle", "ellipse", "square", "triangle", "polygon", "cloudform")
+
+    /**
+     * `filled=true` and `surface.texture="solid"` are two ways of writing one request.
+     *
+     * Ported from `fill_is_asked_for` in `schema.py`, and kept in one place for the
+     * reason that docstring gives: a reader that holds its own copy freezes the day's
+     * judgement, and the same description written the other way then takes another
+     * road. The readers here are the renderer's own fill and coerce's tempering of a
+     * large filled shape.
+     */
+    fun fillIsAskedFor(ins: JSONObject): Boolean {
+        if (ins.optBoolean("filled", false)) return true
+        val surface = ins.optJSONObject("surface") ?: return false
+        return surface.optString("texture", "none") == "solid"
+    }
+
+    /**
+     * Whether `surface` carries the interior (closed shapes only; a line has none).
+     *
+     * `solid` does not count. It is the material's default fill rather than a
+     * printmaker's mark, and the layer that draws a surface does not put down a single
+     * stroke for it -- see [fillsInterior]. Ported from `_has_surface_texture`.
+     */
+    fun hasSurfaceTexture(ins: JSONObject): Boolean {
+        val surface = ins.optJSONObject("surface") ?: return false
+        val texture = surface.optString("texture", "none")
+        return texture != "none" && texture != "solid" && ins.optString("primitive", "line") in CLOSED_SHAPES
+    }
+
+    /**
+     * Whether the interior is filled. Ported from `_fills_interior`.
+     *
+     * A fill is the material's default way of covering an interior and a `surface`
+     * texture is an explicit print-making mark; the drawing never shows both.
+     */
+    fun fillsInterior(ins: JSONObject): Boolean {
+        if (hasSurfaceTexture(ins)) return false
+        return fillIsAskedFor(ins)
+    }
+
     fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale
 
     /**

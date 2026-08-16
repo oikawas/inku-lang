@@ -215,7 +215,14 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                    // The one decision, not a copy of it. Nothing in this branch reads the
+                    // value: the fill attribute below comes from `ServerRendererStyle.fill`,
+                    // which colours every closed shape whether or not it is filled, and
+                    // `renderBodyShape` -- the reader that would override it -- is only
+                    // called on the hand-stroke road. That divergence is its own matter
+                    // (reported this round); the expression itself must not be a second copy.
+                    @Suppress("UNUSED_VARIABLE")
+                    val regionFill = ServerRendererGeometry.fillsInterior(ins)
                     val base = if (needsPathVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
@@ -1710,6 +1717,14 @@ class DefaultSvgRenderer(
     // wrote onto an instruction changed the drawing. Mirrors _SEED_INSTRUCTION_FIELDS and
     // _SEED_ARRANGEMENT_FIELDS in renderer.py, in that order.
     private fun serverInstructionJson(ins: JSONObject): String {
+        // A fill written as `surface.texture="solid"` makes the same key as one written
+        // as `filled=true`: the two are one request, and one request must not perform two
+        // ways. Without this, the moment coerce derives a `surface` onto a saved work's
+        // `filled`, every stroke in it is re-rolled. `solid` is the material's default
+        // fill, so the surface layer consumes none of the remaining surface fields --
+        // they drop out of the key the way an unperformed field always does.
+        val surfaceObj = ins.optJSONObject("surface")
+        val solidSurface = surfaceObj != null && surfaceObj.optString("texture", "none") == "solid"
         return buildString {
             append("{")
             append("\"primitive\":"); append(jsonString(ins.optString("primitive", "line")))
@@ -1723,7 +1738,7 @@ class DefaultSvgRenderer(
             append(",\"angle_start\":"); append(numberOrNull(ins, "angle_start"))
             append(",\"angle_end\":"); append(numberOrNull(ins, "angle_end"))
             append(",\"rotation\":"); append(numberOrNull(ins, "rotation"))
-            append(",\"filled\":"); append(ins.optBoolean("filled", false))
+            append(",\"filled\":"); append(ins.optBoolean("filled", false) || solidSurface)
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
             append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
@@ -1735,7 +1750,7 @@ class DefaultSvgRenderer(
             }
             append(",\"variation\":"); append(variationJson(ins, ins.optJSONObject("variation")))
             append(",\"arrangement\":"); append(seedArrangementJson(ins.optJSONObject("arrangement")))
-            append(",\"surface\":"); append(surfaceJson(ins.optJSONObject("surface")))
+            append(",\"surface\":"); append(if (solidSurface) "null" else surfaceJson(surfaceObj))
             append("}")
         }
     }
@@ -2436,7 +2451,7 @@ class DefaultSvgRenderer(
         wild: Boolean = false,
         instructionSeed: Any? = null
     ): Pair<String?, Boolean> {
-        val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+        val regionFill = ServerRendererGeometry.fillsInterior(ins)
         if (!regionFill) return null to false
         val weight = ins.optString("weight", "pen")
         if (!usesHandStroke(weight)) return null to true

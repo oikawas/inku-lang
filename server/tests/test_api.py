@@ -172,8 +172,9 @@ def test_info_reads_current_render_engine_at_request_time(monkeypatch):
     assert r.json()["render_engine_version"] == "test-version"
 
 
-def test_color_catalogs_are_served_by_api():
-    r = client.get("/api/color-catalogs")
+def test_color_catalogs_are_served_by_api(auth_context):
+    headers, _user, _group = auth_context
+    r = client.get("/api/color-catalogs", headers=headers)
     assert r.status_code == 200
     data = r.json()
     assert data["default_catalog_id"] == "default"

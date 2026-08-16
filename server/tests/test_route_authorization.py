@@ -12,19 +12,25 @@ Enumerate through `iter_route_contexts`, not `app.routes` directly: fastapi
 enumerates zero routes stays green while checking nothing.
 """
 
+import pathlib
+import re
+
+import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
 
 from inku_server.api import app
 
 GUARDS = {"_current_user", "_admin_user", "_user_manager", "_session_token"}
 
+# I-086: the reason each entry gives has to be one that was measured. The list
+# used to say /api/color-catalogs was "needed to render the login screen"; the
+# login screen was then measured and receives no catalog at all, so what kept
+# the route public was the startup fetch running before anyone had logged in.
+# What is left is only what logging in genuinely needs.
 PUBLIC = {  # every entry needs a reason
-    "/health",  # liveness probe, no data
-    "/api/info",  # build/version banner shown before login
-    "/api/color-catalogs",  # catalog list, needed to render the login screen
-    "/api/auth/config",  # tells the client whether login is required at all
+    "/health",  # container liveness probe, returns no data
+    "/api/info",  # build/version and developer_mode, read by the login screen
     "/api/auth/login",  # the login endpoint itself
-    "/api/prompts",  # ledger I-086: keeping it public is still undecided
 }
 
 # The count is part of the contract: a split that loses an endpoint is a
@@ -135,3 +141,28 @@ def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
         ("plugins.py", "api_plugins_reload", "_admin_user"),
         ("plugins.py", "api_plugins_validate", "_admin_user"),
     }
+
+
+# T-89: the published architecture note spells the allowlist out by hand, in two
+# languages. A hand-copied list is a copy that goes stale the day the list moves
+# -- and a reader who trusts it is told a route is public when it is not. Both
+# files are read here so neither half can drift alone.
+_DOCS = pathlib.Path(__file__).parents[2] / "docs" / "architecture"
+_ALLOWLIST_DOCS = ("server-components.ja.md", "server-components.md")
+
+
+def _documented_public_paths(text: str) -> set[str]:
+    """Every `/...` path in the sentence that names the allowlist."""
+    sentence = next(
+        line for line in text.splitlines() if "test_route_authorization.py" in line
+    )
+    return set(re.findall(r"`(/[a-z0-9/_-]+)`", sentence))
+
+
+@pytest.mark.skipif(not _DOCS.is_dir(), reason="docs/ is absent from this checkout")
+@pytest.mark.parametrize("name", _ALLOWLIST_DOCS)
+def test_the_published_allowlist_matches_the_one_the_gate_uses(name) -> None:
+    documented = _documented_public_paths((_DOCS / name).read_text(encoding="utf-8"))
+    assert documented == PUBLIC, (
+        f"{name} lists {sorted(documented)}; the gate holds {sorted(PUBLIC)}"
+    )

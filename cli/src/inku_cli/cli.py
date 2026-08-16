@@ -383,7 +383,7 @@ def _render_color_map(catalog: dict[str, Any]) -> dict[str, str]:
     return color_map
 
 def _fetch_color_catalogs(client: ApiClient) -> dict[str, Any]:
-    data, _ = client.request("GET", "/api/color-catalogs", auth=False)
+    data, _ = client.request("GET", "/api/color-catalogs")
     catalogs = data.get("catalogs")
     if not isinstance(catalogs, list):
         raise CliError("server returned invalid color catalog list")

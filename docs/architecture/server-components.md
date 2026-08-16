@@ -96,7 +96,7 @@ flowchart LR
 | `render` | 8 | Variation, compose, interpret, render, Paint, vision | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 
-Total: 82. The six-path public allowlist is `/health`, `/api/info`, `/api/color-catalogs`, `/api/auth/config`, `/api/auth/login`, and `/api/prompts` (`test_route_authorization.py`).
+Total: 82. The three-path public allowlist is `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The rule is that nothing logging in does not need stays on it.
 
 ## Main flows
 

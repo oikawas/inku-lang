@@ -72,6 +72,34 @@ CHANGED_SCHEMAS = {
 SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 GROUND_MATERIAL_ENUM_ADDED = {"canvas", "drawing_paper"}
 
+# Operations that predate the card and are declared to change, with exactly what
+# may move in them -- the same mechanism as CHANGED_SCHEMAS above, and the same
+# one test_the_acl_only_adds_to_the_api_surface.py uses. Any OTHER movement in a
+# declared operation, and any movement at all in an undeclared one, still fails.
+#
+# I-086: three routes that were public moved behind the guard, so each gains the
+# two arguments the guard reads. The two that carried no parameter at all also
+# gain a 422, because a route with nothing to validate has no validation error
+# to describe -- every already-guarded route in the frozen file carries both.
+# The 200 of each is compared as before, so a route that quietly stopped
+# describing what it returns is still red.
+CHANGED_OPERATIONS = {
+    "GET /api/prompts": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+    },
+    "GET /api/color-catalogs": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+        "added_responses": {"422"},
+    },
+    "GET /api/auth/config": {
+        "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
+        "removed_params": set(),
+        "added_responses": {"422"},
+    },
+}
+
 
 def _before() -> dict:
     return json.loads(SURFACE_BEFORE_THE_CARD.read_text(encoding="utf-8"))
@@ -84,7 +112,7 @@ def test_the_route_count_is_the_branch_points_count_plus_one() -> None:
 
 def test_the_card_route_is_guarded_and_the_public_list_did_not_grow() -> None:
     """The card is somebody's own work, so it is not a public route."""
-    assert len(PUBLIC) == 6
+    assert len(PUBLIC) == 3
     assert CARD_ROUTE not in PUBLIC
 
     card_routes = [context for context in _api_routes() if context.route.path == CARD_ROUTE]
@@ -131,8 +159,36 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
             assert now_enum - was_enum == GROUND_MATERIAL_ENUM_ADDED
             assert was_enum - now_enum == set()
 
+    # The declared operation changes, checked argument by argument and response
+    # by response before being set aside.
+    before_ops = {f"{op['method']} {op['path']}": op for op in before["operations"]}
+    for key, expected_delta in CHANGED_OPERATIONS.items():
+        before_params = set(before_ops[key]["params"])
+        after_op = next(
+            op for op in surface["operations"] if f"{op['method']} {op['path']}" == key
+        )
+        after_params = set(after_op["params"])
+        assert after_params - before_params == expected_delta["added_params"], key
+        assert before_params - after_params == expected_delta["removed_params"], key
+        before_responses = dict(before_ops[key]["responses"])
+        after_responses = dict(after_op["responses"])
+        added_responses = expected_delta.get("added_responses", set())
+        removed_responses = expected_delta.get("removed_responses", set())
+        assert set(after_responses) - set(before_responses) == added_responses, key
+        assert set(before_responses) - set(after_responses) == removed_responses, key
+        # Everything else about the operation must still match byte for byte --
+        # including the body of every response that was already described.
+        for code in added_responses:
+            after_responses.pop(code)
+        for code in removed_responses:
+            before_responses.pop(code)
+        assert _stable(
+            {**after_op, "params": sorted(before_params), "responses": after_responses}
+        ) == _stable({**before_ops[key], "responses": before_responses}), key
+        operations.pop(key)
+
     before_operations = {
-        f"{op['method']} {op['path']}": _stable(op) for op in before["operations"]
+        key: _stable(op) for key, op in before_ops.items() if key not in CHANGED_OPERATIONS
     }
     assert operations == before_operations, (
         "an operation that predates the card has changed. Adding a route is "

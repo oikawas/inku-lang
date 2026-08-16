@@ -75,7 +75,7 @@ test('every combination of page shape and seal is carried, not a constant', () =
 
 // ── T-10 (2): the card has two doors, and no UI mode closes them ────────────
 
-test('the card has two doors and neither is hidden by a UI mode', () => {
+test('the card has two doors, and one of them is open in every mode', () => {
 	// The optional groups. A new key here would mean the UI grew a group the
 	// modes do not know about.
 	assert.deepEqual([...UI_VISIBILITY_KEYS], [
@@ -95,11 +95,19 @@ test('the card has two doors and neither is hidden by a UI mode', () => {
 	assert.match(source, /historyCardExport\b/);
 	assert.equal(SIMPLE_UI_VISIBILITY.history, true);
 
-	// Door two is on the canvas status bar. It is a direct child of .status-bar
-	// rather than of a group that the modes hide, and no rule hides the bar
-	// itself -- so it survives with the rest of the bar's contents gone.
+	// Door two is on the canvas. It used to be a button of its own beside SVG
+	// and PNG, deliberately outside the .png-wrap the work_tools group hides,
+	// so a simple UI kept the card while losing the other two ways out.
+	//
+	// On 2026-08-16 the three were merged into one export button by request.
+	// A merged door cannot be half hidden, so door two now follows work_tools
+	// with the two it joined -- which is why this case no longer claims that
+	// neither door is hidden. Door one carries the promise on its own: the
+	// history group is on in the simple UI, so the card is always reachable.
 	const canvas = readFileSync(CANVAS_PANEL, 'utf8');
-	assert.match(canvas, /onclick=\{downloadCardFromCanvas\}/);
+	assert.match(canvas, /downloadCardFromCanvas\(\)/);
 	const page = readFileSync(PAGE, 'utf8');
+	// The bar that used to hold it is gone, so no rule may name it either.
 	assert.doesNotMatch(hideRuleSelectors(page), /:global\(\.status-bar\)/);
+	assert.doesNotMatch(canvas, /class="status-bar"/);
 });

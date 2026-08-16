@@ -15,7 +15,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { UI_VISIBILITY_KEYS, resolveUiVisibility } from './uiMode.ts';
+import { SIMPLE_UI_VISIBILITY, UI_VISIBILITY_KEYS, resolveUiVisibility } from './uiMode.ts';
 import { derivationKindLabel } from './derivation.ts';
 
 const PAGE = fileURLToPath(new URL('../routes/+page.svelte', import.meta.url));
@@ -136,32 +136,52 @@ test('T-4: the optional groups are the same seven', () => {
 
 // ── The canvas toolbar survives its emptied groups ──────────────────────────
 
-test('T-5: no UI-mode rule hides the whole status bar', () => {
-	// The card button is a child of .status-bar, so hiding the bar takes the
-	// button with it and no exception on the child can bring it back.
-	assert.doesNotMatch(hideRuleSelectors(read(PAGE)), /:global\(\.status-bar\)/);
+test('T-5: no UI-mode rule hides a whole row of canvas controls', () => {
+	// 2026-08-16: the bar under the canvas was abolished and its buttons moved
+	// into the two corner rows on the canvas. The rows hold buttons from two
+	// different visibility groups now -- the hash and the provenance button
+	// answer to detail_status, the rest to work_tools -- so a rule on the row
+	// itself would take one group's buttons out with the other's in any custom
+	// mode that keeps one and drops the other. Every button is named instead.
+	const selectors = hideRuleSelectors(read(PAGE));
+	assert.doesNotMatch(selectors, /:global\(\.status-bar\)/);
+	assert.doesNotMatch(selectors, /:global\(\.canvas-corner-controls\)/);
+	assert.doesNotMatch(selectors, /:global\(\.canvas-corner-right\)/);
+	assert.doesNotMatch(selectors, /:global\(\.canvas-corner-left\)/);
+	// And the two that are not work tools are named under their own group.
+	assert.match(selectors, /\.ui-hide-detail-status :global\(\.canvas-hash-btn\)/);
+	assert.match(selectors, /\.ui-hide-detail-status :global\(\.canvas-provenance-btn\)/);
 });
 
 test('T-6: the other UI-mode selectors are still there', () => {
 	// A control: T-5 must not be satisfied by deleting the rule.
 	const selectors = hideRuleSelectors(read(PAGE));
-	assert.match(selectors, /\.ui-hide-work-tools :global\(\.png-wrap\)/);
+	assert.match(selectors, /\.ui-hide-work-tools :global\(\.canvas-export\)/);
 	assert.match(selectors, /\.ui-hide-history :global\(\.nav-left\)/);
 });
 
-test('T-7: the canvas card button sits in the bar, not in a hidden group', () => {
+test('T-7: the canvas card door is inside the export menu, with the other two', () => {
+	// This claim changed on 2026-08-16, and it changed deliberately.
+	//
+	// It used to read "the card button sits in the bar, not in a hidden group":
+	// SVG and PNG lived in .png-wrap, which the work_tools group hides, and the
+	// card button was their sibling outside it, so a simple UI kept the card
+	// while losing the other two. The three were then merged into one export
+	// button by request, and a merged door cannot be half hidden -- the card
+	// now follows work_tools like the two it joined.
+	//
+	// What still holds is that the card has somewhere to leave from in every
+	// mode: door one is the history manager, and the history group is on in the
+	// simple UI (asserted below and in the two-doors case).
 	const source = read(CANVAS_PANEL);
-	const statusBar = elementBody(source, 'div', /<div class="status-bar">/);
-	assert.match(statusBar, /onclick=\{downloadCardFromCanvas\}/);
-	// .png-wrap is hidden with the work tools, and there are two of them in the
-	// bar. With both cut out the button must still be there: moving it inside
-	// either one would hide it again by another route.
-	let outsideWraps = statusBar;
-	while (/<div class="png-wrap\b/.test(outsideWraps)) {
-		const wrap = elementBody(outsideWraps, 'div', /<div class="png-wrap\b/);
-		outsideWraps = outsideWraps.replace(wrap, '');
-	}
-	assert.match(outsideWraps, /onclick=\{downloadCardFromCanvas\}/);
+	const menu = elementBody(source, 'div', /<div class="export-menu"/);
+	assert.match(menu, /downloadCardFromCanvas\(\)/, 'the card left the export menu');
+	assert.match(menu, /onDownloadSVG\('display'\)/, 'SVG left the export menu');
+	assert.match(menu, /onDownloadPNG\(/, 'PNG left the export menu');
+	// One button opens all three, and it is the one the work_tools rule names.
+	assert.match(source, /class="canvas-icon-btn canvas-export-btn"/);
+	assert.match(hideRuleSelectors(read(PAGE)), /\.ui-hide-work-tools :global\(\.canvas-export\)/);
+	assert.equal(SIMPLE_UI_VISIBILITY.history, true, 'the always-open door closed');
 });
 
 test('T-8: the history side keeps its own card button', () => {

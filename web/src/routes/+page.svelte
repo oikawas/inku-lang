@@ -577,7 +577,7 @@
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
 	let settingsDetail = $state<SettingsDetailLevel>('standard');
-	let pngMenuOpen  = $state(false);
+	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
@@ -634,7 +634,7 @@
 	let exportTemplateStatus = $state<string | null>(null);
 
 	// DOM refs for outside-click handling
-	let pngWrapEl      = $state<HTMLDivElement | null>(null);
+	let exportWrapEl   = $state<HTMLDivElement | null>(null);
 	let userMenuWrapEl = $state<HTMLDivElement | null>(null);
 
 	type SaijikiPreview = {
@@ -1415,7 +1415,7 @@
 			displayedHistoryItem = null;
 			historyCursor = -1;
 			outputTab = 'canvas';
-			pngMenuOpen = false;
+			exportMenuOpen = false;
 			fitCanvasZoom();
 		}
 		await saveCanvasAspectPluginValue();
@@ -1440,7 +1440,7 @@
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		outputTab = 'canvas';
-		pngMenuOpen = false;
+		exportMenuOpen = false;
 		fitCanvasZoom();
 		await saveCanvasAspectPluginValue();
 	}
@@ -5259,7 +5259,7 @@ $effect(() => {
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
+		if (exportMenuOpen && exportWrapEl && !exportWrapEl.contains(e.target as Node)) exportMenuOpen = false;
 		if (userMenuOpen && userMenuWrapEl && !userMenuWrapEl.contains(e.target as Node)) userMenuOpen = false;
 		if (canvasAspectMenuOpen) canvasAspectMenuOpen = false;
 	}
@@ -6838,8 +6838,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:outputTab
 				bind:promptStage1Expanded
 				bind:promptStage2Expanded
-				bind:pngMenuOpen
-				bind:pngWrapEl
+				bind:exportMenuOpen
+				bind:exportWrapEl
 				{result}
 				{nearbyHistory}
 				onOpenNearbyHistory={openNearbyHistory}
@@ -6894,6 +6894,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
+				onToggleForRevision={toggleHistoryForRevision}
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
@@ -7507,15 +7508,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-detail-status .thinking-details,
 	.ui-hide-detail-status .stats-section,
 	.ui-hide-detail-status :global(.render-meta-strip),
-	.ui-hide-detail-status :global(.status-hash-btn),
-	.ui-hide-detail-status :global(.provenance-button),
+	.ui-hide-detail-status :global(.canvas-hash-btn),
+	.ui-hide-detail-status :global(.canvas-provenance-btn),
 	.ui-hide-work-tools :global(.right-tabs),
-	.ui-hide-work-tools :global(.canvas-corner-controls),
+	/* The canvas corner rows are named button by button rather than as whole
+	   rows. Two of the controls now standing there answer to detail_status and
+	   not to work_tools, and a rule on the row would take them with it in any
+	   custom mode that keeps one group and drops the other. */
+	.ui-hide-work-tools :global(.canvas-caption-btn),
+	.ui-hide-work-tools :global(.canvas-presentation-btn),
 	.ui-hide-work-tools :global(.zoom-controls),
-	.ui-hide-work-tools :global(.status-star),
-	.ui-hide-work-tools :global(.replay-button),
-	.ui-hide-work-tools :global(.saijiki-open-btn),
-	.ui-hide-work-tools :global(.png-wrap),
+	.ui-hide-work-tools :global(.canvas-star-btn),
+	.ui-hide-work-tools :global(.canvas-revision-btn),
+	.ui-hide-work-tools :global(.canvas-replay-btn),
+	.ui-hide-work-tools :global(.canvas-saijiki-btn),
+	.ui-hide-work-tools :global(.canvas-export),
 	.ui-hide-history :global(.nav-left),
 	.ui-hide-history :global(.nav-right),
 	.ui-hide-history :global(.nearby-mirror) {

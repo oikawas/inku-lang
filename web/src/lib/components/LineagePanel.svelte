@@ -42,11 +42,21 @@
 	export type LineageGraph = { focus_node_id: string; nodes: LineageNode[]; edges: LineageEdge[] };
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
 
+	/** One of the works the server found close to the one on screen. */
+	type NearbyWork = { id?: string; input: string; svg: string };
+
 	type Props = {
 		graph: LineageGraph | null;
 		loading: boolean;
 		error: string | null;
 		isJapanese: boolean;
+		/**
+		 * Works near the one on screen. They used to float over the canvas,
+		 * where they covered the drawing they were offered beside; this panel is
+		 * where a reader already goes to ask how one work relates to another.
+		 */
+		nearbyHistory?: NearbyWork[];
+		onOpenNearbyHistory?: (id: string) => void;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
@@ -96,7 +106,7 @@
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
+	let { graph, loading, error, isJapanese, nearbyHistory = [], onOpenNearbyHistory, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -794,6 +804,21 @@ $effect(() => {
 	<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
 </div>
 	</header>
+	{#if nearbyHistory.length > 0 && onOpenNearbyHistory}
+		<div class="nearby-mirror">
+			<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
+			{#each nearbyHistory as item (item.id)}
+				<button
+					type="button"
+					class="nearby-thumb"
+					title={item.input}
+					aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
+					disabled={!item.id}
+					onclick={() => { if (item.id) onOpenNearbyHistory?.(item.id); }}
+				>{@html item.svg}</button>
+			{/each}
+		</div>
+	{/if}
 	{#if animationExportError}<div class="lineage-message error">{animationExportError}</div>{/if}
 	{#if contactSheetError}<div class="lineage-message error">{contactSheetError}</div>{/if}
 	{#if loading || overviewLoading}
@@ -1110,6 +1135,14 @@ $effect(() => {
 
 
 <style>
+	/* Moved from the canvas, where it floated over the drawing. Here it is a
+	   row in the flow, so it needs no absolute placement. */
+	.nearby-mirror { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--fg3); font-size: 0.68rem; }
+	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: var(--canvas-paper); border: 1px solid var(--border); cursor: pointer; }
+	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
+	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
+	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
 	.sketch-parent-prose { margin: 0; font-size: 12px; line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
 	.sketch-parent-prose.empty { color: var(--fg3); }
 	.sketch-dialog-current { font-size: 11px; color: var(--fg3); margin-right: auto; }

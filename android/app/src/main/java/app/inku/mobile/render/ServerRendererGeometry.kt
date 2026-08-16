@@ -753,26 +753,20 @@ internal object ServerRendererGeometry {
         return when (primitive) {
             "circle" -> {
                 val center = ins.optJSONArray("center")
-                if (center == null || ins.isNull("radius")) {
-                    null
-                } else {
-                    val cx = center.optDouble(0, 0.5) * width
-                    val cy = center.optDouble(1, 0.5) * height
-                    val r = ins.optDouble("radius", 0.12) * unit
-                    doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
-                }
+                if (center == null || ins.isNull("radius")) return null
+                val cx = center.optDouble(0, 0.5) * width
+                val cy = center.optDouble(1, 0.5) * height
+                val r = ins.optDouble("radius", 0.12) * unit
+                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
             }
             "ellipse" -> {
                 val center = ins.optJSONArray("center")
                 val size = ins.optJSONArray("size")
-                if (center == null || size == null) {
-                    null
-                } else {
-                    val cx = center.optDouble(0, 0.5) * width
-                    val cy = center.optDouble(1, 0.5) * height
-                    val (w, h) = sizePx(size.optDouble(0, 0.26), size.optDouble(1, 0.16), width, height, unit)
-                    doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
-                }
+                if (center == null || size == null) return null
+                val cx = center.optDouble(0, 0.5) * width
+                val cy = center.optDouble(1, 0.5) * height
+                val (w, h) = sizePx(size.optDouble(0, 0.26), size.optDouble(1, 0.16), width, height, unit)
+                doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
             }
             "cloudform" -> {
                 val center = ins.optJSONArray("center")
@@ -792,14 +786,11 @@ internal object ServerRendererGeometry {
             "square", "triangle" -> {
                 val pos = ins.optJSONArray("position")
                 val size = ins.optJSONArray("size")
-                if (pos == null || size == null) {
-                    null
-                } else {
-                    val x = pos.optDouble(0, 0.38) * width
-                    val y = pos.optDouble(1, 0.38) * height
-                    val (w, h) = sizePx(size.optDouble(0, 0.24), size.optDouble(1, 0.24), width, height, unit)
-                    doubleArrayOf(x, y, w, h)
-                }
+                if (pos == null || size == null) return null
+                val x = pos.optDouble(0, 0.38) * width
+                val y = pos.optDouble(1, 0.38) * height
+                val (w, h) = sizePx(size.optDouble(0, 0.24), size.optDouble(1, 0.24), width, height, unit)
+                doubleArrayOf(x, y, w, h)
             }
             // The server builds a polygon's box out of `center` and `radius`
             // and out of nothing else: it does not read `position` for the
@@ -808,14 +799,12 @@ internal object ServerRendererGeometry {
             // no box, the same as one that states neither.
             "polygon" -> {
                 val center = ins.optJSONArray("center")
-                if (center == null || ins.isNull("radius")) {
-                    null
-                } else {
-                    val cx = center.optDouble(0, 0.5) * width
-                    val cy = center.optDouble(1, 0.5) * height
-                    val r = ins.optDouble("radius", 0.12) * unit
-                    doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
-                }
+                val radius = if (ins.isNull("radius")) null else ins.optDouble("radius", 0.12)
+                if (center == null || radius == null) return null
+                val cx = center.optDouble(0, 0.5) * width
+                val cy = center.optDouble(1, 0.5) * height
+                val r = radius * unit
+                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
             }
             else -> null
         }

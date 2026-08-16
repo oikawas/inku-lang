@@ -57,6 +57,24 @@
   const parentWild = $derived(node.history?.render_wild === true);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
+
+  // The label of the model the reader picked. The run status used to name the
+  // page's Stage 1 and Stage 2 whatever was chosen here, which is how "the
+  // selection does nothing" looked from the outside even before it was true.
+  const selectedVisionLabel = $derived.by(() => {
+    for (const group of visionProviderGroups) {
+      for (const model of group.models) {
+        if (qualifiedModelId(group.id, model.id) === selectedVisionModel) return model.label;
+      }
+    }
+    return selectedVisionModel;
+  });
+  // Vision mode is the only mode with a picker, so it is the only mode whose
+  // runs are drawn by a model the reader named. Random mode keeps the page's
+  // setting, which is the only thing it was ever offered.
+  const paintModelOverride = $derived(
+    refineMode === 'vision' && selectedVisionModel ? selectedVisionModel : null
+  );
   onDestroy(() => abortController?.abort());
 
   const activeKinds = $derived.by(() => {
@@ -135,6 +153,7 @@
             ...(advice ? { vision_model: advice.model, vision_observation: advice.observation, vision_next_direction: advice.next_direction } : {})
           },
           ...(wildOverride !== null ? { wild: wildOverride } : {}),
+          ...(paintModelOverride ? { stage1Model: paintModelOverride, stage2Model: paintModelOverride } : {}),
           historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
           saveHistory: true,
           countGeneration: true,
@@ -176,8 +195,8 @@
       {#if running}
         <RunStatus
           label={statusText}
-          stage1Model={stage1ModelLabel}
-          stage2Model={stage2ModelLabel}
+          stage1Model={paintModelOverride ? selectedVisionLabel : stage1ModelLabel}
+          stage2Model={paintModelOverride ? selectedVisionLabel : stage2ModelLabel}
           elapsedMs={refineElapsed.ms}
           tokensIn={refineTokensIn}
           tokensOut={refineTokensOut}

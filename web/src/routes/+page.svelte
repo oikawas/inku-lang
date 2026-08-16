@@ -3144,6 +3144,11 @@
 		// of a saved work replays instead of asking a non-deterministic layer again.
 		sketchMode?: SketchMode;
 		sketchText?: string | null;
+		// Qualified model ids for this run only, when the caller is a dialog that
+		// asked the reader which model to use. Absent means the page's own
+		// setting, which is what every other caller wants.
+		stage1Model?: string;
+		stage2Model?: string;
 		// Called when interpretation finishes, before rendering starts.
 		onStage1?: (event: PaintStage1Event) => void;
 	};
@@ -3222,8 +3227,10 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		activeRunTokensIn = null;
 		activeRunTokensOut = null;
 		const historyInput = options.historyInput ?? text;
-		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
-		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
+		// The effective id, not the raw field: what is sent is what was asked for,
+		// and it is the same value the run status names and the work records.
+		const resolvedStage1Model = options.stage1Model ?? qualifiedModelId(stage1Provider, stage1Model);
+		const resolvedStage2Model = options.stage2Model ?? qualifiedModelId(stage2Provider, stage2Model);
 
 		stage1UserPrompt = text;
 		const resolvedSketchMode = options.sketchMode ?? sketchMode;

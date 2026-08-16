@@ -2148,6 +2148,7 @@ def _with_literal_grid_fidelity(
     *,
     ddl: str | None,
     lang: str | None = None,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> list[Instruction]:
     """Preserve explicit literal-tiling count and full-field coverage."""
     if not _is_literal_grid_request(ddl):
@@ -2175,7 +2176,15 @@ def _with_literal_grid_fidelity(
         arr_data = dict(data.get("arrangement") or {})
         arr_data.update(
             {
-                "count": count_hint or 400,
+                # "tile the whole field" with no numeral in it: the description
+                # states coverage, not a count, so the count is ours to pick and
+                # the most it may be is the most this installation draws. A bare
+                # 400 here made a RAISED ceiling unreachable -- 400 was the order
+                # itself, so nothing was ever trimmed and no note was written,
+                # and an administrator saw a limit go up with no change on the
+                # page and no reason anywhere. Lowering the ceiling always
+                # worked, because _enforce_hard_ceiling cuts afterwards.
+                "count": count_hint or limits.max_expanded_primitives,
                 "layout": "grid",
                 "path": "none",
                 "margin": 0.08,

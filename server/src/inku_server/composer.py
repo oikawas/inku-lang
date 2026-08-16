@@ -21,7 +21,7 @@ import urllib.request
 from copy import deepcopy
 from typing import Any, get_args
 
-from .limits import DEFAULT_LIMITS, Limits, current_limits
+from .limits import DEFAULT_LIMITS, Limits, current_limits, max_cluster_count
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
 from .plugins import CANVAS_ASPECTS, CanvasAspect
@@ -1072,6 +1072,33 @@ def _count_node(node: dict[str, Any], limits: Limits) -> dict[str, Any]:
     return rebuilt
 
 
+def _cluster_count_node(node: dict[str, Any], limits: Limits) -> dict[str, Any]:
+    """The cluster_count property with the effective ceiling, in pydantic's key order.
+
+    Same job as `_count_node`, one level deeper: the field is optional, so the
+    integer branch that carries the bound sits inside `anyOf`.
+    """
+    rebuilt = dict(node)
+    branches = rebuilt.get("anyOf")
+    if not isinstance(branches, list):
+        return rebuilt
+    rewritten: list[Any] = []
+    for branch in branches:
+        if not (isinstance(branch, dict) and branch.get("type") == "integer"):
+            rewritten.append(branch)
+            continue
+        fixed: dict[str, Any] = {}
+        for key, value in branch.items():
+            if key == "minimum":
+                fixed["maximum"] = max_cluster_count(limits)
+            fixed[key] = value
+        if "maximum" not in fixed:
+            fixed["maximum"] = max_cluster_count(limits)
+        rewritten.append(fixed)
+    rebuilt["anyOf"] = rewritten
+    return rebuilt
+
+
 def _score_tool_schema(limits: Limits | None = None) -> dict[str, Any]:
     schema = Score.model_json_schema()
     defs = schema.pop("$defs", {})
@@ -1090,6 +1117,13 @@ def _score_tool_schema(limits: Limits | None = None) -> dict[str, Any]:
         properties = arrangement.get("properties")
         if isinstance(properties, dict) and isinstance(properties.get("count"), dict):
             properties["count"] = _count_node(properties["count"], effective)
+        # `cluster_count` carried the same kind of static bound and is written in
+        # the same way. At the defaults it is 12, which is what the field used to
+        # say, so the tool JSON is byte-identical there.
+        if isinstance(properties, dict) and isinstance(properties.get("cluster_count"), dict):
+            properties["cluster_count"] = _cluster_count_node(
+                properties["cluster_count"], effective
+            )
 
     def inline(node: Any, seen: set[str] | None = None) -> Any:
         if seen is None:

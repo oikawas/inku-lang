@@ -2,6 +2,7 @@ package app.inku.mobile.render
 
 import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.data.model.CanvasSize
+import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -98,12 +99,42 @@ class DefaultSvgRendererPhase2fTest {
         return classes
     }
 
-    private fun countElements(svg: String): Map<String, Int> {
+    /**
+     * The element names the corpus itself counts, read out of `svg_index.json`.
+     *
+     * Written down by hand this list said path, circle, rect, polygon, polyline
+     * and line, while the index counts those plus `ellipse` and `g`. The 24
+     * ellipses across two drawings were therefore compared by nobody, and a
+     * hand-kept list would go blind again the next time the index learns a tag.
+     */
+    private fun countedTags(index: JSONObject): List<String> {
+        val tags = sortedSetOf<String>()
+        for (key in index.keys()) {
+            val counts = index.getJSONObject(key).getJSONObject("counts")
+            for (tag in counts.keys()) tags.add(tag)
+        }
+        return tags.toList()
+    }
+
+    /**
+     * The element names compared between the reference and the port.
+     *
+     * `g` is held back, and only `g`. The reference wraps its marks in named
+     * groups (`inku_artboard`, `layer_10_content`, `instruction_000_...`,
+     * `mark_000_000_...`) and the port groups differently: measured on this
+     * corpus, all 51 drawings disagree on the number of `<g>` and no drawing
+     * disagrees on anything else. Comparing it here would not be widening a
+     * guard's reach, it would be asserting a divergence this contract is not
+     * allowed to fix -- the picture itself is not moved by any of it, since the
+     * groups carry no geometry. It is raised for the ledger instead. Every
+     * other tag the index counts, `ellipse` included, is compared.
+     */
+    private fun comparedTags(index: JSONObject): List<String> = countedTags(index).filter { it != "g" }
+
+    private fun countElements(svg: String, tags: List<String>): Map<String, Int> {
         val counts = mutableMapOf<String, Int>()
-        val tags = listOf("path", "circle", "rect", "polygon", "polyline", "line")
         for (tag in tags) {
-            val openCount = svg.split("<$tag ").size - 1 + svg.split("<$tag>").size - 1
-            if (openCount > 0) counts[tag] = openCount
+            counts[tag] = svg.split("<$tag ").size - 1 + svg.split("<$tag>").size - 1
         }
         return counts
     }
@@ -262,14 +293,25 @@ class DefaultSvgRendererPhase2fTest {
         assertEquals("10_arc_wave must have exactly 1 intent element", 1, intent10Count)
     }
 
+    /**
+     * T-147: the structure comparison walks every drawing in the index.
+     *
+     * It used to name ten drawings. The element counts are the only place the
+     * arc's powder is measured at all, and ten drawings hold 147 of the corpus's
+     * 790 circles, so 643 grains were compared by nobody -- 12.8% of all
+     * elements were reached. Neither the count nor any drawing's name is
+     * written here: the index decides, so a drawing added to the corpus is
+     * walked the day it arrives.
+     */
     @Test
     fun testAllReferenceSvgStructureParity() {
-        val keys = listOf(
-            "01_circle_pen", "02_line_brush", "03_square_filled", "04_arc_crayon",
-            "05_circle_rotring", "06_surface_hatch", "07_circle_wave", "08_circle_perlin",
-            "09_line_white", "10_arc_wave"
-        )
-        for (key in keys) {
+        val index = readReferenceIndex()
+        val tags = comparedTags(index)
+        assertTrue("the index must declare the element names it counts", tags.isNotEmpty())
+        assertTrue("the powder the arcs drop must be among them", "circle" in tags)
+        assertTrue("and so must the ellipse only two drawings hold", "ellipse" in tags)
+        var drawings = 0
+        for (key in index.keys()) {
             val expectedSvg = readReferenceResource("$key.svg")
             val actualSvg = renderSvgForReference(key)
 
@@ -277,10 +319,42 @@ class DefaultSvgRendererPhase2fTest {
             val actualClasses = extractClassAttrs(actualSvg)
             assertEquals("Class attributes list for $key.svg must match", expectedClasses, actualClasses)
 
-            val expectedElements = countElements(expectedSvg)
-            val actualElements = countElements(actualSvg)
+            val expectedElements = countElements(expectedSvg, tags)
+            val actualElements = countElements(actualSvg, tags)
             assertEquals("Element counts map for $key.svg must match", expectedElements, actualElements)
+            drawings++
         }
+        assertEquals("every drawing in the index must be walked", index.length(), drawings)
+    }
+
+    /**
+     * T-148: the drawings the guard read are the drawings the index describes.
+     *
+     * This measures the guard, not the port. [testAllReferenceSvgStructureParity]
+     * compares the reference against the port, and would be just as green if the
+     * reference resource it loaded were the wrong file or a truncated one -- the
+     * two sides would simply agree on less. The index states each drawing's
+     * element counts independently of the drawing, so comparing the expected
+     * side against them says the guard is reading the picture it thinks it is.
+     */
+    @Test
+    fun testTheExpectedCountsAgreeWithTheIndex() {
+        val index = readReferenceIndex()
+        val tags = countedTags(index)
+        var drawings = 0
+        for (key in index.keys()) {
+            val declared = index.getJSONObject(key).getJSONObject("counts")
+            val counted = countElements(readReferenceResource("$key.svg"), tags)
+            for (tag in tags) {
+                assertEquals(
+                    "$key.svg holds the number of <$tag> its index entry declares",
+                    declared.optInt(tag, 0),
+                    counted[tag],
+                )
+            }
+            drawings++
+        }
+        assertEquals("every drawing in the index must be walked", index.length(), drawings)
     }
 
     @Test
@@ -313,9 +387,21 @@ class DefaultSvgRendererPhase2fTest {
         org.junit.Assert.assertEquals("25_line_computer_wild must be identical to 17_line_computer", svg17, svg25)
     }
 
+    /**
+     * Every polyline whose class begins with material-outline, whichever order
+     * the attributes arrive in.
+     *
+     * The reference sorts its attributes alphabetically (`class` before
+     * `points`) and the port writes `points` first, so both readings have to
+     * stay. What is new is the prefix: engine 28 split the layer into contact
+     * fragments and the class became `material-outline stratum-N`, which the
+     * old exact match reached in none of the 51 drawings. The prefix is matched
+     * rather than the stratum spelled out, so the day the strata are numbered
+     * some other way this does not go blind again.
+     */
     private fun extractMaterialOutlinePoints(svg: String): List<String> {
         val result = mutableListOf<String>()
-        val regex = Regex("""<polyline[^>]*points="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*points="([^"]+)"""")
+        val regex = Regex("""<polyline[^>]*points="([^"]+)"[^>]*class="material-outline[^"]*"|<polyline[^>]*class="material-outline[^"]*"[^>]*points="([^"]+)"""")
         regex.findAll(svg).forEach { match ->
             val pts = match.groupValues[1].ifEmpty { match.groupValues[2] }
             result.add(pts)
@@ -323,9 +409,19 @@ class DefaultSvgRendererPhase2fTest {
         return result
     }
 
+    /**
+     * The same widening as [extractMaterialOutlinePoints], for the dash side.
+     *
+     * Engine 35 writes no `stroke-dasharray` at all -- engines 21 to 25 held
+     * 252 across the corpus, 26 and 27 held 640, and 28 onwards hold none --
+     * so this comes back empty from both sides today. It is widened anyway:
+     * were it left on the exact match, a port that started writing a dash on a
+     * stratum would be caught by the count guard (T-145) as a extraction
+     * failure rather than as the divergence it is.
+     */
     private fun extractMaterialOutlineDashArrays(svg: String): List<String> {
         val result = mutableListOf<String>()
-        val regex = Regex("""<polyline[^>]*stroke-dasharray="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*stroke-dasharray="([^"]+)"""")
+        val regex = Regex("""<polyline[^>]*stroke-dasharray="([^"]+)"[^>]*class="material-outline[^"]*"|<polyline[^>]*class="material-outline[^"]*"[^>]*stroke-dasharray="([^"]+)"""")
         regex.findAll(svg).forEach { match ->
             val dash = match.groupValues[1].ifEmpty { match.groupValues[2] }
             result.add(dash)
@@ -357,16 +453,183 @@ class DefaultSvgRendererPhase2fTest {
         }
     }
 
+    /** The drawings whose material layer is compared element by element. */
+    private val materialOutlineKeys =
+        listOf("02_line_brush", "09_line_white", "14_region_then_relation", "15_line_brush_wild")
+
+    /**
+     * The attributes of one element, read one at a time.
+     *
+     * Deliberately not a second copy of the extraction's regex: this walks the
+     * element and reads whatever attributes are on it, so it stays right when
+     * the extraction stops matching -- which is the whole point of the count
+     * guards below.
+     */
+    private fun attributeMap(fragment: String): Map<String, String> {
+        val attrs = mutableMapOf<String, String>()
+        var idx = 0
+        while (true) {
+            val eq = fragment.indexOf("=\"", idx)
+            if (eq == -1) break
+            var nameStart = eq
+            while (nameStart > 0 && !fragment[nameStart - 1].isWhitespace()) nameStart--
+            val valueEnd = fragment.indexOf("\"", eq + 2)
+            if (valueEnd == -1) break
+            attrs[fragment.substring(nameStart, eq)] = fragment.substring(eq + 2, valueEnd)
+            idx = valueEnd + 1
+        }
+        return attrs
+    }
+
+    /**
+     * How many material-outline polylines a drawing actually holds, counted by
+     * walking the elements rather than by matching the extraction's pattern.
+     */
+    private fun countMaterialOutlinePolylines(svg: String, requireDash: Boolean = false): Int {
+        var idx = 0
+        var found = 0
+        while (true) {
+            val start = svg.indexOf("<polyline", idx)
+            if (start == -1) break
+            val end = svg.indexOf(">", start)
+            if (end == -1) break
+            val attrs = attributeMap(svg.substring(start, end))
+            val cls = attrs["class"] ?: ""
+            if (cls == "material-outline" || cls.startsWith("material-outline ")) {
+                if (!requireDash || attrs.containsKey("stroke-dasharray")) found++
+            }
+            idx = end + 1
+        }
+        return found
+    }
+
+    /**
+     * T-143: the guard says how many elements it compared.
+     *
+     * A guard that only compares two extractions is green when both come back
+     * empty, and that is exactly what happened here from engine 28 until this
+     * cycle: the parity test below names four drawings and compared not one
+     * byte of any of them. So the extraction is now measured against the number
+     * of material-outline polylines the drawing really holds, counted by
+     * walking the elements -- a way of counting that cannot fail in the same
+     * direction as the pattern it is checking.
+     *
+     * The numbers themselves (42, 40, 50, 60 in engine 35) are deliberately not
+     * written down: a hand-copied count is green the day after the corpus moves
+     * and goes on guarding the stale figure.
+     */
+    @Test
+    fun testTheMaterialOutlineGuardSaysHowManyItCompared() {
+        for (key in materialOutlineKeys) {
+            val expectedSvg = readReferenceResource("$key.svg")
+            val actualSvg = renderSvgForReference(key)
+
+            val expectedPresent = countMaterialOutlinePolylines(expectedSvg)
+            assertTrue("$key.svg must hold material outlines worth comparing", expectedPresent > 0)
+            assertEquals(
+                "the guard must reach every material outline the reference holds for $key.svg",
+                expectedPresent,
+                extractMaterialOutlinePoints(expectedSvg).size,
+            )
+
+            val actualPresent = countMaterialOutlinePolylines(actualSvg)
+            assertTrue("the port must draw material outlines for $key.svg", actualPresent > 0)
+            assertEquals(
+                "the guard must reach every material outline the port draws for $key.svg",
+                actualPresent,
+                extractMaterialOutlinePoints(actualSvg).size,
+            )
+        }
+    }
+
+    /**
+     * T-145: the same claim for the dash side.
+     *
+     * Both sides are zero in engine 35 and that is today's right answer, not a
+     * hole: the corpus held 252 dasharrays in engines 21 to 25 and 640 in 26
+     * and 27, and none since 28. The gate is here for the day a dash comes
+     * back, and it is stated as a relation between two counts so it needs no
+     * number of its own to stay true across that day.
+     *
+     * No single perturbation can redden it while the corpus holds no dash: the
+     * extraction and the walk both answer zero, and breaking either leaves
+     * 0 == 0. It goes red when a dash exists and the extraction misses it,
+     * which takes two changes at once.
+     */
+    @Test
+    fun testTheMaterialOutlineDashGuardSaysHowManyItCompared() {
+        for (key in materialOutlineKeys) {
+            val expectedSvg = readReferenceResource("$key.svg")
+            val actualSvg = renderSvgForReference(key)
+
+            assertEquals(
+                "the dash guard must reach every dashed material outline the reference holds for $key.svg",
+                countMaterialOutlinePolylines(expectedSvg, requireDash = true),
+                extractMaterialOutlineDashArrays(expectedSvg).size,
+            )
+            assertEquals(
+                "the dash guard must reach every dashed material outline the port draws for $key.svg",
+                countMaterialOutlinePolylines(actualSvg, requireDash = true),
+                extractMaterialOutlineDashArrays(actualSvg).size,
+            )
+        }
+    }
+
+    /**
+     * T-146: neither the corpus nor the port writes a `stroke-dasharray`.
+     *
+     * This states the asymmetry rather than hiding it. The corpus-wide dash
+     * comparison in [testEveryReferenceSvgMatchesOnPathsPointsAndDashes] is
+     * empty against empty on all 51 drawings, so the direction "the port drops
+     * a dash the reference has" is dead. The other direction is alive -- a port
+     * that wrote one extra dash would break the comparison -- and this says so
+     * in one place instead of leaving it to be re-derived.
+     *
+     * The claim is tied to the render engine version. It has to be measured
+     * again in the cycle that raises `renderEngineVersion`.
+     */
+    @Test
+    fun testTheCorpusAndThePortBothHoldNoDashArray() {
+        val index = readReferenceIndex()
+        var drawings = 0
+        for (key in index.keys()) {
+            val expectedSvg = readReferenceResource("$key.svg")
+            val actualSvg = renderSvgForReference(key)
+            assertEquals(
+                "engine ${CompatibilityConstants.renderEngineVersion}'s $key.svg must hold no stroke-dasharray",
+                0,
+                expectedSvg.split("stroke-dasharray").size - 1,
+            )
+            assertEquals(
+                "the port must not write a stroke-dasharray for $key that the reference does not have",
+                0,
+                actualSvg.split("stroke-dasharray").size - 1,
+            )
+            drawings++
+        }
+        assertEquals("every drawing in the index must be walked", index.length(), drawings)
+    }
+
     @Test
     fun testMaterialOutlinePointsAndDashArrayExactParity() {
-        val keys = listOf("02_line_brush", "09_line_white", "14_region_then_relation", "15_line_brush_wild")
-        for (key in keys) {
+        for (key in materialOutlineKeys) {
             val expectedSvg = readReferenceResource("$key.svg")
             val actualSvg = renderSvgForReference(key)
 
             val expectedPoints = extractMaterialOutlinePoints(expectedSvg)
             val actualPoints = extractMaterialOutlinePoints(actualSvg)
-            assertEquals("Material outline points list for $key.svg must match exact reference", expectedPoints, actualPoints)
+            assertEquals(
+                "Material outline element count for $key.svg must match exact reference",
+                expectedPoints.size,
+                actualPoints.size,
+            )
+            for (i in expectedPoints.indices) {
+                assertEquals(
+                    "Material outline points #$i for $key.svg must match exact reference",
+                    expectedPoints[i],
+                    actualPoints[i],
+                )
+            }
 
             val expectedDashes = extractMaterialOutlineDashArrays(expectedSvg)
             val actualDashes = extractMaterialOutlineDashArrays(actualSvg)

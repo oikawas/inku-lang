@@ -99,12 +99,42 @@ class DefaultSvgRendererPhase2fTest {
         return classes
     }
 
-    private fun countElements(svg: String): Map<String, Int> {
+    /**
+     * The element names the corpus itself counts, read out of `svg_index.json`.
+     *
+     * Written down by hand this list said path, circle, rect, polygon, polyline
+     * and line, while the index counts those plus `ellipse` and `g`. The 24
+     * ellipses across two drawings were therefore compared by nobody, and a
+     * hand-kept list would go blind again the next time the index learns a tag.
+     */
+    private fun countedTags(index: JSONObject): List<String> {
+        val tags = sortedSetOf<String>()
+        for (key in index.keys()) {
+            val counts = index.getJSONObject(key).getJSONObject("counts")
+            for (tag in counts.keys()) tags.add(tag)
+        }
+        return tags.toList()
+    }
+
+    /**
+     * The element names compared between the reference and the port.
+     *
+     * `g` is held back, and only `g`. The reference wraps its marks in named
+     * groups (`inku_artboard`, `layer_10_content`, `instruction_000_...`,
+     * `mark_000_000_...`) and the port groups differently: measured on this
+     * corpus, all 51 drawings disagree on the number of `<g>` and no drawing
+     * disagrees on anything else. Comparing it here would not be widening a
+     * guard's reach, it would be asserting a divergence this contract is not
+     * allowed to fix -- the picture itself is not moved by any of it, since the
+     * groups carry no geometry. It is raised for the ledger instead. Every
+     * other tag the index counts, `ellipse` included, is compared.
+     */
+    private fun comparedTags(index: JSONObject): List<String> = countedTags(index).filter { it != "g" }
+
+    private fun countElements(svg: String, tags: List<String>): Map<String, Int> {
         val counts = mutableMapOf<String, Int>()
-        val tags = listOf("path", "circle", "rect", "polygon", "polyline", "line")
         for (tag in tags) {
-            val openCount = svg.split("<$tag ").size - 1 + svg.split("<$tag>").size - 1
-            if (openCount > 0) counts[tag] = openCount
+            counts[tag] = svg.split("<$tag ").size - 1 + svg.split("<$tag>").size - 1
         }
         return counts
     }
@@ -263,14 +293,25 @@ class DefaultSvgRendererPhase2fTest {
         assertEquals("10_arc_wave must have exactly 1 intent element", 1, intent10Count)
     }
 
+    /**
+     * T-147: the structure comparison walks every drawing in the index.
+     *
+     * It used to name ten drawings. The element counts are the only place the
+     * arc's powder is measured at all, and ten drawings hold 147 of the corpus's
+     * 790 circles, so 643 grains were compared by nobody -- 12.8% of all
+     * elements were reached. Neither the count nor any drawing's name is
+     * written here: the index decides, so a drawing added to the corpus is
+     * walked the day it arrives.
+     */
     @Test
     fun testAllReferenceSvgStructureParity() {
-        val keys = listOf(
-            "01_circle_pen", "02_line_brush", "03_square_filled", "04_arc_crayon",
-            "05_circle_rotring", "06_surface_hatch", "07_circle_wave", "08_circle_perlin",
-            "09_line_white", "10_arc_wave"
-        )
-        for (key in keys) {
+        val index = readReferenceIndex()
+        val tags = comparedTags(index)
+        assertTrue("the index must declare the element names it counts", tags.isNotEmpty())
+        assertTrue("the powder the arcs drop must be among them", "circle" in tags)
+        assertTrue("and so must the ellipse only two drawings hold", "ellipse" in tags)
+        var drawings = 0
+        for (key in index.keys()) {
             val expectedSvg = readReferenceResource("$key.svg")
             val actualSvg = renderSvgForReference(key)
 
@@ -278,10 +319,42 @@ class DefaultSvgRendererPhase2fTest {
             val actualClasses = extractClassAttrs(actualSvg)
             assertEquals("Class attributes list for $key.svg must match", expectedClasses, actualClasses)
 
-            val expectedElements = countElements(expectedSvg)
-            val actualElements = countElements(actualSvg)
+            val expectedElements = countElements(expectedSvg, tags)
+            val actualElements = countElements(actualSvg, tags)
             assertEquals("Element counts map for $key.svg must match", expectedElements, actualElements)
+            drawings++
         }
+        assertEquals("every drawing in the index must be walked", index.length(), drawings)
+    }
+
+    /**
+     * T-148: the drawings the guard read are the drawings the index describes.
+     *
+     * This measures the guard, not the port. [testAllReferenceSvgStructureParity]
+     * compares the reference against the port, and would be just as green if the
+     * reference resource it loaded were the wrong file or a truncated one -- the
+     * two sides would simply agree on less. The index states each drawing's
+     * element counts independently of the drawing, so comparing the expected
+     * side against them says the guard is reading the picture it thinks it is.
+     */
+    @Test
+    fun testTheExpectedCountsAgreeWithTheIndex() {
+        val index = readReferenceIndex()
+        val tags = countedTags(index)
+        var drawings = 0
+        for (key in index.keys()) {
+            val declared = index.getJSONObject(key).getJSONObject("counts")
+            val counted = countElements(readReferenceResource("$key.svg"), tags)
+            for (tag in tags) {
+                assertEquals(
+                    "$key.svg holds the number of <$tag> its index entry declares",
+                    declared.optInt(tag, 0),
+                    counted[tag],
+                )
+            }
+            drawings++
+        }
+        assertEquals("every drawing in the index must be walked", index.length(), drawings)
     }
 
     @Test

@@ -69,6 +69,19 @@ def should_fold(width: int | None, height: int | None) -> bool:
     return max(stated) <= TEXTURE_FOLD_MAX_WIDTH
 
 
+def _is_edge(tag: str) -> bool:
+    """Whether this tag is a boundary a run must not reach across.
+
+    Any closing tag, the prologue and comments, and any `<g>`. The last one is
+    not covered by "carries no texture": the renderer writes one group that does
+    carry a texture filter (`renderer.py:5876`, the pencil material outline), and
+    treating that as a run member swallows its opening tag without its close.
+    """
+    if tag.startswith(("</", "<?", "<!")):
+        return True
+    return tag.startswith("<g") and not tag[2:3].isalnum()
+
+
 def fold_texture_runs(svg: str) -> str:
     """Replace each run of same-texture siblings with one group naming it once.
 
@@ -91,10 +104,12 @@ def fold_texture_runs(svg: str) -> str:
     for match in _TAG.finditer(svg):
         tag = match.group(0)
         ref: str | None = None
-        if tag.startswith(("</", "<?", "<!")):
-            pass
-        elif tag.startswith("<g") and not tag[2:3].isalnum():
-            pass
+        if _is_edge(tag):
+            # An edge ends the run rather than being skipped over. Skipping
+            # would let a run reach across a nested group, which parses and
+            # keeps the order -- and puts that group's own marks under a filter
+            # nobody asked to put on them.
+            ref = None
         else:
             found = _REF.search(tag)
             if found is not None:

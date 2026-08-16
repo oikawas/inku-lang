@@ -85,18 +85,20 @@ flowchart LR
 
 | Router | endpoint数 | 主責任 | default guard |
 |---|---:|---|---|
-| `public` | 9 | health、info、catalog、models、saijiki、reference、prompts、demo | なし。一部routeは認証 |
-| `auth` | 4 | auth config、login/logout | なし。更新/logoutは個別guard |
-| `me` | 12 | profile、user settings、各user storage | `_current_user` |
+| `public` | 10 | health、info、catalog、models、saijiki、reference、prompts、demo | なし。`/health` と `/api/info` 以外は個別guard |
+| `auth` | 4 | auth config、login/logout | なし。login以外は個別guard |
+| `me` | 13 | profile、user settings、各user storage | `_current_user` |
 | `plugins` | 8 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
-| `settings` | 10 | server-wide settings、backup | `_admin_user` |
+| `settings` | 16 | server-wide settings、backup | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
-| `history` | 12 | 履歴、SVG、mark、trash、artifact再作成 | `_current_user` |
+| `history` | 17 | 履歴、SVG、mark、trash、artifact再作成 | `_current_user` |
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
 | `render` | 8 | variation、compose、interpret、render、paint、vision | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
 
-合計82。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計95。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+
+**⚠ この表の件数は手で写したもので、赤くする検査は無い**（allowlistの3 pathだけが検査に載っている）。件数の正本は `test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 
 ## 主要flow
 

@@ -7111,8 +7111,16 @@ codes are removed, and everything left is compared byte for byte** — **a windo
   `accept` reported as missing had gained an argument rather than been deleted**
   (`test_color_catalogs_are_served_by_api` and `test_the_catalog_list_serves_the_rename_table`;
   **each was looked up at the branch point to decide**).
-- **Carried forward (untouched here)** — **the "Total: 82" in
-  `docs/architecture/server-components` is stale** (95 as measured). **T-89 reads only the set of
-  allowlist paths and does not look at that number.** **`manual/` says nowhere that these APIs need no
+- **The per-router count table in `docs/architecture/server-components` was corrected too** (measured by
+  the accepting session) — **not only the "Total: 82": every row was stale, and the ten rows summed to
+  exactly 82.** Counted again by running the production code: **history 12→17, settings 10→16, me 12→13,
+  public 9→10, total 82→95** (the other six rows did not move). **The "default guard" column for
+  `public` and `auth` was rewritten as well** — the only routes in those two routers without a guard of
+  their own are **`/health`, `/api/info` and `/api/auth/login`**. **⚠ No gate reddens for that table, so
+  a line saying as much now sits under it** (the canonical count is `EXPECTED_ROUTE_COUNT`).
+- **⚠ The accepting session first counted four unguarded routes, against the check's three** — **the
+  guard list in the throwaway scan was missing `_session_token`**, which is what `/api/auth/logout`
+  carries. **What disagreed was the tool written on the spot, not the check.**
+- **Carried forward (untouched here)** — **`manual/` says nowhere that these APIs need no
   authentication, so nothing in it became false** — **no list of public paths was added to it**, since
   that would be a third hand-copied copy with no gate on it.

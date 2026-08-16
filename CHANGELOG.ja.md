@@ -6478,7 +6478,15 @@ DB は `history.catalog_mode`（VARCHAR・nullable）が 1 列増え、**migrati
   **`accept` が「消えた」と挙げた 2 本は削除ではなく引数の追加**だった
   （`test_color_catalogs_are_served_by_api` と `test_the_catalog_list_serves_the_rename_table`。
   **起点に在るかを引いて判定した**）。
-- **申し送り（本版では直していない）** —— **`docs/architecture/server-components` の「合計82」は古い**
-  （実測 95）。**T-89 は allowlist の path 集合だけを見ており、この数字は見ていない。**
-  **`manual/` は当該 API を「認証不要」と書いている箇所を 1 つも持たないので、偽になった記述は無い** ——
-  **新たに公開 path の一覧を manual へ書き足すことはしなかった**（番人の付かない 3 つ目の写しになるため）。
+- **`docs/architecture/server-components` の router 別の件数表も直した**（受け入れ側が実測）——
+  **「合計82」だけでなく表の各行が古く、10 行の和がちょうど 82 だった。**
+  製品コードを走らせて数え直し、**history 12→17・settings 10→16・me 12→13・public 9→10・合計 82→95** とした
+  （残る 6 行は不変）。**`public` と `auth` の「既定ガード」列も書き換えた** ——
+  この 2 つの router で個別ガードを持たないのは **`/health`・`/api/info`・`/api/auth/login` の 3 本だけ**である。
+  **⚠ この表には赤くする検査が無いので、その旨を表の直後に 1 行書いた**（件数の正本は `EXPECTED_ROUTE_COUNT`）。
+- **⚠ 受け入れ側が最初に数えた「ガード無し」は 4 本で、テストの 3 本と食い違った** ——
+  **自分で書いた走査のガード一覧に `_session_token` が抜けていた**（`/api/auth/logout` はこれを持つ）。
+  **食い違ったのはテストではなく、その場で書いた道具のほうだった。**
+- **申し送り（本版では直していない）** —— **`manual/` は当該 API を「認証不要」と書いている箇所を
+  1 つも持たないので、偽になった記述は無い** —— **新たに公開 path の一覧を manual へ書き足すことはしなかった**
+  （番人の付かない 3 つ目の写しになるため）。

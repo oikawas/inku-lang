@@ -85,18 +85,20 @@ flowchart LR
 
 | Router | Endpoints | Main responsibility | Default guard |
 |---|---:|---|---|
-| `public` | 9 | Health, info, catalogs, models, Saijiki, references, prompts, demo | None; some routes add auth |
-| `auth` | 4 | Auth configuration, login/logout | None; mutation/logout add guards |
-| `me` | 12 | Profile, user settings, user storage | `_current_user` |
+| `public` | 10 | Health, info, catalogs, models, Saijiki, references, prompts, demo | None; every route but `/health` and `/api/info` adds its own guard |
+| `auth` | 4 | Auth configuration, login/logout | None; every route but login adds its own guard |
+| `me` | 13 | Profile, user settings, user storage | `_current_user` |
 | `plugins` | 8 | Browse, validate, CRUD, enable plugins | `_current_user`; admin for changes |
-| `settings` | 10 | Server-wide settings and backup | `_admin_user` |
+| `settings` | 16 | Server-wide settings and backup | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
-| `history` | 12 | History, SVG, mark, trash, derivative rebuild | `_current_user` |
+| `history` | 17 | History, SVG, mark, trash, derivative rebuild | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
 | `render` | 8 | Variation, compose, interpret, render, Paint, vision | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 
-Total: 82. The three-path public allowlist is `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The rule is that nothing logging in does not need stays on it.
+Total: 95. The three-path public allowlist is `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The rule is that nothing logging in does not need stays on it.
+
+**⚠ The counts in this table are copied by hand, and no gate reddens for them** (only the three allowlist paths are held by a check). The canonical count is `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py`.
 
 ## Main flows
 

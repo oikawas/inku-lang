@@ -25,11 +25,15 @@ name = "inku-analysis"
 version = "0.1.0"
 source = { editable = "../shared" }
 dependencies = [
+    { name = "pillow" },
     { name = "resvg-py" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "resvg-py", specifier = ">=0.3.4" }]
+requires-dist = [
+    { name = "pillow", specifier = ">=12.3.0" },
+    { name = "resvg-py", specifier = ">=0.3.4" },
+]
 
 [[package]]
 name = "inku-cli"

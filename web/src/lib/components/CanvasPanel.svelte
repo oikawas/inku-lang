@@ -95,6 +95,11 @@
 		statusHashCopied: boolean;
 		exportMenuOpen: boolean;
 		exportWrapEl: HTMLDivElement | null;
+		// True when the work tools are hidden. The export button stays on the
+		// canvas in that state, but it stops being a door onto three ways out and
+		// becomes the one way out a simple UI keeps: the share card. SVG and PNG
+		// are work tools; the card is how a work leaves for someone else.
+		exportCardOnly: boolean;
 		pngTemplates: ExportTemplate[];
 		animationExportSettings: AnimationExportSettings;
 		apiFetch: ApiFetch;
@@ -249,6 +254,7 @@
 		statusHashCopied,
 		exportMenuOpen = $bindable(false),
 		exportWrapEl = $bindable(null),
+		exportCardOnly = false,
 		pngTemplates,
 		animationExportSettings,
 		apiFetch,
@@ -905,23 +911,30 @@
 					     share card. They were three buttons side by side, which said
 					     three things where the reader wanted one. -->
 					<div class="canvas-export" bind:this={exportWrapEl}>
-						<Tooltip placement="top-left" text={t().exportLabel}>
+						<Tooltip placement="top-left" text={exportCardOnly ? t().historyCardExport : t().exportLabel}>
 							<button
 								type="button"
 								class="canvas-icon-btn canvas-export-btn"
-								class:active={exportMenuOpen}
-								disabled={!result}
-								aria-haspopup="menu"
-								aria-expanded={exportMenuOpen}
-								aria-label={t().exportLabel}
-								onclick={(e) => { e.stopPropagation(); exportMenuOpen = !exportMenuOpen; }}
+								class:active={exportMenuOpen && !exportCardOnly}
+								disabled={exportCardOnly ? (!currentHistoryId || cardExportBusy) : !result}
+								aria-haspopup={exportCardOnly ? undefined : 'menu'}
+								aria-expanded={exportCardOnly ? undefined : exportMenuOpen}
+								aria-label={exportCardOnly ? t().historyCardExport : t().exportLabel}
+								onclick={(e) => {
+									e.stopPropagation();
+									// One button, two jobs, decided by which tools the reader kept.
+									// With the work tools gone there is nothing to choose between,
+									// so opening a menu of one would be a door onto a door.
+									if (exportCardOnly) downloadCardFromCanvas();
+									else exportMenuOpen = !exportMenuOpen;
+								}}
 							>
 								<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
 									<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
 								</svg>
 							</button>
 						</Tooltip>
-						{#if exportMenuOpen}
+						{#if exportMenuOpen && !exportCardOnly}
 							<div class="export-menu" role="menu">
 								<div class="export-menu-group">
 									<div class="svg-menu-head">

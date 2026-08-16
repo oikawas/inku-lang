@@ -180,7 +180,6 @@ test('T-102: the visibility rules name buttons, never a whole corner row', () =>
 		'canvas-share-btn': 'ui-hide-work-tools',
 		'canvas-replay-btn': 'ui-hide-work-tools',
 		'canvas-saijiki-btn': 'ui-hide-work-tools',
-		'canvas-export': 'ui-hide-work-tools',
 		'canvas-caption-btn': 'ui-hide-work-tools',
 		'canvas-presentation-btn': 'ui-hide-work-tools'
 	};
@@ -189,6 +188,13 @@ test('T-102: the visibility rules name buttons, never a whole corner row', () =>
 		assert.equal(named.length, 1, `${cls} is named ${named.length} times, not once`);
 		assert.match(named[0], new RegExp(`^\\.${group} `), `${cls} is under the wrong group`);
 	}
+
+	// The export button is the one moved control that no group names, by the
+	// author's ruling of 2026-08-16: hiding it took the share card out of the
+	// simple UI along with SVG and PNG. It stays and narrows what it opens
+	// onto instead, which is T-107's business. Named here so that the count
+	// above still covers every control on the rows -- this one by its absence.
+	assert.doesNotMatch(block, /:global\(\.canvas-export\)/);
 });
 
 // --------------------------------------- T-103 (nearby works left the canvas)
@@ -213,4 +219,55 @@ test('T-103: the strip is in the flow there, not floating over a drawing', () =>
 	assert.match(LINEAGE, /\.nearby-thumb \{[^}]*var\(--canvas-paper\)/);
 	// The history group still hides it, as it did on the canvas.
 	assert.match(PAGE, /\.ui-hide-history :global\(\.nearby-mirror\)/);
+});
+
+// ------------------------- T-107 (the simple UI keeps a door, and it is the card)
+//
+// Added 2026-08-16 by author's ruling, after the merge of the four stages
+// above: "in a simple UI, show the export button as a button that calls the
+// share card alone."
+//
+// The merge of the three ways out had taken the card off the simple UI with
+// SVG and PNG, because a merged door cannot be half hidden. The ruling keeps
+// the door and narrows what it opens onto, which is the one of the three that
+// is not a work tool: the card is how a work leaves for someone else.
+
+test('T-107: no UI mode hides the export button any more', () => {
+	// The rule that used to hide it is what took the card away.
+	assert.doesNotMatch(PAGE, /:global\(\.canvas-export\)/);
+	// The other work tools on the same row are still named, so this case is not
+	// satisfied by a page that stopped hiding anything at all.
+	assert.match(PAGE, /\.ui-hide-work-tools :global\(\.canvas-star-btn\)/);
+	assert.match(PAGE, /\.ui-hide-work-tools :global\(\.canvas-saijiki-btn\)/);
+});
+
+test('T-107: the page tells the canvas which of the two jobs the button has', () => {
+	// The visibility of the work tools is what decides it, and it is read from
+	// the same derived value the hide classes are read from -- not a second
+	// copy of the rule that could drift from it.
+	assert.match(PAGE, /exportCardOnly=\{!uiVisibility\.work_tools\}/);
+	assert.match(PAGE, /class:ui-hide-work-tools=\{!uiVisibility\.work_tools\}/);
+});
+
+test('T-107: with the work tools gone the button calls the card, not a menu', () => {
+	assert.match(PANEL, /if \(exportCardOnly\) downloadCardFromCanvas\(\);/);
+	assert.match(PANEL, /else exportMenuOpen = !exportMenuOpen;/);
+	// A menu of one is still a menu. The panel must not be able to open it in
+	// that state, whatever the bound flag happens to hold.
+	assert.match(PANEL, /\{#if exportMenuOpen && !exportCardOnly\}/);
+	// And it must not announce a menu it will not open.
+	assert.match(PANEL, /aria-haspopup=\{exportCardOnly \? undefined : 'menu'\}/);
+});
+
+test('T-107: in that state the button is disabled exactly when the card is', () => {
+	// The menu entry is disabled without a saved work or while one is building.
+	// A door that leads only there must refuse in the same two cases -- with
+	// `!result` alone it would be pressable and then do nothing.
+	assert.match(
+		PANEL,
+		/disabled=\{exportCardOnly \? \(!currentHistoryId \|\| cardExportBusy\) : !result\}/
+	);
+	assert.match(PANEL, /disabled=\{!currentHistoryId \|\| cardExportBusy\}/);
+	// It says what it does, too: the card's own label, not "export".
+	assert.match(PANEL, /aria-label=\{exportCardOnly \? t\(\)\.historyCardExport : t\(\)\.exportLabel\}/);
 });

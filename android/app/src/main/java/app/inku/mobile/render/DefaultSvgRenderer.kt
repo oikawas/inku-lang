@@ -483,7 +483,13 @@ class DefaultSvgRenderer(
                     fillGroup != null -> """<path class="$classAttr" d="${contour.pathD}" fill="none" $common/>"""
                     else -> """<path class="$classAttr" d="${contour.pathD}" fill="$fill" $common/>"""
                 }
-                if (fillGroup == null && !hand) {
+                // The server adds the surface group to every instruction group,
+                // outside the primitive switch, so a cloudform gets one like any
+                // other shape; here each branch asks for its own, and this one
+                // never did. Its bbox answering null hid that: the layer would
+                // have returned "" anyway.
+                val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex)
+                if (fillGroup == null && !hand && surfaceGroup.isEmpty()) {
                     pathStr
                 } else {
                     val sb = StringBuilder("<g>").append(pathStr)
@@ -504,6 +510,7 @@ class DefaultSvgRenderer(
                             )
                         }
                     }
+                    sb.append(surfaceGroup)
                     sb.append("</g>").toString()
                 }
             }
@@ -1021,7 +1028,10 @@ class DefaultSvgRenderer(
         val nx = -ty
         val ny = tx
         val localT = if (rhythmSpacing != "none" && localTotal > 1) {
-            rhythmT(localIndex, localTotal, seed, rhythmSpacing)
+            // Stirred per cluster, as the server does: without it the three
+            // clusters keep the same beat inside, which is one rhythm heard three
+            // times rather than three.
+            rhythmT(localIndex, localTotal, seedForClusterRhythm(seed, clusterIndex), rhythmSpacing)
         } else {
             (localIndex + 0.5) / localTotal.toDouble()
         }
@@ -1639,6 +1649,16 @@ class DefaultSvgRenderer(
     }
 
     private fun seedForCluster(seed: String): String = ((seed.toULongOrNull() ?: 0UL) xor 0xC1A57UL).toString()
+
+    /**
+     * The seed the rhythm inside one cluster is solved at: `seed ^ cluster_index`
+     * on the server (`_clustered_pos`). Same spelling as [seedForCluster] -- back
+     * to a number, xor, and out as text again -- because a seed is text here and
+     * any other way of mixing the two ("$seed:$k", a hash of the pair) lands on a
+     * different value than the server's.
+     */
+    private fun seedForClusterRhythm(seed: String, clusterIndex: Int): String =
+        ((seed.toULongOrNull() ?: 0UL) xor clusterIndex.toULong()).toString()
 
     private fun sha256Bytes(value: String): ByteArray = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
 
@@ -2513,8 +2533,11 @@ class DefaultSvgRenderer(
             // engine 28: the band's own samples, not the ideal arc. The geometric helper
             // stayed on `r + offset` and was left behind whenever the ink wandered, which
             // is the ghost the author saw beside the mark.
-            val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-            val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
+            // Same reading as the centreline above and as the server's
+            // `_render_arc_hand_stroke`: the ends' difference, not the folded one.
+            // The powder count follows this length, so a reversed arc used to get
+            // a third of the specks the server puts on it.
+            val arcLen = r * kotlin.math.abs(Math.toRadians(endDeg) - Math.toRadians(startDeg))
             val performed = stroke.samples.map { it.x to it.y }
             sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
         }

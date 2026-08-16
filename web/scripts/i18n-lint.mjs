@@ -148,6 +148,11 @@ const TERNARY = /isJapanese \? '((?:[^'\\]|\\.)*)' : '((?:[^'\\]|\\.)*)'/g;
 const GETLANG = /getLang\(\) === 'ja'\s*\n?\s*\? '((?:[^'\\]|\\.)*)'\s*\n?\s*: '((?:[^'\\]|\\.)*)'/g;
 const BILINGUAL_LABEL = />\s*([^<>\n]*[\u3040-\u30ff\u3400-\u9fff][^<>\n]*?)\s+\/\s+([A-Za-z][^<>\n]*?)\s*</g;
 
+// The same shape picks a language code as picks a label: `isJapanese ? 'ja' :
+// 'en'` is which language to read a DDL in, not two words to put on screen.
+// The pair itself is the tell -- no label in either pack is spelled 'ja'.
+const isLangCodePair = (ja, en) => ja === 'ja' && en === 'en';
+
 const strings = [];
 for (const e of pack(EN)) strings.push({ where: `en.ts ${e.key}`, key: e.key, text: e.text });
 for (const file of walk(SRC)) {
@@ -157,6 +162,7 @@ for (const file of walk(SRC)) {
 		re.lastIndex = 0;
 		let m;
 		while ((m = re.exec(body)) !== null) {
+			if (re !== BILINGUAL_LABEL && isLangCodePair(m[1], m[2])) continue;
 			const line = body.slice(0, m.index).split('\n').length;
 			strings.push({ where: `${relative(SRC, file)}:${line}`, key: null, text: m[2] });
 		}

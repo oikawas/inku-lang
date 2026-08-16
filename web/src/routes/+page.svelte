@@ -21,7 +21,8 @@
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
-	import { SURFACE_PREVIEWS, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
+	import { SURFACE_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
+	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -652,8 +653,8 @@
 	// Entries are keyed by the Japanese surface. The caller pairs the two
 	// display lists by position to derive the canonical word, an invariant the
 	// saijiki table holds and server tests lock (test_saijiki_api.py).
-	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string): SaijikiPreview {
-		const isJa = getLang() === 'ja';
+	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang): SaijikiPreview {
+		const uiLang = instructionLangOf(getLang());
 		const base = {
 			categoryKey,
 			word,
@@ -662,9 +663,11 @@
 			example: '',
 			svg: '',
 		};
+		// The effect is prose for the reader and the example is a fragment of
+		// DDL, so the two do not follow the same language when the DDL is not in
+		// the UI's -- see localizePreview.
 		const localized = (entry: PreviewEntry) => ({
-			effect: isJa ? entry.effect : entry.effectEn,
-			example: isJa ? entry.example : entry.exampleEn,
+			...localizePreview(entry, { uiLang, wordLang }),
 			svg: entry.svg,
 		});
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
@@ -779,8 +782,15 @@
 		if (entry) return { ...base, ...localized(entry) };
 		return {
 			...base,
-			effect: isJa ? '記述の解釈に影響する語彙です。' : 'A vocabulary word that shapes how the description is read.',
-			example: isJa ? `${word}を使う` : `Use "${word}"`,
+			...localizePreview(
+				{
+					effect: '記述の解釈に影響する語彙です。',
+					effectEn: 'A vocabulary word that shapes how the description is read.',
+					example: `${word}を使う`,
+					exampleEn: `Use "${word}"`,
+				},
+				{ uiLang, wordLang }
+			),
 			svg: lineSvg(),
 		};
 	}
@@ -808,14 +818,16 @@
 		fires_on_en?: string[];
 		preview_url?: string;
 		preview_url_2x?: string;
-	}): SaijikiPreview {
-		const isJa = getLang() === 'ja';
-		const firesOn = (isJa ? entry.fires_on_ja : entry.fires_on_en) ?? [];
+	}, wordLang: ResolvedInstructionLang): SaijikiPreview {
+		const uiLang = instructionLangOf(getLang());
+		// The note explains the word, so it is the reader's language; the firing
+		// phrase is what a description would say to reach it, so it is the DDL's.
+		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		return {
 			categoryKey: 'plugin',
 			word: entry.qualified_name,
 			canonicalWord: entry.qualified_name,
-			effect: (isJa ? entry.note_ja : entry.note_en) || '',
+			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
 			example: firesOn[0] ?? '',
 			// The fallback is the drawing, not an empty frame; it is only read
 			// when the word ships no artwork, since `image` wins where it is set.

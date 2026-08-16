@@ -81,15 +81,15 @@ test('T-21: the note is not printed under the chip any more', () => {
 test('T-21: a plugin chip reaches the preview the same ways a built-in one does', () => {
 	for (const panel of PANELS) {
 		const section = pluginSection(read(panel));
-		assert.match(section, /onpointerenter=\{\(\) => \(activePreview = previewForPlugin\(entry\)\)\}/, panel);
-		assert.match(section, /onfocus=\{\(\) => \(activePreview = previewForPlugin\(entry\)\)\}/, panel);
+		assert.match(section, /onpointerenter=\{\(\) => \(activePreview = previewForPlugin\(entry, wordLang\)\)\}/, panel);
+		assert.match(section, /onfocus=\{\(\) => \(activePreview = previewForPlugin\(entry, wordLang\)\)\}/, panel);
 	}
 });
 
 test('T-21: clicking keeps each panel\'s own job', () => {
 	// The drawer is read-only, so a click previews; the editor inserts the word.
 	const drawer = pluginSection(read('./SaijikiDrawer.svelte'));
-	assert.match(drawer, /onclick=\{\(\) => \(activePreview = previewForPlugin\(entry\)\)\}/);
+	assert.match(drawer, /onclick=\{\(\) => \(activePreview = previewForPlugin\(entry, wordLang\)\)\}/);
 	const inline = pluginSection(read('./SaijikiInline.svelte'));
 	assert.match(inline, /onclick=\{\(\) => onInsertWord\(entry\.qualified_name\)\}/);
 });
@@ -106,10 +106,12 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 	// Title, effect, example: the qualified name, the note, the first phrase a
 	// description would use to reach the word.
 	assert.match(fn, /word: entry\.qualified_name/);
-	assert.match(fn, /effect: \(isJa \? entry\.note_ja : entry\.note_en\)/);
+	assert.match(fn, /effect: \(uiLang === 'ja' \? entry\.note_ja : entry\.note_en\)/);
 	assert.match(fn, /example: firesOn\[0\]/);
-	// Both languages are read, so an English UI does not show Japanese prose.
-	assert.match(fn, /isJa \? entry\.fires_on_ja : entry\.fires_on_en/);
+	// Both languages are read, so neither text is ever shown in the other's.
+	// The note is prose and follows the reader; the firing phrase is what a
+	// description would say, so it follows the DDL (T-92).
+	assert.match(fn, /wordLang === 'ja' \? entry\.fires_on_ja : entry\.fires_on_en/);
 });
 
 test('T-22: both panels are given the builder, or one of them shows nothing', () => {
@@ -119,7 +121,7 @@ test('T-22: both panels are given the builder, or one of them shows nothing', ()
 	// panel. Two call sites, and a missing one is a silent dead panel.
 	assert.equal(wired.length, 2);
 	const dialog = read('./DdlEditorDialog.svelte');
-	assert.match(dialog, /previewForPlugin: \(entry: PluginEntry\) => SaijikiPreview;/);
+	assert.match(dialog, /previewForPlugin: \(entry: PluginEntry, wordLang: ResolvedInstructionLang\) => SaijikiPreview;/);
 	assert.match(dialog, /\{previewForPlugin\}/);
 });
 

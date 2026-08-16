@@ -1,9 +1,23 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.render.ServerRendererGeometry
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ServerScoreCoercer {
+    /**
+     * The surface vocabulary, in the order `SurfaceTexture` declares it in `schema.py`.
+     *
+     * Named and ordered rather than written inline because the schema offered to Stage 2
+     * holds the same list, and a model only ever writes what the destination field held
+     * out to it: while `solid` was missing from either copy, the local road could not
+     * say 塗り at all. The two copies are measured against each other.
+     */
+    internal val surfaceTextures: Set<String> = setOf(
+        "none", "solid", "stipple", "hatch", "crosshatch",
+        "aquatint", "grain", "wash", "bleed", "paper_grain",
+    )
+
     private data class FieldSpec(
         val name: String,
         val defaultValue: Any,
@@ -89,6 +103,7 @@ internal object ServerScoreCoercer {
         postCoerce(primitive, data)
         applyMaterialHint(data, ddl)
         applyVariationHint(primitive, data, ddl)
+        foldFillAndSurface(primitive, data)
 
         // Strip unknown extra fields to comply with ConfigDict(extra="forbid")
         val allowedKeys = setOf(
@@ -152,9 +167,56 @@ internal object ServerScoreCoercer {
         return result
     }
 
+    /**
+     * Say one interior state one way, whichever way it arrived.
+     *
+     * Ported from `_with_fill_as_a_surface_word` in `coerce/normalize.py`. A fill used
+     * to be the one surface word with a road of its own -- eight of the nine quality
+     * words landed in `surface.texture` and 塗り landed in the boolean `filled` -- and
+     * that road did not carry. The word now goes where the others go, and this makes
+     * the two statements one:
+     *
+     * - `texture="solid"` derives `filled=true`, so a Score written the new way still
+     *   draws on every reader that only knows the boolean;
+     * - `filled=true` with no surface of its own derives `texture="solid"`, so the works
+     *   already saved say their interior in the same vocabulary the new ones do.
+     *
+     * Closed shapes only, for the reason the server gives: a line has no interior, so
+     * neither statement means anything on one, and inventing a surface there would put
+     * back exactly the invisible surfaces the port takes away elsewhere.
+     */
+    private fun foldFillAndSurface(primitive: String, data: JSONObject) {
+        if (primitive !in ServerRendererGeometry.CLOSED_SHAPES) return
+        val surface = data.optJSONObject("surface")
+        val texture = surface?.optString("texture", "none")
+        if (texture == "solid") {
+            if (!data.optBoolean("filled", false)) data.put("filled", true)
+            return
+        }
+        if (!data.optBoolean("filled", false)) return
+        if (surface != null && texture != "none") return
+        // Built field by field rather than through `normalizeSurface`, which reads the
+        // texture allowlist: the derived word must not be run back through the gate that
+        // is only there to judge what Stage 2 wrote.
+        val solid = if (surface == null) {
+            JSONObject()
+                .put("texture", "solid")
+                .put("density", 0.35)
+                .put("scale", 0.35)
+                .put("opacity", 0.28)
+                .put("bleed", 0.0)
+                .put("direction", "none")
+                .put("spacing_gradient", "none")
+                .put("tone_steps", 3)
+        } else {
+            JSONObject(surface.toString()).put("texture", "solid")
+        }
+        data.put("surface", solid)
+    }
+
     private fun normalizeSurface(source: JSONObject): JSONObject {
         val result = JSONObject(source.toString())
-        result.put("texture", result.optString("texture", "none").takeIf { it in setOf("none", "stipple", "hatch", "crosshatch", "aquatint", "grain", "wash", "bleed", "paper_grain") } ?: "none")
+        result.put("texture", result.optString("texture", "none").takeIf { it in surfaceTextures } ?: "none")
         result.put("density", result.optDouble("density", 0.35).coerceIn(0.0, 1.0))
         result.put("scale", result.optDouble("scale", 0.35).coerceIn(0.0, 1.0))
         result.put("opacity", result.optDouble("opacity", 0.28).coerceIn(0.0, 1.0))

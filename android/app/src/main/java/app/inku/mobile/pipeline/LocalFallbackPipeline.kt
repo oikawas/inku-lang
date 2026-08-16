@@ -5,6 +5,7 @@ import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.render.DefaultSvgRenderer
+import app.inku.mobile.render.ServerRendererGeometry
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.math.round
@@ -1666,7 +1667,10 @@ class LocalFallbackPipeline(
     private fun temperUnintentionalFilledShape(item: JSONObject, ddl: String): JSONObject {
         if (hasIntentionalLargeSurface(ddl)) return item
         if (contextHasDensityGovernor(ddl)) return item
-        if (!item.optBoolean("filled", false)) return item
+        // The request, not the boolean: `surface.texture="solid"` asks for the same fill,
+        // and a governor that reads only half of the vocabulary lets the same drawing
+        // through or holds it back depending on how the request happened to be written.
+        if (!ServerRendererGeometry.fillIsAskedFor(item)) return item
         if (item.has("arrangement") && !item.isNull("arrangement")) return item
         val primitive = item.optString("primitive")
         if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon")) return item

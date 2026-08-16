@@ -8104,7 +8104,7 @@ read one-for-one with the server.
   (md5 verified) and deleted here. **The freeze itself is
   held by commit `593f90a6` (07:46:28), two minutes and forty-six seconds ahead of the first product
   commit `334f6399` (07:49:14).**
-- **Two ledger entries filed (both unnumbered):** (1) the server refuses an instruction missing a
+- **Two ledger entries filed (numbered the same day as I-299 and I-295):** (1) the server refuses an instruction missing a
   field with `ValueError` across seven primitives while the port draws it with defaults — **this
   round fixed only the surface gate, so a middle state remains where the shape is drawn and the
   surface is not**; (2) the duplicated gate above. **Both await a ruling.**
@@ -8167,7 +8167,7 @@ fills an interior — was invisible to every guard.
 - **⚠ The branch point moved mid-round** — another session fast-forwarded this worktree's branch to
   the tip of main (`024df278` → `97400d43`). **The `android/` subtree hashes identically at both**, so
   the baseline measured before the work still holds. **Acceptance read `97400d43..tip`.**
-- **One follow-up filed (unnumbered):** **`ServerRendererStyle.strokeAttrs` does not read the
+- **One follow-up filed (numbered the same day as I-298):** **`ServerRendererStyle.strokeAttrs` does not read the
   server's `do_fill`** — (1) a shape that is not filled still gets a `fill-opacity`, and (2) writing
   the same request as `surface.texture="solid"` makes a `cloudform`'s fill disappear. **Neither shows
   in the frozen corpus** (no `color_hint` there moves `fill-opacity`, and there is no `solid`

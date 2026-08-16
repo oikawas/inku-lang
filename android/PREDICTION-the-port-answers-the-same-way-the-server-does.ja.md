@@ -1,6 +1,7 @@
 # 凍結: 満点と摂動の予測（契約 `the-port-answers-the-same-way-the-server-does`）
 
-**エージェント**: Claude Opus 4.5（Android の実装セッション）
+**エージェント**: Claude Opus 5（`claude-opus-5[1m]`・Android の実装セッション）
+（**2026-08-16 訂正**: 最初に「Claude Opus 4.5」と書いた。**数字は 1 つも動かしていない** —— 名前だけの訂正）
 **枝**: `feat/the-port-answers-the-same-way-the-server-does`／**起点**: `8b93bb9d`（`git merge-base HEAD main` で実測）
 **測った日**: 2026-08-16 ／ **コードは 1 行も書いていない時点**
 

@@ -299,6 +299,18 @@ class AWashIsAFieldTest {
     private val branchPointInk = mapOf("square" to 0.162299, "triangle" to 0.162251)
 
     /**
+     * The branch point swept in two layers, and engine 36 did not touch that.
+     *
+     * ⚠ Written out rather than read from [SURFACE_WASH_LAYERS]. Comparing the
+     * drawing against the constant that produced it says nothing: drop the
+     * constant to 1 and the expectation drops with it, which is how the first
+     * version of T-154 sat green through exactly that perturbation. The claim
+     * here is "the layer count did not move from the branch point", so the
+     * branch point's own number is what it has to be measured against.
+     */
+    private val branchPointLayers = 2
+
+    /**
      * T-149. **This is the body of the claim that it is not a set of stripes.**
      *
      * Sweeps narrower than the pitch leave the paper between two of them
@@ -412,7 +424,16 @@ class AWashIsAFieldTest {
     fun testAWashKeepsThePitchTheLayersAndTheAngles() {
         for (name in shapes.keys) {
             val measured = measure(name)
-            assertEquals("$name: the wash is swept in layers", SURFACE_WASH_LAYERS, measured.layers.size)
+            assertEquals(
+                "$name: the wash is swept in the branch point's number of layers",
+                branchPointLayers,
+                measured.layers.size,
+            )
+            assertEquals(
+                "$name: and the constant still says so",
+                branchPointLayers,
+                SURFACE_WASH_LAYERS,
+            )
 
             // The branch point's pitch, from the formula the wash still uses.
             // The scanlines are laid down with the fill's spacing jitter, so the

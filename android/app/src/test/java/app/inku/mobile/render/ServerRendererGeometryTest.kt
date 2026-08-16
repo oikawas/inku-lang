@@ -91,22 +91,23 @@ class ServerRendererGeometryTest {
         assertTrue("Different seeds should yield varied circle geometry", maxDiff > 0.1)
     }
 
+    /** The varied arc is a run of points now, the way the server writes it -- the
+     * `d` string this used to read went away with `variedArcPathD`. */
     @Test
-    fun testVariedArcPathDGeneration() {
+    fun testVariedArcPointsGeneration() {
         val variation = JSONObject()
             .put("amplitude", "fine")
             .put("frequency", "high")
             .put("quality", "perlin")
             .put("dimensions", JSONArray().put("position_x").put("position_y"))
 
-        val path1 = ServerRendererGeometry.variedArcPathD(500.0, 500.0, 180.0, 20.0, 300.0, variation, 12345)
-        val path2 = ServerRendererGeometry.variedArcPathD(500.0, 500.0, 180.0, 20.0, 300.0, variation, 12345)
-        val pathOtherSeed = ServerRendererGeometry.variedArcPathD(500.0, 500.0, 180.0, 20.0, 300.0, variation, 99999)
+        val pts1 = ServerRendererGeometry.variedArcPoints(500.0, 500.0, 180.0, 20.0, 300.0, variation, 12345)
+        val pts2 = ServerRendererGeometry.variedArcPoints(500.0, 500.0, 180.0, 20.0, 300.0, variation, 12345)
+        val ptsOtherSeed = ServerRendererGeometry.variedArcPoints(500.0, 500.0, 180.0, 20.0, 300.0, variation, 99999)
 
-        assertTrue("Path should start with M", path1.startsWith("M "))
-        assertTrue("Path should contain L segments", path1.contains(" L "))
-        assertEquals("Path must be deterministic for same seed", path1, path2)
-        assertNotEquals("Path should differ for different seeds", path1, pathOtherSeed)
+        assertTrue("An arc must be sampled at more than its two ends", pts1.size > 2)
+        assertEquals("Points must be deterministic for same seed", pts1, pts2)
+        assertNotEquals("Points should differ for different seeds", pts1, ptsOtherSeed)
     }
 
     @Test

@@ -459,41 +459,52 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Any?, count: Int = 60): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
+    fun variedArcPoints(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject, seed: Any?, count: Int = 60): List<Pair<Double, Double>> {
+        return variedArcPoints(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), JSONObject(), 1000.0, 1000.0, 1000.0)
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Any?, ins: JSONObject, width: Double, height: Double, unit: Double): String {
-        return variedArcPathD(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), ins, width, height, unit)
+    fun variedArcPoints(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject, seed: Any?, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return variedArcPoints(cx, cy, r, startDeg, endDeg, variation, seedToLong(seed), ins, width, height, unit)
     }
 
-    fun variedArcPathD(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject?, seed: Long, ins: JSONObject, width: Double, height: Double, unit: Double): String {
-        if (variation == null || !needsPathVariation(variation)) {
-            return arcPathD(cx, cy, r, startDeg, endDeg)
-        }
-        // How long the arc is, is the difference between its two ends -- not that
-        // difference folded back into 0..360. The server measures it this way
-        // (`_arc_points_with_variation`), and an arc drawn from 300 to 20 is the
-        // long way round, 4.89 radii, not the 1.40 the folded reading gives.
+    /**
+     * The server's `_arc_points_with_variation`, for the arc that stays
+     * geometric (`rotring`) and so never enters the stroke engine.
+     *
+     * The hand-stroke path has had its own copy of this all along
+     * (`arcPointsWithVariation` below) and that one already agreed with the
+     * server. This one did not, in four ways at once: it took
+     * `segmentCount` points where the server takes one more, it sampled the
+     * wobble at `i / count` where the server samples at `i / last`, and it let
+     * the two end points wobble, which the server holds fixed so that a
+     * `touching` contact stays a contact.
+     *
+     * The arc's length is the difference between its two ends -- not that
+     * difference folded back into 0..360 -- and it is written the server's way,
+     * `r * |radians(end) - radians(start)|`. The hand path writes the same
+     * number as `2*pi*r*|end-start|/360` and is deliberately left spelled that
+     * way: the two agree to the last digit on every arc either of them is given,
+     * and rewriting one of them would be a change to a path the frozen corpus
+     * walks for nothing gained.
+     */
+    fun variedArcPoints(cx: Double, cy: Double, r: Double, startDeg: Double, endDeg: Double, variation: JSONObject, seed: Long, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         val arcLen = r * Math.abs(Math.toRadians(endDeg) - Math.toRadians(startDeg))
-        val count = segmentCount(arcLen, unit)
-        val points = arcPoints(cx, cy, r, startDeg, endDeg, count)
+        val basePoints = arcPoints(cx, cy, r, startDeg, endDeg, segmentCount(arcLen, unit) + 1)
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
         val amp = amplitudePx(variation, ins, width, height, unit)
         val center = cx to cy
-        val variedPts = points.mapIndexed { i, pt ->
-            val t = i.toDouble() / count.toDouble()
-            val off = sampleOffset(t, variation, seed, i, amp)
-            offsetContourPoint(pt.first, pt.second, off, center, axisX, axisY)
+        val last = basePoints.size - 1
+        if (last <= 0) return basePoints
+        val result = mutableListOf(basePoints[0])
+        for (i in 1 until last) {
+            val (x, y) = basePoints[i]
+            val off = sampleOffset(i.toDouble() / last.toDouble(), variation, seed, i, amp)
+            result.add(offsetContourPoint(x, y, off, center, axisX, axisY))
         }
-        if (variedPts.isEmpty()) return ""
-        val sb = StringBuilder("M ${fmt(variedPts[0].first)} ${fmt(variedPts[0].second)}")
-        for (i in 1 until variedPts.size) {
-            sb.append(" L ${fmt(variedPts[i].first)} ${fmt(variedPts[i].second)}")
-        }
-        return sb.toString()
+        result.add(basePoints[last])
+        return result
     }
 
     /**

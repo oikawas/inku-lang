@@ -441,8 +441,18 @@ class DefaultSvgRenderer(
                     renderArcHandStroke(ins, attrs, cx, cy, r, start, end, unit, width, height, renderSeed, wild)
                 } else {
                     val variation = ins.optJSONObject("variation")
-                    val path = ServerRendererGeometry.variedArcPathD(cx, cy, r, start, end, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
-                    val base = """<path d="$path" fill="none" $common/>"""
+                    // A wobbling arc is a run of points, not an arc command, so
+                    // the server writes it as a <polyline> and keeps <path d="A">
+                    // for the arc that does not wobble. Both branches are here
+                    // because the element itself is part of the answer.
+                    val base = if (needsPathVariation(variation)) {
+                        val points = ServerRendererGeometry.variedArcPoints(
+                            cx, cy, r, start, end, variation!!, seedForInstruction(ins, renderSeed), ins, width, height, unit
+                        ).joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                        """<polyline points="$points" fill="none" $common/>"""
+                    } else {
+                        """<path d="${ServerRendererGeometry.arcPathD(cx, cy, r, start, end)}" fill="none" $common/>"""
+                    }
                     val outline = if (usesMaterialOutline(weight)) materialArcOutline(ins, attrs, cx, cy, r, start, end, unit) else ""
                     if (outline.isNotEmpty()) """<g>$base$outline</g>""" else base
                 }

@@ -1,6 +1,9 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.pipeline.RenderRequest
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -26,7 +29,8 @@ class TheBeatTheArcAndTheSheetAgreeWithTheServerTest {
 
     private val seed = 12345L
     private val seedText = "12345"
-    private val squareSide = 1000.0
+    private fun countOccurrences(haystack: String, needle: String): Int =
+        haystack.split(needle).size - 1
 
     // ---- [I-273] the beat ------------------------------------------------
 
@@ -136,5 +140,162 @@ class TheBeatTheArcAndTheSheetAgreeWithTheServerTest {
         for (i in expected.indices) {
             assertEquals("none i=$i", expected[i], rhythmT(i, 5, "none"), 1e-12)
         }
+    }
+
+    // ---- [I-274] the varied arc ------------------------------------------
+
+    /**
+     * The arc the whole of stage 2 is measured on: 280 degrees on a 1000x1000
+     * sheet at r = 300 px, which the server measures at 1466.0766 px and cuts
+     * into 147 segments -- 148 points.
+     */
+    private fun arc(weight: String, varied: Boolean): JSONObject {
+        val ins = JSONObject(
+            """
+            {"primitive":"arc","center":[0.5,0.5],"radius":0.3,
+             "angle_start":20,"angle_end":300,"weight":"$weight"}
+            """.trimIndent()
+        )
+        if (varied) {
+            ins.put(
+                "variation",
+                JSONObject("""{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_y"]}"""),
+            )
+        }
+        return ins
+    }
+
+    private fun renderScore(instruction: JSONObject, aspect: String = "square"): String {
+        val score = JSONObject().put("instructions", JSONArray().put(instruction))
+        return DefaultSvgRenderer().render(
+            RenderRequest(
+                scoreJson = score.toString(),
+                colorCatalogId = "default",
+                canvasAspect = aspect,
+                svgProfile = "editable",
+                renderSeed = seed,
+            )
+        ).svg
+    }
+
+    /**
+     * The arc's points, whichever element carries them.
+     *
+     * A `<polyline points>` is read straight; a `<path d>` of `M` and `L` is
+     * read the same way. Which element the port writes is T-126's question
+     * alone -- if this helper only knew about the polyline, replacing it with a
+     * path would redden T-127 through T-129 as well, and three gates that all
+     * fail for one reason cannot say which quantity moved.
+     */
+    private fun arcPointsOf(svg: String): List<String> {
+        Regex(" points=\"([^\"]*)\"").find(svg)?.let { return it.groupValues[1].split(" ") }
+        val d = Regex(" d=\"([^\"]*)\"").findAll(svg).map { it.groupValues[1] }
+            .firstOrNull { it.contains(" L ") } ?: return emptyList()
+        return d.removePrefix("M ").split(" L ").map { it.trim().replace(" ", ",") }
+    }
+
+    /** The two ends of the arc command the port writes when nothing wobbles:
+     * `M x y A rx ry rot large sweep x y`. */
+    private fun plainArcEnds(svg: String): Pair<String, String> {
+        val d = Regex(" d=\"([^\"]*)\"").find(svg)!!.groupValues[1]
+        val n = Regex("-?\\d+\\.\\d+").findAll(d).map { it.value }.toList()
+        return "${n[0]},${n[1]}" to "${n[n.size - 2]},${n[n.size - 1]}"
+    }
+
+    /**
+     * T-126: a wobbling geometric arc is a `<polyline>`, and one that does not
+     * wobble is still a `<path>`.
+     *
+     * The server keeps both branches (`_render_instruction`: `dwg.polyline` when
+     * the contour varies, `_arc_path_d` otherwise) and the port wrote a `<path>`
+     * for both -- an `M`/`L` run inside a `d`, which draws the same ink but is
+     * not the same document. The second half is the control: emitting a polyline
+     * unconditionally would answer the first half and be just as wrong.
+     */
+    @Test
+    fun testAWobblingGeometricArcIsAPolylineAndAPlainOneIsAPath() {
+        val varied = renderScore(arc("rotring", varied = true))
+        assertEquals("one polyline", 1, countOccurrences(varied, "<polyline"))
+        assertEquals("and no path", 0, countOccurrences(varied, "<path"))
+
+        val plain = renderScore(arc("rotring", varied = false))
+        assertEquals("one path", 1, countOccurrences(plain, "<path"))
+        assertEquals("and no polyline", 0, countOccurrences(plain, "<polyline"))
+        assertTrue("still an arc command", plain.contains(" A 300.000000 300.000000 "))
+    }
+
+    /**
+     * T-127: it is sampled 148 times -- `segmentCount` plus one.
+     *
+     * The server puts a point on both ends of every segment; the port put one
+     * per segment and so drew the arc one point short, which moves every sample
+     * after the first because the phase is measured against the count.
+     */
+    @Test
+    fun testTheArcIsSampledOnePointMoreThanItHasSegments() {
+        assertEquals(
+            "the server samples this arc 148 times",
+            148,
+            arcPointsOf(renderScore(arc("rotring", varied = true))).size,
+        )
+    }
+
+    /**
+     * T-128: the two ends do not wobble.
+     *
+     * They are the `touching` contract: a second arc asked to meet this one
+     * meets it at the coordinates the geometry says, so those two points are
+     * placed unwobbled and everything between them is not. Both halves are
+     * measured -- if the middle did not move either, the wobble would not be
+     * running at all and the fixed ends would prove nothing.
+     */
+    @Test
+    fun testTheArcsTwoEndsDoNotWobble() {
+        val points = arcPointsOf(renderScore(arc("rotring", varied = true)))
+        val (plainFirst, plainLast) = plainArcEnds(renderScore(arc("rotring", varied = false)))
+        assertEquals("the first point is where the plain arc starts", plainFirst, points.first())
+        assertEquals("the last point is where the plain arc ends", plainLast, points.last())
+        // The unwobbled point 74 on the server, against the wobbled one below.
+        assertNotEquals("but the middle of the arc did move", "216.425700,402.093839", points[74])
+    }
+
+    /**
+     * T-129: and the phase is `i / last`, not `i / count`.
+     *
+     * Both readings agree at the two ends, so only a point in the middle can
+     * tell them apart: at i = 74 the server's phase is 0.503401 and puts the
+     * point at y = 402.192664, where `i / count` gives 0.5 and 402.217861. The
+     * coordinate is the server's own.
+     */
+    @Test
+    fun testTheWobbleIsSampledAtTheServersPhase() {
+        val points = arcPointsOf(renderScore(arc("rotring", varied = true)))
+        assertEquals("point 74 is the server's", "216.425700,402.192664", points[74])
+    }
+
+    /**
+     * T-130: the hand-stroke arc did not move.
+     *
+     * The control for the whole of stage 2. `arcPointsWithVariation` is the
+     * other copy of the same idea and it already agreed with the server, down to
+     * writing the arc's length as `2*pi*r*|end-start|/360` -- so it is pinned
+     * here at both of the server's counts, with and without a wobble, and its
+     * powder with it.
+     */
+    @Test
+    fun testTheHandStrokeArcDidNotMove() {
+        val varied = renderScore(arc("pencil", varied = true))
+        assertTrue(
+            "the varied centreline keeps the server's 148 samples",
+            varied.contains("arc-stroke-v1 controls-148 events-1"),
+        )
+        assertEquals("and its 55 specks", 55, Regex("<circle[ />]").findAll(varied).count())
+
+        val plain = renderScore(arc("pencil", varied = false))
+        assertTrue(
+            "the plain centreline keeps the server's 72 samples",
+            plain.contains("arc-stroke-v1 controls-72 events-0"),
+        )
+        assertEquals("and its 55 specks", 55, Regex("<circle[ />]").findAll(plain).count())
     }
 }

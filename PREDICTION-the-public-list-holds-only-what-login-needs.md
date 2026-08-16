@@ -1,8 +1,11 @@
 # 予測（着手前に凍結）: 公開の一覧は、ログインに要るものだけを持つ
 
 **書いた人**: 実装セッション（Claude Code / Opus 5, 1M context）／**2026-08-16**
-**契約**: `no-git-sync/fable5/claude_code/tasks/stock/the-public-list-holds-only-what-login-needs.md`
+**契約**: 同名の契約 md（在庫にある。未公開文書なのでパスは書かない）
 **枝** `feat/the-public-list-holds-only-what-login-needs` ／ **この commit の親** `8b93bb9d`
+
+> **⚠ この 2 行目は着手後に直した**（`scripts/check_docs.py` が未公開パスの直書きを止めた）。
+> **数字は 1 つも動かしていない。**
 
 > **⚠ この文書はコードを 1 行も書く前に commit する**（実行規約 §2-8）。
 > **凍らせずに後から書いた数字は、測っていない数字として扱う。**

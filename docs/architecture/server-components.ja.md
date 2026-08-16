@@ -96,7 +96,7 @@ flowchart LR
 | `render` | 8 | variation、compose、interpret、render、paint、vision | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
 
-合計82。公開allowlistは `/health`、`/api/info`、`/api/color-catalogs`、`/api/auth/config`、`/api/auth/login`、`/api/prompts` の6 pathである（`test_route_authorization.py`）。
+合計82。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
 ## 主要flow
 

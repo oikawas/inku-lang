@@ -5,6 +5,9 @@
 
 	type Props = {
 		outputTab: 'prompts' | 'score';
+		/** The pane that scrolls in whichever tab is showing. The drawer that
+		    holds this reads it to put the reader back where they closed it. */
+		scrollEl?: HTMLElement | null;
 		promptsData: PromptsData | null;
 		stage1PromptText: string;
 		ddl: string | null;
@@ -20,6 +23,7 @@
 
 	let {
 		outputTab,
+		scrollEl = $bindable(null),
 		promptsData,
 		stage1PromptText,
 		ddl,
@@ -37,7 +41,7 @@
 </script>
 
 {#if outputTab === 'prompts' && promptsData}
-	<div class="prompt-section">
+	<div class="prompt-section" bind:this={scrollEl}>
 		<div class="prompt-head">
 			<p class="prompt-label">{t().promptStage1Input}</p>
 			<button
@@ -112,7 +116,7 @@
 				</svg>
 			</button>
 		</div>
-		<div class="score-view">
+		<div class="score-view" bind:this={scrollEl}>
 			<div class="score-line-nums" aria-hidden="true">
 				{#each scoreJsonLines as _, i (i)}
 					<div class="score-line-num" class:section-start={scoreJsonSeparatorLine === i}>{i + 1}</div>

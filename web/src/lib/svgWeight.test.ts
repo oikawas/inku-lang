@@ -120,14 +120,16 @@ test('T-69  the drawer measures only when the work on screen has an SVG', () => 
 });
 
 test('T-69  and all three cells fall back to a dash, never to a zero', () => {
-	// Bytes go through formatBytes, which already answers '-' for null; the two
-	// new cells say so themselves.
-	assert.match(PANEL, /formatBytes\(detailSvgBytes\)/);
-	assert.match(PANEL, /if \(bytes == null\) return '-';/);
+	// Bytes go through formatByteSize, which answers '-' for null and now lives
+	// in $lib/formatNumber (the canvas strip says the same number); the two
+	// other cells check the derivation itself, since a formatter that groups
+	// digits always returns a string and can no longer carry the dash.
+	assert.match(PANEL, /formatByteSize\(detailSvgBytes\)/);
+	assert.match(read('./formatNumber.ts'), /if \(bytes == null\) return '-';/);
 	for (const field of ['objects', 'points']) {
 		assert.match(
 			PANEL,
-			new RegExp(`\\{detailSvgWeight\\?\\.${field} \\?\\? '-'\\}`),
+			new RegExp(`\\{detailSvgWeight \\? groupDigits\\(detailSvgWeight\\.${field}\\) : '-'\\}`),
 			`the ${field} cell does not fall back to a dash`
 		);
 	}

@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
 	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
+	import { resolveInstructionLang, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
@@ -52,9 +53,9 @@
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		error: string | null;
-		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		previewForWord: (categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 		/** The same preview a built-in word gets, built from the plugin document. */
-		previewForPlugin: (entry: PluginEntry) => SaijikiPreview;
+		previewForPlugin: (entry: PluginEntry, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 		// `fires_on_*` is what lets the editor say which plain word a wrong
 		// qualified name would have fired (GET /api/saijiki carries them).
 		pluginEntries?: PluginEntry[];
@@ -96,6 +97,14 @@
 	// Named while it is being typed: the expansion layer drops such a reference
 	// together with the sentence around it, and nothing says so afterwards.
 	const unknownNames = $derived(unknownPluginNames(value, pluginNameIndex));
+	// The saijiki offers words in the language of the DDL being written, which
+	// is read from the text the same way the server reads it. It follows the
+	// typing rather than the DDL the dialog opened with: a rewrite from one
+	// language into the other switches the words as the last character of the
+	// old language leaves the text. An editor holding neither language yet --
+	// an empty one, or one line of digits -- falls back to the UI language,
+	// which is the fallback the server's API layer passes too.
+	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
 
 	$effect(() => {
 		if (open && !lastOpen) {
@@ -238,6 +247,7 @@
 			</div>
 			<SaijikiInline
 				bind:activePreview={activeSaijikiPreview}
+				{wordLang}
 				{pluginEntries}
 				onInsertWord={insertWord}
 				{previewForWord}

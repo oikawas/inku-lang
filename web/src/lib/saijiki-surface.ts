@@ -12,7 +12,9 @@
 // -- the hatch angle, the two wash sweeps, the three aquatint steps and the
 // density figures behind 濃い / 薄い are all read from there, not invented.
 
-/** One preview: the copy in both UI languages, and the drawing they share. */
+import type { ResolvedInstructionLang } from './instructionLang';
+
+/** One preview: the copy in both languages, and the drawing they share. */
 export type PreviewEntry = {
 	effect: string;
 	example: string;
@@ -20,6 +22,25 @@ export type PreviewEntry = {
 	exampleEn: string;
 	svg: string;
 };
+
+/**
+ * The two texts of a preview, each in the language its reader needs.
+ *
+ * They do not follow the same language. The effect explains the word to the
+ * person looking at it, so it is in the UI language. The example is a fragment
+ * of DDL -- `太い線を引く` against `a thick line` -- so it is in the language
+ * the DDL is in, which need not be the UI language: the DDL editor offers
+ * English words to a Japanese UI whenever the DDL itself is English.
+ */
+export function localizePreview(
+	entry: Pick<PreviewEntry, 'effect' | 'example' | 'effectEn' | 'exampleEn'>,
+	langs: { uiLang: ResolvedInstructionLang; wordLang: ResolvedInstructionLang }
+): { effect: string; example: string } {
+	return {
+		effect: langs.uiLang === 'ja' ? entry.effect : entry.effectEn,
+		example: langs.wordLang === 'ja' ? entry.example : entry.exampleEn
+	};
+}
 
 /** The preview frame every saijiki drawing sits in: paper, then the marks. */
 export const shapeSvg = (shape: string) =>

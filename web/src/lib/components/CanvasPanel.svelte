@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { placeholderMotifTransform } from '$lib/canvas-placeholder';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -13,6 +13,9 @@
 	import VariationLanes from './VariationLanes.svelte';
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { measureSvgWeight } from '$lib/svgWeight';
+	import { formatByteSize, groupDigits } from '$lib/formatNumber';
+	import { shareTargetOf } from '$lib/shareTarget';
+	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -31,7 +34,7 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
@@ -90,8 +93,8 @@
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
-		pngMenuOpen: boolean;
-		pngWrapEl: HTMLDivElement | null;
+		exportMenuOpen: boolean;
+		exportWrapEl: HTMLDivElement | null;
 		pngTemplates: ExportTemplate[];
 		animationExportSettings: AnimationExportSettings;
 		apiFetch: ApiFetch;
@@ -112,6 +115,15 @@
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
+		/** The revision mark of the work on screen, the same flag the history
+		    manager's pencil toggles. */
+		onToggleForRevision: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
+		/**
+		 * The share-target mark. Optional because the flag it stands on does not
+		 * exist yet (ledger I-191): this is the socket, and the mark stays off
+		 * screen until both the field and this handler arrive. See $lib/shareTarget.
+		 */
+		onToggleForShare?: ((item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
 		onReplayCurrent: () => void | Promise<void>;
 		replayDisabled: boolean;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
@@ -235,8 +247,8 @@
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
-		pngMenuOpen = $bindable(false),
-		pngWrapEl = $bindable(null),
+		exportMenuOpen = $bindable(false),
+		exportWrapEl = $bindable(null),
 		pngTemplates,
 		animationExportSettings,
 		apiFetch,
@@ -255,6 +267,8 @@
 		onCopyPromptText,
 		onCopyStatusHash,
 		onToggleStar,
+		onToggleForRevision,
+		onToggleForShare = null,
 		onReplayCurrent,
 		replayDisabled,
 		onDownloadSVG,
@@ -360,7 +374,6 @@
 		};
 	});
 
-	let svgMenuOpen = $state(false);
 	// The card leaves in one press, so the only state it needs is "in flight".
 	let cardExportBusy = $state(false);
 
@@ -376,8 +389,36 @@
 	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
-	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
+	let generationInfoTab = $state<DrawerTab>('details');
 	let generationInfoEl = $state<HTMLElement | null>(null);
+	// The pane that scrolls, which is a different element per tab: the details
+	// list is this component's, the other two belong to OutputTabsContent and
+	// only one of them exists at a time.
+	let detailsScrollEl = $state<HTMLElement | null>(null);
+	let tabsScrollEl = $state<HTMLElement | null>(null);
+	let drawerScrollMemory = $state(emptyDrawerScrollMemory());
+	const drawerScroller = (): HTMLElement | null =>
+		generationInfoTab === 'details' ? detailsScrollEl : tabsScrollEl;
+
+	// Every path that closes the drawer goes through here, or the one that does
+	// not would be the one that forgets: there are four (the close button, the
+	// toggle, Escape, and a press outside).
+	function closeGenerationInfo(): void {
+		const pane = drawerScroller();
+		if (pane) drawerScrollMemory = rememberDrawerScroll(drawerScrollMemory, generationInfoTab, pane.scrollTop);
+		generationInfoOpen = false;
+	}
+
+	function openGenerationInfo(): void {
+		generationInfoOpen = true;
+		// After the pane is on screen: the contents may have been rebuilt while
+		// the drawer was away, and a scrollTop set against the old height would
+		// be clamped to it.
+		void tick().then(() => {
+			const pane = drawerScroller();
+			if (pane) pane.scrollTop = drawerScrollToRestore(drawerScrollMemory, generationInfoTab);
+		});
+	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
@@ -544,13 +585,11 @@
 	// report uses (see $lib/svgWeight), so the number here and the number there
 	// are the same quantity. HistoryItem carries no `svg`, so this reads `result`
 	// rather than the `statusHistoryItem ?? result` shape the other rows use.
+	// The third mark's socket. `supported` is false everywhere today, so the
+	// button below renders nothing -- see $lib/shareTarget and ledger I-191.
+	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
 	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
 	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
-	const formatBytes = (bytes: number | null) => {
-		if (bytes == null) return '-';
-		if (bytes < 1024) return `${bytes} B`;
-		return `${(bytes / 1024).toFixed(1)} KB`;
-	};
 	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
 	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
 	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
@@ -607,7 +646,7 @@
 	onkeydown={(event) => {
 		if (event.key !== 'Escape') return;
 		if (refineModalOpen) closeRefineModal();
-		else if (generationInfoOpen) generationInfoOpen = false;
+		else if (generationInfoOpen) closeGenerationInfo();
 		else if (presentationMode) closePresentationMode();
 	}}
 	onpointerdown={(event) => {
@@ -617,7 +656,7 @@
 		if (!target) return;
 		if (generationInfoEl?.contains(target)) return;
 		if (generationInfoToggleEl?.contains(target)) return;
-		generationInfoOpen = false;
+		closeGenerationInfo();
 	}}
 />
 
@@ -654,6 +693,12 @@
 				<span class="render-meta-item render-meta-canvas">
 					<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
 					<strong title={statusCanvasName}>{statusCanvasName}</strong>
+				</span>
+				<!-- The same measurement the drawer shows, formatted by the same
+				     function: one quantity, said in two places. -->
+				<span class="render-meta-item render-meta-svg-size">
+					<span class="render-meta-label">{isJapanese ? 'SVG \u30b5\u30a4\u30ba' : 'SVG size'}</span>
+					<strong>{formatByteSize(detailSvgBytes)}</strong>
 				</span>
 				<span class="render-meta-item render-meta-created">
 					<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>
@@ -720,26 +765,15 @@
 {#if lineageIntermediateNotice}
 	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
 {/if}
-{#if nearbyHistory.length > 0}
-	<div class="nearby-mirror" onpointerdown={(event) => event.stopPropagation()}>
-		<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
-		{#each nearbyHistory as item (item.id)}
-			<button
-				type="button"
-				class="nearby-thumb"
-				title={item.input}
-				aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
-				disabled={!item.id}
-				onclick={() => { if (item.id) onOpenNearbyHistory(item.id); }}
-			>{@html item.svg}</button>
-		{/each}
-	</div>
-{/if}
+				<!-- The marks a reader puts on the work in front of them: it is a
+				     favourite, it wants another pass. They sit beside the caption
+				     toggle rather than in a bar of their own, because all three are
+				     about the drawing on screen and nothing else. -->
 				<div class="canvas-corner-controls canvas-corner-left" onpointerdown={(event) => event.stopPropagation()}>
 					<Tooltip placement="top-right" text={t().tooltipCanvasCaption}>
 						<button
 							type="button"
-							class="canvas-icon-btn"
+							class="canvas-icon-btn canvas-caption-btn"
 							class:active={instructionCaptionVisible}
 							disabled={!canShowInstructionCaption}
 							aria-label={t().canvasCaptionToggle}
@@ -754,12 +788,204 @@
 							</svg>
 						</button>
 					</Tooltip>
+					<Tooltip placement="top-right" text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
+						<button
+							type="button"
+							class="canvas-icon-btn canvas-star-btn"
+							class:marked={!!statusHistoryItem?.starred}
+							disabled={!statusHistoryItem?.id}
+							aria-pressed={!!statusHistoryItem?.starred}
+							aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
+							onclick={(event) => {
+								event.stopPropagation();
+								onToggleStar(statusHistoryItem, event);
+							}}
+						>★</button>
+					</Tooltip>
+					<Tooltip placement="top-right" text={statusHistoryItem?.for_revision ? t().forRevisionOn : t().forRevisionOff}>
+						<button
+							type="button"
+							class="canvas-icon-btn canvas-revision-btn"
+							class:marked={!!statusHistoryItem?.for_revision}
+							disabled={!statusHistoryItem?.id}
+							aria-pressed={!!statusHistoryItem?.for_revision}
+							aria-label={statusHistoryItem?.for_revision ? t().forRevisionOn : t().forRevisionOff}
+							onclick={(event) => {
+								event.stopPropagation();
+								onToggleForRevision(statusHistoryItem, event);
+							}}
+						>✎</button>
+					</Tooltip>
+					{#if shareTarget.supported && onToggleForShare}
+						<Tooltip placement="top-right" text={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}>
+							<button
+								type="button"
+								class="canvas-icon-btn canvas-share-btn"
+								class:marked={shareTarget.marked}
+								disabled={!shareTarget.pressable}
+								aria-pressed={shareTarget.marked}
+								aria-label={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}
+								onclick={(event) => {
+									event.stopPropagation();
+									onToggleForShare?.(statusHistoryItem, event);
+								}}
+							>
+								<svg viewBox="0 0 24 24" aria-hidden="true">
+									<circle cx="17.5" cy="6" r="2.6" />
+									<circle cx="6.5" cy="12" r="2.6" />
+									<circle cx="17.5" cy="18" r="2.6" />
+									<path d="M9 10.7 15 7.3M9 13.3l6 3.4" />
+								</svg>
+							</button>
+						</Tooltip>
+					{/if}
 				</div>
+				<!-- What the bar under the canvas used to hold. It is here rather
+				     than below the picture because every one of these acts on the
+				     work being looked at; the fullscreen button stays last, at the
+				     corner, so it keeps the position it has always had. -->
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
+					{#if statusHashLabel}
+						<Tooltip placement="top-left" text={statusHashCopied ? (isJapanese ? 'コピーしました' : 'Copied') : (isJapanese ? 'クリックでfull hashをコピーします' : 'Click to copy the full hash')}>
+							<button
+								type="button"
+								class="canvas-icon-btn canvas-hash-btn"
+								class:marked={statusHashCopied}
+								aria-label={isJapanese ? 'full hash をコピー' : 'Copy the full hash'}
+								onclick={onCopyStatusHash}
+							>#</button>
+						</Tooltip>
+					{/if}
+					<Tooltip placement="top-left" text={t().historyReplayTitle}>
+						<button
+							type="button"
+							class="canvas-icon-btn canvas-replay-btn"
+							disabled={replayDisabled}
+							aria-label={t().historyReplay}
+							onclick={onReplayCurrent}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M20 12a8 8 0 1 1-2.6-5.9" />
+								<path d="M20 4v4h-4" />
+							</svg>
+						</button>
+					</Tooltip>
+					<Tooltip placement="top-left" text={isJapanese ? '選択中作品の生成情報を表示' : 'Show the provenance, prompts, and JSON of the chosen work'}>
+						<button
+							bind:this={generationInfoToggleEl}
+							type="button"
+							class="canvas-icon-btn canvas-provenance-btn"
+							class:active={generationInfoOpen}
+							disabled={!result && !allowEmptyOutputTabs}
+							aria-expanded={generationInfoOpen}
+							aria-label={isJapanese ? '生成情報' : 'Provenance'}
+							onclick={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<circle cx="12" cy="12" r="8.5" />
+								<path d="M12 11v5.5M12 7.8v.4" />
+							</svg>
+						</button>
+					</Tooltip>
+					<Tooltip placement="top-left" text={t().tooltipSaijikiToggle}>
+						<button
+							type="button"
+							class="canvas-icon-btn canvas-saijiki-btn"
+							data-saijiki-toggle
+							aria-label={t().saijikiToggleBtn}
+							onclick={onToggleSaijiki}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M5 5.5h5.5a1.5 1.5 0 0 1 1.5 1.5v11a1.2 1.2 0 0 0-1.2-1.2H5z" />
+								<path d="M19 5.5h-5.5a1.5 1.5 0 0 0-1.5 1.5v11a1.2 1.2 0 0 1 1.2-1.2H19z" />
+							</svg>
+						</button>
+					</Tooltip>
+					<!-- One door for the three ways a work leaves: SVG, PNG, and the
+					     share card. They were three buttons side by side, which said
+					     three things where the reader wanted one. -->
+					<div class="canvas-export" bind:this={exportWrapEl}>
+						<Tooltip placement="top-left" text={t().exportLabel}>
+							<button
+								type="button"
+								class="canvas-icon-btn canvas-export-btn"
+								class:active={exportMenuOpen}
+								disabled={!result}
+								aria-haspopup="menu"
+								aria-expanded={exportMenuOpen}
+								aria-label={t().exportLabel}
+								onclick={(e) => { e.stopPropagation(); exportMenuOpen = !exportMenuOpen; }}
+							>
+								<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+									<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+								</svg>
+							</button>
+						</Tooltip>
+						{#if exportMenuOpen}
+							<div class="export-menu" role="menu">
+								<div class="export-menu-group">
+									<div class="svg-menu-head">
+										<span>{t().svgExportHelpTitle}</span>
+										<button
+											type="button"
+											class="svg-help-btn"
+											aria-label={t().svgExportHelpAria}
+											onclick={(e) => { e.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}
+										>?</button>
+									</div>
+									{#if svgHelpOpen}
+										<div class="svg-help-popover">
+											<table>
+												<thead>
+													<tr><th>{t().svgExportTableFormat}</th><th>{t().svgExportTableUse}</th><th>{t().svgExportTableFeature}</th></tr>
+												</thead>
+												<tbody>
+													<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
+													<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
+													<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
+												</tbody>
+											</table>
+										</div>
+									{/if}
+									<button onclick={() => { onDownloadSVG('display'); exportMenuOpen = false; }}>
+										<span class="png-size">{t().svgExportDisplayName}</span>
+										<span class="png-sub">{t().svgExportDisplaySub}</span>
+									</button>
+									<button onclick={() => { onDownloadSVG('editable'); exportMenuOpen = false; }}>
+										<span class="png-size">{t().svgExportEditableName}</span>
+										<span class="png-sub">{t().svgExportEditableSub}</span>
+									</button>
+									<button onclick={() => { onDownloadSVG('compat'); exportMenuOpen = false; }}>
+										<span class="png-size">{t().svgExportCompatName}</span>
+										<span class="png-sub">{t().svgExportCompatSub}</span>
+									</button>
+								</div>
+								<div class="export-menu-group">
+									<div class="export-menu-head">PNG</div>
+									{#each pngTemplates as template (template.id)}
+										<button onclick={() => { onDownloadPNG(template.y_px); exportMenuOpen = false; }}>
+											<span class="png-size">{template.name}</span>
+											<span class="png-sub">{pngTemplateDescription(template)}</span>
+										</button>
+									{/each}
+								</div>
+								<div class="export-menu-group">
+									<button
+										type="button"
+										disabled={!currentHistoryId || cardExportBusy}
+										onclick={() => { downloadCardFromCanvas(); exportMenuOpen = false; }}
+									>
+										<span class="png-size">{cardExportBusy ? t().cardExportBusy : t().historyCardExport}</span>
+										<span class="png-sub">{t().tooltipCanvasDownloadCard}</span>
+									</button>
+								</div>
+							</div>
+						{/if}
+					</div>
 					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
 						<button
 							type="button"
-							class="canvas-icon-btn"
+							class="canvas-icon-btn canvas-presentation-btn"
 							disabled={!result}
 							aria-label={t().canvasPresentationOpen}
 							onclick={(event) => {
@@ -1119,7 +1345,7 @@
 				</div>
 			{:else if outputTab === 'lineage'}
 				{#await import('./LineagePanel.svelte') then { default: LineagePanel }}
-					<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} {catalogName} {formatHistoryDate} {historyPreviewText} />
+					<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} {nearbyHistory} {onOpenNearbyHistory} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} {catalogName} {formatHistoryDate} {historyPreviewText} />
 				{/await}
 			{/if}
 		</div>
@@ -1160,7 +1386,7 @@
 	>
 			<header class="generation-info-head">
 				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
-				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
+				<button type="button" class="generation-info-close" onclick={closeGenerationInfo} aria-label="Close">&times;</button>
 			</header>
 			<div class="generation-info-tabs" role="tablist">
 				<button type="button" role="tab" aria-selected={generationInfoTab === 'details'} class:active={generationInfoTab === 'details'} onclick={() => (generationInfoTab = 'details')}>{isJapanese ? '\u8a73\u7d30' : 'Details'}</button>
@@ -1172,7 +1398,7 @@
 					{#snippet term(label: string, hint: string)}
 						<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
 					{/snippet}
-					<div class="generation-details">
+					<div class="generation-details" bind:this={detailsScrollEl}>
 						{#if hasSketchDetails}
 							<section class="detail-group">
 								<h4>{t().sketchLabel}</h4>
@@ -1232,9 +1458,9 @@
 								{/if}
 								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
 								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
-								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatBytes(detailSvgBytes)}</dd>
-								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight?.objects ?? '-'}</dd>
-								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight?.points ?? '-'}</dd>
+								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatByteSize(detailSvgBytes)}</dd>
+								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.objects) : '-'}</dd>
+								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.points) : '-'}</dd>
 							</dl>
 						</section>
 						<section class="detail-group">
@@ -1276,13 +1502,14 @@
 							<dl>
 								{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
 								{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
-								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
+								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn == null ? '-' : groupDigits(detailTokensIn)} / {detailTokensOut == null ? '-' : groupDigits(detailTokensOut)}</dd>
 								{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
 							</dl>
 						</section>
 					</div>
 				{:else}
 					<OutputTabsContent
+						bind:scrollEl={tabsScrollEl}
 						outputTab={generationInfoTab}
 						{promptsData}
 						{stage1PromptText}
@@ -1300,140 +1527,6 @@
 			</div>
 	</aside>
 
-	<div class="status-bar">
-		<div class="status-spacer"></div>
-		<Tooltip text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
-			<button
-				class="star-btn status-star"
-				class:starred={!!statusHistoryItem?.starred}
-				disabled={!statusHistoryItem?.id}
-				onclick={(event) => onToggleStar(statusHistoryItem, event)}
-				aria-label={statusHistoryItem?.starred ? t().starOn : t().starOff}
-			>★</button>
-		</Tooltip>
-		{#if statusHashLabel}
-			<Tooltip placement="top" text={statusHashCopied ? (isJapanese ? '\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f' : 'Copied') : (isJapanese ? '\u30af\u30ea\u30c3\u30af\u3067full hash\u3092\u30b3\u30d4\u30fc\u3057\u307e\u3059' : 'Click to copy the full hash')}>
-				<button
-					type="button"
-					class="status-hash-btn"
-					onclick={onCopyStatusHash}
-				>
-					<code class="status-hash-code">{statusHashLabel}</code>
-				</button>
-			</Tooltip>
-		{/if}
-		<Tooltip placement="top" text={t().historyReplayTitle}>
-			<button
-				type="button"
-				class="generation-info-button replay-button"
-				disabled={replayDisabled}
-				onclick={onReplayCurrent}
-			>{t().historyReplay}</button>
-		</Tooltip>
-		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show the provenance, prompts, and JSON of the chosen work'}>
-			<button
-				bind:this={generationInfoToggleEl}
-				type="button"
-				class="generation-info-button provenance-button"
-				class:active={generationInfoOpen}
-				disabled={!result && !allowEmptyOutputTabs}
-				aria-expanded={generationInfoOpen}
-				onclick={() => (generationInfoOpen = !generationInfoOpen)}
-			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</button>
-		</Tooltip>
-		<Tooltip placement="top" text={t().tooltipSaijikiToggle}>
-			<button
-				type="button"
-				class="ghost-btn saijiki-open-btn"
-				data-saijiki-toggle
-				onclick={onToggleSaijiki}
-			>{t().saijikiToggleBtn}</button>
-		</Tooltip>
-		<div class="png-wrap">
-			<Tooltip placement="left" text={t().tooltipCanvasDownloadSvg}>
-				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); svgMenuOpen = !svgMenuOpen; }} disabled={!result}>
-					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-					</svg>
-					<span>SVG</span>
-					<span class="menu-caret">▾</span>
-				</button>
-			</Tooltip>
-			{#if svgMenuOpen}
-				<div class="png-menu">
-					<div class="svg-menu-head">
-						<span>{t().svgExportHelpTitle}</span>
-						<button
-							type="button"
-							class="svg-help-btn"
-							aria-label={t().svgExportHelpAria}
-							onclick={(e) => { e.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}
-						>?</button>
-					</div>
-					{#if svgHelpOpen}
-						<div class="svg-help-popover">
-							<table>
-								<thead>
-									<tr><th>{t().svgExportTableFormat}</th><th>{t().svgExportTableUse}</th><th>{t().svgExportTableFeature}</th></tr>
-								</thead>
-								<tbody>
-									<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
-									<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
-									<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
-								</tbody>
-							</table>
-						</div>
-					{/if}
-					<button onclick={() => { onDownloadSVG('display'); svgMenuOpen = false; }}>
-						<span class="png-size">{t().svgExportDisplayName}</span>
-						<span class="png-sub">{t().svgExportDisplaySub}</span>
-					</button>
-					<button onclick={() => { onDownloadSVG('editable'); svgMenuOpen = false; }}>
-						<span class="png-size">{t().svgExportEditableName}</span>
-						<span class="png-sub">{t().svgExportEditableSub}</span>
-					</button>
-					<button onclick={() => { onDownloadSVG('compat'); svgMenuOpen = false; }}>
-						<span class="png-size">{t().svgExportCompatName}</span>
-						<span class="png-sub">{t().svgExportCompatSub}</span>
-					</button>
-				</div>
-			{/if}
-		</div>
-		<div class="png-wrap" bind:this={pngWrapEl}>
-			<Tooltip placement="left" text={t().tooltipCanvasDownloadPng}>
-				<button class="ghost-btn export-btn" onclick={(e) => { e.stopPropagation(); pngMenuOpen = !pngMenuOpen; }} disabled={!result}>
-					<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-					</svg>
-					<span>PNG</span>
-					<span class="menu-caret">▾</span>
-				</button>
-			</Tooltip>
-			{#if pngMenuOpen}
-				<div class="png-menu">
-					{#each pngTemplates as template (template.id)}
-						<button onclick={() => { onDownloadPNG(template.y_px); pngMenuOpen = false; }}>
-							<span class="png-size">{template.name}</span>
-							<span class="png-sub">{pngTemplateDescription(template)}</span>
-						</button>
-					{/each}
-				</div>
-			{/if}
-		</div>
-		<Tooltip placement="left" text={t().tooltipCanvasDownloadCard}>
-			<button
-				class="ghost-btn export-btn"
-				type="button"
-				onclick={downloadCardFromCanvas}
-				disabled={!result || !currentHistoryId || cardExportBusy}
-			>
-				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-				</svg>
-				<span>{cardExportBusy ? t().cardExportBusy : t().historyCardExport}</span>
-			</button>
-		</Tooltip>
-	</div>
 </div>
 
 {#if presentationMode && result}
@@ -1568,7 +1661,10 @@
 	.render-meta-model strong { max-width: 220px; }
 	.render-meta-catalog strong { max-width: 130px; }
 	.render-meta-canvas strong { max-width: 100px; }
-	.render-meta-created strong {
+	/* The two numeric items: never ellipsised, and set on the digit grid so a
+	   size and a timestamp do not jitter as the work on screen changes. */
+	.render-meta-created strong,
+	.render-meta-svg-size strong {
 		max-width: none;
 		font-variant-numeric: tabular-nums;
 	}
@@ -2104,12 +2200,6 @@
 	.interpret-fallback-badge { position: absolute; top: 12px; right: 12px; z-index: 5; padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
 	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
-	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
-	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
-	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
-	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
-	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
 	.canvas-content {
 		position: relative;
 		width: 100%;
@@ -2203,6 +2293,29 @@
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
+	/* Three of these are glyphs rather than drawn paths: the star and the
+	   pencil are the marks the history manager already uses for the same two
+	   flags, and the hash is the character the value itself starts with. */
+	.canvas-star-btn, .canvas-revision-btn, .canvas-hash-btn {
+		font-family: inherit;
+		font-size: 15px;
+		line-height: 1;
+	}
+	.canvas-hash-btn { font-weight: 600; }
+	/* `marked` is a flag standing on the work, not a pressed button: it has to
+	   read as on while the pointer is somewhere else entirely. */
+	.canvas-star-btn.marked {
+		color: var(--star-fg);
+		border-color: var(--star-border);
+		background: var(--star-bg);
+	}
+	.canvas-revision-btn.marked,
+	.canvas-hash-btn.marked {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: var(--accent-light);
+	}
+	.canvas-export-btn .download-icon { width: 18px; height: 18px; }
 	.instruction-caption {
 		position: absolute;
 		left: 10%;
@@ -2360,58 +2473,6 @@
 	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
 	.detail-copy-row code { min-width: 0; flex: 1; }
 	.detail-copy-row button { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: 5px; padding: 3px 7px; background: var(--panel); color: var(--fg2); font: inherit; font-size: 10px; cursor: pointer; }
-	.saijiki-open-btn { flex: 0 0 auto; white-space: nowrap; }
-	.generation-info-button {
-		flex: 0 0 auto;
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		padding: var(--btn-sm-padding);
-		background: var(--panel);
-		color: var(--fg2);
-		font: inherit;
-		font-size: var(--btn-sm-font-size);
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.generation-info-button:hover, .generation-info-button.active { background: var(--bg2); color: var(--fg); border-color: var(--fg3); }
-	.generation-info-button:disabled { opacity: .4; cursor: default; }
-
-	.status-bar {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 8px 16px;
-		border-top: 1px solid var(--border);
-		background: var(--bg);
-		flex-shrink: 0;
-	}
-	.status-spacer { margin-right: auto; }
-	.status-hash-btn {
-		flex: 0 0 auto;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		padding: 5px 9px;
-		background: var(--panel);
-		color: var(--fg2);
-		font: inherit;
-		font-size: 11px;
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.status-hash-code {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-weight: 600;
-		letter-spacing: 0.06em;
-		color: #4d5f86;
-	}
-	:global(html[data-theme='dark']) .status-hash-code { color: #a9c0ee; }
-	.export-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 5px;
-		line-height: 1;
-	}
 	.download-icon {
 		width: 14px;
 		height: 14px;
@@ -2424,31 +2485,10 @@
 		display: block;
 		transform: translateY(0.5px);
 	}
-	.menu-caret {
-		color: var(--fg3);
-		font-size: 10px;
-		line-height: 1;
-	}
-	.star-btn {
-		width: 24px;
-		height: 24px;
-		border: 1px solid var(--border2);
-		border-radius: 50%;
-		background: var(--panel);
-		color: var(--fg3);
-		font-size: 15px;
-		line-height: 1;
-		cursor: pointer;
-		font-family: inherit;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.star-btn.starred { color: var(--star-fg); border-color: var(--star-border); background: var(--star-bg); }
-	.star-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-	.status-star { flex-shrink: 0; }
-	.png-wrap { position: relative; }
-	.png-menu {
+	/* The export menu hangs off the corner controls, so it opens upward from a
+	   button that sits at the bottom of the canvas. */
+	.canvas-export { position: relative; display: inline-flex; }
+	.export-menu {
 		position: absolute;
 		bottom: calc(100% + 6px);
 		right: 0;
@@ -2460,7 +2500,7 @@
 		box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 		min-width: 220px;
 	}
-	.png-menu > button {
+	.export-menu > .export-menu-group > button {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -2476,8 +2516,20 @@
 		font-size: 13px;
 		white-space: nowrap;
 	}
-	.png-menu > button:last-child { border-bottom: none; }
-	.png-menu > button:hover { background: var(--bg); }
+	.export-menu-group:last-child > button:last-child { border-bottom: none; }
+	.export-menu > .export-menu-group > button:hover:not(:disabled) { background: var(--bg); }
+	.export-menu > .export-menu-group > button:disabled { opacity: .45; cursor: not-allowed; }
+	/* The three ways out are one list, divided rather than stacked in three
+	   boxes: a rule says "another kind" without spending the height a second
+	   frame would. */
+	.export-menu-group + .export-menu-group { border-top: 2px solid var(--border2); }
+	.export-menu-head {
+		padding: 7px 14px 3px;
+		color: var(--fg3);
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: .08em;
+	}
 	.png-size { font-weight: 500; }
 	.png-sub { color: var(--fg3); font-size: 11px; white-space: nowrap; }
 	.svg-menu-head {

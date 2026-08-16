@@ -21,7 +21,8 @@
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
-	import { SURFACE_PREVIEWS, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
+	import { SURFACE_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
+	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -576,7 +577,7 @@
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
 	let settingsDetail = $state<SettingsDetailLevel>('standard');
-	let pngMenuOpen  = $state(false);
+	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
@@ -633,7 +634,7 @@
 	let exportTemplateStatus = $state<string | null>(null);
 
 	// DOM refs for outside-click handling
-	let pngWrapEl      = $state<HTMLDivElement | null>(null);
+	let exportWrapEl   = $state<HTMLDivElement | null>(null);
 	let userMenuWrapEl = $state<HTMLDivElement | null>(null);
 
 	type SaijikiPreview = {
@@ -652,8 +653,8 @@
 	// Entries are keyed by the Japanese surface. The caller pairs the two
 	// display lists by position to derive the canonical word, an invariant the
 	// saijiki table holds and server tests lock (test_saijiki_api.py).
-	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string): SaijikiPreview {
-		const isJa = getLang() === 'ja';
+	function saijikiPreview(categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang): SaijikiPreview {
+		const uiLang = instructionLangOf(getLang());
 		const base = {
 			categoryKey,
 			word,
@@ -662,9 +663,11 @@
 			example: '',
 			svg: '',
 		};
+		// The effect is prose for the reader and the example is a fragment of
+		// DDL, so the two do not follow the same language when the DDL is not in
+		// the UI's -- see localizePreview.
 		const localized = (entry: PreviewEntry) => ({
-			effect: isJa ? entry.effect : entry.effectEn,
-			example: isJa ? entry.example : entry.exampleEn,
+			...localizePreview(entry, { uiLang, wordLang }),
 			svg: entry.svg,
 		});
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
@@ -779,8 +782,15 @@
 		if (entry) return { ...base, ...localized(entry) };
 		return {
 			...base,
-			effect: isJa ? '記述の解釈に影響する語彙です。' : 'A vocabulary word that shapes how the description is read.',
-			example: isJa ? `${word}を使う` : `Use "${word}"`,
+			...localizePreview(
+				{
+					effect: '記述の解釈に影響する語彙です。',
+					effectEn: 'A vocabulary word that shapes how the description is read.',
+					example: `${word}を使う`,
+					exampleEn: `Use "${word}"`,
+				},
+				{ uiLang, wordLang }
+			),
 			svg: lineSvg(),
 		};
 	}
@@ -808,14 +818,16 @@
 		fires_on_en?: string[];
 		preview_url?: string;
 		preview_url_2x?: string;
-	}): SaijikiPreview {
-		const isJa = getLang() === 'ja';
-		const firesOn = (isJa ? entry.fires_on_ja : entry.fires_on_en) ?? [];
+	}, wordLang: ResolvedInstructionLang): SaijikiPreview {
+		const uiLang = instructionLangOf(getLang());
+		// The note explains the word, so it is the reader's language; the firing
+		// phrase is what a description would say to reach it, so it is the DDL's.
+		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		return {
 			categoryKey: 'plugin',
 			word: entry.qualified_name,
 			canonicalWord: entry.qualified_name,
-			effect: (isJa ? entry.note_ja : entry.note_en) || '',
+			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
 			example: firesOn[0] ?? '',
 			// The fallback is the drawing, not an empty frame; it is only read
 			// when the word ships no artwork, since `image` wins where it is set.
@@ -1403,7 +1415,7 @@
 			displayedHistoryItem = null;
 			historyCursor = -1;
 			outputTab = 'canvas';
-			pngMenuOpen = false;
+			exportMenuOpen = false;
 			fitCanvasZoom();
 		}
 		await saveCanvasAspectPluginValue();
@@ -1428,7 +1440,7 @@
 		displayedHistoryItem = null;
 		historyCursor = -1;
 		outputTab = 'canvas';
-		pngMenuOpen = false;
+		exportMenuOpen = false;
 		fitCanvasZoom();
 		await saveCanvasAspectPluginValue();
 	}
@@ -5247,7 +5259,7 @@ $effect(() => {
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (pngMenuOpen  && pngWrapEl     && !pngWrapEl.contains(e.target as Node))      pngMenuOpen  = false;
+		if (exportMenuOpen && exportWrapEl && !exportWrapEl.contains(e.target as Node)) exportMenuOpen = false;
 		if (userMenuOpen && userMenuWrapEl && !userMenuWrapEl.contains(e.target as Node)) userMenuOpen = false;
 		if (canvasAspectMenuOpen) canvasAspectMenuOpen = false;
 	}
@@ -6826,8 +6838,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:outputTab
 				bind:promptStage1Expanded
 				bind:promptStage2Expanded
-				bind:pngMenuOpen
-				bind:pngWrapEl
+				bind:exportMenuOpen
+				bind:exportWrapEl
 				{result}
 				{nearbyHistory}
 				onOpenNearbyHistory={openNearbyHistory}
@@ -6882,6 +6894,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
+				onToggleForRevision={toggleHistoryForRevision}
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
@@ -7495,15 +7508,22 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-detail-status .thinking-details,
 	.ui-hide-detail-status .stats-section,
 	.ui-hide-detail-status :global(.render-meta-strip),
-	.ui-hide-detail-status :global(.status-hash-btn),
-	.ui-hide-detail-status :global(.provenance-button),
+	.ui-hide-detail-status :global(.canvas-hash-btn),
+	.ui-hide-detail-status :global(.canvas-provenance-btn),
 	.ui-hide-work-tools :global(.right-tabs),
-	.ui-hide-work-tools :global(.canvas-corner-controls),
+	/* The canvas corner rows are named button by button rather than as whole
+	   rows. Two of the controls now standing there answer to detail_status and
+	   not to work_tools, and a rule on the row would take them with it in any
+	   custom mode that keeps one group and drops the other. */
+	.ui-hide-work-tools :global(.canvas-caption-btn),
+	.ui-hide-work-tools :global(.canvas-presentation-btn),
 	.ui-hide-work-tools :global(.zoom-controls),
-	.ui-hide-work-tools :global(.status-star),
-	.ui-hide-work-tools :global(.replay-button),
-	.ui-hide-work-tools :global(.saijiki-open-btn),
-	.ui-hide-work-tools :global(.png-wrap),
+	.ui-hide-work-tools :global(.canvas-star-btn),
+	.ui-hide-work-tools :global(.canvas-revision-btn),
+	.ui-hide-work-tools :global(.canvas-share-btn),
+	.ui-hide-work-tools :global(.canvas-replay-btn),
+	.ui-hide-work-tools :global(.canvas-saijiki-btn),
+	.ui-hide-work-tools :global(.canvas-export),
 	.ui-hide-history :global(.nav-left),
 	.ui-hide-history :global(.nav-right),
 	.ui-hide-history :global(.nearby-mirror) {

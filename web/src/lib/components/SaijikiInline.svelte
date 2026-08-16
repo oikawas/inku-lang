@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
+	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -27,23 +28,29 @@
 
 	type Props = {
 		activePreview: SaijikiPreview | null;
+		/**
+		 * The language to offer the words in. This is the DDL's language, not
+		 * the UI's: the two are independent (`instruction_lang` is resolved from
+		 * the text), and a word inserted from here becomes part of that DDL, so
+		 * offering it in the other language is offering the wrong word.
+		 */
+		wordLang: ResolvedInstructionLang;
 		/** Namespaced plugin vocabulary, same list the saijiki drawer shows. */
 		pluginEntries?: PluginEntry[];
 		onInsertWord: (word: string) => void;
-		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		previewForWord: (categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 		/** The same preview a built-in word gets, built from the plugin document. */
-		previewForPlugin: (entry: PluginEntry) => SaijikiPreview;
+		previewForPlugin: (entry: PluginEntry, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 	};
 
 	let {
 		activePreview = $bindable(),
+		wordLang,
 		pluginEntries = [],
 		onInsertWord,
 		previewForWord,
 		previewForPlugin,
 	}: Props = $props();
-
-	const isJapanese = $derived(t().code === 'ja');
 </script>
 
 <aside class="saijiki-inline">
@@ -79,7 +86,7 @@
 	</div>
 	<div class="saijiki-list">
 		{#each SAIJIKI as cat (cat.key)}
-			{@const words = saijikiWordsFor(cat.key, isJapanese)}
+			{@const words = saijikiWordsFor(cat.key, wordLang === 'ja')}
 			<div class="saijiki-cat" class:plugin-cat={cat.key.startsWith("plugin-")}>
 				<div class="saijiki-cat-head">
 					<span class="saijiki-cat-ja">{cat.label}</span>
@@ -93,8 +100,8 @@
 							class:plugin-chip={cat.key.startsWith("plugin-")}
 							onpointerdown={(e) => e.preventDefault()}
 							onclick={() => onInsertWord(word)}
-							onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
-							onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word))}
+							onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
+							onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
 						>{word}</button>
 					{/each}
 				</div>
@@ -116,8 +123,8 @@
 							class="saijiki-chip plugin-chip"
 							onpointerdown={(e) => e.preventDefault()}
 							onclick={() => onInsertWord(entry.qualified_name)}
-							onpointerenter={() => (activePreview = previewForPlugin(entry))}
-							onfocus={() => (activePreview = previewForPlugin(entry))}
+							onpointerenter={() => (activePreview = previewForPlugin(entry, wordLang))}
+							onfocus={() => (activePreview = previewForPlugin(entry, wordLang))}
 						>{entry.qualified_name}</button>
 					{/each}
 				</div>

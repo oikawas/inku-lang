@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.26 / Build 913**
+**Target version: v2.13.27 / Build 914**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -102,7 +102,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 35 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 36 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 19 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.34` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
@@ -174,11 +174,14 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Render Engine 35** — the SVG performance.
+- **Render Engine 36** — the SVG performance.
 A surface texture (hatch, crosshatch) has each row clipped at its ends to the outline, so it stays
 inside the shape that carries it. The clipping happens in the coordinates before anything is drawn,
 so a profile that uses no filters keeps the same shape, and the angle, spacing, and density gradient
 are exactly what they were before the clipping.
+A wash lays each sweep as wide as the pitch or wider, so no paper is left between two sweeps: it
+reads as a field rather than as stripes. Each sweep is correspondingly lighter, and the ink a reader
+sees is the composite of the overlapping layers.
 The ground is one of seven supports you can name (paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint), tiled as a `<pattern>`.
 **No filter is used at all, so all three profiles emit exactly the same ground.**
 A mark's extents become pixels through the canvas's short edge, so the same description draws the same shape on any aspect (placement still scales with width and height).

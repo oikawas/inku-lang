@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.27 unreleased baseline (Web Build 914)
+
+Updated the thirteen places that name a version to v2.13.27 / Build 914. **No screen interaction changed. What changed is how `surface: wash` is drawn.**
+
+- **`surface: wash` is now a field rather than stripes.** Paper used to be left between one sweep and the next, so about a fifth of the inside of a shape stayed white. The sweeps are now as wide as the pitch they sit at, which closes the gaps.
+- **The ink is at the same level as before.** Closing the gaps would darken the wash, so each single sweep is correspondingly lighter and the two cancel out. A work drawn from the same description comes out neither darker nor lighter than before.
+- **The pitch, the layer count and the sweep angles did not change at all.** What stopped it reading as stripes is the width of the sweeps.
+- **Works you have already saved look exactly as they did.** A saved work carries the SVG of the version it was drawn in, so reopening it shows what it always showed. **Only newly drawn works get the new wash.**
+- No word you can write in a description was added or removed.
+
 ## 2026-08-16 — v2.13.26 unreleased baseline (Web Build 913)
 
 Updated the thirteen places that name a version to v2.13.26 / Build 913. **No screen interaction changed. What changed is which APIs answer without a session.**

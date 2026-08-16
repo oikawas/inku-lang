@@ -7185,3 +7185,58 @@ produces**", each paired with a control that must not move.
   inventory does not count `android/`** (ledger I-270), so the delta was counted by hand (314 → 325).
 - **⚠ Neither `APP_VERSION` nor `web/BUILD_NUMBER` moved.** `android/` is permanently excluded from
   every sync path, so this round has nothing to send to pentala.
+
+---
+
+### v2.13.27 — A wash is a field, not a set of stripes (Build 914, 2026-08-16, render engine 36, ledger I-260)
+
+**`surface: wash` came out as evenly spaced stripes.**
+Every sweep ran parallel at a constant pitch, no layer reached the paper between two sweeps, and
+**19.9% of the inside of a square (21.1% of a triangle) was left as bare paper**. A wash has no bare
+paper in it. This version **widens the sweep to the pitch and lightens it by as much**.
+
+- **Only two quantities moved** — the sweep's width goes from 0.44–0.74 of the pitch to
+  **0.88–1.48**, and the opacity factor from **0.42 to 0.22**. **The pitch, the layer count and the
+  layer angles are identical to the previous version down to the last decimal.**
+- **Bare paper falls from 19.9% to 0.67% (square) and 21.1% to 1.09% (triangle).** **What is left is
+  a rim along the contour, a median of 2.0 / 2.2px deep** — the sweeps are clipped at the contour and
+  a hand tool tapers at its ends, so only the outermost band runs thin.
+- **The ink is back at the product's level** (composite mean alpha **+2.0% / +1.1%**). Closing the
+  gaps darkens a wash, and the lower factor gives that back. **This was never a preference about
+  darkness; it was a demand to undo the side effect of closing the gaps.**
+- **None of the three rejected proposals went in** — varying the angle per sweep, scattering the
+  pitch, laying a ground underneath. **None of them moved the amount of bare paper; the only thing
+  that closed the gaps was the width of the sweep** (measured the cycle before). Two gates hold this
+  down (the layer angles and pitch unchanged; zero underlay elements).
+- **The cost is that the excursion past the contour doubled** (12.3 / 11.0px → 25.8 / 21.7px).
+  **That is half of one sweep's width, and the same relation held in the previous version** — a brush
+  with width crosses the rim by half of it. The absolute 20.0px used for the speck textures was
+  decided by the size of a speck, so it is not applied to the wash; **the gate computes its limit from
+  the product's constants** instead of writing a px by hand.
+- **The reference corpus moved 6 of 588 cases** — exactly the six that carry `wash`. **The other 582
+  are byte-identical to the previous version**, and **no case id is new, so all six carry
+  discriminating power**.
+- **⚠ One casualty of the version bump was split rather than deleted** — the test that pinned the
+  previous wash claimed two things at once: that the frozen bytes agree with engine 34 (history), and
+  that the current tree draws engine 34's wash (which this version necessarily breaks). **The first
+  claim was kept and the name put into the past tense; the second was taken over by engine 36's
+  redraw test.** **One engine 35 test was also pointed from the current manifest at engine 35's frozen
+  manifest** — without that, the subject of "what engine 35 moved" silently becomes engine 36's diff
+  the moment the new corpus is baked.
+- **12 perturbations, none of them a miss. 55 predicted, 66 measured.** All five misses were
+  *under*-predictions, one of them the shape where **a `max()` whose other side is binding cannot be
+  measured by breaking this side** (halve the pitch and the brush's own thickness starts to bind).
+  **Only the display-profile perturbation came in under prediction** — the generator's profile is
+  `editable`, so one of the two tests expected to fall with it structurally cannot.
+- **Carried forward (untouched by this version)** — hatch bleeding outside the shape, `bleed`
+  exceeding the limit (going outside is what the word means), a surface texture on `line` or `arc`
+  drawing not one pixel, and the defaults of `surface.density` / `surface.opacity`.
+- **⚠ The 103 comment lines this round newly wrote were in Japanese, and the accepting session put
+  them into English** (the 2026-07-30 ruling, reaffirmed by the author on 2026-08-16). **The 216
+  Japanese lines that were already there were left alone.**
+- **Verification (re-measured by the accepting session on the merged tree):** **server 3,271 passed /
+  31 skipped** (3,238 at the branch point, **+18, this contract's gates**; together with main's +15
+  the increments reconcile one by one), **cli 227 passed**, **ruff clean for both server and cli**,
+  **the frozen corpora are byte-identical**, **Android JVM 57 classes / 325 passed / 0 failed**.
+- **Android's reference fixtures gained the 64 files of `render-engine-36/` and no Kotlin source moved
+  by a line** (`android/VERSION` held steady). The port reads the directory of the version it names.

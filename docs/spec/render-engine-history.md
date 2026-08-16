@@ -138,9 +138,9 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.26 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.27 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 913 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 914 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -416,6 +416,51 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 36 — a wash is a field, not a set of stripes (v2.13.27)
+
+**Of the nine surface words, `wash` was the only one that called itself a field without being one.**
+Every sweep ran parallel at a constant pitch, one sweep was only 0.44 to 0.74 of that pitch wide, and
+**no layer reached the paper between two sweeps** — **19.9% (square) / 21.1% (triangle)** of the
+inside of the shape stayed bare and read as evenly spaced stripes. **A wash has no bare paper in it.**
+
+### The only thing that closed the gaps was the width of the sweep
+
+**A 14-rung ladder was measured the cycle before**: varying the angle per sweep and scattering the
+pitch **moved the amount of bare paper not at all**. The only rung that moved it was the one that
+widened the sweeps, and the author picked the cell `G3` from it. **The width goes to 0.88–1.48 of the
+pitch and the opacity factor down from 0.42 to 0.22.**
+
+**Those two are the only quantities that moved.** The pitch, the layer count and the layer angles are
+identical to the previous version down to the last decimal, and no ground is laid underneath (**none
+of the three rejected proposals went in**).
+
+### Closing the gaps darkens a wash, so it is lightened
+
+**Bare paper falls from 19.9% to 0.67% and from 21.1% to 1.09%**, and **the composite ink lands at
++2.0% / +1.1%**. **The opacity came down not as a preference but to undo a side effect** — the rung
+that only doubled the width came out 1.5 to 1.9 times the product's ink.
+
+**What is left is a rim along the contour, a median of 2.0 / 2.2px deep.** The sweeps are clipped at
+the contour (engine 35's cut already reached the wash) and a hand tool tapers at its ends, so only
+the outermost band runs thin. **Stripes would put a band the width of the pitch across the shape.**
+
+### The cost is crossing the rim by twice as much
+
+**The excursion went from 12.3 / 11.0px to 25.8 / 21.7px.** **That is half of one sweep's width, and
+the same relation held in the previous version** — a brush with width crosses the rim by half of it.
+The 20.0px the grain gate uses is **a number decided by the size of one speck**, so it is not applied
+to the wash; the same claim is restated in the wash's own unit as "half of the widest a single sweep
+gets".
+
+### The corpus did not grow, and only six cases moved
+
+**Of 588 cases, exactly the six whose surface texture is `wash` moved.** The other 582 are
+byte-identical to the previous version, and **no case id is new, so all six carry discriminating
+power**.
+
+**Engine 35's entry said the six wash cases would not move because there was no approved "how it
+should look" to move them towards.** This version produced it.
 
 ## engine 35 — a surface belongs to the shape that carries it (v2.13.24)
 

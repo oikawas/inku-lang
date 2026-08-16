@@ -1,6 +1,8 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.pipeline.RenderRequest
+import app.inku.mobile.pipeline.ServerScoreSchemaJson
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,8 +13,8 @@ import org.junit.Test
  * The two hatch cases in the frozen corpus are both unrotated squares, whose
  * contour happens to be their own bounding box, so the corpus alone cannot say
  * whether the rows are cut at the shape or merely at a rectangle. These gates
- * are the triangle the corpus does not hold, plus the control that says the
- * other surface words were not touched.
+ * are the triangle the corpus does not hold, plus the one that says every
+ * surface word the schema offers the model is a word this layer draws.
  */
 class ASurfaceKeepsToItsShapeTest {
 
@@ -121,38 +123,58 @@ class ASurfaceKeepsToItsShapeTest {
     }
 
     /**
-     * T-78, the control: the other surface words were not touched.
+     * The words the schema offers the model for `surface.texture`, read from the
+     * schema itself rather than copied here. A copy would go stale the day the
+     * schema moved, and this gate is about the two lists agreeing.
+     */
+    private fun offeredSurfaceWords(): List<String> {
+        val schema = JSONObject(ServerScoreSchemaJson.parameters)
+        val surface = schema.getJSONObject("properties")
+            .getJSONObject("instructions")
+            .getJSONObject("items")
+            .getJSONObject("properties")
+            .getJSONObject("surface")
+            .getJSONArray("anyOf")
+            .getJSONObject(0)
+        val words = surface.getJSONObject("properties").getJSONObject("texture").getJSONArray("enum")
+        return (0 until words.length()).map { words.getString(it) }
+    }
+
+    /**
+     * T-166: every surface word the schema offers is a word the port draws.
      *
-     * The contract states this as "wash and stipple overshoot by the same amount
-     * before and after". This port drew neither -- renderSurfaceVectors answered
-     * `hatch` and `crosshatch` and returned "" for every other texture -- so the
-     * same claim was put the only way it could be measured here: they still draw
-     * nothing. Widening the cut to take them in is what P-14 does, and it fails
-     * here.
+     * This replaces the T-78 control, which asserted that `bleed` drew nothing.
+     * That claim was true and is what this round went to change, and it could
+     * not simply lose its one entry: an empty list makes the loop run zero times
+     * and the check assert nothing at all. So the claim is turned over instead,
+     * which also makes it the guard for the other side of ledger I-008 -- the
+     * port must not offer the model a texture it cannot draw. The count of words
+     * that draw went 8 to 3 to 1 to 0 over ten rounds; `bleed` was the last.
      *
-     * `wash` left this list first, and `stipple` and `aquatint` have now
-     * followed it. All three are drawn: the wash by render engine 36's surface
-     * layer and the grains and the bands by the port of `_surface_dab`, whose
-     * gates live in [AWashIsAFieldTest] and [AGrainIsOneTouchTest]. One word is
-     * still offered to the model and still draws nothing -- `bleed`, which
-     * shares none of that mechanism and has its own 66 lines on the server -- so
-     * the control keeps its force for it.
+     * `none` and `solid` are not drawn by this layer on either side: `none` is
+     * the absence of one, and a `solid` is laid down by the fill layer.
+     *
+     * The elements are counted against the same shape carrying no surface, so
+     * that the shape's own body never counts as a texture.
      */
     @Test
-    fun testTheOtherSurfaceWordsAreUntouched() {
-        for (texture in listOf("bleed")) {
-            val svg = renderSvg(shape("square", texture))
-            assertEquals(
-                "$texture must still contribute no surface stroke",
-                0,
-                Regex("surface-stroke-v1").findAll(svg).count(),
-            )
-        }
-        // And the one that does draw is not caught by the same net, or the check
-        // above would pass on a renderer that drew nothing at all.
-        assertTrue(
-            "hatch must still draw, or the control above proves nothing",
-            Regex("surface-stroke-v1").findAll(renderSvg(shape("square", "hatch"))).count() > 20,
+    fun testEverySurfaceWordTheSchemaOffersIsDrawn() {
+        val offered = offeredSurfaceWords()
+        assertTrue("the schema must offer `none`", offered.contains("none"))
+        assertTrue("the schema must offer `solid`", offered.contains("solid"))
+        val drawable = offered.filterNot { it == "none" || it == "solid" }
+        assertEquals("the words this layer is asked to draw", 8, drawable.size)
+
+        fun pieces(svg: String) = Triple(
+            Regex("surface-stroke-v1").findAll(svg).count(),
+            Regex("<circle").findAll(svg).count(),
+            Regex("<polygon").findAll(svg).count(),
         )
+        val bare = pieces(renderSvg(shape("square", "none")))
+        for (texture in drawable) {
+            val drawn = pieces(renderSvg(shape("square", texture)))
+            val added = (drawn.first - bare.first) + (drawn.second - bare.second) + (drawn.third - bare.third)
+            assertTrue("$texture is offered to the model, so it must draw something", added > 0)
+        }
     }
 }

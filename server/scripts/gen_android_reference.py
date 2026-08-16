@@ -817,7 +817,16 @@ def proportional_fixtures() -> None:
         # past this fixture.
         for weight in sorted(renderer._MATERIAL_OUTLINE_SPECS):
             for thinness in (None, "fine", "extra_fine"):
-                layers = renderer._material_outline_profile(weight, canvas, thinness)
+                # The profile takes the instruction since render engine 38: the
+                # two widths it reads are asked of `_mark_width_px`, which is
+                # where a described mark is seen. A plain line states the same
+                # tool and thinness this fixture always stated, and no surface,
+                # so every value here is the one it held before.
+                subject = Instruction(
+                    primitive="line", **{"from": (0.1, 0.5)}, to=(0.9, 0.5),
+                    weight=weight, thinness=thinness,
+                )
+                layers = renderer._material_outline_profile(subject, canvas)
                 out["material_outline_thinness"].append({
                     "aspect": aspect, "weight": weight, "thinness": thinness,
                     "layers": [

@@ -294,13 +294,19 @@ def test_surface_on_a_line_moves_to_the_closed_shape_before_it() -> None:
     53.4% of every surface in production sat on a line (739) or an arc (59) and
     was drawn as nothing. The `面: ...` sentence was about the shape it followed,
     so that is where the surface goes back to.
+
+    **The word was `wash` until render engine 38.** It had to change, for the
+    reason `grain` had to change at ddl engine 20: 薄墨 stopped being a stray
+    that day -- it says how the ink was diluted, so on a line it is where it
+    belongs and there is nothing to walk back for. `stipple` is a word about an
+    interior, which is what this test has always been about.
     """
     score, report = _coerced(
-        [_circle(), _instruction(surface={"texture": "wash", "density": 0.5})]
+        [_circle(), _instruction(surface={"texture": "stipple", "density": 0.5})]
     )
     circle = next(ins for ins in score.instructions if ins.primitive == "circle")
     line = next(ins for ins in score.instructions if ins.primitive == "line")
-    assert circle.surface is not None and circle.surface.texture == "wash"
+    assert circle.surface is not None and circle.surface.texture == "stipple"
     assert circle.surface.density == 0.5
     assert line.surface is None or line.surface.texture == "none"
     assert report[_BRANCH] >= 1
@@ -315,11 +321,16 @@ def test_surface_with_no_shape_to_move_to_is_dropped_and_counted() -> None:
 
 
 def test_a_shape_that_already_has_a_surface_keeps_its_own() -> None:
-    """One texture request must not become two textured instructions."""
+    """One texture request must not become two textured instructions.
+
+    **The stray was `wash` until render engine 38**, which is a mark word now
+    and would stay on the line instead of being dropped. `stipple` is an
+    interior word, which is what the dropping rule is about.
+    """
     score, _ = _coerced(
         [
             _circle(surface={"texture": "hatch"}),
-            _instruction(surface={"texture": "wash"}),
+            _instruction(surface={"texture": "stipple"}),
         ]
     )
     circle = next(ins for ins in score.instructions if ins.primitive == "circle")
@@ -365,11 +376,17 @@ def test_a_mark_word_on_a_line_is_not_walked_back_at_all() -> None:
     Without it, an implementation that kept walking every surface back would
     leave the test above green and this category's split unmeasured on the side
     that changed.
+
+    **`wash` joined the three on 2026-08-17** (render engine 38). It is the
+    largest of them in production -- 567 of the 987 works whose surface still
+    sits on an open shape name 薄墨 -- and it belongs here for the same reason
+    the other two do: a wash is how the ink was diluted, which is something a
+    line does, not something that fills an interior.
     """
     # Named, not read from the set: a loop over the production set is empty --
     # and so green -- exactly when the set has been emptied.
-    assert set(schema.MARK_SURFACE_WORDS) == {"grain", "bleed"}
-    for word in ("grain", "bleed"):
+    assert set(schema.MARK_SURFACE_WORDS) == {"grain", "bleed", "wash"}
+    for word in ("grain", "bleed", "wash"):
         score, report = _coerced(
             [
                 _circle(),

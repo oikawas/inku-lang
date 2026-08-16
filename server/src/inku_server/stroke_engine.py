@@ -221,10 +221,14 @@ GROUND_SUPPORT: dict[str, Support] = {
 MARK_SUPPORT_GAIN = 2.0
 SUPPORT_CAP = 3.0
 
-# Which of the sheet's two quantities each mark word raises. The keys are
-# `MARK_SURFACE_WORDS`, the set coerce decides by: a word that is in one table
-# and not the other would be a request that survives coerce and then does
-# nothing, which is the state this contract exists to end.
+# Which of the sheet's two quantities each mark word raises. The keys are a
+# subset of `MARK_SURFACE_WORDS`, the set coerce decides by, and the gap is
+# deliberate rather than an omission: a mark word missing from here must be one
+# some other layer draws, or it is a request that survives coerce and then does
+# nothing, which is the state engine 37 exists to end. 薄墨 is the one such
+# word -- it says how the ink was diluted, not how the sheet meets the tool, and
+# render engine 38 draws it as a broader, paler band in the renderer. So this
+# table is read with `.get`, and a word it does not hold leaves the sheet alone.
 _MARK_WORD_QUANTITY: dict[str, str] = {"grain": "tooth", "bleed": "absorb"}
 
 
@@ -248,10 +252,16 @@ def support_with_mark_word(support: Support, texture: str) -> Support:
     into it. Both are things a line does, so they raise the sheet's own two
     quantities rather than filling an interior. The product is capped: on washi
     a bleed would otherwise reach 4.4, past the end of the accepted ladder.
+
+    `wash` is a mark word too, but not one about the sheet: it says the ink was
+    diluted, which is the same on any paper. It leaves the sheet exactly as it
+    found it and is drawn by the renderer instead (render engine 38).
     """
     if texture not in MARK_SURFACE_WORDS:
         return support
-    quantity = _MARK_WORD_QUANTITY[texture]
+    quantity = _MARK_WORD_QUANTITY.get(texture)
+    if quantity is None:
+        return support
     if quantity == "tooth":
         return Support(
             absorb=support.absorb,

@@ -427,15 +427,15 @@ def test_t11_coerce_keeps_a_mark_word_on_a_line_and_moves_the_rest() -> None:
     # green -- measured 2026-08-16, where emptying the set left this gate
     # passing while every request it guards was being dropped again. The set is
     # a decision, so the decision is what gets pinned; the wash contract
-    # (render engine 39) adds its word here deliberately.
-    assert set(MARK_SURFACE_WORDS) == {"grain", "bleed"}
-    for word in ("grain", "bleed"):
+    # (render engine 38) added its word here deliberately on 2026-08-17.
+    assert set(MARK_SURFACE_WORDS) == {"grain", "bleed", "wash"}
+    for word in ("grain", "bleed", "wash"):
         kept = coerce_score(_score("chalk", texture=word))
         line = kept.instructions[0]
         assert line.primitive == "line"
         assert line.surface is not None and line.surface.texture == word, word
 
-    for word in ("wash", "hatch", "crosshatch", "stipple", "paper_grain", "aquatint"):
+    for word in ("hatch", "crosshatch", "stipple", "paper_grain", "aquatint"):
         assert word not in MARK_SURFACE_WORDS
         moved = coerce_score(_score("chalk", texture=word))
         line = moved.instructions[0]

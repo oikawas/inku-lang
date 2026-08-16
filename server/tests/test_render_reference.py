@@ -31,6 +31,7 @@ ENGINE_33_MANIFEST = SERVER_ROOT / "reference" / "render-engine-33" / "manifest.
 ENGINE_34_MANIFEST = SERVER_ROOT / "reference" / "render-engine-34" / "manifest.json"
 ENGINE_35_MANIFEST = SERVER_ROOT / "reference" / "render-engine-35" / "manifest.json"
 ENGINE_36_MANIFEST = SERVER_ROOT / "reference" / "render-engine-36" / "manifest.json"
+ENGINE_37_MANIFEST = SERVER_ROOT / "reference" / "render-engine-37" / "manifest.json"
 
 
 def _generator():
@@ -104,11 +105,23 @@ def test_render_reference_case_counts() -> None:
     # left their case byte-identical. Six of the nine change nothing but the
     # sheet under `brush_thick` (drunk) and `chalk` (refused), two put a mark
     # word on a line, and one is the combination where the ceiling binds.
-    assert len(cases) == 597
+    # Engine 38 added nine to C, in two groups that must stay countable apart.
+    # Four put 薄墨 on an open shape: the two drawing paths a line has
+    # (`brush_thin` performs a band, `rotring` is an SVG `<line>` written from
+    # `_stroke_attrs`), an arc, which is a third function again, and a closed
+    # control. Not one of the 597 cases above carried a wash on an open shape,
+    # so without them this version's change would not be in the record at all.
+    # Five reach the texture filters, which are written only under `display` --
+    # and all four `display` cases above are `pen`, which is not a filtered
+    # tool, so of 597 baked SVGs the number carrying `filter="url(#texture-`
+    # was zero. `drypoint` is the fifth: it is excluded from the general branch
+    # by name and writes its burr filter instead, and without its own case that
+    # exclusion would be a claim with nobody to test it.
+    assert len(cases) == 606
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 75, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 88, "B": 72, "C": 84, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -151,6 +164,12 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
 
     engine 15 までコーパスは 100% `editable` で、作者が見ている経路 (フィルタ・
     clip) を 1 件も実行していなかった。
+
+    engine 38 で 5 件足した。**`display` を通ることと、フィルタが書かれることは
+    別である** —— 最初の 4 件は 4 件とも `pen` で、`pen` は `TEXTURE_SPECS` に無い。
+    焼かれた 597 件のうち `filter="url(#texture-` を持つものは 0 本だった
+    (2026-08-17 実測・[I-289])。**この一覧は「profile が display である」しか
+    測っていない**ので、フィルタが実際に書かれたことは T-177 が別に測る。
     """
     cases = _generator().build_inputs()
     display = sorted(
@@ -161,6 +180,11 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
         "C-display-surface-grain-pen",
         "C-display-surface-hatch-pen",
         "C-display-surface-wash-pen",
+        "C-filter-display-brush_thick",
+        "C-filter-display-chalk",
+        "C-filter-display-crayon",
+        "C-filter-display-drypoint",
+        "C-filter-display-pencil",
     ]
 
 
@@ -550,9 +574,12 @@ def test_engine_37_moves_only_the_sheet_cases() -> None:
 
     Everything outside the ground is right to be byte-identical: a work that
     names no ground keeps `DEFAULT_SUPPORT`, and `paper` restates it.
+
+    ⚠ engine 37 の manifest を読む。engine 38 を焼いた日に、現在版の manifest を
+    読むこの検査は主張の対象が黙って engine 38 の差分へ入れ替わっていた。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "37" == current_render_engine().version
+    manifest = json.loads(ENGINE_37_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "37"
     assert set(manifest["changed_from_previous"]) == ENGINE_37_SHEET_CASES
     previous = json.loads(ENGINE_36_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -589,6 +616,84 @@ def test_engine_37_sheet_cases_match_the_current_renderer() -> None:
         ), case_id
         checked += 1
     assert checked == 12
+
+
+ENGINE_38_WASH_CASES = frozenset(
+    {
+        # New: 薄墨 on the three drawing paths an open shape has.
+        "C-wash-line-brush_thin",
+        "C-wash-line-rotring",
+        "C-wash-arc-pencil",
+        # New: the control the closed-shape exclusion is measured by.
+        "C-wash-closed-control",
+    }
+)
+ENGINE_38_FILTER_CASES = frozenset(
+    {
+        "C-filter-display-pencil",
+        "C-filter-display-crayon",
+        "C-filter-display-chalk",
+        "C-filter-display-brush_thick",
+        "C-filter-display-drypoint",
+    }
+)
+
+
+def test_engine_38_moves_only_its_own_new_cases() -> None:
+    """Engine 38 moved the nine it added and not one case that was here.
+
+    **Byte-identity of the other 597 is the claim, not a gap.** The version
+    widens and pales a mark whose 面 says 薄墨, and 薄墨 sat on an open shape in
+    exactly zero of the cases frozen before it -- the three open-shape surfaces
+    in the corpus are engine 37's 粒 and にじみ, which this version decides by
+    word and leaves alone. So a diff of anything but the nine would be this
+    version reaching a mark nobody described that way.
+
+    ⚠ 新規 ID はすべて `changed_from_previous` に数えられる (生成器の
+    `case_id not in before`)。ここで測るのは「動いたのが新規 9 件と一致すること」
+    だけで、その 9 件が何を描いているかの判別力は摂動が持つ。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "38" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == (
+        ENGINE_38_WASH_CASES | ENGINE_38_FILTER_CASES
+    )
+    assert len(ENGINE_38_WASH_CASES) == 4
+    assert len(ENGINE_38_FILTER_CASES) == 5
+    previous = json.loads(ENGINE_37_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_38_WASH_CASES or case_id in ENGINE_38_FILTER_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 597
+
+
+def test_engine_38_new_cases_match_the_current_renderer() -> None:
+    """Redraw the nine with the live renderer, not the frozen record.
+
+    **⚠ The test above compares manifest against manifest and redraws not one
+    byte**, the same way engines 35, 36 and 37 found out. This is the only
+    place that traverses 薄墨 on an open shape at all: of the other live
+    redraws in this file, group G, group F and engine 32 hold no surface on an
+    open shape, and engines 35, 36 and 37 hold no wash on one.
+
+    The drawing goes through bake's own call so a key the generator stops
+    forwarding is seen here instead of being copied into this test too.
+    """
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_38_WASH_CASES | ENGINE_38_FILTER_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == (
+            manifest["cases"][case_id]["digest"]
+        ), case_id
+        checked += 1
+    assert checked == 9
 
 
 def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> None:

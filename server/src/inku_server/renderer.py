@@ -21,7 +21,7 @@ import svgwrite
 
 from .cloudform import generate_cloudform_contour, sample_closed_catmull_rom
 from .color_catalogs import DEFAULT_COLOR_CATALOG_ID
-from .master_grid import fmt
+from .master_grid import MASTER_GRID_DECIMALS, fmt
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
     CLOSED_SHAPES,
@@ -481,6 +481,58 @@ def _stroke_width_px(
     return max(width, MIN_STROKE_WIDTH) * _unit_scale(canvas)
 
 
+# render engine 38: 薄墨 named on a line or an arc. A wash is how the ink was
+# diluted, so the tool carries more of a thinner ink -- the mark comes out
+# broad and pale rather than as the tool's ordinary band. The author chose
+# these two numbers on 2026-08-16 from a contact sheet of four readings.
+WASH_MARK_WIDTH_GAIN = 3.0
+WASH_MARK_OPACITY_GAIN = 0.35
+
+
+def _is_wash_mark(ins: Instruction) -> bool:
+    """Whether this instruction is an open shape whose 面 says 薄墨.
+
+    A closed shape's 薄墨 is its interior and is drawn by the surface-texture
+    layer (`_has_surface_texture`), so widening its outline as well would say
+    one word twice. Written as two statements rather than one expression
+    because each half is a separate claim a perturbation aims at on its own.
+    """
+    if ins.primitive in _CLOSED_SHAPES:
+        return False
+    surface = ins.surface
+    return surface is not None and surface.texture == "wash"
+
+
+def _mark_width_gain(ins: Instruction) -> float:
+    """How much broader this instruction's mark is than the tool's own band."""
+    return WASH_MARK_WIDTH_GAIN if _is_wash_mark(ins) else 1.0
+
+
+def _mark_width_px(ins: Instruction, canvas: CanvasSize) -> float:
+    """The width of this instruction's mark (px). The one entrance.
+
+    Every width in this module is asked for here rather than of
+    `_stroke_width_px`, which knows only the tool and the thinness and so
+    cannot see that a mark was described. Wiring only the call sites an open
+    shape reaches would leave the rest indistinguishable from a missed one --
+    a closed shape passes through unchanged, so routing all of them costs
+    nothing and makes "did anyone forget?" a question `grep` can answer.
+    """
+    return _stroke_width_px(ins.weight, canvas, ins.thinness) * _mark_width_gain(ins)
+
+
+def _nominal_mark_width_px(ins: Instruction, canvas: CanvasSize) -> float:
+    """The same width with the thinness modifier left out.
+
+    The material outline reads its ceiling against the tool's own mark and not
+    against the thinned one, because how wide the tone is belongs to the tool's
+    grain (`_material_outline_profile`). How much ink the tool is carrying is a
+    different question, and the wash answers that one, so the gain applies here
+    while the thinness does not.
+    """
+    return _stroke_width_px(ins.weight, canvas) * _mark_width_gain(ins)
+
+
 def _grid_step_px(weight: str, canvas: CanvasSize) -> float:
     """量子化する道具の目盛 (px)。量子化しない道具は 0.0。
 
@@ -798,12 +850,12 @@ def _clamped_representative_px(ins: Instruction, canvas: CanvasSize) -> float:
 def _amplitude_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
     """Wobble amplitude (px), measured in stroke widths of the mark itself.
 
-    `_stroke_width_px` is a pure function of the instruction, so this can ask it
+    `_mark_width_px` is a pure function of the instruction, so this can ask it
     directly rather than having the seven call sites thread the width through.
     The representative-size clamp stays: it is the safety valve that keeps a
     figure smaller than its own mark from wandering further than it is wide.
     """
-    width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    width = _mark_width_px(ins, canvas)
     rep = _clamped_representative_px(ins, canvas)
     amp = AMPLITUDE_WIDTHS[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
         ins.primitive, 1.0
@@ -3676,7 +3728,7 @@ def _surface_dab(
     ]
     stroke = synthesize_along(
         centerline,
-        max(_stroke_width_px(ins.weight, canvas, ins.thinness), radius * 1.3),
+        max(_mark_width_px(ins, canvas), radius * 1.3),
         ins.weight,
         _surface_stroke_seed(seed, index),
         closed=False,
@@ -3820,7 +3872,7 @@ def _render_surface_vectors(
             segments = _scanline_segments(contour, angle, spacing, layer_seed)
             for _, start, end in segments:
                 width = max(
-                    _stroke_width_px(ins.weight, canvas, ins.thinness),
+                    _mark_width_px(ins, canvas),
                     spacing
                     * (
                         SURFACE_WASH_WIDTH_BASE
@@ -4883,7 +4935,7 @@ def _stroke_attrs(
     hint = _norm_label(ins.color_hint or "")
     attrs = {
         "stroke": color,
-        "stroke_width": _stroke_width_px(ins.weight, canvas, ins.thinness),
+        "stroke_width": _mark_width_px(ins, canvas),
         "fill": color if do_fill else "none",
         "stroke_linecap": weight_style.get("stroke_linecap", "round"),
     }
@@ -4949,6 +5001,16 @@ def _stroke_attrs(
             )
     if any(token in hint for token in ("reflection", "反射", "映り")):
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.52)
+    if _is_wash_mark(ins):
+        # render engine 38. Multiplied rather than capped, and last: 薄墨 is a
+        # dilution, so it pales whatever this mark was already going to be
+        # instead of naming a ceiling of its own. The clauses above name
+        # ceilings because a hint says how strongly the thing is present; a
+        # mark already faint for another reason must not come back up to 0.35.
+        attrs["stroke_opacity"] = round(
+            float(attrs.get("stroke_opacity", 1.0)) * WASH_MARK_OPACITY_GAIN,
+            MASTER_GRID_DECIMALS,
+        )
     scale = _unit_scale(canvas)
     dash = _scale_dash(STYLE_TO_DASH[ins.style], scale)
     texture_dash = _scale_dash(weight_style.get("stroke_dasharray"), scale)
@@ -5433,21 +5495,26 @@ _SPECK_SPECS: dict[str, tuple[int, float, float, float]] = {
 
 
 def _material_outline_profile(
-    weight: str, canvas: CanvasSize, thinness: str | None = None
+    ins: Instruction, canvas: CanvasSize
 ) -> list[tuple[float, float, float, str | None]]:
     """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。
 
     細く引いた線の材質層は墨と同じだけ細くなる。基準を公称幅に据え置くと、
     墨だけが細って材質が取り残される。
+
+    It takes the instruction rather than the tool because both widths below are
+    asked of `_mark_width_px` / `_nominal_mark_width_px`, and those two are the
+    only places left that know a mark can be described (render engine 38). All
+    five callers already had the instruction in hand.
     """
-    spec = _MATERIAL_OUTLINE_SPECS.get(weight)
+    spec = _MATERIAL_OUTLINE_SPECS.get(ins.weight)
     if not spec:
         return []
     scale = _unit_scale(canvas)
-    base_width = _stroke_width_px(weight, canvas, thinness)
+    base_width = _mark_width_px(ins, canvas)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
-    nominal_width = _stroke_width_px(weight, canvas)
+    nominal_width = _nominal_mark_width_px(ins, canvas)
     half = base_width / 2.0
     out = []
     for offset, abs_width, width_ratio, opacity, dash in spec:
@@ -5515,7 +5582,7 @@ def _add_material_circle_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
+    for offset, width, opacity, dash in _material_outline_profile(ins, canvas):
         group.add(
             dwg.circle(
                 center=(cx, cy),
@@ -5552,7 +5619,7 @@ def _add_material_ellipse_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
+    for offset, width, opacity, dash in _material_outline_profile(ins, canvas):
         group.add(
             dwg.ellipse(
                 center=(cx, cy),
@@ -5589,7 +5656,7 @@ def _add_material_rect_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
+    for offset, width, opacity, dash in _material_outline_profile(ins, canvas):
         group.add(
             dwg.rect(
                 insert=(x - offset, y - offset),
@@ -5627,7 +5694,7 @@ def _add_material_arc_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
+    for offset, width, opacity, dash in _material_outline_profile(ins, canvas):
         group.add(
             dwg.path(
                 d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
@@ -5749,7 +5816,7 @@ def _add_material_performed_outline(
     scale = _unit_scale(canvas)
     element = dwg.polyline
     for k, (offset, width, opacity, dash) in enumerate(
-        _material_outline_profile(ins.weight, canvas, ins.thinness)
+        _material_outline_profile(ins, canvas)
     ):
         layer_seed = seed + k * 7919
         coverage, grain = _dash_spec_stats(dash)
@@ -5973,7 +6040,7 @@ def _material_line_group(
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
                 0.8 * scale,
-                _stroke_width_px(ins.weight, canvas, ins.thinness)
+                _mark_width_px(ins, canvas)
                 * (0.25 if ins.weight == "crayon" else 0.30),
             )
             layer_attrs["stroke_opacity"] = _layer_opacity(
@@ -6054,7 +6121,7 @@ def _render_hand_stroke(
     wild: bool = False,
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
-    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    base_width = _mark_width_px(ins, canvas)
     grid_step = _grid_step_px(ins.weight, canvas)
     stroke = synthesize_stroke(
         start,
@@ -6374,7 +6441,7 @@ def _fill_scan_angle(seed: int) -> float:
 def _fill_scan_spacing(ins: Instruction, canvas: CanvasSize) -> float:
     """走査線の間隔。完全被覆は狙わない (実際の塗りも紙目を残す)。"""
     return max(
-        _stroke_width_px(ins.weight, canvas, ins.thinness) * FILL_SPACING_WIDTH_GAIN,
+        _mark_width_px(ins, canvas) * FILL_SPACING_WIDTH_GAIN,
         canvas.unit * FILL_SPACING_UNIT_RATIO,
     )
 
@@ -6385,7 +6452,7 @@ def _fill_coverage(ins: Instruction, canvas: CanvasSize) -> float:
     A ratio of two lengths, so it does not move with the canvas: the same
     instruction reaches the same branch on every aspect.
     """
-    return _stroke_width_px(ins.weight, canvas, ins.thinness) / _fill_scan_spacing(
+    return _mark_width_px(ins, canvas) / _fill_scan_spacing(
         ins, canvas
     )
 
@@ -6831,7 +6898,7 @@ def _render_fill_strokes(
     """
     if len(contour) < 3:
         return None
-    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    base_width = _mark_width_px(ins, canvas)
     grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
     hand = _fill_hand(ins)
@@ -7029,7 +7096,7 @@ def _render_fill_texture(
         return None
     seed = _seed_for_instruction(ins, render_seed)
     pitch = _fill_scan_spacing(ins, canvas)
-    width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    width = _mark_width_px(ins, canvas)
     xs = [point[0] for point in contour]
     ys = [point[1] for point in contour]
     short_side = min(max(xs) - min(xs), max(ys) - min(ys))
@@ -7205,7 +7272,7 @@ def _render_fill_dab(
     seed = _seed_for_instruction(ins, render_seed)
     stroke = synthesize_along(
         centerline,
-        max(_stroke_width_px(ins.weight, canvas, ins.thinness), short_axis),
+        max(_mark_width_px(ins, canvas), short_axis),
         ins.weight,
         _fill_stroke_seed(seed, 0),
         closed=False,
@@ -7321,7 +7388,7 @@ def _render_contour_hand_stroke(
     戻り値の 2 つめは演奏後の中心線。材質層がこれに追随できるように返す
     (幾何から引くと墨だけが動いて材質が取り残される)。
     """
-    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    base_width = _mark_width_px(ins, canvas)
     stroke = synthesize_along(
         contour,
         base_width,
@@ -7417,7 +7484,7 @@ def _render_arc_hand_stroke(
         centerline = _arc_points(
             cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
         )
-    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    base_width = _mark_width_px(ins, canvas)
     stroke = synthesize_along(
         centerline,
         base_width,

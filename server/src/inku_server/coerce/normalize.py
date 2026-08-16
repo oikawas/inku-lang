@@ -301,11 +301,12 @@ def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Ins
     sat on a `line` (739) or an `arc` (59) and was invisible -- `wash` 453,
     `grain` 251, `bleed` 83, `paper_grain` 9, `hatch` 2.
 
-    The nine surface words split in two. `MARK_SURFACE_WORDS` -- 粒 and にじみ --
-    speak about how the mark runs rather than about an interior, so on a line or
-    an arc they are left exactly where the sentence put them and the renderer
-    works the sheet harder for that instruction (render engine 37). The rest are
-    about an interior and are handled below.
+    The nine surface words split in two. `MARK_SURFACE_WORDS` -- 粒, にじみ and
+    薄墨 -- speak about how the mark runs rather than about an interior, so on a
+    line or an arc they are left exactly where the sentence put them: the
+    renderer works the sheet harder for that instruction (粒 and にじみ, render
+    engine 37) or draws it as a broader, paler band (薄墨, render engine 38).
+    The rest are about an interior and are handled below.
 
     So the surface goes back to the nearest closed shape before it, which is the
     shape the sentence was about. Where there is no such shape, or where it
@@ -322,10 +323,10 @@ def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Ins
         if ins.primitive in CLOSED_SHAPES:
             continue
         if surface.texture in MARK_SURFACE_WORDS:
-            # Not a misattachment. 粒 and にじみ say how the mark itself runs,
-            # which is what a line has instead of an interior, so the sentence
-            # stays where it landed and the stroke engine works the sheet
-            # harder for this one instruction.
+            # Not a misattachment. 粒, にじみ and 薄墨 say how the mark itself
+            # runs, which is what a line has instead of an interior, so the
+            # sentence stays where it landed and the renderer performs it for
+            # this one instruction.
             continue
         repaired[index] = ins.model_copy(update={"surface": None})
         target = next(

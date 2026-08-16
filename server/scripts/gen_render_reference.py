@@ -33,32 +33,33 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-16"
+FROZEN_AT = "2026-08-17"
 REASON = (
-    "a named sheet changes how the mark runs. `Support` has held the sheet's two "
-    "quantities since engine 19 and `synthesize_stroke` has taken one as an "
-    "argument for just as long, but not one caller passed it: measured "
-    "2026-08-16, `git grep 'support='` returned nothing in `server/src`, so "
-    "every work was drawn on the one constant sheet no matter which ground it "
-    "named. The seven supports the ground field carries now each resolve to a "
-    "sheet -- washi drinks at 2.2 and barely refuses at 0.5, canvas refuses "
-    "hardest at 2.4, mezzotint is a metal plate at (0.2, 0.7) -- and all eleven "
-    "call sites in the renderer hand it down by argument. `paper` restates the "
-    "default, so a work that names it and a work that names no ground draw the "
-    "same bytes. Two of the nine surface words are about the mark rather than "
-    "about an interior: 粒 and にじみ on a line or an arc now stay where the "
-    "sentence put them and raise the sheet's own quantities for that one "
-    "instruction, doubled and capped at 3.0, the far end of the ladder the "
-    "author accepted. Closed shapes are untouched -- their 粒 is their interior, "
-    "drawn by the surface-texture layer, and working the sheet as well would "
-    "draw one word twice. Nine cases are new: the corpus's nineteen ground cases "
-    "are every one of them `pen`, whose meeting with the sheet is (0.15, 0.15), "
-    "so freezing without them would have recorded a version whose change the "
-    "record barely traverses -- the same mistake engines 12, 13 and 15 each "
-    "wrote cases to avoid. Element counts and filter references do not move: "
-    "measured across four subjects and eighteen settings, the sheet rewrites "
-    "widths and breaks before the filter is attached, and a break is a subpath "
-    "inside the same `d`."
+    "a wash named on a line is a broad pale sweep. `_with_surface_on_a_closed_shape` "
+    "has moved every 面 off a line or an arc since ddl engine 15, and engine 37 "
+    "carved out the two words that speak about the mark. 薄墨 is the third and the "
+    "largest: of 3,458 production works, 987 hold a surface still sitting on an open "
+    "shape and 567 of those name 薄墨, of which 490 (86.4%) are dropped outright -- "
+    "354 with no closed shape to go back to and 136 whose shape already carried a "
+    "surface of its own. It is the right word for a line, because a wash is how the "
+    "ink was diluted rather than what fills an interior. `MARK_SURFACE_WORDS` gains "
+    "it, so coerce leaves it where the sentence put it, and the renderer performs it: "
+    "the mark is drawn three times as broad at 0.35 of the opacity it would otherwise "
+    "have had -- the two numbers the author chose on 2026-08-16 from a contact sheet "
+    "of four readings. Width is asked for in one place now: `_mark_width_px` and its "
+    "nominal twin are the only callers of `_stroke_width_px` left in the module, so "
+    "a call site nobody wired is a question grep can answer. The sheet is untouched: "
+    "薄墨 raises neither of its two quantities, since dilution is the same on any "
+    "paper. Closed shapes are untouched too -- their 薄墨 is their interior, drawn by "
+    "the surface layer since engine 36. Nine cases are new. Four carry the wash: two "
+    "lines (`brush_thin` performs a band, `rotring` is drawn from `_stroke_attrs`), "
+    "an arc (a third function again, the one the prototype forgot), and a closed "
+    "control. Five carry the texture filters (ledger I-289): the filters are written "
+    "only under `display`, all four `display` cases in the corpus were `pen`, and "
+    "`pen` is not a filtered tool -- so of 597 baked SVGs the number carrying "
+    "`filter=\"url(#texture-` was zero. `drypoint` is there as the witness for its "
+    "own exclusion. No existing case moves: not one of the 597 carried a wash on an "
+    "open shape, which is the hole this version exists to fill."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -375,6 +376,49 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     cap_surface["texture"] = "bleed"
     _case(cases, "C-sheet-cap",
           _instruction("line", weight="brush_thick", surface=cap_surface), ground=cap_ground)
+
+    # Engine 38. 薄墨 on an open shape is a broad pale sweep. Not one case in
+    # the 597 above carries a wash on a line or an arc -- the three open-shape
+    # surfaces here are engine 37's 粒 and にじみ -- so freezing without these
+    # would record a version whose change the record never traverses.
+    # `brush_thin` and `rotring` are production's top two tools for this
+    # request (171 and 92 of 567 measured 2026-08-16), and they are the two
+    # halves of the drawing path: a `rotring` line is an SVG `<line>` drawn
+    # from `_stroke_attrs`, every other tool is a performed band. The arc goes
+    # through `_render_arc_hand_stroke`, a different function again -- the one
+    # the prototype forgot, which is why its 刷毛 and its 濃度 came out equal.
+    for primitive, tool in (
+        ("line", "brush_thin"), ("line", "rotring"), ("arc", "pencil"),
+    ):
+        wash = copy.deepcopy(BASE_SURFACE)
+        wash["texture"] = "wash"
+        _case(cases, f"C-wash-{primitive}-{tool}",
+              _instruction(primitive, weight=tool, surface=wash))
+
+    # The control. A closed shape's 薄墨 is its interior, drawn by the surface
+    # layer since engine 36, and this version must not reach it: without a
+    # frozen closed case beside the open ones, dropping the closed-shape
+    # exclusion would move nothing the corpus records.
+    closed_wash = copy.deepcopy(BASE_SURFACE)
+    closed_wash["texture"] = "wash"
+    _case(cases, "C-wash-closed-control",
+          _instruction("square", weight="brush_thin", surface=closed_wash))
+
+    # Engine 38, second half (ledger I-289). The texture filters are written
+    # only under the `display` profile, and every `display` case above is drawn
+    # with `pen` -- which is not in `TEXTURE_FILTER_WEIGHTS`. Measured
+    # 2026-08-17 on engine 37: of 597 baked SVGs, the number carrying
+    # `filter="url(#texture-` is **zero**. These carry the four tools the
+    # branch actually fires for. `drypoint` is the fifth key of
+    # `TEXTURE_SPECS` and is excluded by name at every write site, so it is
+    # here as the witness for that exclusion: a list of four would make "and
+    # drypoint does not appear" a claim with nobody to test it.
+    for tool in ("pencil", "crayon", "chalk", "brush_thick", "drypoint"):
+        filter_surface = copy.deepcopy(BASE_SURFACE)
+        filter_surface["texture"] = "hatch"
+        _case(cases, f"C-filter-display-{tool}",
+              _instruction("square", weight=tool, filled=False, surface=filter_surface),
+              svg_profile="display")
 
     representatives = {
         "line-pencil": _instruction("line", weight="pencil"),
@@ -771,10 +815,14 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Engine 37 gained nine more to C: six that change nothing but the sheet
     # under two tools the sheet actually reaches, two that put a mark word on a
     # line, and one where the ceiling binds.
-    expected = {"A": 88, "B": 72, "C": 75, "D": 61, "E": 119, "F": 128,
+    # Engine 38 gained nine more to C: four that put 薄墨 on an open shape --
+    # the two drawing paths a line has plus an arc, and a closed control -- and
+    # five that reach the texture filters, which no `display` case in the
+    # corpus could reach while all four of them were `pen`.
+    expected = {"A": 88, "B": 72, "C": 84, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 597:
+    if actual != expected or len(cases) != 606:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

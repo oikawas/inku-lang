@@ -950,6 +950,10 @@ def _call_compose_detail(
         source_text=plugin_fires_on or original_description,
         lang=lang,
         seed_text=plugin_seed_text or ddl,
+        # The same numbers coerce is about to run under. Without this the
+        # expansion declined counts against the shipping 400 and said so in a
+        # warning, whatever the installation had set.
+        limits=limits,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     variation_report: dict = {}
@@ -1627,6 +1631,7 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             # The hash source, not language: the description, so that two runs
             # of the same work resolve the same counts and rotations.
             seed_text=description,
+            limits=_effective_limits(),
         )
         detail.ddl = expand_intermediate_for_lang(
             plugin_expansion.ddl,

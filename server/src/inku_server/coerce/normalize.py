@@ -7,7 +7,7 @@ from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
-from ..limits import DEFAULT_LIMITS, Limits
+from ..limits import DEFAULT_LIMITS, Limits, note_limit
 from ..schema import CLOSED_SHAPES, Instruction, Score, SurfaceSpec, fill_is_asked_for
 
 
@@ -224,13 +224,23 @@ def _with_visible_particle(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _with_density_budget(ins: Instruction, limits: Limits = DEFAULT_LIMITS) -> Instruction:
+def _with_density_budget(
+    ins: Instruction, limits: Limits = DEFAULT_LIMITS, notes: list[str] | None = None
+) -> Instruction:
     arr = ins.arrangement
     if arr is None or arr.layout != "scatter" or arr.count <= limits.max_expanded_per_instruction:
         return ins
     if _shape_extent(ins) > 0.018:
         return ins
-    return _with_clustered_density(ins, "scatter density clustered to preserve negative space", limits)
+    note_limit(
+        notes,
+        "max_expanded_per_instruction",
+        f"a scatter of {arr.count} is over the {limits.max_expanded_per_instruction} "
+        "one instruction may draw, so it is clustered",
+    )
+    return _with_clustered_density(
+        ins, "scatter density clustered to preserve negative space", limits, notes
+    )
 
 
 def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
@@ -494,16 +504,38 @@ def _cluster_count(original_count: int) -> int:
     return 3
 
 
-def _clustered_visual_count(original_count: int, limits: Limits = DEFAULT_LIMITS) -> int:
+def _clustered_visual_count(
+    original_count: int,
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
+) -> int:
     if original_count <= limits.represented_count_max:
         return original_count
-    return min(
-        limits.represented_count_max,
-        max(limits.represented_count_min, int(original_count * 0.42)),
+    proportional = int(original_count * 0.42)
+    visual = min(limits.represented_count_max, max(limits.represented_count_min, proportional))
+    # Two settings meet here and either can decide the answer, so both are named
+    # by what they did rather than by one line saying "the band applied". The
+    # ceiling is what turned a tally into a band at all, so it is always named;
+    # the floor is named only on the works where it actually lifted the number.
+    note_limit(
+        notes,
+        "represented_count_max",
+        f"a group of {original_count} is above the {limits.represented_count_max} "
+        f"a reader can count, so it is drawn as {visual}",
     )
+    if proportional < limits.represented_count_min:
+        note_limit(
+            notes,
+            "represented_count_min",
+            f"the representative count was raised from {proportional} to "
+            f"{limits.represented_count_min}",
+        )
+    return visual
 
 
-def _budgeted_count(count: int, limits: Limits = DEFAULT_LIMITS) -> int:
+def _budgeted_count(
+    count: int, limits: Limits = DEFAULT_LIMITS, notes: list[str] | None = None
+) -> int:
     """A stated count is literal below the threshold and represented above it.
 
     The description asked for a number; below the threshold the number is not a
@@ -517,17 +549,28 @@ def _budgeted_count(count: int, limits: Limits = DEFAULT_LIMITS) -> int:
     """
     if count < limits.literal_count_threshold:
         return count
-    return _clustered_visual_count(count, limits)
+    note_limit(
+        notes,
+        "literal_count_threshold",
+        f"a stated {count} is at or above the {limits.literal_count_threshold} "
+        "a reader can count, so it is represented rather than tallied",
+    )
+    return _clustered_visual_count(count, limits, notes)
 
 
-def _with_clustered_density(ins: Instruction, note: str, limits: Limits = DEFAULT_LIMITS) -> Instruction:
+def _with_clustered_density(
+    ins: Instruction,
+    note: str,
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
+) -> Instruction:
     arr = ins.arrangement
     if arr is None or arr.layout == "grid":
         return ins
     original_count = arr.count
     data = ins.model_dump(by_alias=True)
     arr_data = dict(data["arrangement"])
-    arr_data["count"] = _clustered_visual_count(original_count, limits)
+    arr_data["count"] = _clustered_visual_count(original_count, limits, notes)
     existing_density = arr_data.get("density", "none")
     arr_data["density"] = existing_density if existing_density != "none" else _density_label(original_count)
     arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count)
@@ -543,7 +586,9 @@ def _with_clustered_density(ins: Instruction, note: str, limits: Limits = DEFAUL
 
 
 def _with_per_instruction_density_budget(
-    instructions: list[Instruction], limits: Limits = DEFAULT_LIMITS
+    instructions: list[Instruction],
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
 ) -> list[Instruction]:
     adjusted: list[Instruction] = []
     for ins in instructions:
@@ -554,16 +599,28 @@ def _with_per_instruction_density_budget(
         ):
             adjusted.append(ins)
             continue
+        note_limit(
+            notes,
+            "max_expanded_per_instruction",
+            f"an arrangement of {ins.arrangement.count} is over the "
+            f"{limits.max_expanded_per_instruction} one instruction may draw, "
+            "so it is clustered",
+        )
         adjusted.append(
             _with_clustered_density(
-                ins, "single arrangement density clustered to preserve negative space", limits
+                ins,
+                "single arrangement density clustered to preserve negative space",
+                limits,
+                notes,
             )
         )
     return adjusted
 
 
 def _with_total_density_budget(
-    instructions: list[Instruction], limits: Limits = DEFAULT_LIMITS
+    instructions: list[Instruction],
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
 ) -> list[Instruction]:
     """Bring the total back under budget by representing the largest groups first.
 
@@ -582,13 +639,23 @@ def _with_total_density_budget(
     if total <= limits.max_expanded_primitives:
         return instructions
 
+    note_limit(
+        notes,
+        "max_expanded_primitives",
+        f"the work asked for {total} marks and the budget is "
+        f"{limits.max_expanded_primitives}, so the largest groups were represented",
+    )
+
     # Represent the largest group, check the budget, and only then reach for the next.
     for index in sorted(movable, key=lambda i: _expanded_count(adjusted[i]), reverse=True):
         if total <= limits.max_expanded_primitives:
             break
         before = _expanded_count(adjusted[index])
         candidate = _with_clustered_density(
-            adjusted[index], "largest group represented to fit the total density budget", limits
+            adjusted[index],
+            "largest group represented to fit the total density budget",
+            limits,
+            notes,
         )
         after = _expanded_count(candidate)
         if after < before:
@@ -748,8 +815,10 @@ def _enforce_hard_ceiling(
         note = f"instruction list capped at {boundary}; {dropped} dropped"
         if instructions:
             instructions[-1] = _with_note(instructions[-1], note)
-        if notes is not None:
-            notes.append(note)
+        # The instruction keeps the sentence it already carried, byte for byte:
+        # that text is inside the Score and every frozen corpus holds it. Only
+        # the line handed back to the caller gains the setting's name.
+        note_limit(notes, "max_instructions", note)
         changed = True
 
     counts = _composite_mark_counts(instructions)
@@ -765,8 +834,7 @@ def _enforce_hard_ceiling(
             else:
                 break
         note = f"hard ceiling {limits.max_expanded_primitives} applied to the whole work"
-        if notes is not None:
-            notes.append(note)
+        note_limit(notes, "max_expanded_primitives", note)
         for index, ins in enumerate(instructions):
             if counts[index] <= ceiling or ins.arrangement is None:
                 continue
@@ -788,10 +856,15 @@ def _enforce_hard_ceiling(
     return Score.model_validate(data)
 
 
-def _repair_visibility(ins: Instruction, background: str) -> Instruction:
+def _repair_visibility(
+    ins: Instruction,
+    background: str,
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
+) -> Instruction:
     repaired = _with_visible_color(ins, background)
     repaired = _with_visible_particle(repaired)
-    return _with_density_budget(repaired)
+    return _with_density_budget(repaired, limits, notes)
 
 
 def _repair_coerced_instruction(
@@ -799,11 +872,13 @@ def _repair_coerced_instruction(
     *,
     original_background: str,
     background: str,
+    limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
 ) -> Instruction:
     repaired = ins
     if original_background == "gray" and repaired.color == "gray":
         repaired = _with_visible_color(repaired, "gray")
-    return _repair_visibility(repaired, background)
+    return _repair_visibility(repaired, background, limits, notes)
 
 
 def ensure_renderable_score(score: Score) -> None:

@@ -305,9 +305,14 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     # Part C hands its input straight to the document plugin manager, so the case
     # record has to name every argument that manager takes -- a default left out
     # of the record is a knob the corpus is not freezing.
+    #
+    # `limits` is excluded for the reason `coerce_score`'s is, above: it is the
+    # injection seam the settings contract writes through, not something that
+    # describes a case. The corpus runs at the defaults by running outside a
+    # request, and a case record naming a limit would make it per-install.
     plugin_fields = set(
         inspect.signature(generator.PluginDocumentManager.expand).parameters
-    ) - {"self"}
+    ) - {"self", "limits"}
     for case in generator.build_plugin_expand_inputs().values():
         assert set(case) == plugin_fields
 

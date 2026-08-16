@@ -19,7 +19,7 @@ from ..counts import (
     count_hint_from_ddl,
 )
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
-from ..limits import DEFAULT_LIMITS, Limits
+from ..limits import DEFAULT_LIMITS, Limits, note_limit
 from ..schema import Instruction, fill_is_asked_for
 from .normalize import (
     VISIBLE_ON_BACKGROUND,
@@ -1756,6 +1756,7 @@ def _fallback_instruction_from_clause(
     background: str,
     limits: Limits = DEFAULT_LIMITS,
     lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> Instruction:
     lower = clause.lower()
     primitive = _primitive_from_clause(clause)
@@ -1846,9 +1847,16 @@ def _fallback_instruction_from_clause(
     elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
         common["center"] = [common["center"][0], 0.22]
 
-    count = count_hint_from_ddl(clause, limits, lang=lang)
+    count = count_hint_from_ddl(clause, limits, lang=lang, notes=notes)
     cycle = _color_cycle_from_clause(clause, background)
     if count and _is_literal_grid_request(clause):
+        if count > limits.schema_count_max:
+            note_limit(
+                notes,
+                "schema_count_max",
+                f"a tiling of {count} is over the {limits.schema_count_max} one "
+                "arrangement may declare",
+            )
         common["arrangement"] = {
             "count": min(count, limits.schema_count_max),
             "layout": "grid",
@@ -1857,7 +1865,7 @@ def _fallback_instruction_from_clause(
         }
     elif count and (("散らす" in clause) or ("scatter" in lower)):
         common["arrangement"] = {
-            "count": _budgeted_count(count, limits),
+            "count": _budgeted_count(count, limits, notes),
             "layout": "scatter",
             "margin": 0.18,
         }
@@ -1999,6 +2007,7 @@ def _with_ddl_coverage(
     background: str,
     limits: Limits = DEFAULT_LIMITS,
     lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> list[Instruction]:
     clauses = _ddl_clauses(ddl)
     if len(instructions) != 1 or len(clauses) <= 1:
@@ -2016,7 +2025,12 @@ def _with_ddl_coverage(
         if len(augmented) >= 5:
             break
         fallback = _fallback_instruction_from_clause(
-            clause, index=len(augmented), background=background, limits=limits, lang=lang
+            clause,
+            index=len(augmented),
+            background=background,
+            limits=limits,
+            lang=lang,
+            notes=notes,
         )
         key = (fallback.primitive, fallback.color, fallback.weight)
         if key in existing:
@@ -2299,6 +2313,7 @@ def _group_the_clause_names(
     limits: Limits,
     spoken_for: frozenset[int],
     lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> int | None:
     """Which group this clause is about, when exactly one answer is available.
 
@@ -2320,7 +2335,7 @@ def _group_the_clause_names(
     """
     fallback = _with_ddl_instruction_hints(
         _fallback_instruction_from_clause(
-            clause, index=index, background=background, limits=limits, lang=lang
+            clause, index=index, background=background, limits=limits, lang=lang, notes=notes
         ),
         ddl=ddl,
     )
@@ -2389,6 +2404,7 @@ def _with_stated_count_fidelity(
     background: str,
     limits: Limits = DEFAULT_LIMITS,
     lang: str | None = None,
+    notes: list[str] | None = None,
 ) -> list[Instruction]:
     """Make a count stated in plain words true of the group the clause names.
 
@@ -2418,11 +2434,20 @@ def _with_stated_count_fidelity(
     if not ddl or not instructions:
         return instructions
     every_stated_count = _explicit_counts_from_ddl(ddl, lang=lang)
-    stated = {
-        value
-        for value in every_stated_count
-        if 1 <= value <= _stated_count_fidelity_band(limits)
-    }
+    band = _stated_count_fidelity_band(limits)
+    stated = {value for value in every_stated_count if 1 <= value <= band}
+    # A number the description stated and this repair declined to make true, for
+    # no reason other than the counting threshold. The picture is not what the
+    # sentence asked for and nothing else in the work says why.
+    for value in sorted(every_stated_count - stated):
+        if value > band:
+            note_limit(
+                notes,
+                "literal_count_threshold",
+                f"a stated {value} is at or above the {limits.literal_count_threshold} "
+                "a reader can count, so it is not made literally true",
+            )
+            break
     if not stated:
         return instructions
 
@@ -2448,6 +2473,12 @@ def _with_stated_count_fidelity(
         # -- but the two are separate settings with no rounding between them, so
         # an install that raises the threshold reaches it.
         if value > limits.max_expanded_per_instruction:
+            note_limit(
+                notes,
+                "max_expanded_per_instruction",
+                f"a stated {value} is over the {limits.max_expanded_per_instruction} "
+                "one instruction may draw, so no group was moved onto it",
+            )
             continue
         # A number the Score already carries somewhere is a number this branch
         # has nothing to add to. Moving a second group onto it would answer a
@@ -2466,6 +2497,7 @@ def _with_stated_count_fidelity(
             limits=limits,
             spoken_for=frozenset(every_stated_count - {value}),
             lang=lang,
+            notes=notes,
         )
         if target is None:
             continue
@@ -2475,6 +2507,12 @@ def _with_stated_count_fidelity(
         # their own can be over the ceiling together, and the second one is the
         # one that has to give way.
         if _marks_with(repaired, target, candidate) > limits.max_expanded_primitives:
+            note_limit(
+                notes,
+                "max_expanded_primitives",
+                f"a stated {value} would put the work over the "
+                f"{limits.max_expanded_primitives}-mark budget, so it was declined",
+            )
             continue
         repaired[target] = candidate
     return repaired

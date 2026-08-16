@@ -675,7 +675,9 @@ usage: inku-cli render-score [-h] [--base-url BASE_URL]
                              [--composition-seed COMPOSITION_SEED]
                              [--catalog-id CATALOG_ID]
                              [--color-catalog COLOR_CATALOG]
-                             [--from-work WORK_ID] [--full-json]
+                             [--from-work WORK_ID]
+                             [--limits KEY=VALUE [KEY=VALUE ...]]
+                             [--full-json]
                              [score]
 
 positional arguments:
@@ -709,6 +711,13 @@ options:
   --from-work WORK_ID   draw in the colors that work was drawn in, not in
                         today's definition of its catalog; a renamed or
                         retired catalog still draws
+  --limits KEY=VALUE [KEY=VALUE ...]
+                        draw under these limits instead of the server's
+                        settings, e.g. --limits represented_count_max=60
+                        max_expanded_primitives=200. Each value is capped at
+                        today's setting, so this can only draw less; with
+                        --from-work it overrides the work's own recorded
+                        limits
   --full-json           print SVG and Score as well
 
 ```

@@ -183,6 +183,8 @@ def coerce_score(
             ),
             original_background=score.background,
             background=background,
+            limits=limits,
+            notes=limit_notes,
         )
         for ins in score.instructions
     ]
@@ -200,7 +202,12 @@ def coerce_score(
     _record_branch_fire(branch_report, "dedupe_instructions", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_ddl_coverage(
-        instructions, ddl=ddl, background=background, limits=limits, lang=lang
+        instructions,
+        ddl=ddl,
+        background=background,
+        limits=limits,
+        lang=lang,
+        notes=limit_notes,
     )
     _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
     _branch_before = instructions
@@ -267,10 +274,10 @@ def coerce_score(
     instructions = _with_existing_event_counterweight(instructions, ddl=ddl, background=background)
     _record_branch_fire(branch_report, "with_existing_event_counterweight", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_per_instruction_density_budget(instructions, limits)
+    instructions = _with_per_instruction_density_budget(instructions, limits, limit_notes)
     _record_branch_fire(branch_report, "with_per_instruction_density_budget", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_total_density_budget(instructions, limits)
+    instructions = _with_total_density_budget(instructions, limits, limit_notes)
     _record_branch_fire(branch_report, "with_total_density_budget", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
@@ -288,7 +295,12 @@ def coerce_score(
     # 1..11 band this branch repairs is never the one they take. So the position
     # is right but nothing distinguishes it, and no test here pretends to.
     instructions = _with_stated_count_fidelity(
-        instructions, ddl=ddl, background=background, limits=limits, lang=lang
+        instructions,
+        ddl=ddl,
+        background=background,
+        limits=limits,
+        lang=lang,
+        notes=limit_notes,
     )
     _record_branch_fire(branch_report, "with_stated_count_fidelity", _branch_before, instructions)
     _branch_before = instructions

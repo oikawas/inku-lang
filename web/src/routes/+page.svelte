@@ -20,6 +20,7 @@
 	} from '$lib/settingsDetail';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
+	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import AppRail from '$lib/components/AppRail.svelte';
@@ -188,6 +189,12 @@
 		// every path; until now nothing showed it to the person who wrote the
 		// sentence that went missing.
 		plugin_warnings?: string[] | null;
+		// Which of the nine limits took effect, and where the numbers came from.
+		// `render_limits` says what was used; only the source says whether a
+		// redraw replayed the work's own ceiling (ledger I-154).
+		render_limits?: Record<string, number> | null;
+		render_limits_source?: string | null;
+		render_limit_notes?: string[] | null;
 		focus?: string | null;
 		variation_amplitude?: string | null;
 		variation_seed?: number | null;
@@ -466,6 +473,9 @@
 	let result   = $state<PaintResult | null>(null);
 	// One read point for every draw path: whatever sets `result` shows them.
 	const pluginWarningsShown = $derived(pluginWarningsToShow(result));
+	// Same read point, same rule, for the limits that took effect on this
+	// drawing. Seven of the nine used to bind in silence (ledger I-154).
+	const limitNotesShown = $derived(limitNotesToShow(result));
 	// 写生 (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
 	// way a user setting like the color catalog is (contract section 0.3.1).
 	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
@@ -6752,6 +6762,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
+					<!-- どの上限が効いたか。墨が減った理由は絵からは読めず、
+					     効いた設定の名前を言えるのはここだけ。 -->
+					{#if limitNotesShown.length > 0 && inputMode === 'single'}
+						<section class="panel-section limit-notes">
+							<div class="limit-notes-title">{t().renderLimitNotesTitle}</div>
+							{#each limitNotesShown as note}
+								<p class="limit-note-line">{note}</p>
+							{/each}
+						</section>
+					{/if}
+
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
@@ -7938,6 +7959,24 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		margin-bottom: 4px;
 	}
 	.plugin-warning-line {
+		color: var(--fg2);
+		font-size: 11px;
+		line-height: 1.5;
+		word-break: break-word;
+	}
+	/* A limit taking effect is not a warning: nothing went wrong, a setting was
+	   honoured. So it reads in the ordinary border, not the amber one. */
+	.limit-notes {
+		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--bg2) 68%, transparent);
+	}
+	.limit-notes-title {
+		color: var(--fg2);
+		font-size: 11px;
+		font-weight: 500;
+		margin-bottom: 4px;
+	}
+	.limit-note-line {
 		color: var(--fg2);
 		font-size: 11px;
 		line-height: 1.5;

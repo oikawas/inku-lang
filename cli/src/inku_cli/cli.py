@@ -628,21 +628,25 @@ def _result_with_svg_profile(
     output["svg_profile"] = svg_profile
     if svg_profile == "display":
         return output
-    output["svg"] = client.request_text(
-        "POST",
-        "/api/render-svg",
-        data={
-            "score": result.get("score") or {},
-            "catalog_id": result.get("render_color_catalog_id") or color_catalog,
-            "svg_profile": svg_profile,
-            "render_seed": result.get("render_seed"),
-            # The performance seed was sent and the placement seed was not, so
-            # a non-display export put the marks somewhere else than the
-            # picture it was exporting. Raw: renderer.py:3486 falls back to the
-            # performance seed when there is no composition seed.
-            "composition_seed": result.get("composition_seed"),
-        },
-    )
+    request_data: dict[str, Any] = {
+        "score": result.get("score") or {},
+        "catalog_id": result.get("render_color_catalog_id") or color_catalog,
+        "svg_profile": svg_profile,
+        "render_seed": result.get("render_seed"),
+        # The performance seed was sent and the placement seed was not, so
+        # a non-display export put the marks somewhere else than the
+        # picture it was exporting. Raw: renderer.py:3486 falls back to the
+        # performance seed when there is no composition seed.
+        "composition_seed": result.get("composition_seed"),
+    }
+    # Name the work when there is one. The export then draws under the limits
+    # the work was drawn under, the way the browser's export already does
+    # through GET /api/history/{id}/svg. A fresh drawing has no history row, and
+    # sending a null id would only be able to 404.
+    history_id = result.get("history_id")
+    if history_id:
+        request_data["work_id"] = history_id
+    output["svg"] = client.request_text("POST", "/api/render-svg", data=request_data)
     return output
 
 def _review_sets(results: list[dict[str, Any]], *, slow_ms: int = 100_000) -> dict[str, list[int]]:
@@ -2872,6 +2876,28 @@ def command_analyze(args: argparse.Namespace) -> int:
     _print_json(summary)
     return 0
 
+def _limits_argument(pairs: list[str] | None) -> dict[str, int] | None:
+    """Read `key=value` limit overrides into the shape the API takes.
+
+    None and an empty list are the same answer -- no override -- because the
+    request must carry no `limits` key at all for the work's own recorded limits
+    to decide. An empty dict would read as "override with nothing", and the
+    server would then bound it against today's settings.
+    """
+    if not pairs:
+        return None
+    limits: dict[str, int] = {}
+    for pair in pairs:
+        name, separator, raw = pair.partition("=")
+        if not separator:
+            raise CliError(f"--limits takes key=value pairs, not {pair!r}")
+        try:
+            limits[name.strip()] = int(raw)
+        except ValueError as exc:
+            raise CliError(f"--limits value for {name.strip()} must be a whole number") from exc
+    return limits
+
+
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -2906,6 +2932,7 @@ def command_render_score(args: argparse.Namespace) -> int:
     request_data = {
         "score": score,
         "work_id": from_work,
+        "limits": _limits_argument(getattr(args, "limits", None)),
         "catalog_id": color_catalog,
         "canvas_aspect": args.canvas_aspect,
         "svg_profile": args.svg_profile,
@@ -2955,6 +2982,12 @@ def command_render_score(args: argparse.Namespace) -> int:
         "ddl_engine_version": rendered["ddl_engine_version"],
         "render_color_catalog_id": rendered["render_color_catalog_id"],
         "render_color_source": rendered["render_color_source"],
+        # Which limits drew this, where they came from, and which of them took
+        # effect. Without the middle key `render_limits` cannot say whether a
+        # --from-work redraw replayed the work's own ceiling or ran at today's.
+        "render_limits": rendered.get("render_limits"),
+        "render_limits_source": rendered.get("render_limits_source"),
+        "render_limit_notes": rendered.get("render_limit_notes"),
         "work_id": from_work,
         "render_canvas_aspect": rendered["render_canvas_aspect"],
         "render_canvas_aspect_id": rendered["render_canvas_aspect_id"],
@@ -3991,6 +4024,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--from-work",
         metavar="WORK_ID",
         help="draw in the colors that work was drawn in, not in today's definition of its catalog; a renamed or retired catalog still draws",
+    )
+    render_score.add_argument(
+        "--limits",
+        metavar="KEY=VALUE",
+        nargs="+",
+        help=(
+            "draw under these limits instead of the server's settings, e.g. "
+            "--limits represented_count_max=60 max_expanded_primitives=200. Each "
+            "value is capped at today's setting, so this can only draw less; "
+            "with --from-work it overrides the work's own recorded limits"
+        ),
     )
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
     render_score.set_defaults(func=command_render_score)

@@ -7575,3 +7575,81 @@ by nobody.
   applied together by hand to see it go red**.
 - **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — and **the Android JVM is not
   among the four jobs in `checks.yml`** in any case).
+
+---
+
+### Android — A wash is a field in the port too (android `2.1.4-android.36`, 2026-08-16, ledger I-285)
+
+**The port offers the model ten surface textures and could actually draw two of them — `hatch` and
+`crosshatch`. The remaining eight matched no branch in `renderSurfaceVectors` and fell through to the
+empty string at the end of the function.** This round closes one of them, `wash`, with render engine
+36's values from the server. **Words that cannot be drawn went from eight to seven; words that are
+offered and still cannot be drawn went from six to five** (`stipple`, `grain`, `paper_grain`,
+`aquatint`, `bleed` remain).
+
+- **The sweep's seed and the machinery that makes one sweep were ported (stage 1):** the server's
+  `_surface_stroke_seed` and `_surface_sweep` had no counterpart in the port at all (zero grep hits,
+  confirmed before any code was written). They were carried over as
+  `ServerRendererGeometry.surfaceStrokeSeed` and `DefaultSvgRenderer.surfaceSweep`. **This stage alone
+  moves not one pixel** — nothing calls them yet.
+- **The `wash` branch was added with engine 36's values (stage 2):** two layers, a width floor of 0.88,
+  a width span of 0.60 and a per-sweep opacity of 0.22, **placed as named constants rather than buried
+  in expressions** (`SURFACE_WASH_LAYERS`, `SURFACE_WASH_WIDTH_BASE`, `SURFACE_WASH_WIDTH_SPAN`,
+  `SURFACE_WASH_OPACITY`). **Engine 36 moved exactly two quantities — the width and the opacity** — so
+  the pitch, the layer count, the angles and the way sweeps are cut at the contour were carried over
+  unchanged from the branch point.
+- **⚠ The port's wash was already the server's wash before this round widened it:** rather than copying
+  the server's baseline, the implementation put engine 35's three constants in temporarily, had the port
+  itself draw the same two shapes, and measured with the same instrument. **The values agreed with the
+  server's frozen ones to six digits** (square ink 0.16229907 against 0.162299; triangle 0.16225059
+  against 0.162251; bare paper 0.19852839 against 0.198528 and 0.21135029 against 0.211350). Even though
+  neither `_surface_sweep` nor `_surface_stroke_seed` existed in the port, **every part that makes the
+  pitch, the layers, the angles and the contour cut already agreed**.
+- **Eight gates were placed as properties (stage 3, T-149 to T-156):** **only two instructions in the
+  51-picture frozen corpus carry a surface at all, and both are `hatch`** (all 51 scores were re-read at
+  the start of the round to count this). **There are zero `wash` cases**, so the gates read no corpus
+  picture; they have the port draw a square and a triangle and measure that. T-149 (almost no bare paper
+  left inside the shape) and T-150 (the composite ink stays near the branch point's) **are placed as a
+  pair** — T-149 on its own is passed by painting everything black.
+- **⚠ T-149's threshold of 1.5% is the server's own value:** the measurement is the same kind (a
+  point-in-polygon test on a 3px grid, which counts a partly covered point as paper), so the two are
+  comparable. **Measured, bare paper is 0.14% for the square and 0.79% for the triangle, against 19.85%
+  and 21.14% at the branch point** — an order of magnitude of clearance on both sides.
+- **⚠ One gate was vacuous at first, and the implementing session found and fixed it:** T-154 compared
+  the layer count against `SURFACE_WASH_LAYERS` itself, so **dropping the constant to 1 dropped the
+  expectation with it and the very perturbation it existed to catch (P-3) sailed through green**. The
+  branch point's 2 was written on the test's side and the constant is now checked against it separately
+  (`branchPointLayers`), and P-3 was re-applied afterwards to see it go red. **The count of reddened
+  tests was the same before and after the fix — agreeing on the count is not agreeing on the contents.**
+- **One existing control narrowed from four words to three:**
+  `ASurfaceKeepsToItsShapeTest.testTheOtherSurfaceWordsAreUntouched` asserted that `wash`, `stipple`,
+  `bleed` and `aquatint` each contribute no surface stroke. **Now that `wash` is drawn, this test going
+  red is the very claim the contract set out to change.** **The pre-work frozen note predicted this one
+  test by name**, and no other existing test went red. **The `@Test` total did not move.**
+- **⚠ Only five of the six perturbations could be applied (reported):** **P-5 (replace the sweeps with a
+  single rectangle under `display`) has no place to land** — **the port's `renderSurfaceVectors` does not
+  receive `svgProfile`**. The profile is read by a single local in `render()` and never descends to the
+  surface layer. **T-156 (the same sweeps in every profile) is therefore structurally green in this port,
+  not green-because-a-perturbation-reddened-it.** The claim itself is true, and stronger than the
+  server's (the server can differ per profile through `use_filters`; the port cannot differ at all).
+  **The contract named a target that does not exist in the tree — an issuing-side measurement error.**
+- **The two predictions that missed, and why:** (1) **T-154 stayed green under P-3** (the vacuous gate
+  above). (2) **T-150 stayed green under P-6** (paint the whole shape once before the sweeps) — **the ink
+  measurement reads only `<path class="surface-stroke-v1">`**, so the `<rect>` laid down as an underlay
+  never enters it (the server's counterpart has the same structure, and a different test catches the
+  underlay). **When the prediction was written, what the instrument itself reads had not been counted.**
+- **A version was taken:** **what runs on the device changed** (`DefaultSvgRenderer.kt` and
+  `ServerRendererGeometry.kt`), so `android/VERSION` is now `2.1.4-android.36`. **⚠
+  `renderEngineVersion` stays at `"35"`** — not one frozen SVG moves between 35 and 36, and **the port
+  has no engine-34 ground layer at all** (what stands for `ground` is three lines of background
+  rectangle against the server's 105), so **the issuing session decided not to raise it. How the version
+  should be handled remains open for the author to rule on.** `ddlEngineVersion` did not move either.
+  **`android/` is permanently excluded from every sync path, so there is nothing to send to pentala.**
+- **Verification (re-measured by the accepting session on the merged tree):** **Android JVM 346 tests /
+  0 failures / 0 errors / 0 skipped** (60 XML files, 1m 18s from `rm -rf app/build`),
+  **`test_android_reference_fixtures_are_current.py` 4 passed**. **The `@Test` total went from 338 at
+  the base to 346 on the branch, +8** (T-149 to T-156) — **no test was deleted and none was renamed**.
+  **⚠ `cycle.sh accept` printed "2343 → 2343" because it does not count a single file under `android/`**
+  (ledger I-270).
+- **⚠ GitHub CI was not waited for** (author's ruling, conventions §2-10 — and **the Android JVM is not
+  among the four jobs in `checks.yml`** in any case).

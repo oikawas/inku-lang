@@ -313,9 +313,21 @@ class DefaultSvgRendererPhase2fTest {
         org.junit.Assert.assertEquals("25_line_computer_wild must be identical to 17_line_computer", svg17, svg25)
     }
 
+    /**
+     * Every polyline whose class begins with material-outline, whichever order
+     * the attributes arrive in.
+     *
+     * The reference sorts its attributes alphabetically (`class` before
+     * `points`) and the port writes `points` first, so both readings have to
+     * stay. What is new is the prefix: engine 28 split the layer into contact
+     * fragments and the class became `material-outline stratum-N`, which the
+     * old exact match reached in none of the 51 drawings. The prefix is matched
+     * rather than the stratum spelled out, so the day the strata are numbered
+     * some other way this does not go blind again.
+     */
     private fun extractMaterialOutlinePoints(svg: String): List<String> {
         val result = mutableListOf<String>()
-        val regex = Regex("""<polyline[^>]*points="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*points="([^"]+)"""")
+        val regex = Regex("""<polyline[^>]*points="([^"]+)"[^>]*class="material-outline[^"]*"|<polyline[^>]*class="material-outline[^"]*"[^>]*points="([^"]+)"""")
         regex.findAll(svg).forEach { match ->
             val pts = match.groupValues[1].ifEmpty { match.groupValues[2] }
             result.add(pts)
@@ -323,9 +335,19 @@ class DefaultSvgRendererPhase2fTest {
         return result
     }
 
+    /**
+     * The same widening as [extractMaterialOutlinePoints], for the dash side.
+     *
+     * Engine 35 writes no `stroke-dasharray` at all -- engines 21 to 25 held
+     * 252 across the corpus, 26 and 27 held 640, and 28 onwards hold none --
+     * so this comes back empty from both sides today. It is widened anyway:
+     * were it left on the exact match, a port that started writing a dash on a
+     * stratum would be caught by the count guard (T-145) as a extraction
+     * failure rather than as the divergence it is.
+     */
     private fun extractMaterialOutlineDashArrays(svg: String): List<String> {
         val result = mutableListOf<String>()
-        val regex = Regex("""<polyline[^>]*stroke-dasharray="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*stroke-dasharray="([^"]+)"""")
+        val regex = Regex("""<polyline[^>]*stroke-dasharray="([^"]+)"[^>]*class="material-outline[^"]*"|<polyline[^>]*class="material-outline[^"]*"[^>]*stroke-dasharray="([^"]+)"""")
         regex.findAll(svg).forEach { match ->
             val dash = match.groupValues[1].ifEmpty { match.groupValues[2] }
             result.add(dash)

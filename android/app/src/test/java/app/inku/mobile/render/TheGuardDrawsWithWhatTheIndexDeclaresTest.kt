@@ -228,8 +228,11 @@ class TheGuardDrawsWithWhatTheIndexDeclaresTest {
      * `ServerRendererStyle.fill` only knows whether the primitive has an inside.
      *
      * Stated as a pair on purpose. "The rotring circle is not filled" alone is
-     * satisfied by a port that fills nothing at all, and "the pen circle is
-     * filled" alone by a port that fills everything.
+     * satisfied by a port that fills nothing at all, so the other direction is
+     * here too. The two poles answer the same request in different elements: the
+     * machine pole has no fill layer, so its interior is the body element's own
+     * `fill`, while the hand pole draws the interior as marks in a `fill-*` group
+     * and deliberately leaves the body open so the two do not stack.
      */
     @Test
     fun testTheMachinePoleDoesNotFillWhatWasNotAskedToBeFilled() {
@@ -243,15 +246,21 @@ class TheGuardDrawsWithWhatTheIndexDeclaresTest {
             "#111111",
             circleFill(renderCircle("rotring", filled = true)),
         )
+
+        val handBare = renderCircle("pen", filled = null)
+        val handFilled = renderCircle("pen", filled = true)
         assertEquals(
             "the hand pole reads the same request the same way",
             "none",
-            circleFill(renderCircle("pen", filled = null)),
+            circleFill(handBare),
         )
-        assertEquals(
-            "and fills when it is asked to",
-            "#111111",
-            circleFill(renderCircle("pen", filled = true)),
+        assertTrue(
+            "a pen circle nobody asked to fill must hold no fill layer either",
+            !handBare.contains("""class="fill-"""),
+        )
+        assertTrue(
+            "a pen circle that was asked to be filled draws its interior as marks",
+            handFilled.contains("""class="fill-"""),
         )
 
         // The one drawing in the corpus this divergence reached, against the

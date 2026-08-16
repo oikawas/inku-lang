@@ -29,6 +29,7 @@ ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.
 ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.json"
 ENGINE_33_MANIFEST = SERVER_ROOT / "reference" / "render-engine-33" / "manifest.json"
 ENGINE_34_MANIFEST = SERVER_ROOT / "reference" / "render-engine-34" / "manifest.json"
+ENGINE_35_MANIFEST = SERVER_ROOT / "reference" / "render-engine-35" / "manifest.json"
 
 
 def _generator():
@@ -347,10 +348,13 @@ ENGINE_35_HATCH_CASES = {
     "E-wild-surface-crosshatch-pen",
     "E-wild-surface-crosshatch-pencil",
 }
-# 薄墨の 6 件。作者は 2026-08-14 に「薄墨は縞に見える」とも裁定したが、
-# **それは別契約である**（あるべき形の現物がまだ 1 つも無い）。engine 35 が
-# 薄墨に触っていないことを、動かなかった側から明示的に留める。
-ENGINE_35_WASH_CASES = {
+# 薄墨の 6 件。**case 名ではなく
+# `input.score.instructions[].surface.texture` で数えた** —— 名前で数えると
+# `C-ground-ink_wash` `C-ground-washi` `C-groundseed-auto-washi` が混ざり、
+# 6 件が 8 件に見える。engine 33 / 34 / 35 の 3 版とも同じ 6 件で、engine 36 が
+# 動かすのがこの 6 件である。**2 つの検査が両側からこの集合を使う** —— engine 35
+# は動かさなかった側から、engine 36 は動かした側から。
+ENGINE_36_WASH_CASES = {
     "C-display-surface-wash-pen",
     "C-surface-wash-pen",
     "C-surface-wash-pencil",
@@ -370,11 +374,11 @@ def test_engine_35_moves_only_the_hatch_cases() -> None:
     新規 ID は 1 件も無い。**したがってこの 9 件は全部が判別力を持つ** ——
     地の版 (engine 34) と違い、changed の側も測れる版である。
 
-    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
-    いる実装ではなく別の実装の記録になる。
+    ⚠ engine 36 が出たので、物差しは現行 manifest から engine 35 の凍結 manifest へ
+    移した（engine 33・34 の検査と同じ形）。版の一致は engine 36 の検査が見る。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "35" == current_render_engine().version
+    manifest = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "35"
     assert set(manifest["changed_from_previous"]) == ENGINE_35_HATCH_CASES
     previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -411,31 +415,78 @@ def test_engine_35_hatch_cases_match_the_current_renderer() -> None:
     assert checked == 9
 
 
-def test_engine_35_leaves_the_wash_cases_alone() -> None:
-    """薄墨の 6 件は前の版とバイト一致する。
+def test_engine_35_left_the_wash_cases_alone() -> None:
+    """engine 35 は薄墨の 6 件を動かさなかった。**これは歴史の主張である。**
 
-    上の検査に含まれてはいるが、**裁定 1（薄墨は縞に見える）が別契約である**
-    ことをここで明示的に留める。薄墨に同じ切り方を当てた実装は、579 件の中に
-    紛れずにこの 1 本で落ちる。
+    engine 35 は行を輪郭で切った版で、切ったのは平行線・交差線だけだった。
+    薄墨に同じ切り方が伸びていれば、579 件の中に紛れずにこの 1 本で落ちる。
 
-    ⚠ **凍結どうしの比較だけでは薄墨を守れない。** 実測で確かめた —— 薄墨の枝の
-    濃度を動かす摂動を当てても、manifest どうしの比較は緑のままだった（凍結物は
-    renderer が動いても動かない）。**そこで前の版との一致と、いまの木が描くものと
-    の一致を 2 つとも見る。**
+    ⚠ **かつてこの検査は生描きも見ていた** —— 「いまの木が描く薄墨は engine 34 と
+    同じである」。engine 36 が薄墨を動かしたので、生描きの側は
+    `test_engine_36_wash_cases_match_the_current_renderer` が引き取った。
+    **消さずに向け直した**のは、engine 35 の主張そのものは真のままだからである
+    （凍結物は後の版が何をしても動かない）。名前も `leaves` から `left` へ直した
+    —— 現在形のまま残すと、いまの木の話をしている検査に見える。
+    """
+    manifest = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))
+    previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    checked = 0
+    for case_id in sorted(ENGINE_36_WASH_CASES):
+        assert case_id in manifest["cases"], case_id
+        assert manifest["cases"][case_id]["digest"] == previous[case_id]["digest"], case_id
+        checked += 1
+    assert checked == 6
+    assert not ENGINE_36_WASH_CASES & ENGINE_35_HATCH_CASES
+
+
+def test_engine_36_moves_only_the_wash_cases() -> None:
+    """engine 36 が動かしたのは、面の質感が `wash` の 6 件だけである。
+
+    掃きの幅と濃さだけを動かした版なので、**薄墨を持たない 582 件はバイト一致する
+    のが正しい**。1 件でも動いていたら、手が薄墨の枝の外へ伸びている
+    （`_scanline_segments` を触ると塗りとハッチが道連れになる）。
+
+    新規 ID は 1 件も無い。**したがってこの 6 件は全部が判別力を持つ。**
+
+    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
+    いる実装ではなく別の実装の記録になる。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "36" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_36_WASH_CASES
+    previous = json.loads(ENGINE_35_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_36_WASH_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 582
+
+
+def test_engine_36_wash_cases_match_the_current_renderer() -> None:
+    """動いた 6 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+
+    **⚠ 上の検査は manifest どうしの比較で、1 バイトも描き直さない。** engine 35 の
+    周に実測されている —— 薄墨の濃度を動かす摂動を当てても、manifest どうしの
+    比較は緑のままだった。**あれは焼き直される記録であって、renderer の検査では
+    ない。** ここが「この版の 6 件は、いまの木が描くものと同じである」を測る。
+
+    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
+    やめた日にこの検査だけが古い呼び方で緑になる。
     """
     generator = _generator()
     manifest = _manifest()
     inputs = generator.build_inputs()
-    previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
     checked = 0
-    for case_id in sorted(ENGINE_35_WASH_CASES):
-        assert case_id in manifest["cases"], case_id
-        assert manifest["cases"][case_id]["digest"] == previous[case_id]["digest"], case_id
+    for case_id in sorted(ENGINE_36_WASH_CASES):
         svg = generator.render_case(inputs[case_id])
-        assert generator._normalized_digest(svg) == previous[case_id]["digest"], case_id
+        assert generator._normalized_digest(svg) == (
+            manifest["cases"][case_id]["digest"]
+        ), case_id
         checked += 1
     assert checked == 6
-    assert not ENGINE_35_WASH_CASES & ENGINE_35_HATCH_CASES
 
 
 def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:

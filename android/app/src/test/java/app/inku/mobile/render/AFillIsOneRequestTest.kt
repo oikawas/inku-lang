@@ -1,7 +1,10 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.pipeline.RenderRequest
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -84,5 +87,36 @@ class AFillIsOneRequestTest {
             "the shape without a surface must still be filled",
             fillsInterior(withoutSurface),
         )
+    }
+
+    private val seedForInstruction = DefaultSvgRenderer::class.java.getDeclaredMethod(
+        "seedForInstruction",
+        JSONObject::class.java,
+        java.lang.Long::class.java,
+    ).apply { isAccessible = true }
+
+    private fun seedOf(instruction: String): String =
+        seedForInstruction.invoke(DefaultSvgRenderer(), JSONObject(instruction), seed) as String
+
+    /**
+     * T-135: the two spellings of one request perform the same way.
+     *
+     * This is what holds the saved works still. Coerce derives a `surface` onto every
+     * `filled` closed shape, and the moment that surface reaches the seed key as a
+     * surface, every stroke of every work already saved is re-rolled.
+     */
+    @Test
+    fun testTheTwoSpellingsOfAFillMakeTheSameSeed() {
+        val asBoolean = seedOf(square(surface = null, filled = true))
+        val asSurfaceWord = seedOf(square("""{"texture":"solid"}""", filled = false))
+        assertEquals(
+            "solid and filled=true must land on the same performance seed",
+            asBoolean,
+            asSurfaceWord,
+        )
+
+        val asRealTexture = seedOf(square("""{"texture":"hatch"}""", filled = false))
+        assertNotEquals("a real surface texture must perform its own way", asBoolean, asRealTexture)
+        assertNotEquals("a real surface texture must perform its own way", asSurfaceWord, asRealTexture)
     }
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { measureSvgWeight } from '$lib/svgWeight';
 	import type { HistoryStripField } from '$lib/historyStripFields';
 
 	type HistoryItem = {
@@ -11,6 +10,8 @@
 		thinking?: string | null;
 		score: { instructions: unknown[] };
 		svg: string;
+		/** The work's own weight, sent by the server: `svg` is empty here. */
+		svg_bytes?: number;
 		at: number;
 		elapsed_ms?: number;
 		stage1_model?: string | null;
@@ -111,9 +112,13 @@
 		return isJapanese ? `第${item.lineage_generation}世代` : `Gen. ${item.lineage_generation}`;
 	}
 
-	/** The stored drawing's own size, as the file the reader would export. */
+	/** The work's own size, as the file the reader would export.
+	 *
+	 *  Read from `svg_bytes`, never counted from `item.svg`: the listing that
+	 *  fills this strip asks for `include_svg=false`, so `svg` arrives empty and
+	 *  counting it reported every work but the open one as 0 B. */
 	function fileSizeLabel(item: HistoryItem): string {
-		const bytes = measureSvgWeight(item.svg || '').bytes;
+		const bytes = item.svg_bytes ?? 0;
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

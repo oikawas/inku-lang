@@ -88,3 +88,14 @@ test('T-152  a box that cannot be ticked is disabled, so the limit is visible', 
 	// Without this the third click is simply inert, which reads as a bug.
 	assert.match(PANEL, /disabled=\{historyStripFieldsSaving \|\| \(!checked && !canAddHistoryStripField\(historyStripFields\)\)\}/);
 });
+
+test('T-163  the file size is read from the server, not counted from what arrived', () => {
+	// The listing that fills the strip asks for include_svg=false, so `svg` is an
+	// empty string by the time it gets here. Counting it reported every work but
+	// the open one as 0 B -- seen on screen, five works, four of them wrong.
+	assert.match(STRIP, /const bytes = item\.svg_bytes \?\? 0;/);
+	assert.ok(!STRIP.includes('measureSvgWeight'), 'the strip must not measure what it was sent');
+	// And the listing really does withhold the picture, which is why.
+	const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf-8');
+	assert.match(PAGE, /include_svg: 'false'/);
+});

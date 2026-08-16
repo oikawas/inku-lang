@@ -44,6 +44,7 @@ def account():
     try:
         yield {"id": user["id"], "headers": headers}
     finally:
+        db.delete_all(user["id"])
         db.delete_session(token)
         db.delete_user(user["id"])
         db.delete_user_group(group_id)
@@ -131,3 +132,43 @@ def test_t157_a_refused_request_leaves_the_stored_choice_alone(account):
 def test_t158_the_normaliser_tells_an_absence_from_an_empty_choice(stored, expected):
     """T-158  the rule itself, without the round trip"""
     assert db.normalize_history_strip_fields(stored) == expected
+
+
+def test_t162_the_listing_sends_each_works_weight_even_when_it_withholds_the_picture(account):
+    """T-162  svg_bytes survives include_svg=false
+
+    The strip asks for the listing without the pictures -- twenty-one works are
+    23.5 MB with them and 163 KB without. A client that counted the bytes it
+    received would therefore report every work as 0 B, which is what the file
+    size column did until this field existed. The count is taken while the
+    picture is still in hand.
+    """
+    svg = "<svg xmlns='http://www.w3.org/2000/svg'>" + ("<path d='M 0 0 L 9 9'/>" * 40) + "</svg>"
+    db.add_item({
+        "id": str(uuid.uuid4()),
+        "user_id": account["id"],
+        "at": 5_000_000,
+        "input": "重さのある作品",
+        "source_text": "重さのある作品",
+        "ddl": "背景を白で埋める。",
+        "score": {"canvas": "square", "instructions": []},
+        "svg": svg,
+        "history_visibility": "normal",
+    })
+    expected = len(svg.encode("utf-8"))
+
+    withheld = client.get(
+        "/api/history",
+        headers=account["headers"],
+        params={"limit": 5, "include_svg": "false"},
+    ).json()["items"][0]
+    assert withheld["svg"] == "", "this test is not exercising the withholding path"
+    assert withheld["svg_bytes"] == expected
+
+    carried = client.get(
+        "/api/history",
+        headers=account["headers"],
+        params={"limit": 5, "include_svg": "true"},
+    ).json()["items"][0]
+    # The same number by the same definition whichever way it was asked for.
+    assert carried["svg_bytes"] == expected == len(carried["svg"].encode("utf-8"))

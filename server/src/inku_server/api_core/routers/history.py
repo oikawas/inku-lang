@@ -123,6 +123,12 @@ def api_history_get(
         starred=starred,
         for_revision=for_revision,
     )
+    # How heavy each work is, counted here because this is the last place the
+    # picture is in hand: below, `include_svg=false` empties the key, and a
+    # client that measured what it received would be measuring the emptying.
+    # UTF-8 bytes, the same quantity measureSvgWeight().bytes counts on the page
+    # and measure() counts in no-git-sync/scripts/svg_weight.py.
+    items = [{**item, "svg_bytes": len((item.get("svg") or "").encode("utf-8")) } for item in items]
     if not include_svg:
         # Emptied, not removed. A client that has never heard of this flag still
         # finds the key where it has always been, holding a string; taking the

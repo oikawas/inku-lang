@@ -215,7 +215,14 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+                    // The one decision, not a copy of it. Nothing in this branch reads the
+                    // value: the fill attribute below comes from `ServerRendererStyle.fill`,
+                    // which colours every closed shape whether or not it is filled, and
+                    // `renderBodyShape` -- the reader that would override it -- is only
+                    // called on the hand-stroke road. That divergence is its own matter
+                    // (reported this round); the expression itself must not be a second copy.
+                    @Suppress("UNUSED_VARIABLE")
+                    val regionFill = ServerRendererGeometry.fillsInterior(ins)
                     val base = if (needsPathVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
@@ -2436,7 +2443,7 @@ class DefaultSvgRenderer(
         wild: Boolean = false,
         instructionSeed: Any? = null
     ): Pair<String?, Boolean> {
-        val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
+        val regionFill = ServerRendererGeometry.fillsInterior(ins)
         if (!regionFill) return null to false
         val weight = ins.optString("weight", "pen")
         if (!usesHandStroke(weight)) return null to true

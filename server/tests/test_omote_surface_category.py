@@ -339,16 +339,45 @@ def test_a_surface_already_on_a_closed_shape_does_not_fire_the_branch() -> None:
 def test_the_search_walks_back_past_other_lines() -> None:
     """`直前の閉図形` is the nearest closed shape before it, not the nearest
     instruction. A line between the shape and the stray surface must not stop
-    the walk."""
+    the walk.
+
+    **The word was `grain` until ddl-engine 20.** It had to change: 粒 stopped
+    being a stray that day -- it says how the mark runs, so on a line it is
+    where it belongs and there is nothing to walk back for. `hatch` is a word
+    about an interior, which is what this test has always been about. The two
+    words are kept apart by `MARK_SURFACE_WORDS`, and the mark-word half is
+    measured in `test_a_named_sheet_changes_how_the_mark_runs.py` (T-11).
+    """
     score, _ = _coerced(
         [
             _circle(),
             _instruction(**{"from": [0.1, 0.2], "to": [0.9, 0.2]}),
-            _instruction(**{"from": [0.1, 0.8], "to": [0.9, 0.8]}, surface={"texture": "grain"}),
+            _instruction(**{"from": [0.1, 0.8], "to": [0.9, 0.8]}, surface={"texture": "hatch"}),
         ]
     )
     circle = next(ins for ins in score.instructions if ins.primitive == "circle")
-    assert circle.surface is not None and circle.surface.texture == "grain"
+    assert circle.surface is not None and circle.surface.texture == "hatch"
+
+
+def test_a_mark_word_on_a_line_is_not_walked_back_at_all() -> None:
+    """The control for the test above, from ddl-engine 20.
+
+    Without it, an implementation that kept walking every surface back would
+    leave the test above green and this category's split unmeasured on the side
+    that changed.
+    """
+    for word in sorted(schema.MARK_SURFACE_WORDS):
+        score, report = _coerced(
+            [
+                _circle(),
+                _instruction(**{"from": [0.1, 0.8], "to": [0.9, 0.8]}, surface={"texture": word}),
+            ]
+        )
+        circle = next(ins for ins in score.instructions if ins.primitive == "circle")
+        line = next(ins for ins in score.instructions if ins.primitive == "line")
+        assert circle.surface is None or circle.surface.texture == "none", word
+        assert line.surface is not None and line.surface.texture == word, word
+        assert report.get(_BRANCH, 0) == 0, word
 
 
 # --- T-8: metadata reports only what is drawn -------------------------------

@@ -976,7 +976,8 @@ def fill_and_arc_fixtures() -> None:
         contour = contour_for(ins, canvas)
         attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
         group = renderer._render_fill_strokes(
-            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
+            support=renderer.DEFAULT_SUPPORT
         )
         paths = path_d_list(group)
         out["fill_stroke_group"].append({
@@ -1024,13 +1025,16 @@ def fill_and_arc_fixtures() -> None:
         contour = contour_for(ins, canvas)
         attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
         scan = renderer._render_fill_strokes(
-            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
+            support=renderer.DEFAULT_SUPPORT
         )
         dab = renderer._render_fill_dab(
-            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
+            support=renderer.DEFAULT_SUPPORT
         )
         chosen, region_fill = renderer._interior_fill(
-            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
+            support=renderer.DEFAULT_SUPPORT
         )
         dab_paths = path_d_list(dab)
         out["fill_dab_group"].append({

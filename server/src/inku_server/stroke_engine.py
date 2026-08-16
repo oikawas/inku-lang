@@ -6,8 +6,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 import hashlib
 import math
+from typing import get_args
 
 from .master_grid import fmt
+from .schema import MARK_SURFACE_WORDS, GroundMaterial
 
 
 @dataclass(frozen=True)
@@ -179,6 +181,87 @@ class Support:
 
 
 DEFAULT_SUPPORT = Support(absorb=1.0, tooth=1.0)
+
+# What each named support is, as the two quantities above. Each row is drawn
+# from what that support physically is, and `paper` restates the default sheet
+# so a work that names it draws exactly what a work naming no ground draws.
+_GROUND_SHEETS: dict[str, Support] = {
+    # The absence of a ground is not a ground. `plain` keeps the one constant
+    # sheet, which is why the saijiki has no word for it.
+    "plain": DEFAULT_SUPPORT,
+    "paper": Support(absorb=1.0, tooth=1.0),
+    # Kozo fibre drinks the ink; the tooth is weak.
+    "washi": Support(absorb=2.2, tooth=0.5),
+    # Already wet.
+    "ink_wash": Support(absorb=1.4, tooth=0.8),
+    # The grain stands up and refuses the tool.
+    "charcoal_ground": Support(absorb=0.7, tooth=1.8),
+    # Plain weave refuses hardest of the seven.
+    "canvas": Support(absorb=0.5, tooth=2.4),
+    # Medium grain.
+    "drawing_paper": Support(absorb=0.8, tooth=1.4),
+    # A metal plate. Not paper at all.
+    "mezzotint": Support(absorb=0.2, tooth=0.7),
+}
+
+# Walked from the enum rather than listed here: a support that joins
+# `GroundMaterial` and never joins the table above must be a value this map has
+# no row for, so `support_for_ground` raises on it instead of letting it fall
+# quietly onto the default sheet.
+GROUND_SUPPORT: dict[str, Support] = {
+    material: _GROUND_SHEETS[material]
+    for material in get_args(GroundMaterial)
+    if material in _GROUND_SHEETS
+}
+
+# A surface word that speaks about the mark rather than about an interior works
+# the sheet harder for that one instruction. One doubling, and the ceiling is
+# the far end of the ladder the author accepted on 2026-08-16 (absorb 3.0 and
+# tooth 3.0 both read as "fine on both sides").
+MARK_SUPPORT_GAIN = 2.0
+SUPPORT_CAP = 3.0
+
+# Which of the sheet's two quantities each mark word raises. The keys are
+# `MARK_SURFACE_WORDS`, the set coerce decides by: a word that is in one table
+# and not the other would be a request that survives coerce and then does
+# nothing, which is the state this contract exists to end.
+_MARK_WORD_QUANTITY: dict[str, str] = {"grain": "tooth", "bleed": "absorb"}
+
+
+def support_for_ground(material: str) -> Support:
+    """The sheet a work that names `material` is worked on.
+
+    Unknown is an error, never the default: a support the schema gained and
+    this module never learned would otherwise draw as plain paper and nobody
+    would see that it had gone missing.
+    """
+    try:
+        return GROUND_SUPPORT[material]
+    except KeyError:
+        raise ValueError(f"no sheet is defined for ground material {material!r}") from None
+
+
+def support_with_mark_word(support: Support, texture: str) -> Support:
+    """Work the sheet harder where the mark itself was described.
+
+    `grain` is the tool skipping on the sheet and `bleed` is the ink spreading
+    into it. Both are things a line does, so they raise the sheet's own two
+    quantities rather than filling an interior. The product is capped: on washi
+    a bleed would otherwise reach 4.4, past the end of the accepted ladder.
+    """
+    if texture not in MARK_SURFACE_WORDS:
+        return support
+    quantity = _MARK_WORD_QUANTITY[texture]
+    if quantity == "tooth":
+        return Support(
+            absorb=support.absorb,
+            tooth=min(SUPPORT_CAP, support.tooth * MARK_SUPPORT_GAIN),
+        )
+    return Support(
+        absorb=min(SUPPORT_CAP, support.absorb * MARK_SUPPORT_GAIN),
+        tooth=support.tooth,
+    )
+
 
 # Which of the two quantities each tool actually meets, as (absorb, tooth).
 # A brush is drunk by the sheet; a waxy or hard tool is refused by it; a pen

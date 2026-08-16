@@ -58,6 +58,8 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **37** | v2.13.31 | 918 | 2026-08-16 | 597 | **12** | **585** |
+| **36** | v2.13.27 | 914 | 2026-08-16 | 588 | **6** | **582** |
 | **35** | v2.13.24 | 911 | 2026-08-15 | 588 | **9** | **579** |
 | **34** | v2.13.22 | 909 | 2026-08-14 | 588 | **13** | **575** |
 | **33** | v2.13.19 | 906 | 2026-08-13 | 586 | **4** | **582** |
@@ -133,14 +135,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `35` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `19` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `render_engine_version` | the drawing engine | `37` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `20` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.30 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.31 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 917 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 918 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -416,6 +418,42 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 37 — a sheet called by name changes how the brush runs (v2.13.31)
+
+**The seven grounds have been tiled onto the sheet since engine 34, and they never reached the mark.**
+`Support` in `stroke_engine.py` was a single constant: the parameter was there, and no caller ever
+passed one. This version hands each support's absorbency (`absorb`) and tooth (`tooth`) to the stroke
+synthesizer. **The same description with the same seed now leaves a different mark on washi than on
+canvas.**
+
+### The sheet reaches all eleven synthesis call sites
+
+`render()` reads it from the Score once and **passes it down as an argument** (no module-level
+state). Thirteen functions take `support`, ten of them as a keyword-only parameter with no default,
+so a forgotten hand-off is a `TypeError`. **A ground name that is not in the table raises
+`ValueError` rather than falling back to the default.**
+
+### `面: 粒` and `面: にじみ` stay on the line (ddl engine 20)
+
+**Of the nine surface words, these two speak about how the mark runs rather than about an inside.**
+coerce used to move every surface off an unclosed instruction to the closed shape before it, or drop
+it, so **these two words were never drawn on the 406 works in production that carry them** (including
+the 49 that were being moved). This version leaves them where the sentence put them, and the renderer
+**works the sheet harder for that one instruction** (a factor of 2.0, **capped at 3.0**). The other
+seven words (`wash`, `paper_grain`, `hatch`, and the rest) are handled exactly as before.
+
+### The corpus grew by nine, and twelve cases moved
+
+**Twelve of the 597 cases moved**: the nine new ones and three existing (`C-ground-washi`,
+`C-ground-ink_wash`, `C-groundseed-auto-washi`). **The nine were needed because the corpus had no
+case the mechanism runs through** — only four frozen cases use the `display` profile, all four draw
+with `pen`, and `pen` carries no texture weight.
+
+**`pen` barely shows the sheet at all.** Its affinity is (0.15, 0.15), which leaves an arrival
+probability of about 0.005 over 49 samples, so **only the two supports that absorb more than `paper`
+(washi and ink wash) crossed the threshold, and the refusing side never did.** That is why the nine
+new cases are written with `brush_thick` and `chalk`.
 
 ## engine 36 — a wash is a field, not a set of stripes (v2.13.27)
 

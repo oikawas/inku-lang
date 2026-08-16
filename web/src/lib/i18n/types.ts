@@ -476,6 +476,7 @@ export interface LangPack {
 	settingsRenderLimitsTitle: string;
 	settingsRenderLimitsIntro: string;
 	settingsRenderLimitsRounding: string;
+	settingsRenderLimitsWeight: (low: number, high: number) => string;
 	settingsRenderLimitsReset: string;
 	settingsRenderLimitsSaved: string;
 	settingsRenderLimitGroups: Record<string, string>;

@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-16 — v2.13.31 unreleased baseline (Web Build 918)
+
+Updated the thirteen places that name a version to v2.13.31 / Build 918. **That a sheet called by name changes how the mark runs, and that two surface words now stay on a line, were written in.**
+
+- **Naming a sheet with `Ground:` changes how the mark runs.** Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. **How much it shows depends on the tool: a pen picks up almost nothing from the sheet.** **Written into `Image Creation` §3.**
+- **`Surface: grain` and `Surface: bleeding` now stay where they are when they land on a line or an arc.** These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (**up to three times**). **Until now these two were not drawn at all on a line.**
+- **The other seven surface words (wash, paper grain, hatch, and the rest) are unchanged.** They move to the closed shape before them, and are dropped where there is none.
+
 ## 2026-08-16 — v2.13.30 unreleased baseline (Web Build 917)
 
 Updated the thirteen places that name a version to v2.13.30 / Build 917. **How the limits take effect, and the path that counts rasters, were written in.**

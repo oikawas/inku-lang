@@ -9,7 +9,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .limits import DEFAULT_LIMITS, Limits, current_limits
+from .limits import DEFAULT_LIMITS, Limits, current_limits, max_cluster_count
 
 
 def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
@@ -44,6 +44,15 @@ Primitive = Literal[
 CLOSED_SHAPES = frozenset(
     {"circle", "ellipse", "square", "triangle", "polygon", "cloudform"}
 )
+# The surface words that speak about the mark rather than about an interior.
+# 粒 is the tool skipping on the sheet and にじみ is the ink spreading into it,
+# and both are things a line does, so a `面: ...` sentence naming one of them on
+# a line or an arc is not a misattachment to be moved back. It lives beside
+# CLOSED_SHAPES and for the same reason: coerce decides by it whether the
+# surface stays where the sentence put it, and the stroke engine decides by it
+# whether that instruction works the sheet harder. A copy in the second layer
+# would freeze whatever the first layer had on the day it was copied.
+MARK_SURFACE_WORDS = frozenset({"grain", "bleed"})
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "silverpoint",
@@ -362,6 +371,13 @@ class Arrangement(BaseModel):
             return min(max(int(v), 1), current_limits().schema_count_max)
         return v
 
+    @field_validator("cluster_count", mode="before")
+    @classmethod
+    def _clamp_cluster_count(cls, v: object) -> object:
+        if isinstance(v, (int, float)):
+            return min(max(int(v), 1), max_cluster_count(current_limits()))
+        return v
+
     layout: Layout = Field(
         default="horizontal",
         description=(
@@ -438,10 +454,16 @@ class Arrangement(BaseModel):
             " / high=粒・雨・雪などの濃い群。count が大きい時の見え方を Renderer に伝える"
         ),
     )
+    # No `le=` here either, and for the reason spelled out over `count`: a static
+    # bound is a second, invisible copy of a limit no setting can reach. The 12
+    # that used to sit here was exactly that -- raise represented_count_max and
+    # the marks per cluster climb, because the drawn count follows the setting
+    # and the divisor stopped at twelve. The clamp below is the only bound, and
+    # composer writes the effective one back into the tool schema, so the model
+    # is still told a maximum and the default configuration still says 12.
     cluster_count: Optional[int] = Field(
         default=None,
         ge=1,
-        le=12,
         description=(
             "群を何個のまとまりに分けるか。大数量を全面均一に埋めず、"
             "3-9 個程度のクラスタで余白を残す時に使う"

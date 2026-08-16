@@ -41,12 +41,16 @@ from .arc_geometry import (
     minor_arc_delta,
 )
 from .stroke_engine import (
+    DEFAULT_SUPPORT,
     GRAMMARS,
+    Support,
     centerline_normals,
     contour_stroke_path,
     grid_point,
     outline_for_centerline,
     polygon_path,
+    support_for_ground,
+    support_with_mark_word,
     synthesize_along,
     synthesize_stroke,
 )
@@ -2641,6 +2645,32 @@ def _score_canvas_ground(score: Score) -> CanvasGroundSpec | None:
     return None
 
 
+def _score_support(score: Score) -> Support:
+    """The sheet this work is worked on.
+
+    One constant unless the work names its own ground: `Support`'s docstring
+    says the sheet is one by default, and this is where a work that names it
+    swaps it (render engine 37).
+    """
+    ground = _score_canvas_ground(score)
+    if ground is None:
+        return DEFAULT_SUPPORT
+    return support_for_ground(ground.material)
+
+
+def _instruction_support(ins: Instruction, support: Support) -> Support:
+    """Raise the sheet where the instruction itself said how the mark runs.
+
+    Open shapes only. A closed shape's 粒 or にじみ is its interior, drawn by
+    the surface-texture layer, so working the sheet as well would say one word
+    twice and draw it twice.
+    """
+    surface = ins.surface
+    if surface is None or ins.primitive in _CLOSED_SHAPES:
+        return support
+    return support_with_mark_word(support, surface.texture)
+
+
 def _texture_seed(
     ground: CanvasGroundSpec, kind: str, render_seed: int | None, index: int = 0
 ) -> int:
@@ -3607,6 +3637,7 @@ def _surface_dab(
     index: int,
     wild: bool,
     use_filters: bool,
+    support: Support,
     class_: str | None = None,
 ) -> None:
     """粒を 1 つ置く。1 点 = 1 筆。
@@ -3651,6 +3682,7 @@ def _surface_dab(
         closed=False,
         grid_step=_grid_step_px(ins.weight, canvas),
         wild=wild,
+        support=support,
     )
     path_attrs = {
         "d": contour_stroke_path(stroke),
@@ -3679,6 +3711,7 @@ def _surface_sweep(
     index: int,
     wild: bool,
     use_filters: bool,
+    support: Support,
 ) -> None:
     """走査線 1 本を 1 筆として引く。薄墨の層はこれを重ねて作る。"""
     length = math.hypot(end[0] - start[0], end[1] - start[1])
@@ -3712,6 +3745,7 @@ def _surface_sweep(
         closed=False,
         grid_step=_grid_step_px(ins.weight, canvas),
         wild=wild,
+        support=support,
     )
     path_attrs = {
         "d": contour_stroke_path(stroke),
@@ -3735,6 +3769,7 @@ def _render_surface_vectors(
     *,
     seed: int,
     contour: list[tuple[float, float]],
+    support: Support,
     wild: bool = False,
     use_filters: bool = False,
 ) -> None:
@@ -3765,6 +3800,7 @@ def _render_surface_vectors(
                 index=index,
                 wild=wild,
                 use_filters=use_filters,
+                support=support,
             )
     elif surface.texture == "wash":
         # 薄墨は粒ではなく層である。同じ図形を角度違いに 2 度掃き、重なった所だけが
@@ -3805,6 +3841,7 @@ def _render_surface_vectors(
                     index=index,
                     wild=wild,
                     use_filters=use_filters,
+                    support=support,
                 )
                 index += 1
     elif surface.texture in {"hatch", "crosshatch"}:
@@ -3897,6 +3934,7 @@ def _render_surface_vectors(
                         closed=False,
                         grid_step=_grid_step_px(ins.weight, canvas),
                         wild=wild,
+                        support=support,
                     )
                     group.add(
                         dwg.path(
@@ -3936,6 +3974,7 @@ def _render_surface_vectors(
                 wild=wild,
                 use_filters=use_filters,
                 class_=f"aquatint-step-{step + 1}",
+                support=support,
             )
     elif surface.texture == "bleed":
         # 「端が滲む」は端の話である。engine 15 までは bbox 中心の楕円を 1 個置いて
@@ -3984,6 +4023,7 @@ def _render_surface_vectors(
                 closed=True,
                 grid_step=_grid_step_px(ins.weight, canvas),
                 wild=wild,
+                support=support,
             )
             path_attrs = {
                 "d": contour_stroke_path(stroke),
@@ -4013,6 +4053,7 @@ def _render_surface_texture(
     render_seed: int | None,
     ins_idx: int,
     mark_idx: int,
+    support: Support,
     wild: bool = False,
     use_filters: bool = False,
 ):
@@ -4053,6 +4094,7 @@ def _render_surface_texture(
         contour=contour,
         wild=wild,
         use_filters=use_filters and profile == "display",
+        support=support,
     )
     return group, None
 
@@ -4208,6 +4250,10 @@ def render(
     blur_elems: list[tuple[str, str]] = []
     elem_idx = 0
 
+    # The sheet this work is worked on. Resolved once from the ground the work
+    # names, then handed down by argument -- never held in a module variable,
+    # because the more places read it the quieter a missed hand-over gets.
+    sheet = _score_support(score)
     ordered_instructions = sorted(
         enumerate(score.instructions), key=lambda pair: pair[1].mode == "carve"
     )
@@ -4240,6 +4286,7 @@ def render(
                 ins_idx=ins_idx,
                 mark_idx=mark_idx,
                 wild=wild,
+                support=sheet,
             )
             if element is not None:
                 if structured:
@@ -4267,6 +4314,7 @@ def render(
                 mark_idx=mark_idx,
                 wild=wild,
                 use_filters=use_filters,
+                support=sheet,
             )
             if surface_group is not None:
                 instruction_group.add(surface_group)
@@ -6002,6 +6050,7 @@ def _render_hand_stroke(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
@@ -6016,6 +6065,7 @@ def _render_hand_stroke(
         samples=_stroke_sample_count(length, canvas),
         wild=wild,
         grid_step=grid_step,
+        support=support,
     )
     group = dwg.g(
         class_=f"stroke-engine-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
@@ -6044,6 +6094,7 @@ def _render_hand_stroke(
             samples=len(centerline),
             wild=wild,
             grid_step=grid_step,
+            support=support,
         )
         # The varied centerline gets its own outline, but the sheet already met
         # the tool: carry the breaks over so a wavering line is refused exactly
@@ -6762,6 +6813,7 @@ def _render_fill_strokes(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     """閉図形の内部を素材の筆致で埋める。1 パス = 1 筆。
@@ -6912,6 +6964,7 @@ def _render_fill_strokes(
                         grid_step=grid_step,
                         wild=wild,
                         terminal="loaded",
+                        support=support,
                     )
                 )
             path_attrs = {
@@ -6945,6 +6998,7 @@ def _render_fill_texture(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     """塗りの上層を、走査線ではなく撒かれた痕で作る (engine 22 段 2)。
@@ -7073,6 +7127,7 @@ def _render_fill_texture(
             grid_step=grid_step,
             wild=wild,
             terminal="loaded",
+            support=support,
         )
         path_attrs = {
             "d": contour_stroke_path(stroke),
@@ -7108,6 +7163,7 @@ def _render_fill_dab(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     """微小な塗りを「塗る」のでなく「置く」。1 筆の打点として描く。
@@ -7155,6 +7211,7 @@ def _render_fill_dab(
         closed=False,
         grid_step=_grid_step_px(ins.weight, canvas),
         wild=wild,
+        support=support,
     )
     path_attrs = {
         "d": contour_stroke_path(stroke),
@@ -7180,6 +7237,7 @@ def _interior_fill(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ) -> tuple[object | None, bool]:
     """内部表現を返す。戻り値は (内部の描画, 領域 fill に縮退したか)。
@@ -7211,13 +7269,15 @@ def _interior_fill(
         group = _render_fill_dab(
             dwg, ins, contour, attrs, canvas, render_seed,
             use_filters=use_filters, wild=wild,
+            support=support,
         )
         return (None, True) if group is None else (group, False)
 
     scan_branch = _fill_takes_scan_branch(ins, canvas)
     render_marks = _render_fill_strokes if scan_branch else _render_fill_texture
     marks = render_marks(
-        dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
+        dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters,
+        wild=wild, support=support,
     )
     if marks is None:
         # Nothing survived the minimum-length filter. Fall through to the dab
@@ -7226,6 +7286,7 @@ def _interior_fill(
         group = _render_fill_dab(
             dwg, ins, contour, attrs, canvas, render_seed,
             use_filters=use_filters, wild=wild,
+            support=support,
         )
         return (None, True) if group is None else (group, False)
 
@@ -7250,6 +7311,7 @@ def _render_contour_hand_stroke(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     closed: bool = True,
     anchors: frozenset[int] = frozenset(),
     wild: bool = False,
@@ -7269,6 +7331,7 @@ def _render_contour_hand_stroke(
         anchors=anchors,
         grid_step=_grid_step_px(ins.weight, canvas),
         wild=wild,
+        support=support,
     )
     group = dwg.g(
         class_=(
@@ -7323,6 +7386,7 @@ def _render_arc_hand_stroke(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     """弧を一筆のストロークとして演奏し、帯として描く (line / 閉図形と対称)。
@@ -7362,6 +7426,7 @@ def _render_arc_hand_stroke(
         closed=False,
         grid_step=_grid_step_px(ins.weight, canvas),
         wild=wild,
+        support=support,
     )
     group = dwg.g(
         class_=(
@@ -7445,6 +7510,7 @@ def _render_corner_shape(
     render_seed: int | None,
     *,
     use_filters: bool,
+    support: Support,
     wild: bool = False,
 ):
     """角を持つ閉図形 (triangle / polygon) を描く。角は筆の継ぎ目として固定。"""
@@ -7460,7 +7526,8 @@ def _render_corner_shape(
     if not _uses_hand_stroke(ins.weight):
         return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
     fill_group, region_fill = _interior_fill(
-        dwg, ins, points, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
+        dwg, ins, points, attrs, canvas, render_seed, use_filters=use_filters, wild=wild,
+        support=support,
     )
     body_attrs = _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
     group = dwg.g()
@@ -7477,6 +7544,7 @@ def _render_corner_shape(
         use_filters=use_filters,
         anchors=anchors,
         wild=wild,
+        support=support,
     )
     group.add(contour_group)
     # engine 15: この関数には材質輪郭の呼び出しが無かったので、triangle と polygon
@@ -7508,12 +7576,16 @@ def _render_instruction(
     *,
     work_assignment: dict[str, str] | None = None,
     use_filters: bool = True,
+    support: Support,
     render_seed: int | None = None,
     ins_idx: int = 0,
     mark_idx: int = 0,
     wild: bool = False,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
+    # Once, here: every mark of this instruction meets the same sheet, and a
+    # word about how the mark runs belongs to this instruction alone.
+    support = _instruction_support(ins, support)
     assignment = work_assignment or _work_color_assignment(cmap, render_seed, None)
     attrs = _stroke_attrs(
         ins,
@@ -7544,6 +7616,7 @@ def _render_instruction(
                 render_seed,
                 use_filters=use_filters,
                 wild=wild,
+                support=support,
             )
         return _apply_rotation(dwg.line(start=start, end=end, **attrs), ins, canvas)
 
@@ -7578,6 +7651,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
@@ -7604,6 +7678,7 @@ def _render_instruction(
                     render_seed,
                     use_filters=use_filters,
                     wild=wild,
+                    support=support,
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
@@ -7667,6 +7742,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
@@ -7693,6 +7769,7 @@ def _render_instruction(
                     render_seed,
                     use_filters=use_filters,
                     wild=wild,
+                    support=support,
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
@@ -7741,6 +7818,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
         # engine 15: 同じ密なポリラインを閉輪郭の共通経路へ渡す。square / circle /
         # polygon と同じ道を通るので、材質層の 3 機構 (材質輪郭・raster-bleed・
@@ -7778,6 +7856,7 @@ def _render_instruction(
                 use_filters=use_filters,
                 closed=True,
                 wild=wild,
+                support=support,
             )
             group.add(contour_group)
             if _uses_material_outline(ins.weight):
@@ -7819,6 +7898,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
@@ -7846,6 +7926,7 @@ def _render_instruction(
                     use_filters=use_filters,
                     anchors=anchors,
                     wild=wild,
+                    support=support,
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
@@ -7888,6 +7969,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
 
     if ins.primitive == "polygon":
@@ -7904,6 +7986,7 @@ def _render_instruction(
             render_seed,
             use_filters=use_filters,
             wild=wild,
+            support=support,
         )
 
     if ins.primitive == "arc":
@@ -7925,6 +8008,7 @@ def _render_instruction(
                 render_seed,
                 use_filters=use_filters,
                 wild=wild,
+                support=support,
             )
         if _needs_contour_variation(ins.variation):
             assert ins.variation is not None

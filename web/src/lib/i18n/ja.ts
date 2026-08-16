@@ -470,6 +470,8 @@ export const ja: LangPack = {
 		'一枚の作品が何本の墨を持てるかを決める数です。速度の調整ではなく、描かれる線の数そのものが変わります。ここで決めた値は Stage 1 / Stage 2 のプロンプトへ書き込まれ、描いた作品ごとに記録されます。九つの数は三つの族に分かれ、族ごとに従うべき相手が違います —— 機材に合わせて動かすもの、人の目に合わせて据え置くもの、誤入力を止めるだけのものです。',
 	settingsRenderLimitsRounding:
 		'互いに矛盾する値は拒否せず丸めます（例: 代表化の上限が literal の閾値を超えていれば、閾値まで下げます）。表示されているのは丸めたあとの、実際に効いている値です。',
+	settingsRenderLimitsWeight: (low: number, high: number) =>
+		`この本数なら 1 枚およそ ${low}〜${high} MB（細い筆致〜太い筆致）`,
 	settingsRenderLimitsReset: '既定値へ戻す',
 	settingsRenderLimitsSaved: '制限値を保存しました',
 	settingsRenderLimitGroups: {

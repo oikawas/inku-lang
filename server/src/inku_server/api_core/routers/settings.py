@@ -8,7 +8,13 @@ from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from ...limits import DEFAULT_LIMITS, LIMIT_ABSOLUTE_MAX, LIMIT_GROUPS, limits_as_dict
+from ...limits import (
+    BYTES_PER_MARK,
+    DEFAULT_LIMITS,
+    LIMIT_ABSOLUTE_MAX,
+    LIMIT_GROUPS,
+    limits_as_dict,
+)
 from ...plugins import plugin_status_items
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
@@ -234,6 +240,9 @@ class RenderLimitsStatus(BaseModel):
     defaults: dict[str, int]
     groups: dict[str, list[str]]
     absolute_max: int
+    # Bytes of SVG one mark costs, by drawing tool. The panel turns the count on
+    # the stepper into the weight a reader will actually open.
+    bytes_per_mark: dict[str, int]
     note: str
 
 
@@ -578,6 +587,7 @@ def _render_limits_status() -> RenderLimitsStatus:
         defaults=limits_as_dict(DEFAULT_LIMITS),
         groups={name: list(fields) for name, fields in LIMIT_GROUPS},
         absolute_max=LIMIT_ABSOLUTE_MAX,
+        bytes_per_mark=dict(BYTES_PER_MARK),
         note=(
             "These govern how many marks a work may carry. They are stored per install and "
             "recorded on every work drawn under them (history.render_limits), so a work made "

@@ -124,15 +124,22 @@ class ASurfaceKeepsToItsShapeTest {
      * T-78, the control: the other surface words were not touched.
      *
      * The contract states this as "wash and stipple overshoot by the same amount
-     * before and after". This port draws neither -- renderSurfaceVectors answers
-     * `hatch` and `crosshatch` and returns "" for every other texture, and the
-     * two words appear nowhere under render/ -- so the same claim is put the only
-     * way it can be measured here: they still draw nothing. Widening the cut to
-     * take them in is what P-14 does, and it fails here.
+     * before and after". This port drew neither -- renderSurfaceVectors answered
+     * `hatch` and `crosshatch` and returned "" for every other texture -- so the
+     * same claim was put the only way it could be measured here: they still draw
+     * nothing. Widening the cut to take them in is what P-14 does, and it fails
+     * here.
+     *
+     * `wash` has since left this list. It is drawn now (render engine 36's
+     * surface layer, ported), and its own gates live in [AWashIsAFieldTest].
+     * Three words are still offered to the model and still draw nothing --
+     * `stipple` and `grain` and `paper_grain` need the server's `_surface_dab`,
+     * `aquatint` needs it too, and `bleed` has its own 65 lines -- so the
+     * control keeps its force for them.
      */
     @Test
     fun testTheOtherSurfaceWordsAreUntouched() {
-        for (texture in listOf("wash", "stipple", "bleed", "aquatint")) {
+        for (texture in listOf("stipple", "bleed", "aquatint")) {
             val svg = renderSvg(shape("square", texture))
             assertEquals(
                 "$texture must still contribute no surface stroke",

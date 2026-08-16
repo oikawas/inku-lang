@@ -23,6 +23,18 @@ internal const val FILL_DAB_MIN_TRAVEL = 0.90
 // the second span of a row never lands on another row's stroke seed.
 internal const val HATCH_SPAN_SEED_STRIDE = 1048576
 
+internal const val SURFACE_WASH_LAYERS = 2
+// One sweep's width, as a multiple of the pitch the sweeps are laid down at.
+// The band decides whether a wash reads as a field or as a set of stripes: below
+// 1.0 the paper between two sweeps is never reached by either of them.
+internal const val SURFACE_WASH_WIDTH_BASE = 0.88
+internal const val SURFACE_WASH_WIDTH_SPAN = 0.60
+// Each sweep carries this fraction of the surface's stated opacity. The layers
+// overlap, so the ink a reader sees is the composite rather than this number.
+// Doubling the width above closes the gaps, which also darkened the wash; the
+// factor comes down from 0.42 so the ink lands back where it was.
+internal const val SURFACE_WASH_OPACITY = 0.22
+
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
 
@@ -1879,7 +1891,7 @@ class DefaultSvgRenderer(
         }
     }
 
-    private fun surfaceSeed(ins: JSONObject, insIdx: Int = 0, markIdx: Int = 0, renderSeed: Long? = null): String {
+    internal fun surfaceSeed(ins: JSONObject, insIdx: Int = 0, markIdx: Int = 0, renderSeed: Long? = null): String {
         val surfaceObj = ins.optJSONObject("surface")
         if (surfaceObj != null && surfaceObj.has("seed") && !surfaceObj.isNull("seed")) {
             return surfaceObj.optLong("seed").toULong().toString()
@@ -1927,7 +1939,7 @@ class DefaultSvgRenderer(
      * the performance seed, because its contour is generated rather than derived
      * from the stated numbers.
      */
-    private fun surfaceContour(
+    internal fun surfaceContour(
         ins: JSONObject,
         width: Double,
         height: Double,
@@ -1997,6 +2009,58 @@ class DefaultSvgRenderer(
         return null
     }
 
+    /**
+     * One scanline drawn as one stroke. The wash's layers are made of these.
+     *
+     * A machine pole gets the plain line it would draw; every hand tool gets the
+     * material engine's stroke along the same centreline, seeded by the surface's
+     * own label so a sweep and a fill stroke at the same index do not share a
+     * waveform.
+     */
+    private fun surfaceSweep(
+        ins: JSONObject,
+        unit: Double,
+        start: Pair<Double, Double>,
+        end: Pair<Double, Double>,
+        width: Double,
+        color: String,
+        opacity: Double,
+        seed: Any,
+        index: Int,
+        wild: Boolean
+    ): String {
+        val length = kotlin.math.hypot(end.first - start.first, end.second - start.second)
+        if (length <= 0.0) return ""
+        val weight = ins.optString("weight", "pen")
+        val opacityStr = fmt(opacity)
+        if (!usesHandStroke(weight)) {
+            return """<line class="surface-stroke-v1" x1="${fmt(start.first)}" y1="${fmt(start.second)}" x2="${fmt(end.first)}" y2="${fmt(end.second)}" stroke="$color" stroke-width="${fmt(width)}" stroke-opacity="$opacityStr" stroke-linecap="round"/>"""
+        }
+        val count = max(2, ServerRendererGeometry.strokeSampleCount(length, unit))
+        val centerline = (0 until count).map { i ->
+            val t = i.toDouble() / (count - 1).toDouble()
+            (start.first + (end.first - start.first) * t) to (start.second + (end.second - start.second) * t)
+        }
+        val stroke = ServerStrokeEngine.synthesizeAlong(
+            centerline,
+            width,
+            weight,
+            ServerRendererGeometry.surfaceStrokeSeed(seed, index),
+            closed = false,
+            gridStep = gridStepPx(weight, unit),
+            wild = wild
+        )
+        // The port writes its texture filters unattached to the profile, the way
+        // every other stroke path here does; the defs they point at are only
+        // emitted for `display`, so an editable file carries a reference nothing
+        // resolves and draws the plain path. Keeping that decision in one place
+        // matters more here than mirroring the server's `use_filters` flag,
+        // which no frozen case pins either way.
+        val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
+        val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
+        return """<path class="surface-stroke-v1" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="$opacityStr" stroke="none"$filterAttr/>"""
+    }
+
     private fun renderSurfaceVectors(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -2021,6 +2085,64 @@ class DefaultSvgRenderer(
         val color = colors[colorKey] ?: "#111111"
         val opacity = kotlin.math.min(0.75, surface.optDouble("opacity", 0.3))
         val density = kotlin.math.max(0.02, surface.optDouble("density", 0.5))
+
+        if (texture == "wash") {
+            // A wash is a layer, not a scatter of grains. The same shape is swept
+            // twice at nearly the same bearing, and only where the two overlap
+            // does it darken. The scanlines are cut at the contour by the same
+            // mechanism the fill strokes use.
+            //
+            // Engine 36 is one claim -- a wash is a field, not a set of stripes.
+            // Below a sweep width of one pitch the paper between two sweeps is
+            // reached by neither, which measured 19.9% of a square's inside on
+            // the server. Only the width and the one sweep's opacity move for
+            // that: the pitch, the layer count and the way the angles are made
+            // are the branch point's, to the last digit.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val weight = ins.optString("weight", "pen")
+            val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+            val spacing = max(10.0, unit * (0.052 - density * 0.024))
+            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
+            val baseAngle = ServerRendererGeometry.fillScanAngle(seedStr)
+            val minWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
+            val sb = StringBuilder()
+            var index = 0
+            for (layer in 0 until SURFACE_WASH_LAYERS) {
+                // Python adds without wrapping, so the layer's seed is carried in
+                // arbitrary precision rather than in a Long -- the seed is a full
+                // 64-bit unsigned and the sum is what gets hashed.
+                val layerSeed = java.math.BigInteger(seedStr)
+                    .add(java.math.BigInteger.valueOf(layer.toLong() * 7919L))
+                    .toString()
+                // The layers do not turn. The second sweep runs at nearly the
+                // first's bearing, so the overlap reads as depth; at an unrelated
+                // angle the two make a lattice and it reads as cloth.
+                val angle = baseAngle + (ServerRendererGeometry.hash01(layer, seedStr, "wash-angle") - 0.5) * Math.toRadians(16.0)
+                for (segment in ServerRendererGeometry.scanlineSegments(contour, angle, spacing, layerSeed)) {
+                    val sweepWidth = max(
+                        minWidth,
+                        spacing * (SURFACE_WASH_WIDTH_BASE + ServerRendererGeometry.hash01(index, seedStr, "wash-width") * SURFACE_WASH_WIDTH_SPAN)
+                    )
+                    sb.append(
+                        surfaceSweep(
+                            ins,
+                            unit,
+                            segment.second,
+                            segment.third,
+                            sweepWidth,
+                            color,
+                            opacity * SURFACE_WASH_OPACITY,
+                            seedStr,
+                            index,
+                            wild
+                        )
+                    )
+                    index += 1
+                }
+            }
+            return sb.toString()
+        }
 
         if (texture in setOf("hatch", "crosshatch")) {
             // A surface belongs to the shape that carries it, so a row is cut

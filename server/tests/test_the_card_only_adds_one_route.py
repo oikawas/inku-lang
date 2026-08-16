@@ -77,10 +77,19 @@ CHANGED_SCHEMAS = {
     "PaintResponse": {"added": {"render_limits_source"}, "removed": set()},
     "ComposeResponse": {"added": {"render_limits_source"}, "removed": set()},
     "RenderScoreResponse": {"added": {"render_limits_source"}, "removed": set()},
+    # I-132: the limits panel converts the total into the weight of a work, so
+    # the settings response carries the measured cost of one mark. One key, and
+    # a second one arriving here is still red.
+    "RenderLimitsStatus": {"added": {"bytes_per_mark"}, "removed": set()},
 }
 
 SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 GROUND_MATERIAL_ENUM_ADDED = {"canvas", "drawing_paper"}
+# I-136: `cluster_count` lost its static `maximum` for the reason `count` never
+# had one -- a bound no setting can reach is a second copy of the setting. It is
+# a change INSIDE a property, so the property-set comparison above sees nothing
+# and the declaration would excuse the whole schema. Named here instead.
+CLUSTER_COUNT_BOUND_REMOVED = 12.0
 
 # Operations that predate the card and are declared to change, with exactly what
 # may move in them -- the same mechanism as CHANGED_SCHEMAS above, and the same
@@ -168,6 +177,19 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
             now_enum = set(now_body["properties"]["material"]["enum"])
             assert now_enum - was_enum == GROUND_MATERIAL_ENUM_ADDED
             assert was_enum - now_enum == set()
+        if name == "Arrangement":
+            # Same reason again: `cluster_count` gave up a bound rather than a
+            # property. Name what left, and name that nothing else did, or the
+            # `group_size` declaration above would cover the whole schema.
+            def _integer_branch(body: dict) -> dict:
+                branches = body["properties"]["cluster_count"]["anyOf"]
+                return next(b for b in branches if b.get("type") == "integer")
+
+            was_branch = _integer_branch(was_body)
+            now_branch = _integer_branch(now_body)
+            assert was_branch.pop("maximum") == CLUSTER_COUNT_BOUND_REMOVED
+            assert "maximum" not in now_branch, "the bound comes from limits now"
+            assert was_branch == now_branch, "nothing else in the bound may move"
 
     # The declared operation changes, checked argument by argument and response
     # by response before being set aside.

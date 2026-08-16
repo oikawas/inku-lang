@@ -1,5 +1,22 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 20 (2026-08-16): two of the nine surface words are about the mark, not about
+# an interior. `_with_surface_on_a_closed_shape` has moved every surface off a
+# line or an arc since engine 15, which was right for the seven words that
+# describe what fills a shape and wrong for the two that describe how the mark
+# itself runs: 粒 is the tool skipping on the sheet and にじみ is the ink
+# spreading into it, and a line has no interior to put either one in. Both stay
+# where the sentence put them now, and render engine 37 raises the sheet's own
+# two quantities for that one instruction. `MARK_SURFACE_WORDS` lives beside
+# `CLOSED_SHAPES` in `schema.py` for the reason written there -- two layers
+# decide by it and a copy would freeze the day it was made. **One case moves**:
+# `B-surface-with-nowhere-to-move`, the only input in this corpus holding a
+# mark word on an open shape, whose 粒 used to be dropped for having no shape to
+# go back to and is now kept. No branch is added, so the other twenty-nine
+# `branch_report`s are byte-identical -- the opposite of engines 11, 15 and 18,
+# which listed every coerce case because a new branch name enters every report.
+# The seven interior words are untouched: `wash` on a line still moves back or
+# is dropped, which is what the second half of T-11 measures.
 # 19 (2026-08-14): the ground is a support you can name. The field held six
 # values and only three of them ever arrived: Stage 1 rewrote 和紙 as 紙 on its
 # very first ground line, `charcoal_ground` appeared in neither prompt nor
@@ -227,7 +244,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "19"
+DDL_ENGINE_VERSION = "20"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

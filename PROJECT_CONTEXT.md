@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.30 / Build 917**
+**Target version: v2.13.31 / Build 918**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -106,9 +106,9 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 36 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 19 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.35` | `android/VERSION` (a namespace separate from web and server) |
+| Render Engine | 37 | `server/src/inku_server/render_engines/default.py` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.36` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -129,7 +129,10 @@ Vocabulary changes go through the table and its golden tests.
 The saijiki holds ten categories, and `おもて` / surfaces (eleven words) says how the inside of a
 closed shape is (ddl-engine 15) — the counterpart to continuity, which says how a line is, with
 state nouns rather than actions. A surface attached to an instruction that encloses nothing is moved
-by coerce to the closed shape before it, and dropped where there is none.
+by coerce to the closed shape before it, and dropped where there is none. **The two words 粒 (grain)
+and にじみ (bleed) are the exception and stay on the line or arc they landed on** (ddl-engine 20):
+they say how the mark runs rather than how an inside is, which is what a line has instead of an
+inside.
 
 ### Pipeline layers
 
@@ -178,7 +181,12 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Render Engine 36** — the SVG performance.
+- **Render Engine 37** — the SVG performance.
+**A sheet called by name changes how the brush runs**: each of the seven grounds carries its own
+absorbency and tooth, and those values reach the stroke synthesizer, so the same description leaves
+a different mark on washi than on canvas. `面: 粒` and `面: にじみ` on a line or an arc are read as
+that one instruction working the sheet harder (capped at 3.0x), rather than as a surface that landed
+on a shape with no inside.
 A surface texture (hatch, crosshatch) has each row clipped at its ends to the outline, so it stays
 inside the shape that carries it. The clipping happens in the coordinates before anything is drawn,
 so a profile that uses no filters keeps the same shape, and the angle, spacing, and density gradient
@@ -335,7 +343,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-35` (588 cases) and `ddl-engine-19` (49 cases) are current, and CI enforces
+`render-engine-37` (597 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

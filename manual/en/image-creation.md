@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.30 (Web Build 917). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.31 (Web Build 918). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -99,6 +99,8 @@ Place three small red circles in the upper right.
 | Sway | fine, broad, slow, fast, waver, undulate, tremble, bleed |
 
 No layer adds what the description does not ask for. What is written is performed as far as it can be.
+
+**Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and `Surface: bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). The other surface words move to the closed shape before them as before, and are dropped where there is none.
 
 A written number is drawn as written, without having to be emphasised as "three lines only". It takes effect when the sentence points to a single group. If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. How far the number reaches is set by the boundary in `Stated counts` in [Server configuration](server-configuration.md) — up to 239 by default; above that the work is shown as a crowd. When the number asked for would cross the limit for one work or for one group, it is left as it is rather than drawn part of the way. **Numbers are read the same way in Japanese and in English**: a `12` written in an English description is a count even where the kanji of a plugin word stands beside it. When the phrase naming a plugin states no number, the sentence is read instead (a number in the phrase wins). **Numbers that name a direction, a kind, a degree, a row or a column are not counts, and neither are decimals** (the four of `four directions`, the thirty of `30 degrees`, `0.11`).
 
@@ -428,7 +430,7 @@ The settings dialog opens either `Standard` or `Detailed`, switched from the tog
 
 `Limits` is not a speed control: it changes the number of lines actually drawn. The values chosen there are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. See `Server Configuration` for the details.
 
-**When a work is redrawn, the limits it was drawn under are the ones that apply** (v2.13.30). Today's settings are used only for an older work whose row recorded no limits. **When a limit actually takes effect and drops marks, it says so under the picture, named** (the same place as the plugin warnings). The same rule holds here as in the settings: a limit can be lowered for one drawing, never raised.
+**When a work is redrawn, the limits it was drawn under are the ones that apply** (v2.13.31). Today's settings are used only for an older work whose row recorded no limits. **When a limit actually takes effect and drops marks, it says so under the picture, named** (the same place as the plugin warnings). The same rule holds here as in the settings: a limit can be lowered for one drawing, never raised.
 
 The nine numbers fall into three families, and **each family answers to a different authority**
 (v2.13.28). `What this machine can draw` is how much the installed hardware can afford to put on one

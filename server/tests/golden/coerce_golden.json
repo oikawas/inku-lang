@@ -2009,7 +2009,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "bleed",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.7,
+        "bleed": 0.2,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 2,
+        "seed": 1234567890
+       }
       }
      ]
     },
@@ -2040,7 +2050,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 1,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -2936,15 +2946,15 @@
        "relation": null,
        "thinness": null,
        "surface": {
-        "texture": "grain",
+        "texture": "solid",
         "density": 0.35,
         "scale": 0.35,
-        "opacity": 0.6,
-        "bleed": 0.1,
+        "opacity": 0.28,
+        "bleed": 0.0,
         "direction": "none",
         "spacing_gradient": "none",
-        "tone_steps": 2,
-        "seed": 1234567890
+        "tone_steps": 3,
+        "seed": null
        }
       },
       {
@@ -3007,7 +3017,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "grain",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.6,
+        "bleed": 0.1,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 2,
+        "seed": 1234567890
+       }
       },
       {
        "primitive": "polygon",
@@ -3063,7 +3083,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
-     "with_fill_as_a_surface_word": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -3076,7 +3096,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 2,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -4380,7 +4400,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "grain",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "line",
@@ -4443,7 +4473,17 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "bleed",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "arc",
@@ -4534,7 +4574,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 4,
+     "with_surface_on_a_closed_shape": 2,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -7735,7 +7775,17 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "grain",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.8,
+        "bleed": 0.1,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 2,
+        "seed": 1234567890
+       }
       },
       {
        "primitive": "ellipse",
@@ -7876,7 +7926,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 1,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -12124,7 +12174,7 @@
    }
   }
  },
- "commit": "984c2b63ae768d88d21d9391c6b6de56c6678645",
+ "commit": "c816d7d1939c058e9d9a4d8dcde1b11ec8762ed9",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

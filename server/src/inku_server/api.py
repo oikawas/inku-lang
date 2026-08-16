@@ -14,9 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware import gzip as _gzip
 from .color_catalogs import render_color_map_for_catalog
+from .compression import FlushingGZipMiddleware
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
 from . import db as _db
@@ -231,7 +231,13 @@ _gzip.DEFAULT_EXCLUDED_CONTENT_TYPES = _gzip.DEFAULT_EXCLUDED_CONTENT_TYPES + (
 # 2,890,540 -- 0.9% smaller for 204 ms more, on every such request. Level 6
 # takes 368 ms and is what this codebase already picked for the animation
 # export, so the two agree.
-app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
+#
+# ⚠ Not Starlette's own class. /api/paint/stream writes an event per stage while
+# it works and the page reads them to say which stage is running; the stock
+# responder holds those events inside zlib until the response ends, so they all
+# arrived at once, when the drawing was already there. FlushingGZipMiddleware is
+# the same layer with a flush after each chunk. See compression.py.
+app.add_middleware(FlushingGZipMiddleware, minimum_size=500, compresslevel=6)
 
 
 app.include_router(public.router)

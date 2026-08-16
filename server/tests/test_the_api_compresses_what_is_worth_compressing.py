@@ -9,10 +9,13 @@ one of them.
 
 from __future__ import annotations
 
+import asyncio
 import gzip
+import json
+from collections.abc import Iterator
 
 from fastapi import FastAPI
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.testclient import TestClient
 
 from inku_server.api import app as inku_app
@@ -22,9 +25,59 @@ def _middleware_names(app: FastAPI) -> list[str]:
     return [entry.cls.__name__ for entry in app.user_middleware]
 
 
+async def _ask_and_record_each_message(
+    app: FastAPI, path: str
+) -> tuple[dict, list[bytes]]:
+    """Drive the app as the ASGI app it is, keeping the body messages apart.
+
+    The test client joins a body up before returning it, which is the one thing
+    a gate about *when* bytes leave must not do.
+    """
+    start: dict = {}
+    bodies: list[bytes] = []
+    asked = False
+
+    async def receive() -> dict:
+        nonlocal asked
+        if not asked:
+            asked = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        # The response also waits for a disconnect. Sleeping rather than
+        # answering at once leaves the loop free to run the stream; the
+        # response cancels this the moment it has finished.
+        await asyncio.sleep(30)
+        raise AssertionError("the response never finished")
+
+    async def send(message: dict) -> None:
+        if message["type"] == "http.response.start":
+            start.update(message)
+        elif message["type"] == "http.response.body":
+            bodies.append(message.get("body", b""))
+
+    await app(
+        {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "GET",
+            "path": path,
+            "raw_path": path.encode(),
+            "root_path": "",
+            "scheme": "http",
+            "query_string": b"",
+            "headers": [(b"accept-encoding", b"gzip")],
+            "client": ("127.0.0.1", 1234),
+            "server": ("127.0.0.1", 8000),
+        },
+        receive,
+        send,
+    )
+    return start, bodies
+
+
 # ── T-75 ────────────────────────────────────────────────────────────────────
 def test_the_app_carries_the_gzip_layer() -> None:
-    assert "GZipMiddleware" in _middleware_names(inku_app)
+    assert "FlushingGZipMiddleware" in _middleware_names(inku_app)
 
 
 # ── T-76 ────────────────────────────────────────────────────────────────────
@@ -82,3 +135,57 @@ def test_an_already_compressed_body_is_left_alone() -> None:
         "an image was gzipped; the exclusion list no longer covers image/"
     )
     assert answer.content == png
+
+
+# ── T-78 ────────────────────────────────────────────────────────────────────
+def test_a_streamed_body_leaves_as_it_is_written() -> None:
+    """The painting route reports each stage while it is still working.
+
+    ``/api/paint/stream`` writes an event as soon as interpretation finishes so
+    the page can name the stage that is running instead of guessing, and the
+    page reads the stream chunk by chunk to do it.  A layer that holds those
+    events back until the drawing is finished loses no bytes and raises no
+    error -- nothing else here would notice -- and costs the only thing that
+    event is for, which is when it arrives.  Measured on 2026-08-16 with the
+    stock responder, five events put 10 / 0 / 0 / 0 / 117 bytes on the wire;
+    the ten were the gzip header.
+    """
+    events = [
+        json.dumps({"event": "stage1", "tokens_in": 1200}).encode() + b"\n",
+        json.dumps({"event": "stage2", "tokens_in": 900}).encode() + b"\n",
+        json.dumps({"event": "render"}).encode() + b"\n",
+        json.dumps({"event": "done", "svg": "<svg>" + "x" * 4000 + "</svg>"}).encode() + b"\n",
+    ]
+
+    probe = FastAPI()
+
+    @probe.get("/stream")
+    def _stream() -> StreamingResponse:
+        def lines() -> Iterator[bytes]:
+            yield from events
+
+        # The type /api/paint/stream sends. It is deliberately not in the
+        # exclusion list: the done event carries the drawing, so this stream is
+        # worth compressing -- it just has to leave as it is written.
+        return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+    for entry in reversed(inku_app.user_middleware):
+        probe.add_middleware(entry.cls, *entry.args, **entry.kwargs)
+
+    start, bodies = asyncio.run(_ask_and_record_each_message(probe, "/stream"))
+
+    headers = {k.decode(): v.decode() for k, v in start["headers"]}
+    assert headers.get("content-encoding") == "gzip", headers
+
+    # One body message per event, then the empty one that ends the response.
+    per_event = bodies[: len(events)]
+    assert len(per_event) == len(events), (
+        f"{len(bodies)} body messages for {len(events)} events"
+    )
+    assert all(len(b) > 0 for b in per_event), (
+        "an event was written and nothing left the layer: "
+        f"{[len(b) for b in bodies]} bytes per message"
+    )
+
+    # And it is still one gzip stream carrying exactly what was written.
+    assert gzip.decompress(b"".join(bodies)) == b"".join(events)

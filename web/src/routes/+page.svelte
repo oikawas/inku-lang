@@ -2601,7 +2601,12 @@
 			trashTotal = 0;
 			historyManager.clear();
 			loginPassword = '';
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			// loadColorCatalogs and fetchPrompts ride here because I-086 put both
+			// endpoints behind the guard. The startup fetch runs before anyone has
+			// logged in and now gets a 401, so without reading them again the
+			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
+			// empty until the page was reloaded.
+			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {

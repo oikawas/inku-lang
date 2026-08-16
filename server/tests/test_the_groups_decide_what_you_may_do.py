@@ -224,7 +224,7 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # the same rule: named here, taken back out before hashing, so the frozen
     # digest keeps measuring everything else byte for byte.
     declared_additions = {
-        "HistoryItem": {"catalog_mode"},
+        "HistoryItem": {"catalog_mode", "svg_bytes"},
         "HistoryPostBody": {"catalog_mode"},
         "AppInfoResponse": {"thumbnail_hidpi"},
         "ComposeRequest": {"fires_on"},
@@ -243,6 +243,15 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
         # panel turns the total into the weight of a work, and the measured cost
         # of one mark comes from the server rather than a copy in the browser.
         "RenderLimitsStatus": {"bytes_per_mark"},
+        # 2026-08-17 added one key to each of two schemas that predate
+        # permission groups, by the same rule: named here, taken back out
+        # before hashing. `HistoryItem.svg_bytes` is a work's own weight,
+        # which the strip needs while the listing withholds the picture;
+        # `UserSettingsBody.history_strip_fields` is the reader's choice of
+        # what the strip prints. A SECOND key arriving in either is still red.
+        # UserAccountItem carries the same choice and is already one of the
+        # three schemas this test excludes wholesale.
+        "UserSettingsBody": {"history_strip_fields"},
     }
     # I-136 changed a schema by taking a bound OFF a property rather than by
     # adding or removing one, so `declared_additions` above cannot express it and
@@ -325,9 +334,14 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
         old_props = set(json.loads(before["changed_schemas"][name])["properties"])
         new_props = set(json.loads(after["schemas"][name])["properties"])
         assert old_props - new_props == {"role"} | ({"role_label"} if name == "UserAccountItem" else set()), name
-        assert new_props - old_props == {"permission_groups"} | (
-            {"permission_group_labels"} if name == "UserAccountItem" else set()
-        ), name
+        # 2026-08-17: the account also carries which facts the history strip
+        # prints under each thumbnail. Named here rather than left to widen the
+        # comparison, so a THIRD arrival in UserAccountItem is still red.
+        expected_arrivals = {"permission_groups"} | (
+            {"permission_group_labels", "history_strip_fields"}
+            if name == "UserAccountItem" else set()
+        )
+        assert new_props - old_props == expected_arrivals, name
 
 
 # --- T-9: permission groups and organisation groups are separate ------------

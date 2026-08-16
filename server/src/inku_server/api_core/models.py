@@ -16,11 +16,6 @@ class HistoryPostBody(BaseModel):
     interpret_fallback: str | None = None
     score: dict
     svg: str = ""
-    # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
-    # The listing that draws the strip asks for `include_svg=false`, so a client
-    # cannot count this for itself: what arrives in `svg` is then an empty
-    # string, and measuring it would report every work as nothing.
-    svg_bytes: int = 0
     at: int
     elapsed_ms: int = 0
     stage1_model: str | None = None
@@ -81,6 +76,15 @@ class HistoryPostBody(BaseModel):
 
 class HistoryItem(HistoryPostBody):
     id: str
+    # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
+    # The listing that draws the strip asks for `include_svg=false`, so a client
+    # cannot count this for itself: what arrives in `svg` is then an empty
+    # string, and measuring it would report every work as nothing.
+    #
+    # It belongs here and not on HistoryPostBody, which this inherits from: the
+    # weight is something the server reports about a stored work, never
+    # something a caller states when saving one.
+    svg_bytes: int = 0
     output_path: str | None = None
     # True when this work is somebody else's, reached through a group scope or an
     # explicit grant. Absent (not false) for one's own, so the ordinary listing

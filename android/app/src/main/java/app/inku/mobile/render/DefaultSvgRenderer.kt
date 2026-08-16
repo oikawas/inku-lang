@@ -2175,6 +2175,12 @@ class DefaultSvgRenderer(
         // shape's name, and held between a fifth and not quite twice the count a
         // shape of the reference area gets.
         val areaFactor = kotlin.math.max(0.2, kotlin.math.min(1.8, (w * h) / (unit * unit * 0.18)))
+        // The surface layer makes its seed once, before the branches, the way the
+        // server does. Two branches used to make their own with (0, 0), which
+        // dropped the mark index: every mark an `arrangement` expanded then wore
+        // the same texture while its outline differed. One seed here also means
+        // a branch added later cannot pick the wrong custom.
+        val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
 
         if (texture in setOf("stipple", "grain", "paper_grain")) {
             // One branch for the three words, because the server holds them in
@@ -2184,7 +2190,6 @@ class DefaultSvgRenderer(
             if (contour == null || contour.size < 3) return ""
             val count = min(SURFACE_MARK_MAX, ((22 + density * 120) * areaFactor).toInt())
             val radius = max(0.45, unit * (0.002 + scale * 0.004))
-            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
             val sb = StringBuilder()
             for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
                 sb.append(
@@ -2217,7 +2222,6 @@ class DefaultSvgRenderer(
             val band = w / steps
             val radius = max(0.45, unit * (0.0015 + scale * 0.0025))
             val count = min(SURFACE_MARK_MAX, max(5, ((18 + density * 90) * areaFactor).toInt()))
-            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
             val sb = StringBuilder()
             for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
                 val step = if (band > 0) min(steps - 1, max(0, ((point.first - x) / band).toInt())) else 0
@@ -2263,7 +2267,6 @@ class DefaultSvgRenderer(
             val weight = ins.optString("weight", "pen")
             val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
             val spacing = max(10.0, unit * (0.052 - density * 0.024))
-            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
             val baseAngle = ServerRendererGeometry.fillScanAngle(seedStr)
             val minWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
             val sb = StringBuilder()
@@ -2320,7 +2323,6 @@ class DefaultSvgRenderer(
             val cy = y + h / 2.0
             val count = min(80, max(3, (span / spacing).toInt()))
             val angles = mutableListOf(angle)
-            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
             if (texture == "crosshatch") {
                 angles.add(angle + Math.toRadians(60.0 + ServerRendererGeometry.hash01(8, seedStr, "cross-angle") * 30.0))
             }

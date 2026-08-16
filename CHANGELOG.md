@@ -6990,3 +6990,68 @@ is placed**.
   version**), **cli 225 passed**, **web 373 pass / 0 fail** (371 at the branch point, +2),
   **`npm run check` 261 FILES / 0 ERRORS / 2 WARNINGS** (unchanged), **`lint:i18n` 0 errors**,
   **ruff clean for both server and cli**.
+
+---
+
+### Android — the port answers the same way the server does (android `2.1.4-android.33`, 2026-08-16, ledger I-262, I-263, I-267)
+
+**The versions already matched.** `renderEngineVersion` reads `"35"`, the same as the server, and all
+51 sheets of the frozen corpus agree byte for byte. **Even so, the port answered differently from the
+server in three places.** **None of the three reddens a single sheet of the frozen corpus** (no case in
+the 51 exercises them), so **every gate here is stated as a property** — what is measured is not "it
+differs from before" but "**it is the same value the server produces**", and **each one is paired with a
+control that must not move**.
+
+- **I-262 — a cloudform gets its surface too.** `shapeBbox` had only four branches (circle, ellipse,
+  square+triangle, polygon) and a cloudform fell through to `else -> null`. **A cloudform that asked for
+  `surface: parallel lines` was drawn with a surface by the server and with none at all on Android.**
+  **⚠ Adding the branch produced no surface lines whatsoever** — the cloudform branch **never called
+  `renderSurfaceVectors` in the first place** (all ten other primitives do). The server calls the surface
+  layer **outside** the primitive switch, once per instruction, so a cloudform gets one. **The call was
+  wired in.** **null did mean "draw no surface", but on a cloudform the surface layer was never reached
+  to see the null.**
+- **I-263 — an arc is measured end to end.** Arc length is the difference between the endpoint angles,
+  not that difference wrapped into 0–360. **Two of the four sites wrapped it**, so an arc drawn from
+  `300°` to `20°` measured `r × 1.3963` where the server measures `r × 4.8869`. Arc length decides the
+  speck count and the sample count, so **a backwards arc carried a different amount of ink altogether**.
+- **I-267 — each cluster keeps its own rhythm.** The server stirs the seed per cluster before resolving
+  the rhythm; the port did not stir at all, so **three clusters spaced themselves identically inside**.
+  The stir is **seed xor the cluster index**, and `k=0` gives `seed xor 0 == seed`.
+- **Stage 1's output was matched against the server one to one** (cloudform + `surface(hatch)`,
+  `golden` 1618×1000, seed 12345) — **`path` / `polyline` / `rect` agree at 16 / 33 / 1**, and so do the
+  five classes `cloudform contour-v1 stroke-engine-touch`, `contour-stroke-v1 controls-245 events-0`,
+  `material-outline stratum-0`, `stratum-1`, `surface-stroke-v1 hatch-spacing-22.500`.
+  **Only the byte count differs, 41,958 against 41,432**, and the difference is the number of `<g>`
+  elements (server 8, Android 4). **The 33 surface lines agree.**
+- **Thirteen perturbations** (P-8 and P-12 each have two sites and were split into a / b, so fifteen were
+  applied and reverted; **all fifteen reverts matched their sha256**). **Not one was a no-op.**
+  **Three missed their predictions** — **P-7** (predicted 2, measured 4) was written as "floating point
+  may differ by 1 ULP, but predict it does not move", and **it moved**: `2πr × (Δ/360)` and
+  `r × |radians Δ|` are the same mathematically, but the input to `rint` changes, the segment count
+  changes, and **two corpus gates came along with it** (the contract's reason for not unifying the two
+  formulas, now measured). **P-11** (predicted 4, measured 3) left T-93 green — the implementation
+  extracts the rhythm **after cancelling out the cluster centres**, so stirring the centre does not move
+  it; **this is not a hole in the gates** (the centre stir is measured by name in T-92, which P-11
+  reddens). **P-12** (predicted 4, measured 2) **moved no existing gate at all** — specks are `<circle>`
+  elements, the gate that walks all 51 sheets compares only `d` / `points` / `stroke-dasharray`, and the
+  gate that counts elements walks only 10 sheets. **Of those ten, the one arc with a material layer is
+  `04_arc_crayon`, whose `0→180` has the same supplement, so nothing moves.** **No gate looks at the
+  speck count of a corpus arc.**
+- **Carried forward (untouched here; all four are on the ledger)** — `rhythmT` differs from the server's
+  `_rhythm_t` **in four places** (0.5 against 0.0 for `n<=1`; accelerando as `base²` against `base^1.35`;
+  loose jitter of `0.12/max(n/8,1)` against `0.16`, a factor of 3.3 at n=20; the syncopated constants);
+  a non-hand-stroke arc with `variation` emits 148 `<polyline>` points on the server and 147 `<path>`
+  points here; canvas dimensions truncate where the server rounds, splitting `oban` into 666 against
+  667; and the gate hole above. **T-93 measures only which seed is read, not what the rhythm does,
+  because of the first of these.**
+- **Verification (re-measured by the accepting session on the merged tree):** **Android JVM 56 classes /
+  314 passed / 0 failed / 0 errors / 0 skipped** (305 at the branch point, **+9, this contract's gates**;
+  nothing deleted or renamed; zero `^e: ` lines), **`test_android_reference_fixtures_are_current.py`
+  4 passed**, **the reference fixtures did not move by a byte**. **`server/`, `web/`, `cli/` and
+  `shared/` have no diff, and their suites were not measured.** **⚠ `cycle.sh accept`'s test inventory
+  does not count a single file under `android/`** (ledger I-270), so the delta was counted by hand as the
+  sum of `git grep -c '@Test'` (305 → 314, across 55 → 56 files).
+- **⚠ Neither `APP_VERSION` nor `web/BUILD_NUMBER` moved.** `android/` is permanently excluded from
+  every sync path, so this round has nothing to send to pentala.
+- **The frozen prediction note was taken out of the published tree** (it lives in `no-git-sync/`;
+  precedent `a5b07945`).

@@ -11,6 +11,7 @@ import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.sin
 import org.json.JSONArray
@@ -932,18 +933,34 @@ class DefaultSvgRenderer(
         return (margin + xv * span) to (margin + yv * span)
     }
 
+    /**
+     * Deterministic non-linear spacing for repeated arrangements -- the
+     * server's `_rhythm_t`, term for term.
+     *
+     * Four of its terms used to be someone else's: a lone member sat at the
+     * middle instead of the start, `accelerando` squared its base instead of
+     * raising it to 1.35, `loose` drew a 0.12 jitter and then divided it by the
+     * count, and `syncopated` beat -0.055/0.085 on the even/odd index where the
+     * server beats -0.045/0.09 on the odd/even one. None of the four is
+     * reachable from the frozen corpus (its thirteen arrangements are all
+     * `none`), so the numbers here were read off the server rather than off the
+     * port's previous answer.
+     */
     private fun rhythmT(i: Int, count: Int, seed: String, rhythmSpacing: String): Double {
-        if (count <= 1) return 0.5
+        if (count <= 1) return 0.0
         val base = i.toDouble() / (count - 1).toDouble()
         return when (rhythmSpacing) {
-            "syncopated" -> {
-                val pulse = if (i % 2 == 0) -0.055 else 0.085
-                clamp01(base + pulse * sin(base * Math.PI))
-            }
-            "accelerando" -> base * base
+            "accelerando" -> base.pow(1.35)
             "loose" -> {
-                val jitter = (hash01(i, seed, "rhythm-loose") - 0.5) * 0.12 / maxOf(count / 8.0, 1.0)
+                // A flat amplitude: the server does not scale the jitter by how
+                // many members are being placed.
+                val jitter = (hash01(i, seed, "rhythm-loose") - 0.5) * 0.16
                 clamp01(base + jitter)
+            }
+            "syncopated" -> {
+                val beat = if (i % 2 != 0) 0.09 else -0.045
+                val taper = sin(base * Math.PI)
+                clamp01(base + beat * taper)
             }
             else -> base
         }

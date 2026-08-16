@@ -3018,6 +3018,36 @@ The renderer uses the selected aspect to determine SVG `width`, `height`, and
 `viewBox`.  Circle and arc radii are based on the shorter side to avoid
 accidental stretching.
 
+### The Resolution of a Number (the Master Grid)
+
+**Every number written into an SVG attribute carries six decimal places.**  SVG
+scales freely, but the numbers written into it are fixed-point, so this is the
+master resolution of a performance (1e-9 of the canvas on a 1000-unit canvas).
+The digits are not decided at each place that writes one: they are **forced at a
+single point on the way out**, over every attribute.  Only `version`, `class`,
+and `id` are exempt, because those are identifiers rather than measurements.
+
+- **The floor is reproducibility.**  The difference between platform libm
+  implementations is 1e-13 on a 1000-unit coordinate, four digits below this
+  grid, so every machine performs the same string.
+- **The ceiling is physical.**  Blown up to a 100m wall the step is 100nm, finer
+  than the wavelength of visible light.
+- **Trailing zeros are not trimmed** (author's ruling, 2026-07-24).  With the
+  width fixed, every number in an artifact matches `-?\d+\.\d{6}`, so sitting on
+  the grid is machine-checkable with one regular expression.  Trimmed, the
+  output no longer distinguishes a value that was rounded from a raw float.
+
+**Six is the specification; the digits are not lowered to write fewer bytes**
+(author's ruling, 2026-08-16).  **The grid covers the settings of the texture
+filters as well as coordinates, so lowering it changes the picture.**  Measured
+on a production-scale work at 1618px, three decimals moved 19.52 percent of the
+pixels; holding the filter values at six brought that down to 0.50 percent.  At
+two decimals the coordinates move on their own -- 17.52 percent of the pixels in
+a fill, 48.57 percent in the production work -- because a coarse grid gathers
+onto shared points the marks the hand had scattered.  **What moves is where the
+grain sits, not how much ink there is.**  What lowering the digits buys is bytes:
+31.9 percent of the gzipped transfer at three decimals, 44.1 percent at two.
+
 ---
 
 ## 20. Modes

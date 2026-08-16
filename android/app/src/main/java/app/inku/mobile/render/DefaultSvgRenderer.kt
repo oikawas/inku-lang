@@ -42,6 +42,10 @@ internal const val SURFACE_WASH_WIDTH_SPAN = 0.60
 // Doubling the width above closes the gaps, which also darkened the wash; the
 // factor comes down from 0.42 so the ink lands back where it was.
 internal const val SURFACE_WASH_OPACITY = 0.22
+// How many bands a `bleed` lays out from the outline. The innermost one sits on
+// the outline itself, so this count is also what decides how far the outermost
+// one reaches: the levels are spread over the count less one.
+internal const val SURFACE_BLEED_RINGS = 3
 
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
@@ -2175,6 +2179,12 @@ class DefaultSvgRenderer(
         // shape's name, and held between a fifth and not quite twice the count a
         // shape of the reference area gets.
         val areaFactor = kotlin.math.max(0.2, kotlin.math.min(1.8, (w * h) / (unit * unit * 0.18)))
+        // The surface layer makes its seed once, before the branches, the way the
+        // server does. Two branches used to make their own with (0, 0), which
+        // dropped the mark index: every mark an `arrangement` expanded then wore
+        // the same texture while its outline differed. One seed here also means
+        // a branch added later cannot pick the wrong custom.
+        val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
 
         if (texture in setOf("stipple", "grain", "paper_grain")) {
             // One branch for the three words, because the server holds them in
@@ -2184,7 +2194,6 @@ class DefaultSvgRenderer(
             if (contour == null || contour.size < 3) return ""
             val count = min(SURFACE_MARK_MAX, ((22 + density * 120) * areaFactor).toInt())
             val radius = max(0.45, unit * (0.002 + scale * 0.004))
-            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
             val sb = StringBuilder()
             for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
                 sb.append(
@@ -2217,7 +2226,6 @@ class DefaultSvgRenderer(
             val band = w / steps
             val radius = max(0.45, unit * (0.0015 + scale * 0.0025))
             val count = min(SURFACE_MARK_MAX, max(5, ((18 + density * 90) * areaFactor).toInt()))
-            val seedStr = surfaceSeed(ins, insIdx, markIdx, renderSeed)
             val sb = StringBuilder()
             for ((index, point) in ServerRendererFill.surfaceScatter(contour, count, seedStr).withIndex()) {
                 val step = if (band > 0) min(steps - 1, max(0, ((point.first - x) / band).toInt())) else 0
@@ -2263,7 +2271,6 @@ class DefaultSvgRenderer(
             val weight = ins.optString("weight", "pen")
             val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
             val spacing = max(10.0, unit * (0.052 - density * 0.024))
-            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
             val baseAngle = ServerRendererGeometry.fillScanAngle(seedStr)
             val minWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
             val sb = StringBuilder()
@@ -2320,7 +2327,6 @@ class DefaultSvgRenderer(
             val cy = y + h / 2.0
             val count = min(80, max(3, (span / spacing).toInt()))
             val angles = mutableListOf(angle)
-            val seedStr = surfaceSeed(ins, 0, 0, renderSeed)
             if (texture == "crosshatch") {
                 angles.add(angle + Math.toRadians(60.0 + ServerRendererGeometry.hash01(8, seedStr, "cross-angle") * 30.0))
             }
@@ -2389,6 +2395,61 @@ class DefaultSvgRenderer(
                         sb.append("""<path class="surface-stroke-v1 $hatchClass" d="$pathD" fill="$color" fill-opacity="$opacityStr" stroke="none"/>""")
                     }
                 }
+            }
+            return sb.toString()
+        }
+
+        if (texture == "bleed") {
+            // "The edge seeps" is a claim about the edge. Up to engine 15 the
+            // server put one ellipse at the centre of the bounding box, so a
+            // triangle and a cloudform got the same ellipse and no edge seeped
+            // at all. Bands pushed out from the outline itself are laid over one
+            // another instead, and how far each vertex is pushed wavers, so the
+            // result reads as a seep rather than as concentric outlines.
+            val contour = surfaceContour(ins, width, height, unit, renderSeed, insIdx, markIdx)
+            if (contour == null || contour.size < 3) return ""
+            val weight = ins.optString("weight", "pen")
+            val blur = max(1.0, unit * (0.010 + surface.optDouble("bleed", 0.0) * 0.030))
+            val normals = ServerStrokeEngine.centerlineNormals(contour, closed = true)
+            val center = pointsCenter(contour)
+            // Which way the normals face is not settled by the shape, so it is
+            // put to a majority vote against the centre rather than fixed here.
+            val outward = contour.zip(normals).sumOf { (point, normal) ->
+                (point.first - center.first) * normal.first + (point.second - center.second) * normal.second
+            }
+            val sign = if (outward >= 0.0) 1.0 else -1.0
+            val sb = StringBuilder()
+            for (ring in 0 until SURFACE_BLEED_RINGS) {
+                // The innermost ring lies on the outline. A seep happens on both
+                // sides of an edge, so the band rises from the edge itself rather
+                // than floating at a distance from the shape.
+                val level = if (SURFACE_BLEED_RINGS > 1) ring.toDouble() / (SURFACE_BLEED_RINGS - 1).toDouble() else 0.0
+                val pushed = contour.zip(normals).mapIndexed { i, (point, normal) ->
+                    val seep = sign * blur * level *
+                        (0.55 + ServerRendererGeometry.hash01(i + ring * 613, seedStr, "bleed-seep") * 0.9)
+                    (point.first + normal.first * seep) to (point.second + normal.second * seep)
+                }
+                val ringOpacity = kotlin.math.min(0.30, opacity * 0.55) * (1.0 - level * 0.55)
+                val ringWidth = max(1.2, blur * (1.05 - level * 0.45))
+                if (!usesHandStroke(weight)) {
+                    val ptsStr = pushed.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
+                    sb.append(
+                        """<polygon points="$ptsStr" fill="none" stroke="$color" stroke-width="${fmt(ringWidth)}" stroke-opacity="${fmt(ringOpacity)}"/>"""
+                    )
+                    continue
+                }
+                val stroke = ServerStrokeEngine.synthesizeAlong(
+                    pushed,
+                    ringWidth,
+                    weight,
+                    ServerRendererGeometry.surfaceStrokeSeed(seedStr, 90000 + ring),
+                    closed = true,
+                    gridStep = gridStepPx(weight, unit),
+                    wild = wild
+                )
+                sb.append(
+                    """<path class="surface-stroke-v1 bleed-ring-${ring + 1}" d="${ServerStrokeEngine.contourStrokePath(stroke)}" fill="$color" fill-opacity="${fmt(ringOpacity)}" fill-rule="evenodd" stroke="none"${textureFilterAttr(weight, useFilters)}/>"""
+                )
             }
             return sb.toString()
         }

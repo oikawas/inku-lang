@@ -732,29 +732,48 @@ internal object ServerRendererGeometry {
         }
     }
 
+    /**
+     * The box a surface is laid inside, or null when the shape never said where
+     * it is.
+     *
+     * Every branch of the server's `_shape_bbox` makes the same demand: both of
+     * the fields that place the shape have to be stated, and when either is
+     * missing the branch is declined and the walk falls through to `return
+     * None`. The one reader of this answer is `renderSurfaceVectors`, whose
+     * `?: return ""` turns a null into "no surface at all" -- so filling a
+     * missing field in with a default here would draw a surface on a shape the
+     * server leaves bare.
+     *
+     * "Missing" means the key is absent or JSON null, never falsy: a `center`
+     * of `[0, 0]` and a `radius` of `0` are both stated, and the server reads
+     * them as stated (`is not None`).
+     */
     fun shapeBbox(ins: JSONObject, width: Double, height: Double, unit: Double): DoubleArray? {
         val primitive = ins.optString("primitive", "")
         return when (primitive) {
             "circle" -> {
                 val center = ins.optJSONArray("center")
-                val cx = (center?.optDouble(0, 0.5) ?: 0.5) * width
-                val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
-                val r = ins.optDouble("radius", 0.12) * unit
-                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+                if (center == null || ins.isNull("radius")) {
+                    null
+                } else {
+                    val cx = center.optDouble(0, 0.5) * width
+                    val cy = center.optDouble(1, 0.5) * height
+                    val r = ins.optDouble("radius", 0.12) * unit
+                    doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+                }
             }
             "ellipse" -> {
                 val center = ins.optJSONArray("center")
                 val size = ins.optJSONArray("size")
-                val cx = (center?.optDouble(0, 0.5) ?: 0.5) * width
-                val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
-                val (w, h) = sizePx(size?.optDouble(0, 0.26) ?: 0.26, size?.optDouble(1, 0.16) ?: 0.16, width, height, unit)
-                doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
+                if (center == null || size == null) {
+                    null
+                } else {
+                    val cx = center.optDouble(0, 0.5) * width
+                    val cy = center.optDouble(1, 0.5) * height
+                    val (w, h) = sizePx(size.optDouble(0, 0.26), size.optDouble(1, 0.16), width, height, unit)
+                    doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
+                }
             }
-            // The server asks for both `center` and `size` here and answers None
-            // when either is missing (`_shape_bbox`), so the branch is only taken
-            // when both are stated. Filling them in with defaults would draw a
-            // surface where the server draws none -- that is a different
-            // judgement, not a port of this one.
             "cloudform" -> {
                 val center = ins.optJSONArray("center")
                 val size = ins.optJSONArray("size")
@@ -773,19 +792,30 @@ internal object ServerRendererGeometry {
             "square", "triangle" -> {
                 val pos = ins.optJSONArray("position")
                 val size = ins.optJSONArray("size")
-                val x = (pos?.optDouble(0, 0.38) ?: 0.38) * width
-                val y = (pos?.optDouble(1, 0.38) ?: 0.38) * height
-                val (w, h) = sizePx(size?.optDouble(0, 0.24) ?: 0.24, size?.optDouble(1, 0.24) ?: 0.24, width, height, unit)
-                doubleArrayOf(x, y, w, h)
+                if (pos == null || size == null) {
+                    null
+                } else {
+                    val x = pos.optDouble(0, 0.38) * width
+                    val y = pos.optDouble(1, 0.38) * height
+                    val (w, h) = sizePx(size.optDouble(0, 0.24), size.optDouble(1, 0.24), width, height, unit)
+                    doubleArrayOf(x, y, w, h)
+                }
             }
+            // The server builds a polygon's box out of `center` and `radius`
+            // and out of nothing else: it does not read `position` for the
+            // centre, and it does not read `size` for the radius. A polygon
+            // that states where its corners reach but never where it sits has
+            // no box, the same as one that states neither.
             "polygon" -> {
                 val center = ins.optJSONArray("center")
-                val pos = ins.optJSONArray("position")
-                val size = ins.optJSONArray("size")
-                val cx = (center?.optDouble(0) ?: ((pos?.optDouble(0, 0.4) ?: 0.4) + (size?.optDouble(0, 0.2) ?: 0.2) / 2.0)) * width
-                val cy = (center?.optDouble(1) ?: ((pos?.optDouble(1, 0.4) ?: 0.4) + (size?.optDouble(1, 0.2) ?: 0.2) / 2.0)) * height
-                val r = ins.optDouble("radius", (size?.optDouble(0, 0.22) ?: 0.22) / 2.0) * unit
-                doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+                if (center == null || ins.isNull("radius")) {
+                    null
+                } else {
+                    val cx = center.optDouble(0, 0.5) * width
+                    val cy = center.optDouble(1, 0.5) * height
+                    val r = ins.optDouble("radius", 0.12) * unit
+                    doubleArrayOf(cx - r, cy - r, r * 2.0, r * 2.0)
+                }
             }
             else -> null
         }

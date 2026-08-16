@@ -1891,7 +1891,7 @@ class DefaultSvgRenderer(
         }
     }
 
-    private fun surfaceSeed(ins: JSONObject, insIdx: Int = 0, markIdx: Int = 0, renderSeed: Long? = null): String {
+    internal fun surfaceSeed(ins: JSONObject, insIdx: Int = 0, markIdx: Int = 0, renderSeed: Long? = null): String {
         val surfaceObj = ins.optJSONObject("surface")
         if (surfaceObj != null && surfaceObj.has("seed") && !surfaceObj.isNull("seed")) {
             return surfaceObj.optLong("seed").toULong().toString()
@@ -1939,7 +1939,7 @@ class DefaultSvgRenderer(
      * the performance seed, because its contour is generated rather than derived
      * from the stated numbers.
      */
-    private fun surfaceContour(
+    internal fun surfaceContour(
         ins: JSONObject,
         width: Double,
         height: Double,

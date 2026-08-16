@@ -84,7 +84,7 @@ def test_the_route_count_is_the_branch_points_count_plus_one() -> None:
 
 def test_the_card_route_is_guarded_and_the_public_list_did_not_grow() -> None:
     """The card is somebody's own work, so it is not a public route."""
-    assert len(PUBLIC) == 6
+    assert len(PUBLIC) == 3
     assert CARD_ROUTE not in PUBLIC
 
     card_routes = [context for context in _api_routes() if context.route.path == CARD_ROUTE]

@@ -98,7 +98,7 @@ def api_info() -> AppInfoResponse:
     )
 
 
-@router.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
+@authenticated_router.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
 def api_color_catalogs() -> ColorCatalogsResponse:
     return ColorCatalogsResponse(
         default_catalog_id="default",
@@ -212,7 +212,7 @@ def api_client_config() -> dict[str, object]:
     return {"render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"])}
 
 
-@router.get("/api/prompts", response_model=PromptsResponse)
+@authenticated_router.get("/api/prompts", response_model=PromptsResponse)
 def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
     try:
         requested_lang = _normalize_instruction_lang(lang)

@@ -7,11 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from ...security import SlidingWindowRateLimiter
 from ... import db as _db
-from ..deps import _SESSION_COOKIE_NAME, _session_token, _user_manager
+from ..deps import _SESSION_COOKIE_NAME, _current_user, _session_token, _user_manager
 from ..models import UserAccountItem
 
 
 router = APIRouter()
+# Everything in the auth group except logging in itself: reading how the server
+# authenticates is not something logging in needs to know beforehand.
+authenticated_router = APIRouter(dependencies=[Depends(_current_user)])
 manager_router = APIRouter(dependencies=[Depends(_user_manager)])
 
 
@@ -58,7 +61,7 @@ def _clear_session_cookie(response: Response) -> None:
     response.delete_cookie(_SESSION_COOKIE_NAME, path="/", samesite="lax")
 
 
-@router.get("/api/auth/config")
+@authenticated_router.get("/api/auth/config")
 def api_auth_config() -> dict:
     return _db.get_auth_settings()
 

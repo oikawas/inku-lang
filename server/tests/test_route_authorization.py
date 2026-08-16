@@ -18,13 +18,15 @@ from inku_server.api import app
 
 GUARDS = {"_current_user", "_admin_user", "_user_manager", "_session_token"}
 
+# I-086: the reason each entry gives has to be one that was measured. The list
+# used to say /api/color-catalogs was "needed to render the login screen"; the
+# login screen was then measured and receives no catalog at all, so what kept
+# the route public was the startup fetch running before anyone had logged in.
+# What is left is only what logging in genuinely needs.
 PUBLIC = {  # every entry needs a reason
-    "/health",  # liveness probe, no data
-    "/api/info",  # build/version banner shown before login
-    "/api/color-catalogs",  # catalog list, needed to render the login screen
-    "/api/auth/config",  # tells the client whether login is required at all
+    "/health",  # container liveness probe, returns no data
+    "/api/info",  # build/version and developer_mode, read by the login screen
     "/api/auth/login",  # the login endpoint itself
-    "/api/prompts",  # ledger I-086: keeping it public is still undecided
 }
 
 # The count is part of the contract: a split that loses an endpoint is a

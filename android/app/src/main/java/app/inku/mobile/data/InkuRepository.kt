@@ -674,7 +674,7 @@ class InkuRepository(
         // child that has to exist first. A failing edge takes the node and the
         // history row down with it, the way the server's rollback does.
         database.withTransaction {
-            database.historyDao().upsert(item)
+            database.historyDao().insert(item)
             database.lineageDao().insertNode(write.node)
             write.edge?.let { database.lineageDao().insertEdge(it) }
         }

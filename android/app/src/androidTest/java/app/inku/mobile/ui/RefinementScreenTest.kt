@@ -309,10 +309,10 @@ class RefinementScreenTest {
         val savedNode = vm().state.value.refinementCandidates.single().savedNodeId
         assertNotNull(savedNode)
 
-        // 「保存済み候補は再保存できない」. Counted in `lineage_nodes`, not in
-        // `history_items`: the render hash is unique there, so a second save of
-        // the same drawing replaces the row and the count never moves. Each save
-        // mints a fresh node, so that table is where a second one shows up.
+        // 「保存済み候補は再保存できない」. Counted in both tables, because a save
+        // that got through would show in both: it mints a fresh node, and it
+        // writes a fresh history row now that the same render hash no longer
+        // replaces the row it matches.
         composeTestRule.runOnIdle { vm().saveRefinementCandidate(candidate.id) }
         composeTestRule.waitForIdle()
         assertEquals("nothing more was written", before + 1, countRows("history_items"))

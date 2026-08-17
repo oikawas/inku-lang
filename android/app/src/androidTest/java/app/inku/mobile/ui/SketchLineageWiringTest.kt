@@ -189,7 +189,7 @@ class SketchLineageWiringTest {
             sketchGrain = sketchGrain,
             sketchState = sketchGrain ?: "off",
         )
-        database.historyDao().upsert(item)
+        database.historyDao().insert(item)
         database.lineageDao().insertNode(
             LineageNodeEntity(
                 id = nodeId,

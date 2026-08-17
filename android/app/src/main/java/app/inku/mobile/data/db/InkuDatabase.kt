@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LineageNodeEntity::class,
         LineageEdgeEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -40,7 +40,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -155,6 +155,32 @@ abstract class InkuDatabase : RoomDatabase() {
                 ).forEach { column ->
                     db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
                 }
+            }
+        }
+
+        /**
+         * The same drawing reached twice is two works, as it is on the server.
+         *
+         * `history.render_hash` carries no unique constraint there: the column
+         * is declared `index=True` and nothing more (`db.py:178`), the index is
+         * created as a plain `CREATE INDEX` (`db.py:653`), and the one place
+         * that drops a duplicate on the save path keys off the caller's explicit
+         * `idempotency_key` (`db.py:2965`), never off the hash. A primary-key
+         * collision is re-raised rather than absorbed (`db.py:2993`).
+         *
+         * The port had a unique index here instead, so a second arrival at the
+         * same score replaced the first row: the save reported success and the
+         * count never moved. This drops that index and rebuilds it non-unique.
+         *
+         * ⚠ The table is not rebuilt. Only the index is exchanged, so every work
+         * already saved survives the migration -- a `CREATE TABLE ... SELECT`
+         * round trip would put the author's existing rows at risk for a change
+         * that touches no column.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS `index_history_items_render_hash`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_items_render_hash` ON `history_items` (`render_hash`)")
             }
         }
     }

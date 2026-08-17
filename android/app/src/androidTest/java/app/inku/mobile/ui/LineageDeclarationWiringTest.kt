@@ -178,10 +178,10 @@ class LineageDeclarationWiringTest {
     /**
      * Puts a finished work in history without drawing it, so that a test can
      * start from a parent whose description, canvas ratio and render hash it
-     * chose. Drawing the parent instead would tie the child's description to it:
-     * `render_hash` is unique, so a second run that reached the same score is
-     * refused, and `replay` -- the case where nothing changed -- could never be
-     * reached at all.
+     * chose. Drawing the parent instead would tie the child's description to
+     * whatever the pipeline produced, and `replay` -- the case where nothing
+     * changed -- is only recognisable when the parent's hash is a value this
+     * test picked.
      */
     /**
      * [sketchGrain] defaults to the grain the app draws at, because that is what
@@ -223,7 +223,7 @@ class LineageDeclarationWiringTest {
             sketchGrain = sketchGrain,
             sketchState = sketchGrain ?: "off",
         )
-        database.historyDao().upsert(item)
+        database.historyDao().insert(item)
         database.lineageDao().insertNode(
             LineageNodeEntity(
                 id = nodeId,
@@ -504,12 +504,10 @@ class LineageDeclarationWiringTest {
         const val STAGE_MODEL = "test-stage-model"
         const val PARENT_DESCRIPTION = "親となる作品 青い鉛筆の線を12本、波打つ軌跡に沿って散らす"
 
-        // Two drawings inside one test have to be two pictures. `upsert` is
-        // `@Insert(onConflict = REPLACE)` over a unique `render_hash`, so a
-        // second run that reached the same score replaces the first row instead
-        // of adding one, and a test waiting for two rows waits forever while
-        // every run reports success. Prose carrying no drawing vocabulary all
-        // lands on the same score, so these two name shapes, counts and colours.
+        // Two drawings inside one test have to be two pictures, because what
+        // these tests read is what changed between them. Prose carrying no
+        // drawing vocabulary all lands on the same score, so these two name
+        // shapes, counts and colours.
         const val FIRST_DRAWING = "赤い円を5個、横に並べる"
         const val SECOND_DRAWING = "黒い太筆の線を3本、斜めに置く"
         const val PARENT_CANVAS = "square"

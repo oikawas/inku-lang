@@ -108,13 +108,18 @@ class RefinementSaveTest {
     // ── T-6 ────────────────────────────────────────────────
 
     /**
-     * 「保存済み候補は再保存できない」. The three states live in the view model, and
-     * what they have to protect is this: a second save writes no second row.
-     * Counted in rows, because a guard that returns early still has to be the
-     * reason the table did not grow.
+     * 「保存済み候補は再保存できない」, and this is the layer that does NOT enforce it.
+     *
+     * The repository writes what it is asked to write: it mints a fresh id for
+     * every save (`newHistoryId()`), so a second call writes a second work.
+     * Until the render hash stopped being unique it looked otherwise -- the
+     * index replaced the first row and the count stayed at two -- so this test
+     * passed for a reason it did not name, and it named a guard it never
+     * reached. The guard lives in the view model, where `RefinementScreenTest`
+     * measures it.
      */
     @Test
-    fun t6_aCandidateSavedTwiceLeavesOneRow() = runBlocking {
+    fun t6_asecondSaveThroughTheRepositoryIsASecondWork() = runBlocking {
         val parent = paintParent()
         assertEquals(1, countRows("history_items"))
 
@@ -128,16 +133,13 @@ class RefinementSaveTest {
         )
         assertEquals("the candidate is in history", 2, countRows("history_items"))
 
-        // The same drawing again. The render hash is unique in history_items,
-        // so the row is replaced rather than added -- which is exactly why the
-        // save state, and not the table, is what stops the second attempt.
-        runCatching {
-            repository.saveRefinementCandidate(
-                result = result, plan = plan, parentNodeId = parent.lineageNodeId, elapsedMs = 1L,
-                stage1ModelId = "s1", stage2ModelId = "s2",
-            )
-        }
-        assertEquals("no third work appeared", 2, countRows("history_items"))
+        // The same drawing again, reaching the same render hash. The server
+        // keeps both (`db.py:178`, `:653`, `:2965`) and so does this table now.
+        repository.saveRefinementCandidate(
+            result = result, plan = plan, parentNodeId = parent.lineageNodeId, elapsedMs = 1L,
+            stage1ModelId = "s1", stage2ModelId = "s2",
+        )
+        assertEquals("a second save is a second work", 3, countRows("history_items"))
     }
 
     // ── T-7 ────────────────────────────────────────────────

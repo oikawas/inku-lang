@@ -34,8 +34,12 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE thumbnail_path IS NULL ORDER BY created_at DESC LIMIT :limit")
     suspend fun listMissingThumbnails(limit: Int): List<HistoryItemEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(item: HistoryItemEntity)
+    // A history row is written once and never overwritten by a second insert.
+    // The server re-raises the IntegrityError a colliding primary key produces
+    // (`db.py:2990-2993`) unless the caller passed an idempotency_key, so a
+    // silent REPLACE here would be a judgement the server does not make.
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(item: HistoryItemEntity)
 
     @Query("UPDATE history_items SET starred = :starred, updated_at = :updatedAt WHERE id = :id")
     suspend fun setStarred(id: String, starred: Boolean, updatedAt: Long)

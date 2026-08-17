@@ -131,12 +131,13 @@ def test_render_hash_backfill_writes_rh3_without_touching_rh2(monkeypatch) -> No
                     id, at, input, score, svg, elapsed_ms, render_seed,
                     render_build_number, render_engine_id,
                     render_engine_version, render_color_catalog_id,
-                    render_hash, trashed, starred, for_revision, history_visibility
+                    render_hash, trashed, starred, for_revision, for_share,
+                    history_visibility
                 ) VALUES (
                     :id, 1, '', :score, '', 0, :render_seed,
                     :render_build_number, :render_engine_id,
                     :render_engine_version, :render_color_catalog_id,
-                    :render_hash, 0, 0, 0, 'normal'
+                    :render_hash, 0, 0, 0, 0, 'normal'
                 )
             """),
             [

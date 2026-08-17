@@ -8359,3 +8359,52 @@ one place to read.
 - **The port's JVM tests moved to the same machine in a second image** (author's instruction): `eclipse-temurin:21-jdk` plus the Android SDK, 1.83GB. **385 tests, 0 failures -- the same as the Mac.** AGP 8.9.1 asks for `build-tools;35.0.0` even at `compileSdk` 36, and a second run finished in 6 s with every task up to date while the previous run's XML still read 385, so the count now only reads files this run wrote and `--rerun` forces execution.
 - `pytest-xdist` joined the dev group. It is in no release image (`uv sync --frozen --no-dev`).
 - **Four SPEC passages (two bilingual pairs) were revised.**
+
+---
+
+### Android — The machine pole's line does not waver, and the fill guard says how many it compared (android `2.1.4-android.42`, 2026-08-17, ledger I-307)
+
+**Both halves are about places nobody was looking.** The port held one branch with no counterpart on the
+server, and beside the guard that should have covered it sat a test **that stayed green whatever broke**.
+
+- **The branch with no counterpart is gone (ledger I-307):** the server answers `primitive: "line"` with
+  `weight: "rotring"` by drawing `dwg.line` once, reaching **neither the variation gate nor the material
+  layer** (`renderer.py:7688`). **The port read the gate and wrote a wavering `<polyline>`.**
+  Nothing went red because **the 51 frozen drawings hold no `rotring` line carrying a `variation`** — of
+  the four instructions that carry one, only a single line does, and its tool is `pencil`.
+  **The acceptances could only be placed as properties.**
+- **The material group is called from the same road the server calls it from:** the port called it **only
+  from the machine pole's road**, where the server calls it **only from the hand's** (`_render_hand_stroke`).
+  The call is gone, and the thin delegate that lost its only caller went with it.
+  **⚠ Not one byte of today's drawing moves** — the six keys of the material table (`pencil`, `chalk`,
+  `brush_thin`, `brush_thick`, `crayon`, `pen`) do not include `rotring`, so the call always returned null.
+  **Perturbing that stage back reddens nothing**, which leaves a measurement standing: **no test asks
+  whether the machine pole comes out clothed.**
+- **A vacuous guard now points at a group the reference actually holds:**
+  `test03SquareFilledExactParity` pulled the `fill-stroke-v1` group from both sides, but
+  **`03_square_filled.svg` holds none of it** — it was comparing nothing with nothing. What the reference
+  holds is `fill-texture-v1`, and **34 marks live in it**.
+- **The guard says how many it compared:** **the 34 is not written by hand** — the group's own class
+  declares it as `marks-34`, and the guard reads that number on both sides and matches it against how many
+  it extracted. **Zero marks is red.**
+- **⚠ That guard was not only vacuous but redundant (found on the accepting side, on the day of issue):**
+  `testEveryReferenceSvgMatchesOnPathsPointsAndDashes` **already compares the whole ` d="…"` sequence of
+  all 51 drawings**, so those 34 were compared outside the group. **What the corpus-wide walk does not see
+  is which mark sits in which group**, so the repaired guard measures that. **The other four `*ExactParity`
+  tests are subsets for the same reason** (filed in the ledger inbox).
+- **⚠ One ruling arrived mid-flight:** stage 1 reddened two existing acceptances — **`line()` defaults its
+  `weight` to `"rotring"`, and two tests used "a machine pole's line wavers" as their control** (the
+  contract had not measured this: an error on the issuing side). **The ruling was to move the control to
+  `pen`.** The machine pole's claim is now made once, by the new acceptances.
+- **⚠ A second error on the issuing side:** the contract predicted two corpus guards would be dragged
+  along, but **the one comparing the `d` sequence does not redden** — changing a class name or `marks-N`
+  moves no `d`. **The measurement is one.**
+- **Verification**: **387 tests / 0 failures / 0 errors / 0 skipped on the merged tree**
+  (66 XML files, 53s, in the test-only container on pentala). **The `@Test` total went from 385 at the
+  base to 387 on the branch** (the two new acceptances; the repaired one changed neither its name nor the
+  count). **`test_android_reference_fixtures_are_current.py` 3 passed / 1 skipped.**
+  **The frozen corpus did not move by a byte.** **Only `android/` was touched** — four files, +224 / −27.
+  **The four perturbations were run on the branch by the implementing session and matched the frozen
+  prediction in both count and name** (same agent model, so the accepting side skipped re-running the
+  branch and re-applying the perturbations, per convention §2-1).
+- **⚠ GitHub CI was not waited on** (ruling, conventions §2-10).

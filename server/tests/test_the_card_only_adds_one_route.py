@@ -38,8 +38,11 @@ ADDED_OPERATIONS = {
     # route, so the picture stays out of the payload the browser asks for on
     # every hydration. Declared by name, as the docstring above requires.
     "GET /api/saijiki/plugin-preview",
+    # I-191: a work says which organisation group may read it, and the bit is
+    # raised on one work at a time. Declared by name, as the docstring requires.
+    "PATCH /api/history/{item_id}/for-share",
 }
-ADDED_SCHEMAS = {"CardExportBody", "HistoryStateResponse"}
+ADDED_SCHEMAS = {"CardExportBody", "HistoryStateResponse", "HistoryForShareBody"}
 
 # Schemas that predate the card and are declared to change, with exactly what
 # may move in them -- the mechanism test_the_acl_only_adds_to_the_api_surface.py
@@ -53,7 +56,13 @@ CHANGED_SCHEMAS = {
     # 2026-08-17: the strip prints a work's file size, and the listing that
     # fills it asks for `include_svg=false` -- so the weight has to ride
     # separately from the picture it is the weight of.
-    "HistoryItem": {"added": {"catalog_mode", "svg_bytes"}, "removed": set()},
+    # I-191: the share bit and the group it points at. Two keys, not one: the
+    # bit is a permission and the group is its destination, and a client shown
+    # only the bit could not say who else is reading.
+    "HistoryItem": {
+        "added": {"catalog_mode", "svg_bytes", "for_share", "share_group_id"},
+        "removed": set(),
+    },
     # 2026-08-17: the reader chooses which two facts the history strip prints
     # under each thumbnail. It is an account setting, so it rides on the account
     # it belongs to and on the PATCH that changes it.
@@ -110,7 +119,23 @@ CLUSTER_COUNT_BOUND_REMOVED = 12.0
 # to describe -- every already-guarded route in the frozen file carries both.
 # The 200 of each is compared as before, so a route that quietly stopped
 # describing what it returns is still red.
+#
+# I-191: three listing routes gain the optional `for_share` argument -- asking
+# for the shared bundle is what makes the bit useful, and the lineage views ask
+# the same question of the same works. Optional and defaulting to the old
+# behaviour, so nothing a caller already sends means anything different. All
+# three are named, because the frozen file already holds all three: leaving the
+# two lineage ones out would read as damage, not as an addition.
 CHANGED_OPERATIONS = {
+    "GET /api/history": {"added_params": {"query:for_share:opt"}, "removed_params": set()},
+    "GET /api/history/lineage-groups": {
+        "added_params": {"query:for_share:opt"},
+        "removed_params": set(),
+    },
+    "GET /api/history/lineage-groups/{root_node_id}/items": {
+        "added_params": {"query:for_share:opt"},
+        "removed_params": set(),
+    },
     "GET /api/prompts": {
         "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
         "removed_params": set(),

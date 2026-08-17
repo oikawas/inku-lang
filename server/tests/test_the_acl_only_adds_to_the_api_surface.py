@@ -69,6 +69,10 @@ ADDED_OPERATIONS = {
     # reads them as damage. What the card added and nothing else is measured
     # against its own starting point in test_the_card_only_adds_one_route.py.
     "POST /api/history/export-card",
+    # I-191: a work says which organisation group may read it. Same rule again:
+    # this file measures everything added since `3450548c`, so an undeclared
+    # route arriving beside it still fails.
+    "PATCH /api/history/{item_id}/for-share",
 }
 
 ADDED_SCHEMAS = {
@@ -87,6 +91,8 @@ ADDED_SCHEMAS = {
     "HistoryStateResponse",
     # The shareable card.
     "CardExportBody",
+    # I-191.
+    "HistoryForShareBody",
 }
 
 # One schema that predates this branch is changed rather than added, and it is
@@ -104,7 +110,13 @@ CHANGED_SCHEMAS = {
     # fills it asks for `include_svg=false` -- so the weight has to ride
     # separately from the picture. Counting the received `svg` reported every
     # work but the open one as 0 B.
-    "HistoryItem": {"added": {"shared", "catalog_mode", "svg_bytes"}, "removed": set()},
+    # I-191: the share bit and the group it points at. Distinct from `shared`
+    # beside it -- that one says the work reached the caller from somebody else,
+    # while these two are what the OWNER set and where they pointed it.
+    "HistoryItem": {
+        "added": {"shared", "catalog_mode", "svg_bytes", "for_share", "share_group_id"},
+        "removed": set(),
+    },
     # 2026-08-17: the reader chooses which two facts the history strip prints
     # under each thumbnail. It is an account setting, so it rides on the account
     # it belongs to and on the PATCH that changes it.
@@ -173,8 +185,23 @@ SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 # `added_responses` names that, so an operation losing or changing its 200 is
 # still red; a declaration that waved the whole `responses` map through would
 # excuse exactly the loss this file exists to catch.
+#
+# I-191: three listing routes gain the optional `for_share` argument. All three
+# are named rather than only the one the contract's stage touches first: the
+# frozen file holds all three already, so an undeclared one reads as damage.
 CHANGED_OPERATIONS = {
-    "GET /api/history": {"added_params": {"query:include_svg:opt"}, "removed_params": set()},
+    "GET /api/history": {
+        "added_params": {"query:include_svg:opt", "query:for_share:opt"},
+        "removed_params": set(),
+    },
+    "GET /api/history/lineage-groups": {
+        "added_params": {"query:for_share:opt"},
+        "removed_params": set(),
+    },
+    "GET /api/history/lineage-groups/{root_node_id}/items": {
+        "added_params": {"query:for_share:opt"},
+        "removed_params": set(),
+    },
     "GET /api/prompts": {
         "added_params": {"cookie:inku_session:opt", "header:authorization:opt"},
         "removed_params": set(),

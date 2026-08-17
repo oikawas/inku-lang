@@ -224,7 +224,8 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # the same rule: named here, taken back out before hashing, so the frozen
     # digest keeps measuring everything else byte for byte.
     declared_additions = {
-        "HistoryPostBody": {"catalog_mode"},
+        # I-292: the record of what Stage 2 did, named here by the same rule.
+        "HistoryPostBody": {"catalog_mode", "compose_fallback"},
         "AppInfoResponse": {"thumbnail_hidpi"},
         "ComposeRequest": {"fires_on"},
         "Arrangement": {"group_size"},

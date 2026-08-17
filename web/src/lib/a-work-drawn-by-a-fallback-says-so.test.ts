@@ -68,8 +68,27 @@ test('T-232 both saves to /api/history carry the value', () => {
 			`the save at index ${index} does not say what compose did`
 		);
 	}
-	// And the value sent is the derived one, never the raw flag.
-	assert.ok(PAGE.includes('composeFallbackValue('), 'the page does not derive the value it sends');
+
+	// Naming the key is not sending a value. The general save binds it to a
+	// derivation, and that derivation has to read the paint response: bound to
+	// the work's own field alone it is null for every freshly drawn work, and
+	// the key is then dropped by the very expression that names it -- a sender
+	// that looks wired and says nothing.
+	const derivation = PAGE.match(/const composeFallback = [\s\S]{0,400}?;\n/);
+	assert.ok(derivation, 'the general save no longer derives the value it sends');
+	assert.ok(
+		derivation[0].includes('compose_fallback_used'),
+		'the derivation never reads the paint response, so a drawn work sends nothing'
+	);
+	assert.ok(
+		derivation[0].includes('composeFallbackValue('),
+		'the derivation does not use the shared sender rule'
+	);
+	// The demo save holds a response outright, so it derives from it directly.
+	assert.ok(
+		posts.some((body) => /compose_fallback: composeFallbackValue\(/.test(body)),
+		'the demo save names the key without deriving its value'
+	);
 });
 
 // ---------------------------------------------------------------------- T-235

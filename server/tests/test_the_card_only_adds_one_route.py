@@ -60,7 +60,7 @@ CHANGED_SCHEMAS = {
     # bit is a permission and the group is its destination, and a client shown
     # only the bit could not say who else is reading.
     "HistoryItem": {
-        "added": {"catalog_mode", "svg_bytes", "for_share", "share_group_id"},
+        "added": {"catalog_mode", "svg_bytes", "for_share", "share_group_id", "compose_fallback"},
         "removed": set(),
     },
     # 2026-08-17: the reader chooses which two facts the history strip prints
@@ -68,7 +68,11 @@ CHANGED_SCHEMAS = {
     # it belongs to and on the PATCH that changes it.
     "UserAccountItem": {"added": {"history_strip_fields"}, "removed": set()},
     "UserSettingsBody": {"added": {"history_strip_fields"}, "removed": set()},
-    "HistoryPostBody": {"added": {"catalog_mode"}, "removed": set()},
+    # I-292: a work says whether its score came from Stage 2 or from the
+    # deterministic fallback. One key on the body a client saves with and on
+    # the item it reads back -- the fact lived only in one paint response
+    # before, and was gone the moment the work was saved.
+    "HistoryPostBody": {"added": {"catalog_mode", "compose_fallback"}, "removed": set()},
     # v2.14: whether a plugin expands is decided by prose. A work authored
     # straight in DDL has no description and must not be given one to make one
     # expand, so the prose rides in its own optional key. Callers that never

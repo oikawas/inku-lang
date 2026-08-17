@@ -226,17 +226,33 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
     /**
      * T-228: and the two answers are reached separately, in one drawing.
      *
-     * A line and a circle given the identical `variation`. The circle wobbles, the
-     * line does not, and the drawing is byte-for-byte the one where the line was
-     * never given the variation at all. One folded gate cannot produce this: it
-     * answers the same for both marks whichever way it is written.
+     * A line and a circle given the identical `variation`. The circle wobbles because
+     * `_CONTOUR_VARIATION_DIMS` carries `radius`; the line does not, because the line's
+     * own gate names `position_x` and `position_y` and nothing else. One folded gate
+     * cannot produce this: it answers the same for both marks whichever way it is
+     * written. What T-226 states for a line on its own, this states for a line and a
+     * contour reached from ONE score -- the two gates are consulted per mark, not per
+     * drawing.
+     *
+     * The line is drawn on the hand pole. It used to be a `rotring` line, and that
+     * half went quiet: since [I-307] the machine pole answers a line with `dwg.line`
+     * and reads no variation gate at all, so "unmoved by radius" was true there for
+     * the broader reason that it is unmoved by anything. The claim is about which
+     * axes the line's gate names, so it has to be stated where that gate is live --
+     * the server keeps `_needs_path_variation` on the hand-stroke road only. The
+     * circle stays on the machine pole: the contour gate is read from both.
+     *
+     * T-257 rides in the same walk. Byte equality on its own cannot tell "the gate
+     * refused this axis" from "this road never consults a gate", so the line is
+     * given `position_y` on the same score with the same tool and must move. Without
+     * it, taking the line's gate out entirely would leave this green.
      */
     @Test
     fun testTheLineAndTheContourAreJudgedApartInOneScore() {
         val radiusOnly = variation("wave", "radius")
-        val both = render("${line(radiusOnly)},${circle(radiusOnly)}")
-        val circleOnly = render("${line(null)},${circle(radiusOnly)}")
-        val neither = render("${line(null)},${circle(null)}")
+        val both = render("${line(radiusOnly, "pen")},${circle(radiusOnly)}")
+        val circleOnly = render("${line(null, "pen")},${circle(radiusOnly)}")
+        val neither = render("${line(null, "pen")},${circle(null)}")
 
         assertEquals(
             "the line must be unmoved by a variation that names only radius",
@@ -247,6 +263,15 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
             "the circle in the same score must be moved by it",
             neither,
             both,
+        )
+
+        // T-257: and the line's gate is live on this road -- same score, same tool,
+        // same circle, an axis the line's gate does name.
+        val lineOnItsOwnAxis = render("${line(variation("wave", "position_y"), "pen")},${circle(radiusOnly)}")
+        assertNotEquals(
+            "the same line given position_y must move, or the gate above refused nothing",
+            both,
+            lineOnItsOwnAxis,
         )
     }
 

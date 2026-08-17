@@ -227,6 +227,20 @@ class DefaultSvgRendererPhase2fTest {
         }
     }
 
+    /**
+     * T-256: and this guard says how many it compared.
+     *
+     * Same shape as the fill guard above, and for the same reason: a group taken out
+     * of both sides that neither side holds compares nothing and stays green whatever
+     * the port writes. What cannot be repeated here is the second half of that guard.
+     * `03_square_filled.svg` declares `marks-34`, the count itself, so the extraction
+     * can be held against a declaration. This group declares `controls-N events-M`,
+     * which counts the stroke's control points and its events, not the paths the
+     * group holds -- so there is no number in the class to hold anything against, and
+     * writing the count here by hand would be a copy of the reference that goes stale
+     * the moment the corpus is rebaked. The claim is therefore the extraction being
+     * non-empty and the two sides agreeing, which is what the vacuous case broke.
+     */
     @Test
     fun test04ArcCrayonExactParity() {
         val expectedSvg = readReferenceResource("04_arc_crayon.svg")
@@ -235,12 +249,25 @@ class DefaultSvgRendererPhase2fTest {
         val expectedArcPaths = extractGroupPathDList(expectedSvg, "arc-stroke-v1")
         val actualArcPaths = extractGroupPathDList(actualSvg, "arc-stroke-v1")
 
+        assertTrue(
+            "04_arc_crayon.svg must hold arc-stroke-v1 marks to compare, found ${expectedArcPaths.size}",
+            expectedArcPaths.isNotEmpty(),
+        )
         assertEquals("arc-stroke-v1 path count for 04_arc_crayon.svg must match", expectedArcPaths.size, actualArcPaths.size)
         for (i in expectedArcPaths.indices) {
             assertEquals("arc-stroke-v1 path d #$i for 04_arc_crayon.svg must match", expectedArcPaths[i], actualArcPaths[i])
         }
     }
 
+    /**
+     * T-256: the hatch guard says how many rows it compared.
+     *
+     * The rows of this drawing are not one group but one group per row, each spelt
+     * `surface-stroke-v1 hatch-spacing-N` -- a spacing, not a count -- so as with
+     * the arc there is nothing in the class to hold the extraction against. The
+     * extraction being non-empty is the part that matters: it is what the fill guard
+     * lacked when both of its sides came back empty.
+     */
     @Test
     fun test06SurfaceHatchExactParity() {
         val expectedSvg = readReferenceResource("06_surface_hatch.svg")
@@ -249,6 +276,10 @@ class DefaultSvgRendererPhase2fTest {
         val expectedHatchPaths = extractGroupPathDList(expectedSvg, "surface-stroke-v1")
         val actualHatchPaths = extractGroupPathDList(actualSvg, "surface-stroke-v1")
 
+        assertTrue(
+            "06_surface_hatch.svg must hold surface-stroke-v1 rows to compare, found ${expectedHatchPaths.size}",
+            expectedHatchPaths.isNotEmpty(),
+        )
         assertEquals("surface-stroke-v1 path count for 06_surface_hatch.svg must match", expectedHatchPaths.size, actualHatchPaths.size)
         for (i in expectedHatchPaths.indices) {
             assertEquals("surface-stroke-v1 path d #$i for 06_surface_hatch.svg must match", expectedHatchPaths[i], actualHatchPaths[i])
@@ -267,6 +298,11 @@ class DefaultSvgRendererPhase2fTest {
      * material engine and come out as paths, in the reference as well as here.
      * The rows are therefore compared as paths, which is the stronger reading of
      * the same claim -- it sees the whole travelled row, not just its two ends.
+     *
+     * T-256: this is the one of the four that already refused an empty extraction.
+     * The assertion was written after the count comparison, where the count would
+     * have reported the break first; it is stated before it now, so the four guards
+     * fail the same way and say the same thing when the group goes missing.
      */
     @Test
     fun test21HatchComputerExactParity() {
@@ -276,13 +312,25 @@ class DefaultSvgRendererPhase2fTest {
         val expectedHatchPaths = extractGroupPathDList(expectedSvg, "surface-stroke-v1")
         val actualHatchPaths = extractGroupPathDList(actualSvg, "surface-stroke-v1")
 
+        assertTrue(
+            "21_hatch_computer.svg must hold surface-stroke-v1 rows to compare, found ${expectedHatchPaths.size}",
+            expectedHatchPaths.isNotEmpty(),
+        )
         assertEquals("surface-stroke-v1 path count for 21_hatch_computer.svg must match", expectedHatchPaths.size, actualHatchPaths.size)
-        assertTrue("21_hatch_computer.svg must hold rows to compare", expectedHatchPaths.isNotEmpty())
         for (i in expectedHatchPaths.indices) {
             assertEquals("surface-stroke-v1 path d #$i for 21_hatch_computer.svg must match", expectedHatchPaths[i], actualHatchPaths[i])
         }
     }
 
+    /**
+     * T-256: the wobbling arc's guard says how many it compared.
+     *
+     * The thinnest of the four -- this group holds a single path, so an extraction
+     * that comes back empty and one that comes back right differ by one element, and
+     * without the assertion below the guard would compare nothing and say so nowhere.
+     * Its class reads `controls-N events-M`, again a control-point count and not a
+     * mark count.
+     */
     @Test
     fun test10ArcWaveExactParity() {
         val expectedSvg = readReferenceResource("10_arc_wave.svg")
@@ -291,6 +339,10 @@ class DefaultSvgRendererPhase2fTest {
         val expectedArcPaths = extractGroupPathDList(expectedSvg, "arc-stroke-v1")
         val actualArcPaths = extractGroupPathDList(actualSvg, "arc-stroke-v1")
 
+        assertTrue(
+            "10_arc_wave.svg must hold arc-stroke-v1 marks to compare, found ${expectedArcPaths.size}",
+            expectedArcPaths.isNotEmpty(),
+        )
         assertEquals("arc-stroke-v1 path count for 10_arc_wave.svg must match", expectedArcPaths.size, actualArcPaths.size)
         for (i in expectedArcPaths.indices) {
             assertEquals("arc-stroke-v1 path d #$i for 10_arc_wave.svg must match", expectedArcPaths[i], actualArcPaths[i])

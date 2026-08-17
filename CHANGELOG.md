@@ -8345,3 +8345,17 @@ one place to read.
   `fill-stroke-v1` group, but **`03_square_filled` draws its interior with `fill-texture-v1` and
   carries no `fill-stroke-v1` at all** — **both sides are empty, so nothing can redden it.**
 - **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).
+
+---
+
+### 2026-08-17 — Frozen output is baked on the machine the release runs on (**no version**, checks and test environment only)
+
+**Checks that hold the CPU moved to a test-only container on the deployment host.** Development stays on macOS.
+
+- **Measured before deciding**: same commit, same tree -- **the Mac 3434 passed / 31 skipped / 504 s**, **the linux container 3432 passed / 2 failed / 31 skipped / 276 s**, with **3,465 collected on both**. The draft's guess that eight cores are eight cores was wrong: the container is **1.8x faster serially and 6.1x in parallel (82 s)**. One file is slower there (`test_single_user_mode`), so the ranking is not a rescaling.
+- **⚠ Both red tests look past the quantisers.** What the product draws is byte-identical on either machine (**four generators rewrote 837 files, 0 differ**). What split was the port's reference fixture, which freezes raw doubles, and the paired test that removes the quantisers on purpose.
+- **Frozen output is now baked on linux, where the release runs.** `renderer_variation_primitives.json` was rebaked there (**six values differ in the last digit**: `-1.7282983464997077` against `-1.7282983464997073`). The port compares those fields at a 1e-9 tolerance and the difference is 4e-16, so the JVM suite is unmoved (385 tests, 0 failures). **F-1 compares bytes, so it can only be asked where the fixture was baked, and says so on darwin instead of failing** -- the cost being that a fixture staled on a Mac is caught by the container run, not by the Mac.
+- **Which cases a one-ULP nudge reaches depends on the host libm**: darwin moves five of engine 28's six splits, glibc the sixth. The expectation is recorded per platform, and a new test asserts the two recordings union to exactly those six.
+- **The port's JVM tests moved to the same machine in a second image** (author's instruction): `eclipse-temurin:21-jdk` plus the Android SDK, 1.83GB. **385 tests, 0 failures -- the same as the Mac.** AGP 8.9.1 asks for `build-tools;35.0.0` even at `compileSdk` 36, and a second run finished in 6 s with every task up to date while the previous run's XML still read 385, so the count now only reads files this run wrote and `--rerun` forces execution.
+- `pytest-xdist` joined the dev group. It is in no release image (`uv sync --frozen --no-dev`).
+- **Four SPEC passages (two bilingual pairs) were revised.**

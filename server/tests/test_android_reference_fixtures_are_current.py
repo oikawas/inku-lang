@@ -30,6 +30,7 @@ import importlib.util
 import json
 import pathlib
 import re
+import sys
 
 import pytest
 
@@ -47,6 +48,31 @@ GENERATOR = ROOT / "server/scripts/gen_android_reference.py"
 
 android_only = pytest.mark.skipif(
     not ANDROID_TREE.is_dir(), reason="android/ is absent (pentala)"
+)
+
+# F-1 rebakes and compares bytes, so it can only be asked on the platform the
+# fixture was baked on. `renderer_variation_primitives.json` stores raw doubles
+# -- wave phases and hash01 values that reach sin/cos -- and macOS libm and glibc
+# disagree there by one ULP: six values, the last digit, e.g.
+# -1.7282983464997077 on darwin against -1.7282983464997073 on glibc 2.41
+# (measured 2026-08-17 in the pentala test container). The port compares those
+# fields with a 1e-9 tolerance, so the difference reaches nothing it asserts;
+# only a byte comparison sees it.
+#
+# The release runs linux (the GHCR images), so linux is where the fixture is
+# baked and where this record is kept. On darwin the rebake is not a fair
+# comparison and this test says so instead of failing. The cost is stated
+# plainly: a fixture staled on a Mac is caught by the container run, not by the
+# Mac. See `no-git-sync/scripts/testbox.sh --corpora`.
+FROZEN_BAKE_PLATFORM = "linux"
+
+baked_here_only = pytest.mark.skipif(
+    sys.platform != FROZEN_BAKE_PLATFORM,
+    reason=(
+        f"the fixture is baked on {FROZEN_BAKE_PLATFORM} (the platform the release"
+        f" runs on) and this is {sys.platform}; rebake and check it with"
+        " no-git-sync/scripts/testbox.sh --sync --corpora"
+    ),
 )
 
 
@@ -84,6 +110,7 @@ def _files_under(root: pathlib.Path, subdirectories: set[str]) -> set[str]:
 
 
 @android_only
+@baked_here_only
 def test_every_android_fixture_matches_a_fresh_bake(tmp_path) -> None:
     """F-1 currency: rebaking the current version reproduces every checked-in byte.
 

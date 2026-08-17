@@ -29,7 +29,9 @@ import pathlib
 
 import pytest
 
+from inku_server.coerce import coerce_score
 from inku_server.language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
+from inku_server.schema import Score
 
 COERCE = pathlib.Path(__file__).resolve().parents[1] / "src" / "inku_server" / "coerce"
 LANGUAGE_SUPPORT = pathlib.Path(__file__).resolve().parents[1] / "src" / "inku_server" / "language_support"
@@ -338,3 +340,30 @@ def test_every_declared_system_is_reachable_from_the_registry() -> None:
         for name, languages in declared_systems().items():
             if languages.get(lang):
                 assert name in markers, f"{name} is in {lang}.py but not in the registry's markers"
+
+
+GOLDEN_CASES = json.loads(
+    (pathlib.Path(__file__).resolve().parent / "golden" / "coerce_golden.json").read_text(encoding="utf-8")
+)["cases"]
+
+
+def test_the_same_description_coerces_to_the_same_score_twice() -> None:
+    """T-287: reading the words from the declaration instead of from a literal
+    must not put anything order-dependent in the path.
+
+    ``test_coerce_golden.py`` pins the value against frozen bytes, which is a
+    stronger claim about *what* comes out, but it never runs one input twice in
+    one process. This does.
+    """
+    checked = 0
+    for case_id, case in sorted(GOLDEN_CASES.items()):
+        ddl = case["input"].get("ddl")
+        if not ddl:
+            continue
+        first = coerce_score(Score.model_validate(case["input"]["score"]), ddl=ddl)
+        second = coerce_score(Score.model_validate(case["input"]["score"]), ddl=ddl)
+        assert first.model_dump(mode="json", by_alias=True) == second.model_dump(mode="json", by_alias=True), (
+            f"{case_id}: coercing the same description twice gave two Scores"
+        )
+        checked += 1
+    assert checked >= 30, f"only {checked} cases carried a description; the gate is nearly empty"

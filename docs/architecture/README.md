@@ -40,4 +40,4 @@ Japanese counterparts use the same names with `.ja.md`.
 5. Update both language editions and move differences to `known-differences.md`.
 6. Check Mermaid fences, cited paths, terminology, accidental disclosure, and the scoped Git difference.
 
-Japanese design decisions are authoritative. English follows `web/src/lib/i18n/GLOSSARY.md`.
+Japanese design decisions are authoritative. English follows the correspondence table in `docs/i18n/glossary.md` and the rules in `web/src/lib/i18n/GLOSSARY.md`.

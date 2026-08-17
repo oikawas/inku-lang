@@ -38,4 +38,4 @@
 5. 各図の直後の根拠表を更新し、`known-differences.ja.md` へ差異を移す。
 6. Mermaid fence、参照path、秘密値・内部識別子、Git差分が意図した文書だけであることを検査する。
 
-英語版は同名の `.md`、日本語版は `.ja.md` とし、事実・構造・Evidence IDを同時に更新する。日本語の設計判断を正本とし、英語は `web/src/lib/i18n/GLOSSARY.md` の語彙に従う。
+英語版は同名の `.md`、日本語版は `.ja.md` とし、事実・構造・Evidence IDを同時に更新する。日本語の設計判断を正本とし、英語は `docs/i18n/glossary.md` の対応表と `web/src/lib/i18n/GLOSSARY.md` の規則に従う。

@@ -80,6 +80,7 @@ docs/*
 !docs/history/
 !docs/guide/
 !docs/architecture/
+!docs/i18n/
 
 #Codex
 AGENTS.md

@@ -84,7 +84,7 @@ flowchart LR
 | 正本 | 実装 |
 |---|---|
 | 日本語/英語UI pack | `web/src/lib/i18n/ja.ts`, `en.ts`, `types.ts` |
-| 英語UI用語 | `web/src/lib/i18n/GLOSSARY.md`、`npm run lint:i18n` |
+| 英語UI用語 | `docs/i18n/glossary.md`（対応表）、`web/src/lib/i18n/GLOSSARY.md`（規則）、`npm run lint:i18n` |
 | 歳時記表示 | login後の`GET /api/saijiki`でserver tableからhydrate |
 | button寸法・action/accent色 | `web/src/routes/+page.svelte`の`:root` token |
 

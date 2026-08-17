@@ -1,18 +1,22 @@
-# inku 英語 UI 用語辞書（正本）
+# inku 英語 UI 用語規則（文体・禁止語・機械検査の正本）
 
-**UI の文字列を足す・変える前に、必ずこの文書を引くこと。** 英語は日本語の直訳ではなく、
-美術・版画・音楽・genart の英語圏の術語に対応させてある。辞書を引かずに訳語を発明すると、
-一語二義（同じ英語が二つの概念を指す）と混線（interpretation / reading / performance / variation）が起きる。
+**⚠ 訳語の対応表は 2026-08-17 に `docs/i18n/glossary.md` へ移した。**
+それまで本書 §2–§3 と私家版ノート 2 枚に散らばっていた日英対応は、あちらの単一の表が正本である。
+**概念の英語を引くのは `docs/i18n/glossary.md`、書き方の規則（文体・禁止語・制限語・検査）を引くのは本書。**
 
-**⚠ 適用範囲は web の表示文字列に限らない。** 本書は **inku の英語すべての正本**で、
-`SPEC.md` / `README.md` / `PROJECT_CONTEXT.md` / `manual/en/` / `docs/` の英語も本書に従う。
-**置き場所が `web/` の下なのは、機械検査がここに住んでいるという歴史的な理由による。**
+英語は日本語の直訳ではなく、美術・版画・音楽・genart の英語圏の術語に対応させる。
+辞書を引かずに訳語を発明すると、一語二義（同じ英語が二つの概念を指す）と
+混線（interpretation / reading / performance / variation）が起きる。
+
+**⚠ 適用範囲は web の表示文字列に限らない。** 本書の規則と対応表は **inku の英語すべての正本**で、
+`SPEC.md` / `README.md` / `PROJECT_CONTEXT.md` / `manual/en/` / `docs/` の英語も従う。
+**本書が `web/` の下に残るのは、機械検査がここに住んでいるという理由による。**
 
 この文書の規則は **`web/scripts/i18n-lint.mjs` が機械で検査する**。文面と検査は一対で、
 片方を変えたら同じ commit でもう片方も変える。
 **⚠ ただし機械が見るのは `web/src/lib/i18n/en.ts` と web のコンポーネントだけである。**
-**上に挙げた web の外の英語は、いま誰も検査していない**（→ 台帳 [I-161]）。
-**書いた本人が本書を引く。**
+**web の外の英語のうち機械が見るのは `server/scripts/check_docs.py` の禁止語検査だけで、
+制限語は誰も検査していない**（→ 台帳 [I-161]）。**書いた本人が引く。**
 
 ```sh
 cd web
@@ -30,7 +34,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 ## 0. 三行で
 
 1. **日本語が正本。** 英語だけを直す。日本語の文言・語順・句読点を「ついでに」直さない。
-2. **一語一義。** 同じ概念に二つの英語を当てない。特に §2 の 6 語。
+2. **一語一義。** 同じ概念に二つの英語を当てない（対応表は `docs/i18n/glossary.md`）。
 3. **工房の語で書く。** generate / prompt / create / image / AI-powered / magic は使わない（§5）。
 
 ---
@@ -54,83 +58,22 @@ npm run check              # 型と鍵の欠落（LangPack）
 
 ## 2. コア用語辞書（層とパイプライン）
 
-| 日本語（正本） | 英語 | 品詞・用法 | 使ってはいけない訳 |
-|---|---|---|---|
-| 記述 | **description** | 名詞。動詞は write | ~~prompt~~（思想に反する） |
-| 解釈（Stage 1） | **interpretation** / **interpret** | 名詞／動詞 | ~~reading~~（読み取りと混線する） |
-| 指示書（正規化DDL） | **instructions** | **常に複数形**。初出は "Instructions (normalized DDL)" | ~~instruction~~（単数）、~~spec~~ |
-| 楽譜 | **score**（固有表記は **JSON Score**） | 名詞 | — |
-| 演奏 | **performance** / **perform** | 名詞／動詞 | ~~rendering~~（技術文脈のみ・§5） |
-| 作曲フォールバック（Stage 2 が落ちた） | **Score fallback** | 名詞句。印の文言と生成情報の見出し。**層を名指す**ため「解釈フォールバック＝Interpretation fallback」と対で使う | ~~Composition fallback~~（`composition` は配置・構図の語で、`composition_seed` と紛れる）、~~Stage 2 fallback~~（UI で段番号を主語にしない） |
-| 演奏する（主動作ボタン） | **Paint** | 動詞。API `/api/paint` と一致 | ~~Generate~~, ~~Create~~, ~~Draw~~（ボタン語として） |
-| 読み取り（言葉の読み直し） | **reading** | 名詞 | ~~interpretation~~ |
-| 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |
-| 添景 | **staffage** | 名詞。tooltip に "minor accompanying elements" を添える | ~~decoration~~, ~~props~~ |
-| 写生（Stage 0.5） | **Sketch from life** | 名詞句。**短縮形 `Sketch` を単独で使わない**（2026-08-03 作者裁定 D-1）。英語版 Stage 1 プロンプトが `sketch` を「淡い鉛筆の筆致」という weight の語に使っているため、単独だと一語二義になる | ~~Sketch~~（単独）、~~sketching~~, ~~drawing from life~~ |
-| 区切りの大きさ | **grain** | 名詞。写生の 3 状態を選ぶ操作子の見出し語 | ~~granularity~~（工学的）、~~segmentation~~ |
-| 細かく区切る／大きく区切る | **Fine** / **Coarse** | 形容詞。**grain の値としてのみ**使う。揺らぎの振幅の `fine` / `broad` とは別の軸で、`Grain:` の直下にしか出さない | ~~Small / Large~~（量に読める） |
-| （推奨しない） | **(not recommended)** | 括弧付きの付記。**メニューの選択肢の隣にだけ出す**（札そのものには足さない。過去の作品の記録に付くと評価になる） | ~~deprecated~~（廃止に読める）、~~discouraged~~, ~~legacy~~ |
-| 歳時記 | **Saijiki** | 固有名詞・大文字 | ~~almanac~~ 単独 |
-| 詞書 | **headnote** | 名詞。**語彙ダイアログの行は v2.9.15 で消えたので "kotobagaki" の注記は許さない** | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
-| 奥書 | **colophon** | 名詞。**CLI サブコマンドと API パスも `colophon`**（§6 の例外・v2.8.0） | ~~Okugaki~~（ローマ字残しは不採用） |
-| 系譜 | **lineage** | 名詞 | — |
-| 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
-| 世代 | **generation**（略 **Gen.**） | 名詞。**世代の意味のときだけ generation を使ってよい** | — |
-| 推敲 | **refinement** / **refine** | 名詞／動詞 | ~~revision~~（事務的）、~~iteration~~（工学的） |
-| AI 自律推敲 | **autonomous refinement** | 名詞句。**AI を頭に付けない** | ~~AI refinement~~, ~~AI-powered~~ |
-| 変奏 | **variation** | 名詞。**変奏（Stage 1.5 の振り）だけに使う** | 推敲の候補は **option** |
-| 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（変奏と衝突） |
-| 色カタログ | **color catalog** | 名詞。inku 固有概念 | ~~palette~~（**禁止**） |
-| 作品 | **work**（複数 works） | 名詞 | ~~artwork~~（**禁止**）、~~image~~ |
-| 配置・構図 | **composition** | 名詞。五操作でも provenance でも同語 | ~~layout~~（UI 文中） |
-| エディション／刷り | **edition** / **impression** | 名詞。`rh3` は edition ID、個々の SVG は an impression | — |
-| 版木・版 | **block** / **state** | 版画の文脈のみ。engine の版数は **engine version** | — |
-| 暴れる | **Wild** | トグルラベル。実装名 `WILD_GAIN` と一致 | ~~Unleashed~~ |
-| 筆致制限 | **Stroke limit** | 暴れるトグルの見出し語。何を切り替えるかを名指す | ~~Brush limit~~ |
-| 制限値 | **Limits** | 設定タブ名。一枚が持てる墨の数を決める九つの数。`limit` 系で筆致制限と揃う | ~~Caps~~・~~Quotas~~・~~Thresholds~~ |
-| 生成情報 | **provenance** | 名詞。モデル・seed・版数のドロワー | ~~Generation Info~~ |
-| SVG オブジェクト数／SVG 点数 | **SVG objects** / **SVG points** | 名詞句。生成情報の重さ 3 行のうち「SVG サイズ」以外の 2 つ。**数え方の正本は `$lib/svgWeight` と `no-git-sync/scripts/svg_weight.py` の対**で、表示語が変わっても定義は変えない | ~~elements~~・~~nodes~~（DOM の量に読める。数えるのは文字列で、`<defs>` の中も数え、除くのは 5 タグだけ）、~~vertices~~（多角形に限る語） |
-| 履歴 | **history** | 名詞 | — |
-| ごみ箱 | **trash** | 名詞 | — |
-| 起点（新規作成） | **origin**（動作は **New**） | 名詞 | — |
-| 記録なし | **not recorded** | 状態表示。値を推測しない契約の表示 | ~~unknown~~（別状態。`historyVersionUnknown` は「不明」の訳として別に存在する） |
-| UIモード | **UI mode**（**Simple UI / Full UI / Custom UI**） | 表示構成の固定プリセットとユーザー別設定 | ~~Beginner / Expert~~（習熟度の評価にしない） |
-| 権限グループ | **Permission groups** | 名詞・**常に複数形**。何ができるかを決める所属で、1 人が複数を持てる（v2.12.0） | ~~Role~~・~~ロール~~（**判定から消えた語。列としてしか残っていない**）、~~Permission group~~（単数）、~~Access level~~（段位に読める） |
-| 管理者（グループ名） | **Administrators** | 権限グループ `admins` の表示形。**複数形で、グループを指す** | ~~Admin~~（旧 role の表示語）、~~Administrator~~（単数） |
-| リーダー（グループ名） | **Leaders** | 権限グループ `leaders` の表示形 | ~~Group lead~~（旧 role の表示語）、~~Manager~~ |
-| ユーザー（グループ名） | **Users** | 権限グループ `users` の表示形。**組織のまとまりを指す user group とは別物** | ~~User~~（単数）、~~Member~~ |
-| ユーザーグループ | **user group** | 名詞。組織のまとまりで、1 人 1 つ。**権限とは独立に動く** | ~~permission group~~（別の実体） |
-
-### 2-1. 道具（てざわり）の名
-
-てざわりの語そのものは `saijiki.py` が正本で、UI へは `/api/saijiki` からハイドレートされる（§6）。
-ここに載せるのは、**UI が自前の文字列として書いている**もの — 語プレビューの例文と感情語ヒント — に限る。
-
-| 日本語（正本） | 英語 | 品詞・用法 | 使ってはいけない訳 |
-|---|---|---|---|
-| 銀筆 | **silverpoint** | 名詞。Score の `weight` 値と同綴りで、小文字のまま文中に置く | ~~hair~~（2026-07-27 に改名。画材として存在しない語だった）、~~silver pen~~, ~~metalpoint~~ |
+**→ `docs/i18n/glossary.md` へ移した（2026-08-17）。**
+コア用語・道具の名（銀筆ほか）・系譜の派生種別・画面の語・文書と調査の語は、すべてあちらの表が持つ。
+本書には表の写しを置かない（写しは腐る）。
 
 ---
 
 ## 3. 五つの推敲操作と変奏の強度（**固定値。lint が一致を強制する**）
 
-「何を引き直し、何を保つか」が名前だけで対比できるよう、**Another + 名詞**で統一する。
-変奏だけは音楽術語 Variation を単独で使う。**ボタン幅が厳しくても名詞を省略しない**（折り返す）。
-
-| 日本語（正本） | 英語ラベル | ツールチップの型 |
-|---|---|---|
-| 言葉でタッチを変える | **Another performance** | "Same interpretation, same composition — only the performance sways…" |
-| 配置を変える | **Another composition** | "Same reading of your words — Stage 2 redraws…" |
-| 読み取りを変える | **Another reading** | "Your sentence stays. The words are read anew…" |
-| 色カタログを変える | **Another catalog** | "Same performance — colors re-translated through a different catalog…" |
-| 変奏 | **Variation** | "Shakes the expansion layer (Stage 1.5) at a chosen amplitude…" |
-
-変奏の強度 小／中／大 = **Subtle / Moderate / Sweeping**（2026-07-25 作者裁定）。
+**語の対応表は `docs/i18n/glossary.md` §3 にある**（Another + 名詞の五操作と、強度 Subtle / Moderate / Sweeping）。
+lint が一字一句を強制する事実と、次の 2 つの規則は本書が持つ。
 
 > **`Moderate` は変奏の強度に予約されている。** 速度の表示に使わない（コストは
 > `Very fast (no LLM)` / `Medium (Stage 2 LLM and API)` / `Slow (LLM and API)`）。
 
 tooltip の型: 一文目に「何が起きるか」、二文目に「何が保たれるか」。一〜二文で止める。
+**ボタン幅が厳しくても名詞を省略しない**（折り返す）。
 
 ---
 
@@ -144,7 +87,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 4. **数値・単位・seed・hash・識別子は日英で同一。** 翻訳しない（`{render}` のような置換トークンも動かさない）。
 5. **エラーは一行目を平叙文にする。** 技術情報は後段へ畳む。例: "The interpreter did not answer in time, so a stock set of instructions was performed."
 6. **段階表示は工房の語で。** "Interpreting your words…" / "Writing the score…" / "Performing…"（"Generating…" と書かない）。
-7. **語彙ダイアログ（App Info）は §2 の対訳表と一致させる。**
+7. **語彙ダイアログ（App Info）は `docs/i18n/glossary.md` の対訳表と一致させる。**
 
 ---
 
@@ -187,7 +130,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 
 **例外その一 — 奥書（2026-07-27 作者裁定、v2.8.0 で実施）。**
 **打鍵する名前は英語の術語で付ける**という先例（`paint` / `refine` / `lineage` が
-辞書語と一致している。辞書 :55 は「API `/api/paint` と一致」と明記する）に対し、
+辞書語と一致している。対応表は Paint の行で「API `/api/paint` と一致」と明記する）に対し、
 **`okugaki` だけがローマ字で残っていた**ため、**CLI サブコマンド名と API パスを
 `colophon` へ移した**。エイリアスは残していない（互換が切れるので minor 採番）。
 
@@ -210,7 +153,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 > **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録がある。**
 
 **例外その二 — 添景（2026-07-27 作者裁定「奥書と同じ方針で」、v2.8.0 で実施）。**
-辞書は 添景 = **staffage** と定めており（:58）、**web は既にその語で表示していた**。
+辞書は 添景 = **staffage** と定めており、**web は既にその語で表示していた**。
 ローマ字が残っていたのは**打鍵する側 1 箇所だけ** — CLI の旗 `--tenkei` である。
 **`--staffage` へ移し、エイリアスは残していない**（奥書と同じ）。
 help の文言も第三の語 `scenery` から `staffage` へ揃えた。
@@ -235,9 +178,9 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 ## 7. 新しい UI 文字列を足すときの手順
 
 1. **日本語を先に書く**（`ja.ts` に鍵を足す）。日本語が正本。
-2. **§2 の表で概念を引く。** 表にある概念なら、英語はそこにある語を使う。
+2. **`docs/i18n/glossary.md` の表で概念を引く。** 表にある概念なら、英語はそこにある語を使う。
 3. **表に無い概念なら、原典 §1 の五原則で決める**（メタファーを貫く／直訳より役割／ローマ字を増やさない／静かな文体／一語一義）。
-   **決めた語と退けた候補を §2 の表に追記する**（辞書に無い語を黙って使わない）。
+   **決めた語と退けた候補を `docs/i18n/glossary.md` の表に追記する**（辞書に無い語を黙って使わない）。
 4. **§4 の文体規則を当てる**（Sentence case、`…`、感嘆符なし）。
 5. `npm run lint:i18n` と `npm run check` を通す。
 6. 語そのものの新設・変更（五操作の名前、強度の名前、コア用語の差し替え）は**作者裁定が要る**。

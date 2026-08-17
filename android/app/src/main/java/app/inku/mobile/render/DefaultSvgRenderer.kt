@@ -212,14 +212,13 @@ class DefaultSvgRenderer(
                 if (weight != "rotring") {
                     renderHandStroke(ins, attrs, x1, y1, x2, y2, weight, unit, width, height, renderSeed, wild)
                 } else {
-                    val variation = ins.optJSONObject("variation")
-                    if (needsPathVariation(variation)) {
-                        val points = variedLinePoints(x1, y1, x2, y2, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
-                            .joinToString(" ") { "${it.first},${it.second}" }
-                        """<polyline points="$points" fill="none" $common/>"""
-                    } else {
-                        materialLineGroup(ins, attrs, x1, y1, x2, y2, unit) ?: """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
-                    }
+                    // The machine pole draws one straight line, whatever it was
+                    // asked to do. The server's `line` branch hands every other
+                    // weight to `_render_hand_stroke` and answers `rotring` with
+                    // `dwg.line(start, end)`, reaching neither the variation gate
+                    // nor the material layer: a ruling pen has no hand to wobble
+                    // and no grain to clothe (ledger I-307).
+                    """<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" $common/>"""
                 }
             }
             "circle" -> {
@@ -1421,12 +1420,6 @@ class DefaultSvgRenderer(
 
         sb.append("</g>")
         return sb.toString()
-    }
-
-    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, renderSeed: Long? = null, centerline: List<Pair<Double, Double>>? = null): String? {
-        val seedStr = seedForInstruction(ins, renderSeed)
-        val seedLong = seedStr.toULongOrNull()?.toLong() ?: 0L
-        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, renderSeed = renderSeed, centerline = centerline, instructionSeed = seedLong)
     }
 
     private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {

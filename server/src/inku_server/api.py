@@ -24,6 +24,7 @@ from . import thumbs_db as _thumbs_db
 from .api_core.common import _APP_VERSION, _build_number, _env_flag
 from .api_core.deps import _logger
 from .api_core.state import _render_slots
+from .api_core.thumbnails import shutdown_bake_pool
 from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback
 
 
@@ -62,6 +63,10 @@ async def _lifespan(_app: FastAPI):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+        # The children that bake saved works are this process's to end. Nothing
+        # else closes them: they are held in a pool that outlives every request,
+        # unlike the rebuild's, which is made and dropped inside one run.
+        shutdown_bake_pool()
 
 
 app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)

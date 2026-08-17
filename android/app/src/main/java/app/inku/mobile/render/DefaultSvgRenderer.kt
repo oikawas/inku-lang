@@ -1659,12 +1659,6 @@ class DefaultSvgRenderer(
         return ServerRendererGeometry.needsContourVariation(variation)
     }
 
-    private fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
-        return ServerRendererGeometry.variedLinePoints(x1, y1, x2, y2, variation, seed, ins, width, height, unit)
-    }
-
-
-
     private fun px(value: Double, scale: Double): Double = value * scale
 
     private fun fmt(value: Double): String = ServerRendererGeometry.fmt(value)

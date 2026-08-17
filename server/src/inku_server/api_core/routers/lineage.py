@@ -56,13 +56,14 @@ def api_history_lineage_groups(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     for_revision: bool = Query(default=False),
+    for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     min_items: int = Query(default=1, ge=1, le=1000),
     actor: dict = Depends(_current_user),
 ) -> HistoryLineageGroupListResponse:
     groups, total = _db.list_lineage_groups(
         actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred,
-        for_revision=for_revision, min_item_count=min_items,
+        for_revision=for_revision, for_share=for_share, min_item_count=min_items,
     )
     return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
 
@@ -75,12 +76,13 @@ def api_history_lineage_group_items(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     for_revision: bool = Query(default=False),
+    for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     items, total = _db.list_lineage_group_items(
         actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q,
-        starred=starred, for_revision=for_revision,
+        starred=starred, for_revision=for_revision, for_share=for_share,
     )
     if total == 0:
         root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)

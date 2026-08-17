@@ -3149,6 +3149,68 @@ def test_the_history_listing_asks_for_the_drawings_unless_told_otherwise(monkeyp
     assert no_svg_query["include_svg"] is False
 
 
+# ── T-201 ───────────────────────────────────────────────────────────────────
+# I-191: a work says which organisation group may read it, and the listing can
+# be asked for that bundle. Measured by running the command and reading the
+# query it built -- the argument's NAME appearing in build_parser() says only
+# that the flag parses, and the sender that has to carry it is a different line
+# in a different function.
+def test_the_history_listing_carries_the_share_filter_in_both_directions(monkeypatch):
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            sent.append((method, path, kwargs.get("query") or {}))
+            return {"items": []}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    parser = cli.build_parser()
+
+    assert cli.command_history(parser.parse_args(["history"])) == 0
+    assert cli.command_history(parser.parse_args(["history", "--for-share"])) == 0
+
+    assert [(m, p) for m, p, _q in sent] == [("GET", "/api/history")] * 2
+    plain, filtered = sent[0][2], sent[1][2]
+    # Written in both cases, like include_svg beside it: a sender that only
+    # writes the key when it is true leaves the false case to the server's
+    # default, and nothing on this side would notice the day that moved.
+    assert "for_share" in plain and "for_share" in filtered
+    assert plain["for_share"] is False
+    assert filtered["for_share"] is True
+    # And it narrows beside the other two rather than replacing them.
+    assert filtered["starred"] is False and filtered["for_revision"] is False
+
+
+def test_the_history_export_sender_carries_the_share_filter(monkeypatch):
+    """The other sender of the same listing: the one that resolves hashes.
+
+    Two senders, counted rather than assumed. `history` and `history-export`
+    build the query in different functions, and a flag added to one of them
+    leaves the other asking a question its own argument says it is not asking.
+    """
+    sent = []
+
+    class FakeClient:
+        base_url = "http://127.0.0.1:8100"
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            sent.append((method, path, kwargs.get("query") or {}))
+            return {"items": [], "total": 0}, None
+
+    assert cli._fetch_all_history(FakeClient(), for_share=True) == []
+    assert cli._fetch_all_history(FakeClient()) == []
+    assert [(m, p) for m, p, _q in sent] == [("GET", "/api/history")] * 2
+    assert sent[0][2]["for_share"] is True
+    assert sent[1][2]["for_share"] is False
+
+
 def _subparser(name: str) -> argparse.ArgumentParser:
     """The parser argparse built for one subcommand, found by walking the root."""
     for action in cli.build_parser()._actions:

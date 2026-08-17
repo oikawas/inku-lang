@@ -350,6 +350,8 @@ export const ja: LangPack = {
 	historyStarredOnly: 'スターのみ',
 	historyForRevisionOnly: '推敲のみ',
 	tooltipHistoryForRevisionOnly: '推敲マークを付けた作品だけを表示します。スターのみと併せると両方に該当する作品だけになります。',
+	historyForShareOnly: '共有のみ',
+	tooltipHistoryForShareOnly: '共有対象にした作品だけを表示します。ほかの絞り込みと併せると、すべてに該当する作品だけになります。',
 	forRevisionOn: '推敲マークを外す',
 	forRevisionOff: '推敲マークを付ける',
 	shareTargetOn: '共有対象から外す',

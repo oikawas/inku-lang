@@ -1236,6 +1236,7 @@ def _fetch_all_history(
     *,
     starred: bool = False,
     for_revision: bool = False,
+    for_share: bool = False,
     query: str | None = None,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
@@ -1252,6 +1253,7 @@ def _fetch_all_history(
                 "q": query,
                 "starred": starred,
                 "for_revision": for_revision,
+                "for_share": for_share,
             },
         )
         page = data.get("items")
@@ -3061,6 +3063,7 @@ def command_history(args: argparse.Namespace) -> int:
             "q": args.query,
             "starred": args.starred,
             "for_revision": args.for_revision,
+            "for_share": args.for_share,
             # Sent either way rather than only when it is false: a sender that
             # writes nothing is a sender nothing tests, and what it receives is
             # then decided by the server's default alone.
@@ -3113,7 +3116,8 @@ def command_history_export(args: argparse.Namespace) -> int:
         timeout_seconds=_resolved_timeout_seconds(args, config),
     )
     items = _fetch_all_history(
-        client, starred=args.starred, for_revision=args.for_revision, query=args.query
+        client, starred=args.starred, for_revision=args.for_revision,
+        for_share=args.for_share, query=args.query,
     )
     selected = _select_history_items(
         items,
@@ -4113,6 +4117,11 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--starred", action="store_true")
     history.add_argument("--for-revision", action="store_true")
     history.add_argument(
+        "--for-share",
+        action="store_true",
+        help="list only the works whose owner opened them to an organisation group",
+    )
+    history.add_argument(
         "--no-svg",
         action="store_true",
         help="leave each work's drawing out of the listing; the items come back with svg empty",
@@ -4190,6 +4199,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--for-revision",
         action="store_true",
         help="filter history to items marked for revision before resolving hashes",
+    )
+    history_export.add_argument(
+        "--for-share",
+        action="store_true",
+        help="filter history to items opened to an organisation group before resolving hashes",
     )
     history_export.set_defaults(func=command_history_export)
 

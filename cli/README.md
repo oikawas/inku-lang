@@ -785,7 +785,7 @@ options:
 usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
-                        [--for-revision] [--no-svg]
+                        [--for-revision] [--for-share] [--no-svg]
                         {share,unshare,acl,peers,state} ...
 
 positional arguments:
@@ -808,6 +808,8 @@ options:
   --query QUERY, -q QUERY
   --starred
   --for-revision
+  --for-share           list only the works whose owner opened them to an
+                        organisation group
   --no-svg              leave each work's drawing out of the listing; the
                         items come back with svg empty
 
@@ -909,7 +911,7 @@ usage: inku-cli history-export [-h] [--base-url BASE_URL]
                                [--from FROM_HASH] [--to TO_HASH] --out-dir
                                OUT_DIR [--columns COLUMNS]
                                [--thumb-size THUMB_SIZE] [--query QUERY]
-                               [--starred] [--for-revision]
+                               [--starred] [--for-revision] [--for-share]
                                [hashes ...]
 
 positional arguments:
@@ -932,6 +934,8 @@ options:
                         hashes
   --for-revision        filter history to items marked for revision before
                         resolving hashes
+  --for-share           filter history to items opened to an organisation
+                        group before resolving hashes
 
 ```
 

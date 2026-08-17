@@ -82,6 +82,10 @@ export type HistoryItem = {
 	trashed?: boolean;
 	starred?: boolean;
 	for_revision?: boolean;
+	// The share bit and where it points. Optional because a server that predates
+	// them sends neither, which is a different thing from "not shared".
+	for_share?: boolean;
+	share_group_id?: string | null;
 	note?: string | null;
 };
 
@@ -104,6 +108,7 @@ type Request = {
 	search: string;
 	starredOnly: boolean;
 	forRevisionOnly: boolean;
+	forShareOnly: boolean;
 };
 
 type FetchOptions = {
@@ -112,6 +117,7 @@ type FetchOptions = {
 	search?: string;
 	starredOnly?: boolean;
 	forRevisionOnly?: boolean;
+	forShareOnly?: boolean;
 	pageSize?: number;
 	silent?: boolean;
 };
@@ -125,6 +131,7 @@ export class HistoryManagerState {
 	loading = $state(false);
 	starredOnly = $state(false);
 	forRevisionOnly = $state(false);
+	forShareOnly = $state(false);
 	activeItems = $state<HistoryItem[]>([]);
 	activeTotal = $state(0);
 	trashItems = $state<HistoryItem[]>([]);
@@ -196,6 +203,7 @@ export class HistoryManagerState {
 		this.loading = false;
 		this.starredOnly = false;
 		this.forRevisionOnly = false;
+		this.forShareOnly = false;
 		this.activeItems = [];
 		this.activeTotal = 0;
 		this.trashItems = [];
@@ -215,7 +223,7 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
-		const preloaded = this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal);
+		const preloaded = this.preloadMatches('active', 0, this.pageSize, '', false, false, false, activeTotal);
 		if (!preloaded) {
 			this.activeItems = activeItems;
 		}
@@ -234,6 +242,7 @@ export class HistoryManagerState {
 		const search = options.search ?? this.search.trim();
 		const starredOnly = options.starredOnly ?? this.starredOnly;
 		const forRevisionOnly = options.forRevisionOnly ?? this.forRevisionOnly;
+		const forShareOnly = options.forShareOnly ?? this.forShareOnly;
 		const pageSize = options.pageSize ?? this.pageSize;
 		const silent = options.silent ?? false;
 		// Two callers can decide at the same moment that the manager needs its
@@ -247,7 +256,7 @@ export class HistoryManagerState {
 		// one would throw away the answer it was riding on: the works arrive, all
 		// of them, and are discarded on the doorstep.
 		const offset = page * pageSize;
-		const request: Request = { view, page, pageSize, offset, search, starredOnly, forRevisionOnly };
+		const request: Request = { view, page, pageSize, offset, search, starredOnly, forRevisionOnly, forShareOnly };
 		if (this.requestInFlight(request, pageSize)) return;
 		const requestId = ++this.requestId;
 		this.inFlight.push(request);
@@ -267,6 +276,8 @@ export class HistoryManagerState {
 			if (starredOnly) params.set('starred', 'true');
 			// The two marks are independent, so asking for both means both.
 			if (forRevisionOnly) params.set('for_revision', 'true');
+			// The third mark is independent of the other two in the same way.
+			if (forShareOnly) params.set('for_share', 'true');
 			const r = await this.apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== this.requestId) return;
 			if (!r.ok) return;
@@ -282,7 +293,7 @@ export class HistoryManagerState {
 			}
 			// Written where the works are taken in, so the two can never disagree.
 			this.fetchedOffset = offset;
-			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, data.total);
+			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, forShareOnly, data.total);
 			if (data.items.length === 0 && data.total > 0 && page > 0) {
 				const fallbackPage = page - 1;
 				this.page = fallbackPage;
@@ -291,8 +302,9 @@ export class HistoryManagerState {
 					this.search.trim() === search &&
 					this.starredOnly === starredOnly
 					&& this.forRevisionOnly === forRevisionOnly
+					&& this.forShareOnly === forShareOnly
 				) {
-					await this.fetch({ view, page: fallbackPage, search, starredOnly, forRevisionOnly });
+					await this.fetch({ view, page: fallbackPage, search, starredOnly, forRevisionOnly, forShareOnly });
 				}
 			}
 		} catch { /* ignore */ }
@@ -341,6 +353,13 @@ export class HistoryManagerState {
 		void this.fetch({ page: 0, forRevisionOnly: value });
 	};
 
+	setForShareOnly = (value: boolean) => {
+		this.forShareOnly = value;
+		this.page = 0;
+		this.selectedIds = [];
+		void this.fetch({ page: 0, forShareOnly: value });
+	};
+
 	setPage = (page: number) => {
 		const nextPage = Math.max(0, Math.min(page, this.totalPages - 1));
 		if (nextPage === this.page) return;
@@ -374,7 +393,7 @@ export class HistoryManagerState {
 		// not a search, and answering it would cost a whole page of history for
 		// works already in hand -- which is what reopening the manager used to do.
 		const next = search.trim();
-		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.total)) return;
+		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.forShareOnly, this.total)) return;
 		this.page = 0;
 		this.selectedIds = [];
 		void this.fetch({ page: 0, search });
@@ -399,6 +418,16 @@ export class HistoryManagerState {
 		if (!item.id) return;
 		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
 		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		this.preloadKey = "";
+	}
+
+	applyForShareState(item: { id?: string; for_share?: boolean; share_group_id?: string | null }) {
+		if (!item.id) return;
+		// Both keys move together: the bit without its destination would leave the
+		// row saying it is open with no record of to whom.
+		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
+		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
+		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
 		this.preloadKey = "";
 	}
 
@@ -434,12 +463,13 @@ export class HistoryManagerState {
 			sent.search === request.search &&
 			sent.starredOnly === request.starredOnly &&
 			sent.forRevisionOnly === request.forRevisionOnly &&
+			sent.forShareOnly === request.forShareOnly &&
 			sent.pageSize >= atLeast
 		);
 	}
 
-	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): string {
-		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, total].join('|');
+	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): string {
+		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, forShareOnly ? 1 : 0, total].join('|');
 	}
 
 	/**
@@ -448,10 +478,10 @@ export class HistoryManagerState {
 	 * Public because it is what decides whether opening the manager costs a
 	 * fetch, which is a fact about this class rather than an internal detail.
 	 */
-	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
+	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): boolean {
 		const expectedItems = Math.min(pageSize, total);
 		return (
-			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, total) &&
+			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, forShareOnly, total) &&
 			this.items.length >= expectedItems
 		);
 	}

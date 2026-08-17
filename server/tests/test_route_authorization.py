@@ -48,7 +48,10 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for GET /api/saijiki/plugin-preview, which serves a plugin word's
 #   artwork so the picture stays out of the saijiki payload the browser
 #   asks for on every hydration.
-EXPECTED_ROUTE_COUNT = 95
+#   +1 for PATCH /api/history/{item_id}/for-share, which opens one work to an
+#   organisation group. The listing filter that reads the bit is an argument on
+#   a route that already exists, so it adds none.
+EXPECTED_ROUTE_COUNT = 96
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -85,6 +88,22 @@ def test_endpoint_count_is_unchanged():
 def test_every_route_is_guarded_or_listed_public():
     unguarded = {r.path for r in _api_routes() if not (_guard_names(r.dependant) & GUARDS)}
     assert unguarded == PUBLIC
+
+
+def test_the_share_route_is_guarded_and_the_public_list_did_not_grow():
+    """I-191: opening a work is an act of its owner, so it is never public.
+
+    Named beside the count rather than left to the sweep above: the sweep says
+    "everything not in PUBLIC is guarded", which stays true if the route were
+    added to PUBLIC instead. Both halves are needed -- the route is guarded, AND
+    the allowlist is still the three entries logging in genuinely needs.
+    """
+    path = "/api/history/{item_id}/for-share"
+    assert len(PUBLIC) == 3
+    assert path not in PUBLIC
+    routes = [ctx for ctx in _api_routes() if ctx.route.path == path]
+    assert len(routes) == 1, f"the share route is declared {len(routes)} times"
+    assert _guard_names(routes[0].dependant) & GUARDS
 
 
 def test_public_list_names_only_real_routes():

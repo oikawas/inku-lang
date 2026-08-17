@@ -58,6 +58,8 @@
 		onSetStarredOnly: (value: boolean) => void;
 		historyForRevisionOnly: boolean;
 		onSetForRevisionOnly: (value: boolean) => void;
+		historyForShareOnly: boolean;
+		onSetForShareOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
 		historyModelStage1Short: (item: HistoryItem) => string;
 		historyModelStage1Full: (item: HistoryItem) => string;
@@ -94,6 +96,8 @@
 		onSetStarredOnly,
 		historyForRevisionOnly,
 		onSetForRevisionOnly,
+		historyForShareOnly,
+		onSetForShareOnly,
 		historyIndexLabel,
 		historyModelStage1Short,
 		historyModelStage1Full,
@@ -186,6 +190,11 @@
 							class:ghost-active={historyForRevisionOnly}
 							onclick={() => onSetForRevisionOnly(!historyForRevisionOnly)}
 						>{t().historyForRevisionOnly}</button>
+						<button
+							class="ghost-btn history-filter-btn"
+							class:ghost-active={historyForShareOnly}
+							onclick={() => onSetForShareOnly(!historyForShareOnly)}
+						>{t().historyForShareOnly}</button>
 						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>

@@ -357,6 +357,8 @@ export interface LangPack {
 	historyStarredOnly: string;
 	historyForRevisionOnly: string;
 	tooltipHistoryForRevisionOnly: string;
+	historyForShareOnly: string;
+	tooltipHistoryForShareOnly: string;
 	forRevisionOn: string;
 	forRevisionOff: string;
 	shareTargetOn: string;

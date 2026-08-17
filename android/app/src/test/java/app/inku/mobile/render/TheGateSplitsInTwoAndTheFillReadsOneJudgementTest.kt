@@ -81,15 +81,41 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
      *
      * `wave` is the control on the same score, same axes, same seed material: the
      * claim is about the quality word and nothing else.
+     *
+     * The line road is stated on the hand pole. It used to be stated on the machine
+     * pole, where a wobble showed up as a `<polyline>` -- but that element was the
+     * divergence [I-307] removed: the server answers a `rotring` line with
+     * `dwg.line` and never reads the gate, so a machine-pole line is one straight
+     * `<line>` whether it was asked to wobble or not, and both halves of the
+     * contrast would now be vacuous there. The machine pole's own claim lives in
+     * [TheMachinePoleLineDoesNotWaverTest]. On the hand pole the gate is live, and
+     * the claim is read as "does the axis reach the stroke": `pink` is excluded
+     * from the gate AND from the seed material's `dimensions`, so naming an axis
+     * must change nothing at all. Byte equality, with the same quality word on
+     * both sides, so what is measured is the axis and not the word.
      */
     @Test
     fun testPinkWobblesNothingOnEitherRoadWhileWaveDoes() {
-        val pinkLine = render(line(variation("pink", "position_y")))
-        assertFalse("a pink line must not wobble:\n$pinkLine", wobbles(pinkLine))
-        assertTrue("a pink line stays the straight <line> the server draws", pinkLine.contains("<line "))
+        val pinkOnAnAxis = render(line(variation("pink", "position_y"), "pen"))
+        val pinkOnNoAxis = render(line(variation("pink"), "pen"))
+        // Byte equality is the whole reading on this road. `wobbles` cannot be
+        // asked here: the hand pole clothes its stroke in `material-outline`
+        // polylines, so it answers yes for every hand tool whether the stroke
+        // wobbles or not. It stays the reading on the contour road below, where
+        // the machine pole draws the mark itself.
+        assertEquals(
+            "a pink line must not read the axis it was given",
+            pinkOnNoAxis,
+            pinkOnAnAxis,
+        )
 
-        val waveLine = render(line(variation("wave", "position_y")))
-        assertTrue("the control must wobble:\n$waveLine", waveLine.contains("<polyline"))
+        val waveOnAnAxis = render(line(variation("wave", "position_y"), "pen"))
+        val waveOnNoAxis = render(line(variation("wave"), "pen"))
+        assertNotEquals(
+            "the control must read it: a wave line given position_y wobbles",
+            waveOnNoAxis,
+            waveOnAnAxis,
+        )
 
         val pinkCircle = render(circle(variation("pink", "position_x", "position_y", "radius")))
         assertTrue("a pink circle stays the <circle> the server draws", pinkCircle.contains("<circle "))
@@ -132,12 +158,21 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
      * line that was never asked to vary -- `variationJson` already drops a variation
      * the line's gate refuses, so the seed matches too.
      *
-     * Both roads, because a line reaches the gate twice: the machine pole through
-     * the `"line"` branch and the hand pole through `renderHandStroke`.
+     * The hand pole, and only the hand pole. A line used to reach the gate twice --
+     * the machine pole through the `"line"` branch as well -- and the machine half
+     * of this walk was where the control lived: `position_y` moved a `rotring` line
+     * because the port wobbled it. [I-307] took that branch out to match the
+     * server, so on that road the unvaried line, the radius-only line and the
+     * position_y line are now the same three bytes and the whole walk would be
+     * true for the wrong reason. What the machine pole does instead is stated in
+     * [TheMachinePoleLineDoesNotWaverTest]. The count is asserted so this cannot
+     * quietly become a walk over nothing.
      */
     @Test
     fun testALineAskedToVaryOnRadiusAloneIsByteForByteTheUnvariedLine() {
-        for (weight in listOf("rotring", "pen")) {
+        val roads = listOf("pen")
+        var walked = 0
+        for (weight in roads) {
             val radiusOnly = render(line(variation("wave", "radius"), weight))
             val noVariation = render(line(null, weight))
             assertEquals(
@@ -152,7 +187,9 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
                 noVariation,
                 positionY,
             )
+            walked++
         }
+        assertEquals("every road that still holds the line's gate must be walked", roads.size, walked)
     }
 
     /**

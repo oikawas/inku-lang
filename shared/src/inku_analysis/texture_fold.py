@@ -34,6 +34,14 @@ thumbnail. Production bakes thumbnails at 256 and 512 (`thumbs_db.BASE_WIDTH`
 times the scale) and exports PNG at 2160 (`db.png_size`), so the rule as stated
 folds for every thumbnail and for nothing else.
 
+The ceiling is a ruling as well as a measurement: I-264 puts the PNG export
+default of 2160px and the browser's display width outside it, and leaves the
+stored SVG the renderer's byte for byte. Folding does change the pixels -- at
+1:1 the mean difference (/255) is 0.058 / 0.184 / 2.010 / 3.685 at 256px and
+0.039 / 0.115 / 1.383 / 2.575 at 512px, for subjects of 127 / 378 / 4,616 /
+12,292 references -- and the author judged those two widths and no others, so
+the difference at any other width has been neither measured nor seen.
+
 A reference-count threshold was measured first and does not exist: at 2160px
 folding lost at every count from 34 to 26,675, and got worse as the count rose.
 """

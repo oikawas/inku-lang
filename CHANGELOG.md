@@ -8452,3 +8452,71 @@ server, and beside the guard that should have covered it sat a test **that staye
 - **⚠ Not one byte of today's drawings changes.** What moved is six lines in one production file, in a function nobody called.
 - **Verification on the merged tree**: **Android JVM 387 tests / 0 failures / 0 errors / 0 skipped** (66 XML files, 37 s, test container on pentala, run with `--exclusive` because it decides a merge). **The `@Test` total is 387 at both the branch point and the tip** (stages 2 and 3 add lines to existing methods). **`test_android_reference_fixtures_are_current.py` 3 passed / 1 skipped.** **The frozen corpus did not move by a byte; the branch touched three files, all under `android/`** (+147 / −14). **The three perturbations were run by the implementation session on its branch** (conventions 2-1: implementation and acceptance were the same agent, so the acceptance side skipped re-running the branch and re-applying the perturbations — **the full run on the merged tree was not skipped**). **⚠ Only one of the three predictions was exact**: P-1 missed one same-shaped corpus comparison in another file, and **P-2 matched at 10 while two names inside it were wrong** — the errors cancelled.
 - **The GitHub CI result was not waited for** (author's ruling, conventions 2-10).
+
+---
+
+### Android — Arriving at the same drawing twice makes two works (android `2.1.4-android.44`, 2026-08-17, ledger I-201, I-319)
+
+**The port's history could hold only one work per drawing fingerprint. The server can hold more.** A second
+work **silently replaced the first**. This round brings the judgement in line with the server and puts a
+test on what used to disappear.
+
+- **The fingerprint index is no longer unique (stage 1):** `Index("render_hash", unique = true)` in
+  `HistoryItemEntity` becomes `Index("render_hash")`. **The Room version goes 8 → 9 and `MIGRATION_8_9`
+  is added** — two statements that drop the index and create it again; **the table is not rebuilt.**
+  `android/app/schemas/…/9.json` was baked.
+  **⚠ The migration was measured on the author's own device** — during an instrumentation run the app
+  itself went 8 → 9, and **`history_items` held the same 2 rows before and after** (backed up twice,
+  measured at 18:25 and 19:24).
+- **The primary-key judgement matches the server (stage 2):** `OnConflictStrategy.REPLACE` in `HistoryDao`
+  becomes **`ABORT`** (the server re-raises at the same place). **`upsert` was renamed to `insert` and its
+  four call sites followed** (one production, three instrumentation). **The seven `upsert`s on other DAOs
+  are untouched.**
+- **Prose that would have become false was corrected (stage 3):** **the contract said two places; the
+  measurement found eight, across six files** (a miss on the issuing side). All eight were corrected, and
+  **the two tests the contract told us not to change kept every assert** — only their prose moved.
+- **⚠ One author ruling was taken mid-flight:** stage 1 turned an existing instrumentation test red,
+  `RefinementSaveTest.t6`. **It claimed that saving the same candidate twice leaves one row, but the
+  repository has no guard against a second save; the count stayed at two because the unique index was
+  deleting the first row** — **the test never reached the guard it named** (the three states in the view
+  model). The ruling was to follow the measurement and expect three rows, so the test now claims
+  **"a second save through the repository is a second work"**, with a docstring pointing at the real guard
+  in the view model, which `RefinementScreenTest` measures.
+- **⚠⚠ One acceptance test made two claims, and a perturbation could never redden one of them (I-319):**
+  `T-268` claimed both ① that the migration loses no rows and ② that the index is non-unique afterwards.
+  **`MIGRATION_8_9` has only two lines, and changing either makes `runMigrationsAndValidate` throw
+  `Migration didn't properly handle` before any assert runs.**
+  **➡ P-3 and P-4 both broke claim ②; ① had never once been seen to go red.**
+  **The author ruled (20:11) that T-268 be split in two** — the new **`T-290` calls
+  `MIGRATION_8_9.migrate` directly, without the schema validator, and counts the rows**, while T-268 keeps
+  `runMigrationsAndValidate` and claims ② alone. **Re-applying P-4 turns T-290 red with
+  `both works survived the migration expected:<2> but was:<0>`, so ① is now a claim that can be measured.**
+  **⚠ Claim ② still reddens through the framework's exception rather than its assert.** No production code
+  moved for this split.
+- **All five acceptance tests live in instrumentation** (T-266 … T-269 and T-290). **No LLM was called and
+  the frozen corpus was never read.**
+- **⚠ Why perturbation P-1 missed was not established** — putting `unique = true` back on the entity should
+  make the schema comparison disagree, yet `t268` / `t269` stayed green. **The instrumentation assets may
+  carry a schema that did not follow the perturbed build; this was filed to the ledger** (not measured).
+- **⚠ The first shape of perturbation P-3 measured nothing** — **Android's `execSQL` refuses the `SELECT 1`
+  the contract gave as an example**, so the migration merely threw. **The count and the names were right,
+  so by name alone it looked like a hit.** It was re-applied as a harmless `UPDATE`.
+- **⚠ The device was backed up four times** — `backup-android.sh` before the instrumentation runs and
+  before P-4. **All twelve runs carried
+  `-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`, and the app on the device was never
+  uninstalled.**
+- **Verification on the merged tree**: **Android JVM 387 tests / 0 failures / 0 errors / 0 skipped**
+  (66 XML files, 39 s, test container on pentala, run with `--exclusive` because it decides a merge).
+  **`test_android_reference_fixtures_are_current.py` 3 passed / 1 skipped.**
+  **The `@Test` total is unchanged at 387 for the JVM and rises 96 → 101 for instrumentation** (+5 new
+  acceptance tests). **The branch touched 14 files, all under `android/`** (+1,083 / −46). **The frozen
+  corpus did not move by a byte.** **Instrumentation was run by the implementation session at the branch
+  tip** — **101 tests / 1 failure**, the remaining red being `VersionInfoPanelTest`, present since the
+  branch point, unrelated to this contract and already filed. Conventions 2-1 applied: implementation and
+  acceptance were the same agent, so the acceptance side skipped re-running the branch and re-applying the
+  perturbations. **⚠ Instrumentation alone was not re-run on the merged tree** (it needs the physical
+  device). **The `androidTest` subtree hash is identical to the branch tip's** (`2a13af96`), and the only
+  production difference on the merged tree is one file from main, `render/DefaultSvgRenderer.kt`.
+  **⚠ After the split, all three predicted numbers (JVM, instrumentation, the P-4 round) matched the
+  measurement exactly.**
+- **The GitHub CI result was not waited for** (author's ruling, conventions 2-10).

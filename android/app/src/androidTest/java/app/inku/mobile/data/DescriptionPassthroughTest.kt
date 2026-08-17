@@ -59,8 +59,8 @@ class DescriptionPassthroughTest {
      *
      * Echoing matters for the same reason it does in
      * `CatalogSelectionWiringTest`: a model that answered with one fixed
-     * sentence would make two descriptions render one picture, and the second
-     * save would be refused by the unique render hash.
+     * sentence would make two descriptions render one picture, and a test that
+     * reads the description back could not tell which run wrote the row.
      *
      * Not an `object`: the recorded prompts must not survive into the next test.
      */

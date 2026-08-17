@@ -53,7 +53,7 @@ class LineageWiringTest {
         database.close()
     }
 
-    /** Each save needs its own text: the render hash is unique in history_items. */
+    /** Each save needs its own text, so the rows a test reads can be told apart. */
     private suspend fun save(
         description: String,
         repo: InkuRepository = repository,

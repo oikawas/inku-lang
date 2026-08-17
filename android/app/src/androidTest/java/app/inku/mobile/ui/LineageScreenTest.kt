@@ -195,7 +195,7 @@ class LineageScreenTest {
             tokenMetadataJson = null,
             lineageNodeId = nodeId,
         )
-        database.historyDao().upsert(item)
+        database.historyDao().insert(item)
         database.lineageDao().insertNode(
             LineageNodeEntity(
                 id = nodeId,

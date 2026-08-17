@@ -59,8 +59,8 @@ class CatalogSelectionWiringTest {
     /**
      * Answers every request with the text it was given, so that two runs of two
      * descriptions stay two pictures. A model that answered with one fixed
-     * sentence made every run render the same score, and the second save was
-     * refused by the unique render hash.
+     * sentence would make every run render the same score, and this test could
+     * no longer tell the two runs apart.
      *
      * Nothing here reaches a real model, which is the point: this stands in the
      * place the server's acceptance puts `_ask_model`.
@@ -227,9 +227,8 @@ class CatalogSelectionWiringTest {
     fun t5_repeatedRunsOfOneSettingAllReachTheSameCatalogue() = runBlocking {
         // Two runs, not two reads of one value: a path that chose again per run
         // is what this has to be able to see.
-        // The two runs have to draw different pictures: the render hash is
-        // unique in history_items, so a second run that reached the same score
-        // would not be saved at all.
+        // The two runs have to draw different pictures, so that the two rows
+        // read below are two works and not one work counted twice.
         useCatalog("ink_porcelain")
         promptFor("赤い円を5個、横に並べる")
         viewModel.draw()

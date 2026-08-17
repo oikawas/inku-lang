@@ -161,21 +161,21 @@ def _with_variation_hint(ins: Instruction, ddl: str | None) -> Instruction:
         return ins
     lower = ddl.lower()
     variation: dict[str, object] | None = None
-    if any(marker in ddl for marker in ("ゆっくり揺れる", "ゆっくり波打つ")) or "slow" in lower:
+    if any(marker in ddl or marker in lower for marker in VARIATION_SLOW_WAVE_MARKERS):
         variation = {
             "amplitude": "medium",
             "frequency": "slow",
             "quality": "wave",
             "dimensions": ["position_x", "position_y"],
         }
-    elif any(marker in ddl for marker in ("細かく揺れる", "細かく震える", "震える")) or "trembling" in lower:
+    elif any(marker in ddl or marker in lower for marker in VARIATION_FINE_TREMBLE_MARKERS):
         variation = {
             "amplitude": "fine",
             "frequency": "medium",
             "quality": "perlin",
             "dimensions": ["position_y"] if ins.primitive == "line" else ["position_x", "position_y"],
         }
-    elif any(marker in ddl for marker in ("滲む", "にじむ", "境界が滲む")) or "blurring" in lower:
+    elif any(marker in ddl or marker in lower for marker in VARIATION_BLURRED_EDGE_MARKERS):
         variation = {
             "amplitude": "medium",
             "frequency": "medium",
@@ -225,6 +225,56 @@ DAWN_MARKERS: tuple[str, ...] = _coerce_marker_values("dawn")
 NIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("night")
 
 
+# One system per judgement, moved out of the branches below so the words
+# coerce reacts to are all readable in language_support (ledger I-115). The
+# comparison at each site is unchanged -- `_marker_in_text` bounds an ASCII
+# word where a bare `in` does not, so the two are not interchangeable.
+VARIATION_SLOW_WAVE_MARKERS: tuple[str, ...] = _coerce_marker_values("variation_slow_wave")
+VARIATION_FINE_TREMBLE_MARKERS: tuple[str, ...] = _coerce_marker_values("variation_fine_tremble")
+VARIATION_BLURRED_EDGE_MARKERS: tuple[str, ...] = _coerce_marker_values("variation_blurred_edge")
+NEON_BLUR_SCENE_MARKERS: tuple[str, ...] = _coerce_marker_values("neon_blur_scene")
+NEON_BLUR_EVIDENCE_MARKERS: tuple[str, ...] = _coerce_marker_values("neon_blur_evidence")
+TEMPORAL_CHAIN_SEQUENCE_MARKERS: tuple[str, ...] = _coerce_marker_values("temporal_chain_sequence")
+TEMPORAL_CHAIN_ACTION_MARKERS: tuple[str, ...] = _coerce_marker_values("temporal_chain_action")
+TEMPORAL_CHAIN_BEFORE_AFTER_MARKERS: tuple[str, ...] = _coerce_marker_values("temporal_chain_before_after")
+TEMPORAL_CHAIN_REACTION_MARKERS: tuple[str, ...] = _coerce_marker_values("temporal_chain_reaction")
+CRESCENT_SCENE_MARKERS: tuple[str, ...] = _coerce_marker_values("crescent_scene")
+WITHERED_GRASS_MARKERS: tuple[str, ...] = _coerce_marker_values("withered_grass_green")
+AUTUMN_FOREST_SCENE_MARKERS: tuple[str, ...] = _coerce_marker_values("autumn_forest_scene")
+AUTUMN_LEAF_FALL_MARKERS: tuple[str, ...] = _coerce_marker_values("autumn_leaf_fall")
+PRESENCE_CENTER_UPPER_RIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_upper_right")
+PRESENCE_CENTER_UPPER_LEFT_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_upper_left")
+PRESENCE_CENTER_LOWER_RIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_lower_right")
+PRESENCE_CENTER_LOWER_LEFT_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_lower_left")
+PRESENCE_CENTER_RIGHT_HALF_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_right_half")
+PRESENCE_CENTER_LEFT_HALF_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_center_left_half")
+PRESENCE_INTENSITY_HIGH_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_intensity_high")
+CLAUSE_NAMES_A_MARK_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_names_a_mark")
+CLAUSE_SHAPE_CLOUDFORM_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_cloudform")
+CLAUSE_SHAPE_ELLIPSE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_ellipse")
+CLAUSE_SHAPE_CIRCLE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_circle")
+SMALL_MARK_SIZE_MARKERS: tuple[str, ...] = _coerce_marker_values("small_mark_size")
+SMALL_MARK_KIND_MARKERS: tuple[str, ...] = _coerce_marker_values("small_mark_kind")
+RADIUS_CLAUSE_MARKERS: tuple[str, ...] = _coerce_marker_values("radius_clause")
+CLAUSE_REFLECTION_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_reflection")
+CLAUSE_FADING_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_fading")
+SENSORY_KIND_LIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("sensory_kind_light")
+SENSORY_KIND_SCENT_MARKERS: tuple[str, ...] = _coerce_marker_values("sensory_kind_scent")
+SENSORY_KIND_BUD_MARKERS: tuple[str, ...] = _coerce_marker_values("sensory_kind_bud")
+SENSORY_KIND_SENSE_MARKERS: tuple[str, ...] = _coerce_marker_values("sensory_kind_sense")
+LINE_AT_RIGHT_EDGE_MARKERS: tuple[str, ...] = _coerce_marker_values("line_at_right_edge")
+LINE_IS_VERTICAL_MARKERS: tuple[str, ...] = _coerce_marker_values("line_is_vertical")
+LINE_IS_HORIZONTAL_MARKERS: tuple[str, ...] = _coerce_marker_values("line_is_horizontal")
+POLYGON_IS_HEXAGONAL_MARKERS: tuple[str, ...] = _coerce_marker_values("polygon_is_hexagonal")
+FALLBACK_PLACE_RIGHT_HALF_MARKERS: tuple[str, ...] = _coerce_marker_values("fallback_place_right_half")
+FALLBACK_PLACE_UPPER_RIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("fallback_place_upper_right")
+FALLBACK_PLACE_UPPER_EDGE_MARKERS: tuple[str, ...] = _coerce_marker_values("fallback_place_upper_edge")
+FALLBACK_ARRANGEMENT_SCATTER_MARKERS: tuple[str, ...] = _coerce_marker_values("fallback_arrangement_scatter")
+FALLBACK_ARRANGEMENT_LINE_UP_MARKERS: tuple[str, ...] = _coerce_marker_values("fallback_arrangement_line_up")
+GRID_REQUESTS_SQUARE_MARKERS: tuple[str, ...] = _coerce_marker_values("grid_requests_square")
+GRID_REQUESTS_LINE_MARKERS: tuple[str, ...] = _coerce_marker_values("grid_requests_line")
+
+
 # The clause is the description's own instruction; the scene markers above are
 # inferences about it. An explicit clause must not need a sunset to be believed.
 _EXPLICIT_BACKGROUND_CLAUSE = re.compile(
@@ -252,9 +302,10 @@ def _context_has_neon_blur_density(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    scene_markers = ("夜", "ガラス", "ネオン", "night", "glass", "neon")
-    blur_markers = ("涙", "滲", "にじ", "blur", "tear")
-    return _any_marker_in_text(scene_markers, ddl, lower) and _any_marker_in_text(blur_markers, ddl, lower)
+    return (
+        _any_marker_in_text(NEON_BLUR_SCENE_MARKERS, ddl, lower)
+        and _any_marker_in_text(NEON_BLUR_EVIDENCE_MARKERS, ddl, lower)
+    )
 
 
 def _context_has_motion(ddl: str | None) -> bool:
@@ -670,25 +721,13 @@ VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
 
 
 def _has_temporal_chain_evidence(text: str, lower: str) -> bool:
-    sequence = _any_marker_in_text(
-        ("順に", "一斉", "その後", "あとで", "また", "in order", "again and again", "at once"),
-        text,
-        lower,
-    )
-    action = _any_marker_in_text(
-        ("揺", "渡り", "動", "犬", "羊", "猫", "窓", "笛", "whistle", "moving", "moved", "crossed", "dog", "flock", "cat", "laundry", "window"),
-        text,
-        lower,
-    )
+    sequence = _any_marker_in_text(TEMPORAL_CHAIN_SEQUENCE_MARKERS, text, lower)
+    action = _any_marker_in_text(TEMPORAL_CHAIN_ACTION_MARKERS, text, lower)
     if sequence and action:
         return True
 
-    before_after = _any_marker_in_text(("先に", "before", "after"), text, lower)
-    reaction = _any_marker_in_text(
-        ("一斉", "順に", "その瞬間", "looked up", "at once", "dog moved", "flock moved", "moving the"),
-        text,
-        lower,
-    )
+    before_after = _any_marker_in_text(TEMPORAL_CHAIN_BEFORE_AFTER_MARKERS, text, lower)
+    reaction = _any_marker_in_text(TEMPORAL_CHAIN_REACTION_MARKERS, text, lower)
     return before_after and reaction and action
 
 
@@ -734,7 +773,7 @@ def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str |
 
 
 def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
-    if not ddl or "crescent" not in ddl.lower():
+    if not ddl or not any(marker in ddl.lower() for marker in CRESCENT_SCENE_MARKERS):
         return instructions
 
     adjusted: list[Instruction] = []
@@ -1074,7 +1113,7 @@ DDL_CLAUSE_SPLIT = re.compile(r"[。\n;；]+|(?<!\d)\.\s+")
 # Words that ask for many colors at once. A description carrying one of these
 # has asked for a cycle, so the rule that folds unrequested cycles away must
 # not touch it.
-POLYCHROME_MARKERS = ("色とりどり", "多色", "カラフル", "虹", "colorful", "multi-color")
+POLYCHROME_MARKERS: tuple[str, ...] = _coerce_marker_values("polychrome_request")
 
 
 def _split_ddl_clauses(ddl: str) -> list[str]:
@@ -1158,9 +1197,11 @@ def _green_intent_context(ddl: str | None) -> str | None:
     lower = ddl.lower()
     if "竹" in ddl or "bamboo" in lower:
         return "bamboo green kept as primary contour"
-    if any(marker in ddl for marker in ("枯れ草", "枯草", "枯れた草", "枯葉")) or "withered grass" in lower or "dry grass" in lower:
+    if any(marker in ddl or marker in lower for marker in WITHERED_GRASS_MARKERS):
         return "withered grass kept as muted green-gray"
-    if ("森" in ddl or "forest" in lower) and any(marker in ddl for marker in ("落ち葉", "紅葉", "秋")):
+    if any(marker in ddl or marker in lower for marker in AUTUMN_FOREST_SCENE_MARKERS) and any(
+        marker in ddl for marker in AUTUMN_LEAF_FALL_MARKERS
+    ):
         return "forest green kept as quiet residue behind warm leaves"
     return None
 
@@ -1572,17 +1613,17 @@ def _context_has_any(context: str, markers: tuple[str, ...]) -> bool:
 
 def _presence_center_from_context(context: str) -> list[float] | None:
     lower = context.lower()
-    if any(marker in context or marker in lower for marker in ("右上", "upper right")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_UPPER_RIGHT_MARKERS):
         return [0.68, 0.34]
-    if any(marker in context or marker in lower for marker in ("左上", "upper left")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_UPPER_LEFT_MARKERS):
         return [0.32, 0.34]
-    if any(marker in context or marker in lower for marker in ("右下", "lower right")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LOWER_RIGHT_MARKERS):
         return [0.68, 0.66]
-    if any(marker in context or marker in lower for marker in ("左下", "lower left")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LOWER_LEFT_MARKERS):
         return [0.32, 0.66]
-    if any(marker in context or marker in lower for marker in ("右半分", "right half")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_RIGHT_HALF_MARKERS):
         return [0.68, 0.50]
-    if any(marker in context or marker in lower for marker in ("左半分", "left half")):
+    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LEFT_HALF_MARKERS):
         return [0.32, 0.50]
     return None
 
@@ -1598,8 +1639,8 @@ def _presence_from_ddl(ddl: str | None) -> dict | None:
     has_group = _context_has_any(ddl, GROUP_PRESENCE_MARKERS)
     has_gaze = _context_has_any(ddl, GAZE_PRESENCE_MARKERS)
     kind = "group_like" if has_group else "creature_like" if has_creature and not has_human else "figure_like"
-    intensity = "high" if any(marker in ddl for marker in ("強い", "圧力", "濃い")) or any(
-        marker in ddl.lower() for marker in ("strong", "pressure", "dense")
+    intensity = "high" if any(
+        marker in ddl or marker in ddl.lower() for marker in PRESENCE_INTENSITY_HIGH_MARKERS
     ) else "medium" if has_gaze or has_group else "low"
     contour_density = "high" if has_group else "medium" if has_creature or has_gaze else "low"
     symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS) else "none"
@@ -1620,19 +1661,11 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
     if not ddl:
         return []
     clauses = _split_ddl_clauses(ddl)
-    markers = (
-        "線", "点", "円", "楕円", "四角", "三角", "多角形", "五角", "六角", "弧", "塗りつぶす", "散らす", "並べる",
-        "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",
-        "光", "陽光", "日差し", "香", "匂", "蕾", "つぼみ", "開花", "五感", "温",
-        "line", "dot", "circle", "ellipse", "square", "triangle", "polygon", "arc", "scatter", "fill",
-        "membrane", "haze", "fog", "mist", "trace", "reflection", "fade", "fading", "blur",
-        "light", "sunlight", "scent", "fragrance", "bud", "bloom", "sense", "warm",
-    )
     return [
         clause
         for clause in clauses
         if not (clause.startswith("背景") or clause.lower().startswith("background"))
-        and _any_marker_in_text(markers, clause, clause.lower())
+        and _any_marker_in_text(CLAUSE_NAMES_A_MARK_MARKERS, clause, clause.lower())
     ]
 
 
@@ -1680,7 +1713,7 @@ def _primitive_from_clause(clause: str) -> str:
     # would catch: a clause naming 雲形 falls through every test below to the
     # `line` default, and a repair that pairs clauses with groups then pushes
     # the clause's count onto whatever line the Score happens to carry.
-    if ("雲形" in clause) or ("cloudform" in lower):
+    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_CLOUDFORM_MARKERS):
         return "cloudform"
     if ("多角形" in clause) or ("五角" in clause) or ("六角" in clause) or ("polygon" in lower):
         return "polygon"
@@ -1690,23 +1723,24 @@ def _primitive_from_clause(clause: str) -> str:
         return "triangle"
     if ("弧" in clause) or ("arc" in lower):
         return "arc"
-    if ("楕円" in clause) or ("ellipse" in lower) or ("oval" in lower):
+    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_ELLIPSE_MARKERS):
         return "ellipse"
-    if ("点" in clause) or ("円" in clause) or ("dot" in lower) or ("point" in lower) or ("circle" in lower):
+    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_CIRCLE_MARKERS):
         return "circle"
     return "line"
 
 
 def _is_small_mark_clause(clause: str) -> bool:
     lower = clause.lower()
-    size_markers = ("小さ", "細い", "tiny", "small", "little", "thin")
-    mark_markers = ("点", "円", "楕円", "dot", "point", "circle", "ellipse", "oval")
-    return _any_marker_in_text(size_markers, clause, lower) and _any_marker_in_text(mark_markers, clause, lower)
+    return (
+        _any_marker_in_text(SMALL_MARK_SIZE_MARKERS, clause, lower)
+        and _any_marker_in_text(SMALL_MARK_KIND_MARKERS, clause, lower)
+    )
 
 
 def _radius_hint_from_clause(clause: str) -> float | None:
     lower = clause.lower()
-    match = re.search(r"(?:半径|radius(?:\s+is)?|r)\s*(?:は|=|:)?\s*(0?\.\d+|1(?:\.0+)?)", lower if "radius" in lower else clause)
+    match = re.search(r"(?:半径|radius(?:\s+is)?|r)\s*(?:は|=|:)?\s*(0?\.\d+|1(?:\.0+)?)", lower if any(marker in lower for marker in RADIUS_CLAUSE_MARKERS) else clause)
     if not match:
         return None
     try:
@@ -1728,23 +1762,23 @@ def _is_atmospheric_clause(clause: str) -> bool:
 
 def _is_reflection_clause(clause: str) -> bool:
     lower = clause.lower()
-    return any(marker in clause or marker in lower for marker in ("反射", "映り", "reflection", "reflected"))
+    return any(marker in clause or marker in lower for marker in CLAUSE_REFLECTION_MARKERS)
 
 
 def _is_fading_clause(clause: str) -> bool:
     lower = clause.lower()
-    return any(marker in clause or marker in lower for marker in ("消え", "薄れ", "fade", "fading", "vanish", "dissolve"))
+    return any(marker in clause or marker in lower for marker in CLAUSE_FADING_MARKERS)
 
 
 def _sensory_kind(clause: str) -> str | None:
     lower = clause.lower()
-    if _any_marker_in_text(("光", "陽光", "日差し", "柔ら", "light", "sunlight", "soft"), clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_LIGHT_MARKERS, clause, lower):
         return "light"
-    if _any_marker_in_text(("香", "匂", "沈丁花", "scent", "fragrance"), clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_SCENT_MARKERS, clause, lower):
         return "scent"
-    if _any_marker_in_text(("蕾", "つぼみ", "開花", "bud", "bloom"), clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_BUD_MARKERS, clause, lower):
         return "bud"
-    if _any_marker_in_text(("五感", "気配", "訪れ", "sense", "presence", "arrival"), clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_SENSE_MARKERS, clause, lower):
         return "sense"
     return None
 
@@ -1781,12 +1815,12 @@ def _fallback_instruction_from_clause(
     }
     offset = min(index, 4) * 0.09
     if primitive == "line":
-        if any(marker in clause or marker in lower for marker in ("画面右端", "右端", "right edge")):
+        if any(marker in clause or marker in lower for marker in LINE_AT_RIGHT_EDGE_MARKERS):
             common.update({"from": [0.88, 0.18 + offset / 2], "to": [0.88, 0.82 - offset / 2], "rotation": 0})
-        elif any(marker in clause or marker in lower for marker in ("縦線", "vertical line")):
+        elif any(marker in clause or marker in lower for marker in LINE_IS_VERTICAL_MARKERS):
             x = 0.58 + min(index, 3) * 0.08
             common.update({"from": [x, 0.20 + offset / 2], "to": [x, 0.78 - offset / 2], "rotation": 0})
-        elif any(marker in clause or marker in lower for marker in ("横線", "horizontal line")):
+        elif any(marker in clause or marker in lower for marker in LINE_IS_HORIZONTAL_MARKERS):
             y = 0.38 + min(index, 3) * 0.08
             common.update({"from": [0.16, y], "to": [0.84, y], "rotation": 0})
         else:
@@ -1794,7 +1828,7 @@ def _fallback_instruction_from_clause(
     elif primitive == "arc":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
     elif primitive == "polygon":
-        sides = 6 if ("六角" in clause or "hex" in lower or "mineral" in lower or "鉱物" in clause) else 5
+        sides = 6 if any(marker in clause or marker in lower for marker in POLYGON_IS_HEXAGONAL_MARKERS) else 5
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.055, "sides": sides, "rotation": -18 + index * 9})
     elif primitive == "circle":
         radius = _radius_hint_from_clause(clause) or (0.038 if _is_small_mark_clause(clause) else 0.10)
@@ -1837,14 +1871,14 @@ def _fallback_instruction_from_clause(
         }
         common["note"] = f"{common['note']}; circle focal mark kept compact with preserved negative space"
 
-    if any(marker in clause or marker in lower for marker in ("右半分", "right half")):
+    if any(marker in clause or marker in lower for marker in FALLBACK_PLACE_RIGHT_HALF_MARKERS):
         if "center" in common:
             common["center"] = [0.66, common["center"][1]]
         elif "position" in common:
             common["position"] = [0.66, common["position"][1]]
-    if any(marker in clause or marker in lower for marker in ("右上", "upper right")) and "center" in common:
+    if any(marker in clause or marker in lower for marker in FALLBACK_PLACE_UPPER_RIGHT_MARKERS) and "center" in common:
         common["center"] = [0.68, 0.30]
-    elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
+    elif any(marker in clause or marker in lower for marker in FALLBACK_PLACE_UPPER_EDGE_MARKERS) and "center" in common:
         common["center"] = [common["center"][0], 0.22]
 
     count = count_hint_from_ddl(clause, limits, lang=lang, notes=notes)
@@ -1863,13 +1897,13 @@ def _fallback_instruction_from_clause(
             "jitter": 0.12,
             "margin": 0.08,
         }
-    elif count and (("散らす" in clause) or ("scatter" in lower)):
+    elif count and any(marker in clause or marker in lower for marker in FALLBACK_ARRANGEMENT_SCATTER_MARKERS):
         common["arrangement"] = {
             "count": _budgeted_count(count, limits, notes),
             "layout": "scatter",
             "margin": 0.18,
         }
-    elif count and (("並べる" in clause) or ("line up" in lower)):
+    elif count and any(marker in clause or marker in lower for marker in FALLBACK_ARRANGEMENT_LINE_UP_MARKERS):
         common["arrangement"] = {
             "count": _budgeted_count(count, limits, notes),
             "layout": "horizontal",
@@ -2160,9 +2194,9 @@ def _with_literal_grid_fidelity(
     ):
         lower = (ddl or "").lower()
         requested_primitive: str | None = None
-        if any(marker in lower for marker in ("四角", "square", "squares", "brick", "bricks")):
+        if any(marker in lower for marker in GRID_REQUESTS_SQUARE_MARKERS):
             requested_primitive = "square"
-        elif any(marker in lower for marker in ("線", "雨脚", "line", "stroke")):
+        elif any(marker in lower for marker in GRID_REQUESTS_LINE_MARKERS):
             requested_primitive = "line"
         target_index = next(
             (

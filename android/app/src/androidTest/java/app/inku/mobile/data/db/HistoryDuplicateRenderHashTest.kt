@@ -170,15 +170,16 @@ class HistoryDuplicateRenderHashTest {
     // ── T-268 ──────────────────────────────────────────────
 
     /**
-     * The migration exchanges the index and loses no work.
+     * The migration exchanges the index for a non-unique one.
      *
      * The rows here carry different hashes, because version 8 is where the
-     * unique index still stands and would refuse two of a kind. What the
-     * migration has to prove is that it did not rebuild the table underneath
-     * works the author already saved.
+     * unique index still stands and would refuse two of a kind. They are here
+     * so that the migration runs over a populated table rather than an empty
+     * one; the claim that no row is lost belongs to T-290, which measures it
+     * without the schema validator in the way.
      */
     @Test
-    fun t268_migration8to9KeepsEveryRowAndLeavesTheIndexNonUnique() {
+    fun t268_migration8to9LeavesTheIndexNonUnique() {
         helper.createDatabase(TEST_DB, 8).use { db ->
             insertRow(db, "h-1", "rh3:first")
             insertRow(db, "h-2", "rh3:second")
@@ -186,13 +187,6 @@ class HistoryDuplicateRenderHashTest {
 
         val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, InkuDatabase.MIGRATION_8_9)
 
-        db.query("SELECT id FROM history_items ORDER BY id").use { cursor ->
-            assertEquals("both works survived the migration", 2, cursor.count)
-            cursor.moveToFirst()
-            assertEquals("h-1", cursor.getString(0))
-            cursor.moveToNext()
-            assertEquals("h-2", cursor.getString(0))
-        }
         assertTrue(
             "$RENDER_HASH_INDEX must be non-unique after the migration",
             !renderHashIndexIsUnique(db),
@@ -225,6 +219,36 @@ class HistoryDuplicateRenderHashTest {
             assertEquals("h-1", cursor.getString(0))
             cursor.moveToNext()
             assertEquals("h-2", cursor.getString(0))
+        }
+    }
+
+    // ── T-290 ──────────────────────────────────────────────
+
+    /**
+     * The migration loses none of the author's work.
+     *
+     * The row-preservation claim is measured without the schema check, so that
+     * a migration which loses rows fails on the count rather than on the
+     * validator. `runMigrationsAndValidate` compares the migrated shape against
+     * the generated one and throws `Migration didn't properly handle` before
+     * any assert here runs -- with it in the way this test would only ever
+     * report that the shape was wrong, never that the rows were gone.
+     */
+    @Test
+    fun t290_migration8to9LosesNoWork() {
+        helper.createDatabase(TEST_DB, 8).use { db ->
+            insertRow(db, "h-1", "rh4:first")
+            insertRow(db, "h-2", "rh4:second")
+
+            InkuDatabase.MIGRATION_8_9.migrate(db)
+
+            db.query("SELECT id FROM history_items ORDER BY id").use { cursor ->
+                assertEquals("both works survived the migration", 2, cursor.count)
+                cursor.moveToFirst()
+                assertEquals("the first work is still there", "h-1", cursor.getString(0))
+                cursor.moveToNext()
+                assertEquals("and so is the second", "h-2", cursor.getString(0))
+            }
         }
     }
 }

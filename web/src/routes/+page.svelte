@@ -30,6 +30,8 @@
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
+	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
+	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
@@ -203,6 +205,10 @@
 		variation_moved_axes?: Array<{ axis: string; from: string; to: string }>;
 		interpret_fallback_used?: boolean;
 		interpret_fallback_reasons?: string[];
+		// Stage 2's counterpart. The response is the only place it exists, which
+		// is why a work saved from here has to carry it into the save.
+		compose_fallback_used?: boolean;
+		compose_retry_reasons?: string[];
 		tokens_in_stage1: number | null;
 		tokens_out_stage1: number | null;
 		tokens_in_stage2: number | null;
@@ -3023,7 +3029,7 @@
 		trashItems = items;
 		trashTotal = total;
 	});
-	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean } | null>(null);
+	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void } | null>(null);
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
@@ -3065,6 +3071,57 @@
 			? (displayedHistoryItem.interpret_fallback ?? null)
 			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
 	);
+
+	// Stage 2's counterpart, read the same two ways: a saved work has a column,
+	// a work still on the canvas has only the response it was drawn by.
+	const composeFallbackRaw = $derived(
+		displayedHistoryItem
+			? (displayedHistoryItem.compose_fallback ?? null)
+			: (result ? composeFallbackValue(result) : null)
+	);
+	const composeFallbackDrawnReason = $derived(composeFallbackReason(composeFallbackRaw));
+	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
+
+	// Which works this screen has already asked about. Kept here and not on the
+	// server: the question is about this sitting, not about the work (contract
+	// §5-7). See $lib/fallbackRefineGate.
+	const fallbackRefineAsked = new Set<string>();
+
+	/** The work a refinement started from the canvas would descend from.
+	 *  Built from the same two derivations the badges read, so the dialog and
+	 *  the mark can never disagree about whether the words were lost. */
+	function currentRefineParent(): FallbackRefineParent {
+		return {
+			id: displayedHistoryItem?.id ?? result?.history_id ?? null,
+			interpret_fallback: interpretFallbackReason,
+			compose_fallback: composeFallbackRaw
+		};
+	}
+
+	/** Whether the next drawing from the input panel would hang under a parent.
+	 *  Detached, or with nothing on the canvas, it is a new work rather than a
+	 *  refinement, and nothing is being carried forward to ask about. Mirrors
+	 *  the parent expression submit() and replay() compute for themselves. */
+	function submitWouldRefine(): boolean {
+		const parentNodeId = pendingCanvasAspectDerivation?.parentNodeId
+			?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
+		return parentNodeId !== null;
+	}
+
+	/** Ask before refining from a work drawn by a fallback, and wait for the
+	 *  answer. Resolves true when the refinement may go ahead -- which is
+	 *  immediately, and without a dialog, for every unmarked work. */
+	function confirmFallbackRefine(parent: FallbackRefineParent): Promise<boolean> {
+		if (!needsFallbackRefineConfirm(parent, fallbackRefineAsked)) return Promise.resolve(true);
+		return new Promise((resolve) => {
+			confirmAction = {
+				message: t().confirmRefineFromFallbackMessage,
+				runLabel: t().confirmRefineFromFallbackContinue,
+				run: () => { rememberFallbackRefineConfirm(parent, fallbackRefineAsked); resolve(true); },
+				cancelRun: () => resolve(false)
+			};
+		});
+	}
 
 	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
 	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
@@ -3627,6 +3684,9 @@ if (unreadWords.length > 0) {
 	 */
 	async function submit(options: { resumeLines?: NumberedLine[] } = {}) {
 		if (!canSubmit || loading || variationGridBusy) return;
+		// Before resetTargetScopedState and before the intermediate save below:
+		// the question is asked while nothing has been written yet.
+		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
 		try {
 			await ensureVisibleLineageParentId();
@@ -3891,6 +3951,7 @@ if (unreadWords.length > 0) {
 	// ── Replay (Stage 2 のみ) ────────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
+		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
 		try {
 			await ensureVisibleLineageParentId();
@@ -4458,12 +4519,19 @@ if (unreadWords.length > 0) {
 		// would store a work with no picture -- a failure that shows up only when
 		// somebody opens the copy.
 		const svgToSave = await ensureIterationSvg(it);
+		// What this work says about its compose stage. A work that already
+		// carries a record keeps it; a fresh paint result is read for one. A work
+		// with neither -- an older row being saved again -- sends no key at all,
+		// because claiming 'none' would put a statement in the row that nothing
+		// recorded.
+		const composeFallback = it.compose_fallback
+			?? (typeof it.compose_fallback_used === 'boolean' ? composeFallbackValue(it) : null);
 		let saved: Iteration | null = null;
 		try {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, catalog_mode: it.catalog_mode ?? (colorCatalogSettings.isAuto ? 'auto' : 'fixed'), render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, catalog_mode: it.catalog_mode ?? (colorCatalogSettings.isAuto ? 'auto' : 'fixed'), render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}), ...(composeFallback === null ? {} : { compose_fallback: composeFallback }) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -4513,6 +4581,10 @@ if (unreadWords.length > 0) {
 					sketch_text: result.sketch_text ?? null,
 					sketch_grain: result.sketch_grain ?? null,
 					...(result.sketch_state ? { sketch_state: result.sketch_state } : {}),
+					// It saves a work it holds the paint response for, so it can
+					// always say what compose did -- and has to, or the row reads as
+					// one drawn before the column existed.
+					compose_fallback: composeFallbackValue(result),
 				})
 			});
 			if (!r.ok) {
@@ -4892,6 +4964,8 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
+	// Ask before the words are carried into a child (contract § stage 4).
+	if (!(await confirmFallbackRefine(node.history))) return;
 	const rendered = await paintOne(sourceText, {
 		sourceText,
 		historyInput: sourceText,
@@ -4914,6 +4988,8 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
  *  stored prose would leave the parameter dead. */
 async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal): Promise<void> {
 	if (!node.history) return;
+	// Ask before the words are carried into a child (contract § stage 4).
+	if (!(await confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	if (!sourceText.trim()) return;
 	const rendered = await paintOne(sourceText, {
@@ -4940,6 +5016,8 @@ async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse
 async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history) return;
+	// Ask before the words are carried into a child (contract § stage 4).
+	if (!(await confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
 		canvasAspectId: lineageCanvasAspectId(node),
@@ -5550,6 +5628,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	async function varyPerformance() {
 		if (!result || variationBusy) return;
+		// Ask before the words are carried into a child (contract § stage 4).
+		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		variationTokensIn = null;
@@ -5599,6 +5679,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		// Ask before the words are carried into a child (contract § stage 4).
+		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		variationTokensIn = null;
@@ -5646,6 +5728,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!result || variationBusy || loading) return;
 		const source = input.trim();
 		if (!source) return;
+		// Ask before the words are carried into a child (contract § stage 4).
+		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
 		variationBusy = true;
 		variationTokensIn = null;
@@ -5979,6 +6063,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			variationGridStatus = getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.';
 			return;
 		}
+		// Ask before the words are carried into a child (contract § stage 4).
+		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const contextVersion = targetContextVersion;
 		await ensureVisibleLineageParentId();
 		if (contextVersion !== targetContextVersion) return;
@@ -6940,6 +7026,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 												<span class="stats-value"><span>{t().interpretFallbackHint(interpretFallbackReason)}</span></span>
 											</div>
 										{/if}
+										<!-- Three states, always shown: see CanvasPanel's drawer. -->
+										<div class="stats-row">
+											<span class="stats-key">{t().composeFallbackBadge}</span>
+											<span class="stats-value"><span>{t().composeFallbackRecord(composeFallbackRecord)}{composeFallbackDrawnReason ? ` (${t().composeFallbackHint(composeFallbackDrawnReason)})` : ''}</span></span>
+										</div>
 										<div class="stats-row">
 											<span class="stats-key">{t().statsStruct}</span>
 											<span class="stats-value">
@@ -7504,7 +7595,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if confirmAction}
 	<ConfirmDialog
 		action={confirmAction}
-		onCancel={() => (confirmAction = null)}
+		onCancel={() => { const cancel = confirmAction?.cancelRun; confirmAction = null; cancel?.(); }}
 		onRun={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}
 	/>
 {/if}

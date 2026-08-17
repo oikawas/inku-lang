@@ -61,6 +61,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 指示書（正規化DDL） | **instructions** | **常に複数形**。初出は "Instructions (normalized DDL)" | ~~instruction~~（単数）、~~spec~~ |
 | 楽譜 | **score**（固有表記は **JSON Score**） | 名詞 | — |
 | 演奏 | **performance** / **perform** | 名詞／動詞 | ~~rendering~~（技術文脈のみ・§5） |
+| 作曲フォールバック（Stage 2 が落ちた） | **Score fallback** | 名詞句。印の文言と生成情報の見出し。**層を名指す**ため「解釈フォールバック＝Interpretation fallback」と対で使う | ~~Composition fallback~~（`composition` は配置・構図の語で、`composition_seed` と紛れる）、~~Stage 2 fallback~~（UI で段番号を主語にしない） |
 | 演奏する（主動作ボタン） | **Paint** | 動詞。API `/api/paint` と一致 | ~~Generate~~, ~~Create~~, ~~Draw~~（ボタン語として） |
 | 読み取り（言葉の読み直し） | **reading** | 名詞 | ~~interpretation~~ |
 | 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |

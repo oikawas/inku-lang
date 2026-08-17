@@ -402,6 +402,19 @@ export const en: LangPack = {
 		: reason === 'stage1_empty_output'
 			? 'The interpreter returned nothing, so a stock set of instructions was performed.'
 			: 'The interpreter failed, so a stock set of instructions was performed.',
+	composeFallbackBadge: 'Score fallback',
+	confirmRefineFromFallbackMessage: 'This work is not an answer to its description. Refine from it anyway?',
+	confirmRefineFromFallbackContinue: 'Continue',
+	composeFallbackHint: (reason) => reason === 'stage2_hard_timeout'
+		? 'Stage 2 did not answer in time, so a stock score was performed.'
+		: reason === 'stage2_empty_output'
+			? 'Stage 2 returned nothing, so a stock score was performed.'
+			: 'Stage 2 failed, so a stock score was performed.',
+	composeFallbackRecord: (state) => state === 'yes'
+		? 'Yes'
+		: state === 'no'
+			? 'No'
+			: 'Not recorded',
 	statsInterp: 'Interpretation',
 	statsStruct: 'Score and performance',
 	statsTotal: 'Total',
@@ -848,6 +861,7 @@ export const en: LangPack = {
 	provenanceSectionRun: 'Run',
 	provenanceLabelLangRequested: 'Language requested',
 	provenanceLabelInterpretFallback: 'Interpretation fallback',
+	provenanceLabelComposeFallback: 'Score fallback',
 	provenanceLabelFocus: 'Focus',
 	provenanceLabelVariation: 'Variation',
 	provenanceLabelVariationSeed: 'Variation seed',
@@ -877,6 +891,7 @@ export const en: LangPack = {
 	provenanceHintLangRequested: 'The language you asked for. It can differ from the one that was used.',
 	provenanceHintInterpretationSeed: 'The seed that fixes the interpretation. The same seed reads your words the same way.',
 	provenanceHintInterpretFallback: 'Why a stock set of instructions was performed instead of an answer from Stage 1.',
+	provenanceHintComposeFallback: 'Whether Stage 2 answered. Not recorded means the work was saved before this field existed.',
 	provenanceHintFocus: 'The focus Stage 2 placed in the picture.',
 	provenanceHintVariation: 'How far the expansion layer (Stage 1.5) was shaken for this work.',
 	provenanceHintVariationSeed: 'The seed that fixes how the variation was shaken.',

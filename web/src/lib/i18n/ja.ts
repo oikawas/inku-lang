@@ -402,6 +402,19 @@ export const ja: LangPack = {
 		: reason === 'stage1_empty_output'
 			? 'Stage 1 が空の応答を返したため、定型の代替DDLで描画しました。'
 			: 'Stage 1 が失敗したため、定型の代替DDLで描画しました。',
+	composeFallbackBadge: '作曲フォールバック',
+	confirmRefineFromFallbackMessage: 'この作品は記述との対応が切れています。ここから推敲を続けますか。',
+	confirmRefineFromFallbackContinue: '続ける',
+	composeFallbackHint: (reason) => reason === 'stage2_hard_timeout'
+		? 'Stage 2 が時間内に応答しなかったため、定型の楽譜で描画しました。'
+		: reason === 'stage2_empty_output'
+			? 'Stage 2 が空の応答を返したため、定型の楽譜で描画しました。'
+			: 'Stage 2 が失敗したため、定型の楽譜で描画しました。',
+	composeFallbackRecord: (state) => state === 'yes'
+		? 'あり'
+		: state === 'no'
+			? 'なし'
+			: '記録なし',
 	statsInterp: 'DDL生成',
 	statsStruct: 'JSON生成・SVGレンダリング',
 	statsTotal: '合計',
@@ -848,6 +861,7 @@ export const ja: LangPack = {
 	provenanceSectionRun: '実行',
 	provenanceLabelLangRequested: '要求した言語',
 	provenanceLabelInterpretFallback: '解釈フォールバック',
+	provenanceLabelComposeFallback: '作曲フォールバック',
 	provenanceLabelFocus: '焦点',
 	provenanceLabelVariation: '変奏',
 	provenanceLabelVariationSeed: '変奏 seed',
@@ -877,6 +891,7 @@ export const ja: LangPack = {
 	provenanceHintLangRequested: '作者が要求した言語。実際に使われた言語と食い違うことがある。',
 	provenanceHintInterpretationSeed: '解釈を固定する種。同じ種なら同じ読み替えになる。',
 	provenanceHintInterpretFallback: 'Stage 1 が答えず、代わりの指示書で演奏された理由。',
+	provenanceHintComposeFallback: 'Stage 2 が答えたか。記録なし＝この欄より前に保存された作品。',
 	provenanceHintFocus: 'Stage 2 が置いた絵の焦点。',
 	provenanceHintVariation: '展開層（Stage 1.5）をどれだけ振ったか。',
 	provenanceHintVariationSeed: '変奏の振りを固定する種。',

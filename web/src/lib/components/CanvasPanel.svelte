@@ -26,15 +26,16 @@
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	import Tooltip from './Tooltip.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
+	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { colorMapEntries, colorWordLabel, type ColorMap } from '$lib/colors';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
-	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; compose_fallback_used?: boolean; compose_retry_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; compose_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
@@ -562,6 +563,18 @@
 			? (statusHistoryItem.interpret_fallback ?? null)
 			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
 	);
+	// Stage 2's counterpart. A saved work reads its column; a work still on the
+	// canvas reads the response it was drawn by, which is the only place the
+	// fact exists before it is saved.
+	const composeFallbackRaw = $derived(
+		statusHistoryItem
+			? (statusHistoryItem.compose_fallback ?? null)
+			: (result ? composeFallbackValue(result) : null)
+	);
+	const composeFallbackDrawnReason = $derived(composeFallbackReason(composeFallbackRaw));
+	// Three readings for the drawer, one condition for the badge. Only Stage 2
+	// can tell 'no' from 'unrecorded', so only its row shows three.
+	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
 	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
 	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
@@ -769,8 +782,18 @@
 {#if unsavedRefinementPreview}
 	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
 {/if}
-{#if interpretFallbackReason}
-	<div class="interpret-fallback-badge" role="status" title={t().interpretFallbackHint(interpretFallbackReason)}>{t().interpretFallbackBadge}</div>
+{#if interpretFallbackReason || composeFallbackDrawnReason}
+	<!-- Stacked, and one badge per layer: a work whose interpretation and whose
+	     composition both fell has lost the words twice, and a single badge would
+	     say it once. The wording names the layer for the same reason. -->
+	<div class="fallback-badges" role="status">
+		{#if interpretFallbackReason}
+			<div class="interpret-fallback-badge" title={t().interpretFallbackHint(interpretFallbackReason)}>{t().interpretFallbackBadge}</div>
+		{/if}
+		{#if composeFallbackDrawnReason}
+			<div class="compose-fallback-badge" title={t().composeFallbackHint(composeFallbackDrawnReason)}>{t().composeFallbackBadge}</div>
+		{/if}
+	</div>
 {/if}
 {#if lineageIntermediateNotice}
 	<div class="lineage-intermediate-notice" role="status">{lineageIntermediateNotice}</div>
@@ -1439,6 +1462,10 @@
 								{#if interpretFallbackReason}
 									{@render term(t().provenanceLabelInterpretFallback, t().provenanceHintInterpretFallback)}<dd>{interpretFallbackReason}</dd>
 								{/if}
+								<!-- Always shown, and in three states: 'no record' is a fact
+								     about the work, and hiding it would leave every work drawn
+								     before the column looking like one whose compose held. -->
+								{@render term(t().provenanceLabelComposeFallback, t().provenanceHintComposeFallback)}<dd>{t().composeFallbackRecord(composeFallbackRecord)}{composeFallbackDrawnReason ? ` (${composeFallbackDrawnReason})` : ''}</dd>
 							</dl>
 						</section>
 						<section class="detail-group">
@@ -2214,8 +2241,11 @@
 	}
 	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
-	.interpret-fallback-badge { position: absolute; top: 12px; right: 12px; z-index: 5; padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
-	:global(html[data-theme='dark']) .interpret-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
+	/* The stack owns the corner; each badge only paints itself, so a second one
+	   sits under the first instead of on top of it. */
+	.fallback-badges { position: absolute; top: 12px; right: 12px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+	.interpret-fallback-badge, .compose-fallback-badge { padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	:global(html[data-theme='dark']) .interpret-fallback-badge, :global(html[data-theme='dark']) .compose-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
 	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
 	.canvas-content {
 		position: relative;

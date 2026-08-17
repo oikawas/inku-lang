@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { thumbnailConditions, thumbnailSrc } from '$lib/thumbnailSource';
+	import { composeFallbackReason, hasFallbackMark } from '$lib/composeFallback';
 	type HistoryItem = {
 		id?: string;
 		svg: string;
@@ -8,6 +9,8 @@
 		render_hash?: string | null;
 		// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
 		interpret_fallback?: string | null;
+		// Stage 2's. 'none' is not a mark -- see lib/composeFallback.ts.
+		compose_fallback?: string | null;
 	};
 
 	type Size = 'strip' | 'manager' | 'mini';
@@ -46,11 +49,21 @@
 			})
 			.replace(/<\/svg>\s*$/i, '</g></svg>');
 	});
+
+	// One mark for both layers, worded so it names the one that fell. The
+	// condition itself lives in $lib/composeFallback so this and the canvas
+	// badge cannot drift into disagreeing about the same work.
+	const fallbackMarkLabel = $derived(
+		[
+			item.interpret_fallback ? t().interpretFallbackBadge : null,
+			composeFallbackReason(item.compose_fallback) ? t().composeFallbackBadge : null
+		].filter(Boolean).join(' / ')
+	);
 </script>
 
 <div class="history-thumbnail" class:strip={size === 'strip'} class:manager={size === 'manager'} class:mini={size === 'mini'}>
-	{#if item.interpret_fallback}
-		<span class="thumb-fallback-mark" title={t().interpretFallbackBadge} aria-label={t().interpretFallbackBadge}></span>
+	{#if hasFallbackMark(item)}
+		<span class="thumb-fallback-mark" title={fallbackMarkLabel} aria-label={fallbackMarkLabel}></span>
 	{/if}
 	{#if pngSrc}
 		<img src={pngSrc} alt="" loading="lazy" decoding="async" onerror={() => (thumbMissing = true)} />

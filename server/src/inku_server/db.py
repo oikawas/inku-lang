@@ -150,6 +150,11 @@ class HistoryRow(Base):
     variation_seed = Column(String, nullable=True)
     # v1.98: Stage 1 がフォールバック DDL で描かれた作品の理由。NULL = 通常の解釈。
     interpret_fallback = Column(String, nullable=True)
+    # v2.13.38: why Stage 2 fell back to the deterministic score. Unlike the
+    # column above, NULL is not "it held": a writer that did not fall says so
+    # with "none", so a row drawn before this column exists stays tellable
+    # apart from one drawn after it. Backfilling would erase that difference.
+    compose_fallback = Column(String, nullable=True)
     interpretation_seed = Column(String, nullable=True)
     seed_text = Column(Text, nullable=True)
     # Stage 0.5 (v2.10). Both NULL = the work was painted straight from the
@@ -430,6 +435,10 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "variation_amplitude": "ALTER TABLE history ADD COLUMN variation_amplitude VARCHAR",
     "variation_seed": "ALTER TABLE history ADD COLUMN variation_seed VARCHAR",
     "interpret_fallback": "ALTER TABLE history ADD COLUMN interpret_fallback VARCHAR",
+    # No DEFAULT and no UPDATE, on purpose: a default would write "none" into
+    # every existing row and claim their compose stage held, which nothing
+    # recorded. They stay NULL, which is the true statement about them.
+    "compose_fallback": "ALTER TABLE history ADD COLUMN compose_fallback VARCHAR",
     "expanded_ddl": "ALTER TABLE history ADD COLUMN expanded_ddl TEXT",
     "interpretation_seed": "ALTER TABLE history ADD COLUMN interpretation_seed VARCHAR",
     "seed_text": "ALTER TABLE history ADD COLUMN seed_text TEXT",
@@ -2717,6 +2726,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
         item["variation_seed"] = row.variation_seed
     if row.interpret_fallback is not None:
         item["interpret_fallback"] = row.interpret_fallback
+    # Absent, not null: no key means the work was drawn before the column
+    # existed, and "none" means a writer said the stage held. A reader that got
+    # NULL for both could not tell an unrecorded work from a sound one.
+    if row.compose_fallback is not None:
+        item["compose_fallback"] = row.compose_fallback
     if row.interpretation_seed is not None:
         item["interpretation_seed"] = row.interpretation_seed
     if row.seed_text is not None:
@@ -2918,6 +2932,10 @@ def add_item(item: dict) -> dict:
         variation_amplitude=item.get("variation_amplitude"),
         variation_seed=str(item.get("variation_seed")) if item.get("variation_seed") is not None else None,
         interpret_fallback=item.get("interpret_fallback"),
+        # Carried through, never derived: an absent key means the writer said
+        # nothing, and guessing "none" here would put a claim in the row that
+        # nobody made.
+        compose_fallback=item.get("compose_fallback"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
         sketch_text=item.get("sketch_text"),

@@ -84,7 +84,7 @@ flowchart LR
 | Source | Implementation |
 |---|---|
 | Japanese/English UI packs | `web/src/lib/i18n/ja.ts`, `en.ts`, `types.ts` |
-| English terminology | `web/src/lib/i18n/GLOSSARY.md`; `npm run lint:i18n` |
+| English terminology | `docs/i18n/glossary.md` (correspondence table); `web/src/lib/i18n/GLOSSARY.md` (rules); `npm run lint:i18n` |
 | Saijiki display | `GET /api/saijiki` after login |
 | Button dimensions and action/accent tokens | `:root` in `web/src/routes/+page.svelte` |
 

@@ -3469,7 +3469,8 @@ or under `no-git-sync/`.
 
 The application is developed on macOS. **Checks that hold the CPU -- the whole
 suite, a whole perturbation sweep, rebaking the reference corpora, rasterizing,
-and benchmark runs -- are run in a test-only container on the deployment host**
+benchmark runs, and the port's JVM tests -- are run in test-only containers on
+the deployment host** (one image per toolchain)
 (`AGENTS.md` carries the procedure). Source is still synced with rsync and
 verified on the deployment host after a systemd service restart. Production
 Docker Compose images are verified at milestones such as release candidates

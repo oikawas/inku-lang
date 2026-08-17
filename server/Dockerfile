@@ -6,8 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_PREFERENCE=only-system
 
+# libcairo2 was here for cairosvg, which v2.7.10 removed entirely. resvg-py is
+# a wheel and needs no OS library of its own, so nothing in the image links
+# against cairo any more.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libcairo2 \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir uv
 

@@ -314,6 +314,59 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
         assertEquals("four primitives asked both ways", shapes.size * 2, compared)
     }
 
+    /**
+     * T-232: and each pole puts its answer in the place the server puts it.
+     *
+     * T-231 asks whether the two poles agree; this asks WHERE each one says it. The
+     * machine pole has no mark group, so the body element carries the fill. The hand
+     * pole draws the interior as marks and leaves the body open, because a flat fill
+     * under them is the very thing engine 9 and 16 took out of filled shapes -- the
+     * server states it in `_body_attrs_for_contour_stroke`, which drops `fill` and
+     * `fill_opacity` whenever `_interior_fill` reports it drew the marks itself.
+     *
+     * Nothing measured this. `test03SquareFilledExactParity` compares the mark paths
+     * and never reads the body, and the colour guard compares the SET of colours a
+     * drawing holds -- `#111111` is already in the index's `fill_colors` for this
+     * drawing, so a body newly filled with it changes no set. A flat fill could be
+     * put back under every hand-drawn fill in the port and the suite stayed green.
+     */
+    @Test
+    fun testTheHandPoleLeavesItsBodyOpenAndTheMachinePoleFillsIt() {
+        val frozen = app.inku.mobile.ReferenceCorpus.text("03_square_filled.svg")
+        val redrawn = ReferenceRendering.svg("03_square_filled")
+        for ((who, svg) in listOf("the server" to frozen, "the port" to redrawn)) {
+            val bodies = bodyRects(svg)
+            assertEquals("$who draws one body rect for 03_square_filled", 1, bodies.size)
+            assertTrue(
+                "$who leaves the hand pole's body open: ${bodies[0]}",
+                bodies[0].contains("""fill="none""""),
+            )
+            assertFalse(
+                "$who writes no fill-opacity onto that open body: ${bodies[0]}",
+                bodies[0].contains("fill-opacity"),
+            )
+            assertTrue("""$who draws the interior as marks instead""", svg.contains("""class="fill-"""))
+        }
+
+        val machine = render(
+            """{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"rotring","color":"black","filled":true}"""
+        )
+        val machineBodies = bodyRects(machine)
+        assertEquals("the machine pole draws one body rect", 1, machineBodies.size)
+        assertTrue(
+            "and that body IS the fill for the machine pole: ${machineBodies[0]}",
+            machineBodies[0].contains("""fill="#111111""""),
+        )
+        assertFalse("the machine pole lays down no fill marks", machine.contains("""class="fill-"""))
+    }
+
+    /** Every `<rect>` a drawing holds except the ground, which is the one at the origin. */
+    private fun bodyRects(svg: String): List<String> =
+        Regex("""<rect\b[^>]*>""").findAll(svg)
+            .map { it.value }
+            .filterNot { it.contains("""x="0"""") && it.contains("""y="0"""") }
+            .toList()
+
     private fun machineBody(svg: String, primitive: String): String = when (primitive) {
         "circle" -> element(svg, "circle")
         "ellipse" -> element(svg, "ellipse")

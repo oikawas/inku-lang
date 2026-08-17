@@ -76,7 +76,7 @@ flowchart LR
 
 - `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Roomという端末内flow。
 - `RoutingModelProvider` はlocal LiteRT-LMとOpenAI-compatible remote providerを選ぶ。
-- `CompatibilityConstants.renderEngineVersion` は26。Serverの29とは別版である。
+- `CompatibilityConstants.renderEngineVersion` は35。Serverの38とは別版である。
 - serverの条件式・schema・seed・参照fixtureを後追い移植する。数字が同じでも自動的な同一実装ではない。
 
 ## i18nとUI token
@@ -84,7 +84,7 @@ flowchart LR
 | 正本 | 実装 |
 |---|---|
 | 日本語/英語UI pack | `web/src/lib/i18n/ja.ts`, `en.ts`, `types.ts` |
-| 英語UI用語 | `web/src/lib/i18n/GLOSSARY.md`、`npm run lint:i18n` |
+| 英語UI用語 | `docs/i18n/glossary.md`（対応表）、`web/src/lib/i18n/GLOSSARY.md`（規則）、`npm run lint:i18n` |
 | 歳時記表示 | login後の`GET /api/saijiki`でserver tableからhydrate |
 | button寸法・action/accent色 | `web/src/routes/+page.svelte`の`:root` token |
 

@@ -4,15 +4,15 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST) |
-| Public branch / commit | `main` / `dfa7b25569c10f45fe504fdb39be1335eebb9e87` |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17 |
+| Public branch / commit | `main` / `a69730d743da478eb7d3b3e9c8c9b50fa008ccfd` |
 | Public uncommitted changes | None at the refreshed snapshot |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.11.18 / Build 874` |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.39 / Build 926` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.11.18`; `web/BUILD_NUMBER` = `874` |
-| Render Engine | implementation `default / 29` |
-| DDL | `ddl_version=3`; `ddl_engine_version=11` |
-| Android | `android/VERSION` = `2.1.4-android.22`; implementation reports Render Engine `26` |
+| Web / app | `web/APP_VERSION` = `v2.13.39`; `web/BUILD_NUMBER` = `926` |
+| Render Engine | implementation `default / 38` |
+| DDL | `ddl_version=3`; `ddl_engine_version=20` |
+| Android | `android/VERSION` = `2.1.4-android.43`; implementation reports Render Engine `35` |
 
 Environment-variable names may appear, but values, credentials, production DB contents, and deployment-specific identifiers were outside the investigation.
 
@@ -30,9 +30,10 @@ Environment-variable names may appear, but values, credentials, production DB co
 | SYS-FILES | Work-file area | Optional description, DDL, JSON, SVG, and PNG derivatives | `api_core/rendering.py` (`_save_output_files`, `_submit_history_artifact_save`) | §21 | Confirmed |
 | SYS-LOG | Log area | stdout and rotating application file | `logging_setup.py:configure_logging` | §21 | Confirmed |
 | SYS-BACKUP | DB backup area | SQLite replicas and manual/scheduled generations | `db.py:create_db_backup`, `ensure_scheduled_db_backup` | §22 | Confirmed |
-| API-ROUTERS | Router set | 10 groups and 82 endpoints | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `test_route_authorization.py` | Project Context | Confirmed |
-| API-AUTH | Authentication and authorization | Bearer/cookie sessions, role guards, six public paths | `api_core/deps.py`; `routers/auth.py`; `test_route_authorization.py` | §22 | Confirmed |
+| API-ROUTERS | Router set | 10 groups and 96 endpoints (the canonical count is `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py`) | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `test_route_authorization.py` | Project Context | Confirmed |
+| API-AUTH | Authentication and authorization | Bearer/cookie sessions, role guards, three public paths | `api_core/deps.py`; `routers/auth.py`; `test_route_authorization.py` | §22 | Confirmed |
 | API-LIMIT | Capacity boundaries | Body, request, render, Stage, and file-queue limits | `security.py`; `api_core/state.py`; `render.py:_run_with_hard_timeout` | §22 | Confirmed |
+| PIPE-LIMITS | Drawing-volume limits | Define the ceilings on expanded primitives, instructions, and counts read from a description in one place, resolve them per request, and record them on the work | `limits.py` (`Limits`, `DEFAULT_LIMITS`); `render.py:_limits_for_render` | Project Context | Confirmed |
 | PIPE-SKETCH | Stage 0.5 Sketch from life | Optional natural-language observation and state record | `sketch.py`; `render.py:_resolved_sketch`; `SketchDetail` | §12.15; Project Context | Confirmed |
 | PIPE-S1 | Stage 1 interpretation | Description to Instructions (normalized DDL) | `interpreter.py:interpret_detail`, `_build_system_prompt_parts` | §12.1, §12.6 | Confirmed |
 | PIPE-PLUGIN | Declarative plugin | Deterministic writing-down into core DDL and optional instructions | `plugins/document_format.py`; `render.py:_call_compose_detail` | §4.4–4.7 | Confirmed |
@@ -46,6 +47,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | DATA-RH2 | Legacy `rh2` | Compatibility with the older edition hash | `db.py:_legacy_render_hash_for_item`; `test_render_hash.py` | Project Context | Confirmed |
 | DATA-LINEAGE | Lineage nodes and edges | Connect only an explicit parent and derivation kind | `LineageNodeRow`; `LineageEdgeRow`; `db.py:add_item`; `test_lineage_acceptance.py` | §21; Project Context | Confirmed |
 | DATA-SAIJIKI | Saijiki | Vocabulary source for prompts, markers, relation literals, display, and references | `saijiki.py`; `test_saijiki_golden.py` | Project Context | Confirmed |
+| DATA-FALLBACK | Fallback records | Store each layer's fallback as a column (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`, Sketch from life = `sketch_state`), keeping "unrecorded" (works older than the column) apart from "not a fallback" | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context | Confirmed |
 | WEB-FEATURES | Web feature modules | Separate batch, export, catalog, inspection, Wild, and related state | `web/src/lib/features/<name>/` | Project Context | Confirmed |
 | WEB-REGISTRY | Three settings registries | Collect local storage, user settings, and render payload fields | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context | Confirmed |
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
@@ -54,7 +56,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | TEST-CORPUS | Frozen corpora | Rebuild and compare 606 Render Engine 38 cases and 49 DDL Engine 20 cases | `server/reference/render-engine-38/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | Confirmed |
 | TEST-ANDROID | Android reference | Pin Server-version fixtures with manifests | `android/app/src/test/resources/server_reference/`; `test_android_reference_fixtures_are_current.py` | Android specification | Confirmed |
 | TEST-WEBCLI | Web/CLI checks | Svelte checks/unit/lint and CLI pytest | `web/package.json`; Web tests; `cli/tests/test_cli.py` | Project Context | Confirmed |
-| CI-GATES | Current CI | Corpus rebuild, Android design preview, and release-tag container build | `.github/workflows/reference-corpus.yml`; `release.yml` | §11, §22 | Confirmed |
+| CI-GATES | Current CI | Server/CLI lint+pytest, Web check+unit+lint:i18n, document checks, corpus and Android design preview rebuild, and release-tag container build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `release.yml` | §11, §22 | Confirmed |
 
 ## Confidence
 

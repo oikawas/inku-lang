@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `dfa7b25569c10f45fe504fdb39be1335eebb9e87`、app `v2.11.18 / Build 874` である。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `a69730d743da478eb7d3b3e9c8c9b50fa008ccfd`、app `v2.13.39 / Build 926` である。
 
 ## 推奨閲覧順
 
@@ -8,12 +8,14 @@
 2. `system-context.ja.md` — システム外形
 3. `runtime-containers.ja.md` — 実行単位
 4. `ddl-processing-pipeline.ja.md` — DDL処理
-5. `server-components.ja.md` — Server内部
-6. `client-boundaries.ja.md` — Web/CLI/Android
-7. `data-history-lineage.ja.md` — DB、同一性、系譜
-8. `operations-security.ja.md` — 運用・安全境界
-9. `change-impact-map.ja.md` — 変更時の波及
-10. `known-differences.ja.md` — 不一致・未確認
+5. `description-to-svg.ja.md` — 記述からSVGまでの判定の道筋（pipelineの深掘り）
+6. `server-components.ja.md` — Server内部
+7. `client-boundaries.ja.md` — Web/CLI/Android
+8. `data-history-lineage.ja.md` — DB、同一性、系譜
+9. `operations-security.ja.md` — 運用・安全境界
+10. `change-impact-map.ja.md` — 変更時の波及
+11. `known-differences.ja.md` — 不一致・未確認
+12. `future-plan.ja.md` — 生成アーキテクチャの改修計画（裁定済みの範囲）
 
 ## 図の読み方
 
@@ -36,4 +38,4 @@
 5. 各図の直後の根拠表を更新し、`known-differences.ja.md` へ差異を移す。
 6. Mermaid fence、参照path、秘密値・内部識別子、Git差分が意図した文書だけであることを検査する。
 
-英語版は同名の `.md`、日本語版は `.ja.md` とし、事実・構造・Evidence IDを同時に更新する。日本語の設計判断を正本とし、英語は `web/src/lib/i18n/GLOSSARY.md` の語彙に従う。
+英語版は同名の `.md`、日本語版は `.ja.md` とし、事実・構造・Evidence IDを同時に更新する。日本語の設計判断を正本とし、英語は `docs/i18n/glossary.md` の対応表と `web/src/lib/i18n/GLOSSARY.md` の規則に従う。

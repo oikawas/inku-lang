@@ -122,12 +122,12 @@ line behavior, color, weight, and negative space.
 
 ### 3.1 What Belongs in the Core
 
-The core vocabulary is the ten Saijiki categories plus **relations** (あいだ).
+The core vocabulary is the eleven Saijiki categories plus **relations** (あいだ).
 The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v2.7.9 snapshot.
+Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is an overview, and reference §1 decides additions and removals.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
@@ -135,6 +135,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
 | surfaces | おもて | empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
@@ -350,9 +351,10 @@ shorthand, not a new capability.
 
 ### 4.4 Implementation Hooks
 
-The reference implementation adds the `canvas-aspect` plugin (v1.29).  Its only
-hook is the **canvas-size hook**, and per-user plugin settings are stored as JSON
-in plugin extension storage.  System plugins and user plugins live in separate
+The reference implementation's plugin hooks began with the `canvas-aspect`
+plugin (v1.29), whose only hook was the **canvas-size hook**; the current shape
+of vocabulary plugins is the declarative document format of §4.6 (v1.90.0).
+Per-user plugin settings are stored as JSON in plugin extension storage.  System plugins and user plugins live in separate
 directories, one directory per plugin: `server/src/inku_server/plugins/system/canvas_aspect/`
 on the server and `web/src/lib/plugins/system/canvas-aspect/` on the web side.
 The web UI's plugin button (Canvas) sits in the writing tab's action row,
@@ -385,7 +387,7 @@ Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.i
 
 The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus bounded expansion forms: deterministic `N to M` repetition (with unit-preserving singulars, and Build 591 multi-word English units such as `leaf forms`, `blades`, `cloudforms`, `spots`, `arcs`); a `member name: definition` local composite inlined at each member (Build 591; undefined references are rejected at load); `note:` comment lines that carry no expansion (Build 591); a `preview:` line naming **one `.png` inside the document's own directory** (v2.14), which takes no part in expansion or the closure check — a path that leaves the directory (relative or absolute), a name that is not `.png`, a file over 512 KB, and a missing file are all refused, and **a refusal does not stop the document loading**, it leaves the word with the same shared picture a built-in word without one of its own gets; the HiDPI sibling is **found by name rather than declared** (`name@2x.png`), so "no HiDPI" stays distinguishable from "no picture"; the picture is served by `GET /api/saijiki/plugin-preview` instead of riding in the Saijiki payload and is shown in an `<img>`, so **a document cannot put markup on screen**; an `anchor` whose region determines separate member bands, including a Build 591 `anchor ... at N to M spots` nested repetition (spots x per-anchor members, depth two, each spot its own band); and symbolic `{region: ...}` translation, whose canonical key list is published by reference §3 and includes a `bottom band`, with an `upper-left to lower-right diagonal band` resolved as a computation (member sub-regions along a descending diagonal) rather than a rectangle. The same input chooses the same count, member regions, and rotations.
 
-Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
+Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This boundary also applies where the deterministic per-member transcription (Build 600) leaves no region sentence in the text: for input whose plugin expansion returned transcribed instructions, Stage 1.5's additions are suppressed the same way (Build 605). This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
 
 The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not a governor of the work itself. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). Since v1.92 the closure marker table (shapes, verbs, relations, and the Saijiki modifier categories) is derived from the saijiki table; reference §1 and §3 always show the current values.
 
@@ -691,7 +693,7 @@ the language-specific extension separate on their own.
 This subsection is on the operational side.  It records what the English path
 actually does and how it was measured.
 
-Builds 403-427 extend the English instruction path beyond structural routing.
+Build 403 through 427 extended the English instruction path beyond structural routing.
 Japanese and English now live in separate language files for Stage 1 prompts,
 Stage 1.5 expansion/filter behavior, Stage 2 prompts, and coerce marker sets.
 They still share the same JSON Score schema, renderer, color catalogs, and
@@ -845,8 +847,8 @@ name.
 
 **Category structure**
 
-Saijiki displays 11 categories — forms, angles, touches, continuity, surfaces,
-colors, movements, places, motions, proportions, relations — together with the qualified
+Saijiki displays 12 categories — forms, angles, touches, continuity, surfaces,
+grounds, colors, movements, places, motions, proportions, relations — together with the qualified
 words of any loaded plugin.  The current values of the vocabulary are given by
 the §3.1 table and by reference §1, and the web Saijiki display is served from
 that same saijiki table (v1.92: `GET /api/saijiki` plus a synchronized store over
@@ -854,7 +856,7 @@ the snapshot bundled into the build).
 
 The Japanese category names are written in hiragana.  Kanji is stiff; hiragana
 lowers the threshold of writing.  The English category names are forms / angles /
-touches / continuity / **surfaces** / colors / movements / places / motions /
+touches / continuity / **surfaces** / **grounds** / colors / movements / places / motions /
 proportions / relations.
 
 **Placement policy**
@@ -941,14 +943,29 @@ part I rewrote" and "the degree to which the LLM read it" on a single screen.
 What follows records what the reference interface actually provides.  It is
 operational rather than conceptual.
 
-Short English tabs, buttons, and labels follow the casing and vocabulary rules
-in `web/src/lib/i18n/GLOSSARY.md`, which is canonical for the English interface
-and is enforced by `npm run lint:i18n` (v2.7.1).  At iPad-class widths the
+Short English tabs, buttons, and labels follow the correspondence table in
+`docs/i18n/glossary.md` and the style rules in `web/src/lib/i18n/GLOSSARY.md`
+(the correspondence table was consolidated into the former on 2026-08-17); the
+latter's rules are enforced by `npm run lint:i18n` (v2.7.1).  At iPad-class widths the
 Canvas tabs and the displayed Models / Color / Canvas / creation metadata wrap
 into two rows, and the left panel scales with the viewport rather than clipping
 the work metadata.
 
-The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
+The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause.
+
+Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser.
+
+Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog.
+
+Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover.
+
+Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates.
+
+A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs.
+
+The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work.
+
+Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
@@ -1031,9 +1048,11 @@ history pages, or while a history request is already in flight.
 
 PNG export options are managed as per-user templates in the settings modal's
 export tab.  Each template has a name, description, and y-axis height in pixels.
-The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
-menu is generated from these templates, and export width is computed from the
-current canvas aspect ratio.
+The default templates are `PNG 1080px`, `PNG 2160px`, and `PNG 4320px` (the
+older stored defaults `1024px` / `2048px` are replaced automatically, while
+templates the user edited are kept).  The status bar PNG menu is generated from
+these templates, and export width is computed from the current canvas aspect
+ratio.
 
 ---
 
@@ -1242,7 +1261,8 @@ not as an artistic quality signal.  Queue delays can indicate service pressure,
 but they do not exclude a successful work from aesthetic or structural review.
 
 **The inventory of what is currently implemented moved to
-[current implementation status](docs/spec/implementation-status.md) on 2026-07-28.**
+[current implementation status](docs/spec/implementation-status.md) on 2026-07-28**
+(kept as a Japanese/English pair since 2026-08-02, with Japanese canonical).
 
 ### 11.4 The Original Test Plan (v0.8 to v1.6)
 
@@ -1276,6 +1296,11 @@ around 100), (4) build a log viewer (SVGs side by side for visual review).
 ---
 
 ## 12. The Two-Stage Architecture
+
+The early sections of this chapter (12.1–12.10) keep assumptions from the design
+period. The model then assumed for Stage 1 was Opus 4.7, and passages written
+under that name are **records of the design period**. The current implementation
+selects models per stage (§12.5) and assumes no particular one.
 
 ### 12.1 Two Stages, Not One
 
@@ -1400,7 +1425,7 @@ a light one — is kept as policy:
 
 ### 12.6 The Design of Stage 1 (Interpretation)
 
-**What Opus 4.7 carries:**
+**What Stage 1 carries:**
 
 1. read the meaning of a free description (「佇ませる」 -> *place it quietly at
    the center*)
@@ -1410,8 +1435,9 @@ a light one — is kept as policy:
 4. decide the degree of sway from the atmosphere of the description
    (「ひっそりと」, *hushed*, -> a small sway)
 
-This design draws the most out of Opus's **artistic power of interpretation**.
-Reading nuance is hard for a light model, so it is left to Opus.
+This design draws the most out of the interpreting model's **artistic power of
+interpretation**.  Reading nuance is hard for a light model, so it is left to a
+capable one (Opus 4.7, at design time).
 
 In the implementation the stage holds to the same boundary.
 
@@ -1485,7 +1511,7 @@ Splitting into two stages lets error recovery be designed per stage.
   feedback (§7.6)
 - **it is fed back to the author and does not stop the processing**
 
-**Errors in stage two:**
+**Errors in stage two (as assumed at design time):**
 
 1. try to repair the JSON in the sanitizer (the existing Kotlin / Python
    implementation)
@@ -1493,6 +1519,12 @@ Splitting into two stages lets error recovery be designed per stage.
    most three times)
 3. if that still fails, fall back to Opus 4.7 (it costs more but nearly always
    succeeds)
+
+**The implementation did not take step 3.** An empty or too-short answer is
+retried **once, with the reason stated in the prompt**, and a hard timeout or an
+empty retry completes the run through the **deterministic fallback** (a Score
+written mechanically from the DDL). There is no fallback to another model — the
+choice was to record the fall rather than hide it (the addenda below).
 
 **Added in v1.98:** an empty Stage 1 output is treated as a failure rather than
 drawn from nothing. A work drawn through a Stage 1 fallback path records an
@@ -1519,9 +1551,9 @@ Score.  This fallback is still expected to preserve the DDL's visible essentials
 quantity, placement path, material words, scene tone, and enough shape variety
 to remain reviewable.
 
-### 12.9 Implementation Order (Back to Front)
+### 12.9 Implementation Order (Back to Front) — a Record of the Plan
 
-The policy is to **implement from the back of the pipeline forward**.
+The policy was to **implement from the back of the pipeline forward** (done).
 
 **Step 1: build stage two first**
 
@@ -1556,7 +1588,10 @@ waiting for stage two, the drawing, to finish.  The felt latency drops.
 
 **Measure B: cache.**  On the assumption that the same description produces
 the same normalized DDL, cache the result of stage one.  Sway enters from
-stage two onward.
+stage two onward.  The shape this took in the implementation is **reuse of the
+saved DDL**: "Another composition" and "Paint from DDL" start from the stored
+normalized DDL through `/api/compose` and do not call Stage 1 again; the server
+keeps no separate Stage 1 cache.
 
 The cache must not kill the one-time nature of the output (§13.2, role 2).
 Macro sway — composition and placement — is realized by the renderer
@@ -1581,7 +1616,15 @@ stage two in parallel.
 
 ### 12.11 The Intermediate Filter (Stage 1.5)
 
-v1.19 introduces a deterministic intermediate filter between stage one
+**⚠ The technique-injection passages of this section (the candidate layers of
+mathematics, music, and painting technique) are a record of the design's
+history.** The role turned to attaching relation predicates in v1.51 (§14.5),
+and the folding away of the staffage level in v2.11.0 (§12.12) removed the
+candidate injection itself. **What the current Stage 1.5 does is rewrite the
+focus and perform explicit variation (§12.13), nothing more.** Do not infer the
+current structure from this section alone.
+
+v1.19 introduced a deterministic intermediate filter between stage one
 (interpretation) and stage two (structuring).
 
 ```text
@@ -2752,7 +2795,7 @@ repetition of the same auxiliary layer becomes structurally unlikely.
 
 ### 14.6 Constraints and Prohibitions
 
-Given the lesson of tune_bench Builds 346 through 436 — an accumulation of
+Given the lesson of tune_bench Build 346 through 436 — an accumulation of
 one-directional repair layers contracted the output distribution — the following
 hold when relation is introduced.
 
@@ -2885,16 +2928,21 @@ performance.
 
 ### 15.1 Axes of Development
 
-**Main axis**: web UI (browser) + Python FastAPI + the Opus 4.7 API
+**Main axis**: web UI (browser) + Python FastAPI + LLM providers selected per
+stage (§12.5)
 
 - the reasons: speed of development, ease of demonstration, room to grow
-- testing and iteration are done on the Mac
+- development happens on the Mac; sustained-load testing runs in a dedicated
+  test container on the deployment host (§22)
 
-**Complementary axis**: an Android app (Pixel 9) + Gemma 4 E2B-IT
+**Complementary axis**: a native Android app (verified on a Pixel 9) +
+LiteRT-LM (Gemma 4 E2B / E4B)
 
-- end-to-end operation confirmed
+- a port that follows the server as canonical, tracking the render engine
+  version by version (the current state is in `android/ANDROID_SPEC.ja.md`)
 - kept as the "it runs on a local LLM too" point of difference
-- further development is kept to a minimum
+- its versioning is independent, in `android/VERSION`, with its own acceptance
+  cycle
 
 ### 15.2 Phase 1 (completing the PoC) -- reached by v0.8 (the plan as it stood)
 
@@ -3002,8 +3050,8 @@ The scene-tone rule currently chooses from the abstract colors alone:
 - water, night, moon, rain, mist, and cold air lean toward blue / white / gray
 - forest, leaves, grass, moss, and fragrance lean toward green / white / gray
 
-Nuance that cannot be represented by the six abstract colors is retained in
-`color_hint` for catalog-based rendering.
+Nuance that cannot be represented by the nine abstract colors (§3.1) is retained
+in `color_hint` for catalog-based rendering.
 
 Relations are sequential. `along`, `not_touching`, `cutting`, and `touching` refer to the immediately previous instruction; `between` refers to the previous two. There are no arbitrary ids, forward references, or repair governors for relations. Invalid relations are dropped by validation or coercion with a recorded warning, and the instruction is rendered normally without the relation. The coerce layer may remove invalid relations but must not add new ones. JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, `前の二つの間に` / `between the previous two`, and the explicit contact phrases `前の線に触れる` / `touching the previous line` or `前の弧に両端で触れる` / `touching the previous arc at both ends`. Touching is never added spontaneously. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
 
@@ -3610,8 +3658,10 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── server/                            # the FastAPI backend (inku_server, managed with uv)
 ├── web/                               # the SvelteKit 2 + Svelte 5 frontend
 ├── cli/                               # inku-cli (an HTTP API client, managed with uv)
-├── manual/ja|en/cli-reference-for-ai.md  # the CLI reference
-└── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.md)
+├── shared/                            # the analysis package the server and CLI share (inku_analysis)
+├── docs/                              # published documents (architecture / spec / guide / history / i18n)
+├── manual/ja|en/                      # the user manual (seven Japanese/English pairs)
+└── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.ja.md)
 ```
 
 The **current values** of the module layout, the API routes, the CLI
@@ -3632,8 +3682,9 @@ These are canonical instead:
   SvelteKit template, and `cli/README.md` holds usage recipes and a copy of
   `--help`, so none of the three described an internal layout)
 
-`ddl/` is the early Python PoC that the complementary Android axis was built
-from; the web version has moved to `server/`.
+The early Python PoC directory `ddl/`, which the complementary Android axis was
+built from, has served its purpose and left the tree; `server/` carries the
+implementation.
 
 ---
 
@@ -3672,7 +3723,13 @@ The writing tab no longer asks the author to choose an instruction language. Nor
 
 Normal Stage 1 and Stage 2 generation is LLM processing, while image-reading operations have a separate per-user Vision model setting. The model dialog separates Shared Stage 1/2, Stage 1, Stage 2, and Vision selection, and admin model settings identify whether each model is available for LLM, Vision, or both. `GET /api/models` retains the LLM `catalog` for older CLI clients and also returns `llm_catalog` and `vision_catalog`. The colophon has its own per-user model choice, initially derived from the general Vision default and restored the next time it opens. An explicit API or CLI model remains authoritative for compatibility.
 
-Each model may carry LLM/Vision purposes, per-purpose five-level recommendations (split into LLM and Vision values in v1.98; the old single value is read for compatibility only), Japanese and English evaluation comments, and a measured speed class and label. **Recommendations are split by stage as well as by purpose since v2.9.10**: a model measured per stage carries a Stage 1 and a Stage 2 value, which narrow the per-purpose value rather than replacing it. A model with no stage value reads the per-purpose value for both stages, so nothing changes for a model measured end to end. Administrators can edit this metadata, and both admin and user model selection expose it on hover. **Hover shows two recommendation lines for a model measured per stage and one line for a model measured end to end (v2.9.10)** — duplicating an end-to-end value across two lines would imply a measurement that was never made. Vision is not split by stage. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. **A provider may declare that its speed values are shown in developer mode only (v2.9.5, v2.9.8)**, which applies to providers whose numbers depend on one machine's environment and are therefore not something a release can promise. The hiding happens in the display layer alone; it changes neither what is stored nor which model is called. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while the colophon selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
+Each model may carry LLM/Vision purposes, per-purpose five-level recommendations (split into LLM and Vision values in v1.98; the old single value is read for compatibility only), Japanese and English evaluation comments, and a measured speed class and label. **Recommendations are split by stage as well as by purpose since v2.9.10**: a model measured per stage carries a Stage 1 and a Stage 2 value, which narrow the per-purpose value rather than replacing it. A model with no stage value reads the per-purpose value for both stages, so nothing changes for a model measured end to end.
+
+Administrators can edit this metadata, and both admin and user model selection expose it on hover. **Hover shows two recommendation lines for a model measured per stage and one line for a model measured end to end (v2.9.10)** — duplicating an end-to-end value across two lines would imply a measurement that was never made. Vision is not split by stage.
+
+Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. **A provider may declare that its speed values are shown in developer mode only (v2.9.5, v2.9.8)**, which applies to providers whose numbers depend on one machine's environment and are therefore not something a release can promise. The hiding happens in the display layer alone; it changes neither what is stored nor which model is called.
+
+Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while the colophon selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
 
 Since v1.98 every model list is ordered with end-of-life (EOL) models last, then by the recommendation for the purpose and stage at hand in descending order (the stage since v2.9.10), with ties broken by label. A shared Stage 1/2 selection uses the lower of the two stage values. EOL models stay in the catalog marked as retired and unselectable rather than being removed, so model references in saved works remain resolvable. **There are two reasons a model can be unselectable: it has reached end of life, or it requires a paid plan from the provider (v2.9.8).** The second mark does not appear in the provider's own listing — such a model is listed and then refuses when called — so **a re-fetch does not clear it**, whereas an EOL mark is cleared because the listing carries it. The difference is where the mark comes from: the listing, or a measurement. The server does not reject requests naming an EOL model; the provider's failure is classified and explained by kind (model gone, authentication, rate limit, other).
 
@@ -3683,6 +3740,36 @@ Build 558 implements this boundary and the UI-language fallback. Adopted compari
 Build 559 adds the effective Stage 1 and Stage 2 languages to Provenance / Details. Normal works show their shared resolved language, while adopted language comparisons show the per-stage values recorded in lineage metadata.
 
 Build 560 aligns Provenance / JSON with Details by adding per-stage instruction languages, render/layout/interpretation seeds, description hash, elapsed time, input/output token counts, and derivation kind/metadata at the top level. The JSON Score, API and database schemas, and canonical render-hash payload remain unchanged.
+
+Build 561 removes "seed with today's words" from first-run generation on the writing tab and moves it into Refine's Adjust as "words change the touch". The input words act on neither the interpretation, the DDL, the JSON Score, nor the composition; they change only the Renderer's performance seed, deterministically. The same words reproduce the same touch, so options are generated one at a time. The phrase and the decided seed are kept in history, the provenance JSON, and the replay path. The first sheet, as the original poem, does not apply the phrase.
+
+Build 562 removes the instruction text that was shown twice below the description input and merges the normalized-DDL heading into the same row as Saijiki, DDL edit, and auto-repair. Among the refinement elements, "words change the touch" moves to the end and shows its untitled input field — with the note on seed determinism and the one-option limit — only while selected. The writing tab's selection buttons now name what they operate on, Canvas and Color catalog, in both languages instead of showing the current values, and the canvas prefix icon is gone.
+
+Build 563 orders the writing tab's actions color catalog, model selection, canvas, new, and gives the canvas selector the same border and background as the other ordinary buttons. The Instructions and Interpretation (normalized DDL) headings are emphasized as 12px medium-bold without increasing the line height.
+
+Build 545 organizes the Canvas work information and the next-generation settings into separate groups and gathers provenance into the Details / Prompts / JSON inspector. Stage 1 user input and the Stage 2 system prompt keep their content and roughly halve their displayed line count.
+
+Build 546 merges the previously independent comparison tab into Refine, splitting Refine into the Adjust and Model comparison subtabs. Switching subtabs keeps each option and comparison result; only changing the displayed work discards old comparison results.
+
+Build 547 adds First to the right of Next in the History Manager, jumping straight to the oldest page — the one holding the first saved work. It is disabled while the oldest page is shown and while loading.
+
+Build 548 fixes a boundary condition where the History Manager's page-size calculation counted the thumbnail area's padding as placeable area and computed one more column than the actual CSS grid. Columns now come from the grid's real width, height from the effective height without the vertical padding, and only as many items are fetched as fit without cutting the bottom row.
+
+Build 549 unifies the History Manager's Delete selected with the lineage tab's bulk trash operation: a trash icon with the selection count. It is disabled with nothing selected, and the operation name stays in the tooltip and aria-label.
+
+Build 550 stops enumerating the demo tab's instruction-generation models from a fixed catalog and synchronizes them with the configured, enabled list `/api/models` returns. Empty providers are excluded from the candidates, a stored demo model that has been disabled is corrected to the first enabled entry and saved, and starting the demo is disabled when no model is enabled.
+
+Build 551 fixes the inconsistency where the demo's per-drawing random color catalog changed only the render request and never updated the catalog selected on screen. The draw now switches the UI selection too — choosing among candidates other than the previous one when two or more catalogs exist — and the selection re-synchronizes with the catalog ID the response actually used.
+
+Build 552, after a case where the client-side draw alone pinned the actual rendering to `Ink & Season`, adds the backward-compatible `random_color_catalog` to `/api/paint`. When enabled the server draws the lot excluding the current catalog ID it was sent, and the decided ID travels through render metadata, the color map, the Renderer, history, and the response. The demo updates the UI from the ID the response used; normal drawing keeps the explicit catalog ID.
+
+Build 553 changes the refinement elements to a radio-style single selection, so that one lineage edge answers to one kind of change, and adds the color catalog as the fourth element. Color options are made by a metadata-carrying redraw that pins the parent work's DDL, Score, seeds, and canvas, recording the IDs before and after in `catalog_change`. Touch, layout, and reading options likewise inherit the parent work's actual catalog and canvas.
+
+Build 554 fixes options surviving from a previous target even after another work — a saved option, say — was explicitly chosen as the refinement target. Choosing a work from history, lineage, nearby works, or prev/next, starting a new generation, and drawing from DDL all reset the option state and the progress display; switching subtabs inside Refine keeps them.
+
+Build 555 unifies the reset of the transient displays that belong to the target work: model-comparison results, reading differences, replay errors, and the lineage intermediate-work notice and fetch state are also discarded when the target switches. Model comparison checks an AbortController and a run ID, lineage fetches a request ID, and comparison, refinement saves, and replays check the target generation, so a stale response from an old target cannot leak into the current work.
+
+Build 556 fixes the stacking order in which the lineage overview sat in front of the delete-confirmation dialog, making the trash operation appear unresponsive after items were checked. The confirmation dialog now sits on the topmost operation layer, above the full-screen overlay, so deletion can be confirmed or cancelled without closing the overview.
 
 ## Autonomous Refinement Methods
 

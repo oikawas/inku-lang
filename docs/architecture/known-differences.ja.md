@@ -11,9 +11,8 @@
 ### F-02 Android仕様メモの版記述
 
 - `android/ANDROID_SPEC.ja.md` 冒頭は `2.1.4-android.10` / engine 21、server `v2.11.2` / engine 21と記す。
-- 同じ文書の後半はengine 26へ到達と記す。
-- 実装は `android/VERSION` が `2.1.4-android.22`、`CompatibilityConstants.renderEngineVersion` が26。
-- 判定: **文書内不一致かつ冒頭snapshotが古い**。
+- 実装は `android/VERSION` が `2.1.4-android.43`、`CompatibilityConstants.renderEngineVersion` が35（2026-08-17に再測）。
+- 判定: **冒頭snapshotが古い**。追随の実況は文書後半の周ごとの節が持ち、冒頭は追いついていない。
 
 ### F-03 Android外部provider実行
 
@@ -62,6 +61,6 @@ request/response schema、provider failure、fallback、Stage orchestration、tr
 
 1. Android仕様メモ冒頭のsnapshotと外部provider「未実装」を、現行コードに合わせて更新するか。
 2. page、DB、render routerの責任集中を、次の機能変更時にどのseamから分離するか。
-3. pytest/Web/CLI/Android local gateをCIへ追加するか。現状はcorpus以外の退行をCIが止めない。
+3. Android JVM testをCIへ追加するか。server/CLI/Web/docsのgateは`checks.yml`（台帳I-192）でCIに入った。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

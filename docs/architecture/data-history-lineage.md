@@ -20,7 +20,7 @@ flowchart LR
     NODE -->|"explicit parent + derivation kind"| EDGE
 ```
 
-A DB row stores the input, Stage 1 DDL, effective DDL, JSON Score, Server SVG, model/version/seed/color/time/token metadata, marks, and display state. Disabling automatic files or overflowing their queue does not remove DB history.
+A DB row stores the input, Stage 1 DDL, effective DDL, JSON Score, Server SVG, model/version/seed/color/time/token metadata, marks, and display state. It also carries the sketch columns (`sketch_text` / `sketch_grain` / `sketch_state`) and each layer's fallback record (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`). `compose_fallback` has three readings — fell (a reason string), held (`none`), and unrecorded (works older than the column) — and unrecorded is never read as "not a fallback". Nothing is backfilled. Disabling automatic files or overflowing their queue does not remove DB history.
 
 ## Identity values
 

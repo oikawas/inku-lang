@@ -20,7 +20,7 @@ flowchart LR
     NODE -->|"明示parent + derivation kindのみ"| EDGE
 ```
 
-DB rowには入力、Stage 1側DDL、effective DDL、Score、server生成SVG、model/版/seed/色/時間/token、mark、表示状態が入る。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
+DB rowには入力、Stage 1側DDL、effective DDL、Score、server生成SVG、model/版/seed/色/時間/token、mark、表示状態が入る。さらに写生（`sketch_text` / `sketch_grain` / `sketch_state`）と、各層のfallbackの記録（Stage 1 = `interpret_fallback`、Stage 2 = `compose_fallback`）を列として持つ。`compose_fallback`は「fallbackだった（理由文字列）」「fallbackでない（`none`）」「記録なし（列導入前の作品）」の3値で、記録なしをfallbackでないと混同しない。backfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
 
 ## 4種類のID
 

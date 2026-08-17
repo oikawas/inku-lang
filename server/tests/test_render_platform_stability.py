@@ -23,6 +23,7 @@ import inspect
 import json
 import math
 import pathlib
+import sys
 
 from inku_server import renderer
 
@@ -40,18 +41,26 @@ ENGINE_28_PLATFORM_SPLITS = frozenset(
     }
 )
 
-# Measured on 2026-08-09 against engine 28, before the contact-length
-# quantiser existed. The sixth real platform split is included in the main
-# sample but does not move under this Mac's one-direction ULP perturbation.
-MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER = frozenset(
-    {
-        "B-perlin-medium-circle-pencil",
-        "B-white-broad-arc-pencil",
-        "C-fill-ellipse-pencil",
-        "E-wild-pencil-ellipse",
-        "E-wild-pencil-polygon",
-    }
-)
+# Which of the six real splits a one-ULP nudge reaches depends on the host libm,
+# because the nudge goes in one direction and the two platforms sit on opposite
+# sides of the boundary. macOS was measured on 2026-08-09 against engine 28,
+# before the contact-length quantiser existed; the linux test container was
+# measured on 2026-08-17 (glibc 2.41, ledger-free run on pentala) and moves the
+# one case macOS does not. Their union is asserted below to be exactly
+# ENGINE_28_PLATFORM_SPLITS: a host that moved something outside that set would
+# be a new route, not a recording difference.
+MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER_BY_PLATFORM = {
+    "darwin": frozenset(
+        {
+            "B-perlin-medium-circle-pencil",
+            "B-white-broad-arc-pencil",
+            "C-fill-ellipse-pencil",
+            "E-wild-pencil-ellipse",
+            "E-wild-pencil-polygon",
+        }
+    ),
+    "linux": frozenset({"A-pencil-polygon"}),
+}
 
 # Measured on 2026-08-03 against engine 20, before the arrangement quantiser
 # existed. Every case is a layout that goes through sin/cos.
@@ -223,10 +232,27 @@ def test_one_ulp_of_libm_does_not_move_the_drawing(monkeypatch) -> None:
 
 def test_without_the_stabilisers_the_same_perturbation_is_seen(monkeypatch) -> None:
     """Keeps the main test honest by exposing both known platform routes."""
+    expected_contact = MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER_BY_PLATFORM.get(
+        sys.platform
+    )
+    assert expected_contact is not None, (
+        f"no contact-length recording for {sys.platform!r}; measure it by running"
+        " this test there and add the set it reports"
+    )
     monkeypatch.setattr(renderer, "_quantise_instructions", lambda items: items)
     monkeypatch.setattr(renderer, "_quantise_contact_length", lambda value: value)
     moved = _moved_under_one_ulp(monkeypatch)
-    assert moved == (
-        MOVED_WITHOUT_ARRANGEMENT_QUANTISER
-        | MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER
-    )
+    assert moved == (MOVED_WITHOUT_ARRANGEMENT_QUANTISER | expected_contact)
+
+
+def test_the_two_recordings_together_cover_every_engine_28_split() -> None:
+    """The platform recordings partition the six splits; neither alone does.
+
+    Reading one platform's set as "the cases that are sensitive" is how this
+    file gets misread: macOS sees five, linux sees the sixth, and the drawing
+    the product ships is stable on both because the quantisers are what remove
+    the difference -- not the choice of machine.
+    """
+    recordings = MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER_BY_PLATFORM.values()
+    assert frozenset().union(*recordings) == ENGINE_28_PLATFORM_SPLITS
+    assert all(recording for recording in recordings)

@@ -243,9 +243,15 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
      * circle stays on the machine pole: the contour gate is read from both.
      *
      * T-257 rides in the same walk. Byte equality on its own cannot tell "the gate
-     * refused this axis" from "this road never consults a gate", so the line is
-     * given `position_y` on the same score with the same tool and must move. Without
-     * it, taking the line's gate out entirely would leave this green.
+     * refused this axis" from "this road never consults a gate", so the line is given
+     * `position_y` on the same score with the same tool and must move -- and the move
+     * is read as DISTANCE, not as inequality. `variationJson` keeps its own copy of
+     * the two axes for the performance seed, so naming `position_y` re-rolls the
+     * mark's seed and changes the drawing whether or not the gate ever reads the
+     * axis: with `needsPathVariation` forced to false the byte reading stays green.
+     * What only the gate does is geometric, it bends the centreline, so the yardstick
+     * is a mark whose seed moved and whose gate said no -- `pink` on the same axis,
+     * which both gates exclude.
      */
     @Test
     fun testTheLineAndTheContourAreJudgedApartInOneScore() {
@@ -273,6 +279,62 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
             both,
             lineOnItsOwnAxis,
         )
+
+        // The yardstick: an axis named on a quality both gates exclude. Its seed
+        // material moves -- `variationJson` writes a pink variation out -- and its
+        // centreline does not, so it shows what a re-rolled seed alone can do to the
+        // reading. The unvaried line stands beside it as the second sample.
+        val seedMovedButGateSaidNo = render("${line(variation("pink", "position_y"), "pen")},${circle(radiusOnly)}")
+        assertNotEquals(
+            "the yardstick must be live: naming an axis re-rolls the mark's performance seed",
+            both,
+            seedMovedButGateSaidNo,
+        )
+        val gateSaidNo = maxOf(lineAxisCrossings(circleOnly), lineAxisCrossings(seedMovedButGateSaidNo))
+        val gateSaidYes = lineAxisCrossings(lineOnItsOwnAxis)
+        assertTrue(
+            "position_y must make the line wave across its own axis, not merely re-roll its " +
+                "texture (a line whose gate said no crosses the axis $gateSaidNo times, this one $gateSaidYes)",
+            gateSaidYes > gateSaidNo * 2.5,
+        )
+    }
+
+    /**
+     * How many times the score's first instruction crosses the axis the line is
+     * stated on: `from [0.1,0.5] to [0.9,0.5]` on a 1000px square, so y = 500.
+     *
+     * Read on the first instruction alone. The circle beside it is 500px across and
+     * would swamp any reading taken over the whole drawing. The hand pole draws the
+     * stroke as a filled contour and clothes it in outline polylines, so both `d` and
+     * `points` are collected.
+     *
+     * Crossings rather than distance, because distance does not separate the two.
+     * A wobble is asked for in multiples of the tool's own stroke width --
+     * `amplitudeWidths` puts `medium` at 0.6 of it -- which is smaller than the
+     * envelope the hand's own jitter already draws, and the varied road rebuilds that
+     * envelope from its own centreline, so a wobbling line can reach LESS far than a
+     * straight one. Measured on the branch tip: unvaried 9.53px, wave on position_y
+     * 5.54px. What only a wave does is take the mark back and forth over its axis:
+     * 9 crossings unvaried, 6 with the seed re-rolled and the gate refusing, 38 with
+     * the gate accepting.
+     */
+    private fun lineAxisCrossings(svg: String): Int {
+        val segments = svg.split("""<g id="instruction_""")
+        assertTrue("the drawing must hold a first instruction:\n$svg", segments.size >= 2)
+        val number = Regex("""-?\d+(?:\.\d+)?""")
+        val ys = Regex("""\s(?:d|points)="([^"]*)"""").findAll(segments[1])
+            .flatMap { attr ->
+                number.findAll(attr.groupValues[1])
+                    .map { it.value.toDouble() }
+                    .toList()
+                    .chunked(2)
+                    .filter { it.size == 2 }
+                    .map { it[1] - 500.0 }
+                    .asSequence()
+            }
+            .toList()
+        assertTrue("the line must have drawn coordinates to measure", ys.size >= 2)
+        return (1 until ys.size).count { ys[it - 1] * ys[it] < 0.0 }
     }
 
     // ---------------------------------------------------------------- the fill

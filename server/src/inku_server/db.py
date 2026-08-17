@@ -177,6 +177,13 @@ class HistoryRow(Base):
     # apart from starred so a work can be a favourite, a revision target, both
     # or neither.
     for_revision = Column(Integer,    nullable=False, default=0)
+    # The share bit and the group it points at, together. A work is readable by a
+    # group only when the bit is up AND the group matches: the bit alone is a
+    # permission with no destination, and the group alone is a destination nobody
+    # opened. Raising the bit without naming a group fills in the owner's own
+    # organisation group, the way a new file takes the group of whoever made it.
+    for_share      = Column(Integer, nullable=False, default=0)
+    share_group_id = Column(String, ForeignKey("user_groups.id"), nullable=True)
     note         = Column(Text,       nullable=True)
     source_text = Column(Text, nullable=True)
     display_label = Column(String, nullable=True)
@@ -430,6 +437,11 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
     "for_revision": "ALTER TABLE history ADD COLUMN for_revision INTEGER NOT NULL DEFAULT 0",
+    # The bit gets a DEFAULT and the destination does not, and the difference is
+    # the point: every existing row is "not shared", which is a fact, while every
+    # existing row's group is unknown rather than the migrating admin's own.
+    "for_share": "ALTER TABLE history ADD COLUMN for_share INTEGER NOT NULL DEFAULT 0",
+    "share_group_id": "ALTER TABLE history ADD COLUMN share_group_id VARCHAR",
     "note": "ALTER TABLE history ADD COLUMN note TEXT",
     "source_text": "ALTER TABLE history ADD COLUMN source_text TEXT",
     "display_label": "ALTER TABLE history ADD COLUMN display_label VARCHAR",
@@ -620,6 +632,14 @@ _HISTORY_INDEX_MIGRATIONS = (
     (
         "ix_history_user_for_revision_trashed_at",
         "CREATE INDEX IF NOT EXISTS ix_history_user_for_revision_trashed_at ON history (user_id, for_revision, trashed, at)",
+    ),
+    (
+        # Deliberately NOT led by user_id, unlike the three above. Those narrow a
+        # reader down to their own works; this one is read when somebody looks at
+        # OTHER people's, so leading with the owner would put the column the query
+        # never constrains first and the index would go unused.
+        "ix_history_for_share_group",
+        "CREATE INDEX IF NOT EXISTS ix_history_for_share_group ON history (for_share, share_group_id, trashed, at)",
     ),
     ("ix_history_render_hash", "CREATE INDEX IF NOT EXISTS ix_history_render_hash ON history (render_hash)"),
     ("ix_history_user_description_hash", "CREATE INDEX IF NOT EXISTS ix_history_user_description_hash ON history (user_id, description_hash)"),
@@ -1076,6 +1096,24 @@ def _acl_grants(actor: dict, permissions: tuple[str, ...]):
     )
 
 
+def _shared_with_group(actor: dict):
+    """Works whose owner opened them to the actor's organisation group.
+
+    The third way in, after the group scope and an explicit grant. It differs
+    from both by being a CONDITION rather than a list: one bit on the work names
+    every reader at once, which is what an ACL row -- always one work, one
+    subject -- cannot say.
+
+    An actor with no group is not in any group, so nothing here reaches them.
+    Returning a clause that matched a NULL share_group_id would hand every
+    half-configured work to every groupless account.
+    """
+    return select(HistoryRow.id).where(
+        HistoryRow.for_share == 1,
+        HistoryRow.share_group_id == actor["group_id"],
+    )
+
+
 def _same_org_group(actor: dict):
     """Accounts sharing the actor's organisation group, as a subquery.
 
@@ -1102,6 +1140,12 @@ def _readable_by(actor: dict, owner_column, acl_history_id=None):
     one. Rows that are not a work and carry no id to grant against (lineage
     edges, for now) pass nothing and are decided by scope alone. A `write` grant
     satisfies a read: someone trusted to change a work can obviously see it.
+
+    The share bit (I-191) rides on that same branch and not on the scope, which
+    is a ruling and not an accident: every caller that hands over a work id gets
+    it -- the listing, the search, the lineage nodes -- and `list_okugaki`, the
+    one caller that hands over none, does not. A colophon is somebody's writing
+    ABOUT a work, and opening the work does not hand that over.
     """
     if has_permission_group(actor, "admins"):
         return true()
@@ -1111,7 +1155,14 @@ def _readable_by(actor: dict, owner_column, acl_history_id=None):
         scope = owner_column == actor["id"]
     if acl_history_id is None:
         return scope
-    return or_(scope, acl_history_id.in_(_acl_grants(actor, ACL_PERMISSIONS)))
+    ways = [scope, acl_history_id.in_(_acl_grants(actor, ACL_PERMISSIONS))]
+    # The same guard the leaders branch above uses, and for the same reason: an
+    # actor with no group is in no group. `actor.get("group_id") or ""` would
+    # read as defensive and would quietly compare the destination against the
+    # empty string instead.
+    if actor.get("group_id"):
+        ways.append(acl_history_id.in_(_shared_with_group(actor)))
+    return or_(*ways)
 
 
 def _writable_by(actor: dict, owner_column, acl_history_id=None):
@@ -1196,6 +1247,15 @@ def _readable_sql(actor: dict, owner_column: str, acl_history_id: str | None = N
             f"{acl_history_id} IN (SELECT history_id FROM history_acl"
             f" WHERE permission IN ('read', 'write') AND ({' OR '.join(subjects)}))"
         )
+        # The share bit (I-191), said here exactly as _readable_by says it. The
+        # bind parameter is the same name and the same value the two branches
+        # above already write, so a third writer of it is not a collision.
+        if actor.get("group_id"):
+            params["acl_group_id"] = actor["group_id"]
+            clauses.append(
+                f"{acl_history_id} IN (SELECT id FROM history"
+                f" WHERE for_share = 1 AND share_group_id = :acl_group_id)"
+            )
     if len(clauses) == 1:
         return clauses[0], params
     return "(" + " OR ".join(clauses) + ")", params
@@ -2559,6 +2619,12 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
         "for_revision": bool(row.for_revision),
+        # bool(), not the stored integer: a client reading `0`/`1` as truth is
+        # reading a value SQLite is free to hand back as a string, and `bool("0")`
+        # is True. The two keys always ride together -- the bit says whether the
+        # work is open, the group says to whom, and either alone is unreadable.
+        "for_share":    bool(row.for_share),
+        "share_group_id": row.share_group_id,
     "note":         row.note,
     "source_text": row.source_text if row.source_text is not None else row.input,
     "display_label": row.display_label,
@@ -2860,7 +2926,11 @@ def add_item(item: dict) -> dict:
         # exporting database recorded, and an old export legitimately has none.
         sketch_state=item.get("sketch_state"),
         render_limits=json.dumps(item.get("render_limits"), ensure_ascii=False, sort_keys=True) if isinstance(item.get("render_limits"), dict) else None,
-        render_hash=render_hash, trashed=0, starred=0, for_revision=0, note=item.get("note"),
+        # A new work is closed, and the destination stays NULL rather than being
+        # filled with the author's group: a work nobody opened has no readers, and
+        # writing the group here would make "closed" and "open to my own group"
+        # look the same in the table.
+        render_hash=render_hash, trashed=0, starred=0, for_revision=0, for_share=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
         description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
@@ -3930,6 +4000,7 @@ def _list_items_with_fts(
     search: str,
     starred: bool,
     for_revision: bool = False,
+    for_share: bool = False,
 ) -> tuple[list[dict], int]:
     visible, visible_params = _readable_sql(actor, "h.user_id", "h.id")
     params = {
@@ -3943,6 +4014,9 @@ def _list_items_with_fts(
     # Both marks filter at once and independently: asking for starred and for
     # for_revision means both, not either.
     for_revision_clause = "AND h.for_revision = 1" if for_revision else ""
+    # The third mark narrows the same way: AND, not OR. Asking for the bundle
+    # asks for the works in it, not for the works in it plus one's own.
+    for_share_clause = "AND h.for_share = 1" if for_share else ""
     total = session.execute(
         text(
             f"""
@@ -3954,6 +4028,7 @@ def _list_items_with_fts(
               AND h.history_visibility = 'normal'
               {starred_clause}
               {for_revision_clause}
+              {for_share_clause}
               AND history_fts MATCH :match
             """
         ),
@@ -3972,6 +4047,7 @@ def _list_items_with_fts(
                   AND h.history_visibility = 'normal'
                   {starred_clause}
                   {for_revision_clause}
+                  {for_share_clause}
                   AND history_fts MATCH :match
                 ORDER BY h.at DESC
                 LIMIT :limit OFFSET :offset
@@ -3996,6 +4072,7 @@ def list_items(
     query_text: str = "",
     starred: bool = False,
     for_revision: bool = False,
+    for_share: bool = False,
 ) -> tuple[list[dict], int]:
     actor = _actor_of(user_id)
     with SessionLocal() as session:
@@ -4008,10 +4085,12 @@ def list_items(
             query = query.filter(HistoryRow.starred == 1)
         if for_revision:
             query = query.filter(HistoryRow.for_revision == 1)
+        if for_share:
+            query = query.filter(HistoryRow.for_share == 1)
         search = query_text.strip()
         if search and _use_history_fts(search):
             return _list_items_with_fts(
-                session, actor, offset, limit, trashed, search, starred, for_revision
+                session, actor, offset, limit, trashed, search, starred, for_revision, for_share
             )
         if search:
             query = query.filter(_history_search_clause(search))
@@ -4072,6 +4151,7 @@ def list_lineage_groups(
     query_text: str = "",
     starred: bool = False,
     for_revision: bool = False,
+    for_share: bool = False,
     min_item_count: int = 1,
 ) -> tuple[list[dict], int]:
     """List deterministic history groups, paginated by lineage rather than artwork.
@@ -4097,6 +4177,8 @@ def list_lineage_groups(
             query = query.filter(HistoryRow.starred == 1)
         if for_revision:
             query = query.filter(HistoryRow.for_revision == 1)
+        if for_share:
+            query = query.filter(HistoryRow.for_share == 1)
         search = query_text.strip()
         if search:
             query = query.filter(_history_search_clause(search))
@@ -4173,6 +4255,7 @@ def list_lineage_group_items(
     query_text: str = "",
     starred: bool = False,
     for_revision: bool = False,
+    for_share: bool = False,
 ) -> tuple[list[dict], int]:
     actor = _actor_of(user_id)
     with SessionLocal() as session:
@@ -4205,6 +4288,8 @@ def list_lineage_group_items(
             query = query.filter(HistoryRow.starred == 1)
         if for_revision:
             query = query.filter(HistoryRow.for_revision == 1)
+        if for_share:
+            query = query.filter(HistoryRow.for_share == 1)
         search = query_text.strip()
         if search:
             query = query.filter(_history_search_clause(search))
@@ -4219,6 +4304,7 @@ def item_position(
     trashed: bool = False,
     starred: bool = False,
     for_revision: bool = False,
+    for_share: bool = False,
 ) -> int | None:
     actor = _actor_of(user_id)
     with SessionLocal() as session:
@@ -4231,6 +4317,8 @@ def item_position(
         if target is None or (starred and not target.starred):
             return None
         if for_revision and not target.for_revision:
+            return None
+        if for_share and not target.for_share:
             return None
         query = session.query(func.count(HistoryRow.id)).filter(
             _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
@@ -4245,6 +4333,8 @@ def item_position(
             query = query.filter(HistoryRow.starred == 1)
         if for_revision:
             query = query.filter(HistoryRow.for_revision == 1)
+        if for_share:
+            query = query.filter(HistoryRow.for_share == 1)
         return int(query.scalar() or 0)
 
 
@@ -4279,6 +4369,63 @@ def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dic
         if not row:
             return None
         row.for_revision = 1 if for_revision else 0
+        session.commit()
+        session.refresh(row)
+        return _row_to_dict(row)
+
+
+def set_item_for_share(
+    user_id: str, item_id: str, for_share: bool, share_group_id: str | None = None
+) -> dict | None:
+    """Open a work to an organisation group, or close it again.
+
+    Who may do it is `_writable_by`, the same test starring uses -- opening a
+    work is an act of its owner, not of everyone who can read it. `None` means
+    the caller may not write this work, and the route answers 404 rather than
+    403: telling a caller that a work they may not touch exists is itself a
+    disclosure.
+
+    Raising the bit with no destination names the owner's own organisation
+    group, the way a new file takes the group of whoever made it. Naming
+    somebody else's group is an administrator's act, because a member who could
+    do it would be able to hand their organisation's work to any other.
+
+    Dropping the bit leaves the destination where it is: `chmod g-r` does not
+    forget the group, and clearing it would silently re-aim the work the next
+    time the bit went up.
+    """
+    actor = _actor_of(user_id)
+    with SessionLocal() as session:
+        row = (
+            session.query(HistoryRow)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
+            .first()
+        )
+        if not row:
+            return None
+        if not for_share:
+            row.for_share = 0
+            session.commit()
+            session.refresh(row)
+            return _row_to_dict(row)
+        # Only a NAMED group is checked, not the one already on the row. `chmod
+        # g+r` asks nothing of the group the file is in; re-opening a work its
+        # owner had opened before is the same act, and requiring administrator
+        # rights for it would make the destination unrepeatable by the one person
+        # who chose it.
+        if share_group_id and share_group_id != actor.get("group_id") and not has_permission_group(actor, "admins"):
+            raise PermissionError("only administrators may share a work outside their own group")
+        owner_group_id = _actor_of(row.user_id)["group_id"] if row.user_id else None
+        # The destination the work already carries wins over the owner's own: it
+        # is what "the bit went down and came back up" has to mean, and a fresh
+        # work has none, so the owner's group is what fills the blank.
+        target_group = share_group_id or row.share_group_id or owner_group_id
+        if not target_group:
+            raise ValueError("this work has no organisation group to be shared with")
+        if session.get(UserGroupRow, target_group) is None:
+            raise ValueError(f"no such organisation group: {target_group}")
+        row.for_share = 1
+        row.share_group_id = target_group
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)

@@ -105,6 +105,12 @@ class HistoryItem(HistoryPostBody):
     starred: bool = False
     # The revision mark, independent of starred.
     for_revision: bool = False
+    # The share bit and where it points. Unlike `shared`, which says this work
+    # reached the caller from somebody else, these two are what the OWNER set:
+    # the bit is a permission and the group is its destination, and a reader who
+    # saw only the bit would not know who else is looking.
+    for_share: bool = False
+    share_group_id: str | None = None
     note: str | None = None
     description_hash: str | None = None
     lineage_node_id: str | None = None

@@ -68,6 +68,19 @@ class HistoryForRevisionBody(BaseModel):
     for_revision: bool = False
 
 
+class HistoryForShareBody(BaseModel):
+    """The permission bit and, optionally, where it points.
+
+    Two keys rather than one because the destination has to be sayable without
+    being compulsory: leaving it out means "my own organisation", which is what
+    almost every caller wants, while naming it is how an administrator hands a
+    work to another group.
+    """
+
+    for_share: bool = False
+    share_group_id: str | None = None
+
+
 class HistoryAclEntry(BaseModel):
     """One guest on one work's list."""
 
@@ -100,6 +113,7 @@ def api_history_get(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     for_revision: bool = Query(default=False),
+    for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     anchor_id: str | None = Query(default=None, max_length=100),
     include_svg: bool = Query(
@@ -110,7 +124,8 @@ def api_history_get(
 ) -> HistoryListResponse:
     if anchor_id:
         position = _db.item_position(
-            actor["id"], anchor_id, trashed=trashed, starred=starred, for_revision=for_revision
+            actor["id"], anchor_id, trashed=trashed, starred=starred,
+            for_revision=for_revision, for_share=for_share,
         )
         if position is not None:
             offset = (position // limit) * limit
@@ -122,6 +137,7 @@ def api_history_get(
         query_text=q,
         starred=starred,
         for_revision=for_revision,
+        for_share=for_share,
     )
     # How heavy each work is, counted here because this is the last place the
     # picture is in hand: below, `include_svg=false` empties the key, and a
@@ -482,6 +498,28 @@ def api_history_for_revision(
     item_id: str, body: HistoryForRevisionBody, actor: dict = Depends(_current_user)
 ) -> HistoryItem:
     item = _db.set_item_for_revision(actor["id"], item_id, body.for_revision)
+    if not item:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return HistoryItem(**item)
+
+
+@router.patch("/api/history/{item_id}/for-share", response_model=HistoryItem, response_model_exclude_none=True)
+def api_history_for_share(
+    item_id: str, body: HistoryForShareBody, actor: dict = Depends(_current_user)
+) -> HistoryItem:
+    """Open one work to an organisation group, or close it again.
+
+    404, not 403, when the caller may not write the work: the same rule the ACL
+    routes follow, because saying "that exists but is not yours" discloses it.
+    403 is kept for the one case where the caller may write the work and is
+    still refused -- naming a group that is not their own.
+    """
+    try:
+        item = _db.set_item_for_share(actor["id"], item_id, body.for_share, body.share_group_id)
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)

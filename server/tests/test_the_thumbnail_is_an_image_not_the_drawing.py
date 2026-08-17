@@ -191,17 +191,32 @@ def test_scale_one_is_256_and_scale_two_is_512():
     assert png_size(thumbnails.bake(SQUARE_SVG, 2))[0] == 512
 
 
-# ── T-4 ─────────────────────────────────────────────────────────────────────
+# ── T-4 / T-219 ─────────────────────────────────────────────────────────────
 def test_saving_a_work_does_not_wait_for_its_thumbnail(owner, monkeypatch):
-    """Baking measured 0.50 s a work. A save must not have grown by that."""
+    """Baking measured 0.50 s a work. A save must not have grown by that.
+
+    ⚠ The slow bake is arranged on `inku_analysis.rasterizer.svg_to_png`, which
+    is what crosses to the pool, and not on `thumbnails.bake`, which the save
+    path stopped calling with I-284. Patching the old name goes on passing --
+    and passes without ever making a bake slow, because "the save was quick" is
+    also true when no bake happened. `bakes` is what keeps this from measuring
+    nothing.
+    """
+    import inku_analysis.rasterizer as rasterizer
+
     user, headers = owner
     slow = 1.0
+    bakes: list[float] = []
+    real_svg_to_png = rasterizer.svg_to_png
 
-    def slow_bake(svg, scale):
+    def slow_bake(svg, *args, **kwargs):
+        started = time.monotonic()
         time.sleep(slow)
-        return rasterize(svg, thumbs_db.width_for_scale(scale))
+        png = real_svg_to_png(svg, *args, **kwargs)
+        bakes.append(time.monotonic() - started)
+        return png
 
-    monkeypatch.setattr(thumbnails, "bake", slow_bake)
+    monkeypatch.setattr(rasterizer, "svg_to_png", slow_bake)
 
     started = time.monotonic()
     response = client.post(
@@ -213,6 +228,12 @@ def test_saving_a_work_does_not_wait_for_its_thumbnail(owner, monkeypatch):
 
     assert response.status_code == 200
     assert elapsed < slow / 2, f"the save waited {elapsed:.2f}s for a {slow:.2f}s bake"
+
+    deadline = time.monotonic() + slow * 10
+    while not bakes and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert bakes, "no bake was made slow: the arrangement never reached the thing that bakes"
+    assert bakes[0] >= slow, f"the bake took {bakes[0]:.2f}s, so the save was not racing one"
 
 
 # ── T-5 ─────────────────────────────────────────────────────────────────────

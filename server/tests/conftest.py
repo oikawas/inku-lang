@@ -31,7 +31,17 @@ if os.getenv("INKU_TEST_USE_CONFIGURED_DB") != "1":
     os.environ.setdefault("INKU_BOOTSTRAP_ADMIN_PASSWORD", "test-admin-password")
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "child_bake_pool: let a save bake in a real child process, as production does",
+    )
+
+
 def pytest_sessionfinish(session, exitstatus):
+    from inku_server.api_core.thumbnails import shutdown_bake_pool
+
+    shutdown_bake_pool()
     for path in (_TEST_DB_PATH, _TEST_THUMBS_PATH):
         if path is None:
             continue
@@ -68,3 +78,40 @@ def rebuild_in_process(monkeypatch):
 
     monkeypatch.setattr(thumbnails, "ProcessPoolExecutor", InProcessPool)
     monkeypatch.setattr(thumbnails, "multiprocessing", NoContext())
+
+
+def _in_process_bake_pool():
+    """The save path's pool, standing in as threads of this process."""
+    return ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-thumb-bake")
+
+
+@pytest.fixture(autouse=True)
+def bake_in_process(request, monkeypatch):
+    """Bake a freshly saved work in this process, unless the test says otherwise.
+
+    Unlike the rebuild, which runs only when a test calls it, the save path
+    bakes on every POST /api/history. Left alone it would spawn a child for each
+    such test -- and a patched `svg_to_png` would never reach the one doing the
+    work, so a test arranging a slow or raising bake would pass without ever
+    making one. The default is therefore an in-process pool, and the tests that
+    have to show the bake really leaves this process carry
+    `@pytest.mark.child_bake_pool`.
+
+    ⚠ Only the save path is redirected. The rebuild keeps its opt-in fixture
+    above: replacing `ProcessPoolExecutor` for every test would change what
+    `test_the_rasterizing_leaves_this_process_and_the_writing_does_not` compares
+    against, and that gate is how the rebuild's own child pool is measured.
+
+    The pool is cleared around every test either way, so one test's pool never
+    answers the next test's save.
+    """
+    from inku_server.api_core import thumbnails
+
+    monkeypatch.setattr(thumbnails, "_bake_pool", None)
+    monkeypatch.setattr(thumbnails, "_bake_pool_closed", False)
+    if "child_bake_pool" not in request.keywords:
+        monkeypatch.setattr(thumbnails, "_new_bake_pool", _in_process_bake_pool)
+    yield
+    pool = thumbnails._bake_pool
+    if pool is not None:
+        pool.shutdown(wait=False)

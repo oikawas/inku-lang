@@ -405,13 +405,54 @@ internal object ServerRendererGeometry {
         return (dx / length) to (dy / length)
     }
 
-    fun needsPathVariation(variation: JSONObject?): Boolean {
+    /**
+     * The qualities that are not a wobble at all.
+     *
+     * Written as an exclusion, the way the server writes it (`v.quality in ("none",
+     * "pink")`), rather than as the list of qualities that do wobble. The two spell
+     * the same set today because `Quality` holds exactly five words, but they are not
+     * the same condition: a sixth word added to the schema joins the wobble under the
+     * exclusion and is silently dropped under the enumeration.
+     *
+     * `pink` is a bleed, not a wobble. The server draws it with `feGaussianBlur` and
+     * lets no variation reach the point run -- see [ServerRendererStyle.blurFilterId].
+     */
+    private val NO_VARIATION_QUALITIES: Set<String> = setOf("none", "pink")
+
+    /** The axes a line's wobble rides on. Ported from `_needs_path_variation`. */
+    private val PATH_VARIATION_DIMS: Set<String> = setOf("position_x", "position_y")
+
+    /**
+     * The axes a contour's wobble rides on. Ported from `_CONTOUR_VARIATION_DIMS`.
+     *
+     * `radius` is the shape's own natural axis, so it belongs to the closed figures
+     * and the arc and to nothing else: a line has no radius to vary along.
+     */
+    private val CONTOUR_VARIATION_DIMS: Set<String> = setOf("position_x", "position_y", "radius")
+
+    /**
+     * Whether a line's point run wobbles. Ported from `_needs_path_variation`.
+     *
+     * The server keeps two gates because the two roads do not read the same axes, and
+     * the port held one that read all three from every call site. A line asked to vary
+     * on `radius` alone therefore wobbled here and stayed straight on the server
+     * (ledger I-278).
+     */
+    fun needsPathVariation(variation: JSONObject?): Boolean =
+        needsVariation(variation, PATH_VARIATION_DIMS)
+
+    /** Whether an arc's or a closed shape's contour wobbles. Ported from `_needs_contour_variation`. */
+    fun needsContourVariation(variation: JSONObject?): Boolean =
+        needsVariation(variation, CONTOUR_VARIATION_DIMS)
+
+    private fun needsVariation(variation: JSONObject?, dims: Set<String>): Boolean {
         if (variation == null) return false
-        val quality = variation.optString("quality", "none")
-        if (quality == "none") return false
+        if (variation.optString("quality", "none") in NO_VARIATION_QUALITIES) return false
+        // A variation with no `dimensions` rides on nothing: the server's `any(...)`
+        // over an empty list is false, and the absent array is read the same way here.
         val dimensions = variation.optJSONArray("dimensions") ?: return false
         for (i in 0 until dimensions.length()) {
-            if (dimensions.optString(i) in setOf("position_x", "position_y", "radius")) return true
+            if (dimensions.optString(i) in dims) return true
         }
         return false
     }
@@ -473,7 +514,7 @@ internal object ServerRendererGeometry {
         val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
         val count = segmentCount(approxPerimeter, unit)
         val basePoints = circlePoints(cx, cy, rx, ry, count)
-        if (variation == null || !needsPathVariation(variation)) return basePoints
+        if (variation == null || !needsContourVariation(variation)) return basePoints
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
@@ -495,7 +536,7 @@ internal object ServerRendererGeometry {
     }
 
     fun variedPolygonPoints(points: List<Pair<Double, Double>>, variation: JSONObject?, seed: Long, cx: Double, cy: Double, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
-        if (variation == null || !needsPathVariation(variation) || points.isEmpty()) return points
+        if (variation == null || !needsContourVariation(variation) || points.isEmpty()) return points
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }
@@ -830,7 +871,7 @@ internal object ServerRendererGeometry {
         val arcLen = 2.0 * Math.PI * r * (Math.abs(endDeg - startDeg) / 360.0)
         val count = segmentCount(arcLen, unit) + 1
         val basePoints = arcPoints(cx, cy, r, startDeg, endDeg, count)
-        if (!needsPathVariation(variation)) return basePoints
+        if (!needsContourVariation(variation)) return basePoints
         val dimensions = variation.optJSONArray("dimensions") ?: JSONArray()
         val axisX = (0 until dimensions.length()).any { dimensions.optString(it) == "position_x" }
         val axisY = (0 until dimensions.length()).any { dimensions.optString(it) == "position_y" }

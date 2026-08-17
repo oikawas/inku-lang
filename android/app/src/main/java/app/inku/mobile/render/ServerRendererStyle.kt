@@ -57,11 +57,17 @@ internal object ServerRendererStyle {
         "extra_fine" to 0.35,
     )
 
-    fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
+    fun strokeAttrs(weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
         val colorHint = if (ins.has("color_hint") && !ins.isNull("color_hint")) ins.optString("color_hint") else null
         val color = resolveColor(colorKey, colorHint, colorMap)
-        val closedShape = primitive in setOf("circle", "ellipse", "square", "triangle", "polygon")
-        val fill = if (closedShape || ins.optBoolean("filled", false)) color else "none"
+        // One judgement, read once, the way `_stroke_attrs` reads it: `do_fill =
+        // _fills_interior(ins)` settles both the `fill` value and every branch of
+        // `fill-opacity` below. This used to be decided here a second time, out of
+        // "does the primitive have an inside, or was `filled` written" -- a set that
+        // knew nothing about `surface.texture` and did not hold `cloudform`, so the
+        // same request took two roads depending on how it was spelt (ledger I-298).
+        val doFill = ServerRendererGeometry.fillsInterior(ins)
+        val fill = if (doFill) color else "none"
         // The level is read off the RAW hint, before the lowercasing: the server
         // reads it before `_norm_label`, and a normalisation that replaces the
         // dot delivers "0 3000" to the consumer with the value gone.
@@ -72,23 +78,23 @@ internal object ServerRendererStyle {
         when {
             hint.containsAny("membrane", "haze", "fog", "mist", "atmosphere", "膜", "霞", "霧", "靄") -> {
                 strokeOpacity = min(strokeOpacity, 0.26)
-                if (fill != "none") fillOpacity = 0.12
+                if (doFill) fillOpacity = 0.12
             }
             hint.containsAny("soft light", "柔らかな光", "陽光", "日差し") -> {
                 strokeOpacity = min(strokeOpacity, 0.30)
-                if (fill != "none") fillOpacity = 0.14
+                if (doFill) fillOpacity = 0.14
             }
             hint.containsAny("scent", "fragrance", "香り", "匂") -> {
                 strokeOpacity = min(strokeOpacity, 0.38)
-                if (fill != "none") fillOpacity = 0.20
+                if (doFill) fillOpacity = 0.20
             }
             hint.containsAny("waiting buds", "開花を待つ蕾", "蕾", "つぼみ") -> {
                 strokeOpacity = min(strokeOpacity, 0.72)
-                if (fill != "none") fillOpacity = 0.58
+                if (doFill) fillOpacity = 0.58
             }
             hint.containsAny("five-sense", "五感") -> {
                 strokeOpacity = min(strokeOpacity, 0.44)
-                if (fill != "none") fillOpacity = 0.18
+                if (doFill) fillOpacity = 0.18
             }
             // engine 24: the member's own ceiling when the expansion wrote one,
             // the group-wide constant when it did not -- a degenerate group, or
@@ -97,7 +103,7 @@ internal object ServerRendererStyle {
                 val level = ServerRendererFade.levelFromHint(rawHint)
                 val ceiling = level ?: 0.48
                 strokeOpacity = min(strokeOpacity, ceiling)
-                if (fill != "none") {
+                if (doFill) {
                     fillOpacity = if (level == null) {
                         0.30
                     } else {
@@ -109,7 +115,7 @@ internal object ServerRendererStyle {
                 val level = ServerRendererFade.levelFromHint(rawHint)
                 val ceiling = level ?: 0.40
                 strokeOpacity = min(strokeOpacity, ceiling)
-                if (fill != "none") {
+                if (doFill) {
                     fillOpacity = if (level == null) {
                         0.22
                     } else {

@@ -8242,3 +8242,17 @@ When the works to be shown are a set rather than a list, the ACL has to be writt
 - **What production sees:** `history` holds 3,486 rows, and **the default is `for_share = 0`**, so **no work changes who can see it on the day this is deployed**. The account holding 3,484 of them is the only member of organisation group `default`.
 - **Verification:** server **3,427 passed / 31 skipped** (+14), cli **237 passed** (+2), web **449 pass / 0 fail** (+3), `npm run check` **268 files / 0 errors / 2 warnings**, `lint:i18n` **1,078 strings / 0 warnings / 0 errors** (+2). **17 perturbations applied 18 times with no misses** (one was split across the two guards). **The fourth frozen-API-surface guard stayed green under every perturbation**, and that is not a miss -- `HistoryItem` is not among the 78 frozen names that guard compares, so nothing declared there measures a single line, which the contract had measured and foretold on the day it was issued.
 - **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).
+
+---
+
+### 2026-08-17 — Only names that are actually measured may be declared (**no version**, checks and tooling only, ledger I-305, I-258)
+
+**One declaration in the frozen API-surface guard was measuring nothing.**
+`test_t8` freezes the shape the API had before permission groups, **78 names** of it, as a digest. A sanctioned addition is **named in a declaration table, and the key is taken back out before the digest is taken**, so the one change is allowed and everything else is still measured byte for byte -- a good mechanism. **But the table is read only inside the loop over the frozen names**, and **`HistoryItem` is in neither the 78 nor the three changed schemas.** Anything declared for it was never read, while the table read as coverage.
+
+- **Measured**: the table names **13 schemas, 14 keys**, and **exactly one entry was inert** -- `HistoryItem` (two keys, `catalog_mode` and `svg_bytes`). **The other 12 schemas are live.**
+- **The fix (author's ruling)**: **a declaration for a name that is not frozen is red rather than silent.** The inert row is gone and the same assertion covers all three declaration tables.
+- **Discriminating power**: **one perturbation, 1 failed / 16 passed** (the control is the 17 passed before it). **The first attempt replaced the line and took a live declaration out with it**, so the digest alone could have reddened it -- it was re-aimed with both on one line, and the failure was attributed by its message.
+- **The guard's reach did not widen.** `HistoryItem` itself is still outside it. What changed is that the table can no longer say something untrue.
+- **The frozen-corpus regeneration check now belongs to CI (ledger I-258, author's ruling).** It is not an acceptance criterion, no perturbation is aimed at it, and the accepting session no longer runs it by hand. **Measured on the day of the ruling, CI already did exactly that** -- `reference-corpus.yml` fires on pull requests and pushes to main, and three jobs re-run the generators and require byte-identical output. **It was work to remove from contracts, not work to add.**
+- **Together with "the CI result is not waited for" (ruling of 2026-08-16), drift is now caught after the push by a job nobody reads.** The three past misses (the engine 10 platform drift, the retired `contact` key, the silverpoint rename) happened in exactly that shape.

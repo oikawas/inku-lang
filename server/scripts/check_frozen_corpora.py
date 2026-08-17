@@ -9,8 +9,16 @@ stays green. That has happened three times -- the engine 10 platform drift, the
 retired `contact` key, and the silverpoint rename -- and each time the red
 arrived after the push instead of before it.
 
-This script makes CI the backstop rather than the detector. Run it from
-``server/`` before merging:
+**CI owns this check** (author's ruling, 2026-08-17, ledger I-258). It is not an
+acceptance criterion in any contract, no perturbation is aimed at it, and the
+session accepting a branch is not expected to run it by hand. The two other
+homes considered -- the contract template, and the generators checking
+themselves -- were declined. The consequence is stated where the ruling is:
+drift is caught after the push, by a job whose result this project does not wait
+for.
+
+Run it from ``server/`` when you want that answer before pushing rather than
+after:
 
     uv run python scripts/check_frozen_corpora.py
 

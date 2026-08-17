@@ -224,7 +224,6 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # the same rule: named here, taken back out before hashing, so the frozen
     # digest keeps measuring everything else byte for byte.
     declared_additions = {
-        "HistoryItem": {"catalog_mode", "svg_bytes"},
         "HistoryPostBody": {"catalog_mode"},
         "AppInfoResponse": {"thumbnail_hidpi"},
         "ComposeRequest": {"fires_on"},
@@ -282,6 +281,26 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
             (" / canvas=カンバス", " / drawing_paper=画用紙"),
         ),
     }
+    # Every table above is read inside the loop below, and the loop walks the
+    # frozen names alone. A name that is not frozen therefore declares nothing:
+    # the entry is never looked up, nothing is taken back out, and no digest
+    # moves -- yet it reads on the page as though that schema were covered.
+    # `HistoryItem` sat here that way (it is in neither the frozen 78 nor the
+    # three changed schemas, so this test never touched it), and I-191 added two
+    # keys to it while the entry claimed two others. Declaring an unfrozen name
+    # is the mistake, so it is red rather than silent.
+    for table, label in (
+        (declared_additions, "declared_additions"),
+        (declared_enum_additions, "declared_enum_additions"),
+        (declared_bound_restorations, "declared_bound_restorations"),
+    ):
+        unfrozen = sorted(set(table) - set(frozen_names))
+        assert not unfrozen, (
+            f"{label} names schemas this test never reads: {unfrozen}. "
+            "Only the frozen names are walked, so an entry here measures nothing. "
+            "Either the schema belongs in the frozen set, or the entry should go."
+        )
+
     others = {}
     for name in frozen_names:
         body = after["schemas"][name]

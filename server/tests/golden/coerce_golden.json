@@ -2465,7 +2465,17 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "wash",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.6,
+        "bleed": 0.2,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "arc",
@@ -2640,7 +2650,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 1,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -4266,17 +4276,7 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "wash",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.6,
-        "bleed": 0.0,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": null
-       }
+       "surface": null
       },
       {
        "primitive": "line",
@@ -4338,7 +4338,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "wash",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.6,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "line",
@@ -4574,7 +4584,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 2,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -5438,7 +5448,17 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "wash",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.8,
+        "bleed": 0.1,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": 1234567890
+       }
       },
       {
        "primitive": "ellipse",
@@ -5667,7 +5687,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
-     "with_surface_on_a_closed_shape": 1,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -12172,9 +12192,169 @@
      "without_unrequested_color_cycle": 0
     }
    }
+  },
+  "S-surface-on-a-line-walks-back": {
+   "input": {
+    "ddl": "円を中央に置く。細い線を下に引く。面: 点。",
+    "score": {
+     "background": "white",
+     "instructions": [
+      {
+       "primitive": "circle",
+       "center": [
+        0.5,
+        0.42
+       ],
+       "radius": 0.18,
+       "color": "black",
+       "filled": false,
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.15,
+        0.78
+       ],
+       "to": [
+        0.85,
+        0.78
+       ],
+       "color": "black",
+       "filled": false,
+       "weight": "pen",
+       "surface": {
+        "texture": "stipple",
+        "density": 0.4
+       }
+      }
+     ]
+    }
+   },
+   "targets": "with_surface_on_a_closed_shape",
+   "note": "an interior word on a line, with a closed shape behind it to walk back to. Added on 2026-08-17 for render engine 38: H-06, H-10 and H-13 were the only cases firing this branch and all three fired it with a 薄墨, which is a mark word now and stays where the sentence put it. Without this the branch is reached and never fires, and the whole repair could be deleted with the golden set staying green.",
+   "source": "synthetic",
+   "expected": {
+    "score": {
+     "version": "0.1.0",
+     "canvas": "square",
+     "background": "white",
+     "presence": null,
+     "instructions": [
+      {
+       "primitive": "circle",
+       "note": null,
+       "from": null,
+       "to": null,
+       "center": [
+        0.5,
+        0.42
+       ],
+       "radius": 0.18,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": {
+        "texture": "stipple",
+        "density": 0.4,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
+      },
+      {
+       "primitive": "line",
+       "note": null,
+       "from": [
+        0.15,
+        0.78
+       ],
+       "to": [
+        0.85,
+        0.78
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      }
+     ]
+    },
+    "instruction_count": 2,
+    "branch_report": {
+     "coerce_and_repair_instruction": 0,
+     "dedupe_instructions": 0,
+     "drop_invalid_relations": 0,
+     "presence_from_ddl": 0,
+     "with_background_dominance_governor": 0,
+     "with_color_delivery_repair": 0,
+     "with_complex_motif_repair": 0,
+     "with_context_density_governor": 0,
+     "with_crescent_sensory_suppression": 0,
+     "with_ddl_coverage": 0,
+     "with_existing_event_counterweight": 0,
+     "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
+     "with_literal_grid_fidelity": 0,
+     "with_ma_pressure": 0,
+     "with_motion_energy": 0,
+     "with_per_instruction_density_budget": 0,
+     "with_presence_auxiliary_shape_repair": 0,
+     "with_primary_color_delivery": 0,
+     "with_repetition_event_variation": 0,
+     "with_rhythm_variation": 0,
+     "with_semantic_visual_event_hints": 0,
+     "with_shape_delivery_repair": 0,
+     "with_stated_count_fidelity": 0,
+     "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 2,
+     "with_total_density_budget": 0,
+     "with_unintentional_filled_shape_tempering": 0,
+     "with_visual_event_type_hints": 0,
+     "without_explicit_region_support": 0,
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
+    }
+   }
   }
  },
- "commit": "c816d7d1939c058e9d9a4d8dcde1b11ec8762ed9",
+ "commit": "8b387f46ceea095326ec766925fc9faf75f82363",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

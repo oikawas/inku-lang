@@ -21,8 +21,22 @@ from inku_server.renderer import (
     _stroke_width_px,
     render,
 )
-from inku_server.schema import Score
+from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import synthesize_along
+
+
+def _plain_mark(weight: str) -> Instruction:
+    """A line that names the tool and nothing else.
+
+    `_material_outline_profile` takes the instruction since render engine 38:
+    both widths it reads are asked of `_mark_width_px`, which is where a
+    described mark is seen. This bound is about the tool, so the subject states
+    no surface.
+    """
+    return Instruction(
+        primitive="line", **{"from": (0.18, 0.50)}, to=(0.82, 0.50), weight=weight,
+    )
+
 
 RENDER_SEED = 12345
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
@@ -347,7 +361,7 @@ def test_material_outline_follows_the_ink_whether_or_not_wild_is_on() -> None:
             bound = (
                 max(
                     abs(offset) + _outline_wander_px(offset, canvas)
-                    for offset, _, _, _ in _material_outline_profile(tool, canvas)
+                    for offset, _, _, _ in _material_outline_profile(_plain_mark(tool), canvas)
                 )
                 + _stroke_width_px(tool, canvas)
                 + LAYER_DISTANCE_SLACK_PX

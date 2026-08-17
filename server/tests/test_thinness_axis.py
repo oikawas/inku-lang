@@ -29,6 +29,21 @@ from inku_server.renderer import (
 from inku_server.schema import Instruction, Score
 
 CANVAS = canvas_size_for_aspect(None)
+
+
+def _plain_mark(weight: str, thinness: str | None = None) -> Instruction:
+    """A line that names the tool and nothing else.
+
+    `_material_outline_profile` takes the instruction since render engine 38:
+    both widths it reads are asked of `_mark_width_px`, which is where a
+    described mark is seen. These probes are about the tool, so the subject
+    states no surface -- the case whose numbers this file has always held.
+    """
+    return Instruction(
+        primitive="line", **{"from": (0.18, 0.50)}, to=(0.82, 0.50),
+        weight=weight, thinness=thinness,
+    )
+
 FIXTURE = pathlib.Path(__file__).resolve().parent / "fixtures" / "thinness_carry_h5.json"
 
 # engine 15 の値。ここが動いたら太さの軸が道具の太さを書き換えている。
@@ -243,8 +258,8 @@ def test_material_outline_follows_the_thinned_ink(weight: str) -> None:
     """
     from inku_server.renderer import _material_outline_profile
 
-    default = _material_outline_profile(weight, CANVAS)
-    thinned = _material_outline_profile(weight, CANVAS, "extra_fine")
+    default = _material_outline_profile(_plain_mark(weight), CANVAS)
+    thinned = _material_outline_profile(_plain_mark(weight, "extra_fine"), CANVAS)
     assert len(default) == len(thinned)
     assert all(a[1] > b[1] for a, b in zip(default, thinned))
 
@@ -258,6 +273,6 @@ def test_material_outline_absolute_widths_do_not_move(weight: str) -> None:
     """
     from inku_server.renderer import _material_outline_profile
 
-    assert _material_outline_profile(weight, CANVAS) == _material_outline_profile(
-        weight, CANVAS, "extra_fine"
+    assert _material_outline_profile(_plain_mark(weight), CANVAS) == _material_outline_profile(
+        _plain_mark(weight, "extra_fine"), CANVAS
     )

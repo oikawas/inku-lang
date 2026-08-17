@@ -45,14 +45,19 @@ CLOSED_SHAPES = frozenset(
     {"circle", "ellipse", "square", "triangle", "polygon", "cloudform"}
 )
 # The surface words that speak about the mark rather than about an interior.
-# 粒 is the tool skipping on the sheet and にじみ is the ink spreading into it,
-# and both are things a line does, so a `面: ...` sentence naming one of them on
-# a line or an arc is not a misattachment to be moved back. It lives beside
-# CLOSED_SHAPES and for the same reason: coerce decides by it whether the
-# surface stays where the sentence put it, and the stroke engine decides by it
-# whether that instruction works the sheet harder. A copy in the second layer
-# would freeze whatever the first layer had on the day it was copied.
-MARK_SURFACE_WORDS = frozenset({"grain", "bleed"})
+# 粒 is the tool skipping on the sheet, にじみ is the ink spreading into it, and
+# 薄墨 is how the ink was diluted before it ever met the sheet -- all three are
+# things a line does, so a `面: ...` sentence naming one of them on a line or an
+# arc is not a misattachment to be moved back. It lives beside CLOSED_SHAPES and
+# for the same reason: coerce decides by it whether the surface stays where the
+# sentence put it, and the stroke engine decides by it whether that instruction
+# works the sheet harder. A copy in the second layer would freeze whatever the
+# first layer had on the day it was copied.
+#
+# The three do not all land in the same place. 粒 and にじみ raise the sheet's
+# own two quantities (render engine 37); 薄墨 says nothing about the sheet, so
+# the renderer draws it as a broader, paler band instead (render engine 38).
+MARK_SURFACE_WORDS = frozenset({"grain", "bleed", "wash"})
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "silverpoint",

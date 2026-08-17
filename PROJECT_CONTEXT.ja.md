@@ -235,7 +235,7 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 正方形と縦長の 2 版面。サーバーが同梱フォントで焼くので、どの機械でも同じ文字が出る）。
 落とし口は 1 本で、利用者が選んだフォルダへ書ける（File System Access API を持つブラウザのみ。
 持たないブラウザはブラウザ既定へ落ちる）
-- 日英の UI。英語の用語は `web/src/lib/i18n/GLOSSARY.md` が正本で、**web の表示文字列は `npm run lint:i18n` が、公開文書の英語は `server/scripts/check_docs.py` が**強制する
+- 日英の UI。**英語の用語は 2 つに分かれて正本を持つ** —— **訳語の対応表は `docs/i18n/glossary.md`**（2026-08-17 に web の表と私家版ノート 2 枚を統合した）、**文体規則・禁止語と制限語・機械検査との対は `web/src/lib/i18n/GLOSSARY.md`**。**web の表示文字列は `npm run lint:i18n` が、公開文書の英語は `server/scripts/check_docs.py` が**強制する
 
 UI の寸法は `+page.svelte` の `:root` のトークン（`--btn-sm-*`）が、色は `--action-*` と `--accent*` が正本で、px と色の直書きは退行として扱う。
 **共通のボタンクラス（`ghost-btn`）の基底・hover・disabled・`ghost-active` は `+page.svelte` のグローバル規則 各 1 本が持つ。**

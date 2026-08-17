@@ -296,7 +296,7 @@ so the same characters appear on any machine).
 One code path drops every file, and it can write to a folder the user picked (browsers with the File
 System Access API; the rest fall back to the browser default)
 - A Japanese and English UI.
-`web/src/lib/i18n/GLOSSARY.md` is canonical for English terminology; **`npm run lint:i18n` enforces it over the web display strings, and `server/scripts/check_docs.py` enforces it over the English public documents**.
+**English terminology is canonical in two places**: `docs/i18n/glossary.md` holds the term-by-term correspondence (gathered on 2026-08-17 from the web table and two local notes), and `web/src/lib/i18n/GLOSSARY.md` holds the style rules, the forbidden and restricted words, and the pairing with the machine checks. **`npm run lint:i18n` enforces them over the web display strings, and `server/scripts/check_docs.py` enforces them over the English public documents**.
 
 UI dimensions come from the `:root` tokens in `+page.svelte` (`--btn-sm-*`) and colors from
 `--action-*` and `--accent*`; literal px values and literal colors are treated as regressions.

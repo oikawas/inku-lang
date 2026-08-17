@@ -8535,3 +8535,50 @@ test on what used to disappear.
 - **Verification on the merged tree**: **3462 passed / 32 skipped** in the test container on pentala (**the branch point `e188850b` was 3454 / 31**), **cli 240 passed** (unchanged), ruff clean for both server and cli. **The frozen corpora exited 0 at the branch tip** (`rewrote 134 files; 0 of them differ`), and **the merged tree's `server/` subtree is byte-identical to the branch tip** (`d4af9421`), so that result carries. **The implementation applied eight perturbations** (seven predicted reds against ten measured; both misses were in the "more red than predicted" direction, because the acceptance that compares the moved set also fires when a word is added) **and the accepting side applied one more**, aimed at the "tuple bound to a name" shape the mid-flight ruling brought into scope — **exactly one test reddened, as predicted**.
 - **⚠ Not one file of `web`, `cli` or `android` was touched.** The web checks (`npm run check`, `test:unit`, `lint:i18n`) and the Android suites **were not run**. **No engine version, reference corpus, Score schema or Stage 1 / Stage 2 prompt moved.**
 - **The GitHub CI result was not waited for** (author's ruling, conventions 2-10).
+
+### 2026-08-17 — the published documents catch up with the tree, and one table gathers the glossaries (**no version number**, documents and checks only, [I-322])
+
+**Not one line of product code moved.** What changed is the published documents, `check_docs.py`, the two
+tests that read it, and the terminology tables. **⚠ This cycle reached stage 0 of contract [I-322] and then
+the author replaced the task**, so four directly assigned pieces of work were done on the same branch:
+**the contract's acceptances `T-300`–`T-306` and perturbations `P-1`–`P-5` were never carried out.**
+
+- **The eleven pairs under `docs/architecture` caught up with the tree.** Not only the versions
+  (v2.13.39 / Build 926 / render engine 38 / ddl engine 20 / Android `2.1.4-android.43`) but **the route count 96
+  and the public allowlist of 3** (they said 82/95 and 6), the four CI jobs, and the 606-case render corpus
+  were all measured against the code.
+- **Two new pairs were added**: `description-to-svg.{ja,}.md` (the path from trimming the input to saving the
+  work, function by function, with the seventeen decisions in a table) and `future-plan.{ja,}.md` (what the
+  improvement proposals look like after their rulings — **including the six premises measurement turned over**).
+  **Both are registered in `check_docs.py`'s pair list and `test_manual_parity_gate.py`: 31 → 33 pairs.**
+- **The term-by-term correspondence now lives in one table** — **`docs/i18n/glossary.md` is canonical for it.**
+  It used to be split between `web/src/lib/i18n/GLOSSARY.md` and two unpublished local notes.
+  **`GLOSSARY.md` remains canonical for the style rules, the forbidden and restricted words, and the pairing with
+  `lint:i18n`; its table is now a pointer.** **Correspondences that had been waiting on a ruling were settled with
+  the word that is current in art writing, and marked with ★** (author = user by context, request delivery, and the
+  boundary between new performance / replay / render / rasterize).
+- **The specification caught up with the implementation**: thirteen places that disagreed with the code
+  (eleven saijiki categories plus relations, the three default PNG templates, the color vocabulary 6 → 9 in §18,
+  the repository tree in the appendix), and **design history was separated from current behaviour** (§12's Opus 4.7
+  premise is a record; the current retry is one attempt with a stated reason plus a deterministic fallback).
+- **The English side's eighteen missing version marks went to zero.** The fourteen v1.82 accounting paragraphs and
+  the transcription-boundary sentence for Builds 600 and 605 were carried over. **⚠ The marks were not pasted on
+  their own — the statement that carries each mark was moved with it.**
+- **⚠ One measurement trap surfaced**: **a regular expression that counts version marks must not use `\b`.**
+  Next to kana or kanji no word boundary exists, so `Build 557では` goes uncounted (it was mismeasured twice).
+- **⚠ Two latent failures were created mid-cycle and caught by the full run at the branch tip**: the two tests that
+  read a row of `GLOSSARY.md` (`test_limits_are_settings.py` and web's `svgWeight.test.ts`) had not followed the
+  table when it moved. **A cycle that skipped the full run made them; the next cycle's full run found them.**
+- **Verification on the merged tree**: **3464 passed / 32 skipped** in the test container on pentala (the previous
+  main was 3462 / 32, and **the +2 is exactly the two new pairs' parametrization**), **`npm run check` 271 FILES /
+  0 ERRORS / 2 WARNINGS** (the two known a11y warnings), **web unit 467 / 0 failed**, **`lint:i18n` 1087 strings /
+  48 allowed exceptions / 0 errors**, **`check_docs.py` clean (33 pairs, 30 documents scanned for forbidden words)**,
+  ruff clean. **cli has no diff at all and was not run.**
+- **⚠ The implementation was Fable, a different model, so the accepting side skipped nothing.** There was, however,
+  nothing to re-apply: neither the acceptances nor the perturbations were carried out. What was verified is the
+  branch as it stands and the merged tree, which nobody had walked.
+- **⚠ No version number was taken** (documents and checks only), **and nothing was sent to pentala** (no product diff).
+- **The GitHub CI result was not waited for** (author's ruling, conventions 2-10).
+- **⚠ What remains of the interrupted contract** (stage 1's two changelog pairs, stage 2's leave-as-is decisions,
+  stage 4's gate, and the whole set of acceptances and perturbations) **has not been ruled on.**
+  **The fact that six version marks exist only in the Japanese changelog is filed as [I-326].**

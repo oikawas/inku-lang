@@ -52,6 +52,8 @@
 		trashed?: boolean;
 		starred?: boolean;
 		for_revision?: boolean;
+		for_share?: boolean;
+		share_group_id?: string | null;
 	note?: string | null;
 	};
 
@@ -77,6 +79,7 @@
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
 		historyManagerForRevisionOnly: boolean;
+		historyManagerForShareOnly: boolean;
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
@@ -85,6 +88,7 @@
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSetForRevisionOnly: (value: boolean) => void;
+		onSetForShareOnly: (value: boolean) => void;
 		onToggleForRevision: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		onSelectAll: () => void;
 		onAskTrash: (ids: string[]) => void;
@@ -124,6 +128,7 @@
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
 		historyManagerForRevisionOnly,
+		historyManagerForShareOnly,
 		onClose,
 		onSetView,
 		onSetPage,
@@ -132,6 +137,7 @@
 		onSetPageSize,
 		onSetStarredOnly,
 		onSetForRevisionOnly,
+		onSetForShareOnly,
 		onToggleForRevision,
 		onSelectAll,
 		onAskTrash,
@@ -224,6 +230,7 @@
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
+		if (historyManagerForShareOnly) params.set('for_share', 'true');
 		// The thumbnail tab lays a lineage's works out side by side, so a lineage
 		// holding one work has nothing to lay out. The server drops them, because
 		// dropping them here would leave short pages and a total that disagrees.
@@ -271,6 +278,7 @@
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
+		if (historyManagerForShareOnly) params.set('for_share', 'true');
 		try {
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -522,7 +530,7 @@
 		if (historyDisplayMode !== 'lineage') return;
 		// historyManagerTab is a dependency because the thumbnail tab asks the
 		// server for a different set (min_items=2) than the list tab does.
-		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab;
+		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; historyManagerForShareOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab;
 		void fetchLineageGroups();
 	});
 
@@ -637,6 +645,13 @@
 					class:ghost-active={historyManagerForRevisionOnly}
 					onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
 				>{t().historyForRevisionOnly}</button>
+			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryForShareOnly}>
+				<button
+					class="ghost-btn"
+					class:ghost-active={historyManagerForShareOnly}
+					onclick={() => onSetForShareOnly(!historyManagerForShareOnly)}
+				>{t().historyForShareOnly}</button>
 			</Tooltip>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
 				<button

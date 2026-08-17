@@ -350,6 +350,8 @@ export const en: LangPack = {
 	historyStarredOnly: 'Starred only',
 	historyForRevisionOnly: 'For revision only',
 	tooltipHistoryForRevisionOnly: 'Show only the works marked for revision. Combined with Starred only it shows the works that carry both marks.',
+	historyForShareOnly: 'Shared only',
+	tooltipHistoryForShareOnly: 'Show only the works marked for sharing. Combined with the other filters it shows the works that carry every mark asked for.',
 	forRevisionOn: 'Remove revision mark',
 	forRevisionOff: 'Mark for revision',
 	shareTargetOn: 'Remove share mark',

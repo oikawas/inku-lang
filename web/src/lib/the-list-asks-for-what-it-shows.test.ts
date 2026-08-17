@@ -96,7 +96,7 @@ test('holding the strip is not claimed to be holding a page', async () => {
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(manager);
 	assert.equal(
-		manager.preloadMatches('active', 0, manager.pageSize, '', false, false, TOTAL),
+		manager.preloadMatches('active', 0, manager.pageSize, '', false, false, false, TOTAL),
 		false
 	);
 
@@ -114,7 +114,7 @@ test('holding the strip is not claimed to be holding a page', async () => {
 	refreshDerived(stale.manager);
 	assert.equal(stale.manager.items.length, MANAGER_PAGE_SIZE);
 	assert.equal(
-		stale.manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, TOTAL + 1),
+		stale.manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, false, TOTAL + 1),
 		false
 	);
 });
@@ -275,7 +275,7 @@ test('opening it again with the page already in hand fetches nothing', async () 
 	refreshDerived(manager);
 	assert.equal(calls.length, 1);
 	assert.equal(
-		manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, TOTAL),
+		manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, false, TOTAL),
 		true
 	);
 

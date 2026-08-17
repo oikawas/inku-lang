@@ -12,8 +12,15 @@
 // is worse than no mark at all.
 //
 // T-104: the socket decides on the field being there, not on it being true.
-// T-105: nothing is offered while nothing can save it, and both halves gate it.
-// T-106: the words and the visibility rule are in place for the follow-up.
+// T-105: the mark is behind both the flag and a handler.
+// T-106: the words and the visibility rule are in place.
+//
+// 2026-08-17, ledger I-191: the follow-up landed. The server carries
+// `history.for_share` and `history.share_group_id`, and the page passes the
+// canvas a handler that saves them, so the socket is no longer empty. One test
+// below turned over with it -- what used to measure that NOTHING was plugged in
+// now measures that something is (T-202). The other four are unchanged: the
+// socket's own rules did not move because the plug arrived.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -69,15 +76,21 @@ test('T-105: the mark is behind both the flag and a handler', () => {
 	assert.match(PANEL, /for_share\?: boolean;/);
 });
 
-test('T-105: nothing hands the canvas a way to save it, so nothing shows', () => {
-	// The page is the half that is deliberately missing: there is no endpoint
-	// to call. When I-191 lands it passes a handler here and the mark appears
-	// with no further change to the canvas.
+test('T-202: the page hands the canvas a way to save the mark, so it shows', () => {
+	// The half that used to be deliberately missing. The canvas was built to
+	// offer the mark the moment a handler arrives, so this one line is what makes
+	// it appear -- and it is measured inside the <CanvasPanel .../> call rather
+	// than anywhere in the file, because the name occurs in the handler's own
+	// definition too and a whole-file match would be satisfied by that alone.
 	const call = PAGE.slice(PAGE.indexOf('<CanvasPanel'), PAGE.indexOf('/>', PAGE.indexOf('<CanvasPanel')));
 	assert.match(call, /onToggleForRevision=\{toggleHistoryForRevision\}/, 'the wired marks moved');
-	assert.doesNotMatch(call, /onToggleForShare/, 'a share handler was wired before there is anything to save to');
-	// And the prop defaults to nothing rather than to a function that pretends.
+	assert.match(call, /onToggleForShare=\{toggleHistoryForShare\}/, 'nothing hands the canvas a way to save the share mark');
+	// And the prop still defaults to nothing, so a caller that passes no handler
+	// gets no mark rather than one that pretends.
 	assert.match(PANEL, /onToggleForShare = null,/);
+	// The handler has to reach the endpoint that stores it. A handler that only
+	// moved local state would satisfy the line above and save nothing.
+	assert.match(PAGE, /`\/api\/history\/\$\{item\.id\}\/for-share`/);
 });
 
 test('T-105: the socket names where the rest of the work is written down', () => {

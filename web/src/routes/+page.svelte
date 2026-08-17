@@ -3004,13 +3004,17 @@
 	// The strip's own 推敲のみ filter. Separate from the manager's: the two
 	// boxes are filtered independently, the same way starred already is.
 	let historyForRevisionOnly = $state(false);
+	// The strip's own 共有のみ filter, beside the other two. The manager keeps its
+	// own copy for the same reason the revision mark does: the two boxes filter
+	// independently.
+	let historyForShareOnly = $state(false);
 	// Whether the strip is showing a filtered listing rather than the whole one.
 	// Three places ask this to decide whether the page in hand is the plain
 	// newest-first listing: what to seed the manager with, what the strip may
 	// slice, and whether a freshness check may compare its first item with the
 	// newest work. Read through one name so a fourth filter cannot be added to
 	// some of them and forgotten in the rest.
-	const historyStripFiltered = $derived(historyStarredOnly || historyForRevisionOnly);
+	const historyStripFiltered = $derived(historyStarredOnly || historyForRevisionOnly || historyForShareOnly);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
 	let externalHistoryRefreshInFlight = false;
@@ -3439,7 +3443,7 @@ if (unreadWords.length > 0) {
 	// The same guard already protects the strip from externally saved works.
 	async function refreshHistoryAfterServerSave() {
 		if (historyOffset !== 0) {
-			if (!historyStarredOnly && !historyForRevisionOnly) historyTotal += 1;
+			if (!historyStripFiltered) historyTotal += 1;
 			return;
 		}
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
@@ -4092,6 +4096,7 @@ if (unreadWords.length > 0) {
 			if (historyStarredOnly) params.set('starred', 'true');
 			// The two marks are independent, so asking for both means both.
 			if (historyForRevisionOnly) params.set('for_revision', 'true');
+			if (historyForShareOnly) params.set('for_share', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== historyFetchRequest) return false;
@@ -4155,6 +4160,7 @@ if (unreadWords.length > 0) {
 			const clearedStarred = historyStarredOnly;
 			historyStarredOnly = false;
 			historyForRevisionOnly = false;
+			historyForShareOnly = false;
 			if (clearedStarred) showHistoryStarredFilterClearedNotice();
 			else showHistoryForRevisionFilterClearedNotice();
 			found = await fetchHistoryOffset(0, { anchorId: item.id });
@@ -4374,6 +4380,62 @@ if (unreadWords.length > 0) {
 		} catch (e) {
 			updateHistoryForRevisionState(item);
 			console.warn('failed to update the revision mark', e);
+		}
+	}
+
+	type HistoryForShareTarget = { id?: string; for_share?: boolean; share_group_id?: string | null };
+
+	// The share mark rides the same paths as the other two, and carries one thing
+	// they do not: a destination. Both keys move together everywhere -- a row left
+	// holding the bit without the group would say it is open with no record of to
+	// whom, which is the one thing this feature exists to say.
+	function updateHistoryForShareState(item: HistoryForShareTarget) {
+		if (!item.id) return;
+		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
+		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
+		historyManager.applyForShareState(item);
+		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
+		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, ...next };
+		if (lineageGraph) {
+			lineageGraph = {
+				...lineageGraph,
+				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
+					? { ...node, history: { ...node.history, ...next } }
+					: node)
+			};
+		}
+	}
+
+	async function toggleHistoryForShare(item: HistoryForShareTarget | null | undefined, event?: Event): Promise<void> {
+		event?.stopPropagation();
+		if (!item?.id) return;
+		const nextForShare = !item.for_share;
+		// Optimistic, like the other two marks -- but the destination is NOT
+		// guessed here. Only the server knows which group a bare bit resolves to,
+		// so the local row keeps the destination it had until the answer arrives.
+		updateHistoryForShareState({ ...item, for_share: nextForShare });
+		try {
+			const r = await apiFetch(`/api/history/${item.id}/for-share`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ for_share: nextForShare })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const updated = await r.json() as Iteration;
+			updateHistoryForShareState(updated);
+			const refreshes: Promise<unknown>[] = [];
+			if (historyForShareOnly) {
+				// The work just left the listing the strip is showing, so the
+				// filter comes off rather than leaving the strip on a work it no
+				// longer holds -- the rule the other two marks already follow.
+				if (!updated.for_share) historyForShareOnly = false;
+				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+			}
+			if (historyManager.forShareOnly) refreshes.push(historyManager.fetch());
+			if (refreshes.length > 0) await Promise.all(refreshes);
+		} catch (e) {
+			updateHistoryForShareState(item);
+			console.warn('failed to update the share mark', e);
 		}
 	}
 
@@ -4815,6 +4877,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	if (!found && historyStripFiltered) {
 		historyStarredOnly = false;
 		historyForRevisionOnly = false;
+		historyForShareOnly = false;
 		found = await fetchHistoryOffset(0, { anchorId: historyId });
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
@@ -6325,6 +6388,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		void fetchHistoryOffset(0);
 	}
 
+	function setHistoryForShareOnly(value: boolean) {
+		historyForShareOnly = value;
+		historyOffset = 0;
+		historyCursor = -1;
+		void fetchHistoryOffset(0);
+	}
+
 	$effect(() => {
 		const q = historyManager.search.trim();
 		if (!historyManager.open) return;
@@ -6967,6 +7037,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
 				onToggleForRevision={toggleHistoryForRevision}
+				onToggleForShare={toggleHistoryForShare}
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
@@ -7068,6 +7139,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyForRevisionOnly}
 			onSetForRevisionOnly={setHistoryForRevisionOnly}
+			{historyForShareOnly}
+			onSetForShareOnly={setHistoryForShareOnly}
 			{historyIndexLabel}
 			{historyModelStage1Short}
 			{historyModelStage1Full}
@@ -7368,6 +7441,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			cardExportSettings={exportSettings.card}
 			historyManagerStarredOnly={historyManager.starredOnly}
 			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
+			historyManagerForShareOnly={historyManager.forShareOnly}
 			onClose={() => (historyManager.open = false)}
 			onSetView={historyManager.setView}
 			onSetPage={historyManager.setPage}
@@ -7376,6 +7450,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetPageSize={historyManager.setPageSize}
 			onSetStarredOnly={historyManager.setStarredOnly}
 			onSetForRevisionOnly={historyManager.setForRevisionOnly}
+			onSetForShareOnly={historyManager.setForShareOnly}
 			onToggleForRevision={toggleHistoryForRevision}
 			onSelectAll={selectAllManagedHistory}
 			onAskTrash={askTrash}

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.39 / Build 926**
+**Target version: v2.13.40 / Build 927**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -179,6 +179,10 @@ placement, never the number of marks. **What it declares stays in `Score.canvas`
 with the aspect actually performed on.**
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
+**The words this layer judges a description with are declared in one place**, `COERCE_MARKERS` in
+`language_support/{ja,en}.py` (72 systems, 693 distinct words).
+**No matching literal is written into a branch of `coerce/`** — the one exception is a string this
+layer wrote itself and a later branch reads back (a `note`). Tests hold both halves.
 **When the description names exactly one abstract color, the color cycle folds to that one color**
 (background clauses do not count, and a polychrome phrase or a cycle without the named color is left
 alone).

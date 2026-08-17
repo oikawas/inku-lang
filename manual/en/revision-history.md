@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.40 unreleased baseline (Web Build 927)
+
+The thirteen places that name a version were updated to v2.13.40 / Build 927. **Nothing changes for a reader.**
+Inside the server, the words used to judge a description were gathered into one place (the screen, the CLI,
+the settings and the output are all as they were, and the same description still draws the same picture).
+Not one line of the body text was changed.
+
 ## 2026-08-17 — v2.13.39 unreleased baseline (Web Build 926)
 
 Updated the thirteen places that name a version to v2.13.39 / Build 926. **Added that the indicator shown while a work is being painted now names the layer that is working** (`sketching from life…` / `interpreting your words…` / `writing the score…` / `performing…`). **It no longer guesses the next layer ahead of time: each name is switched by a signal the server sends when that layer finishes.** With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`. No settings were added.

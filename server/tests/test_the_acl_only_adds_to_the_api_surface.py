@@ -114,7 +114,7 @@ CHANGED_SCHEMAS = {
     # beside it -- that one says the work reached the caller from somebody else,
     # while these two are what the OWNER set and where they pointed it.
     "HistoryItem": {
-        "added": {"shared", "catalog_mode", "svg_bytes", "for_share", "share_group_id"},
+        "added": {"shared", "catalog_mode", "svg_bytes", "for_share", "share_group_id", "compose_fallback"},
         "removed": set(),
     },
     # 2026-08-17: the reader chooses which two facts the history strip prints
@@ -122,7 +122,11 @@ CHANGED_SCHEMAS = {
     # it belongs to and on the PATCH that changes it.
     "UserAccountItem": {"added": {"history_strip_fields"}, "removed": set()},
     "UserSettingsBody": {"added": {"history_strip_fields"}, "removed": set()},
-    "HistoryPostBody": {"added": {"catalog_mode"}, "removed": set()},
+    # I-292: a work says whether its score came from Stage 2 or from the
+    # deterministic fallback. One key on the body a client saves with and on
+    # the item it reads back -- the fact lived only in one paint response
+    # before, and was gone the moment the work was saved.
+    "HistoryPostBody": {"added": {"catalog_mode", "compose_fallback"}, "removed": set()},
     # Contract 2: the client asks for the second thumbnail size only where the
     # server keeps it, and /api/info is where it learns that.
     "AppInfoResponse": {"added": {"thumbnail_hidpi"}, "removed": set()},

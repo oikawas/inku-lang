@@ -2110,6 +2110,28 @@ def _compose_response_as_paint_result(
         **_sketch_response_summary(result),
     }
 
+COMPOSE_FALLBACK_NONE = "none"
+
+
+def _compose_fallback_value(result: dict[str, Any]) -> str:
+    """What to record about Stage 2 for a work this CLI is saving.
+
+    The same rule the server applies on the paint route
+    (`api_core/rendering.py:compose_fallback_value`): always a string, never
+    absent. Sending nothing would store NULL, and NULL already means "this row
+    predates the column" -- a sender that stays silent about a work drawn today
+    makes a sound work indistinguishable from an unrecorded one.
+    """
+    if not result.get("compose_fallback_used"):
+        return COMPOSE_FALLBACK_NONE
+    reasons = result.get("compose_retry_reasons")
+    if isinstance(reasons, list):
+        for reason in reasons:
+            if isinstance(reason, str) and reason:
+                return reason
+    return "stage2_fallback"
+
+
 def _history_payload_from_result(
     args: argparse.Namespace,
     result: dict[str, Any],
@@ -2153,6 +2175,10 @@ def _history_payload_from_result(
         "sketch_text": result.get("sketch_text"),
         "sketch_grain": result.get("sketch_grain"),
         "sketch_state": result.get("sketch_state"),
+        # Stage 2's record. Written either way -- see _compose_fallback_value --
+        # so the work says whether its score came from the model or from the
+        # deterministic fallback.
+        "compose_fallback": _compose_fallback_value(result),
         "save_artifacts": args.save_artifacts if args.save_artifacts is not None else args.save_history,
         "count_generation": True,
     }

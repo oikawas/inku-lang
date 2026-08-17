@@ -553,6 +553,28 @@ def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
     return Score.model_validate(data)
 
 
+# The word a writer uses to say Stage 2 held. A value rather than NULL on
+# purpose: NULL already means "this row predates the column", and one field
+# cannot carry both readings at once.
+COMPOSE_FALLBACK_NONE = "none"
+
+
+def compose_fallback_value(*, fallback_used: bool, reasons: list[str] | None) -> str:
+    """What to record about Stage 2 for a work being saved now.
+
+    Always a string, never None: a writer that knows the answer says so either
+    way, so a reader can tell a work whose compose held from one drawn before
+    anybody wrote this down. The reason is the first the stage gave, which is
+    the same shape Stage 1's column already uses.
+    """
+    if not fallback_used:
+        return COMPOSE_FALLBACK_NONE
+    for reason in reasons or []:
+        if reason:
+            return reason
+    return "stage2_fallback"
+
+
 def _add_history_item(
     *,
     actor: dict,
@@ -563,6 +585,7 @@ def _add_history_item(
     at: int,
     expanded_ddl: str | None = None,
     interpret_fallback: str | None = None,
+    compose_fallback: str | None = None,
     elapsed_ms: int = 0,
     stage1_model: str | None = None,
     stage2_model: str | None = None,
@@ -611,6 +634,7 @@ def _add_history_item(
         "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
         "expanded_ddl": _sanitize_placement_words(expanded_ddl) if expanded_ddl else expanded_ddl,
         "interpret_fallback": interpret_fallback,
+        "compose_fallback": compose_fallback,
         "score": score_dict,
         "svg": svg,
         "at": at,

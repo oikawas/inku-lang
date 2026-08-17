@@ -14,6 +14,11 @@ class HistoryPostBody(BaseModel):
     variation_amplitude: str | None = None
     variation_seed: int | None = None
     interpret_fallback: str | None = None
+    # Stage 2's counterpart. Three readings, not two: a reason means compose
+    # fell over, "none" means a sender said it did not, and NULL means the row
+    # predates the column. Stage 1's field cannot say the middle one, which is
+    # why only this one is asked to.
+    compose_fallback: str | None = None
     score: dict
     svg: str = ""
     at: int

@@ -33,6 +33,14 @@ export type HistoryItem = {
 	variation_seed?: number | string | null;
 	// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
 	interpret_fallback?: string | null;
+	// Stage 2's counterpart, with a third reading the field above cannot make:
+	// 'none' means a writer said the stage held, and an absent value means the
+	// work was drawn before the column existed. See lib/composeFallback.ts.
+	compose_fallback?: string | null;
+	// Carried on a fresh paint result so a save can write the record above.
+	// A work read back out of the listing has neither.
+	compose_fallback_used?: boolean;
+	compose_retry_reasons?: string[];
 	thinking?: string | null;
 	score: Score;
 	svg: string;

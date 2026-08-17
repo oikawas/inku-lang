@@ -424,6 +424,10 @@ def api_history_post(
         ddl=body.ddl,
         expanded_ddl=body.expanded_ddl,
         interpret_fallback=body.interpret_fallback,
+        # Taken as the sender wrote it, including "none". Deriving it here is
+        # not possible: this route never ran Stage 2, so only the client that
+        # holds the paint response knows whether it fell.
+        compose_fallback=body.compose_fallback,
         score=score,
         svg=svg,
         at=body.at,

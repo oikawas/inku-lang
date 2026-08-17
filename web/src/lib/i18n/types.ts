@@ -1,3 +1,5 @@
+import type { ComposeFallbackState } from '$lib/composeFallback';
+
 export interface LangPack {
 	code: string;
 	label: string;
@@ -408,6 +410,12 @@ export interface LangPack {
 	resultLogLabel: string;
 	interpretFallbackBadge: string;
 	interpretFallbackHint: (reason: string) => string;
+	composeFallbackBadge: string;
+	confirmRefineFromFallbackMessage: string;
+	confirmRefineFromFallbackContinue: string;
+	composeFallbackHint: (reason: string) => string;
+	// Three readings, which is one more than Stage 1's field can make.
+	composeFallbackRecord: (state: ComposeFallbackState) => string;
 	statsInterp: string;
 	statsStruct: string;
 	statsTotal: string;
@@ -821,6 +829,7 @@ export interface LangPack {
 	provenanceSectionRun: string;
 	provenanceLabelLangRequested: string;
 	provenanceLabelInterpretFallback: string;
+	provenanceLabelComposeFallback: string;
 	provenanceLabelFocus: string;
 	provenanceLabelVariation: string;
 	provenanceLabelVariationSeed: string;
@@ -850,6 +859,7 @@ export interface LangPack {
 	provenanceHintLangRequested: string;
 	provenanceHintInterpretationSeed: string;
 	provenanceHintInterpretFallback: string;
+	provenanceHintComposeFallback: string;
 	provenanceHintFocus: string;
 	provenanceHintVariation: string;
 	provenanceHintVariationSeed: string;

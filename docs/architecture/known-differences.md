@@ -10,7 +10,7 @@
 
 ### F-02 Android specification snapshot
 
-- The beginning of `android/ANDROID_SPEC.ja.md` names `2.1.4-android.10`, engine 21, and an older Server snapshot.
+- The beginning of `android/ANDROID_SPEC.ja.md` names `2.1.4-android.10`, engine 21, and an older Server snapshot (`v2.11.2`, engine 21).
 - Implementation is `android/VERSION` `2.1.4-android.43`; `CompatibilityConstants.renderEngineVersion` is 35 (re-measured 2026-08-17).
 - Status: the opening snapshot is stale. The per-cycle sections later in the document carry the live tracking record; the opening has not caught up.
 

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.35 / Build 922**
+**Target version: v2.13.36 / Build 923**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -246,9 +246,9 @@ When a request names a work (`work_id`), the server draws from that row and neve
 definition of the catalog. **A renamed catalog and a retired one both draw**, and an older work with
 no record falls back to the current definition. The catalog name is shown under its current name,
 with a note when it is retired or when the work holds no record of its colors
-- Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
-nodes and edges.
-The two marks are independent: filtering on both shows only the works that carry both.
+- Per-user history, stars, revision marks, share marks, comments, trash, search, lineage groups, and
+explicit lineage nodes and edges.
+The three marks are independent: filtering on them together shows only the works that carry them all.
 A listing shows **images baked from the stored SVGs**, kept in a derived `thumbs.db` beside the
 canonical database. Baking happens after saving and never runs the engine, so the picture stays
 the one the work was drawn with; works not baked yet are drawn from their SVG.
@@ -272,6 +272,14 @@ Recipients can be picked by name among the members of your own organisation grou
 stays closed.
 A lineage may cross owners, so a node you cannot read appears as a card with its content withheld,
 and deleted is told apart from private in words
+- A share mark aimed at a group. The work itself says "this group may read me".
+**It is visible only when the read bit (`for_share`) and the destination (`share_group_id`) are both
+there**: the bit alone is a permission with no destination, the destination alone is one nobody
+opened.
+Raising the bit without naming a group fills in the owner's own organisation group, and only an
+administrator may name another.
+Dropping it leaves the destination, so raising it again returns to the same recipients.
+**What widens is reading only; writing does not move**
 - Model, language, and drawing-element comparison; generation-info, prompt, and JSON inspectors; the
 colophon
 - SVG, PNG, and animation export, plus a shareable one-sheet card (drawing, headnote, seed, and seal
@@ -296,7 +304,7 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 95 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+- The 96 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
 `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
 The count is owned by `EXPECTED_ROUTE_COUNT` in `server/tests/test_route_authorization.py`.
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
@@ -317,7 +325,7 @@ the existing user APIs. The organisation group is a separate thing, one per memb
 - **What a member may do** (the permission group) and **what a member may see** (the visibility scope)
 are separate axes, and both run through a single predicate.
 The default scope gives `admins` everything, `leaders` their own organisation and `users` their own
-works, and a per-work ACL adds to it.
+works, and a per-work ACL and the group-aimed flag the work carries itself add to it.
 **The paths written in raw SQL run through the same predicate** — when full-text search is left out,
 it shows up not as "too much is visible" but as "it goes missing when you search".
 - The LLM layer reaches both Anthropic and OpenAI-compatible local or cloud backends, and the product

@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.36 unreleased baseline (Web Build 923)
+
+Updated the thirteen places that name a version to v2.13.36 / Build 923. **That a work now carries a third mark -- sharing -- was written in.**
+
+- **Raising the share mark lets the members of your own organisation group read that work.** Raise it with `Mark for sharing` at the top right of the canvas on the work tab, and press it again to lower it. **An administrator may aim it at another organisation group.**
+- **Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients.
+- **What widens is reading only.** A work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
+- **A `Shared only` filter was added to both the history strip and `History management`.** It combines with starred and revision, leaving only the works that carry every mark asked for. **Written into `Creating Images` §14.**
+- **`inku-cli` gained `--for-share`** (on `history` and `history-export`). **Written into the `CLI Reference`.**
+- **Nothing changes for works that already exist.** The mark is down by default, so no work changes who can see it on the day this version goes in.
+
 ## 2026-08-17 — v2.13.35 unreleased baseline (Web Build 922)
 
 Updated the thirteen places that name a version to v2.13.35 / Build 922. **That a wash named on a line or an arc is now drawn as a broader, paler band was written in.**

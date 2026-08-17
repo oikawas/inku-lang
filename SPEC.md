@@ -965,7 +965,8 @@ Major UI areas:
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
   which facts are printed under each thumbnail** — up to two of generation, model, engine version
   and file size, and **none is also an answer** (choose nothing and only the pictures are shown)
-- History manager: larger history view, trash, restore, permanent delete, star filter, and
+- History manager: larger history view, trash, restore, permanent delete, star filter,
+a shared-only filter, and
 per-work sharing. The sharing dialog picks a recipient and a permission (read or write) and
 lists who currently holds the work. **A work shared by somebody else carries a mark** — this
 is the screen where people select and delete, and without the mark another member's work sits
@@ -3350,6 +3351,28 @@ a test written in the "now it is visible" direction cannot catch.  **A refused w
 answers 404, or a count of zero, rather than 403** — a 403 would confirm that the work
 exists.  **Settings carry no ACL**: personal settings stay with their owner, and global
 settings stay with `admins`.
+
+**A group-aimed share the work carries itself (v2.13.36).**  The third entrance to the
+visibility scope.  **When the works to be shown are a set rather than a list, the ACL has
+to be written row by row** — and in fact `history_acl` in production holds 0 rows to this
+day.  **The shape follows a Linux filesystem**: the owner is `user_id`, the group is
+`share_group_id`, and the read bit is `for_share`.  **Nothing corresponding to world is
+created** (author's ruling, 2026-08-17; "anyone may read" is a decision to publish outside
+the organisation, not something to add alongside a flag).  **A work is readable only when
+the bit is up AND the group matches** — the bit alone is a permission with no destination,
+the group alone a destination nobody opened, and **neither means a permission by itself**.
+**Raising the bit without naming a group fills in the owner's own organisation group**, the
+way a new file takes the group of whoever made it.  **Only `admins` may name another
+group**; anyone else gets a 403.  **That 403 applies only when a group is named** —
+`chmod g+r` asks nothing of the group the file is in, and requiring administrator rights to
+re-open a work already opened would **stop the very person who chose the destination from
+repeating it**.  **Dropping the bit keeps the destination** — `chmod g-r` does not forget
+the group, and clearing it would silently re-aim the work the next time the bit went up.
+**The flag widens reading only; `_writable_by` does not move.**  **Lineage nodes and edges
+follow, the colophon does not** — the flag's clause sits on the same branch as the ACL, the
+one handed a work id, and `list_okugaki` is the only call that is handed none.  **The
+decision runs through the same single visibility predicate as the ACL, and the raw-SQL path
+carries the same clause.**
 
 **A lineage may cross owners (v2.12.2).**  Any readable work of another member can be a
 parent, and the root id is inherited, so **one group spans two people and the number of

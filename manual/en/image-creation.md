@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.35 (Web Build 922). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.36 (Web Build 923). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -318,7 +318,7 @@ The history strip at the bottom is for moving quickly back and forth in time. `H
 **What is printed under each thumbnail is chosen under `Other` in `Settings`** (`Facts under the history thumbnails`). Choose **up to two** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
 - Search by description, by the last four characters of the hash, or by **a whole render hash**
-- Filters for starred only and for revision only. Used together, only works matching both remain
+- Filters for starred only, for revision only, and shared only. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
 - Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
 - Move to trash, restore, and permanent delete, singly or by multiple selection
@@ -329,6 +329,12 @@ The history strip at the bottom is for moving quickly back and forth in time. `H
 `By lineage` groups only on stored lineage nodes and edges. `lineage_only` intermediate works and tombstones are not counted in ordinary history.
 
 The revision mark is a second mark, independent of the star. Use it for works you mean to return to.
+
+The share mark is a third one. Raise it with `Mark for sharing` at the top right of the canvas on the work tab. **Once it is up, the members of your own organisation group can read that work.** Press it again to lower it. An administrator may aim it at another organisation group instead.
+
+**Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients. **What this mark widens is reading only, never writing** — a work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
+
+Both the history strip and `History management` carry a `Shared only` filter, so the marked works can be listed on their own.
 
 `Replay` re-renders from the stored score and seed. If the engine version that painted the work differs from the current one, that fact and a comparison of the two are shown. Old history entries without a render seed cannot be replayed.
 

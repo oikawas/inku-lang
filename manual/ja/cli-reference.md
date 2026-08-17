@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.13.35（Web Build 922）です。
+対象はinku v2.13.36（Web Build 923）です。
 
 ## 基本操作
 
@@ -124,8 +124,8 @@ batchはさらに `--continue-on-error` を持ちます。
 
 | コマンド | 主な旗 |
 |---|---|
-| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--no-svg`（作品の絵を一覧に含めません。`svg`は空文字で返ります） |
-| `history-export` | `--from` / `--to`（hash下位桁の範囲）/ `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
+| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--for-share` / `--no-svg`（作品の絵を一覧に含めません。`svg`は空文字で返ります） |
+| `history-export` | `--from` / `--to`（hash下位桁の範囲）/ `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` / `--for-share` |
 | `unread-words` | `--all`（管理者のみの全体集計）/ `--limit` |
 | `history share` | `--to-user` / `--to-group`（どちらか一方）/ `--permission {read,write}` |
 | `history unshare` | `--to-user` / `--to-group`（どちらか一方） |
@@ -134,6 +134,7 @@ batchはさらに `--continue-on-error` を持ちます。
 | `history state` | `--bytes`（応答が届いた実バイト数を添えます）。作品の総数と、最新の作品の時刻とIDだけを返します。**作品の絵は1バイトも読みません**ので、一覧を取り直す前に「変わったかどうか」だけを安く確かめられます |
 
 `--for-revision` は推敲マークの付いた作品だけに絞ります。スターとは別の印です。
+`--for-share` は、所有者が組織グループへ開いた作品だけに絞ります。これも別の印で、3つは併用できます。
 
     uv run inku-cli history share WORK_ID --to-user USER_ID --permission read
     uv run inku-cli history share WORK_ID --to-group GROUP_ID --permission write

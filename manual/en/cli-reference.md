@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.13.35 (Web Build 922).
+It covers inku v2.13.36 (Web Build 923).
 
 ## Basics
 
@@ -124,8 +124,8 @@ batch additionally takes `--continue-on-error`.
 
 | Command | Main flags |
 |---|---|
-| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--no-svg` (leaves each work's drawing out of the listing; `svg` comes back empty) |
-| `history-export` | `--from` / `--to` (a range of hash suffixes) / `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
+| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--for-share` / `--no-svg` (leaves each work's drawing out of the listing; `svg` comes back empty) |
+| `history-export` | `--from` / `--to` (a range of hash suffixes) / `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` / `--for-share` |
 | `unread-words` | `--all` (administrator-only aggregate) / `--limit` |
 | `history share` | `--to-user` / `--to-group` (one or the other) / `--permission {read,write}` |
 | `history unshare` | `--to-user` / `--to-group` (one or the other) |
@@ -134,6 +134,7 @@ batch additionally takes `--continue-on-error`.
 | `history state` | `--bytes` (adds the byte count the response actually arrived in). Returns only the number of works and the newest work's timestamp and ID. **It reads no picture bytes at all**, so you can ask whether anything changed before re-fetching the listing |
 
 `--for-revision` narrows to works carrying the revision mark. That mark is independent of the star.
+`--for-share` narrows to the works their owner has opened to an organisation group. That mark is independent too, and the three can be combined.
 
     uv run inku-cli history share WORK_ID --to-user USER_ID --permission read
     uv run inku-cli history share WORK_ID --to-group GROUP_ID --permission write

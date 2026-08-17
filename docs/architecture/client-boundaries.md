@@ -76,7 +76,7 @@ flowchart LR
 
 - Flow: `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Room.
 - `RoutingModelProvider` selects local LiteRT-LM or an OpenAI-compatible remote provider.
-- `CompatibilityConstants.renderEngineVersion` is 26; Server is 29.
+- `CompatibilityConstants.renderEngineVersion` is 35; Server is 38.
 - Server conditions, schema, seeds, and reference fixtures are ported later. Matching numbers would not by themselves prove identical implementations.
 
 ## Language and UI sources

@@ -76,7 +76,7 @@ flowchart LR
 
 - `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Roomという端末内flow。
 - `RoutingModelProvider` はlocal LiteRT-LMとOpenAI-compatible remote providerを選ぶ。
-- `CompatibilityConstants.renderEngineVersion` は26。Serverの29とは別版である。
+- `CompatibilityConstants.renderEngineVersion` は35。Serverの38とは別版である。
 - serverの条件式・schema・seed・参照fixtureを後追い移植する。数字が同じでも自動的な同一実装ではない。
 
 ## i18nとUI token

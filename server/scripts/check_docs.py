@@ -146,6 +146,19 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "shape",
         None,
     ),
+    # Added 2026-08-17: the pipeline deep dive and the ruled improvement plan.
+    (
+        "docs/architecture/description-to-svg.ja.md",
+        "docs/architecture/description-to-svg.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/future-plan.ja.md",
+        "docs/architecture/future-plan.md",
+        "shape",
+        None,
+    ),
     ("SETUP.ja.md", "SETUP.md", "shape", None),
     ("PROJECT_CONTEXT.ja.md", "PROJECT_CONTEXT.md", "shape", None),
     (

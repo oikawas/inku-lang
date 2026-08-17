@@ -11,9 +11,8 @@
 ### F-02 Android specification snapshot
 
 - The beginning of `android/ANDROID_SPEC.ja.md` names `2.1.4-android.10`, engine 21, and an older Server snapshot.
-- A later part of the same document says the port reached engine 26.
-- Implementation is `android/VERSION` `2.1.4-android.22`; `CompatibilityConstants.renderEngineVersion` is 26.
-- Status: the opening snapshot is stale and the document is internally inconsistent.
+- Implementation is `android/VERSION` `2.1.4-android.43`; `CompatibilityConstants.renderEngineVersion` is 35 (re-measured 2026-08-17).
+- Status: the opening snapshot is stale. The per-cycle sections later in the document carry the live tracking record; the opening has not caught up.
 
 ### F-03 Android external-provider execution
 
@@ -62,6 +61,6 @@ Every major node and edge in this set has public implementation evidence. The di
 
 1. Should the opening Android snapshot and external-provider statement be aligned with current code?
 2. Which seam should first separate responsibility from the page, DB module, or render router?
-3. Should ordinary pytest, Web, CLI, and Android gates move into CI?
+3. Should the Android JVM tests move into CI? The Server, CLI, Web, and document gates entered CI with `checks.yml` (ledger I-192).
 
 These questions are not copied automatically into `PROJECT_CONTEXT.ja.md` or `SPEC.ja.md`.

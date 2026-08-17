@@ -91,12 +91,12 @@ flowchart LR
 | `plugins` | 8 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
 | `settings` | 16 | server-wide settings、backup | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
-| `history` | 17 | 履歴、SVG、mark、trash、artifact再作成 | `_current_user` |
+| `history` | 18 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成 | `_current_user` |
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
 | `render` | 8 | variation、compose、interpret、render、paint、vision | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
 
-合計95。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計96。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
 **⚠ この表の件数は手で写したもので、赤くする検査は無い**（allowlistの3 pathだけが検査に載っている）。件数の正本は `test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 

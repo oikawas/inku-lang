@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The baseline is public commit `dfa7b25569c10f45fe504fdb39be1335eebb9e87`, app `v2.11.18 / Build 874`.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The baseline is public commit `a69730d743da478eb7d3b3e9c8c9b50fa008ccfd`, app `v2.13.39 / Build 926`.
 
 ## Reading order
 
@@ -8,12 +8,14 @@ This documentation maps the DDL design stages to the current implementation and 
 2. `system-context.md` — System boundary
 3. `runtime-containers.md` — Runtime units
 4. `ddl-processing-pipeline.md` — DDL processing
-5. `server-components.md` — Server internals
-6. `client-boundaries.md` — Web, CLI, and Android
-7. `data-history-lineage.md` — DB, identity, and lineage
-8. `operations-security.md` — Operations and security boundaries
-9. `change-impact-map.md` — Change propagation
-10. `known-differences.md` — Differences and unknowns
+5. `description-to-svg.md` — From a description to an SVG, decision by decision (the pipeline deep dive)
+6. `server-components.md` — Server internals
+7. `client-boundaries.md` — Web, CLI, and Android
+8. `data-history-lineage.md` — DB, identity, and lineage
+9. `operations-security.md` — Operations and security boundaries
+10. `change-impact-map.md` — Change propagation
+11. `known-differences.md` — Differences and unknowns
+12. `future-plan.md` — The generation-architecture improvement plan (as far as it is ruled)
 
 Japanese counterparts use the same names with `.ja.md`.
 

@@ -91,12 +91,12 @@ flowchart LR
 | `plugins` | 8 | Browse, validate, CRUD, enable plugins | `_current_user`; admin for changes |
 | `settings` | 16 | Server-wide settings and backup | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
-| `history` | 17 | History, SVG, mark, trash, derivative rebuild | `_current_user` |
+| `history` | 18 | History, SVG, thumbnails, mark, trash, sharing, derivative rebuild | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
 | `render` | 8 | Variation, compose, interpret, render, Paint, vision | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
 
-Total: 95. The three-path public allowlist is `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The rule is that nothing logging in does not need stays on it.
+Total: 96. The three-path public allowlist is `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The rule is that nothing logging in does not need stays on it.
 
 **⚠ The counts in this table are copied by hand, and no gate reddens for them** (only the three allowlist paths are held by a check). The canonical count is `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py`.
 

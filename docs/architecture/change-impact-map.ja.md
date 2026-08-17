@@ -10,9 +10,9 @@
 | plugin文書 | Stage 1直後のcore writing-down | `plugins/document_format.py`, router | plugin format/v2 tests | DDL corpus `A-plugin-*` | plugin CRUD/auth、reference dump |
 | Stage 1.5 | 意味非上書き、焦点、明示変奏 | `ddl_expander.py`, language support | expander、variation、staffage fold tests | DDL engine corpus | `check_frozen_corpora.py` |
 | coerce | drop/repair、要求配達、hard ceiling、単一の名指し抽象色 | `coerce/normalize.py`, `coerce/compose.py`, `coerce/__init__.py` | composer/coerce/limits/relation tests | DDL engine corpus | `check_frozen_corpora.py` |
-| renderer/stroke | 同一Score+seed、engine前進 | `renderer.py`, `stroke_engine.py`, `render_engines/default.py` | renderer各契約、platform stability | Render Engine corpus 553件 | version bump、再生成2回、Linux CI |
+| renderer/stroke | 同一Score+seed、engine前進 | `renderer.py`, `stroke_engine.py`, `render_engines/default.py` | renderer各契約、platform stability | Render Engine corpus 606件 | version bump、再生成2回、Linux CI |
 | identity/history | `dh1`, `rh3`, legacy `rh2`, DB正本 | `identity.py`, `db.py`, rendering/history router | hash、integrity、lineage acceptance | Android parity fixtures | migrationと既存row互換 |
-| API route/model | 82 route、公開6、response shape | `api.py`, `api_core/*` | route auth、module split、API surface baseline | なし | Web/CLI/Android sender census |
+| API route/model | 96 route、公開3、response shape | `api.py`, `api_core/*` | route auth、module split、API surface baseline | なし | Web/CLI/Android sender census |
 | Web設定feature | 3 registry、local/user/payload境界 | `web/src/lib/features/*`, `+page.svelte` | registry unit tests、route source contracts | なし | `npm run check`, `test:unit`, relevant lint |
 | Web表示語 | 日英語彙、token | `i18n/*`, component | type/check | なし | `lint:i18n`、必要ならdocs check |
 | CLI flag/API field | 公開HTTPのみ、help/manual同時更新 | `cli.py`, CLI README/manual | `cli/tests/test_cli.py`, sender census | bench artifactは別 | CLI経由機能試験 |
@@ -24,28 +24,30 @@
 ```mermaid
 flowchart LR
     CHANGE["変更"]
+    CI_SERVER["CI: server ruff + pytest"]
+    CI_CLI["CI: CLI ruff + pytest"]
+    CI_WEB["CI: web check + unit + lint:i18n"]
+    CI_DOCS["CI: check_docs.py"]
     CI_CORPUS["CI: render/DDL corpus再生成"]
     CI_PREVIEW["CI: Android design preview再生成"]
-    LOCAL_SERVER["Local: pytest + ruff"]
-    LOCAL_WEB["Local: check + unit + lint"]
-    LOCAL_CLI["Local: CLI pytest + CLI機能試験"]
     LOCAL_ANDROID["Local: Gradle JVM / 必要時実機"]
     RELEASE["Tag: container image build/publish"]
 
+    CHANGE --> CI_SERVER
+    CHANGE --> CI_CLI
+    CHANGE --> CI_WEB
+    CHANGE --> CI_DOCS
     CHANGE --> CI_CORPUS
     CHANGE --> CI_PREVIEW
-    CHANGE -.->|"CIでは未実行"| LOCAL_SERVER
-    CHANGE -.->|"CIでは未実行"| LOCAL_WEB
-    CHANGE -.->|"CIでは未実行"| LOCAL_CLI
     CHANGE -.->|"CIでは未実行"| LOCAL_ANDROID
     CHANGE -->|"release tag"| RELEASE
 ```
 
-現行CIが通常push/PRで実行するapplication gateは、凍結render/DDL corpus再生成とAndroid design preview再生成である。pytest、ruff、Svelte check、Web unit/lint、CLI pytest、Android unit testはworkflow上に無く、local/配備先検証が必要である。
+現行CIは通常push/PRで、server（ruff + pytest）、CLI（ruff + pytest）、Web（svelte-check + unit + lint:i18n）、公開文書（`check_docs.py`）、凍結render/DDL corpus再生成、Android design preview再生成を実行する（`checks.yml` は台帳I-192で追加）。AndroidのJVM/instrumentationテストはworkflow上に無く、local検証が必要である。
 
 ## 決定的層の特別規則
 
-`coerce/`, `ddl_expander.py`, `renderer.py`, `stroke_engine.py`, `schema.py`, `saijiki.py`, `language_support/{ja,en}.py` は `server/scripts/check_frozen_corpora.py` の対象である。pytestのreference testは凍結fileとmanifestを読むだけの部分があり、generator再実行の代用にならない。
+`coerce/`, `ddl_expander.py`, `renderer.py`, `stroke_engine.py`, `schema.py`, `saijiki.py`, `language_support/` は `server/scripts/check_frozen_corpora.py` の対象である。pytestのreference testは凍結fileとmanifestを読むだけの部分があり、generator再実行の代用にならない。
 
 ## 根拠対応
 

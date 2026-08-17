@@ -100,6 +100,16 @@ ARCHITECTURE_PAIRS = (
         "docs/architecture/known-differences.md",
         "shape",
     ),
+    (
+        "docs/architecture/description-to-svg.ja.md",
+        "docs/architecture/description-to-svg.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/future-plan.ja.md",
+        "docs/architecture/future-plan.md",
+        "shape",
+    ),
 )
 
 # The thirteen pairs that were already there, as the control: adding seven rows
@@ -181,8 +191,8 @@ def test_the_thirteen_earlier_pairs_are_intact() -> None:
     ja_names = [pair[0] for pair in pairs]
     missing = [name for name in EXISTING_PAIRS if name not in ja_names]
     assert not missing, f"pairs that check_docs.py used to compare are gone: {missing}"
-    assert len(pairs) == 31, (
-        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, and 11 architecture pairs"
+    assert len(pairs) == 33, (
+        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, and 13 architecture pairs"
     )
 
 

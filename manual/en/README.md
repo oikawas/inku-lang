@@ -1,6 +1,6 @@
 # inku User and Operations Manual
 
-This manual explains how to use and operate the unreleased inku v2.13.34 baseline (Web Build 921). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
+This manual explains how to use and operate the unreleased inku v2.13.35 baseline (Web Build 922). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
 
 ## Audience
 

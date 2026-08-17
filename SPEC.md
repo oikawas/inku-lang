@@ -177,12 +177,17 @@ wide / byobu / vertical.
   absolute darkness**: the same flat fill varies widely with the tool (measured
   mean luminance 17.4 to 131.1 at the native 1618px). **Paper grain does not
   belong here** -- it is a quality of the support, and `Ground:` takes it.
-  **Two of the qualities, `grain` and `bleeding`, are kept when they land on a
-  line or an arc and are read as how that mark runs** (author's ruling of
-  2026-08-16, ddl engine 20 / render engine 37) -- **they speak about the run of
-  the mark rather than about an inside, which is what a line has instead of an
-  inside. The other seven are moved to the closed shape before them as before,
-  and dropped where there is none.** **An
+  **Three of the qualities, `grain`, `bleeding` and `wash`, are kept when they
+  land on a line or an arc and are read as how that mark runs** (grain and
+  bleeding by the author's ruling of 2026-08-16, ddl engine 20 / render engine
+  37; wash by the ruling of the same day, render engine 38) -- **they speak
+  about the run of the mark rather than about an inside, which is what a line
+  has instead of an inside. The three do not land in the same place**: grain and
+  bleeding raise the support's two quantities (absorption and tooth), while
+  **a wash says nothing about the sheet** -- it is how the ink was diluted, not
+  what it was laid on -- and is drawn as **a broader, paler band** (three times
+  the width at 0.35 of the opacity). **The other six are moved to the closed
+  shape before them as before, and dropped where there is none.** **An
   instruction to fill the background is not about a surface** either; it goes to
   the `background` field.
 - **the grounds category holds the names of supports** (added 2026-08-15, render

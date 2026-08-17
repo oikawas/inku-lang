@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.13.34 / Build 921**
+**対象バージョン: v2.13.35 / Build 922**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -99,7 +99,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 37 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 38 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.40` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
@@ -157,7 +157,7 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
 **強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
 切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
-- **Render Engine 37** — SVG の演奏。
+- **Render Engine 38** — SVG の演奏。
 **名前で呼んだ支持体は筆の走り方を変える** —— 地の 7 種はそれぞれ吸い方と歯の強さを持ち、
 その値が筆の合成へ渡るので、同じ記述でも和紙とカンバスでは痕が違う形で出る。
 `面: 粒` と `面: にじみ` は線や弧に付いたとき、その 1 命令だけ紙を強く働かせる指示として読まれ（上限 3.0 倍）、
@@ -282,7 +282,7 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-37`（597 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-38`（606 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
 - **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
 移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
 旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。

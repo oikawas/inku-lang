@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
 | **37** | v2.13.31 | 918 | 2026-08-16 | 597 | **12** | **585** |
 | **36** | v2.13.27 | 914 | 2026-08-16 | 588 | **6** | **582** |
 | **35** | v2.13.24 | 911 | 2026-08-15 | 588 | **9** | **579** |
@@ -140,9 +141,9 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.34 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.35 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 921 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 922 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -418,6 +419,51 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 38 — a wash named on a line is a broad pale sweep (v2.13.35)
+
+**Of the nine surface words, `wash` alone was drawn nowhere at all when it landed on a line or an arc.**
+Of the 3,458 works in production, **567** name a wash on a line or an arc, and **490 of them (86.4%) appear
+nowhere** -- 354 dropped for want of a closed shape before them, 136 dropped because that shape already
+carried a surface. **The remaining 77 were moved onto some other shape.**
+
+### Three words now speak about the run of the mark, and they do not land in the same place
+
+Grain and bleeding raise **the sheet's own two quantities** (absorption and tooth, engine 37).
+**A wash says nothing about the sheet** -- it is how the ink was diluted, not what it was laid on -- so
+**the renderer draws it as a band three times as wide at 0.35 of the opacity.**
+`MARK_SURFACE_WORDS` has two readers, and **the second looked its words up in the table of the sheet's two
+quantities**, so adding a word alone raised an exception. A word that is not in that table now returns the
+support unchanged.
+
+### The width and the darkness of a mark are decided in one place
+
+All **fifteen** call sites of `_stroke_width_px` were routed through two entrances (`_mark_width_px`, and
+`_nominal_mark_width_px` for the separate quantity that carries no thinness). **Seven are reachable from an
+open shape** -- the amplitude of the waver, the `rotring` line, two material outlines, the material line, the
+hand-drawn line and **the hand-drawn arc**. **On a closed shape the entrance passes straight through**, so no
+closed drawing moves a byte.
+
+### The corpus grew by nine cases, and those nine are the only ones that moved
+
+**Of 606 cases, the nine new ones moved and the existing 597 did not move a byte.**
+The nine split across two changes: **four for the wash** (two lines, one arc, and one closed-shape control
+that must not move) and **five for ledger I-289.**
+
+**I-289: the frozen corpus held four `display` cases and all four used `pen`.** `pen` carries no texture
+weight, so **no case went through the texture-filter branch at all** (SVGs carrying `filter="url(#texture-`:
+**0 of 597** in engine 37, **5 of 606** in engine 38).
+
+**Drypoint is excluded on the general branch, but the burr writes `url(#texture-drypoint)` outright** (three
+places). **The burr is drypoint itself.** The reference count is exactly one, and the general branch fires
+zero times.
+
+### `brush_thick` alone does not turn its width ratio into an area ratio
+
+Three times the width puts **2.10 times** the ink area on the sheet (`brush_thin` 3.96, `crayon` 3.46,
+`chalk` 3.50, `pencil` 3.09, `pen` / `rotring` / `silverpoint` 3.00), because the taper of the bristle and
+where the sheet cuts do not scale with the width. **The opacity ratio is exactly 0.350 for every tool.**
+**Whether it needs a ceiling is undecided.**
 
 ## engine 37 — a sheet called by name changes how the brush runs (v2.13.31)
 

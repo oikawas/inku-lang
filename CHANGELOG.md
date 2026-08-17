@@ -8173,3 +8173,50 @@ fills an interior — was invisible to every guard.
   in the frozen corpus** (no `color_hint` there moves `fill-opacity`, and there is no `solid`
   `cloudform`). **They are latent divergences, not a break in today's drawings.**
 - **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).
+
+### v2.13.35 — a wash named on a line is a broad pale sweep (Build 922, 2026-08-17, ledger I-279, I-289)
+
+**This is the cycle where a wash finally appears on the lines and arcs that asked for one.**
+Of the 3,458 works in production, **567** are written that way, and **490 of them (86.4%) were drawn nowhere at
+all** -- 354 dropped because no closed shape stood before them, 136 dropped because the shape before them
+already carried a surface. **The remaining 77 were moved onto some other shape that never asked for it.**
+
+- **`Surface: wash` now stays on the line and the arc:** the surface words that speak about the run of the mark
+  went from **two to three** (grain, bleeding, wash). **The three do not land in the same place.** Grain and
+  bleeding raise the sheet's own two quantities (engine 37); **a wash says nothing about the sheet.** A wash is
+  how the ink was diluted, so **the renderer draws it as a band three times as wide at 0.35 of the opacity.**
+- **The width and the darkness of a mark are now decided in one place:** all **fifteen** call sites of
+  `_stroke_width_px` were routed through two entrances (`_mark_width_px` and `_nominal_mark_width_px`).
+  **Seven of them are reachable from an open shape**; on a closed shape the entrance passes straight through,
+  so no closed drawing moves. **The prototype had missed the arc path** (`_render_arc_hand_stroke`); counting
+  all fifteen is what closed it.
+- **One place the contract did not name:** `MARK_SURFACE_WORDS` has two readers, and **the second one looked
+  the word up in a table** holding only grain and bleeding. **Adding wash alone made every drawing with a wash
+  on an open shape raise an exception.** The lookup now returns the support unchanged when a word raises none
+  of the sheet's quantities. **No coefficient or branch of grain and bleeding was touched.**
+- **Ledger I-289 was closed in the same version:** the frozen corpus held only four `display` cases and **all
+  four used `pen`**, so **not one case went through the texture-filter branch** (SVGs carrying
+  `filter="url(#texture-` in engine 37: **0 of 597**). Cases for the four tools that do emit a filter bring it
+  to **5 of 606**.
+- **One premise of the contract was false:** "drypoint writes no filter, so it never appears" is right in its
+  first half and wrong in its second. **Three places name `url(#texture-drypoint)` outright** -- the burr.
+  The burr is drypoint itself, so the acceptance was written to the measurement: **the general branch fires
+  zero times and the burr once.** A drypoint case was added as the witness, because **a claim that something
+  never appears is vacuous with nobody to check it against.**
+- **The corpus went from 597 to 606 cases. Only the nine new ones are new; the existing 597 did not move a
+  byte** (the accepting side compared 597 manifest digests). **`ddl-engine-20` did not move at all** -- the ddl
+  corpus holds no case with a wash on an open shape.
+- **Three coerce goldens moved, and the repair lost every witness it had:** `H-06`, `H-10` and `H-13` were
+  **the only cases that fired `_with_surface_on_a_closed_shape`**, so rebaking them as they were would have
+  left **a golden that stays green even if the repair itself is deleted**. A witness case was added, putting it
+  back at `branches reached: 32 / with a witness: 32`.
+- **Six of the eleven perturbations matched the prediction:** three reddened more than predicted (+1, +3, +2)
+  and **one missed entirely** -- no case added by this work goes through the site the contract named
+  (`_surface_dab`). **`filter="url(#texture-` is written in fourteen places in `renderer.py`**, not the five
+  the contract read. **A perturbation with real discriminating power was written instead** (dropping
+  `use_filters` upstream of all fourteen), and **five tests were measured going red.**
+- **`brush_thick` alone puts only 2.10 times the ink area on the sheet for three times the width** (every
+  other tool lands between 3.00 and 3.96). The taper of the bristle and where the sheet cuts do not scale with
+  the width. **Whether it needs a ceiling is undecided** -- 32 of the 567 works in production use it, and none
+  of them was on the contact sheet the author ruled from.
+- **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).

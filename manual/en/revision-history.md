@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.35 unreleased baseline (Web Build 922)
+
+Updated the thirteen places that name a version to v2.13.35 / Build 922. **That a wash named on a line or an arc is now drawn as a broader, paler band was written in.**
+
+- **`Surface: wash` on a line or an arc now stays there and is drawn as a broad, pale band.** Three times the width at 0.35 of the darkness. **Until now a wash named on a line or an arc was drawn nowhere at all** -- it was moved onto the closed shape before it, or dropped where there was none. **Written into `Creating Images` §3.**
+- **A wash is not about the sheet.** `Surface: grain` and `Surface: bleeding` make the sheet work harder; a wash is how the ink was diluted, so what changes is the band itself rather than the paper.
+- **The other six surface words (paper grain, hatching, cross-hatching and the rest) are unchanged.** They move to the closed shape before them, and are dropped where there is none.
+- **The thick brush alone puts about 2.10 times the ink on the sheet for three times the width.** The taper of the bristle and where the sheet cuts do not scale with the width; every other tool lands between about three and four times.
+
 ## 2026-08-17 — v2.13.34 unreleased baseline (Web Build 921)
 
 Updated the thirteen places that name a version to v2.13.34 / Build 921. **That the reader chooses what the history strip prints, that history search takes a whole render hash, and that the model picked for AI refinement also draws, were written in.**

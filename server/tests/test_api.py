@@ -1704,7 +1704,8 @@ def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
     assert r.headers["content-type"].startswith("application/x-ndjson")
 
     events = _stream_events(r)
-    assert [e["event"] for e in events] == ["stage1", "done"]
+    # This fixture paints with Stage 0.5 off, so no sketch event stands in front.
+    assert [e["event"] for e in events] == ["stage1", "score", "done"]
 
     stage1 = events[0]
     assert "黒い円を置く。" in stage1["ddl"]
@@ -1714,7 +1715,7 @@ def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
     assert stage1["interpret_fallback_used"] is False
 
     # The done event carries the Stage 2 DDL, which may rewrite the Stage 1 text.
-    done = events[1]
+    done = events[-1]
     assert "黒い円を置く。" in done["ddl"]
     assert done["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in done["svg"]

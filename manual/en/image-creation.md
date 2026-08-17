@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.38 (Web Build 925). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.39 (Web Build 926). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -51,6 +51,8 @@ This manual assumes Full UI. Under Simple UI some of the operations described he
 3. If needed, set `Model`, `Color catalog`, `Sketch from life`, `Wild`, and `Canvas`.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
+
+While you wait, the indicator next to `Paint` names the layer that is working (`sketching from life…`, `interpreting your words…`, `writing the score…`, `performing…`). **It is not a guess: each name is switched by a signal the server sends when that layer finishes** (v2.13.39). With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`.
 
 The first work is the source work. The refinement action `Another performance` is never applied to this first painting.
 

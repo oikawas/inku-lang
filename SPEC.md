@@ -1570,7 +1570,11 @@ the interpretation completes it emits a `stage1` event (normalized DDL, the
 model used, token count, elapsed time, and whether a fallback occurred), and
 the final `done` event returns the usual `PaintResponse`.  The existing
 `/api/paint` is a wrapper consuming the same logic and its response shape is
-unchanged, so the CLI and Android needed no modification.
+unchanged, so the CLI and Android needed no modification.  Two more signals
+were added in v2.13.39: `sketch`, emitted before `stage1` only on requests
+where the sketch layer ran, and `score`, emitted before `done` at the moment
+the Score is settled.  Neither carries its body (the prose, the Score), and
+neither the shape of `done` nor the `/api/paint` response changed.
 
 **Measure C: parallelism (later).**  When generating several options, run
 stage two in parallel.
@@ -3148,6 +3152,20 @@ interpretation while Stage 2 and rendering continue, and the final `done` event
 carries the same `PaintResponse` as before. `POST /api/paint` remains a wrapper
 over the same logic with an unchanged response shape, so the CLI and Android
 need no changes.
+
+Since v2.13.39 there are four signals. On a request where the sketch layer ran,
+`sketch` arrives before `stage1` (grain, fallback flag, token counts, the time
+the sketch took), and `score` arrives once Stage 2 and coerce are done and the
+Score will not change again (instruction count, model, token counts, elapsed).
+**The stage indicator switches on these four signals and no longer guesses the
+next layer ahead of time.** Neither the prose nor the Score body travels in an
+event; `done` already carries both. **`stage1`'s `elapsed_ms` still includes
+the sketch** — the breakdown comes from subtracting the `sketch` event's
+`elapsed_ms`. **⚠ Because the first event is now `sketch`, a Stage 1 failure on
+a sketched request arrives as `{"event":"error","status":502}` in the body
+rather than as HTTP 502** (with the layer off it is still 502). The rule
+itself — a failure before the first event is HTTP, one after it is in the body
+— has not changed.
 
 DDL replay shows elapsed time, token information, a stop button, and the
 progress mascot.  Stopping replay aborts the active `/api/compose` request.

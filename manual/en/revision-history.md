@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.39 unreleased baseline (Web Build 926)
+
+Updated the thirteen places that name a version to v2.13.39 / Build 926. **Added that the indicator shown while a work is being painted now names the layer that is working** (`sketching from life…` / `interpreting your words…` / `writing the score…` / `performing…`). **It no longer guesses the next layer ahead of time: each name is switched by a signal the server sends when that layer finishes.** With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`. No settings were added.
+
 ## 2026-08-17 — v2.13.38 unreleased baseline (Web Build 925)
 
 Updated the thirteen places that name a version to v2.13.38 / Build 925. **Added that a work drawn after composition (Stage 2) fell back now carries a mark, and that refining from a marked work asks once before it runs.** Also recorded that `Score fallback` in the generation details answers `yes`, `no`, or `no record`, and that **`no record` does not mean it did not fall back**.

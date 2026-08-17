@@ -68,6 +68,7 @@ sequenceDiagram
     opt Stage 0.5 enabled
         P->>L: Sketch from life
         L-->>P: observation / fallback
+        R-->>C: sketch NDJSON event on stream only
     end
     P->>L: Stage 1 interpretation
     L-->>P: Instructions
@@ -76,6 +77,7 @@ sequenceDiagram
     P->>L: Stage 2 schema tool
     L-->>P: Score / retry / fallback
     P->>P: coerce + validation
+    R-->>C: score NDJSON event on stream only
     P->>E: Score + render/composition seed
     E-->>P: SVG + metadata
     opt save_history

@@ -102,7 +102,7 @@ Total: 95. The three-path public allowlist is `/health`, `/api/info`, and `/api/
 
 ## Main flows
 
-- `/api/paint` and `/api/paint/stream` consume the same `_paint_events` iterator; only the stream emits the Stage 1 event early.
+- `/api/paint` and `/api/paint/stream` consume the same `_paint_events` iterator; only the stream emits the layer-completion events early (`sketch`, `stage1`, `score`; `sketch` only on requests where that layer ran). **Once any early event has been written, a failure arrives as an `error` event in the body rather than as an HTTP status.**
 - `/api/compose` starts from supplied DDL and proceeds through plugin → Stage 1.5 → Stage 2 → coerce → performance.
 - `provider_for_model` and `_resolved_stage_model` resolve request, user settings, and provider catalog choices.
 - `api_core/rendering.py` joins Score/performance to history and optional work-file persistence.

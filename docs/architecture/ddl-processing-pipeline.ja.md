@@ -68,6 +68,7 @@ sequenceDiagram
     opt Stage 0.5 enabled
         P->>L: 写生
         L-->>P: 写生文 / fallback
+        R-->>C: streamのみ sketch NDJSON event
     end
     P->>L: Stage 1
     L-->>P: 正規化DDL
@@ -76,6 +77,7 @@ sequenceDiagram
     P->>L: Stage 2 tool/schema
     L-->>P: Score / retry / fallback
     P->>P: coerce + validation
+    R-->>C: streamのみ score NDJSON event
     P->>E: Score + render/composition seed
     E-->>P: SVG + metadata
     opt save_history

@@ -102,7 +102,7 @@ flowchart LR
 
 ## 主要flow
 
-- `/api/paint` と `/api/paint/stream` は同じ `_paint_events` generatorを消費する。streamだけStage 1完了を先行eventとして返す。
+- `/api/paint` と `/api/paint/stream` は同じ `_paint_events` generatorを消費する。streamだけ層の完了を先行eventとして返す（`sketch`・`stage1`・`score` の3つ。`sketch` は写生層が動いた回だけ）。**先行eventが1つでも出た後の失敗は、HTTPではなく本文の `error` eventで届く。**
 - `/api/compose` はStage 1を通らず、受け取ったDDLからplugin → Stage 1.5 → Stage 2 → coerce → renderへ進む。
 - provider/modelはrequest指定、userのStage設定、provider catalogを `provider_for_model` / `_resolved_stage_model` で解決する。
 - `api_core/rendering.py` がScore/renderとhistory/file保存の継ぎ目である。

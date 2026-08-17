@@ -28,10 +28,26 @@ from inku_server.renderer import (
     _stroke_width_px,
     render,
 )
-from inku_server.schema import Score
+from inku_server.schema import Instruction, Score
 
 RENDER_SEED = 12345
 CANVAS = canvas_size_for_aspect(None)
+
+
+def _plain_mark(weight: str, thinness: str | None = None) -> Instruction:
+    """A line that names the tool and nothing else.
+
+    `_material_outline_profile` takes the instruction since render engine 38,
+    because the two widths it reads are asked of `_mark_width_px`, where a
+    described mark is seen. Every probe in this file is about the tool, so the
+    subject states no surface -- which is the case whose numbers this file has
+    always held.
+    """
+    return Instruction(
+        primitive="line", **{"from": (0.18, 0.50)}, to=(0.82, 0.50),
+        weight=weight, thinness=thinness,
+    )
+
 
 # コーパスと同じ幾何。raster-bleed のセル数は図形の大きさで変わるので、
 # 恒等検査 (D-10) はここを動かしてはいけない。
@@ -226,7 +242,7 @@ def _rendered_offsets(weight: str) -> list[float]:
     """
     from inku_server.renderer import _material_outline_profile
 
-    return [entry[0] for entry in _material_outline_profile(weight, CANVAS)]
+    return [entry[0] for entry in _material_outline_profile(_plain_mark(weight), CANVAS)]
 
 
 def test_pen_strata_are_symmetric_about_the_ink() -> None:
@@ -337,7 +353,7 @@ def test_no_stratum_is_wider_than_its_share_of_the_tool(weight: str, thinness) -
     引いても紙の目や粉の粒は細らない (`test_material_outline_absolute_widths_do_not_move`)。
     """
     nominal = _stroke_width_px(weight, CANVAS)
-    for _, width, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+    for _, width, _, _ in _material_outline_profile(_plain_mark(weight, thinness), CANVAS):
         assert width <= nominal * MATERIAL_OUTLINE_MAX_WIDTH_RATIO + 1e-9, (weight, width)
 
 
@@ -350,7 +366,7 @@ def test_the_width_cap_actually_binds_on_the_tool_it_was_set_for() -> None:
     at_cap = {
         weight
         for weight in MATERIAL_TOOLS
-        for _, width, _, _ in _material_outline_profile(weight, CANVAS)
+        for _, width, _, _ in _material_outline_profile(_plain_mark(weight), CANVAS)
         if abs(width - _stroke_width_px(weight, CANVAS) * MATERIAL_OUTLINE_MAX_WIDTH_RATIO) < 1e-9
     }
     assert {"brush_thin", "chalk"} <= at_cap, at_cap
@@ -366,7 +382,7 @@ def test_no_stratum_sits_inside_the_mark(weight: str, thinness) -> None:
     読む幅が違う。
     """
     half = _stroke_width_px(weight, CANVAS, thinness) / 2.0
-    for offset, _, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+    for offset, _, _, _ in _material_outline_profile(_plain_mark(weight, thinness), CANVAS):
         assert abs(offset) >= half - 1e-9, (weight, thinness, offset, half)
 
 
@@ -375,7 +391,7 @@ def test_the_offset_floor_actually_binds_on_the_tools_it_was_set_for() -> None:
     at_floor = {
         weight
         for weight in MATERIAL_TOOLS
-        for offset, _, _, _ in _material_outline_profile(weight, CANVAS)
+        for offset, _, _, _ in _material_outline_profile(_plain_mark(weight), CANVAS)
         if abs(abs(offset) - _stroke_width_px(weight, CANVAS) / 2.0) < 1e-9
     }
     assert {"brush_thick", "crayon"} <= at_floor, at_floor

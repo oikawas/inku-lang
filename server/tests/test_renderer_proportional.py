@@ -35,10 +35,25 @@ from inku_server.renderer import (
     _texture_filter_xml,
     render,
 )
-from inku_server.schema import Score, Variation
+from inku_server.schema import Instruction, Score, Variation
 
 SQUARE = canvas_size_for_aspect(None)
 VERTICAL = canvas_size_for_aspect("vertical")  # 9:16 → unit = width < 1000
+
+
+def _plain_mark(weight: str, thinness: str | None = None) -> Instruction:
+    """A line that names the tool and nothing else.
+
+    `_material_outline_profile` takes the instruction since render engine 38:
+    both widths it reads are asked of `_mark_width_px`, which is where a
+    described mark is seen. These probes are about the tool, so the subject
+    states no surface -- the case whose numbers this file has always held.
+    """
+    return Instruction(
+        primitive="line", **{"from": (0.18, 0.50)}, to=(0.82, 0.50),
+        weight=weight, thinness=thinness,
+    )
+
 
 
 def _circle_score(radius: float, **variation) -> Score:
@@ -513,8 +528,8 @@ def test_material_layer_shrinks_with_canvas_unit():
         WEIGHT_TO_STROKE_WIDTH["brush_thick"] * ratio
     )
 
-    square_profile = _material_outline_profile("chalk", SQUARE)
-    vertical_profile = _material_outline_profile("chalk", VERTICAL)
+    square_profile = _material_outline_profile(_plain_mark("chalk"), SQUARE)
+    vertical_profile = _material_outline_profile(_plain_mark("chalk"), VERTICAL)
     for (s_off, s_w, s_op, _), (v_off, v_w, v_op, _) in zip(
         square_profile, vertical_profile
     ):

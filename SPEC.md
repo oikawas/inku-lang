@@ -1501,6 +1501,18 @@ failures are classified by HTTP status into model-gone, authentication,
 rate-limit, and other kinds, reported with the failing stage and the provider's
 original message (the legacy string-form error path is kept for compatibility).
 
+**Added in v2.13.38:** a work drawn through a Stage 2 fallback path records a
+`compose_fallback` reason in history in the same shape, and is marked in the UI
+by a badge that names the layer. **The field holds three states**: a reason
+string (it fell back), `"none"` (it did not), and no record at all (the work was
+saved before the field existed). Using `null` for "did not fall back" would make
+such a work indistinguishable from one saved before the field, so a writer
+states `"none"` explicitly. **The writer is whoever performs the save**, which
+for the drawing path is the server itself: the response is returned after the
+row is written, so a client cannot send the fact back for a work it asked to be
+saved. **Refining from a marked work as the lineage parent asks for confirmation
+once before it runs.** Nothing is written retroactively to existing works.
+
 When Stage 2 cannot return usable instructions because of timeout, empty output,
 or transient model failure, the server may produce a deterministic fallback
 Score.  This fallback is still expected to preserve the DDL's visible essentials:

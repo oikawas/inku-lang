@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.37 / Build 924**
+**Target version: v2.13.38 / Build 925**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -153,6 +153,10 @@ The description itself is kept for saving and display, and when the layer fails 
 `off`, `not_applicable`). **A run that fell over, a run the author switched off, and a route that
 never calls the layer are recorded separately.** `NULL` means only one thing: the work was drawn
 before the column existed.
+**A run where interpretation or composition fell back is recorded the same way** (`interpret_fallback`
+and `compose_fallback`). **The composition field holds three states**: a reason, `"none"` (it did not
+fall back), and no record at all.
+**Refining from a marked work as the lineage parent asks once before it runs.**
 - **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
 The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.
 - **Plugin expansion** — writes a validated `.inku-plugin.md` down into core DDL deterministically,

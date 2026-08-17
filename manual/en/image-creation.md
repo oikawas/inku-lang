@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.37 (Web Build 924). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.38 (Web Build 925). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -281,7 +281,7 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback |
-| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, Score fallback, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
@@ -293,6 +293,10 @@ Every row carries an explanation. The render seed is "the seed that fixes the sw
 `Prompts` shows the Stage 1 and Stage 2 system prompts and user input; `JSON` shows the JSON Score. Do not confuse the JSON Score itself with the provenance.
 
 If Stage 1 does not answer in time, returns an empty answer, or fails, a stock set of instructions is performed and the reason is recorded as `Interpretation fallback`.
+
+**When Stage 2 does not answer either, the piece is performed by a stock procedure and the reason is recorded as `Score fallback`.** Both cases mark the work, and **a work where both fell back carries two marks**. In the generation details, `Score fallback` gives one of three answers: `yes` (it fell back), `no` (it did not), and `no record` (the work was drawn before this was recorded). **`No record` does not mean it did not fall back.**
+
+**Choosing a marked work to refine asks you once before it runs.** That work's link to the words is broken, so you are asked whether to continue from it. The same work is not asked about twice.
 
 ## 12. Follow the Lineage
 

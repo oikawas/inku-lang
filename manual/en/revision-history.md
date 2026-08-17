@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.38 unreleased baseline (Web Build 925)
+
+Updated the thirteen places that name a version to v2.13.38 / Build 925. **Added that a work drawn after composition (Stage 2) fell back now carries a mark, and that refining from a marked work asks once before it runs.** Also recorded that `Score fallback` in the generation details answers `yes`, `no`, or `no record`, and that **`no record` does not mean it did not fall back**.
+
 ## 2026-08-17 — v2.13.37 unreleased baseline (Web Build 924)
 
 Updated the thirteen places that name a version to v2.13.37 / Build 924. **That the bake following a save moved into a child process, so the server keeps answering other requests while it runs, was written in.**

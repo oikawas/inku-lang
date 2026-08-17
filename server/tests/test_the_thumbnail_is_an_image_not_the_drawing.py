@@ -201,11 +201,19 @@ def test_saving_a_work_does_not_wait_for_its_thumbnail(owner, monkeypatch):
     and passes without ever making a bake slow, because "the save was quick" is
     also true when no bake happened. `bakes` is what keeps this from measuring
     nothing.
+
+    ⚠ And `bakes` counts only the thumbnail's own width. A save rasterizes
+    twice through this one function: the thumbnail at 256 px and, when output
+    saving is on -- which it is in a fresh database -- the artifact copy at
+    2,160 px. Counting both left this gate green with the thumbnail baking in a
+    child that the arrangement never reached, which is the exact blindness the
+    paragraph above is about.
     """
     import inku_analysis.rasterizer as rasterizer
 
     user, headers = owner
     slow = 1.0
+    thumbnail_width = thumbs_db.width_for_scale(1)
     bakes: list[float] = []
     real_svg_to_png = rasterizer.svg_to_png
 
@@ -213,7 +221,8 @@ def test_saving_a_work_does_not_wait_for_its_thumbnail(owner, monkeypatch):
         started = time.monotonic()
         time.sleep(slow)
         png = real_svg_to_png(svg, *args, **kwargs)
-        bakes.append(time.monotonic() - started)
+        if kwargs.get("width") == thumbnail_width:
+            bakes.append(time.monotonic() - started)
         return png
 
     monkeypatch.setattr(rasterizer, "svg_to_png", slow_bake)

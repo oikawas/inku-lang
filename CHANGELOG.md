@@ -8272,3 +8272,76 @@ When the works to be shown are a set rather than a list, the ACL has to be writt
 - **The merge conflicted** -- the branch was cut from `3f56b7c2`, and **I-191 landed in main the same day, so both sides had stamped a build on the same four version-marker lines**. **The product code did not overlap at all.** The merged tree was numbered once.
 - **Verification**: server **3,434 passed / 31 skipped** (+7), cli **237 passed**, web **449 pass / 0 fail**, `npm run check` **268 files / 0 errors / 2 warnings**, ruff clean on both trees, `check_docs.py` consistent. **Nine perturbations reddened 30 acceptances between them, with no misses** (the implementation predicted 19, the contract 13). **The reference corpora did not move by one byte.**
 - **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).
+
+### Android — The wobble gate splits in two and the fill attribute reads one judgement (android `2.1.4-android.41`, 2026-08-17, ledger I-278, I-298)
+
+**The server settles a judgement once, in one place, and whatever needs it reads it there. The port
+held copies of the same judgement** — two of them, each telling a different lie. This round gave both
+one place to read.
+
+- **The wobble gate splits into the server's two (ledger I-278):** the server keeps one gate for
+  **lines** (`renderer.py:780`, the axes `position_x` / `position_y`) and one for **contours**
+  (`:792`, those two plus `radius`), and **neither lets `quality` `none` or `pink` through**. **The
+  port had folded them into one that read all three axes from every call site and excluded only
+  `none`.** **Two inputs diverged** — **`pink`** (a bleed the server draws with a blur and lets no
+  variation reach; the port drew the blur *and* wobbled) and **a line asked to vary on `radius`
+  alone** (straight on the server).
+- **The exclusion lives in one place:** a single `NO_VARIATION_QUALITIES` both gates read. **The axis
+  lists stay separate, as the server keeps them** (`PATH_VARIATION_DIMS` / `CONTOUR_VARIATION_DIMS`).
+  **⚠ The exclusion is written negatively** — with `Quality` holding five words it names the same set
+  as "the three that do wobble", but **a sixth word added to the schema joins the wobble under the
+  exclusion and is silently dropped under the enumeration.**
+- **All 23 call sites were read one at a time:** **only two are line-side** (the machine pole in the
+  `"line"` branch, and `renderHandStroke`); **the other 21 are contour-side.** **A shape branch asking
+  three times corresponds to the server solving `varied` once per branch** — the meaning did not
+  multiply. **`edgeContourWithAnchors` uses the line tool inside but is contour-side**, because the
+  server's `_render_corner_shape` reads the contour gate: **using the line tool inside is not the same
+  as reading the line gate.**
+- **The fill attribute now reads one judgement (ledger I-298):** `ServerRendererStyle.strokeAttrs`
+  **reads `fillsInterior` once at the top and uses that one variable for the `fill` value and for all
+  seven `fill-opacity` branches**, the shape the server's `_stroke_attrs` has. **It used to decide out
+  of "does the primitive have an inside, or was `filled` written"** — a set that knew nothing about
+  `surface.texture` and did not hold `cloudform`, so **the same request took different roads depending
+  on how it was spelt.**
+- **The re-decision added in the I-280 round became redundant and is gone:** the geometric road writes
+  `attrs.fill` as it stands. **Now that the value carries the judgement, asking again there would be
+  the copy this cycle came to remove.** **`strokeAttrs` also lost its `primitive` argument**, which no
+  longer had a reader.
+- **⚠⚠ The other place the contract called redundant was not redundant (the issuing side was wrong):**
+  the contract said `renderBodyShape`'s `regionFill` could go too. **`regionFill` is not a copy of
+  `fillsInterior` but a separate quantity** meaning **"the interior was drawn as marks, so the body
+  element stays open"**. **The server holds the same quantity** (`renderer.py:6235`
+  `_body_attrs_for_contour_stroke`, whose docstring states that with `region_fill=False` the body
+  carries no fill either, and which six call sites pass). **Removing it would double a flat fill under
+  the mark group on hand-drawn filled shapes and diverge from the server.** **The implementation
+  stopped and reported instead of applying stage 4's second half, and the author ruled on 2026-08-17
+  that it stays.**
+- **⚠ That is when it emerged that no gate measured which element did the filling:** applying stage
+  4's second half and running the whole suite **reddened nothing**. **The existing parity compares
+  only the `d` of the fill marks, and the colour comparison is a set, so a newly filled body element
+  leaves the set unchanged.** **The ruling added T-232 in the same round** — on both the server's
+  baked `03_square_filled.svg` and the port's redraw, **the hand tool leaves its body open while the
+  mark group fills, and the machine pole fills the body and has no mark group.**
+- **Nine gates (T-224..T-232), and twelve perturbations** — the contract's nine plus three the
+  implementation added — **all through `perturb.py`** (all twelve restored byte-identical; `git
+  checkout` was never run). **The runner detects `^e: ` so a failed compile is not read as a green
+  run** (proven twice by breaking it on purpose).
+- **⚠ Four perturbation predictions missed, in two shapes, both "failing to count a reader":**
+  **(1) the fallout was counted only from the frozen corpus, never from existing tests that call the
+  product function with input they build themselves** (three tests across P-4 and P-8); **(2) a case
+  outside a guard's own list was read as "compared"** —
+  `testMaterialOutlinePointsAndDashArrayExactParity` walks four named cases rather than every key in
+  the index, and the case in question was not among them. **⚠ P-9' matched on count (4) while two of
+  the names were wrong** — the errors cancelled.
+- **The full suite went 376 → 385 (+9). On the merged tree, XML 65 / tests 385 / failures 0 / errors 0
+  / skipped 0**, and `test_android_reference_fixtures_are_current.py` **4 passed**. **The frozen
+  corpus was not touched** — **its 51 sheets carry zero `pink` and zero lines varying on `radius`
+  alone**, so it cannot measure this change at all and every gate is placed on a property.
+- **One follow-up filed (since numbered I-307):** **the machine pole's line carries a wobble branch
+  the server does not have** — the server draws a `rotring` line as one straight line and calls no
+  gate, while the port reads a gate and writes a wobbled `<polyline>`. **No corpus sheet has a
+  `rotring` line with a variation, so nothing reddened.**
+- **⚠ One more vacuous test surfaced (not fixed):** `test03SquareFilledExactParity` compares the
+  `fill-stroke-v1` group, but **`03_square_filled` draws its interior with `fill-texture-v1` and
+  carries no `fill-stroke-v1` at all** — **both sides are empty, so nothing can redden it.**
+- **⚠ The GitHub CI was not waited for** (author's ruling, conventions §2-10).

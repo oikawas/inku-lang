@@ -611,10 +611,15 @@ def test_t10_i18n_keys_and_the_glossary_row():
         assert "settingsTabLimits" in (i18n / name).read_text(encoding="utf-8"), name
 
     # lint:i18n reads web display strings only, never documents, so the glossary
-    # row is asserted separately or nothing checks it at all.
-    glossary = (i18n / "GLOSSARY.md").read_text(encoding="utf-8")
+    # row is asserted separately or nothing checks it at all. The correspondence
+    # table moved to docs/i18n/glossary.md on 2026-08-17; a partial tree without
+    # docs/ skips rather than fails, like the other document-reading gates.
+    glossary_path = WEB_ROOT.parent / "docs" / "i18n" / "glossary.md"
+    if not glossary_path.is_file():
+        pytest.skip("docs/i18n/glossary.md is absent from this checkout")
+    glossary = glossary_path.read_text(encoding="utf-8")
     row = [line for line in glossary.splitlines() if line.startswith("| 制限値 ")]
-    assert row, "GLOSSARY.md carries no 制限値 row"
+    assert row, "the glossary carries no 制限値 row"
     assert "**Limits**" in row[0]
 
 

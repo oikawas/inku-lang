@@ -157,11 +157,12 @@ test('T-70  the two new hint keys stand in all three i18n faces', () => {
 });
 
 test('T-70  and the two labels are the words the glossary settles on', () => {
-	// Japanese is the source; the English side is the row added to GLOSSARY.md.
+	// Japanese is the source; the English side is the row in the correspondence
+	// table, which lives in docs/i18n/glossary.md since 2026-08-17.
 	assert.match(PANEL, /isJapanese \? 'SVG オブジェクト数' : 'SVG objects'/);
 	assert.match(PANEL, /isJapanese \? 'SVG 点数' : 'SVG points'/);
-	const glossary = read('./i18n/GLOSSARY.md');
-	assert.match(glossary, /SVG オブジェクト数/, 'GLOSSARY.md does not settle the pair');
+	const glossary = read('../../../docs/i18n/glossary.md');
+	assert.match(glossary, /SVG オブジェクト数/, 'the glossary does not settle the pair');
 	assert.match(glossary, /\*\*SVG objects\*\*/);
 	assert.match(glossary, /\*\*SVG points\*\*/);
 });

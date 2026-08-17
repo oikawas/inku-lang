@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -219,6 +220,27 @@ def _client_senders() -> dict[str, str]:
     return {"web": web.read_text(encoding="utf-8"), "cli": cli.read_text(encoding="utf-8")}
 
 
+def _web_save_bodies(text: str) -> list[str]:
+    """The request literal of each POST to /api/history, and nothing else.
+
+    Scoped, because the file mentions the key in half a dozen unrelated places
+    -- a type, a derivation, a badge. Asking whether the whole file contains
+    the word answers yes while the save sends nothing.
+    """
+    return [m.group(0) for m in re.finditer(r"apiFetch\('/api/history',[\s\S]{0,6000}?\n\t*\}\);", text)]
+
+
+def _cli_save_payload(text: str) -> set[str]:
+    """The keys of the payload the CLI POSTs, read from the syntax."""
+    tree = ast.parse(text)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_history_payload_from_result":
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Dict):
+                    return {k.value for k in inner.keys if isinstance(k, ast.Constant)}
+    raise AssertionError("the CLI no longer builds its history payload here")
+
+
 def test_t234_every_sender_that_saves_a_drawn_work_stacks_the_key(auth_context):
     headers, user = auth_context
     sources = _client_senders()
@@ -226,13 +248,27 @@ def test_t234_every_sender_that_saves_a_drawn_work_stacks_the_key(auth_context):
     # Two senders, and the count is part of the claim: a third client that
     # learns to save would have to come here and be counted.
     assert sorted(sources) == ["cli", "web"]
-    silent = [name for name, text in sources.items() if "compose_fallback" not in text]
-    assert not silent, f"these save a drawn work without saying what compose did: {silent}"
-    # Each of them writes the value either way, not only when it fell.
-    for name, text in sources.items():
-        assert "composeFallbackValue" in text or "_compose_fallback_value" in text, (
-            f"{name} names the key but does not send an effective value"
-        )
+
+    bodies = _web_save_bodies(sources["web"])
+    assert len(bodies) == 2, f"expected 2 saves from the web, saw {len(bodies)}"
+    for index, body in enumerate(bodies):
+        assert "compose_fallback" in body, f"the web save at index {index} says nothing about compose"
+    # Naming the key is not sending a value: bound to the work's own field
+    # alone it is null for every freshly drawn work, so the key that is named
+    # right there is dropped before the request leaves.
+    derivation = re.search(r"const composeFallback = [\s\S]{0,400}?;\n", sources["web"])
+    assert derivation, "the web save no longer derives what it sends"
+    assert "compose_fallback_used" in derivation.group(0), (
+        "the web derivation never reads the paint response, so a drawn work sends nothing"
+    )
+
+    assert "compose_fallback" in _cli_save_payload(sources["cli"]), (
+        "the CLI payload says nothing about compose"
+    )
+
+    # And each of them writes the value either way, not only when it fell.
+    assert "composeFallbackValue" in sources["web"]
+    assert "_compose_fallback_value" in sources["cli"]
 
     # And the far end stores what they send. Dropping the assignment in the save
     # route leaves both senders correct and the column empty, which is the same

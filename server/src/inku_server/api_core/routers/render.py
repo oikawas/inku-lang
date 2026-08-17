@@ -2073,6 +2073,14 @@ def _paint_events(
     save_artifacts = req.save_artifacts if req.save_artifacts is not None else req.save_history
     if req.save_history:
         history_at = req.history_at or int(time.time() * 1000)
+        # This route is where a drawn work is normally saved, and it is the only
+        # writer that knows whether compose fell: the flag is computed here and
+        # only reaches a client afterwards, in the response. A client cannot send
+        # back a fact about a row that is already written, so leaving this to the
+        # senders would mark nothing.
+        compose_fallback = compose_fallback_value(
+            fallback_used=compose_detail.fallback_used, reasons=compose_detail.retry_reasons
+        )
         item = _add_history_item(
             actor=actor,
             input_text=req.history_input or req.description,
@@ -2083,15 +2091,7 @@ def _paint_events(
                 if interpret_detail_result.fallback_used
                 else None
             ),
-            # This route is where a drawn work is normally saved, and it is the
-            # only writer that knows whether compose fell: the flag is computed
-            # here and only reaches a client afterwards, in the response. A
-            # client cannot send back a fact about a row that is already
-            # written, so leaving this to the senders would mark nothing.
-            compose_fallback=compose_fallback_value(
-                fallback_used=compose_detail.fallback_used,
-                reasons=compose_detail.retry_reasons,
-            ),
+            compose_fallback=compose_fallback,
             score=score,
             svg=svg,
             at=history_at,

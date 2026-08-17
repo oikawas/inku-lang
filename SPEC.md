@@ -2929,8 +2929,9 @@ changelog keeps the record and the ledger keeps the tracking**; this section nam
 
 Operational details specific to the author's local server are kept out of the published
 specification and collected in `AGENTS.md` or `no-git-sync/`, both outside Git. Ordinary
-development syncs from the Mac with rsync and restarts the systemd services; Docker Compose is
-used to verify the production configuration at milestones such as a release.
+development syncs from the Mac with rsync and restarts the systemd services; **checks that hold
+the CPU, and the rebaking of frozen output, run in a test-only container on the deployment host**;
+Docker Compose is used to verify the production configuration at milestones such as a release.
 
 ---
 
@@ -3466,11 +3467,22 @@ Operational details for the author's local server are intentionally not part of
 this public specification. They are consolidated in the untracked `AGENTS.md`
 or under `no-git-sync/`.
 
-The application is developed on macOS and verified on the deployment host after
-rsync-based sync and systemd service restart. Production Docker Compose images
-are verified at milestones such as release candidates rather than rebuilt for
-every ordinary source change. Git is used for source history, not as a file
-exchange mechanism with the local server.
+The application is developed on macOS. **Checks that hold the CPU -- the whole
+suite, a whole perturbation sweep, rebaking the reference corpora, rasterizing,
+and benchmark runs -- are run in a test-only container on the deployment host**
+(`AGENTS.md` carries the procedure). Source is still synced with rsync and
+verified on the deployment host after a systemd service restart. Production
+Docker Compose images are verified at milestones such as release candidates
+rather than rebuilt for every ordinary source change. **The test container and
+the release image are not the same image**: the release image is built without
+the test dependencies (`uv sync --frozen --no-dev`), so the test container is
+that same base with the dev group added. What a measurement there may claim is
+"on the same footing as the release image", never "in the release image".
+**Frozen output -- the reference corpora and the port's reference fixtures -- is
+baked on the same Linux the release runs on**: macOS libm and glibc disagree by
+one ULP on sin/cos/hypot, and values that sit outside the quantisers split
+there. Git is used for source history, not as a file exchange mechanism with the
+local server.
 
 **The record of each engine version moved to the [render engine history](docs/spec/render-engine-history.md) on 2026-07-28.**
 Release distribution, deterministic layers, versions and identity IDs, the reference corpus, the engine not going backwards, how a PNG is treated, and what each version changed are canonical there.

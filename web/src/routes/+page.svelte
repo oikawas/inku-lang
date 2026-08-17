@@ -31,6 +31,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
+	import { paintStageHandlers, paintStageLabel, readPaintStream, type PaintStage1Event } from '$lib/paintStream';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
@@ -3171,63 +3172,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
 }
 
-	type PaintStage1Event = {
-		event: 'stage1';
-		ddl: string;
-		thinking: string | null;
-		stage1_model: string;
-		stage2_model: string;
-		tokens_in: number | null;
-		tokens_out: number | null;
-		elapsed_ms: number;
-		interpret_fallback_used: boolean;
-	};
-
-	/**
-	 * Consume the NDJSON stream of /api/paint/stream.
-	 *
-	 * The stage1 event arrives as soon as interpretation finishes, so the
-	 * running indicator can show the real stage and the Stage 1 token counts
-	 * instead of guessing. The done event carries the same payload the
-	 * non-streaming /api/paint returns.
-	 */
-	async function readPaintStream(
-		response: Response,
-		onStage1: (event: PaintStage1Event) => void
-	): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		const reader = response.body?.getReader();
-		if (!reader) throw new Error('paint stream is not readable');
-		const decoder = new TextDecoder();
-		let buffer = '';
-		let done: ({ ddl: string; thinking: string | null } & PaintResult) | null = null;
-
-		for (;;) {
-			const chunk = await reader.read();
-			if (chunk.value) buffer += decoder.decode(chunk.value, { stream: true });
-			let newline = buffer.indexOf('\n');
-			while (newline >= 0) {
-				const line = buffer.slice(0, newline).trim();
-				buffer = buffer.slice(newline + 1);
-				newline = buffer.indexOf('\n');
-				if (!line) continue;
-				const event = JSON.parse(line) as { event: string } & Record<string, unknown>;
-				if (event.event === 'stage1') {
-					onStage1(event as unknown as PaintStage1Event);
-				} else if (event.event === 'error') {
-					throw new Error(describeApiError(event.detail, Number(event.status ?? 500)));
-				} else if (event.event === 'done') {
-					done = event as unknown as { ddl: string; thinking: string | null } & PaintResult;
-				}
-			}
-			if (chunk.done) break;
-		}
-		if (!done) throw new Error('paint stream ended before completion');
-		return done;
-	}
-
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
 		const uiLang = getLang();
-		stageLabel = t().stageInterpreting;
 		activeRunTokensIn = null;
 		activeRunTokensOut = null;
 		const historyInput = options.historyInput ?? text;
@@ -3239,6 +3185,10 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		stage1UserPrompt = text;
 		const resolvedSketchMode = options.sketchMode ?? sketchMode;
 		const resolvedSketchGrain = sketchGrainOf(resolvedSketchMode);
+		const sketchOn = resolvedSketchMode !== 'off';
+		// Until the first event arrives there is nothing to read, so the label
+		// names the layer that was asked for rather than the one after it.
+		stageLabel = paintStageLabel('requested', t(), { sketchOn });
 		const r = await apiFetch('/api/paint/stream', {
 			method: 'POST',
 			signal: options.signal,
@@ -3280,11 +3230,16 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			const d = await r.json().catch(() => ({})) as { detail?: unknown };
 			throw new Error(describeApiError(d.detail, r.status));
 		}
-		const data = await readPaintStream(r, (stage1) => {
-			stageLabel = t().stageStructuring('');
-			activeRunTokensIn = stage1.tokens_in;
-			activeRunTokensOut = stage1.tokens_out;
-			options.onStage1?.(stage1);
+		const data = await readPaintStream<{ ddl: string; thinking: string | null } & PaintResult>(r, {
+			describeError: describeApiError,
+			...paintStageHandlers(t(), (label) => { stageLabel = label; }, {
+				sketchOn,
+				onStage1: (stage1) => {
+					activeRunTokensIn = stage1.tokens_in;
+					activeRunTokensOut = stage1.tokens_out;
+					options.onStage1?.(stage1);
+				}
+			})
 		});
 		activeRunTokensIn = null;
 		activeRunTokensOut = null;

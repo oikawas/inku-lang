@@ -122,8 +122,10 @@ export interface LangPack {
 	runStatusStage2: string;
 	stageDdlGenerating: string;
 	stageImageGenerating: string;
+	stageSketching: string;
 	stageInterpreting: string;
 	stageStructuring: (tokLabel: string) => string;
+	stagePerforming: string;
 	batchProgress: (current: number, total: number) => string;
 	batchRetryProgress: (current: number, total: number, round: number) => string;
 	settingsBatchRetryLabel: string;

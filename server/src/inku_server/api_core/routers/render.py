@@ -1879,6 +1879,30 @@ def _paint_events(
         lang=instruction_lang_resolved,
         include_trace=req.include_trace,
     )
+    t_sketch = time.perf_counter()
+    # Three of the four events below used to be one NULL sketch_text. The state
+    # is derived once here and used by the sketch event, the row and the
+    # response, so the record and what the author is shown cannot disagree.
+    sketch_state = sketch_state_of(
+        sketch_result,
+        requested=req.sketch,
+        has_description=bool((description or "").strip()),
+    )
+    # Stage 0.5 is settled: say so before Stage 1 starts, so the page can name
+    # the layer that is actually working instead of guessing.  Only when the
+    # layer contributed something -- with 0.5 off there is nothing to report.
+    # The prose itself does not travel here: `done` already carries it, and a
+    # description may run to 100,000 characters.
+    if sketch_result is not None:
+        yield {
+            "event": "sketch",
+            "sketch_state": sketch_state,
+            "grain": sketch_result.grain,
+            "fallback_used": sketch_result.fallback_used,
+            "tokens_in": sketch_result.tokens_in,
+            "tokens_out": sketch_result.tokens_out,
+            "elapsed_ms": int((t_sketch - t0) * 1000),
+        }
     # Stage 0.5 stands in for the description everywhere the description went:
     # Stage 1, the plugin expansion, Stage 1.5, Stage 2 and coerce. Wiring it
     # into stage1_input alone would leave the other four reading the raw
@@ -2006,6 +2030,21 @@ def _paint_events(
         score = _finalize_score(score, compose_detail.ddl)
         coerce_report["coerce_relation_output_count"] = _score_relation_count(score)
 
+    t_score = time.perf_counter()
+    # Stage 2 and coerce are done and the Score will not change again; the rest
+    # of the wait is the performance.  The Score itself travels in `done`, so
+    # only its size is reported here.  This is a separate clock from `t2`: `t2`
+    # is what the record calls the Stage 2 elapsed time, and moving it here
+    # would quietly shorten every stored measurement.
+    yield {
+        "event": "score",
+        "instruction_count": len(score.instructions),
+        "stage2_model": resolved_stage2_model,
+        "tokens_in": compose_detail.tokens_in,
+        "tokens_out": compose_detail.tokens_out,
+        "elapsed_ms": int((t_score - t1) * 1000),
+    }
+
     # The Score keeps Stage 2's declaration -- see the note at the /api/compose
     # call site.
     render_metadata = {
@@ -2055,14 +2094,8 @@ def _paint_events(
     sketch_recorded = sketch_result is not None and not sketch_result.fallback_used
     stored_sketch_text = sketch_result.text if sketch_recorded else None
     stored_sketch_grain = sketch_result.grain if sketch_recorded else None
-    # Three of the four events above used to be one NULL sketch_text. The state
-    # is derived once here and used by both the row and the response, so the
-    # record and what the author is shown cannot disagree.
-    sketch_state = sketch_state_of(
-        sketch_result,
-        requested=req.sketch,
-        has_description=bool((description or "").strip()),
-    )
+    # `sketch_state` was derived where Stage 0.5 settled, above: the sketch
+    # event, the row and the response all read that one value.
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
@@ -2225,6 +2258,13 @@ def api_paint_stream(
     event is pulled here and a refusal reaches the client as the status it is
     -- the guard on a label-only description raises before any event, and this
     route answers 400 like the other two rather than 200 carrying an error.
+
+    Which failures fall on which side moves with the first event, and Stage 0.5
+    now writes one: on a request where the sketch layer ran, a Stage 1 failure
+    arrives as ``{"event": "error", "status": 502}`` in the body rather than as
+    HTTP 502.  The rule is unchanged and so is what the page shows -- both
+    paths hand the same detail and status to the same reader -- but the
+    boundary sits one stage earlier than it did when ``stage1`` was first.
     """
     events = _paint_events(req, idempotency_key, actor)
     try:

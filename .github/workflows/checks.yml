@@ -42,7 +42,14 @@ jobs:
       # what this backstop cannot see.
       - name: Test
         run: >
-          make test-server PYTEST_ARGS="--deselect tests/test_android_reference_fixtures_are_current.py::test_every_android_fixture_matches_a_fresh_bake --deselect tests/test_render_platform_stability.py::test_without_the_stabilisers_the_same_perturbation_is_seen"
+          # The two deselects that used to be here compared linux bytes against a
+          # darwin bake and read the difference as a defect (ledger I-111, I-222).
+          # As of 2026-08-17 the fixture is baked on linux and the platform
+          # expectation is recorded per platform, so both run here. Measured the
+          # same day in two containers, glibc 2.36 and 2.41: identical bytes and
+          # 8 passed in both. If this job goes red on them, the honest fix is to
+          # look at which glibc the runner has before deselecting anything again.
+          make test-server
 
   cli:
     runs-on: ubuntu-latest

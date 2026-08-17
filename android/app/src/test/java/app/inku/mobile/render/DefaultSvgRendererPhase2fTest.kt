@@ -157,17 +157,73 @@ class DefaultSvgRendererPhase2fTest {
         }
     }
 
+    /**
+     * The number of marks a group's own class declares, read out of `marks-N`.
+     *
+     * Reading the declaration beats writing the number down here: the server
+     * writes `marks-` out of the same `points` list it then draws (`class_` in
+     * `_fill_texture`, `marks-` in [DefaultSvgRenderer]), so the declaration and
+     * the drawing are one quantity and a hand-copied constant would start
+     * guarding a stale copy the day the corpus moves. -1 when the group is not
+     * in the drawing at all, so an absent group fails the comparison instead of
+     * quietly agreeing with an empty extraction.
+     */
+    private fun declaredMarkCount(svg: String, groupClassPrefix: String): Int {
+        val match = Regex("""class="$groupClassPrefix marks-(\d+)"""").find(svg) ?: return -1
+        return match.groupValues[1].toInt()
+    }
+
+    /**
+     * T-244: the fill guard compares a group the reference actually holds, and says
+     * how many marks it compared.
+     *
+     * It used to take `fill-stroke-v1` out of both sides. `03_square_filled.svg`
+     * holds no such group -- the drawing is a pen square, and since engine 22 that
+     * is an underlay with a rubbed texture on it, not ruled bands -- so both sides
+     * came back empty and the guard was green whatever the port wrote. What the
+     * reference does hold is `fill-texture-v1 marks-34`.
+     *
+     * The 34 is not written here; the group's class declares it, and the guard holds
+     * the extraction against the declaration. An empty extraction fails, and so does
+     * a group whose class says one number while another number of paths sits inside
+     * it.
+     *
+     * The `d` values themselves are also compared corpus-wide, by
+     * [testEveryReferenceSvgMatchesOnPathsPointsAndDashes], which walks the whole
+     * file in order and never looks at what encloses them. What this adds is the
+     * enclosure: that these paths are the ones inside `fill-texture-v1`.
+     */
     @Test
     fun test03SquareFilledExactParity() {
         val expectedSvg = readReferenceResource("03_square_filled.svg")
         val actualSvg = renderSvgForReference("03_square_filled")
 
-        val expectedFillPaths = extractGroupPathDList(expectedSvg, "fill-stroke-v1")
-        val actualFillPaths = extractGroupPathDList(actualSvg, "fill-stroke-v1")
+        val expectedFillPaths = extractGroupPathDList(expectedSvg, "fill-texture-v1")
+        val actualFillPaths = extractGroupPathDList(actualSvg, "fill-texture-v1")
+        val declaredByReference = declaredMarkCount(expectedSvg, "fill-texture-v1")
+        val declaredByPort = declaredMarkCount(actualSvg, "fill-texture-v1")
 
-        assertEquals("fill-stroke-v1 path count for 03_square_filled.svg must match", expectedFillPaths.size, actualFillPaths.size)
+        assertTrue(
+            "03_square_filled.svg must hold fill-texture-v1 marks to compare, found ${expectedFillPaths.size}",
+            expectedFillPaths.isNotEmpty(),
+        )
+        assertEquals(
+            "the reference group holds the number of marks its own class declares",
+            declaredByReference,
+            expectedFillPaths.size,
+        )
+        assertEquals(
+            "fill-texture-v1 path count for 03_square_filled.svg must match",
+            expectedFillPaths.size,
+            actualFillPaths.size,
+        )
+        assertEquals(
+            "and the port's group must declare that same number",
+            declaredByReference,
+            declaredByPort,
+        )
         for (i in expectedFillPaths.indices) {
-            assertEquals("fill-stroke-v1 path d #$i for 03_square_filled.svg must match", expectedFillPaths[i], actualFillPaths[i])
+            assertEquals("fill-texture-v1 path d #$i for 03_square_filled.svg must match", expectedFillPaths[i], actualFillPaths[i])
         }
     }
 

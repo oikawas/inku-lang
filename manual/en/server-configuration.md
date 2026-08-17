@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.36 (Web Build 923). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.37 (Web Build 924). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -77,7 +77,7 @@ inku has no self-service registration. Accounts are created only through `POST /
 | `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
-| `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the stored `workers` setting) | `2` |
+| `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the stored `workers` setting). **It starts having an effect in v2.13.37** -- until then the bake ran inside the same process, and the rasterizer holds one core, so any number of workers finished one image at a time | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | Thumbnail baking queue ceiling | `64` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
@@ -142,6 +142,10 @@ INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 How many thumbnails the rebuild bakes at once comes from the stored `workers` setting (1..16, default 4). **It is not an environment variable** — the machine is never asked for its core count, so whoever enters it has to know what this machine or container actually has.
 
 Thumbnails do not go into the canonical database; they go into `thumbs.db` beside it. Deleting that file leaves the canonical data whole, and the listing draws from each work's SVG again.
+
+**The bake that follows a save runs in a child process** (v2.13.37). **The server keeps answering other requests while it runs** -- until then it baked inside the same process, and the rasterizer holds a core for the whole rasterization, so saving a heavy work could stall other requests for seconds (measured: one request stalled 4.65 seconds; the slowest is now 255 ms). **The bake itself is no faster.** It simply no longer stops anything.
+
+**The first bake after a server start waits for the child to come up** (measured 0.32 s). No bake after that pays it. **A light work becomes very slightly slower** (measured 7.2 -> 12.4 ms), which is the round trip of handing the SVG to the child and taking the PNG back. **A thumbnail is a shortcut for display, so when one is late the listing draws the work's own SVG instead.**
 
 **At thumbnail widths (256px, and 512px for HiDPI) the texture of marks drawn in a row with one tool is folded into a single run before rasterizing** (v2.13.33). **The stored SVG does not change by a single byte** — the fold happens only at bake time. It cuts how many times the filter is applied and raises the area it covers, so it only pays while the width is small; the 2160px PNG export default and browser display widths are not folded. **⚠ Thumbnails already baked are not rebaked** — staleness is decided from the hash of the stored SVG, and that SVG does not move. What gets faster is what is baked from now on, plus an explicit rebuild from the admin UI.
 

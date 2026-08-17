@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-17 — v2.13.37 unreleased baseline (Web Build 924)
+
+Updated the thirteen places that name a version to v2.13.37 / Build 924. **That the bake following a save moved into a child process, so the server keeps answering other requests while it runs, was written in.**
+
+- **Saving a heavy work no longer stalls other requests for seconds.** Measured, the slowest request went from 4.65 seconds to 255 ms, and **no request takes over a second**. **The bake itself is no faster** -- it simply no longer stops anything.
+- **`INKU_THUMBNAIL_WORKERS` starts having an effect in this version.** Until now the bake ran inside the same process, and the rasterizer holds one core, so any number of workers finished one image at a time. **Written into `Server Configuration`.**
+- **The first bake after a server start waits 0.32 s for the child to come up.** No bake after that pays it.
+- **A light work becomes very slightly slower** (measured 7.2 -> 12.4 ms), the round trip of handing the SVG to the child and taking the PNG back. **When a thumbnail is late, the listing draws the work's own SVG.**
+- **No settings were added.** Neither a new environment variable nor a new administrative setting.
+
 ## 2026-08-17 — v2.13.36 unreleased baseline (Web Build 923)
 
 Updated the thirteen places that name a version to v2.13.36 / Build 923. **That a work now carries a third mark -- sharing -- was written in.**

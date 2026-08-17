@@ -8256,3 +8256,19 @@ When the works to be shown are a set rather than a list, the ACL has to be writt
 - **The guard's reach did not widen.** `HistoryItem` itself is still outside it. What changed is that the table can no longer say something untrue.
 - **The frozen-corpus regeneration check now belongs to CI (ledger I-258, author's ruling).** It is not an acceptance criterion, no perturbation is aimed at it, and the accepting session no longer runs it by hand. **Measured on the day of the ruling, CI already did exactly that** -- `reference-corpus.yml` fires on pull requests and pushes to main, and three jobs re-run the generators and require byte-identical output. **It was work to remove from contracts, not work to add.**
 - **Together with "the CI result is not waited for" (ruling of 2026-08-16), drift is now caught after the push by a job nobody reads.** The three past misses (the engine 10 platform drift, the retired `contact` key, the silverpoint rename) happened in exactly that shape.
+
+---
+
+### v2.13.37 — The server keeps answering while a work is baked (Build 924, 2026-08-17, ledger I-284)
+
+**While a heavy work was being saved, one request stalled for a full 4.65 seconds.** The bake (SVG to PNG) ran on a thread of the same process as the API, and **the rasterizer holds the GIL for the whole rasterization**, so nothing else moved meanwhile (measured: during a 9.00-second bake, a companion thread was stopped for **8.93 seconds, 99.2%**). **The bulk rebuild had already been moved to child processes**, and the same reason applied to the per-save path, which had stayed on threads.
+
+- **The child bakes, the parent writes.** A resident `ProcessPoolExecutor` lives in `thumbnails.py` (**created lazily**) and only the rasterization goes to it. **The write into `thumbs.db` stays in the parent.** Its width comes from the existing `INKU_THUMBNAIL_WORKERS`. **No new environment variable and no new administrative setting were added.**
+- **A broken pool is rebuilt once.** Shutdown folds it in `_lifespan`, with a flag that **keeps a save arriving afterwards from reviving the child**.
+- **This is not a speed change.** What changed is whether the server can do other work while a bake runs; **the bake itself is not one millisecond faster.**
+- **Measured (before -> after, same session, one run each)**: **requests over one second, 1 -> 0**; **slowest 4,650 ms -> 255 ms**. **The median did not move** (167.0 -> 142.2 ms) -- what makes it is the drawing, which is outside this contract. **The save round trip going 13.8 -> 8.7 seconds is a by-product** (gzipping and writing out a 7.3 MB SVG could not proceed either while the bake held the GIL). **One run each, so it is not quoted as a saving.**
+- **A light work becomes slightly slower** (7.2 -> 12.4 ms), the round trip of handing the SVG to the child and taking the PNG back. **The first bake after a start pays 0.32 s for the child to come up** (no bake after that pays it). **Whether to pay it in advance is ledger I-306.**
+- **Tests bake in-process by default.** Only the three marked `@pytest.mark.child_bake_pool` start a child. **Without that, every test touching a save would pay a spawn** -- one file (18 tests) went **7.08 s -> 16.16 s**.
+- **The merge conflicted** -- the branch was cut from `3f56b7c2`, and **I-191 landed in main the same day, so both sides had stamped a build on the same four version-marker lines**. **The product code did not overlap at all.** The merged tree was numbered once.
+- **Verification**: server **3,434 passed / 31 skipped** (+7), cli **237 passed**, web **449 pass / 0 fail**, `npm run check` **268 files / 0 errors / 2 warnings**, ruff clean on both trees, `check_docs.py` consistent. **Nine perturbations reddened 30 acceptances between them, with no misses** (the implementation predicted 19, the contract 13). **The reference corpora did not move by one byte.**
+- **The GitHub CI result was not waited for** (author's ruling, conventions §2-10).

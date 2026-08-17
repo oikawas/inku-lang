@@ -189,21 +189,18 @@ class DefaultSvgRenderer(
         val primitive = ins.optString("primitive", "line")
         val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
-        val attrs = strokeAttrs(primitive, weight, colorKey, colors, ins, unit)
+        val attrs = strokeAttrs(weight, colorKey, colors, ins, unit)
         val common = attrs.toSvgAttributes(includeFill = false)
         // The fill the geometric road writes onto the element itself.
         //
-        // The server settles this once, in `_stroke_attrs`: `"fill": color if
-        // do_fill else "none"`, with `do_fill = _fills_interior(ins)`. The hand
-        // road here reaches the same answer inside `renderBodyShape`; the
-        // geometric road never calls it, and wrote `attrs.fill` unconditionally.
-        // That value comes from `ServerRendererStyle`, which only knows whether
-        // the primitive has an inside -- so every closed shape a machine pole
-        // drew came out filled, whether or not the description asked for it, and
-        // the corpus's `05_circle_rotring` was an outline in the reference and a
-        // disc in the port. The judgement is the one already ported from
-        // `_fills_interior`, read here rather than copied (ledger I-280).
-        val fill = if (ServerRendererGeometry.fillsInterior(ins)) attrs.fill else "none"
+        // `attrs.fill` already IS the answer: `strokeAttrs` reads `fillsInterior`
+        // once and writes `color` or `"none"` out of it, the way `_stroke_attrs`
+        // does with `do_fill`. I-280 had to read the judgement again right here,
+        // because at the time `attrs.fill` only knew whether the primitive has an
+        // inside and every closed shape a machine pole drew came out filled. Now
+        // that the value carries the judgement, asking a second time would be the
+        // second copy this cycle came to remove (ledger I-298).
+        val fill = attrs.fill
         val raw = when (primitive) {
             "line" -> {
                 val from = ins.optJSONArray("from")
@@ -232,14 +229,14 @@ class DefaultSvgRenderer(
                 val r = px(ins.optDouble("radius", 0.12), min(width, height))
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
-                    val contour = if (variation != null && needsPathVariation(variation)) {
+                    val contour = if (variation != null && needsContourVariation(variation)) {
                         ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                     } else {
                         val count = ServerRendererGeometry.strokeSampleCount(2.0 * Math.PI * r, unit)
                         ServerRendererGeometry.circlePoints(cx, cy, r, r, count)
                     }
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
-                    val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
+                    val bodyPts = if (needsContourVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("circle", ins, attrs, regionFill, cx, cy, r, r, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
@@ -261,7 +258,7 @@ class DefaultSvgRenderer(
                 } else {
                     // `fill` above is the one decision, read once for every branch of
                     // this road rather than settled again here (ledger I-280).
-                    val base = if (needsPathVariation(variation)) {
+                    val base = if (needsContourVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, r, r, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                         """<polygon points="$pts" fill="$fill" $common/>"""
@@ -284,14 +281,14 @@ class DefaultSvgRenderer(
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
                     val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
-                    val contour = if (variation != null && needsPathVariation(variation)) {
+                    val contour = if (variation != null && needsContourVariation(variation)) {
                         ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                     } else {
                         val count = ServerRendererGeometry.strokeSampleCount(approxPerimeter, unit)
                         ServerRendererGeometry.circlePoints(cx, cy, rx, ry, count)
                     }
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, contour, unit, renderSeed, wild)
-                    val bodyPts = if (needsPathVariation(variation)) contour else emptyList()
+                    val bodyPts = if (needsContourVariation(variation)) contour else emptyList()
                     val body = renderBodyShape("ellipse", ins, attrs, regionFill, cx, cy, rx, ry, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
@@ -311,7 +308,7 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val base = if (needsPathVariation(variation)) {
+                    val base = if (needsContourVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                         """<polygon points="$pts" fill="$fill" $common/>"""
@@ -334,14 +331,14 @@ class DefaultSvgRenderer(
                 if (usesHandStroke(weight)) {
                     val seedStr = seedForInstruction(ins, renderSeed)
                     val (contour, anchors) = edgeContourWithAnchors(corners, variation, seedStr, ins, width, height, unit)
-                    val fillContour = if (needsPathVariation(variation)) {
+                    val fillContour = if (needsContourVariation(variation)) {
                         val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
                         ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedStr, x + w / 2.0, y + h / 2.0, ins, width, height, unit)
                     } else {
                         corners
                     }
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
-                    val bodyPts = if (needsPathVariation(variation)) fillContour else emptyList()
+                    val bodyPts = if (needsContourVariation(variation)) fillContour else emptyList()
                     val body = renderBodyShape("square", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, x, y, w, h, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
@@ -361,7 +358,7 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val base = if (needsPathVariation(variation)) {
+                    val base = if (needsContourVariation(variation)) {
                         val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
                         val pts = ServerRendererGeometry.variedPolygonPoints(rectPts, variation, seedForInstruction(ins, renderSeed), x + w / 2.0, y + h / 2.0, ins, width, height, unit)
                             .joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
@@ -384,13 +381,13 @@ class DefaultSvgRenderer(
                     val size = ins.optJSONArray("size")
                     val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
                     val cy = px((pos?.optDouble(1, 0.35) ?: 0.35) + (size?.optDouble(1, 0.30) ?: 0.30) / 2.0, height)
-                    val fillContour = if (needsPathVariation(variation)) {
+                    val fillContour = if (needsContourVariation(variation)) {
                         ServerRendererGeometry.variedPolygonPoints(points, variation, seedStr, cx, cy, ins, width, height, unit)
                     } else {
                         points
                     }
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
-                    val bodyPts = if (needsPathVariation(variation)) fillContour else points
+                    val bodyPts = if (needsContourVariation(variation)) fillContour else points
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
@@ -412,7 +409,7 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val pts = if (needsPathVariation(variation)) {
+                    val pts = if (needsContourVariation(variation)) {
                         val pos = ins.optJSONArray("position")
                         val size = ins.optJSONArray("size")
                         val cx = px((pos?.optDouble(0, 0.35) ?: 0.35) + (size?.optDouble(0, 0.30) ?: 0.30) / 2.0, width)
@@ -437,13 +434,13 @@ class DefaultSvgRenderer(
                 if (usesHandStroke(weight)) {
                     val seedStr = seedForInstruction(ins, renderSeed)
                     val (contour, anchors) = edgeContourWithAnchors(rawPoints, variation, seedStr, ins, width, height, unit)
-                    val fillContour = if (needsPathVariation(variation)) {
+                    val fillContour = if (needsContourVariation(variation)) {
                         ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedStr, cx, cy, ins, width, height, unit)
                     } else {
                         rawPoints
                     }
                     val (fillGroup, regionFill) = interiorFill(ins, attrs, fillContour, unit, renderSeed, wild)
-                    val bodyPts = if (needsPathVariation(variation)) fillContour else rawPoints
+                    val bodyPts = if (needsContourVariation(variation)) fillContour else rawPoints
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild, index, markIndex, useFilters)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
@@ -465,7 +462,7 @@ class DefaultSvgRenderer(
                     val fg = fillGroup ?: ""
                     """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
-                    val pts = if (needsPathVariation(variation)) {
+                    val pts = if (needsContourVariation(variation)) {
                         ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins, renderSeed), cx, cy, ins, width, height, unit)
                     } else {
                         rawPoints
@@ -490,7 +487,7 @@ class DefaultSvgRenderer(
                     // the server writes it as a <polyline> and keeps <path d="A">
                     // for the arc that does not wobble. Both branches are here
                     // because the element itself is part of the answer.
-                    val base = if (needsPathVariation(variation)) {
+                    val base = if (needsContourVariation(variation)) {
                         val points = ServerRendererGeometry.variedArcPoints(
                             cx, cy, r, start, end, variation!!, seedForInstruction(ins, renderSeed), ins, width, height, unit
                         ).joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
@@ -1168,7 +1165,7 @@ class DefaultSvgRenderer(
             val start = corners[i]
             val end = corners[(i + 1) % n]
             anchors.add(result.size)
-            val edge = if (variation == null || !needsPathVariation(variation)) {
+            val edge = if (variation == null || !needsContourVariation(variation)) {
                 val len = kotlin.math.hypot(end.first - start.first, end.second - start.second)
                 val segments = ServerRendererGeometry.strokeSampleCount(len, unit)
                 (0..segments).map { k ->
@@ -1606,8 +1603,8 @@ class DefaultSvgRenderer(
         return out.toString()
     }
 
-    private fun strokeAttrs(primitive: String, weight: String, colorKey: String, colors: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
-        return ServerRendererStyle.strokeAttrs(primitive, weight, colorKey, colors, ins, unit)
+    private fun strokeAttrs(weight: String, colorKey: String, colors: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
+        return ServerRendererStyle.strokeAttrs(weight, colorKey, colors, ins, unit)
     }
 
     private fun outlineAttrs(attrs: SvgAttrs, strokeWidth: Double, opacity: Double, dash: String?): SvgAttrs {
@@ -1658,8 +1655,15 @@ class DefaultSvgRenderer(
         return ServerRendererStyle.blurFilterId(variation, ins, width, height, unit)
     }
 
+    // Two thin delegations rather than one, so that a call site says which of the
+    // server's two gates it is asking. A single helper that answered for both would
+    // put the choice back where it cannot be read.
     private fun needsPathVariation(variation: JSONObject?): Boolean {
         return ServerRendererGeometry.needsPathVariation(variation)
+    }
+
+    private fun needsContourVariation(variation: JSONObject?): Boolean {
+        return ServerRendererGeometry.needsContourVariation(variation)
     }
 
     private fun variedLinePoints(x1: Double, y1: Double, x2: Double, y2: Double, variation: JSONObject?, seed: String, ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
@@ -2856,7 +2860,7 @@ class DefaultSvgRenderer(
         val seedStr = seedForInstruction(ins, renderSeed)
         val seedLong = ServerRendererGeometry.seedToLong(seedStr)
         val variation = ins.optJSONObject("variation")
-        val varied = ServerRendererGeometry.needsPathVariation(variation)
+        val varied = ServerRendererGeometry.needsContourVariation(variation)
 
         val centerline = if (varied && variation != null) {
             ServerRendererGeometry.arcPointsWithVariation(cx, cy, r, startDeg, endDeg, variation, seedStr, ins, width, height, unit)

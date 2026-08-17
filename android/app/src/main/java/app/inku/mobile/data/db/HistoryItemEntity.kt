@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
     tableName = "history_items",
     indices = [
         Index("created_at"),
-        Index("render_hash", unique = true),
+        Index("render_hash"),
         Index("render_hash_short"),
         Index("starred"),
         Index("trashed"),

@@ -348,6 +348,24 @@ class TheGateSplitsInTwoAndTheFillReadsOneJudgementTest {
             assertTrue("""$who draws the interior as marks instead""", svg.contains("""class="fill-"""))
         }
 
+        // The frozen drawing carries no `color_hint`, so its `fill-opacity` is null
+        // and the assertion above cannot tell an open body from one that simply had
+        // no opacity to write. This one asks for the fill AND the haze, so the value
+        // exists and the only reason it stays off the body is the judgement itself.
+        val handWithAnOpacity = render(
+            """{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"pen","color":"black","filled":true,"color_hint":"haze over the water"}"""
+        )
+        val handBody = bodyRects(handWithAnOpacity)
+        assertEquals("the hand pole draws one body rect", 1, handBody.size)
+        assertFalse(
+            "an open body carries no fill-opacity even when the mark has one: ${handBody[0]}",
+            handBody[0].contains("fill-opacity"),
+        )
+        assertTrue(
+            "and the marks that do carry the interior are there",
+            handWithAnOpacity.contains("""class="fill-"""),
+        )
+
         val machine = render(
             """{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"rotring","color":"black","filled":true}"""
         )

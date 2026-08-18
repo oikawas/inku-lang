@@ -2,7 +2,7 @@
 
 This document serves as a guideline for AI agents to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them while tracking lineage nodes.
 
-It covers inku v2.13.41 (Web Build 928). The full flag list lives in the `inku-cli Reference`.
+It covers inku v2.13.42 (Web Build 929). The full flag list lives in the `inku-cli Reference`.
 
 ---
 

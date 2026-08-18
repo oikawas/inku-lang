@@ -8610,3 +8610,26 @@ the author replaced the task**, so four directly assigned pieces of work were do
   **⚠ The workflow that builds the image fires only on a tag push, so a static scan is the only check that
   can run every cycle.** **⚠ `release_version`, `build_number` and the version shown in the UI were already
   correct.**
+
+### v2.13.42 — the proxy does not relabel a body it decoded (Build 929, 2026-08-18, fix-forward)
+
+- **The published image's web UI stopped dead right after login.** The proxy in `web/src/hooks.server.ts`
+  hands `/api/*` upstream with `fetch`, and **that fetch decodes a gzipped body before the handler sees it.**
+  The response was rebuilt with the upstream headers anyway, so **`content-encoding: gzip` and the compressed
+  `content-length` travelled with plain bytes.** The browser fails to gunzip them, and **reading the body of a
+  200 throws `TypeError: Failed to fetch`.**
+- **⚠ The login looked like it failed while in fact it had succeeded.** `login()` reads the body with
+  `r.json()` inside its `try`, so **a 200 with a session cookie already set showed `Failed to fetch`, and none
+  of the eleven follow-up loads were ever sent.**
+- **The fix is to drop two headers** (`content-encoding` and `content-length`: the body is no longer encoded
+  and no longer that length). **The new `web/src/lib/proxyResponse.ts` owns that rule and the proxy goes
+  through it.**
+- **⚠ Since when**: gzip arrived in `d7955139` on 2026-08-16, so **`v2.13.40` was the first image to carry the
+  hole** (the proxy itself has not changed since 2026-07-16). **Local development is unaffected** -- Vite's
+  proxy passes the bytes through -- **only the container layout breaks.**
+- **Three acceptances** (`web/src/lib/proxyResponse.test.ts`, `T-298`-`T-300`). **⚠ The failure itself cannot
+  be reproduced under node:test**: gunzipping belongs to the browser's network layer and node's `Response`
+  never decodes. So the guards measure that the labels are dropped and that the proxy goes through them, and
+  the wire is checked against the published image after the release.
+- **Verification**: **web unit 470 pass / 0 failed** (+3); **three perturbations reddened two tests each, six in
+  total, exactly as predicted** (the suite-wide `T-15` came along every time).

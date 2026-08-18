@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-18 — v2.13.42 unreleased baseline (Web Build 929)
+
+The thirteen places that name a version were updated to v2.13.42 / Build 929. **A fault that stopped the
+distributed (docker) web UI right after login was fixed.** The screen said `Failed to fetch`, but **the login
+had in fact succeeded and only the loads after it were failing** -- the web container's proxy returned a body
+it had itself decoded while still labelling it compressed. **Running from source is unaffected.** **The
+v2.13.40 and v2.13.41 images carry the fault.** Not one line of the body text was changed.
+
 ## 2026-08-18 — v2.13.41 unreleased baseline (Web Build 928)
 
 The thirteen places that name a version were updated to v2.13.41 / Build 928. **A way back for an administrator who

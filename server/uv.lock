@@ -379,7 +379,7 @@ requires-dist = [
 
 [[package]]
 name = "inku-server"
-version = "2.13.40"
+version = "2.13.41"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

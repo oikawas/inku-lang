@@ -8601,3 +8601,12 @@ the author replaced the task**, so four directly assigned pieces of work were do
   release cycle, so the published v2.13.40 does not carry it).
 - **⚠ It cannot live in `cli/`**: `server/Dockerfile` copies only `shared/` and `server/`, so `inku-cli` is not in
   the distributed image.
+- **Ledger [I-327] was folded into this same version** (the tag had not been cut, so no new number was
+  taken): **published images answered `/api/info` with `version: unknown`.** `server/Dockerfile` copied
+  `web/BUILD_NUMBER` but not `web/APP_VERSION`, so **both readers** (`reference.py:89` and
+  `api_core/common.py:26`) came back empty. **One `COPY` line fixes it, and a static guard now watches for
+  the same shape**: it scans which `web/…` files the server code opens and compares them with what the
+  Dockerfile carries (`server/tests/test_the_image_can_name_its_own_version.py`).
+  **⚠ The workflow that builds the image fires only on a tag push, so a static scan is the only check that
+  can run every cycle.** **⚠ `release_version`, `build_number` and the version shown in the UI were already
+  correct.**

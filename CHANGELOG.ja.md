@@ -7779,3 +7779,12 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **⚠ 配布の利用者へ届くのは次のリリース以降である**（イメージはリリースの周に焼かれるので、公開済みの v2.13.40 には入っていない）。
 - **⚠ `cli/` には置けない** —— `server/Dockerfile` は `shared/` と `server/` しか COPY しないので、
   配布イメージに `inku-cli` は存在しない。
+- **同じ版に [I-327] を畳んだ**（**タグを打つ前の未公開の版なので、番号は増やさない**）——
+  **配布イメージの `/api/info` が `version: unknown` を返していた。**
+  `server/Dockerfile` が `web/BUILD_NUMBER` は COPY するのに `web/APP_VERSION` を持たず、
+  **読み手 2 つ**（`reference.py:89` と `api_core/common.py:26`）**がどちらも読めなかった。**
+  **`COPY` を 1 行足して直し、同じ型の穴を静的に見る番人を置いた** ——
+  製品コードが読む `web/…` のファイルを走査し、Dockerfile の `COPY` と突き合わせる
+  （`server/tests/test_the_image_can_name_its_own_version.py`）。
+  **⚠ イメージを組む workflow はタグ push でしか発火しないので、常時回る道は静的な走査だけである。**
+  **⚠ `release_version`・`build_number`・画面の版は以前から正しく出ていた。**

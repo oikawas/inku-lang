@@ -1,6 +1,8 @@
 import { env } from '$env/dynamic/private';
 import type { Handle } from '@sveltejs/kit';
 
+import { headersForDecodedBody } from '$lib/proxyResponse';
+
 const apiBaseUrl = (env.INKU_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -21,7 +23,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return new Response(upstream.body, {
 			status: upstream.status,
 			statusText: upstream.statusText,
-			headers: upstream.headers
+			headers: headersForDecodedBody(upstream.headers)
 		});
 	}
 

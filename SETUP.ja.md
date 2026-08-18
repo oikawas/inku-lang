@@ -116,6 +116,7 @@ export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
 ```
 
 inku にはセルフサインアップがなく、アカウントを作れるのは認証済みの管理者だけである。**この初期管理者なしで空の DB を起動すると、ログインする手段がない**。設定を忘れた場合は、パスワードを設定して再起動すれば作成される。既にユーザーがいる DB では何も起きないため、既存のパスワードが上書きされることはない。空文字は未指定と同じ扱いになる。
+このパスワードを失った場合、Web UI からは取り戻せず、`.env` も読まれない。`inku-admin reset-password` がサーバー自身の環境の中から再設定する —— コンテナなら `docker compose exec api inku-admin reset-password --username admin`、このディレクトリからなら `uv run inku-admin reset-password --username admin` である。新しいパスワードは2度尋ねられ、`--password-stdin` を付けると標準入力の1行目から読む。実行できるのはサーバーのコンテナかそのファイルを握っている者で、その者は既にDBを握っている。
 
 必要に応じてDB保存先を指定する。未指定の場合は、ユーザーのローカルデータディレクトリ配下にSQLite DBが作成される。
 

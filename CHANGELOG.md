@@ -8582,3 +8582,22 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **⚠ What remains of the interrupted contract** (stage 1's two changelog pairs, stage 2's leave-as-is decisions,
   stage 4's gate, and the whole set of acceptances and perturbations) **has not been ruled on.**
   **The fact that six version marks exist only in the Japanese changelog is filed as [I-326].**
+
+### v2.13.41 — an administrator who forgot the password has a way back (Build 928, 2026-08-18, [I-328])
+
+- **`inku-admin reset-password` was added.** It sets one account's password from inside the server's own
+  environment (`docker compose exec api inku-admin reset-password --username admin` for the distributed image).
+  **There is no self-service registration, `.env` is read only while the database has no accounts, and the web UI
+  was the only place a password changed — so a self-hosted install with a single administrator had no way back**
+  (it happened on the docker bench on 2026-08-18).
+- **The password never goes on the command line.** It is asked for twice by default, and only `--password-stdin`
+  reads it from the first line of standard input. **Anything shorter than eight characters is refused**, the same
+  floor the bootstrap path enforces, so the rule does not depend on which door the operator came through.
+  **With no account named it takes the one `INKU_BOOTSTRAP_ADMIN_USERNAME` created**, and **an unknown name prints
+  the accounts that exist** — for the operator who forgot the name as well.
+- **⚠ This is not a second way in.** Running it needs the container or its files, and whoever holds those can
+  already write `/data/inku.db`. **It spares them from writing SQL by hand.**
+- **⚠ It reaches people running the distribution only from the next release onward** (images are baked during the
+  release cycle, so the published v2.13.40 does not carry it).
+- **⚠ It cannot live in `cli/`**: `server/Dockerfile` copies only `shared/` and `server/`, so `inku-cli` is not in
+  the distributed image.

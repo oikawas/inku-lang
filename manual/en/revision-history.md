@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-18 — v2.13.41 unreleased baseline (Web Build 928)
+
+The thirteen places that name a version were updated to v2.13.41 / Build 928. **A way back for an administrator who
+forgot the password was written in**: `inku-admin reset-password` sets one account's password from inside the
+server's own environment (Server Configuration 2.2). **Nothing was added to the screen, the CLI or the settings**
+(there is no new environment variable), and **the entry point widens no authority** — running it needs the container
+or the files, and both already carry the database.
+
 ## 2026-08-17 — v2.13.40 unreleased baseline (Web Build 927)
 
 The thirteen places that name a version were updated to v2.13.40 / Build 927. **Nothing changes for a reader.**

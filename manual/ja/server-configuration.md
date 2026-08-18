@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.13.40（Web Build 927）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.13.41（Web Build 928）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -63,6 +63,7 @@ passwordが設定され、DBにユーザーがいない場合だけ作成しま�
 空文字は未設定と同じ扱いです。env fileの空欄も、composeの `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` 補間が渡す空値も、起動を失敗させません。初回作成後に環境から除去する際は、行を削除しても空欄にしても同じ結果になります。
 
 inkuにはセルフサインアップがありません。アカウントを作れるのは、`admins`または`leaders`グループに属する認証済み利用者による `POST /api/users` だけです。したがって**単独利用モードを off にしたうえで空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**（単独利用モードが on なら、サーバーが利用者を1人作って自動的にログイン済みにします）。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
+passwordを忘れた管理者が締め出されたままになることはありません。`inku-admin reset-password` が、サーバー自身の環境の中から1アカウントのpasswordを設定します（配布イメージでは `docker compose exec api inku-admin reset-password --username admin`、ソースからなら `uv run inku-admin reset-password`）。passwordは2度尋ねられ、コマンドラインには置きません。`--password-stdin` を付けると標準入力の1行目から読みます。アカウントを指定しない場合は`INKU_BOOTSTRAP_ADMIN_USERNAME`が作った管理者が対象で、無い名前を指定すると在るアカウントを印字します。**これは2つ目の入口ではありません** —— 実行にはコンテナかファイルが要り、どちらも既にDBを含んでいます。v2.13.41から使えます。
 
 ### 2.3 artifactと同時実行
 
@@ -279,6 +280,8 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 SQLite backup directoryは`INKU_DB_BACKUP_DIR`で変更できます。Web管理UIの手動／定期backupには世代管理があります。外部backupも併用し、DBと暗号化鍵を同じ復旧点で保管します。
 
 復旧試験では、ログイン、provider key復号、履歴表示、lineage edge、SVG再現を確認します。
+
+誰も覚えていないpasswordは、backupからではなく`inku-admin reset-password`で再設定します（2.2）。
 
 ## 9. log
 

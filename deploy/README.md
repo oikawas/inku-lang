@@ -46,6 +46,35 @@ in `.env` does not change an existing password — use the web UI for that.
 このパスワードはアカウントが 0 件のときだけ読まれます。後から `.env` を書き換えても
 既存のパスワードは変わりません。変更は Web UI から行ってください。
 
+## If nobody can sign in / ログインできなくなったとき
+
+An administrator who forgets the password cannot recover it from the web UI, and
+`.env` is not read again once the database holds an account. Reset the password
+from inside the container and sign in with the new one. The command asks for it
+twice and never takes it on the command line; `--password-stdin` reads it from
+the first line of standard input instead. Naming no account resets the one
+`INKU_BOOTSTRAP_ADMIN_USERNAME` created (`admin` unless it was changed), and an
+unknown name prints the accounts that do exist.
+
+パスワードを忘れた管理者は、Web UI から取り戻せません。`.env` はアカウントが
+1 件でも在れば読まれないので、コンテナの中から再設定して、新しいパスワードで
+ログインします。パスワードは 2 度尋ねられ、コマンドラインには置きません。
+`--password-stdin` を付けると標準入力の 1 行目から読みます。アカウントを指定
+しなければ `INKU_BOOTSTRAP_ADMIN_USERNAME` が作った管理者（変更していなければ
+`admin`）が対象で、無い名前を指定すると在るアカウントを印字します。
+
+```bash
+docker compose exec api inku-admin reset-password --username admin
+```
+
+This is no new way in. Running it means holding the container, and holding the
+container already means holding `/data/inku.db`; it spares the operator from
+writing SQL by hand. Images from v2.13.41 onward carry the command.
+
+これは新しい侵入口ではありません。実行できるのはコンテナを操作できる者だけで、
+その者は既に `/data/inku.db` を読み書きできます。手で SQL を書く手間を省くための
+ものです。**このコマンドを持つのは v2.13.41 以降のイメージです。**
+
 ## Data / データ
 
 Everything that persists — the SQLite database, generated outputs, database

@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.40 (Web Build 927). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.41 (Web Build 928). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -63,6 +63,7 @@ The account is created only when a password is set and the DB contains no users.
 A blank value counts as unset. Neither an empty field in an environment file nor the empty value that Compose's `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` interpolation supplies will fail startup. When clearing the secret after initial creation, deleting the line and blanking it have the same effect.
 
 inku has no self-service registration. Accounts are created only through `POST /api/users`, by an authenticated member of the `admins` or `leaders` group. **Starting an empty database without a bootstrap administrator, with single-user mode off, therefore leaves a server nobody can sign in to.** With single-user mode on, the server creates one account and signs it in by itself. Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
+An administrator who forgets the password is not shut out for good. `inku-admin reset-password` sets one account's password from inside the server's own environment (`docker compose exec api inku-admin reset-password --username admin` for the distributed image, `uv run inku-admin reset-password` from a source checkout). It asks for the password twice and never takes it on the command line; `--password-stdin` reads the first line of standard input for scripted use. Naming no account resets the one `INKU_BOOTSTRAP_ADMIN_USERNAME` created, and an unknown name prints the accounts that exist. **This is not a second way in**: running it needs the container or the files, and both already carry the database. Available from v2.13.41.
 
 ### 2.3 Artifacts and Concurrency
 
@@ -279,6 +280,8 @@ Back up at least:
 Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. The Web admin UI supports manual and scheduled backups with generation retention. Use external backups as well, keeping the DB and encryption key at the same recovery point.
 
 Recovery tests should verify sign-in, provider-key decryption, history display, lineage edges, and SVG replay.
+
+A password nobody remembers is not recovered from a backup: reset it with `inku-admin reset-password` (2.2).
 
 ## 9. Logs
 

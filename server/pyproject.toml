@@ -1,6 +1,6 @@
 [project]
 name = "inku-server"
-version = "2.13.41"
+version = "2.13.42"
 description = "FastAPI server for inku: interprets descriptions into DDL, composes JSON Scores, and performs them as SVG"
 readme = "README.md"
 requires-python = ">=3.12"

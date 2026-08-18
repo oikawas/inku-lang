@@ -10,6 +10,11 @@ server's own environment (Server Configuration 2.2). **Nothing was added to the 
 (there is no new environment variable), and **the entry point widens no authority** — running it needs the container
 or the files, and both already carry the database.
 
+**The same day, the way to change a password you still know was written in as well**: `Changing your own
+password` in chapter 1 of Creating Images (`Profile`, with both the current and the new one), and, in chapter 4
+of Server Configuration, the path by which an administrator or a `leaders` member changes someone else's.
+**Both were already on screen; only the manual was missing them.**
+
 ## 2026-08-17 — v2.13.40 unreleased baseline (Web Build 927)
 
 The thirteen places that name a version were updated to v2.13.40 / Build 927. **Nothing changes for a reader.**

@@ -44,6 +44,16 @@ The user menu, settings, single description and painting, the canvas and the his
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
 
+### Changing your own password
+
+1. Press your user name in the left app rail and choose `Profile`.
+2. Fill in both `Current password` and `New password`. **One without the other changes nothing** (leave both empty when you only mean to correct the email address).
+3. Press `Save`.
+
+The new password must be at least eight characters. **It does not change unless the current password is right.**
+
+**⚠ If you have forgotten it and cannot sign in, this screen is out of reach.** The way back is `inku-admin reset-password` on the server, described in 2.2 of Server Configuration. An administrator can change another person's password from `User management` in the settings, which does not ask for the current one.
+
 ## 2. Paint the First Work
 
 1. Open the `Describe` tab.

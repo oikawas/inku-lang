@@ -183,6 +183,8 @@ Lineage connects only explicit creation operations. It is never inferred from si
 | `leaders` | User administration within assigned scope |
 | `users` | Generation and management of own history and settings |
 
+An administrator can change another person's password: choose the account under `User management` in the settings, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). A `leaders` member can do the same within their own scope. A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
+
 One member may hold several permission groups; where they overlap the stronger one decides (a member holding `admins` and `leaders` passes as `admins`). A user group — the organisational unit — is a separate thing: one per member, and independent of permission.
 
 **What a member may do (the table above) and what a member may see are separate axes.** Membership decides the default scope of a work.

@@ -8633,3 +8633,32 @@ the author replaced the task**, so four directly assigned pieces of work were do
   the wire is checked against the published image after the release.
 - **Verification**: **web unit 470 pass / 0 failed** (+3); **three perturbations reddened two tests each, six in
   total, exactly as predicted** (the suite-wide `T-15` came along every time).
+
+### v2.13.43 — the bundle is built where its toolchain can run (Build 930, 2026-08-19, fix-forward)
+
+- **The web image for `v2.13.42` was never published.** The tag's run (`32092151332`) ended with the
+  **api job successful in 109 seconds and the web job cancelled after 21,576**. **Only
+  `inku-api:2.13.42` reached GHCR, and `inku-web:latest` still pointed at `2.13.41`** — so the proxy fix
+  released as v2.13.42 **reached nobody running the distribution.**
+- **⚠ It was not slow. It stopped.** Reading the timestamps out of the job log,
+  `#22 [linux/arm64 build 6/6] RUN npm run build` **printed `rendering chunks...` at t=56s and then said
+  nothing for 21,480 seconds (5h58m)** before the 6h job limit cancelled it. **The amd64 leg of the same run
+  finished that step in 14.4 seconds** (its `npm ci` took 3.4s, warm from cache). rollup had stopped making
+  progress under QEMU; waiting longer would not have finished it.
+- **The fix is one word in `web/Dockerfile`**: the build stage is pinned to `--platform=$BUILDPLATFORM`, so
+  the toolchain runs only on the architecture of the machine doing the building.
+- **⚠ That is sound because web declares no runtime dependencies** (`dependencies` in `package.json` is
+  empty and adapter-node emits plain JS). **The bundle is the same whichever arch produced it, and the
+  runtime stage stays on the target platform** — which is where the node binary that ships comes from.
+- **Three acceptances** (`server/tests/test_the_web_image_is_built_where_its_toolchain_can_run.py`,
+  `T-301`-`T-303`). **⚠ The rule is measured in both directions**: the stage running the toolchain is pinned
+  (`T-301`), and **the stage the image ships from is not** (`T-302` — pinning that one would publish an amd64
+  runtime under the arm64 tag). **`T-303` reddens when the scan finds nothing**, because the first two are
+  green for a Dockerfile the parser cannot read. **⚠ The workflow that builds images fires only on a tag
+  push, so a static scan is the only check that runs every cycle** — the same reasoning, and the same shape,
+  as the guard added for [I-327].
+- **⚠ `inku-web:2.13.42` will not exist.** No tag was recut (fix-forward). **What v2.13.42 contained reaches
+  the published images for the first time in this version.**
+- **Verification**: **container suite 3476 passed / 32 skipped** (`782c2a84`, before the version stamp, was
+  3473 / 32; **the +3 are the new guards**); **three perturbations reddened exactly one test each, as
+  predicted** (unpin the build stage / pin the runtime stage / remove what the scan looks for).

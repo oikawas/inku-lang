@@ -8662,3 +8662,15 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **Verification**: **container suite 3476 passed / 32 skipped** (`782c2a84`, before the version stamp, was
   3473 / 32; **the +3 are the new guards**); **three perturbations reddened exactly one test each, as
   predicted** (unpin the build stage / pin the runtime stage / remove what the scan looks for).
+
+### v2.13.44 — UI modes follow the amount they show (Build 931, 2026-08-20, [I-246])
+
+- **The three choices under Settings → Other now read Simple → Custom → Full.** This follows the rail icon's
+  one, two, and three dark bars, without placing the largest amount before the middle amount.
+- **The tables in both manuals now use the same order.** Values, persistence, and display wording are unchanged.
+- **The acceptance does not copy the ordering into another constant.** It reads each mode's number of dark bars
+  from the icon's own fade rule, then checks the rail, settings, and both manuals against the same 1-2-3 scale.
+  Before the fix, settings and the manuals produced `[1, 3, 2]` and two tests failed; afterwards all seven focused
+  tests and all 472 web unit tests passed.
+- **Verification:** `npm run check` 0 errors / 2 warnings, 472 web unit tests passed, `lint:i18n` 0 errors,
+  production build completed, and `check_docs.py` passed.

@@ -1788,12 +1788,12 @@
 						<span><strong>{t().uiModeSimple}</strong><small>{t().uiModeSimpleDescription}</small></span>
 					</label>
 					<label class="setting-toggle">
-						<input type="radio" name="ui-mode" value="full" checked={uiMode === 'full'} disabled={uiModeSaving} onchange={() => onSetUiMode('full')} />
-						<span><strong>{t().uiModeFull}</strong><small>{t().uiModeFullDescription}</small></span>
-					</label>
-					<label class="setting-toggle">
 						<input type="radio" name="ui-mode" value="custom" checked={uiMode === 'custom'} disabled={uiModeSaving} onchange={() => onSetUiMode('custom')} />
 						<span><strong>{t().uiModeCustom}</strong><small>{t().uiModeCustomDescription}</small></span>
+					</label>
+					<label class="setting-toggle">
+						<input type="radio" name="ui-mode" value="full" checked={uiMode === 'full'} disabled={uiModeSaving} onchange={() => onSetUiMode('full')} />
+						<span><strong>{t().uiModeFull}</strong><small>{t().uiModeFullDescription}</small></span>
 					</label>
 				</div>
 				{#if uiMode === 'custom'}

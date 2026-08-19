@@ -35,8 +35,8 @@ The UI language and the description language are separate. Ordinary painting det
 | UI mode | Contents |
 |---|---|
 | Simple UI | Shows the essential items and the history |
-| Full UI | Shows every available item |
 | Custom UI | Adds the items you choose to the essential ones |
+| Full UI | Shows every available item |
 
 The UI mode can also be switched from the icon on the left of the rail. **The number of dark bars is the mode that is on**: one for simple, two for custom, three for full. The menu is listed in the same order (simple, custom, full).
 

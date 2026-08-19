@@ -20,6 +20,9 @@ import { test } from 'node:test';
 import { normalizeUiMode } from '../uiMode.ts';
 
 const RAIL = readFileSync(new URL('./AppRail.svelte', import.meta.url), 'utf8');
+const SETTINGS = readFileSync(new URL('./SettingsModal.svelte', import.meta.url), 'utf8');
+const MANUAL_JA = readFileSync(new URL('../../../../manual/ja/image-creation.md', import.meta.url), 'utf8');
+const MANUAL_EN = readFileSync(new URL('../../../../manual/en/image-creation.md', import.meta.url), 'utf8');
 
 /** The three modes uiMode.ts can hand the rail. */
 const MODES = ['simple', 'full', 'custom'];
@@ -71,6 +74,12 @@ function solidBars(mode: string): number {
 	return 3 - (faded[1].match(new RegExp(`\\.ui-mode-${mode} `, 'g')) ?? []).length;
 }
 
+/** Check an ordering against the icon instead of copying the expected names. */
+function assertFollowsIcon(listed: string[]): void {
+	assert.deepEqual([...listed].sort(), [...MODES].sort(), 'the surface lists all three exactly once');
+	assert.deepEqual(listed.map(solidBars), [1, 2, 3]);
+}
+
 // ------------------------------------------------------------------- T-55
 
 test('T-55  the menu is listed in the order the icon draws', () => {
@@ -78,13 +87,33 @@ test('T-55  the menu is listed in the order the icon draws', () => {
 	const listed = [...menu.slice(0, menu.indexOf('</div>')).matchAll(/selectUiMode\('(\w+)'\)/g)].map(
 		(match) => match[1]
 	);
-	assert.deepEqual([...listed].sort(), [...MODES].sort(), 'the menu lists all three exactly once');
 	// The claim, executed against the icon rather than restated: the list rises
 	// by how much interface each mode shows, so the middle amount is in the
 	// middle. It read simple / full / custom before, which put it last.
-	const bars = listed.map(solidBars);
-	assert.deepEqual(bars, [1, 2, 3]);
-	assert.deepEqual(listed, ['simple', 'custom', 'full']);
+	assertFollowsIcon(listed);
+});
+
+test('T-56  the settings dialog is listed in the order the icon draws', () => {
+	const options = SETTINGS.slice(SETTINGS.indexOf('class="settings-radio-set ui-mode-options"'));
+	const listed = [...options.slice(0, options.indexOf('</div>')).matchAll(/name="ui-mode" value="(\w+)"/g)].map(
+		(match) => match[1]
+	);
+	assertFollowsIcon(listed);
+});
+
+test('T-57  both manuals list the modes in the order the icon draws', () => {
+	const names: Record<string, string> = {
+		シンプル: 'simple',
+		カスタム: 'custom',
+		フル: 'full',
+		Simple: 'simple',
+		Custom: 'custom',
+		Full: 'full'
+	};
+	const japanese = [...MANUAL_JA.matchAll(/^\| (シンプル|カスタム|フル)UI \|/gm)].map((match) => names[match[1]]);
+	const english = [...MANUAL_EN.matchAll(/^\| (Simple|Custom|Full) UI \|/gm)].map((match) => names[match[1]]);
+	assertFollowsIcon(japanese);
+	assertFollowsIcon(english);
 });
 
 // ------------------------------------------------------------------- T-54

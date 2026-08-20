@@ -8674,3 +8674,21 @@ the author replaced the task**, so four directly assigned pieces of work were do
   tests and all 472 web unit tests passed.
 - **Verification:** `npm run check` 0 errors / 2 warnings, 472 web unit tests passed, `lint:i18n` 0 errors,
   production build completed, and `check_docs.py` passed.
+
+### Android `2.1.4-android.45` — the port proves every DDL road before naming engine 20 (2026-08-20, [I-181])
+
+- **Android's deterministic DDL repairs now follow engines 8 through 20.** Color delivery and
+  single-color folding, unambiguous stated-count assignment and the all-or-nothing total of 400,
+  returning surfaces to closed shapes, small-shape radii, and density budgets containing composite
+  groups run in the server's order. Engine 13's document plugin loader remains server-only. The
+  existing engine 9, 14, 18, and 19 roads are also exercised from their entry points; only after all
+  gates passed did Android's DDL reference version move from `7` to `20`.
+- **Formal acceptance rejected three defects and added red regressions before they were fixed:**
+  insertion of a needless `group_size=1`, composite groups bypassing ordinary density limits, and
+  stated-count repair stealing the sole answer to another stated count while losing the whole-DDL material hint.
+- **Verification:** baseline 387 and final **395 tests / 0 failures / 0 errors / 0 skipped** (67 XML).
+  `P-1` through `P-8` and acceptance seams `A-1` through `A-4` reddened exactly the predicted tests;
+  fixture-current was **3 passed / 1 skipped**. Instrumentation and devices were out of scope, and nothing was sent to pentala.
+- **A procedural deviation is recorded:** stages 1–5 were integrated before their full run rather
+  than preserved as five intermediate trees. The final tree completed the full suite and every
+  perturbation, and the accepting session re-reviewed the diff before accepting it.

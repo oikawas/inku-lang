@@ -3,12 +3,13 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-06。
+最終更新: 2026-08-20。
 
-**追随状況**: Android は `2.1.4-android.10` / **render engine version `21`** の世代にある
-（版は `data/model/CompatibilityConstants.kt` が名乗る）。
-master の web/server は v2.11.2 / **render engine `21`** / **`ddl_engine_version` 7** なので、
-**描画層の版は一致している**。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
+**追随状況**: Android は `2.1.4-android.45` / **render engine version `35`** /
+**DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
+DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.44 /
+**render engine `38`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
+描画層は 3 版遅れている**。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
 （末尾の 2026-08-05 の節を参照）。
 
 **ただし「層の版が同じ」は「移植が終わった」ではない。**

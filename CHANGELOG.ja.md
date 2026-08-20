@@ -7849,3 +7849,17 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
   修正後は対象7本およびWeb単体472本がすべて通った。
 - **検証:** `npm run check` 0 errors / 2 warnings、Web単体472 passed、`lint:i18n` 0 errors、
   production build成功、`check_docs.py` 緑。
+
+### Android `2.1.4-android.45` — DDL の各道を証明して engine 20 を名乗る（2026-08-20・[I-181]）
+
+- **Android の決定的 DDL 修復を engine 8〜20 へ追随させた。** 色の配達と一色化、明示数の一意な割当と
+  total 400 の all-or-nothing、面の閉形状への戻し、小形の半径、複合群れを含む密度予算を server と同じ順で行う。
+  engine 13 の document plugin loader は server 専用なので追加していない。既存だった engine 9 / 14 / 18 / 19 の道も
+  入口から検査し、すべて通った後で Android の DDL 参照版を `7` から `20` へ上げた。
+- **正式受入で3件を reject し、回帰を先に赤くして直した。** `group_size=1` の不要な挿入、複合群れがあると通常群れの
+  密度制限を迂回する穴、明示数の修復が別の明示数の唯一の回答を奪い whole-DDL の素材ヒントも失う穴である。
+- **検証:** 起点 387、最終 **395 tests / 0 failures / 0 errors / 0 skipped**（67 XML）。`P-1`〜`P-8` と
+  受入追加 `A-1`〜`A-4` は予測どおりの検査だけを赤くし、fixture-current は **3 passed / 1 skipped**。
+  計装・実機は対象外で、pentala へは送っていない。
+- **手続上の逸脱を記録する。** 段1〜5を別々の中間木に保存して各段の全走を行わず、統合木で全走した。
+  最終木では全走と全摂動を完了し、受入側が差分を再審査したうえで受け入れた。

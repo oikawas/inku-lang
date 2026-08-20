@@ -4,13 +4,15 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-06.
+Last updated: 2026-08-20.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.10` with **render engine
-version `21`** (the version is declared in `data/model/CompatibilityConstants.kt`). The master
-web/server implementation is at v2.11.2 with **render engine `21`** and **`ddl_engine_version` 7**,
-so **the drawing layer versions match**. The Stage 1.5 expander followed the staffage level being
-folded away on 2026-08-05 (see the 2026-08-05 section at the end of this document).
+**Catch-up status**: Android sits at generation `2.1.4-android.45` with **render engine
+version `35`** and **DDL engine version `20`** (declared by
+`data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
+web/server implementation is at v2.13.44 with **render engine `38`** and
+**`ddl_engine_version` 20**, so **the deterministic DDL repairs match while the drawing layer is
+three versions behind**. The Stage 1.5 expander followed the staffage level being folded away on
+2026-08-05 (see the 2026-08-05 section at the end of this document).
 
 **Matching layer versions is not the same as a finished port.** The version number asserts that
 drawing is identical; it says nothing about the UI, storage, or vocabulary. **The gaps that remain

@@ -9,6 +9,7 @@ server/tests/test_version_consistency.py fails if they ever disagree again.
     python3 scripts/bump.py --version v2.9.25 --scan-build          # report only
     python3 scripts/bump.py --scan-build --local                    # no ssh
     python3 scripts/bump.py --version v2.9.25 --build 822 --write
+    python3 scripts/bump.py --build 822 --check                     # exit 2 on drift
     python3 scripts/bump.py --show
 
 Nothing is written without --write.  The default used to be the other way
@@ -279,12 +280,16 @@ def main() -> int:
     parser.add_argument("--show", action="store_true", help="print current values and exit")
     parser.add_argument("--write", action="store_true",
                         help="stamp the files; without it nothing on disk changes")
+    parser.add_argument("--check", action="store_true",
+                        help="write nothing and exit 2 if any stamped file is out of date")
     args = parser.parse_args()
 
     # A flag that quietly does nothing is how the caller comes to believe the
     # host was scanned when nothing scanned anything (ledger I-196).
     if args.local and not args.scan_build:
         parser.error("--local narrows --scan-build; it means nothing on its own")
+    if args.check and args.write:
+        parser.error("--check and --write are mutually exclusive")
 
     version, build = read_current()
 
@@ -310,10 +315,17 @@ def main() -> int:
 
     changes = apply(version, build, write=args.write)
     if not changes:
-        print("nothing to change")
+        print("version markers are current" if args.check else "nothing to change")
         return 0
     for line in changes:
         print(("wrote " if args.write else "would write ") + line)
+    if args.check:
+        print(
+            f"version markers are out of date ({len(changes)} file(s)); "
+            "stamp them before running expensive checks",
+            file=sys.stderr,
+        )
+        return 2
     if not args.write:
         print(f"nothing was written ({len(changes)} file(s) would change) -- add --write to stamp")
     return 0

@@ -136,6 +136,35 @@ def test_show_writes_nothing(tree):
     assert _changed(before, tree) == []
 
 
+def test_check_is_green_when_every_marker_matches(tree):
+    before = _snapshot(tree)
+    build = (tree / "web/BUILD_NUMBER").read_text(encoding="utf-8").strip()
+    result = _run(tree, "--build", build, "--check")
+
+    assert result.returncode == 0, result.stderr
+    assert "version markers are current" in result.stdout
+    assert _changed(before, tree) == []
+
+
+def test_check_fails_before_an_expensive_suite_when_markers_drift(tree):
+    before = _snapshot(tree)
+    result = _run(tree, "--build", "4242", "--check")
+
+    assert result.returncode == 2
+    assert "would write" in result.stdout
+    assert "before running expensive checks" in result.stderr
+    assert _changed(before, tree) == []
+
+
+def test_check_cannot_be_combined_with_write(tree):
+    before = _snapshot(tree)
+    result = _run(tree, "--build", "4242", "--check", "--write")
+
+    assert result.returncode == 2
+    assert "mutually exclusive" in result.stderr
+    assert _changed(before, tree) == []
+
+
 def test_dry_run_is_gone_and_fails_loudly(tree):
     """The old read-only flag was removed rather than kept as a synonym.
 

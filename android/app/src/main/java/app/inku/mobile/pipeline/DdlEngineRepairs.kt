@@ -73,7 +73,13 @@ internal object DdlEngineRepairs {
             if (repaired.any { ServerScoreCounts.countFollowsDdlRequest(arrangementCount(it), setOf(value)) }) {
                 continue
             }
-            val target = groupTheClauseNames(repaired, clause, background) ?: continue
+            val target = groupTheClauseNames(
+                repaired,
+                clause,
+                ddl,
+                background,
+                everyStated.toSet() - value,
+            ) ?: continue
             val candidate = withStatedCount(repaired[target], value)
             val proposed = repaired.toMutableList().also { it[target] = candidate }
             if (compositeMarkCounts(proposed).sum() > maxExpandedPrimitives) continue
@@ -146,13 +152,21 @@ internal object DdlEngineRepairs {
     private fun groupTheClauseNames(
         instructions: List<JSONObject>,
         clause: String,
+        ddl: String,
         background: String,
+        spokenFor: Set<Int>,
     ): Int? {
         val primitive = ServerScoreRepairFactory.primitiveFromClause(clause) ?: return null
         val color = ServerScoreRepairFactory.colorFromClause(clause, background)
-        val weight = ServerScoreSemantics.detectWeightKey(clause)
+        val clauseWeight = ServerScoreSemantics.detectWeightKey(clause)
+        val weight = if (clauseWeight == "pen") {
+            ServerScoreCoercer.materialWeightHint(ddl) ?: clauseWeight
+        } else {
+            clauseWeight
+        }
         val candidates = instructions.indices.filter { index ->
-            STATED_COUNT_NOTE !in instructions[index].optString("note", "")
+            STATED_COUNT_NOTE !in instructions[index].optString("note", "") &&
+                !isOnlyAnswerToAnotherCount(instructions, index, spokenFor)
         }
         val triple = candidates.filter { index ->
             val instruction = instructions[index]
@@ -162,6 +176,23 @@ internal object DdlEngineRepairs {
         }
         if (triple.isNotEmpty()) return triple.singleOrNull()
         return candidates.filter { instructions[it].optString("primitive", "line") == primitive }.singleOrNull()
+    }
+
+    private fun isOnlyAnswerToAnotherCount(
+        instructions: List<JSONObject>,
+        position: Int,
+        spokenFor: Set<Int>,
+    ): Boolean {
+        val count = arrangementCount(instructions[position])
+        return spokenFor.any { value ->
+            ServerScoreCounts.countFollowsDdlRequest(count, setOf(value)) &&
+                instructions.indices.none { other ->
+                    other != position && ServerScoreCounts.countFollowsDdlRequest(
+                        arrangementCount(instructions[other]),
+                        setOf(value),
+                    )
+                }
+        }
     }
 
     private fun withStatedCount(instruction: JSONObject, count: Int): JSONObject {

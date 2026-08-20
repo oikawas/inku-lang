@@ -173,7 +173,12 @@ internal object ServerScoreCoercer {
         val layout = result.optString("layout", "horizontal").takeIf { it in setOf("horizontal", "vertical", "radial", "scatter", "grid") } ?: "horizontal"
         val maxCount = if (layout == "grid") 2000 else 1000
         result.put("count", result.optInt("count", 1).coerceIn(1, maxCount))
-        result.put("group_size", maxOf(1, result.optInt("group_size", 1)))
+        val groupSize = result.optInt("group_size", 1)
+        if (result.has("group_size") && groupSize > 1) {
+            result.put("group_size", groupSize)
+        } else {
+            result.remove("group_size")
+        }
         result.put("layout", layout)
         if (layout == "grid") {
             if (result.has("rows")) result.put("rows", result.optInt("rows", 1).coerceIn(1, 64))
@@ -275,12 +280,18 @@ internal object ServerScoreCoercer {
 
     private fun applyMaterialHint(data: JSONObject, ddl: String) {
         if (ddl.isBlank() || data.optString("weight", "pen") != "pen") return
-        val lower = ddl.lowercase()
-        val weight = materialWeightHints.firstOrNull { (markers, _) -> markers.any { it.lowercase() in lower } }?.second ?: return
+        val weight = materialWeightHint(ddl) ?: return
         data.put("weight", weight)
         val note = "material inferred from DDL: $weight"
         val hint = data.optString("color_hint", "").takeIf { it.isNotBlank() }
         data.put("color_hint", if (hint == null) note else "$hint; $note")
+    }
+
+    internal fun materialWeightHint(ddl: String): String? {
+        val lower = ddl.lowercase()
+        return materialWeightHints.firstOrNull { (markers, _) ->
+            markers.any { it.lowercase() in lower }
+        }?.second
     }
 
     private fun applyVariationHint(primitive: String, data: JSONObject, ddl: String) {

@@ -146,6 +146,31 @@ class DdlEngineTwentyParityTest {
                 "ja",
             ).map(JSONObject::toString),
         )
+
+        val spokenFor = listOf(
+            instruction("circle", color = "red", count = 2),
+            instruction("line", color = "black", count = 3),
+        )
+        val guarded = DdlEngineRepairs.withStatedCountFidelity(
+            spokenFor,
+            "赤い円を二個並べる。青い円を十二個並べる。",
+            "white",
+            "ja",
+        )
+        assertEquals(2, guarded[0].getJSONObject("arrangement").getInt("count"))
+
+        val globallyHinted = listOf(
+            instruction("circle", color = "red", weight = "pencil", count = 2),
+            instruction("circle", color = "blue", weight = "pencil", count = 3),
+        )
+        val materialMatched = DdlEngineRepairs.withStatedCountFidelity(
+            globallyHinted,
+            "鉛筆で描く。赤い円を十二個並べる。",
+            "white",
+            "ja",
+        )
+        assertEquals(12, materialMatched[0].getJSONObject("arrangement").getInt("count"))
+        assertEquals(3, materialMatched[1].getJSONObject("arrangement").getInt("count"))
     }
 
     @Test
@@ -231,6 +256,48 @@ class DdlEngineTwentyParityTest {
             ordinary.map(JSONObject::toString),
             DdlEngineRepairs.withCompositeDensityBudget(ordinary).map(JSONObject::toString),
         )
+
+        val explicitOne = instruction("circle", count = 3).also {
+            it.getJSONObject("arrangement").put("group_size", 1)
+        }
+        val normalizedOne = normalize(listOf(explicitOne), "draw circles.", "en").single()
+        val normalizedOrdinary = normalize(
+            listOf(instruction("circle", count = 3)),
+            "draw circles.",
+            "en",
+        ).single()
+        assertFalse(normalizedOne.getJSONObject("arrangement").has("group_size"))
+        assertEquals(normalizedOrdinary.toString(), normalizedOne.toString())
+
+        val ordinaryHigh = instruction("circle", count = 300)
+        val mixedHead = instruction("arc", count = 3).also {
+            it.getJSONObject("arrangement").put("group_size", 2)
+        }
+        val mixed = normalize(
+            listOf(ordinaryHigh, mixedHead, instruction("arc")),
+            "draw circles and arcs.",
+            "en",
+        )
+        val normalizedHigh = mixed.single { it.getString("primitive") == "circle" }
+        assertTrue(normalizedHigh.getJSONObject("arrangement").getInt("count") < 300)
+        assertTrue(normalizedHigh.getJSONObject("arrangement").getBoolean("preserve_space"))
+
+        val totalMixedHead = instruction("arc", count = 3).also {
+            it.getJSONObject("arrangement").put("group_size", 2)
+        }
+        val totalMixed = normalize(
+            listOf(
+                instruction("circle", count = 200),
+                instruction("square", count = 200),
+                totalMixedHead,
+                instruction("arc"),
+            ),
+            "draw circles, squares, and arcs.",
+            "en",
+        )
+        val ordinaryMixed = totalMixed.filter { it.getString("primitive") in setOf("circle", "square") }
+        assertEquals(1, ordinaryMixed.count { it.getJSONObject("arrangement").getInt("count") == 200 })
+        assertEquals(1, ordinaryMixed.count { it.getJSONObject("arrangement").getBoolean("preserve_space") })
 
         val expand = DefaultSvgRenderer::class.java.getDeclaredMethod(
             "expandCompositeGroups",

@@ -1237,14 +1237,50 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withDensityBudget(): List<JSONObject> {
-        if (any { (it.optJSONObject("arrangement")?.optInt("group_size", 1) ?: 1) > 1 }) {
-            return DdlEngineRepairs.withCompositeDensityBudget(
-                this,
+        val perInstruction = withPerInstructionDensityBudget()
+        if (perInstruction.any { (it.optJSONObject("arrangement")?.optInt("group_size", 1) ?: 1) > 1 }) {
+            val compositePerInstruction = DdlEngineRepairs.withCompositeDensityBudget(
+                perInstruction,
                 maxExpandedPerInstruction = MAX_EXPANDED_PER_INSTRUCTION,
-                maxExpandedPrimitives = MAX_EXPANDED_PRIMITIVES,
+                maxExpandedPrimitives = Int.MAX_VALUE,
             )
+            return compositePerInstruction.withCompositeAwareTotalDensityBudget()
         }
-        return withPerInstructionDensityBudget().withTotalDensityBudget()
+        return perInstruction.withTotalDensityBudget()
+    }
+
+    private fun List<JSONObject>.withCompositeAwareTotalDensityBudget(): List<JSONObject> {
+        val adjusted = toMutableList()
+        var costs = DdlEngineRepairs.compositeMarkCounts(adjusted).mapIndexed { index, cost ->
+            if (isGrid(adjusted[index])) 0 else cost
+        }
+        var total = costs.sum()
+        if (total > MAX_EXPANDED_PRIMITIVES) {
+            val ordinary = adjusted.indices.filter { index ->
+                costs[index] > 0 &&
+                    adjusted[index].optJSONObject("arrangement") != null &&
+                    (adjusted[index].optJSONObject("arrangement")?.optInt("group_size", 1) ?: 1) <= 1 &&
+                    !isGrid(adjusted[index])
+            }
+            for (index in ordinary.sortedByDescending { costs[it] }) {
+                if (total <= MAX_EXPANDED_PRIMITIVES) break
+                val candidate = adjusted[index].withClusteredDensity(
+                    "largest group represented to fit the total density budget",
+                )
+                val before = costs[index]
+                adjusted[index] = candidate
+                costs = DdlEngineRepairs.compositeMarkCounts(adjusted).mapIndexed { position, cost ->
+                    if (isGrid(adjusted[position])) 0 else cost
+                }
+                val after = costs[index]
+                if (after < before) total -= before - after
+            }
+        }
+        return DdlEngineRepairs.withCompositeDensityBudget(
+            adjusted,
+            maxExpandedPerInstruction = Int.MAX_VALUE,
+            maxExpandedPrimitives = MAX_EXPANDED_PRIMITIVES,
+        )
     }
 
     /**

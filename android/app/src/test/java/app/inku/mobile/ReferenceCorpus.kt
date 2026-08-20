@@ -28,7 +28,7 @@ import org.json.JSONObject
 object ReferenceCorpus {
 
     /** The Stage 1.5 expansion version the port implements (`layer_versions.py` on the server). */
-    const val ddlEngineVersion = "7"
+    const val ddlEngineVersion = "20"
 
     /** Fixtures no engine version governs: they are rebaked in place and the port follows them. */
     private val FLAT = setOf(

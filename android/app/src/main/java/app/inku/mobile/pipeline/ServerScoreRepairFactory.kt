@@ -23,11 +23,13 @@ internal object ServerScoreRepairFactory {
     fun primitiveFromClause(clause: String): String? {
         val lower = clause.lowercase()
         return when {
+            "雲形" in clause || "cloudform" in lower -> "cloudform"
             "多角形" in clause || "五角" in clause || "六角" in clause || "polygon" in lower -> "polygon"
             "四角" in clause || "square" in lower || "rectangle" in lower -> "square"
             "三角" in clause || "triangle" in lower -> "triangle"
             "弧" in clause || "arc" in lower -> "arc"
-            "円" in clause || "楕円" in clause || "circle" in lower || "ellipse" in lower -> "ellipse"
+            "楕円" in clause || "ellipse" in lower || "oval" in lower -> "ellipse"
+            "点" in clause || "円" in clause || "dot" in lower || "point" in lower || "circle" in lower -> "circle"
             else -> "line"
         }
     }
@@ -111,6 +113,9 @@ internal object ServerScoreRepairFactory {
                 "芽", "落ち葉", "若葉", "木の葉", "葉っぱ", "葉脈",
             ),
             "gray" to listOf("灰", "gray", "grey"),
+            "yellow" to listOf("黄", "金", "yellow", "gold"),
+            "orange" to listOf("橙", "蜜柑", "灯火", "orange", "lantern"),
+            "purple" to listOf("紫", "菫", "藤", "purple", "violet", "lilac"),
         ).forEach { (color, markers) ->
             if (color in negated) return@forEach
             if (markers.any { it in text || it in lower }) result += color
@@ -119,6 +124,12 @@ internal object ServerScoreRepairFactory {
             result += listOf("red", "blue", "green", "black", "gray").filterNot { it in negated }
         }
         return result.distinct()
+    }
+
+    fun colorRepairOrder(colors: Collection<String>): List<String> {
+        val values = colors.toSet()
+        val known = listOf("red", "blue", "green", "white", "black", "gray").filter { it in values }
+        return known + values.filterNot { it in known }.sorted()
     }
 
     fun colorFromClause(clause: String, background: String): String {

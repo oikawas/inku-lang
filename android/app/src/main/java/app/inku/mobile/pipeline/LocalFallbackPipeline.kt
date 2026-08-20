@@ -130,7 +130,7 @@ class LocalFallbackPipeline(
         val scoreJson = generatedScore ?: if (request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 explicit provider returned no usable Score.")
         } else {
-            scoreFromWebRules(expandedDdl, request.canvasAspect).toString()
+            scoreFromWebRules(expandedDdl, request.canvasAspect, resolvedLang).toString()
         }
         val renderStarted = System.currentTimeMillis()
         val renderSeed = effectiveRenderSeed(request)
@@ -344,7 +344,7 @@ class LocalFallbackPipeline(
                     logStage2InvalidResponse(request.stage2Model, response, extracted.exceptionOrNull(), extracted.getOrNull())
                     retryStage2OrFallback(provider, request, expandedDdl, userPrompt, lang)
                 }
-            normalizeServerScore(score, expandedDdl, request.canvasAspect).toString()
+            normalizeServerScoreWithLang(score, expandedDdl, request.canvasAspect, lang).toString()
         }.onSuccess { scoreJson ->
             Log.i(
                 PERF_TAG,
@@ -520,7 +520,7 @@ class LocalFallbackPipeline(
         return ServerFallbackComposer.fallbackDdlFromText(text)
     }
 
-    internal fun scoreFromWebRules(ddl: String, canvasAspect: String): JSONObject {
+    internal fun scoreFromWebRules(ddl: String, canvasAspect: String, lang: String? = null): JSONObject {
         val context = ddl
         val background = detectBackground(context)
         val foreground = visibleForeground(detectColorKey(context, background), background)
@@ -546,7 +546,7 @@ class LocalFallbackPipeline(
             // above stays as it is, because that is this fallback's Stage 2, not
             // its coerce.
             .put("instructions", JSONArray().put(coerceInstruction(instruction, ddl, background)))
-        return normalizeServerScore(score, ddl, canvasAspect)
+        return normalizeServerScoreWithLang(score, ddl, canvasAspect, lang)
     }
 
     private fun fallbackInstruction(text: String, color: String, weight: String): JSONObject {
@@ -560,6 +560,15 @@ class LocalFallbackPipeline(
     private fun buildStage2UserMessage(ddl: String): String = ddl
 
     private fun normalizeServerScore(score: JSONObject, ddl: String, canvasAspect: String): JSONObject {
+        return normalizeServerScoreWithLang(score, ddl, canvasAspect, null)
+    }
+
+    internal fun normalizeServerScoreWithLang(
+        score: JSONObject,
+        ddl: String,
+        canvasAspect: String,
+        lang: String?,
+    ): JSONObject {
         val background = backgroundDominanceGovernor(visibleBackground(score.optString("background", "white")), ddl)
         val source = score.optJSONArray("instructions") ?: JSONArray()
         val repairedItems = mutableListOf<JSONObject>()
@@ -571,7 +580,8 @@ class LocalFallbackPipeline(
             repairedItems += fallbackInstruction(ddl, visibleForeground("black", background), "pen")
         }
         val presence = score.optJSONObject("presence") ?: presenceFromDdl(ddl)
-        val repaired = repairedItems
+        val attachedItems = DdlEngineRepairs.withSurfaceOnAClosedShape(repairedItems)
+        val repaired = attachedItems
             .dedupeInstructions()
             .withDdlCoverage(ddl, background)
             .withColorDelivery(ddl, background)
@@ -592,6 +602,8 @@ class LocalFallbackPipeline(
             .withVisualEvent(ddl, background)
             .withMotionFloor(ddl, background)
             .withDensityBudget()
+            .let { DdlEngineRepairs.withStatedCountFidelity(it, ddl, background, lang) }
+            .let { DdlEngineRepairs.withoutUnrequestedColorCycle(it, ddl) }
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
             .put("version", "0.1.0")
@@ -692,7 +704,7 @@ class LocalFallbackPipeline(
             }
             colors
         }.toSet()
-        val missing = listOf("red", "blue", "green", "white", "black", "gray").filter { it in requested && it !in delivered }
+        val missing = ServerScoreRepairFactory.colorRepairOrder(requested.filterNot { it in delivered })
         if (missing.isEmpty()) return this
         val targetIndex = indexOfFirst { it.optString("primitive") in setOf("ellipse", "arc", "circle", "square", "triangle") }.takeIf { it >= 0 } ?: 0
         return mapIndexed { index, item ->
@@ -707,7 +719,7 @@ class LocalFallbackPipeline(
             if (greenContext?.contains("bamboo") == true) copy.put("color", "green")
             val base = copy.optString("color", visibleForeground("black", background))
             if (greenContext?.contains("withered") == true) cycle.put("gray")
-            if (base != background) cycle.put(base)
+            if (base != background && (0 until cycle.length()).none { cycle.optString(it) == base }) cycle.put(base)
             missing.forEach { color ->
                 if ((0 until cycle.length()).none { cycle.optString(it) == color }) cycle.put(color)
             }
@@ -721,14 +733,18 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withPrimaryColorDelivery(ddl: String, background: String): List<JSONObject> {
-        val requested = requestedColors(ddl).filter { it != background && it != "white" }
+        val requested = ServerScoreRepairFactory.colorRepairOrder(
+            requestedColors(ddl).filter { it != background && it != "white" },
+        )
         if (requested.isEmpty()) return this
         val repaired = toMutableList()
+        val wanted = requested.toSet()
         for (color in requested) {
             if (repaired.any { it.optString("color") == color }) continue
             val candidateIndex = repaired.indexOfFirst { item ->
                 val arrangement = item.optJSONObject("arrangement")
                 arrangement != null &&
+                    item.optString("color") !in wanted &&
                     item.optString("primitive") in setOf("line", "arc", "ellipse", "square", "triangle", "polygon") &&
                     arrangement.optJSONArray("color_cycle")?.let { cycle ->
                         (0 until cycle.length()).any { cycle.optString(it) == color }
@@ -1221,6 +1237,13 @@ class LocalFallbackPipeline(
     }
 
     private fun List<JSONObject>.withDensityBudget(): List<JSONObject> {
+        if (any { (it.optJSONObject("arrangement")?.optInt("group_size", 1) ?: 1) > 1 }) {
+            return DdlEngineRepairs.withCompositeDensityBudget(
+                this,
+                maxExpandedPerInstruction = MAX_EXPANDED_PER_INSTRUCTION,
+                maxExpandedPrimitives = MAX_EXPANDED_PRIMITIVES,
+            )
+        }
         return withPerInstructionDensityBudget().withTotalDensityBudget()
     }
 

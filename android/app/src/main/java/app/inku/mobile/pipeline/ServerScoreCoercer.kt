@@ -74,6 +74,8 @@ internal object ServerScoreCoercer {
         visibleForeground: (String, String) -> String,
     ): JSONObject {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
+        val rawHasRadius = source.has("radius") && !source.isNull("radius")
+        val rawHasSize = source.has("size") && !source.isNull("size")
         val data = ServerScoreCompat.migrateInstruction(JSONObject(source.toString())).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple") } ?: "black")
         data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
@@ -100,6 +102,7 @@ internal object ServerScoreCoercer {
             val value = coercedField(data, spec)
             data.put(spec.name, toJsonValue(value ?: spec.defaultValue))
         }
+        applyStatedSize(primitive, data, ddl, rawHasRadius, rawHasSize)
         postCoerce(primitive, data)
         applyMaterialHint(data, ddl)
         applyVariationHint(primitive, data, ddl)
@@ -107,7 +110,7 @@ internal object ServerScoreCoercer {
 
         // Strip unknown extra fields to comply with ConfigDict(extra="forbid")
         val allowedKeys = setOf(
-            "primitive", "from", "to", "center", "radius", "sides", "position", "size",
+            "primitive", "note", "from", "to", "center", "radius", "sides", "position", "size",
             "angle_start", "angle_end", "rotation", "filled", "style", "weight", "thinness",
             "mode", "carve_depth", "color", "color_hint", "variation", "arrangement",
             "at", "relation", "surface",
@@ -130,6 +133,35 @@ internal object ServerScoreCoercer {
         return null
     }
 
+    private fun applyStatedSize(
+        primitive: String,
+        data: JSONObject,
+        ddl: String,
+        rawHasRadius: Boolean,
+        rawHasSize: Boolean,
+    ) {
+        if ((primitive == "circle" && rawHasRadius) || (primitive == "ellipse" && rawHasSize)) return
+        if (primitive != "circle" && primitive != "ellipse") return
+        val clauses = ServerDdlText.splitClauses(ddl).filter { clause ->
+            ServerScoreRepairFactory.primitiveFromClause(clause) == primitive && isSmallMarkClause(clause)
+        }
+        if (clauses.size != 1) return
+        if (primitive == "circle") {
+            data.put("radius", ServerScoreSemantics.detectRadius(clauses.single()) ?: 0.038)
+        } else {
+            data.put("size", JSONArray(listOf(0.06, 0.032)))
+        }
+    }
+
+    private fun isSmallMarkClause(clause: String): Boolean {
+        val lower = clause.lowercase()
+        val hasSize = listOf("小さ", "細い").any { it in clause } ||
+            listOf("tiny", "small", "little", "thin").any { it in lower }
+        val hasKind = listOf("点", "円", "楕円").any { it in clause } ||
+            listOf("dot", "point", "circle", "ellipse", "oval").any { it in lower }
+        return hasSize && hasKind
+    }
+
     private fun postCoerce(primitive: String, data: JSONObject) {
         if (primitive == "arc" && kotlin.math.abs(data.optDouble("angle_start") - data.optDouble("angle_end")) < 1e-6) {
             data.put("angle_end", (data.optDouble("angle_start") + 270.0) % 360.0)
@@ -141,6 +173,7 @@ internal object ServerScoreCoercer {
         val layout = result.optString("layout", "horizontal").takeIf { it in setOf("horizontal", "vertical", "radial", "scatter", "grid") } ?: "horizontal"
         val maxCount = if (layout == "grid") 2000 else 1000
         result.put("count", result.optInt("count", 1).coerceIn(1, maxCount))
+        result.put("group_size", maxOf(1, result.optInt("group_size", 1)))
         result.put("layout", layout)
         if (layout == "grid") {
             if (result.has("rows")) result.put("rows", result.optInt("rows", 1).coerceIn(1, 64))
@@ -345,4 +378,3 @@ internal object ServerScoreCoercer {
         listOf("コンピュータ", "computer") to "computer",
     )
 }
-

@@ -74,20 +74,41 @@ def _grain_marks(pattern: ElementTree.Element) -> list[ElementTree.Element]:
     ]
 
 
+def _grain_dabs(pattern: ElementTree.Element) -> list[ElementTree.Element]:
+    return [
+        element
+        for element in pattern.iter()
+        if "surface-grain-dab" in element.attrib.get("class", "").split()
+    ]
+
+
 def _surface_group(svg: str) -> str:
     match = re.search(r'(<g id="surface_000_000_grain">.*?</g>)', svg)
     assert match is not None
     return match.group(1)
 
 
-def _without_presentation(attrs: dict[str, str]) -> tuple[tuple[str, str], ...]:
-    return tuple(
+def _tool_geometry_signature(mark: ElementTree.Element) -> tuple[object, ...]:
+    """Compare tool grammar structure, excluding all seed-derived numeric values."""
+    tag = mark.tag.rpartition("}")[-1]
+    attrs = tuple(
         sorted(
             (key, value)
-            for key, value in attrs.items()
-            if key not in {"class", "fill", "fill-opacity"}
+            for key, value in mark.attrib.items()
+            if key
+            not in {
+                "class",
+                "fill",
+                "fill-opacity",
+                "opacity",
+                "cx",
+                "cy",
+                "d",
+                "r",
+            }
         )
     )
+    return tag, attrs, tuple(re.findall(r"[A-Za-z]", mark.attrib.get("d", "")))
 
 
 def test_t329_grain_uses_one_fixed_pattern_and_shape_carrier():
@@ -131,16 +152,14 @@ def test_t330_grain_inputs_change_only_their_pattern_decision_axis():
     )
     assert [
         mark.attrib.get("d", mark.attrib.get("r"))
-        for mark in _grain_marks(_grain_pattern(broad))
+        for mark in _grain_dabs(_grain_pattern(broad))
     ] != [
         mark.attrib.get("d", mark.attrib.get("r"))
-        for mark in _grain_marks(_grain_pattern(base))
+        for mark in _grain_dabs(_grain_pattern(base))
     ]
     assert [
-        mark.attrib.get("fill-opacity") for mark in _grain_marks(_grain_pattern(faint))
-    ] != [
-        mark.attrib.get("fill-opacity") for mark in _grain_marks(_grain_pattern(base))
-    ]
+        mark.attrib.get("fill-opacity") for mark in _grain_dabs(_grain_pattern(faint))
+    ] != [mark.attrib.get("fill-opacity") for mark in _grain_dabs(_grain_pattern(base))]
     assert ElementTree.tostring(_grain_pattern(other_seed)) != ElementTree.tostring(
         _grain_pattern(base)
     )
@@ -152,16 +171,13 @@ def test_t331_grain_tool_signature_is_geometry_not_presentation(weight: str):
     pattern = _grain_pattern(
         render(_score(weight=weight), svg_profile="editable", render_seed=51)
     )
-    marks = _grain_marks(pattern)
+    marks = _grain_dabs(pattern)
     assert marks
-    signature = tuple(
-        (mark.tag.rpartition("}")[-1], _without_presentation(mark.attrib))
-        for mark in marks
-    )
+    signature = tuple(_tool_geometry_signature(mark) for mark in marks)
     signatures = {
         candidate: tuple(
-            (mark.tag.rpartition("}")[-1], _without_presentation(mark.attrib))
-            for mark in _grain_marks(
+            _tool_geometry_signature(mark)
+            for mark in _grain_dabs(
                 _grain_pattern(
                     render(
                         _score(weight=candidate), svg_profile="editable", render_seed=51
@@ -205,10 +221,12 @@ def test_t332_grain_boundaries_are_a_pattern_carrier_in_every_profile(
         )
     )
     svg = render(score, svg_profile=profile, render_seed=73)
-    assert _grain_marks(_grain_pattern(svg))
+    pattern = _grain_pattern(svg)
+    assert _grain_marks(pattern)
     assert "clip_surface_" not in svg
-    assert "filter=" not in svg
+    assert all("filter" not in element.attrib for element in pattern.iter())
     if profile == "compat":
+        assert "filter=" not in svg
         validate_compat_svg(svg)
 
 

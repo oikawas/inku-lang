@@ -1708,6 +1708,8 @@ v2.3.0 で閉図形の塗りを領域 fill から**素材の筆致で内側を�
 
 rotring は領域 fill を維持し（`True` = ベタ塗り / `False` = 輪郭のみ）、走査線 3 本未満の微小図形は領域 fill に縮退する。`surface` 指定時は素材塗りを出さない（塗り = 素材の既定の埋め方、`surface` = 明示的な版表現）。
 
+**`surface.texture="grain"` は道具文法で作った有限の粒を `<pattern>` tile に定義し、閉輪郭そのものを carrier path として `fill` から反復参照する。** 粒の論理数は density と固定tileだけで決まり、面積はその定義を何度繰り返すかだけを決める。`filter`・`clipPath` は加えないので、3つのSVG profile は同じ grain 構造を出す。
+
 **⚠ v2.13.20（ddl engine 18）で 1 つ例外ができた** —— `surface.texture="solid"` は「素材の既定の埋め方」そのものを言う値なので、**版表現の層ではなく塗りの層へ行く**。おもての質 9 語がすべて `surface.texture` の値になり、塗りだけが `filled` へ行く非対称が消えた（`filled` は残り、coerce の枝が `solid` と `filled=true` を両方向に導出する）。あわせて surface の hatch / crosshatch を幾何直線から筆致の帯（`class="surface-stroke-v1"`）へ差し替え（中心線・角度・間隔・本数は不変、rotring は幾何直線のまま）、演奏されない variation を seed key から除外して不活性な variation の有無で演奏バイトが変わらないようにした（primitive 別の不活性判定。cloudform は輪郭生成器が quality / amplitude / frequency を常に消費するため不活性なのは dimensions のみ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 9 へ更新した。
 
 **⚠ v2.13.24（render engine 35）で hatch / crosshatch の行は輪郭で切られるようになった** —— 塗りと同じ交点の機構を通すので、行は図形の中だけに残り、凹形では区間ごとに 1 本ずつ描いて空洞をまたがず、輪郭と交わらない行は 1 本も描かない。`clipPath` は使わないので `compat` でも同じ形に収まる。**切る前の層は動かない** —— 角度・間隔・`spacing_gradient`・1 行ごとの揺らぎはそのままで、間隔クラスの値も前の版と同じである（減るのは輪郭の外に出ていた行の本数だけ）。

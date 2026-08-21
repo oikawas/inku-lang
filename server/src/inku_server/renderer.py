@@ -3482,6 +3482,24 @@ def _surface_seed(
     return struct.unpack("<Q", hashlib.sha256(key.encode("utf-8")).digest()[:8])[0]
 
 
+def _surface_grain_seed(
+    ins: Instruction, ins_idx: int, mark_idx: int, render_seed: int | None
+) -> int:
+    """Keep grain placement/jitter on the seed axis, not its visual controls."""
+    surface = ins.surface
+    assert surface is not None and surface.texture == "grain"
+    if surface.seed is not None:
+        return int(surface.seed)
+    stable_surface = surface.model_copy(
+        update={"density": 0.5, "scale": 0.5, "opacity": 0.5}
+    )
+    return _surface_seed(
+        ins.model_copy(update={"surface": stable_surface}),
+        ins_idx,
+        mark_idx,
+        render_seed,
+    )
+
 def _shape_bbox(
     ins: Instruction, canvas: CanvasSize
 ) -> tuple[float, float, float, float] | None:
@@ -3744,10 +3762,108 @@ def _surface_dab(
         "stroke": "none",
         "class_": f"surface-stroke-v1{' ' + class_ if class_ else ''}",
     }
+    if class_ == "surface-grain-dab":
+        # A grain keeps the same tool grammar after its fill has become a tile.
+        # These portable stroke attributes are the grammar's structural
+        # signature; the path itself remains fill-only.
+        signature = WEIGHT_STYLE.get(ins.weight, {})
+        path_attrs["stroke_opacity"] = signature.get("stroke_opacity", 1.0)
+        if "stroke_linecap" in signature:
+            path_attrs["stroke_linecap"] = signature["stroke_linecap"]
+        if "stroke_dasharray" in signature:
+            path_attrs["stroke_dasharray"] = signature["stroke_dasharray"]
     if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
         path_attrs["filter"] = f"url(#texture-{ins.weight})"
     group.add(dwg.path(**path_attrs))
 
+
+def _surface_grain_pattern_id(ins_idx: int, mark_idx: int) -> str:
+    return f"surface_pattern_{ins_idx:03d}_{mark_idx:03d}_grain"
+
+
+def _surface_grain_logical_mark_count(density: float, canvas: CanvasSize) -> int:
+    """Fixed-tile grain count; the destination only repeats this definition."""
+    tile_area = (canvas.unit * 0.08) ** 2
+    reference_area = canvas.unit * canvas.unit * 0.18
+    return max(1, math.ceil((22 + density * 120) * tile_area / reference_area))
+
+
+def _surface_grain_carrier_path(contour: list[tuple[float, float]]) -> str:
+    start, *rest = contour
+    commands = [f"M {start[0]:.6f} {start[1]:.6f}"]
+    commands.extend(f"L {x:.6f} {y:.6f}" for x, y in rest)
+    return " ".join(commands) + " Z"
+
+
+def _surface_grain_wrap_offsets(
+    point: tuple[float, float], reach: float, tile: float
+) -> list[tuple[float, float]]:
+    """Copies crossing a tile edge are the same logical mark in the next tile."""
+    x, y = point
+    x_offsets = [0.0]
+    y_offsets = [0.0]
+    if x < reach:
+        x_offsets.append(tile)
+    if x > tile - reach:
+        x_offsets.append(-tile)
+    if y < reach:
+        y_offsets.append(tile)
+    if y > tile - reach:
+        y_offsets.append(-tile)
+    return [(dx, dy) for dx in x_offsets for dy in y_offsets]
+
+
+def _render_surface_grain_pattern(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    canvas: CanvasSize,
+    *,
+    seed: int,
+    color: str,
+    opacity: float,
+    wild: bool,
+    support: Support,
+    pattern_id: str,
+) -> str:
+    """Build one finite tool-made grain tile, independent of its carrier area."""
+    surface = ins.surface
+    assert surface is not None and surface.texture == "grain"
+    tile = canvas.unit * 0.08
+    radius = max(0.45, canvas.unit * (0.002 + max(0.04, surface.scale) * 0.004))
+    marks = dwg.g(class_="surface-grain-pattern-v1")
+    for index in range(
+        _surface_grain_logical_mark_count(max(0.02, surface.density), canvas)
+    ):
+        point = (
+            _hash01(index, seed, "surface-grain-x") * tile,
+            _hash01(index, seed, "surface-grain-y") * tile,
+        )
+        mark_radius = radius * (0.55 + _hash01(index, seed, "surface-r") * 1.1)
+        mark_opacity = opacity * (0.45 + _hash01(index, seed, "surface-o") * 0.55)
+        reach = max(mark_radius * 2.0, _mark_width_px(ins, canvas) * 0.75)
+        logical_mark = dwg.g(class_="surface-grain-mark")
+        for dx, dy in _surface_grain_wrap_offsets(point, reach, tile):
+            _surface_dab(
+                dwg,
+                logical_mark,
+                ins,
+                canvas,
+                (point[0] + dx, point[1] + dy),
+                mark_radius,
+                color,
+                mark_opacity,
+                seed=seed,
+                index=index,
+                wild=wild,
+                use_filters=False,
+                class_="surface-grain-dab",
+                support=support,
+            )
+        marks.add(logical_mark)
+    return (
+        f'<pattern id="{pattern_id}" patternUnits="userSpaceOnUse" '
+        f'width="{tile:.6f}" height="{tile:.6f}">{marks.tostring()}</pattern>'
+    )
 
 def _surface_sweep(
     dwg: svgwrite.Drawing,
@@ -3836,7 +3952,7 @@ def _render_surface_vectors(
     density = max(0.02, surface.density)
     scale = max(0.04, surface.scale)
     area_factor = max(0.2, min(1.8, (w * h) / (canvas.unit * canvas.unit * 0.18)))
-    if surface.texture in {"stipple", "grain", "paper_grain"}:
+    if surface.texture in {"stipple", "paper_grain"}:
         count = min(SURFACE_MARK_MAX, int((22 + density * 120) * area_factor))
         radius = max(0.45, canvas.unit * (0.002 + scale * 0.004))
         for index, point in enumerate(_surface_scatter(contour, count, seed)):
@@ -4133,9 +4249,37 @@ def _render_surface_texture(
     )
     if contour is None or len(contour) < 3:
         return None, None
-    seed = _surface_seed(ins, ins_idx, mark_idx, render_seed)
+    seed = (
+        _surface_grain_seed(ins, ins_idx, mark_idx, render_seed)
+        if surface.texture == "grain"
+        else _surface_seed(ins, ins_idx, mark_idx, render_seed)
+    )
     gid = _safe_svg_id(f"surface_{ins_idx:03d}_{mark_idx:03d}_{surface.texture}")
     group = dwg.g(id=gid)
+    if surface.texture == "grain":
+        color = _surface_color(ins, cmap, work_assignment)
+        opacity = min(0.75, surface.opacity)
+        pattern_id = _surface_grain_pattern_id(ins_idx, mark_idx)
+        grain_defs = _render_surface_grain_pattern(
+            dwg,
+            ins,
+            canvas,
+            seed=seed,
+            color=color,
+            opacity=opacity,
+            wild=wild,
+            support=support,
+            pattern_id=pattern_id,
+        )
+        group.add(
+            dwg.path(
+                d=_surface_grain_carrier_path(contour),
+                fill=f"url(#{pattern_id})",
+                stroke="none",
+                class_="surface-grain-carrier-v1",
+            )
+        )
+        return group, grain_defs
     _render_surface_vectors(
         dwg,
         group,

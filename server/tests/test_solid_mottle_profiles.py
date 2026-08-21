@@ -65,13 +65,29 @@ def test_t337_non_computer_solid_has_stable_base_fill_and_calibrated_mottle():
         assert turbulence.attrib["baseFrequency"] == "0.035000"
         assert turbulence.attrib["numOctaves"] == "3"
         component = next(mottle_filter.iter(f"{SVG_NS}feFuncA"))
-        assert component.attrib["tableValues"] == "0.31 1"
+        assert component.attrib["tableValues"] == "0.310000 1"
 
         base = _classed(first, "solid-base-fill-v1")
         overlay = _classed(first, "solid-mottle-overlay-v1")
         assert len(base) == len(overlay) == 1
         assert "filter" not in base[0].attrib
         assert overlay[0].attrib["filter"] == f"url(#{filter_id})"
+
+    paired = Score.model_validate(
+        {
+            "instructions": [
+                _solid_score("pen").instructions[0].model_dump(),
+                _solid_score("pen").instructions[0].model_dump(),
+            ]
+        }
+    )
+    paired_svg = render(paired, render_seed=SEED, svg_profile="editable")
+    paired_ids = [
+        element.attrib["id"]
+        for element in _elements(paired_svg, "filter")
+        if element.attrib["id"].startswith("solid-mottle-")
+    ]
+    assert len(paired_ids) == len(set(paired_ids)) == 2
 
 
 def test_t338_non_computer_solid_compat_is_flat_and_portable():
@@ -85,11 +101,12 @@ def test_t338_non_computer_solid_compat_is_flat_and_portable():
 
 
 def test_t339_computer_keeps_its_raster_while_non_computer_drops_scanline_growth():
-    computer = _render("computer", "display")
-    hand = _render("pen", "display")
+    for profile in ("display", "editable", "compat"):
+        computer = _render("computer", profile)
+        assert _classed(computer, "fill-stroke-v1")
+        assert not _classed(computer, "solid-mottle-overlay-v1")
 
-    assert _classed(computer, "fill-stroke-v1")
-    assert not _classed(computer, "solid-mottle-overlay-v1")
+    hand = _render("pen", "display")
     assert _classed(hand, "solid-mottle-overlay-v1")
     assert not _classed(hand, "fill-stroke-v1")
     assert len(hand.encode("utf-8")) <= OLD_LARGE_SOLID_BYTES // 2

@@ -270,4 +270,4 @@ def test_t334_spec_names_the_grain_pattern_while_existing_export_seams_stay_char
 
 def test_t335_default_engine_advances_for_the_changed_grain_serialisation():
     """T-335: reference work belongs under render engine 39 after author approval."""
-    assert current_render_engine().version == "39"
+    assert current_render_engine().version == "40"

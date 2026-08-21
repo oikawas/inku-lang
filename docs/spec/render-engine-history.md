@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **40** | v2.13.46 | 935 | author checkpoint pending | — | — | — |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
 | **37** | v2.13.31 | 918 | 2026-08-16 | 597 | **12** | **585** |
@@ -420,6 +421,12 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 40 — non-computer solid becomes a mottled base fill, not scan lines (v2.13.46)
+
+**Non-computer `surface.texture="solid"` no longer grows scan lines with area.** A real base fill always remains, with a standard SVG filter mottle over it calibrated to `baseFrequency=0.035`, `numOctaves=3`, and an alpha floor of 0.31. The filter seed and ID derive deterministically from the render seed and instruction identity, so a Score, seed, and profile remain byte-identical and filter IDs do not collide within a work.
+
+**`display` and `editable` carry this standard filter.** Readers that ignore filters still retain the base fill. `editable` targets SVG-native editors and does not promise behavior in partially supporting applications. **`compat` adds neither filter nor clipPath and emits a filter-free flat vector fallback base fill.** `computer × solid` retains its periodic one-direction scan and underlay rather than moving to mottle.
 
 ## engine 39 — grain repeats tool-made marks as a tile, rather than scattering over an area (v2.13.45)
 

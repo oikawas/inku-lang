@@ -1921,11 +1921,11 @@ SVG export has three profiles:
 - `display`: the default server-rendered SVG used for web display, history,
   PNG generation, and artifact rebuilds.
 - `editable`: generated on demand from JSON Score and server-owned color catalog
-  metadata, with stable ASCII IDs and layer-like groups for Illustrator and
-  Affinity editing.
+  metadata, with stable ASCII IDs and layer-like groups for SVG-native editors.
+  Non-computer solid fills retain a real base fill and standard SVG filter mottle.
 - `compat`: generated on demand from JSON Score and server-owned color catalog
-  metadata, restricted to a defined portable subset that is filter / clip-path free.
-  Some effects may be simplified for broad compatibility.
+  metadata, restricted to a filter-free flat vector fallback in a defined portable
+  subset. Some effects may be simplified for broad compatibility.
 
 The DB stores only the `display` SVG in `history.svg`.  Editable and compatible
 SVG files are regenerated at download time rather than stored as additional DB

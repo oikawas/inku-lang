@@ -1924,7 +1924,8 @@ SVG export has three profiles:
   metadata, with stable ASCII IDs and layer-like groups for Illustrator and
   Affinity editing.
 - `compat`: generated on demand from JSON Score and server-owned color catalog
-  metadata, avoiding filters and clip paths for broader SVG compatibility.
+  metadata, restricted to a defined portable subset that is filter / clip-path free.
+  Some effects may be simplified for broad compatibility.
 
 The DB stores only the `display` SVG in `history.svg`.  Editable and compatible
 SVG files are regenerated at download time rather than stored as additional DB

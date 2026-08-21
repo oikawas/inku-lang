@@ -40,6 +40,7 @@ from .arc_geometry import (
     arc_svg_flags,
     minor_arc_delta,
 )
+from .svg_compat import validate_compat_svg
 from .stroke_engine import (
     DEFAULT_SUPPORT,
     GRAMMARS,
@@ -4420,7 +4421,10 @@ def render(
         svg = _inject_blur_filters(svg, blur_needed, blur_elems)
     if structured:
         svg = _inject_svg_document_metadata(svg, profile=profile)
-    return _apply_master_grid(svg)
+    svg = _apply_master_grid(svg)
+    if profile == "compat":
+        validate_compat_svg(svg)
+    return svg
 
 
 # The set moved to `schema.py` so coerce decides by the same one. The private

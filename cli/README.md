@@ -366,7 +366,8 @@ options:
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
   --svg-profile {display,editable,compat}
-                        SVG output profile for saved files
+                        SVG output profile for saved files; compat uses a defined portable
+                        subset (filter / clip-path free; effects may be simplified)
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
@@ -484,7 +485,8 @@ options:
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
   --svg-profile {display,editable,compat}
-                        SVG output profile for saved files
+                        SVG output profile for saved files; compat uses a defined portable
+                        subset (filter / clip-path free; effects may be simplified)
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
@@ -731,6 +733,8 @@ options:
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
   --svg-profile {display,editable,compat}
+                        SVG output profile for saved files; compat uses a defined portable
+                        subset (filter / clip-path free; effects may be simplified)
   --canvas-aspect CANVAS_ASPECT
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay

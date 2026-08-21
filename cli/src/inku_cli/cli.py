@@ -3893,7 +3893,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
-    parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files")
+    parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; compat uses a defined portable subset (filter / clip-path free; effects may be simplified)")
     parser.add_argument(
         "--input-mode",
         choices=["paint", "ddl"],
@@ -4102,7 +4102,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     render_score.add_argument("--prefix", help="output filename prefix")
     render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
-    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
+    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; compat uses a defined portable subset (filter / clip-path free; effects may be simplified)")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     render_score.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")

@@ -388,7 +388,7 @@ export const en: LangPack = {
 	svgExportCompatName: 'Compatibility',
 	svgExportCompatSub: 'portable SVG',
 	svgExportCompatUse: 'Generic SVG handoff',
-	svgExportCompatFeature: 'Regenerated from Score. Close to Editable, but prioritizes robustness across apps.',
+	svgExportCompatFeature: 'Regenerated from Score. Uses a defined portable subset; filter / clip-path free. May simplify some effects for broad compatibility.',
 	pngStandard: 'Standard',
 	pngHighRes: 'High resolution (2×)',
 	pngSquare: 'Square',

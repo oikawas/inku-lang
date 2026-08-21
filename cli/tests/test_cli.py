@@ -694,7 +694,7 @@ def test_result_with_svg_profile_regenerates_non_display_svg():
 
         def request_text(self, method, path, *, data=None, query=None, auth=True):
             self.calls.append((method, path, data, query, auth))
-            return "<svg><title>editable</title></svg>"
+            return "<svg><title>compat</title></svg>"
 
     client = FakeClient()
     result = {
@@ -703,13 +703,13 @@ def test_result_with_svg_profile_regenerates_non_display_svg():
         "render_color_catalog_id": "vivid_material",
     }
 
-    output = cli._result_with_svg_profile(client, result, svg_profile="editable", color_catalog="default")
+    output = cli._result_with_svg_profile(client, result, svg_profile="compat", color_catalog="default")
 
-    assert output["svg_profile"] == "editable"
-    assert output["svg"] == "<svg><title>editable</title></svg>"
+    assert output["svg_profile"] == "compat"
+    assert output["svg"] == "<svg><title>compat</title></svg>"
     assert client.calls[0][0:2] == ("POST", "/api/render-svg")
     assert client.calls[0][2]["catalog_id"] == "vivid_material"
-    assert client.calls[0][2]["svg_profile"] == "editable"
+    assert client.calls[0][2]["svg_profile"] == "compat"
     assert result["svg"] == "<svg><title>display</title></svg>"
 
 

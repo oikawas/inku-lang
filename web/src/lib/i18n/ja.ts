@@ -388,7 +388,7 @@ export const ja: LangPack = {
 	svgExportCompatName: '互換優先',
 	svgExportCompatSub: '汎用SVG',
 	svgExportCompatUse: '汎用SVG受け渡し',
-	svgExportCompatFeature: 'Scoreから再生成。編集用に近いが、壊れにくさを優先する。',
+	svgExportCompatFeature: 'Scoreから再生成。定義済みportable subsetに制限し、filter / clip-path を使わない。広い互換性のため一部表現を単純化することがある。',
 	pngStandard: '標準',
 	pngHighRes: '高解像度 (2×)',
 	pngSquare: '正方形',

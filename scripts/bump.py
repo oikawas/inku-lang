@@ -277,6 +277,8 @@ def main() -> int:
     parser.add_argument("--local", action="store_true",
                         help="do not ssh to the deployment host; the number then comes "
                              "from the refs and worktrees only")
+    parser.add_argument("--verbose", action="store_true",
+                        help="print every build-number source scanned by --scan-build")
     parser.add_argument("--show", action="store_true", help="print current values and exit")
     parser.add_argument("--write", action="store_true",
                         help="stamp the files; without it nothing on disk changes")
@@ -300,9 +302,20 @@ def main() -> int:
 
     if args.scan_build:
         nxt, seen, scanned = scan_build_numbers(local=args.local)
-        for source, value in sorted(seen.items(), key=lambda kv: -kv[1]):
-            print(f"  {value:>6}  {source}", file=sys.stderr)
-        print(f"next build number: {nxt} (scanned: {', '.join(scanned)})", file=sys.stderr)
+        current = nxt - 1
+        owners = sorted(source for source, value in seen.items() if value == current)
+        owner_summary = ", ".join(owners[:2])
+        if len(owners) > 2:
+            owner_summary += f", +{len(owners) - 2} more"
+        if args.verbose:
+            for source, value in sorted(seen.items(), key=lambda kv: (-kv[1], kv[0])):
+                print(f"  {value:>6}  {source}", file=sys.stderr)
+        print(
+            f"next build number: {nxt} (current max: {current}; "
+            f"owner{'s' if len(owners) != 1 else ''}: {owner_summary}; "
+            f"scanned {len(seen)} faces: {', '.join(scanned)})",
+            file=sys.stderr,
+        )
         build = str(nxt)
     elif args.build:
         build = args.build

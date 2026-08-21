@@ -7870,3 +7870,10 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **現行groundの`pattern`はsubsetへ明示許可した。** fallbackや描画変更は加えておらず、代表compat SVGは変更前後とも35,256 bytesでSHA-256一致した。render engineは38のまま。
 - **API・履歴・Web・CLIは既存のprofile伝播で同じserver実装へ到達する。** Web/CLIの保存ロジックは変えず、Web日英help、CLI help/README、日英SPECを実装した保証へ同期した。
 - **検証:** server直接検査85 passed、履歴API 1 passed、CLI 2 passed、Web伝播1 passed、ruff、`npm run check` 0 errors、`lint:i18n` 0 errors。bulk描画・外部アプリ検証・無変更componentのsuiteは行っていない。
+
+### v2.13.46 — solid塗りをmottleとprofile別fallbackへ移す（render engine 40）（Build 935、2026-08-21・[I-335]）
+
+- **computer以外の`solid`を、多数の走査線からbase fillと決定的なmottleへ置き換えた。** `display`と`editable`は標準SVG filterでむらを重ね、filterを読まない場合もbase fillが残る。
+- **`compat`はfilter-freeのflat vector fallback、`computer × solid`は従来の一方向periodic scanを維持した。** profileの用途説明をWeb、CLI、日英SPECへ同期した。
+- **render engine 40の参照はsolidの代表4件だけが変化し、既存606件は不変だった。** generatorの2回目はbyte-identical。作者はdisplay mottle、compat fallback、computer scanの3画像を受け入れた。
+- **検証:** server直接・reference検査11 passed、ruff、docs、Web check 0 errors、`lint:i18n`、CLI help/README直接検査。全suite・全摂動・Android・外部app matrix・benchmark・containerは行っていない。

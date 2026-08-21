@@ -8699,3 +8699,10 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **The existing ground `pattern` is explicitly part of the subset.** No fallback or drawing change was added: a representative compat SVG remained byte-identical at 35,256 bytes, so render engine 38 stays unchanged.
 - **API, history, Web, and CLI already reach the same server implementation through the existing profile hand-off.** Their save logic is unchanged; Web help, CLI help/README, and both specifications now state the implemented guarantee.
 - **Verification:** 85 focused server tests, one history API test, two CLI tests, one Web hand-off test, ruff, `npm run check` with zero errors, and `lint:i18n` with zero errors. Bulk rendering, external-app testing, and untouched component suites were not run.
+
+### v2.13.46 — solid fills use mottle and profile-specific fallbacks (render engine 40) (Build 935, 2026-08-21, [I-335])
+
+- **Non-computer `solid` fills move from many scan lines to a real base fill with deterministic mottle.** `display` and `editable` add the mottle with a standard SVG filter, while the base survives readers that ignore the filter.
+- **`compat` uses a filter-free flat vector fallback, and `computer × solid` keeps its existing one-direction periodic scan.** Web, CLI, and both specifications now describe the profile purposes accurately.
+- **The engine 40 reference changes only four representative solid cases; the existing 606 cases are unchanged.** A second generator run was byte-identical. The author accepted the three-image comparison of display mottle, compat fallback, and computer scan.
+- **Verification:** 11 focused server/reference tests, ruff, docs, Web check with zero errors, `lint:i18n`, and a focused CLI help/README check. Full suites, all perturbations, Android, external-app matrices, benchmarks, and containers were not run.

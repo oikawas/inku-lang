@@ -2510,12 +2510,17 @@ def test_history_svg_endpoint_keeps_display_svg_and_regenerates_editable(auth_co
 
     display = client.get(f"/api/history/{item['id']}/svg?profile=display", headers=headers)
     editable = client.get(f"/api/history/{item['id']}/svg?profile=editable", headers=headers)
+    compat = client.get(f"/api/history/{item['id']}/svg?profile=compat", headers=headers)
 
     assert display.status_code == 200
     assert display.text == "<svg><desc>stored display</desc></svg>"
     assert editable.status_code == 200
     assert "<title>inku render (editable SVG)</title>" in editable.text
     assert 'id="layer_10_content"' in editable.text
+    assert compat.status_code == 200
+    assert "<title>inku render (compat SVG)</title>" in compat.text
+    assert "<filter" not in compat.text
+    assert "clipPath" not in compat.text
 
     db.delete_items(user["id"], [item["id"]])
 

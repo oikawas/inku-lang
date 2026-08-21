@@ -16,6 +16,7 @@ from inku_server.renderer import (
     render,
 )
 from inku_server.schema import Instruction, Score
+from inku_server.svg_compat import PORTABLE_SVG_POLICY, validate_compat_svg
 
 # engine 28 appends a stratum token to the class, so the match is on the token.
 _MATERIAL_OUTLINE_ELEMENT = re.compile(
@@ -206,6 +207,43 @@ def test_render_compat_svg_is_portable_and_filter_free():
     assert 'id="mark_000_000_circle"' in svg
     assert "filter=" not in svg
     assert "<filter" not in svg
+
+
+def test_t325_compat_render_obeys_the_portable_policy_and_keeps_its_ground():
+    score = Score.model_validate(
+        {
+            "canvas": {
+                "ground": {"material": "paper", "tone": "off_white", "grain": "fine"},
+            },
+            "instructions": [
+                {
+                    "primitive": "ellipse",
+                    "center": [0.5, 0.5],
+                    "size": [0.4, 0.22],
+                    "filled": True,
+                    "surface": {"texture": "wash", "density": 0.3, "opacity": 0.45},
+                }
+            ],
+        }
+    )
+
+    assert "filter" not in PORTABLE_SVG_POLICY.attributes_by_element
+    assert "clipPath" not in PORTABLE_SVG_POLICY.attributes_by_element
+
+    compat = render(score, svg_profile="compat", render_seed=123)
+    validate_compat_svg(compat)
+
+    assert "id=\"layer_01_canvas_ground\"" in compat
+    assert "fill=\"url(#gp0)\"" in compat
+    assert "id=\"mark_000_000_ellipse\"" in compat
+    assert "<filter" not in compat
+    assert "clipPath" not in compat
+
+    # The policy is enforced only at the compat save boundary.
+    editable = render(score, svg_profile="editable", render_seed=123)
+    display = render(score, svg_profile="display", render_seed=123)
+    assert "<filter" not in editable
+    assert "<filter" in display
 
 
 def test_render_polygon_outputs_svg_polygon():

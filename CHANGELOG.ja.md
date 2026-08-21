@@ -7863,3 +7863,10 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
   計装・実機は対象外で、pentala へは送っていない。
 - **手続上の逸脱を記録する。** 段1〜5を別々の中間木に保存して各段の全走を行わず、統合木で全走した。
   最終木では全走と全摂動を完了し、受入側が差分を再審査したうえで受け入れた。
+
+### v2.13.45 — compat SVGを定義済みportable subsetで検査する（Build 934、2026-08-21・[I-332]）
+
+- **互換優先SVGの保存境界に、単一の明示allowlistとfail-closed XML checkerを置いた。** 未知のelement・attribute・namespace・外部/欠落referenceを拒否し、`filter`と`clipPath`を許可しない。
+- **現行groundの`pattern`はsubsetへ明示許可した。** fallbackや描画変更は加えておらず、代表compat SVGは変更前後とも35,256 bytesでSHA-256一致した。render engineは38のまま。
+- **API・履歴・Web・CLIは既存のprofile伝播で同じserver実装へ到達する。** Web/CLIの保存ロジックは変えず、Web日英help、CLI help/README、日英SPECを実装した保証へ同期した。
+- **検証:** server直接検査85 passed、履歴API 1 passed、CLI 2 passed、Web伝播1 passed、ruff、`npm run check` 0 errors、`lint:i18n` 0 errors。bulk描画・外部アプリ検証・無変更componentのsuiteは行っていない。

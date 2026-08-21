@@ -8692,3 +8692,10 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **A procedural deviation is recorded:** stages 1–5 were integrated before their full run rather
   than preserved as five intermediate trees. The final tree completed the full suite and every
   perturbation, and the accepting session re-reviewed the diff before accepting it.
+
+### v2.13.45 — compat SVG is checked against a defined portable subset (Build 934, 2026-08-21, [I-332])
+
+- **The compat SVG save boundary now has one explicit allowlist and a fail-closed XML checker.** Unknown elements, attributes, namespaces, and external or missing references are rejected; `filter` and `clipPath` are not allowed.
+- **The existing ground `pattern` is explicitly part of the subset.** No fallback or drawing change was added: a representative compat SVG remained byte-identical at 35,256 bytes, so render engine 38 stays unchanged.
+- **API, history, Web, and CLI already reach the same server implementation through the existing profile hand-off.** Their save logic is unchanged; Web help, CLI help/README, and both specifications now state the implemented guarantee.
+- **Verification:** 85 focused server tests, one history API test, two CLI tests, one Web hand-off test, ruff, `npm run check` with zero errors, and `lint:i18n` with zero errors. Bulk rendering, external-app testing, and untouched component suites were not run.

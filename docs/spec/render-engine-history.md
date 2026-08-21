@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
 | **37** | v2.13.31 | 918 | 2026-08-16 | 597 | **12** | **585** |
 | **36** | v2.13.27 | 914 | 2026-08-16 | 588 | **6** | **582** |
@@ -136,7 +137,7 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `38` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `39` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `20` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
@@ -419,6 +420,14 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 39 — grain repeats tool-made marks as a tile, rather than scattering over an area (v2.13.45)
+
+**`surface.texture="grain"` no longer scatters directly across the area of a closed shape.** It puts a finite set of tool-made marks into a fixed-size `<pattern>` tile and repeats it through the closed contour as a carrier path. `density` decides only logical marks in the tile, `scale` only mark size, `opacity` only pattern children, and the seed only position and jitter.
+
+**Of 606 cases, exactly the five that explicitly name grain moved; the other 601 are byte-identical to engine 38.** They are `C-display-surface-grain-pen`, `C-surface-grain-pen`, `C-surface-grain-pencil`, `E-wild-surface-grain-pen`, and `E-wild-surface-grain-pencil`. `stipple`, `paper_grain`, `aquatint`, `wash`, `hatch`, `crosshatch`, and `solid` do not move in this version.
+
+**The four tool signatures remain in the tile children.** The carrier is the closed contour with `fill="url(#pattern)"`; grain does not collapse to generic circles. The same grain structure is used across SVG profiles, with no additional `filter` or `clipPath`.
 
 ## engine 38 — a wash named on a line is a broad pale sweep (v2.13.35)
 

@@ -32,6 +32,7 @@ ENGINE_34_MANIFEST = SERVER_ROOT / "reference" / "render-engine-34" / "manifest.
 ENGINE_35_MANIFEST = SERVER_ROOT / "reference" / "render-engine-35" / "manifest.json"
 ENGINE_36_MANIFEST = SERVER_ROOT / "reference" / "render-engine-36" / "manifest.json"
 ENGINE_37_MANIFEST = SERVER_ROOT / "reference" / "render-engine-37" / "manifest.json"
+ENGINE_38_MANIFEST = SERVER_ROOT / "reference" / "render-engine-38" / "manifest.json"
 
 
 def _generator():
@@ -653,8 +654,8 @@ def test_engine_38_moves_only_its_own_new_cases() -> None:
     `case_id not in before`)。ここで測るのは「動いたのが新規 9 件と一致すること」
     だけで、その 9 件が何を描いているかの判別力は摂動が持つ。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "38" == current_render_engine().version
+    manifest = json.loads(ENGINE_38_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "38"
     assert set(manifest["changed_from_previous"]) == (
         ENGINE_38_WASH_CASES | ENGINE_38_FILTER_CASES
     )
@@ -694,6 +695,46 @@ def test_engine_38_new_cases_match_the_current_renderer() -> None:
         ), case_id
         checked += 1
     assert checked == 9
+
+
+ENGINE_39_GRAIN_CASES = frozenset(
+    {
+        "C-display-surface-grain-pen",
+        "C-surface-grain-pen",
+        "C-surface-grain-pencil",
+        "E-wild-surface-grain-pen",
+        "E-wild-surface-grain-pencil",
+    }
+)
+
+
+def test_engine_39_moves_only_the_grain_cases() -> None:
+    """Engine 39 moves exactly the five grain serialisations and preserves 601 cases."""
+    manifest = _manifest()
+    assert manifest["engine_version"] == "39" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_39_GRAIN_CASES
+    previous = json.loads(ENGINE_38_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_39_GRAIN_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 601
+
+
+def test_engine_39_grain_cases_match_the_current_renderer() -> None:
+    """The five changed records are regenerated through the bake's own call."""
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_39_GRAIN_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
+        checked += 1
+    assert checked == 5
 
 
 def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> None:

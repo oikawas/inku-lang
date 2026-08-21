@@ -818,10 +818,10 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # the two drawing paths a line has plus an arc, and a closed control -- and
     # five that reach the texture filters, which no `display` case in the
     # corpus could reach while all four of them were `pen`.
-    expected = {"A": 88, "B": 72, "C": 84, "D": 61, "E": 119, "F": 128,
+    expected = {"A": 88, "B": 72, "C": 88, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 606:
+    if actual != expected or len(cases) != 610:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

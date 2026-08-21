@@ -33,6 +33,7 @@ ENGINE_35_MANIFEST = SERVER_ROOT / "reference" / "render-engine-35" / "manifest.
 ENGINE_36_MANIFEST = SERVER_ROOT / "reference" / "render-engine-36" / "manifest.json"
 ENGINE_37_MANIFEST = SERVER_ROOT / "reference" / "render-engine-37" / "manifest.json"
 ENGINE_38_MANIFEST = SERVER_ROOT / "reference" / "render-engine-38" / "manifest.json"
+ENGINE_39_MANIFEST = SERVER_ROOT / "reference" / "render-engine-39" / "manifest.json"
 
 
 def _generator():
@@ -118,11 +119,13 @@ def test_render_reference_case_counts() -> None:
     # was zero. `drypoint` is the fifth: it is excluded from the general branch
     # by name and writes its burr filter instead, and without its own case that
     # exclusion would be a claim with nobody to test it.
-    assert len(cases) == 606
+    # Engine 40 adds four profile-boundary cases: editable/display/compat
+    # non-computer solid and a display computer control.
+    assert len(cases) == 610
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 84, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 88, "B": 72, "C": 88, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -155,7 +158,7 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         else:
             assert case["catalog_id"] is None
             assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
-        assert case["svg_profile"] in ("editable", "display")
+        assert case["svg_profile"] in ("editable", "display", "compat")
         assert isinstance(case["render_seed"], int)
         assert isinstance(case["wild"], bool)
 
@@ -180,6 +183,8 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
         "C-display-surface-bleed-pen",
         "C-display-surface-grain-pen",
         "C-display-surface-hatch-pen",
+        "C-display-surface-solid-computer",
+        "C-display-surface-solid-pen",
         "C-display-surface-wash-pen",
         "C-filter-display-brush_thick",
         "C-filter-display-chalk",
@@ -710,8 +715,8 @@ ENGINE_39_GRAIN_CASES = frozenset(
 
 def test_engine_39_moves_only_the_grain_cases() -> None:
     """Engine 39 moves exactly the five grain serialisations and preserves 601 cases."""
-    manifest = _manifest()
-    assert manifest["engine_version"] == "39" == current_render_engine().version
+    manifest = json.loads(ENGINE_39_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "39"
     assert set(manifest["changed_from_previous"]) == ENGINE_39_GRAIN_CASES
     previous = json.loads(ENGINE_38_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -735,6 +740,46 @@ def test_engine_39_grain_cases_match_the_current_renderer() -> None:
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
     assert checked == 5
+
+
+ENGINE_40_SOLID_PROFILE_CASES = frozenset(
+    {
+        "C-surface-solid-pen",
+        "C-display-surface-solid-pen",
+        "C-compat-surface-solid-pen",
+        "C-display-surface-solid-computer",
+    }
+)
+
+
+def test_engine_40_moves_only_the_solid_profile_cases() -> None:
+    """Engine 40 adds four solid-profile cases and preserves all 606 prior cases."""
+    manifest = _manifest()
+    assert manifest["engine_version"] == "40" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_40_SOLID_PROFILE_CASES
+    previous = json.loads(ENGINE_39_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_40_SOLID_PROFILE_CASES:
+            assert case_id not in previous, case_id
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 606
+
+
+def test_engine_40_solid_profile_cases_match_the_current_renderer() -> None:
+    """The four new mottle/fallback boundary records redraw through the bake call."""
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_40_SOLID_PROFILE_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
+        checked += 1
+    assert checked == 4
 
 
 def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> None:

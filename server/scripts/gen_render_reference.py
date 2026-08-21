@@ -35,13 +35,11 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-21"
 REASON = (
-    "grain is no longer scattered directly across each destination. It is a finite "
-    "tool-made pattern tile carried by the closed contour, so density decides logical "
-    "tile marks, scale decides mark size, opacity stays on the pattern children, and "
-    "the seed decides placement and jitter. Engine 39 changes exactly the five frozen "
-    "grain cases: C-display-surface-grain-pen, C-surface-grain-pen, "
-    "C-surface-grain-pencil, E-wild-surface-grain-pen, and "
-    "E-wild-surface-grain-pencil. The other 601 cases are byte-identical to engine 38."
+    "Non-computer solid surfaces now keep a real base fill and use a deterministic "
+    "standard SVG mottle filter in editable and display output. Compat keeps a "
+    "filter-free flat vector base fill, and computer keeps its periodic scan. Engine 40 "
+    "adds the four direct cases C-surface-solid-pen, C-display-surface-solid-pen, "
+    "C-compat-surface-solid-pen, and C-display-surface-solid-computer."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -290,6 +288,25 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         _case(cases, f"C-display-surface-{texture}-pen",
               _instruction("square", weight="pen", filled=False, surface=surface),
               svg_profile="display")
+
+    # Engine 40: the three profiles must each carry their actual solid boundary,
+    # and the periodic grammar must stay on the computer's scan path. This is
+    # the smallest set that distinguishes editable/display mottle, compat's
+    # filter-free fallback, and the machine control without a tool/shape matrix.
+    for case_id, tool, svg_profile in (
+        ("C-surface-solid-pen", "pen", SVG_PROFILE),
+        ("C-display-surface-solid-pen", "pen", "display"),
+        ("C-compat-surface-solid-pen", "pen", "compat"),
+        ("C-display-surface-solid-computer", "computer", "display"),
+    ):
+        solid = copy.deepcopy(BASE_SURFACE)
+        solid["texture"] = "solid"
+        _case(
+            cases,
+            case_id,
+            _instruction("square", weight=tool, filled=True, surface=solid),
+            svg_profile=svg_profile,
+        )
 
     # Read from the enum rather than listed here: a support added to the schema
     # and not to this list would be a value the frozen record never holds, and

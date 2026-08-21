@@ -628,6 +628,37 @@ def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
     return "".join(parts)
 
 
+SOLID_MOTTLE_BASE_FREQUENCY = 0.035
+SOLID_MOTTLE_NUM_OCTAVES = 3
+SOLID_MOTTLE_ALPHA_FLOOR = 0.31
+SOLID_MOTTLE_OVERLAY_OPACITY = 0.22
+
+
+def _solid_mottle_filter_id(
+    ins: Instruction, render_seed: int | None, ins_idx: int, mark_idx: int
+) -> tuple[str, int]:
+    """A per-mark deterministic filter ID and seed, never a shared literal."""
+    instruction_seed = _seed_for_instruction(ins, render_seed)
+    identity = f"{instruction_seed}:{ins_idx}:{mark_idx}:solid-mottle".encode("utf-8")
+    seed = struct.unpack("<I", hashlib.sha256(identity).digest()[:4])[0]
+    return _safe_svg_id(f"solid-mottle-{ins_idx:03d}-{mark_idx:03d}-{seed:08x}"), seed
+
+
+def _solid_mottle_filter_xml(filter_id: str, seed: int) -> str:
+    """A standard filter whose alpha is a calibrated, deterministic mottle."""
+    return (
+        f'<filter id="{filter_id}" x="-2%" y="-2%" width="104%" height="104%" '
+        'color-interpolation-filters="sRGB">'
+        f'<feTurbulence type="fractalNoise" baseFrequency="{fmt(SOLID_MOTTLE_BASE_FREQUENCY)}" '
+        f'numOctaves="{SOLID_MOTTLE_NUM_OCTAVES}" seed="{seed}" result="solidMottleNoise"/>'
+        '<feColorMatrix in="solidMottleNoise" type="luminanceToAlpha" result="solidMottleAlpha"/>'
+        f'<feComponentTransfer in="solidMottleAlpha" result="solidMottleFloor"><feFuncA type="table" '
+        f'tableValues="{SOLID_MOTTLE_ALPHA_FLOOR} 1"/></feComponentTransfer>'
+        '<feComposite in="SourceGraphic" in2="solidMottleFloor" operator="in"/>'
+        "</filter>"
+    )
+
+
 _VARIATION_SEED_FIELDS_ALL = frozenset(
     {"amplitude", "frequency", "quality", "dimensions"}
 )
@@ -4407,6 +4438,7 @@ def render(
         dwg, score, canvas, bg, profile=profile, render_seed=render_seed
     )
     surface_filter_xml: list[str] = []
+    solid_mottle_filter_xml: list[str] = []
     performance_filter_xml: str | None = None
     if structured:
         artboard = dwg.g(id="inku_artboard")
@@ -4472,6 +4504,17 @@ def render(
             dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
         )
         for mark_idx, single in enumerate(expanded):
+            solid_mottle_id: str | None = None
+            if (
+                profile != "compat"
+                and _is_noncomputer_solid_fill(single)
+            ):
+                solid_mottle_id, solid_mottle_seed = _solid_mottle_filter_id(
+                    single, render_seed, ins_idx, mark_idx
+                )
+                solid_mottle_filter_xml.append(
+                    _solid_mottle_filter_xml(solid_mottle_id, solid_mottle_seed)
+                )
             element = _render_instruction(
                 dwg,
                 single,
@@ -4479,6 +4522,7 @@ def render(
                 canvas,
                 work_assignment=work_assignment,
                 use_filters=use_filters,
+                solid_mottle_filter_id=solid_mottle_id,
                 render_seed=render_seed,
                 ins_idx=ins_idx,
                 mark_idx=mark_idx,
@@ -4548,10 +4592,11 @@ def render(
     else:
         dwg.add(content)
     svg = dwg.tostring()
-    if ground_defs_xml or surface_filter_xml or performance_filter_xml:
+    if ground_defs_xml or surface_filter_xml or solid_mottle_filter_xml or performance_filter_xml:
         extra_defs_xml = (
             (ground_defs_xml or "")
             + "".join(surface_filter_xml)
+            + "".join(solid_mottle_filter_xml)
             + (performance_filter_xml or "")
         )
         if "<defs />" in svg:
@@ -6893,6 +6938,50 @@ def _fill_underlay(dwg: svgwrite.Drawing, ins: Instruction, contour, attrs, tone
     return group
 
 
+def _is_noncomputer_solid_fill(ins: Instruction) -> bool:
+    return (
+        _fills_interior(ins)
+        and ins.surface is not None
+        and ins.surface.texture == "solid"
+        and not GRAMMARS[ins.weight].periodic
+    )
+
+
+def _render_solid_mottle_fill(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    mottle_filter_id: str | None,
+):
+    """A real base fill, with a filter overlay only where the profile permits it."""
+    opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    color = attrs.get("stroke", "#111111")
+    path_d = polygon_path(tuple(contour))
+    group = dwg.g(class_="solid-fill-v1")
+    group.add(
+        dwg.path(
+            d=path_d,
+            class_="solid-base-fill-v1",
+            fill=color,
+            fill_opacity=opacity,
+            stroke="none",
+        )
+    )
+    if mottle_filter_id is not None:
+        group.add(
+            dwg.path(
+                d=path_d,
+                class_="solid-mottle-overlay-v1",
+                fill=color,
+                fill_opacity=opacity * SOLID_MOTTLE_OVERLAY_OPACITY,
+                stroke="none",
+                filter=f"url(#{mottle_filter_id})",
+            )
+        )
+    return group
+
+
 def _fill_stroke_seed(seed: int, index: int) -> int:
     """筆ごとの seed。輪郭帯と共有すると同じ energy 波形が内部にも出る。"""
     digest = hashlib.sha256(f"{seed}:fill-stroke:{index}".encode("utf-8")).digest()
@@ -7452,6 +7541,7 @@ def _interior_fill(
     render_seed: int | None,
     *,
     use_filters: bool,
+    solid_mottle_filter_id: str | None = None,
     support: Support,
     wild: bool = False,
 ) -> tuple[object | None, bool]:
@@ -7475,6 +7565,10 @@ def _interior_fill(
     """
     if not _fills_interior(ins):
         return None, False
+    if _is_noncomputer_solid_fill(ins):
+        return _render_solid_mottle_fill(
+            dwg, ins, contour, attrs, solid_mottle_filter_id
+        ), False
     if not _uses_hand_stroke(ins.weight):
         return None, True
     if len(contour) < 3:
@@ -7725,6 +7819,7 @@ def _render_corner_shape(
     render_seed: int | None,
     *,
     use_filters: bool,
+    solid_mottle_filter_id: str | None = None,
     support: Support,
     wild: bool = False,
 ):
@@ -7739,9 +7834,38 @@ def _render_corner_shape(
     )
     points = contour if varied else corners
     if not _uses_hand_stroke(ins.weight):
-        return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+        if not _is_noncomputer_solid_fill(ins):
+            return _apply_rotation(dwg.polygon(points=points, **attrs), ins, canvas)
+        fill_group, _ = _interior_fill(
+            dwg,
+            ins,
+            points,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
+            support=support,
+            wild=wild,
+        )
+        body_attrs = _copy_attrs(attrs)
+        body_attrs["fill"] = "none"
+        body_attrs.pop("fill_opacity", None)
+        group = dwg.g()
+        group.add(dwg.polygon(points=points, **body_attrs))
+        assert fill_group is not None
+        group.add(fill_group)
+        return _apply_rotation(group, ins, canvas)
     fill_group, region_fill = _interior_fill(
-        dwg, ins, points, attrs, canvas, render_seed, use_filters=use_filters, wild=wild,
+        dwg,
+        ins,
+        points,
+        attrs,
+        canvas,
+        render_seed,
+        use_filters=use_filters,
+        solid_mottle_filter_id=solid_mottle_filter_id,
+        wild=wild,
         support=support,
     )
     body_attrs = _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
@@ -7791,6 +7915,7 @@ def _render_instruction(
     *,
     work_assignment: dict[str, str] | None = None,
     use_filters: bool = True,
+    solid_mottle_filter_id: str | None = None,
     support: Support,
     render_seed: int | None = None,
     ins_idx: int = 0,
@@ -7865,13 +7990,18 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
             if hand
-            else attrs
+            else (
+                _body_attrs_for_contour_stroke(attrs, ins, region_fill=True)
+                if fill_group is not None
+                else attrs
+            )
         )
         if varied:
             element = dwg.polygon(points=contour, **body_attrs)
@@ -7956,13 +8086,18 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
             if hand
-            else attrs
+            else (
+                _body_attrs_for_contour_stroke(attrs, ins, region_fill=True)
+                if fill_group is not None
+                else attrs
+            )
         )
         if varied:
             element = dwg.polygon(points=contour, **body_attrs)
@@ -8032,6 +8167,7 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )
@@ -8112,13 +8248,18 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )
         body_attrs = (
             _body_attrs_for_contour_stroke(attrs, ins, region_fill=region_fill)
             if hand
-            else attrs
+            else (
+                _body_attrs_for_contour_stroke(attrs, ins, region_fill=True)
+                if fill_group is not None
+                else attrs
+            )
         )
         if varied:
             element = dwg.polygon(points=contour, **body_attrs)
@@ -8183,6 +8324,7 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )
@@ -8200,6 +8342,7 @@ def _render_instruction(
             canvas,
             render_seed,
             use_filters=use_filters,
+            solid_mottle_filter_id=solid_mottle_filter_id,
             wild=wild,
             support=support,
         )

@@ -1235,8 +1235,8 @@ Score の coerce 層は、現行の既定エンジンが使う**描画中核の�
 SVG の書き出しは 3 つのプロファイルを持つ。
 
 - `display`: 既定のサーバー描画 SVG。Web 表示・履歴・PNG 生成・作品の再構築に使う
-- `editable`: JSON Score とサーバー所有の色カタログメタデータから要求に応じて生成する。Illustrator と Affinity での編集のため、安定した ASCII の ID とレイヤー相当のグループを持つ
-- `compat`: 同じく要求に応じて生成し、定義済みportable subsetに制限する。filter と clip-path を使わず、広い互換性のため一部表現を単純化することがある
+- `editable`: JSON Score とサーバー所有の色カタログメタデータから要求に応じて生成する。SVG-native editor での編集に向け、安定した ASCII の ID とレイヤー相当のグループを持つ。non-computer の solid fill は実体の base fill と standard SVG filter のむらを保つ
+- `compat`: 同じく要求に応じて生成し、定義済みportable subsetに制限する。filter と clip-path を使わない filter-free flat vector fallback で、広い互換性のため一部表現を単純化することがある
 
 DB が保存するのは `history.svg` の `display` SVG だけである。編集可能 SVG と互換 SVG は、DB の追加ペイロードとして保存するのではなく**ダウンロード時に生成し直す**。
 

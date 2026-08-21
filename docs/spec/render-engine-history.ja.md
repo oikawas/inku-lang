@@ -49,6 +49,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 
 | 版 | 製品版数 | Build | 凍結日 | ケース | 動いた | 不変 |
 |---|---|---|---|---|---|---|
+| **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
 | **37** | v2.13.31 | 918 | 2026-08-16 | 597 | **12** | **585** |
 | **36** | v2.13.27 | 914 | 2026-08-16 | 588 | **6** | **582** |
@@ -124,7 +125,7 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 
 | 名前 | 何の版か | 現在 | 上げる条件 |
 |---|---|---|---|
-| `render_engine_version` | 描画エンジン | `38` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
+| `render_engine_version` | 描画エンジン | `39` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
 | `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `20` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
@@ -329,6 +330,14 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
+
+## engine 39 — 粒は面積へ散らさず、道具の痕を版として繰り返す（v2.13.45）
+
+**`surface.texture="grain"` は閉図形の面積へ直接散布するのをやめ、固定寸法の `<pattern>` tile に有限の道具痕を置いて、閉輪郭を carrier path として反復参照する。** `density` は tile 内の論理粒数だけ、`scale` は粒の大きさだけ、`opacity` は pattern child だけ、seed は位置と jitter だけを決める。
+
+**606 件のうち動いたのは grain を明示する 5 件だけで、残る 601 件は engine 38 と byte-identical である。** 対象は `C-display-surface-grain-pen`、`C-surface-grain-pen`、`C-surface-grain-pencil`、`E-wild-surface-grain-pen`、`E-wild-surface-grain-pencil`。`stipple`、`paper_grain`、`aquatint`、`wash`、`hatch`、`crosshatch`、`solid` はこの版で変わらない。
+
+**4種類の道具 signature は tile の子要素にも残る。** carrier は `fill="url(#pattern)"` の閉輪郭であり、粒を generic circle に縮退させない。SVG profile 間で同じ grain 構造を使い、追加の `filter` / `clipPath` を必要としない。
 
 ## engine 38 — 線に付いた薄墨は、太くて淡い掃きである（v2.13.35）
 

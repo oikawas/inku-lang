@@ -2585,7 +2585,9 @@ Complete coverage is not attempted — the grain of the paper is left showing.
 rotring keeps a region fill, and shapes too small for three scan lines degrade to
 a region fill. When `surface` is given, no material fill is produced (a fill is
 the material's default way of filling; `surface` is an explicit printmaking
-expression). **⚠ v2.13.20 (ddl engine 18) added one exception**: `surface.texture="solid"`
+expression).
+
+**`surface.texture="grain"` defines a finite set of tool-made marks in a `<pattern>` tile and repeats it through the closed contour itself as the carrier path.** Logical mark count depends only on density and the fixed tile; destination area decides only how often that definition repeats. It adds neither a `filter` nor a `clipPath`, so all three SVG profiles carry the same grain structure. **⚠ v2.13.20 (ddl engine 18) added one exception**: `surface.texture="solid"`
 names the material's default way of filling itself, so it goes to the fill layer
 rather than the printmaking layer. All nine *omote* quality words are now values
 of `surface.texture`, and the asymmetry where only a fill went to `filled` is

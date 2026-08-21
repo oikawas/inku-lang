@@ -19,7 +19,7 @@ from ... import thumbs_db as _thumbs_db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _capture_history_coerce_observability, _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -383,11 +383,20 @@ def api_history_post(
     try:
         # Site 2 of 5.
         limits = _effective_limits()
+        pre_coerce_score = Score.model_validate(body.score)
+        coerce_observability = _capture_history_coerce_observability(
+            pre_coerce_score,
+            ddl=None,
+            lang=body.instruction_lang_resolved,
+            auto_repair=True,
+            include_trace=False,
+        )
         with using_limits(limits):
             score = coerce_score(
-                Score.model_validate(body.score),
+                pre_coerce_score,
                 limits=limits,
                 lang=body.instruction_lang_resolved,
+                trace=coerce_observability,
             )
         catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
@@ -456,6 +465,7 @@ def api_history_post(
         # says nothing still gets a state: leaving NULL here would record every
         # work this endpoint saves as older than the column.
         sketch_state=body.sketch_state or _derived_sketch_state(body),
+        coerce_observability=coerce_observability.persistable(),
     )
     if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:

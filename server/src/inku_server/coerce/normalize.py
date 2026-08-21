@@ -19,11 +19,25 @@ from ..schema import (
 
 
 def _coerce_marker_values(name: str) -> tuple[Any, ...]:
+    """Keep only input marker leaves observable without changing table shapes."""
+    from .observability import marker_token
+
     values: list[Any] = []
-    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+    for language, support in INSTRUCTION_LANGUAGE_REGISTRY.items():
         language_values = support.coerce_markers.get(name, ())
-        if isinstance(language_values, tuple):
-            values.extend(language_values)
+        if not isinstance(language_values, tuple):
+            continue
+        for value in language_values:
+            if isinstance(value, str):
+                values.append(marker_token(value, system=name, language=language))
+            elif isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], tuple):
+                markers, output = value
+                values.append((
+                    tuple(marker_token(marker, system=name, language=language) for marker in markers),
+                    output,
+                ))
+            else:
+                values.append(value)
     return tuple(values)
 
 

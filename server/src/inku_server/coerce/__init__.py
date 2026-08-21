@@ -60,6 +60,26 @@ __all__ = [
 enforce_hard_ceiling = _enforce_hard_ceiling
 
 
+COERCE_BRANCH_ORDER = (
+    "coerce_instruction", "with_background_dominance_governor",
+    "coerce_and_repair_instruction", "with_surface_on_a_closed_shape",
+    "without_spontaneous_grid", "dedupe_instructions", "with_ddl_coverage",
+    "with_color_delivery_repair", "with_primary_color_delivery",
+    "with_shape_delivery_repair", "with_complex_motif_repair",
+    "with_structural_duplicate_repair", "presence_from_ddl",
+    "with_presence_auxiliary_shape_repair",
+    "with_unintentional_filled_shape_tempering", "with_context_density_governor",
+    "with_motion_energy", "with_rhythm_variation", "with_repetition_event_variation",
+    "with_crescent_sensory_suppression", "with_ma_pressure",
+    "with_semantic_visual_event_hints", "with_visual_event_type_hints",
+    "with_existing_event_counterweight", "with_per_instruction_density_budget",
+    "with_total_density_budget", "with_explicit_constraint_enforcement",
+    "with_stated_count_fidelity", "with_literal_grid_fidelity",
+    "drop_invalid_relations", "without_explicit_region_support",
+    "with_fill_as_a_surface_word", "without_unrequested_color_cycle",
+)
+
+
 def _folded_of_unrequested_color_cycle(
     instructions: list[Instruction],
     *,
@@ -101,7 +121,7 @@ def _folded_of_the_two_ways_to_say_a_fill(
     return folded
 
 
-def coerce_score(
+def _coerce_score(
     score: Score,
     *,
     ddl: str | None = None,
@@ -326,3 +346,42 @@ def coerce_score(
     # Last word. Every governor above has had its say; nothing after this may
     # grow a count back, which is why it sits at the exit and not beside them.
     return _enforce_hard_ceiling(Score.model_validate(data), limits, limit_notes)
+
+
+def coerce_score(
+    score: Score,
+    *,
+    ddl: str | None = None,
+    branch_report: dict[str, int] | None = None,
+    limits: Limits = DEFAULT_LIMITS,
+    limit_notes: list[str] | None = None,
+    lang: str | None = None,
+    trace: object | None = None,
+) -> Score:
+    """Run coerce with optional internal observation of actual input matches."""
+    if trace is None:
+        return _coerce_score(
+            score,
+            ddl=ddl,
+            branch_report=branch_report,
+            limits=limits,
+            limit_notes=limit_notes,
+            lang=lang,
+        )
+    if branch_report is None:
+        branch_report = {}
+    with trace.activate():
+        result = _coerce_score(
+            score,
+            ddl=ddl,
+            branch_report=branch_report,
+            limits=limits,
+            limit_notes=limit_notes,
+            lang=lang,
+        )
+    trace.finish(
+        result.model_dump(mode="json", by_alias=True),
+        branch_report,
+        disabled=_style_coerce_disabled(),
+    )
+    return result

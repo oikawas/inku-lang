@@ -325,13 +325,14 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     for case in generator.build_expand_inputs().values():
         assert set(case) == expand_fields
 
-    # `branch_report` and `limit_notes` are out-parameters and `limits` is the
-    # injection seam the settings contract writes through -- none of the three
-    # describes a case, so none belongs in a per-case input record.
+    # `branch_report` and `limit_notes` are out-parameters; `limits` and the
+    # optional internal `trace` are injection seams. None describes a reference
+    # case, so none belongs in a per-case input record.
     coerce_fields = set(inspect.signature(coerce_score).parameters) - {
         "branch_report",
         "limits",
         "limit_notes",
+        "trace",
     }
     for case in generator.build_coerce_inputs().values():
         assert set(case) == coerce_fields

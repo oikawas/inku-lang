@@ -198,6 +198,17 @@ class HistoryRow(Base):
     history_visibility = Column(String, nullable=False, default="normal", index=True)
     lineage_node_id = Column(String, nullable=True, unique=True, index=True)
     idempotency_key = Column(String, nullable=True)
+    score_pre_coerce = Column(Text, nullable=True)
+    coerce_trace_version = Column(Integer, nullable=True)
+    coerce_catalog_digest = Column(String, nullable=True)
+    coerce_trace = Column(Text, nullable=True)
+
+
+class CoerceTraceCatalogRow(Base):
+    __tablename__ = "coerce_trace_catalogs"
+    digest = Column(String, primary_key=True)
+    trace_version = Column(Integer, nullable=False)
+    snapshot_json = Column(Text, nullable=False)
 
 
 class LineageNodeRow(Base):
@@ -469,6 +480,10 @@ _HISTORY_COLUMN_MIGRATIONS = {
     # Same rule as sketch_state: no DEFAULT and no backfill. Filling old rows
     # with today's defaults would claim a configuration nobody recorded.
     "render_limits": "ALTER TABLE history ADD COLUMN render_limits TEXT",
+    "score_pre_coerce": "ALTER TABLE history ADD COLUMN score_pre_coerce TEXT",
+    "coerce_trace_version": "ALTER TABLE history ADD COLUMN coerce_trace_version INTEGER",
+    "coerce_catalog_digest": "ALTER TABLE history ADD COLUMN coerce_catalog_digest VARCHAR",
+    "coerce_trace": "ALTER TABLE history ADD COLUMN coerce_trace TEXT",
 }
 _LINEAGE_NODE_COLUMN_MIGRATIONS = {
     "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
@@ -684,6 +699,10 @@ def init_db() -> None:
 
 def _migrate_columns() -> None:
     with engine.begin() as conn:
+        try:
+            CoerceTraceCatalogRow.__table__.create(bind=conn, checkfirst=True)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("failed to create coerce trace catalog table") from exc
         try:
             inspector = inspect(conn)
             existing_history_columns = {col["name"] for col in inspector.get_columns("history")}
@@ -2949,6 +2968,9 @@ def add_item(item: dict) -> dict:
         # writing the group here would make "closed" and "open to my own group"
         # look the same in the table.
         render_hash=render_hash, trashed=0, starred=0, for_revision=0, for_share=0, note=item.get("note"),
+        score_pre_coerce=json.dumps(item.get("score_pre_coerce"), ensure_ascii=False) if item.get("score_pre_coerce") is not None else None,
+        coerce_trace_version=item.get("coerce_trace_version"), coerce_catalog_digest=item.get("coerce_catalog_digest"),
+        coerce_trace=json.dumps(item.get("coerce_trace"), ensure_ascii=False) if item.get("coerce_trace") is not None else None,
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
         description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
@@ -2981,6 +3003,28 @@ def add_item(item: dict) -> dict:
                 raise ValueError("lineage parent not found")
             node.root_node_id = parent.root_node_id or parent.id
         row.idempotency_key = idempotency_key
+        if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
+            digest = item["coerce_catalog_digest"]
+            trace_version = item.get("coerce_trace_version") or 1
+            snapshot_json = json.dumps(
+                item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
+            )
+            if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
+                raise ValueError("coerce catalog digest does not match its snapshot bytes")
+            catalog = session.get(CoerceTraceCatalogRow, digest)
+            if catalog is None:
+                session.add(
+                    CoerceTraceCatalogRow(
+                        digest=digest,
+                        trace_version=trace_version,
+                        snapshot_json=snapshot_json,
+                    )
+                )
+            elif (
+                catalog.trace_version != trace_version
+                or catalog.snapshot_json != snapshot_json
+            ):
+                raise ValueError("coerce catalog digest does not match its immutable snapshot")
         session.add(row)
         session.add(node)
         # SQLite foreign-key enforcement requires the new child node to exist

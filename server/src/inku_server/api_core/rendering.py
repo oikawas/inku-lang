@@ -575,6 +575,23 @@ def compose_fallback_value(*, fallback_used: bool, reasons: list[str] | None) ->
     return "stage2_fallback"
 
 
+def _capture_history_coerce_observability(
+    score: Score,
+    *,
+    ddl: str | None,
+    lang: str | None,
+    auto_repair: bool,
+    include_trace: bool,
+):
+    """Create a private capture independent of the public trace response flag."""
+    from ..coerce.observability import capture_context
+
+    trace = capture_context(score, ddl=ddl, lang=lang)
+    if not auto_repair:
+        trace.mark_not_executed("auto_repair_off")
+    return trace
+
+
 def _add_history_item(
     *,
     actor: dict,
@@ -607,6 +624,7 @@ def _add_history_item(
     sketch_text: str | None = None,
     sketch_grain: str | None = None,
     sketch_state: str | None = None,
+    coerce_observability: dict | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -657,6 +675,15 @@ def _add_history_item(
 "sketch_text": sketch_text,
 "sketch_grain": sketch_grain,
 "sketch_state": sketch_state,
+"score_pre_coerce": (coerce_observability or {}).get("score_pre_coerce"),
+"coerce_trace_version": (coerce_observability or {}).get("trace_version"),
+"coerce_catalog_digest": (coerce_observability or {}).get("catalog_digest"),
+"coerce_trace": {
+    key: value
+    for key, value in (coerce_observability or {}).items()
+    if key not in {"score_pre_coerce", "trace_version", "catalog_digest", "catalog_snapshot"}
+} if coerce_observability else None,
+"coerce_catalog_snapshot": (coerce_observability or {}).get("catalog_snapshot"),
 **metadata,
     })
     except ValueError as exc:

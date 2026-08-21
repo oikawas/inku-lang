@@ -47,6 +47,7 @@ from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
 from ..rendering import COLOR_CATALOG_ID_HEADER, COLOR_SOURCE_HEADER, LIMITS_SOURCE_HEADER, compose_fallback_value, _color_render_metadata, _effective_limits, _limits_for_render, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude, _work_for_color_snapshot
+from ..rendering import _capture_history_coerce_observability
 from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
@@ -1992,6 +1993,17 @@ def _paint_events(
         raise _stage_http_error("compose", 502) from e
 
     ddl = compose_detail.ddl
+    coerce_observability = (
+        _capture_history_coerce_observability(
+            compose_detail.score,
+            ddl=ddl,
+            lang=instruction_lang_resolved,
+            auto_repair=req.auto_repair,
+            include_trace=req.include_trace,
+        )
+        if req.save_history
+        else None
+    )
     # trace: capture the pre-coerce Score before any coerce/ensure mutation.
     score_pre_coerce_dump = (
         compose_detail.score.model_dump(mode="json", by_alias=True)
@@ -2016,6 +2028,7 @@ def _paint_events(
                     ddl=ddl,
                     limits=limits,
                     lang=instruction_lang_resolved,
+                    trace=coerce_observability,
                 )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
@@ -2160,6 +2173,11 @@ def _paint_events(
             sketch_text=stored_sketch_text,
             sketch_grain=stored_sketch_grain,
             sketch_state=sketch_state,
+            coerce_observability=(
+                coerce_observability.persistable()
+                if coerce_observability is not None
+                else None
+            ),
         )
         history_id = item["id"]
         idempotent_replay = bool(item.get("_idempotent_replay"))

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {"catalog_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "trace": {"complete": true, "executed": true, "disabled": false, "marker_events": [{"marker": "night", "system": "night", "language": "en", "decision_site": "background", "match_mode": "word"}, {"marker": "night", "system": "edge_light", "language": "en", "decision_site": "edge", "match_mode": "word"}], "branch_events": [{"branch": "with_background_dominance_governor", "change_count": 1, "changed_fields": [{"path": "/background", "effect": "replace"}]}]}},
+    {"catalog_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "trace": {"complete": false, "executed": false, "disabled": false, "failure_stage": "catalog", "reason_class": "capture_error"}},
+    {"catalog_digest": null, "trace": null},
+    {"catalog_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "trace": {"complete": true, "executed": false, "disabled": true, "marker_events": [], "branch_events": []}}
+  ],
+  "simulation": {"work_count": 3486, "catalog_versions": 2, "pre_score_average_bytes": 3140, "sqlite_growth_bytes": 20971520, "average_bytes_per_work": 6144}
+}

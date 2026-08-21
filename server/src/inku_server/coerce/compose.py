@@ -48,14 +48,29 @@ from .normalize import (
 """
 
 
+def _direct_marker_values(system: str, markers: tuple[str, ...]) -> tuple[str, ...]:
+    """Register compose-local author-input literals without changing their values."""
+    from .observability import marker_token
+
+    return tuple(
+        marker_token(marker, system=system, language="en" if marker.isascii() else "ja")
+        for marker in markers
+    )
+
+
 def _coerce_marker_dict(name: str) -> dict[str, tuple[str, ...]]:
+    from .observability import marker_token
+
     merged: dict[str, list[str]] = {}
-    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
+    for language, support in INSTRUCTION_LANGUAGE_REGISTRY.items():
         language_values = support.coerce_markers.get(name, {})
         if not isinstance(language_values, dict):
             continue
         for key, markers in language_values.items():
-            merged.setdefault(str(key), []).extend(str(marker) for marker in markers)
+            merged.setdefault(str(key), []).extend(
+                marker_token(str(marker), system=name, language=language)
+                for marker in markers
+            )
     return {key: tuple(markers) for key, markers in merged.items()}
 
 
@@ -121,16 +136,74 @@ MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("color_markers")
 
+POLYCHROME_CLAUSE_MARKERS = _direct_marker_values(
+    "direct.polychrome_clause",
+    ("色とりどり", "多色", "colorful", "multi-color"),
+)
+BAMBOO_GREEN_MARKERS = _direct_marker_values(
+    "direct.bamboo_green", ("竹", "bamboo")
+)
 
-def _marker_in_text(marker: str, text: str, lower: str) -> bool:
+
+def _marker_in_text(
+    marker: str, text: str, lower: str, *, decision_site: str | None = None
+) -> bool:
+    from .observability import record_marker_match
+
     marker_lower = marker.lower()
     if marker.isascii() and any(ch.isalpha() for ch in marker):
-        return re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower) is not None
-    return marker in text or marker_lower in lower
+        return record_marker_match(
+            marker,
+            re.search(rf"(?<![a-z]){re.escape(marker_lower)}(?![a-z])", lower)
+            is not None,
+            match_mode="word",
+            decision_site=decision_site,
+        )
+    return record_marker_match(
+        marker,
+        marker in text or marker_lower in lower,
+        match_mode="substring",
+        decision_site=decision_site,
+    )
 
 
-def _any_marker_in_text(markers: tuple[str, ...], text: str, lower: str) -> bool:
-    return any(_marker_in_text(marker, text, lower) for marker in markers)
+def _any_marker_in_text(
+    markers: tuple[str, ...], text: str, lower: str, *, decision_site: str | None = None
+) -> bool:
+    return any(
+        _marker_in_text(marker, text, lower, decision_site=decision_site)
+        for marker in markers
+    )
+
+
+def _observed_direct_raw(
+    markers: tuple[str, ...], text: str, lower: str, *, decision_site: str
+) -> bool:
+    return _observed_raw_any(markers, text, lower, decision_site=decision_site)
+
+
+def _observed_raw_any(
+    markers: tuple[str, ...],
+    text: str,
+    lower: str,
+    *,
+    decision_site: str,
+    text_match: bool = True,
+    lower_match: bool = True,
+    lower_marker: bool = False,
+) -> bool:
+    from .observability import record_marker_match
+
+    return any(
+        record_marker_match(
+            marker,
+            (text_match and marker in text)
+            or (lower_match and (marker.lower() if lower_marker else marker) in lower),
+            match_mode="raw-substring",
+            decision_site=decision_site,
+        )
+        for marker in markers
+    )
 
 
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = _coerce_marker_dict("negated_color_markers")
@@ -147,7 +220,7 @@ def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
         return ins
     lower = ddl.lower()
     for markers, weight in MATERIAL_WEIGHT_HINTS:
-        if any(marker.lower() in lower for marker in markers):
+        if _observed_raw_any(markers, ddl, lower, decision_site="coerce.compose._with_material_hint.material_weight_hints", text_match=False, lower_marker=True):
             data = ins.model_dump(by_alias=True)
             data["weight"] = weight
             note = f"material inferred from DDL: {weight}"
@@ -161,21 +234,21 @@ def _with_variation_hint(ins: Instruction, ddl: str | None) -> Instruction:
         return ins
     lower = ddl.lower()
     variation: dict[str, object] | None = None
-    if any(marker in ddl or marker in lower for marker in VARIATION_SLOW_WAVE_MARKERS):
+    if _observed_raw_any(VARIATION_SLOW_WAVE_MARKERS, ddl, lower, decision_site="coerce.compose._with_variation_hint.variation_slow_wave"):
         variation = {
             "amplitude": "medium",
             "frequency": "slow",
             "quality": "wave",
             "dimensions": ["position_x", "position_y"],
         }
-    elif any(marker in ddl or marker in lower for marker in VARIATION_FINE_TREMBLE_MARKERS):
+    elif _observed_raw_any(VARIATION_FINE_TREMBLE_MARKERS, ddl, lower, decision_site="coerce.compose._with_variation_hint.variation_fine_tremble"):
         variation = {
             "amplitude": "fine",
             "frequency": "medium",
             "quality": "perlin",
             "dimensions": ["position_y"] if ins.primitive == "line" else ["position_x", "position_y"],
         }
-    elif any(marker in ddl or marker in lower for marker in VARIATION_BLURRED_EDGE_MARKERS):
+    elif _observed_raw_any(VARIATION_BLURRED_EDGE_MARKERS, ddl, lower, decision_site="coerce.compose._with_variation_hint.variation_blurred_edge"):
         variation = {
             "amplitude": "medium",
             "frequency": "medium",
@@ -288,14 +361,14 @@ def _context_has_density_governor(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return _any_marker_in_text(QUIET_DENSITY_CONTEXT_MARKERS, ddl, lower)
+    return _any_marker_in_text(QUIET_DENSITY_CONTEXT_MARKERS, ddl, lower, decision_site="coerce.compose._context_has_density_governor.quiet_density")
 
 
 def _context_has_vertical_density(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return _any_marker_in_text(VERTICAL_DENSITY_CONTEXT_MARKERS, ddl, lower)
+    return _any_marker_in_text(VERTICAL_DENSITY_CONTEXT_MARKERS, ddl, lower, decision_site="coerce.compose._context_has_vertical_density.vertical_density")
 
 
 def _context_has_neon_blur_density(ddl: str | None) -> bool:
@@ -303,8 +376,8 @@ def _context_has_neon_blur_density(ddl: str | None) -> bool:
         return False
     lower = ddl.lower()
     return (
-        _any_marker_in_text(NEON_BLUR_SCENE_MARKERS, ddl, lower)
-        and _any_marker_in_text(NEON_BLUR_EVIDENCE_MARKERS, ddl, lower)
+        _any_marker_in_text(NEON_BLUR_SCENE_MARKERS, ddl, lower, decision_site="coerce.compose._context_has_neon_blur_density.neon_blur_scene")
+        and _any_marker_in_text(NEON_BLUR_EVIDENCE_MARKERS, ddl, lower, decision_site="coerce.compose._context_has_neon_blur_density.neon_blur_evidence")
     )
 
 
@@ -312,14 +385,16 @@ def _context_has_motion(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return _any_marker_in_text(MOTION_CONTEXT_MARKERS, ddl, lower)
+    return _any_marker_in_text(MOTION_CONTEXT_MARKERS, ddl, lower, decision_site="coerce.compose._context_has_motion.motion")
 
 
-def _context_has_marker(ddl: str | None, markers: tuple[str, ...]) -> bool:
+def _context_has_marker(
+    ddl: str | None, markers: tuple[str, ...], *, decision_site: str | None = None
+) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return _any_marker_in_text(markers, ddl, lower)
+    return _any_marker_in_text(markers, ddl, lower, decision_site=decision_site)
 
 
 def _with_arrangement_density_governor(ins: Instruction, *, count: int, density: str, fade: str, note: str) -> Instruction:
@@ -397,7 +472,7 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
     if not ddl:
         return False
     lower = ddl.lower()
-    return _any_marker_in_text(INTENTIONAL_LARGE_SURFACE_MARKERS, ddl, lower)
+    return _any_marker_in_text(INTENTIONAL_LARGE_SURFACE_MARKERS, ddl, lower, decision_site="coerce.compose._has_intentional_large_surface.intentional_large_surface")
 
 
 def _source_context(ddl: str | None) -> str:
@@ -433,13 +508,13 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     if _EXPLICIT_BACKGROUND_CLAUSE.search(ddl):
         return True
     lower = context.lower()
-    if _any_marker_in_text(EXPLICIT_SURFACE_MARKERS, context, lower):
+    if _any_marker_in_text(EXPLICIT_SURFACE_MARKERS, context, lower, decision_site="coerce.compose._has_explicit_background_intent.explicit_surface"):
         return True
-    if _any_marker_in_text(SUNSET_SKY_MARKERS, context, lower):
+    if _any_marker_in_text(SUNSET_SKY_MARKERS, context, lower, decision_site="coerce.compose._has_explicit_background_intent.sunset_sky"):
         return True
-    if _any_marker_in_text(DAWN_MARKERS, context, lower):
+    if _any_marker_in_text(DAWN_MARKERS, context, lower, decision_site="coerce.compose._has_explicit_background_intent.dawn"):
         return False
-    return _any_marker_in_text(NIGHT_MARKERS, context, lower)
+    return _any_marker_in_text(NIGHT_MARKERS, context, lower, decision_site="coerce.compose._has_explicit_background_intent.night")
 
 
 def _with_background_dominance_governor(background: str, *, ddl: str | None) -> str:
@@ -573,7 +648,7 @@ def _without_explicit_region_support(
 
 def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     """楽しい・躍動的な文脈では数を足さず、配置リズムだけを強める。"""
-    if not _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS):
+    if not _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS, decision_site="coerce.compose._with_rhythm_variation.rhythm"):
         return instructions
 
     adjusted: list[Instruction] = []
@@ -638,8 +713,8 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
     """反復線が支配する場面では、線群自体に間隔差と欠落感を作る。"""
     if not (
         _context_has_motion(ddl)
-        or _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS)
-        or _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS)
+        or _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS, decision_site="coerce.compose._with_repetition_event_variation.visual_event")
+        or _context_has_marker(ddl, RHYTHM_CONTEXT_MARKERS, decision_site="coerce.compose._with_repetition_event_variation.rhythm")
     ):
         return instructions
     if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
@@ -685,7 +760,7 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
     return adjusted
 
 
-VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
+_RAW_VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
     "shared_object": (
         ("二人", "見知らぬ二人", "別々", "手", "two", "strangers", "hands"),
         ("同じ", "一枚", "別々の端", "same", "opposite edges", "opposite"),
@@ -720,14 +795,27 @@ VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
 }
 
 
+VISUAL_EVENT_TYPE_MARKERS: dict[str, tuple[tuple[str, ...], ...]] = {
+    event_type: tuple(
+        _direct_marker_values("direct.visual_event.dynamic_groups", group)
+        for group in evidence_groups
+    )
+    for event_type, evidence_groups in _RAW_VISUAL_EVENT_TYPE_MARKERS.items()
+}
+ANTICIPATORY_SKIP_MARKERS = _direct_marker_values(
+    "direct.visual_event.anticipatory_skip",
+    ("発車ベル", "案内板", "departure board", "bell"),
+)
+
+
 def _has_temporal_chain_evidence(text: str, lower: str) -> bool:
-    sequence = _any_marker_in_text(TEMPORAL_CHAIN_SEQUENCE_MARKERS, text, lower)
-    action = _any_marker_in_text(TEMPORAL_CHAIN_ACTION_MARKERS, text, lower)
+    sequence = _any_marker_in_text(TEMPORAL_CHAIN_SEQUENCE_MARKERS, text, lower, decision_site="coerce.compose._has_temporal_chain_evidence.temporal_chain_sequence")
+    action = _any_marker_in_text(TEMPORAL_CHAIN_ACTION_MARKERS, text, lower, decision_site="coerce.compose._has_temporal_chain_evidence.temporal_chain_action")
     if sequence and action:
         return True
 
-    before_after = _any_marker_in_text(TEMPORAL_CHAIN_BEFORE_AFTER_MARKERS, text, lower)
-    reaction = _any_marker_in_text(TEMPORAL_CHAIN_REACTION_MARKERS, text, lower)
+    before_after = _any_marker_in_text(TEMPORAL_CHAIN_BEFORE_AFTER_MARKERS, text, lower, decision_site="coerce.compose._has_temporal_chain_evidence.temporal_chain_before_after")
+    reaction = _any_marker_in_text(TEMPORAL_CHAIN_REACTION_MARKERS, text, lower, decision_site="coerce.compose._has_temporal_chain_evidence.temporal_chain_reaction")
     return before_after and reaction and action
 
 
@@ -741,12 +829,21 @@ def _detect_visual_event_type(ddl: str | None) -> str | None:
                 return event_type
             continue
         if event_type == "anticipatory_shift" and _any_marker_in_text(
-            ("発車ベル", "案内板", "departure board", "bell"),
+            ANTICIPATORY_SKIP_MARKERS,
             ddl,
             lower,
+            decision_site="coerce.compose._detect_visual_event_type.direct.visual_event.anticipatory_skip",
         ):
             continue
-        if all(_any_marker_in_text(group, ddl, lower) for group in evidence_groups):
+        if all(
+            _any_marker_in_text(
+                group,
+                ddl,
+                lower,
+                decision_site="coerce.compose._detect_visual_event_type.direct.visual_event.dynamic_groups",
+            )
+            for group in evidence_groups
+        ):
             return event_type
     return None
 
@@ -773,7 +870,7 @@ def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str |
 
 
 def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
-    if not ddl or not any(marker in ddl.lower() for marker in CRESCENT_SCENE_MARKERS):
+    if not ddl or not _observed_raw_any(CRESCENT_SCENE_MARKERS, ddl, ddl.lower(), decision_site="coerce.compose._with_crescent_sensory_suppression.crescent_scene", text_match=False):
         return instructions
 
     adjusted: list[Instruction] = []
@@ -812,7 +909,7 @@ def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: 
 
 def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
     """余白・間の文脈では描画数を増やさず、配置余白と薄れ方で圧を作る。"""
-    if not _context_has_marker(ddl, MA_PRESSURE_CONTEXT_MARKERS):
+    if not _context_has_marker(ddl, MA_PRESSURE_CONTEXT_MARKERS, decision_site="coerce.compose._with_ma_pressure.ma_pressure"):
         return instructions
 
     adjusted: list[Instruction] = []
@@ -856,7 +953,7 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
     for markers, note in SEMANTIC_VISUAL_EVENT_HINTS:
         if note in " ".join(ins.note or "" for ins in adjusted):
             continue
-        if not _any_marker_in_text(markers, source, lower_source):
+        if not _any_marker_in_text(markers, source, lower_source, decision_site="coerce.compose._with_semantic_visual_event_hints.semantic_visual_event_hints"):
             continue
 
         next_instructions: list[Instruction] = []
@@ -1141,7 +1238,7 @@ def _marks_only_ddl(ddl: str | None) -> str:
 def _has_polychrome_phrase(ddl: str | None) -> bool:
     if not ddl:
         return False
-    return _any_marker_in_text(POLYCHROME_MARKERS, ddl, ddl.lower())
+    return _any_marker_in_text(POLYCHROME_MARKERS, ddl, ddl.lower(), decision_site="coerce.compose._has_polychrome_phrase.polychrome_request")
 
 
 def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
@@ -1150,7 +1247,7 @@ def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     colors: set[str] = set()
     for markers, color in COLOR_MARKERS:
-        if _any_marker_in_text(markers, ddl, lower):
+        if _any_marker_in_text(markers, ddl, lower, decision_site="coerce.compose._requested_colors_from_ddl.color_markers"):
             colors.add(color)
     return colors - _negated_colors_from_text(ddl)
 
@@ -1162,7 +1259,7 @@ def _negated_colors_from_text(text: str | None) -> set[str]:
     return {
         color
         for color, markers in NEGATED_COLOR_MARKERS.items()
-        if _any_marker_in_text(markers, text, lower)
+        if _any_marker_in_text(markers, text, lower, decision_site="coerce.compose._negated_colors_from_text.negated_color_markers")
     }
 
 
@@ -1195,13 +1292,16 @@ def _green_intent_context(ddl: str | None) -> str | None:
     if "green" in _negated_colors_from_text(ddl):
         return None
     lower = ddl.lower()
-    if "竹" in ddl or "bamboo" in lower:
-        return "bamboo green kept as primary contour"
-    if any(marker in ddl or marker in lower for marker in WITHERED_GRASS_MARKERS):
-        return "withered grass kept as muted green-gray"
-    if any(marker in ddl or marker in lower for marker in AUTUMN_FOREST_SCENE_MARKERS) and any(
-        marker in ddl for marker in AUTUMN_LEAF_FALL_MARKERS
+    if _observed_direct_raw(
+        BAMBOO_GREEN_MARKERS,
+        ddl,
+        lower,
+        decision_site="coerce.compose._green_intent_context.direct.bamboo_green",
     ):
+        return "bamboo green kept as primary contour"
+    if _observed_raw_any(WITHERED_GRASS_MARKERS, ddl, lower, decision_site="coerce.compose._green_intent_context.withered_grass_green"):
+        return "withered grass kept as muted green-gray"
+    if _observed_raw_any(AUTUMN_FOREST_SCENE_MARKERS, ddl, lower, decision_site="coerce.compose._green_intent_context.autumn_forest_scene") and _observed_raw_any(AUTUMN_LEAF_FALL_MARKERS, ddl, lower, decision_site="coerce.compose._green_intent_context.autumn_leaf_fall", lower_match=False):
         return "forest green kept as quiet residue behind warm leaves"
     return None
 
@@ -1374,7 +1474,7 @@ def _requested_shapes_from_ddl(ddl: str | None) -> set[str]:
     lower = ddl.lower()
     shapes: set[str] = set()
     for markers, primitive in SHAPE_INTENT_MARKERS:
-        if _any_marker_in_text(markers, ddl, lower):
+        if _any_marker_in_text(markers, ddl, lower, decision_site="coerce.compose._requested_shapes_from_ddl.shape_intent_markers"):
             shapes.add(primitive)
     return shapes
 
@@ -1464,7 +1564,7 @@ def _requested_motifs_from_ddl(ddl: str | None) -> list[str]:
     lower = ddl.lower()
     motifs: list[str] = []
     for markers, motif in MOTIF_INTENT_MARKERS:
-        if _any_marker_in_text(markers, ddl, lower):
+        if _any_marker_in_text(markers, ddl, lower, decision_site="coerce.compose._requested_motifs_from_ddl.motif_intent_markers"):
             motifs.append(motif)
     return motifs
 
@@ -1605,25 +1705,33 @@ SYMMETRY_PRESENCE_MARKERS: tuple[str, ...] = (
     "人型", "顔", "正面", "対称", "figure", "face", "frontal", "symmetry",
 )
 
+HUMAN_PRESENCE_MARKERS = _direct_marker_values("direct.presence.human", HUMAN_PRESENCE_MARKERS)
+CREATURE_PRESENCE_MARKERS = _direct_marker_values("direct.presence.creature", CREATURE_PRESENCE_MARKERS)
+GROUP_PRESENCE_MARKERS = _direct_marker_values("direct.presence.group", GROUP_PRESENCE_MARKERS)
+GAZE_PRESENCE_MARKERS = _direct_marker_values("direct.presence.gaze", GAZE_PRESENCE_MARKERS)
+SYMMETRY_PRESENCE_MARKERS = _direct_marker_values("direct.presence.symmetry", SYMMETRY_PRESENCE_MARKERS)
 
-def _context_has_any(context: str, markers: tuple[str, ...]) -> bool:
+
+def _context_has_any(
+    context: str, markers: tuple[str, ...], *, decision_site: str | None = None
+) -> bool:
     lower = context.lower()
-    return _any_marker_in_text(markers, context, lower)
+    return _any_marker_in_text(markers, context, lower, decision_site=decision_site)
 
 
 def _presence_center_from_context(context: str) -> list[float] | None:
     lower = context.lower()
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_UPPER_RIGHT_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_UPPER_RIGHT_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_upper_right"):
         return [0.68, 0.34]
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_UPPER_LEFT_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_UPPER_LEFT_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_upper_left"):
         return [0.32, 0.34]
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LOWER_RIGHT_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_LOWER_RIGHT_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_lower_right"):
         return [0.68, 0.66]
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LOWER_LEFT_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_LOWER_LEFT_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_lower_left"):
         return [0.32, 0.66]
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_RIGHT_HALF_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_RIGHT_HALF_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_right_half"):
         return [0.68, 0.50]
-    if any(marker in context or marker in lower for marker in PRESENCE_CENTER_LEFT_HALF_MARKERS):
+    if _observed_raw_any(PRESENCE_CENTER_LEFT_HALF_MARKERS, context, lower, decision_site="coerce.compose._presence_center_from_context.presence_center_left_half"):
         return [0.32, 0.50]
     return None
 
@@ -1631,19 +1739,26 @@ def _presence_center_from_context(context: str) -> list[float] | None:
 def _presence_from_ddl(ddl: str | None) -> dict | None:
     if not ddl:
         return None
-    has_human = _context_has_any(ddl, HUMAN_PRESENCE_MARKERS)
-    has_creature = _context_has_any(ddl, CREATURE_PRESENCE_MARKERS)
+    has_human = _context_has_any(ddl, HUMAN_PRESENCE_MARKERS, decision_site="coerce.compose._presence_from_ddl.direct.presence.human")
+    has_creature = _context_has_any(ddl, CREATURE_PRESENCE_MARKERS, decision_site="coerce.compose._presence_from_ddl.direct.presence.creature")
     if not has_human and not has_creature:
         return None
 
-    has_group = _context_has_any(ddl, GROUP_PRESENCE_MARKERS)
-    has_gaze = _context_has_any(ddl, GAZE_PRESENCE_MARKERS)
+    has_group = _context_has_any(ddl, GROUP_PRESENCE_MARKERS, decision_site="coerce.compose._presence_from_ddl.direct.presence.group")
+    has_gaze = _context_has_any(ddl, GAZE_PRESENCE_MARKERS, decision_site="coerce.compose._presence_from_ddl.direct.presence.gaze")
     kind = "group_like" if has_group else "creature_like" if has_creature and not has_human else "figure_like"
-    intensity = "high" if any(
-        marker in ddl or marker in ddl.lower() for marker in PRESENCE_INTENSITY_HIGH_MARKERS
-    ) else "medium" if has_gaze or has_group else "low"
+    intensity = (
+        "high"
+        if _observed_raw_any(
+            PRESENCE_INTENSITY_HIGH_MARKERS,
+            ddl,
+            ddl.lower(),
+            decision_site="coerce.compose._presence_from_ddl.presence_intensity_high",
+        )
+        else "medium" if has_gaze or has_group else "low"
+    )
     contour_density = "high" if has_group else "medium" if has_creature or has_gaze else "low"
-    symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS) else "none"
+    symmetry = "bilateral" if _context_has_any(ddl, SYMMETRY_PRESENCE_MARKERS, decision_site="coerce.compose._presence_from_ddl.direct.presence.symmetry") else "none"
     gaze_pressure = "medium" if has_gaze else "none"
     presence: dict[str, object] = {
         "kind": kind,
@@ -1665,7 +1780,7 @@ def _ddl_clauses(ddl: str | None) -> list[str]:
         clause
         for clause in clauses
         if not (clause.startswith("背景") or clause.lower().startswith("background"))
-        and _any_marker_in_text(CLAUSE_NAMES_A_MARK_MARKERS, clause, clause.lower())
+        and _any_marker_in_text(CLAUSE_NAMES_A_MARK_MARKERS, clause, clause.lower(), decision_site="coerce.compose._ddl_clauses.clause_names_a_mark")
     ]
 
 
@@ -1675,7 +1790,7 @@ def _color_from_clause(clause: str, background: str) -> str:
     for markers, color in COLOR_MARKERS:
         if color in negated:
             continue
-        if any(marker in clause or marker in lower for marker in markers):
+        if _observed_raw_any(markers, clause, lower, decision_site="coerce.compose._color_from_clause.color_markers"):
             if color != background:
                 return color
     return VISIBLE_ON_BACKGROUND.get(background, "black")
@@ -1688,9 +1803,14 @@ def _color_cycle_from_clause(clause: str, background: str) -> list[str]:
     for markers, color in COLOR_MARKERS:
         if color == background or color in negated:
             continue
-        if any(marker in clause or marker in lower for marker in markers):
+        if _observed_raw_any(markers, clause, lower, decision_site="coerce.compose._color_cycle_from_clause.color_markers"):
             colors.append(color)
-    if ("色とりどり" in clause or "多色" in clause or "colorful" in lower or "multi-color" in lower) and len(colors) < 3:
+    if _observed_direct_raw(
+        POLYCHROME_CLAUSE_MARKERS,
+        clause,
+        lower,
+        decision_site="coerce.compose._color_cycle_from_clause.direct.polychrome_clause",
+    ) and len(colors) < 3:
         colors.extend(color for color in ("red", "blue", "green", "black", "gray") if color != background)
     deduped: list[str] = []
     for color in colors:
@@ -1702,7 +1822,7 @@ def _color_cycle_from_clause(clause: str, background: str) -> list[str]:
 def _weight_from_clause(clause: str) -> str:
     lower = clause.lower()
     for markers, weight in MATERIAL_WEIGHT_HINTS:
-        if any(marker.lower() in lower for marker in markers):
+        if _observed_raw_any(markers, clause, lower, decision_site="coerce.compose._weight_from_clause.material_weight_hints", text_match=False, lower_marker=True):
             return weight
     return "pen"
 
@@ -1713,7 +1833,7 @@ def _primitive_from_clause(clause: str) -> str:
     # would catch: a clause naming 雲形 falls through every test below to the
     # `line` default, and a repair that pairs clauses with groups then pushes
     # the clause's count onto whatever line the Score happens to carry.
-    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_CLOUDFORM_MARKERS):
+    if _observed_raw_any(CLAUSE_SHAPE_CLOUDFORM_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_cloudform"):
         return "cloudform"
     if ("多角形" in clause) or ("五角" in clause) or ("六角" in clause) or ("polygon" in lower):
         return "polygon"
@@ -1723,9 +1843,9 @@ def _primitive_from_clause(clause: str) -> str:
         return "triangle"
     if ("弧" in clause) or ("arc" in lower):
         return "arc"
-    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_ELLIPSE_MARKERS):
+    if _observed_raw_any(CLAUSE_SHAPE_ELLIPSE_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_ellipse"):
         return "ellipse"
-    if any(marker in clause or marker in lower for marker in CLAUSE_SHAPE_CIRCLE_MARKERS):
+    if _observed_raw_any(CLAUSE_SHAPE_CIRCLE_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_circle"):
         return "circle"
     return "line"
 
@@ -1733,14 +1853,14 @@ def _primitive_from_clause(clause: str) -> str:
 def _is_small_mark_clause(clause: str) -> bool:
     lower = clause.lower()
     return (
-        _any_marker_in_text(SMALL_MARK_SIZE_MARKERS, clause, lower)
-        and _any_marker_in_text(SMALL_MARK_KIND_MARKERS, clause, lower)
+        _any_marker_in_text(SMALL_MARK_SIZE_MARKERS, clause, lower, decision_site="coerce.compose._is_small_mark_clause.small_mark_size")
+        and _any_marker_in_text(SMALL_MARK_KIND_MARKERS, clause, lower, decision_site="coerce.compose._is_small_mark_clause.small_mark_kind")
     )
 
 
 def _radius_hint_from_clause(clause: str) -> float | None:
     lower = clause.lower()
-    match = re.search(r"(?:半径|radius(?:\s+is)?|r)\s*(?:は|=|:)?\s*(0?\.\d+|1(?:\.0+)?)", lower if any(marker in lower for marker in RADIUS_CLAUSE_MARKERS) else clause)
+    match = re.search(r"(?:半径|radius(?:\s+is)?|r)\s*(?:は|=|:)?\s*(0?\.\d+|1(?:\.0+)?)", lower if _observed_raw_any(RADIUS_CLAUSE_MARKERS, clause, lower, decision_site="coerce.compose._radius_hint_from_clause.radius_clause", text_match=False) else clause)
     if not match:
         return None
     try:
@@ -1752,33 +1872,40 @@ def _radius_hint_from_clause(clause: str) -> float | None:
     return min(value, 0.22)
 
 
+ATMOSPHERIC_CLAUSE_MARKERS = _direct_marker_values(
+    "direct.atmospheric_clause",
+    ("膜", "霞", "霧", "靄", "気配", "余韻", "透明", "membrane", "haze", "fog", "mist", "atmosphere"),
+)
+
+
 def _is_atmospheric_clause(clause: str) -> bool:
-    lower = clause.lower()
-    return any(
-        marker in clause or marker in lower
-        for marker in ("膜", "霞", "霧", "靄", "気配", "余韻", "透明", "membrane", "haze", "fog", "mist", "atmosphere")
+    return _observed_direct_raw(
+        ATMOSPHERIC_CLAUSE_MARKERS,
+        clause,
+        clause.lower(),
+        decision_site="coerce.compose._is_atmospheric_clause.direct.atmospheric_clause",
     )
 
 
 def _is_reflection_clause(clause: str) -> bool:
     lower = clause.lower()
-    return any(marker in clause or marker in lower for marker in CLAUSE_REFLECTION_MARKERS)
+    return _observed_raw_any(CLAUSE_REFLECTION_MARKERS, clause, lower, decision_site="coerce.compose._is_reflection_clause.clause_reflection")
 
 
 def _is_fading_clause(clause: str) -> bool:
     lower = clause.lower()
-    return any(marker in clause or marker in lower for marker in CLAUSE_FADING_MARKERS)
+    return _observed_raw_any(CLAUSE_FADING_MARKERS, clause, lower, decision_site="coerce.compose._is_fading_clause.clause_fading")
 
 
 def _sensory_kind(clause: str) -> str | None:
     lower = clause.lower()
-    if _any_marker_in_text(SENSORY_KIND_LIGHT_MARKERS, clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_LIGHT_MARKERS, clause, lower, decision_site="coerce.compose._sensory_kind.sensory_kind_light"):
         return "light"
-    if _any_marker_in_text(SENSORY_KIND_SCENT_MARKERS, clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_SCENT_MARKERS, clause, lower, decision_site="coerce.compose._sensory_kind.sensory_kind_scent"):
         return "scent"
-    if _any_marker_in_text(SENSORY_KIND_BUD_MARKERS, clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_BUD_MARKERS, clause, lower, decision_site="coerce.compose._sensory_kind.sensory_kind_bud"):
         return "bud"
-    if _any_marker_in_text(SENSORY_KIND_SENSE_MARKERS, clause, lower):
+    if _any_marker_in_text(SENSORY_KIND_SENSE_MARKERS, clause, lower, decision_site="coerce.compose._sensory_kind.sensory_kind_sense"):
         return "sense"
     return None
 
@@ -1815,12 +1942,12 @@ def _fallback_instruction_from_clause(
     }
     offset = min(index, 4) * 0.09
     if primitive == "line":
-        if any(marker in clause or marker in lower for marker in LINE_AT_RIGHT_EDGE_MARKERS):
+        if _observed_raw_any(LINE_AT_RIGHT_EDGE_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.line_at_right_edge"):
             common.update({"from": [0.88, 0.18 + offset / 2], "to": [0.88, 0.82 - offset / 2], "rotation": 0})
-        elif any(marker in clause or marker in lower for marker in LINE_IS_VERTICAL_MARKERS):
+        elif _observed_raw_any(LINE_IS_VERTICAL_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.line_is_vertical"):
             x = 0.58 + min(index, 3) * 0.08
             common.update({"from": [x, 0.20 + offset / 2], "to": [x, 0.78 - offset / 2], "rotation": 0})
-        elif any(marker in clause or marker in lower for marker in LINE_IS_HORIZONTAL_MARKERS):
+        elif _observed_raw_any(LINE_IS_HORIZONTAL_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.line_is_horizontal"):
             y = 0.38 + min(index, 3) * 0.08
             common.update({"from": [0.16, y], "to": [0.84, y], "rotation": 0})
         else:
@@ -1828,7 +1955,7 @@ def _fallback_instruction_from_clause(
     elif primitive == "arc":
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.11, "angle_start": 210, "angle_end": 330})
     elif primitive == "polygon":
-        sides = 6 if any(marker in clause or marker in lower for marker in POLYGON_IS_HEXAGONAL_MARKERS) else 5
+        sides = 6 if _observed_raw_any(POLYGON_IS_HEXAGONAL_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.polygon_is_hexagonal") else 5
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": 0.055, "sides": sides, "rotation": -18 + index * 9})
     elif primitive == "circle":
         radius = _radius_hint_from_clause(clause) or (0.038 if _is_small_mark_clause(clause) else 0.10)
@@ -1871,14 +1998,14 @@ def _fallback_instruction_from_clause(
         }
         common["note"] = f"{common['note']}; circle focal mark kept compact with preserved negative space"
 
-    if any(marker in clause or marker in lower for marker in FALLBACK_PLACE_RIGHT_HALF_MARKERS):
+    if _observed_raw_any(FALLBACK_PLACE_RIGHT_HALF_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.fallback_place_right_half"):
         if "center" in common:
             common["center"] = [0.66, common["center"][1]]
         elif "position" in common:
             common["position"] = [0.66, common["position"][1]]
-    if any(marker in clause or marker in lower for marker in FALLBACK_PLACE_UPPER_RIGHT_MARKERS) and "center" in common:
+    if _observed_raw_any(FALLBACK_PLACE_UPPER_RIGHT_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.fallback_place_upper_right") and "center" in common:
         common["center"] = [0.68, 0.30]
-    elif any(marker in clause or marker in lower for marker in FALLBACK_PLACE_UPPER_EDGE_MARKERS) and "center" in common:
+    elif _observed_raw_any(FALLBACK_PLACE_UPPER_EDGE_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.fallback_place_upper_edge") and "center" in common:
         common["center"] = [common["center"][0], 0.22]
 
     count = count_hint_from_ddl(clause, limits, lang=lang, notes=notes)
@@ -1897,13 +2024,13 @@ def _fallback_instruction_from_clause(
             "jitter": 0.12,
             "margin": 0.08,
         }
-    elif count and any(marker in clause or marker in lower for marker in FALLBACK_ARRANGEMENT_SCATTER_MARKERS):
+    elif count and _observed_raw_any(FALLBACK_ARRANGEMENT_SCATTER_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.fallback_arrangement_scatter"):
         common["arrangement"] = {
             "count": _budgeted_count(count, limits, notes),
             "layout": "scatter",
             "margin": 0.18,
         }
-    elif count and any(marker in clause or marker in lower for marker in FALLBACK_ARRANGEMENT_LINE_UP_MARKERS):
+    elif count and _observed_raw_any(FALLBACK_ARRANGEMENT_LINE_UP_MARKERS, clause, lower, decision_site="coerce.compose._fallback_instruction_from_clause.fallback_arrangement_line_up"):
         common["arrangement"] = {
             "count": _budgeted_count(count, limits, notes),
             "layout": "horizontal",
@@ -2110,13 +2237,27 @@ ONLY_PRIMITIVE_MARKERS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
 )
 
 
+ONLY_PRIMITIVE_MARKERS = tuple(
+    (
+        _direct_marker_values("direct.only_primitive.dynamic_groups", markers),
+        allowed,
+    )
+    for markers, allowed in ONLY_PRIMITIVE_MARKERS
+)
+
+
 def _primitive_only_constraint_from_ddl(ddl: str | None) -> set[str]:
     if not ddl:
         return set()
     lower = ddl.lower()
     primitives: set[str] = set()
     for markers, allowed in ONLY_PRIMITIVE_MARKERS:
-        if any(marker in ddl or marker in lower for marker in markers):
+        if _observed_direct_raw(
+            markers,
+            ddl,
+            lower,
+            decision_site="coerce.compose._primitive_only_constraint_from_ddl.direct.only_primitive.dynamic_groups",
+        ):
             primitives.update(allowed)
     return primitives
 
@@ -2194,9 +2335,9 @@ def _with_literal_grid_fidelity(
     ):
         lower = (ddl or "").lower()
         requested_primitive: str | None = None
-        if any(marker in lower for marker in GRID_REQUESTS_SQUARE_MARKERS):
+        if _observed_raw_any(GRID_REQUESTS_SQUARE_MARKERS, ddl or "", lower, decision_site="coerce.compose._with_literal_grid_fidelity.grid_requests_square", text_match=False):
             requested_primitive = "square"
-        elif any(marker in lower for marker in GRID_REQUESTS_LINE_MARKERS):
+        elif _observed_raw_any(GRID_REQUESTS_LINE_MARKERS, ddl or "", lower, decision_site="coerce.compose._with_literal_grid_fidelity.grid_requests_line", text_match=False):
             requested_primitive = "line"
         target_index = next(
             (
@@ -2617,16 +2758,25 @@ def _record_branch_fire(
     before: list[Instruction],
     after: list[Instruction],
 ) -> None:
-    if report is None:
-        return
-    report.setdefault(name, 0)
     changed = abs(len(before) - len(after))
     changed += sum(
         first.model_dump(by_alias=True) != second.model_dump(by_alias=True)
         for first, second in zip(before, after)
     )
+    if report is not None:
+        report.setdefault(name, 0)
+        if changed:
+            report[name] += changed
     if changed:
-        report[name] += changed
+        from .observability import record_branch_effect
+
+        record_branch_effect(
+            name,
+            [instruction.model_dump(mode="json", by_alias=True) for instruction in before],
+            [instruction.model_dump(mode="json", by_alias=True) for instruction in after],
+            change_count=changed,
+            path="/instructions",
+        )
 
 
 def _record_value_branch_fire(
@@ -2635,11 +2785,16 @@ def _record_value_branch_fire(
     before: object,
     after: object,
 ) -> None:
-    if report is None:
+    if report is not None:
+        report.setdefault(name, 0)
+    if before == after:
         return
-    report.setdefault(name, 0)
-    if before != after:
+    if report is not None:
         report[name] += 1
+    from .observability import record_branch_effect
+
+    field = "/background" if "background" in name else "/presence"
+    record_branch_effect(name, before, after, change_count=1, path=field)
 
 
 def _style_coerce_disabled() -> bool:

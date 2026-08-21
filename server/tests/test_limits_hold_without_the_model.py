@@ -326,7 +326,9 @@ def test_t8_the_ceiling_is_the_last_word() -> None:
 def test_t8_guard_the_restoring_governor_still_runs_after_the_governors() -> None:
     """The perturbation target for T-8, named so a refactor cannot hide it."""
     source = (COERCE_DIR / "__init__.py").read_text(encoding="utf-8")
-    body = source[source.index("def coerce_score") :]
+    start = source.index("def _coerce_score")
+    end = source.index("\ndef coerce_score", start)
+    body = source[start:end]
     ceiling_at = body.rindex("_enforce_hard_ceiling")
     fidelity_at = body.rindex("_with_literal_grid_fidelity")
     total_budget_at = body.rindex("_with_total_density_budget")

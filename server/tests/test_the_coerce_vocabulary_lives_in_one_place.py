@@ -186,6 +186,22 @@ def judgement_literals() -> dict[str, list[tuple[str, int]]]:
     return found
 
 
+def direct_registration_systems() -> set[str]:
+    """Read the explicit compose-local input registry from the source."""
+    tree = ast.parse((COERCE / "compose.py").read_text(encoding="utf-8"))
+    return {
+        call.args[0].value
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "_direct_marker_values"
+        and call.args
+        and isinstance(call.args[0], ast.Constant)
+        and isinstance(call.args[0].value, str)
+        and call.args[0].value.startswith("direct.")
+    }
+
+
 def declared_systems() -> dict[str, dict[str, set[str]]]:
     """system name -> {language: words}, read from the source so a test can name the file."""
     systems: dict[str, dict[str, set[str]]] = {}
@@ -256,9 +272,28 @@ def test_the_scan_reads_all_four_shapes_and_skips_the_notes() -> None:
     assert seen == {"いんらいん", "inline", "たばね", "bound", "たんいつ", "はんてん", "よびだし", "call"}, sorted(seen)
 
     found = judgement_literals()
-    assert len(found) >= 30, f"only {len(found)} judgement words seen in coerce/; the scan has gone blind"
     files = {path for places in found.values() for path, _ in places}
     assert files == {"compose.py", "normalize.py"}, files
+
+    # Compose-local author inputs no longer look like raw containment tests: they
+    # are registered by `_direct_marker_values` and attached to explicit runtime
+    # decision sites. Verify that architecture against the live catalog instead
+    # of treating the scanner's former literal count as a proxy for coverage.
+    from inku_server.coerce.observability import (
+        catalog_snapshot,
+        verify_decision_site_registry,
+    )
+
+    snapshot = catalog_snapshot()
+    direct_catalog = [
+        event for event in snapshot["markers"] if event["system"].startswith("direct.")
+    ]
+    assert direct_catalog
+    assert verify_decision_site_registry() == []
+    assert direct_registration_systems() == {
+        event["system"] for event in direct_catalog
+    }
+    assert not {event["marker"] for event in direct_catalog} & NOTE_LITERALS
 
 
 def test_both_languages_gained_the_moved_systems() -> None:

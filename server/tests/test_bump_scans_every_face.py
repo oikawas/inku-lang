@@ -196,12 +196,16 @@ def test_a_number_taken_in_a_worktree_but_not_committed_moves_the_next_one(tree:
     _git(tree.root, "worktree", "add", "-q", "--detach", str(linked), "HEAD")
     tree.number(SEED + 9, at=linked)
 
-    result = tree.run("--scan-build")
+    concise = tree.run("--scan-build")
+    verbose = tree.run("--scan-build", "--verbose")
 
-    assert result.returncode == 0, result.stderr
-    assert _next_number(result) == SEED + 10
+    assert concise.returncode == 0, concise.stderr
+    assert verbose.returncode == 0, verbose.stderr
+    assert _next_number(concise) == _next_number(verbose) == SEED + 10
+    assert "\n  " not in concise.stderr
+    assert "scanned 4 faces" in concise.stderr
     assert any("linked" in line and "working tree" in line
-               for line in result.stderr.splitlines())
+               for line in verbose.stderr.splitlines())
 
 
 def test_the_deployment_host_moves_the_next_one(tree: Tree):

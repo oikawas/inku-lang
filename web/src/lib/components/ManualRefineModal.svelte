@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { LineageNode } from './LineagePanel.svelte';
+	import type { LineageNode } from '$lib/features/history/types';
 	import { t } from '$lib/i18n/index.svelte';
 
 	type Props = {

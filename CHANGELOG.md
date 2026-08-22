@@ -8706,3 +8706,9 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **`compat` uses a filter-free flat vector fallback, and `computer × solid` keeps its existing one-direction periodic scan.** Web, CLI, and both specifications now describe the profile purposes accurately.
 - **The engine 40 reference changes only four representative solid cases; the existing 606 cases are unchanged.** A second generator run was byte-identical. The author accepted the three-image comparison of display mottle, compat fallback, and computer scan.
 - **Verification:** 11 focused server/reference tests, ruff, docs, Web check with zero errors, `lint:i18n`, and a focused CLI help/README check. Full suites, all perturbations, Android, external-app matrices, benchmarks, and containers were not run.
+
+### Android `2.1.4-android.46` — `source_text` decides the refinement parent prose once (2026-08-22, [I-153])
+
+- **Refinement parent prose and `description_edit` now use the same single choice as server and Web.** A present `source_text` wins; only a NULL row falls back to `original_input`. The second interpretation that stripped batch `#N ` and demo `[demo] ` prefixes is gone.
+- **Current prefixed writers already store the unprefixed prose in `source_text` at the same time.** Ordinary rows with NULL `source_text` have no bookkeeping prefix, so no Room migration or persistence-format change was needed.
+- **Verification:** one focused JVM test passed with zero failures or errors. Temporarily reproducing the old prefix stripping made that same test fail once, and restoring HEAD returned it to green. The omitted initial pre-edit run is recorded as a procedural deviation in the completion report. Full JVM, instrumentation, devices, reference generation, and pentala were out of scope.

@@ -114,7 +114,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 38 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.45` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.46` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -365,8 +365,8 @@ Its interface is bilingual and the language is chosen in the settings screen (de
 A Kotlin language pack holds the wording; `server/scripts/gen_saijiki_kt.py` generates the saijiki
 vocabulary.
 Android currently declares render engine `35` and DDL engine `20`. The server declares render
-engine `38` and DDL engine `20`, so the deterministic DDL repairs are current while the drawing
-layer is three versions behind.
+engine `40` and DDL engine `20`, so the deterministic DDL repairs are current while the drawing
+layer is five versions behind.
 
 ### Verification surfaces
 

@@ -7877,3 +7877,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **`compat`はfilter-freeのflat vector fallback、`computer × solid`は従来の一方向periodic scanを維持した。** profileの用途説明をWeb、CLI、日英SPECへ同期した。
 - **render engine 40の参照はsolidの代表4件だけが変化し、既存606件は不変だった。** generatorの2回目はbyte-identical。作者はdisplay mottle、compat fallback、computer scanの3画像を受け入れた。
 - **検証:** server直接・reference検査11 passed、ruff、docs、Web check 0 errors、`lint:i18n`、CLI help/README直接検査。全suite・全摂動・Android・外部app matrix・benchmark・containerは行っていない。
+
+### Android `2.1.4-android.46` — 推敲元の記述は `source_text` が一度だけ決める（2026-08-22・[I-153]）
+
+- **推敲元の記述と `description_edit` 判定を、server/webと同じ一段へ揃えた。** `source_text` が在ればその値を使い、NULLの行だけ `original_input` へ落ちる。batchの `#N ` とdemoの `[demo] ` をもう一度解釈して剥がす道は削除した。
+- **現行の接頭辞付き保存は、同時に接頭辞なしの `source_text` を書く。** 通常描画でNULLになる行の `original_input` は接頭辞を持たないため、Room移行と保存形式は変更していない。
+- **検証:** focused JVM 1 test / failures 0 / errors 0。旧い接頭辞除去を一時再現すると同じ検査が1件redになり、HEAD復元後にgreenへ戻った。最初のpre-edit実行を落とした手続逸脱はcompletion reportへ記録した。JVM全走、計装、実機、reference生成、pentalaは対象外。

@@ -15,7 +15,12 @@
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
-	import type { SettingsController, SettingsTab, PluginItem } from '$lib/features/settings/state.svelte';
+	import type {
+		ModelProviderSetting,
+		PluginItem,
+		SettingsController,
+		SettingsTab
+	} from '$lib/features/settings/state.svelte';
 	import { markWeight } from '$lib/markWeight';
 	type PermissionGroup = 'admins' | 'leaders' | 'users';
 	type UserGroup = {
@@ -34,28 +39,6 @@
 		image_generation_count: number;
 		at: number;
 	};
-	type ModelProviderSetting = {
-		label?: string;
-		kind?: string;
-		default_base_url?: string;
-		requires_api_key?: boolean;
-		memo?: string;
-		models?: ModelOption[];
-		delete?: boolean;
-		base_url: string;
-		api_key_set: boolean;
-		api_key_hint: string | null;
-		api_key?: string;
-		clear_api_key?: boolean;
-		enabled_models?: Record<string, boolean>;
-	};
-	type ModelSettings = {
-		providers: Record<string, ModelProviderSetting>;
-	};
-	type ModelFetchResult = {
-		type: 'success' | 'error';
-		message: string;
-	};
 
 	type Props = {
 		settings: SettingsController;
@@ -70,10 +53,6 @@
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
 		includeThinking: boolean;
-		modelSettings: ModelSettings | null;
-		modelSettingsStatus: string | null;
-		modelFetchResults: Record<string, ModelFetchResult>;
-		modelSettingsLoading: boolean;
 		currentUser: UserItem | null;
 		uiMode: UiMode;
 		uiCustom: UiCustomVisibility;
@@ -120,16 +99,6 @@
 		onSetStage2Model: (model: string) => void;
 		onSetVisionProvider: (provider: Provider) => void;
 		onSetVisionModel: (model: string) => void;
-		onUpdateModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void;
-		onAddModelProvider: (provider: Provider, patch: Partial<ModelProviderSetting>) => void | Promise<void>;
-		onAskDeleteModelProvider: (provider: Provider) => void;
-		onAskClearModelApiKey: (provider: Provider) => void;
-		onFetchModelList: (provider: Provider) => void | Promise<void>;
-		onSaveModelProviderName: (provider: Provider, label: string) => void | Promise<void>;
-		onSaveModelProviderMemo: (provider: Provider, memo: string) => void | Promise<void>;
-		onSaveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => void | Promise<void>;
-		onSaveModelSettings: () => void | Promise<void>;
-		onLoadModelSettings: () => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
@@ -163,10 +132,6 @@
 		visionProviderGroups,
 		allowVisionSelection,
 		includeThinking = $bindable(),
-		modelSettings = $bindable(),
-		modelSettingsStatus,
-		modelFetchResults,
-		modelSettingsLoading,
 		currentUser,
 		uiMode,
 		uiCustom,
@@ -213,16 +178,6 @@
 		onSetStage2Model,
 		onSetVisionProvider,
 		onSetVisionModel,
-		onUpdateModelProvider,
-		onAddModelProvider,
-		onAskDeleteModelProvider,
-		onAskClearModelApiKey,
-		onFetchModelList,
-		onSaveModelProviderName,
-		onSaveModelProviderMemo,
-		onSaveModelProvider,
-		onSaveModelSettings,
-		onLoadModelSettings,
 		onLoadUserSettings,
 		onLogin,
 		onLogout,
@@ -255,6 +210,10 @@
 	const renderLimitsStatus = $derived(settings.renderLimitsStatus);
 	const pluginActionStatus = $derived(settings.pluginActionStatus);
 	const renderConcurrencyStatus = $derived(settings.renderConcurrencyStatus);
+	const modelSettings = $derived(settings.modelSettings);
+	const modelSettingsStatus = $derived(settings.modelSettingsStatus);
+	const modelFetchResults = $derived(settings.modelFetchResults);
+	const modelSettingsLoading = $derived(settings.modelSettingsLoading);
 	const onClose = () => settings.close();
 	const onSelectSettingsTab = (tab: SettingsTab) => settings.selectTab(tab);
 	const onSetSettingsDetail = (detail: SettingsDetailLevel) => settings.setDetail(detail);
@@ -275,6 +234,16 @@
 		settings.updateLogRetentionSettings(enabled, retentionDays, rotate, compress);
 	const onUpdateRenderLimits = (patch: Record<string, number> | null) => settings.updateRenderLimits(patch);
 	const onCancelModelSelection = () => settings.close();
+	const onUpdateModelProvider = (provider: Provider, patch: Partial<ModelProviderSetting>) => settings.updateModelProvider(provider, patch);
+	const onAddModelProvider = (provider: Provider, patch: Partial<ModelProviderSetting>) => settings.addModelProvider(provider, patch);
+	const onAskDeleteModelProvider = (provider: Provider) => settings.askDeleteModelProvider(provider);
+	const onAskClearModelApiKey = (provider: Provider) => settings.askClearModelApiKey(provider);
+	const onFetchModelList = (provider: Provider) => settings.fetchProviderModels(provider);
+	const onSaveModelProviderName = (provider: Provider, label: string) => settings.saveModelProviderName(provider, label);
+	const onSaveModelProviderMemo = (provider: Provider, memo: string) => settings.saveModelProviderMemo(provider, memo);
+	const onSaveModelProvider = (provider: Provider, patch?: Partial<ModelProviderSetting>) => settings.saveModelProvider(provider, patch);
+	const onSaveModelSettings = () => settings.saveModelSettings();
+	const onLoadModelSettings = () => settings.loadModelSettings();
 
 	// The tab bar asks the same question the page's guard asks, from the same
 	// module: a button the guard would refuse to act on must not be drawn.

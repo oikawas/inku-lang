@@ -65,7 +65,7 @@ test('the page no longer owns moved Settings operations or endpoints', () => {
 
 test('SettingsModal receives one typed Stage 2A boundary and no generic transport', () => {
 	assert.match(MODAL, /settings: SettingsController;/);
-	assert.match(MODAL, /import type \{ SettingsController/);
+	assert.match(MODAL, /import type \{[\s\S]*SettingsController,[\s\S]*\} from '\$lib\/features\/settings\/state\.svelte'/);
 	assert.match(PAGE, /<SettingsModal[\s\S]*settings=\{settings\}/);
 	assert.doesNotMatch(MODAL, /apiFetch\s*:/);
 	for (const prop of [
@@ -80,8 +80,10 @@ test('SettingsModal receives one typed Stage 2A boundary and no generic transpor
 	}
 });
 
-test('sensitive model and user edit fields do not enter the Stage 2A owner', () => {
-	for (const field of ['api_key', 'loginPassword', 'newUserPassword', 'editUserPassword']) {
+test('user edit secrets do not enter the Settings owner', () => {
+	for (const field of ['loginPassword', 'newUserPassword', 'editUserPassword']) {
 		assert.doesNotMatch(OWNER, new RegExp(field), field);
 	}
+	assert.doesNotMatch(OWNER, /newProviderApiKey/);
+	assert.match(MODAL, /let newProviderApiKey = \$state\(''\)/);
 });

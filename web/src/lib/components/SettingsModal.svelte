@@ -9,6 +9,7 @@
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import DatabaseAdministrationSettings from '$lib/features/settings/DatabaseAdministrationSettings.svelte';
+	import RenderLimitsSettings from '$lib/features/settings/RenderLimitsSettings.svelte';
 	import UserAdministrationSettings from '$lib/features/settings/UserAdministrationSettings.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -24,7 +25,6 @@
 		SettingsTab,
 		SettingsUserItem
 	} from '$lib/features/settings/state.svelte';
-	import { markWeight } from '$lib/markWeight';
 
 	type Props = {
 		settings: SettingsController;
@@ -191,32 +191,6 @@
 	let pluginEditorLoading = $state(false);
 	let pluginEditorSaving = $state(false);
 	let pluginEditorReasons = $state<string[]>([]);
-
-	// The nine limits are addressed by their server-side field names. The label,
-	// the hint and the group heading all come from i18n by that name, so the
-	// panel does not carry a second, drifting copy of the vocabulary.
-	function renderLimitLabel(field: string): string {
-		const labels = t().settingsRenderLimitLabels as Record<string, string>;
-		return labels[field] ?? field;
-	}
-
-	function renderLimitHint(field: string): string {
-		const hints = t().settingsRenderLimitHints as Record<string, string>;
-		return hints[field] ?? '';
-	}
-
-	function renderLimitGroupLabel(group: string): string {
-		const groups = t().settingsRenderLimitGroups as Record<string, string>;
-		return groups[group] ?? group;
-	}
-
-	// The families answer to different authorities -- the machine, the eye, and a
-	// typing guard -- and nothing on the row says so. The heading carries the
-	// reason; the per-field line under each stepper stays what that one field does.
-	function renderLimitGroupTooltip(group: string): string {
-		const tips = t().settingsRenderLimitGroupTooltips as Record<string, string>;
-		return tips[group] ?? '';
-	}
 
 	function pluginId(plugin: PluginItem): string {
 		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
@@ -913,70 +887,15 @@
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
 			</div>
 		{:else if settingsTab === 'limits'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsRenderLimitsTitle}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					<div class="db-test-result">{t().settingsRenderLimitsIntro}</div>
-					{#each Object.entries(settingsStatus.render_limits.groups) as [groupName, fields]}
-						<div class="limits-group">
-							<div class="limits-group-label">
-								<span>{renderLimitGroupLabel(groupName)}</span>
-								{#if renderLimitGroupTooltip(groupName)}
-									<Tooltip placement="bottom-right" wide text={renderLimitGroupTooltip(groupName)}>
-										<span class="settings-info-mark" aria-hidden="true">i</span>
-									</Tooltip>
-								{/if}
-							</div>
-							<div class="limits-grid">
-								{#each fields as field}
-									<!-- A div, not a label: the stepper's first labelable child is a
-									     button, so a wrapping label would target that instead of the
-									     field. The stepper carries its own aria-label. -->
-									<div class="limits-field">
-										<span>{renderLimitLabel(field)}</span>
-										<NumberStepper
-											label={renderLimitLabel(field)}
-											min={1}
-											max={settingsStatus.render_limits.absolute_max}
-											value={settingsStatus.render_limits.limits[field]}
-											onChange={(value) => onUpdateRenderLimits({ [field]: value })}
-										/>
-										<small>{renderLimitHint(field)}</small>
-										<!-- `{@const}` may only be the immediate child of a block, so the
-										     costs guard hosts it rather than the field div. Both conditions
-										     carry weight: an older server sends no costs at all, and eight
-										     of the nine fields govern no megabytes even when it does. -->
-										{#if settingsStatus.render_limits.bytes_per_mark}
-											{@const weight = markWeight(
-												field,
-												settingsStatus.render_limits.limits[field],
-												settingsStatus.render_limits.bytes_per_mark
-											)}
-											{#if weight}
-												<small class="limits-weight"
-													>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
-												>
-											{/if}
-										{/if}
-									</div>
-								{/each}
-							</div>
-						</div>
-					{/each}
-					<div class="db-test-result">{t().settingsRenderLimitsRounding}</div>
-					{#if renderLimitsStatus}
-						<div class="inline-message">{renderLimitsStatus}</div>
-					{/if}
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
-			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
-				<button class="ghost-btn" onclick={() => onUpdateRenderLimits(null)} disabled={settingsStatusLoading || !isAdmin}>{t().settingsRenderLimitsReset}</button>
-			</div>
+			<RenderLimitsSettings
+				status={settingsStatus?.render_limits ?? null}
+				statusError={settingsStatusError}
+				loading={settingsStatusLoading}
+				saveStatus={renderLimitsStatus}
+				{isAdmin}
+				onReload={onLoadSettingsStatus}
+				onUpdate={onUpdateRenderLimits}
+			/>
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsSystemPlugins}</div>
@@ -1673,31 +1592,6 @@
 		margin-top: 10px;
 		margin-bottom: 0;
 	}
-	.limits-group { margin-top: 12px; }
-	.limits-group-label {
-		font-size: var(--btn-sm-font-size); color: var(--fg2); font-weight: 600; margin-bottom: 6px;
-		display: flex; align-items: center; gap: 6px;
-	}
-	.limits-grid {
-		display: grid;
-		/* The hint sets the card width, not the control: the stepper is fixed
-		   below and every hint is a sentence. */
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 10px;
-	}
-	.limits-field {
-		display: flex; flex-direction: column; gap: 4px; min-width: 0;
-		font-size: var(--btn-sm-font-size);
-	}
-	.limits-field > span { color: var(--fg2); }
-	.limits-field > small { color: var(--fg3); line-height: 1.4; }
-	/* The conversion answers a different question from the hint above it -- what
-	   this number costs, rather than what it governs -- so it is set apart
-	   rather than reading as a second sentence of the same line. */
-	.limits-field > small.limits-weight { color: var(--fg2); }
-	/* The largest value that can be typed is the absolute ceiling, 100000 -- six
-	   digits. The stepper is sized for that and does not stretch to the card. */
-	.limits-field :global(.number-stepper) { width: min(136px, 100%); }
 	.db-backup-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));

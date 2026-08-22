@@ -7883,3 +7883,10 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **推敲元の記述と `description_edit` 判定を、server/webと同じ一段へ揃えた。** `source_text` が在ればその値を使い、NULLの行だけ `original_input` へ落ちる。batchの `#N ` とdemoの `[demo] ` をもう一度解釈して剥がす道は削除した。
 - **現行の接頭辞付き保存は、同時に接頭辞なしの `source_text` を書く。** 通常描画でNULLになる行の `original_input` は接頭辞を持たないため、Room移行と保存形式は変更していない。
 - **検証:** focused JVM 1 test / failures 0 / errors 0。旧い接頭辞除去を一時再現すると同じ検査が1件redになり、HEAD復元後にgreenへ戻った。最初のpre-edit実行を落とした手続逸脱はcompletion reportへ記録した。JVM全走、計装、実機、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.47` — 代表化の帯を端末内上限の整数比へ移す（2026-08-22・[I-271]）
+
+- **密度帯を代表化上限の `3/2`・`2/3`、cluster帯を `25/6`・`2/1`・`1/1` で算出する。** clusterのband値も出荷時上限120を基準に整数scalingし、端末内上限を変えた場合に同じ比を保つ。
+- **出荷値80–120の結果は不変。** 密度境界180/80、cluster境界500/240/120、band値9/7/5/3を維持する。server設定同期、UI、永続化、network/APIは追加していない。
+- **最初の実装はserverの24-marks-per-cluster capまで移植し、受入で停止した。** 既定count 73–119が3から4/5へ変わる到達可能な差だったため、作者裁定でcapを対象外とし、修正用fail-firstを本体再編集前に追加した。
+- **検証:** 初回fail-first 3 tests / 3 failures、修正fail-first 3 tests / 2 failures。修正後のfocused JVM 3 testsは実装中・worker最終・受入側でgreen。JVM全走、計装、実機、reference生成、pentalaは対象外。

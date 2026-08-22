@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-22。
 
-**追随状況**: Android は `2.1.4-android.46` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.47` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2064,3 +2064,9 @@ DDL は `解釈` の欄と DDL エディタから読める。**4 つ目のタブ
 **戻るキーの行き先・当たり判定 48dp・余白が 4 段であること・キャンバスが最上部に居ること**には、
 **契約にも T が無く、本段でも観測点を置いていない**（目視だけである）。
 **余白の 4 段は「`Dimens` の spacing 族が 4 値であること」で置ける** — 現行の T-7 は格子までしか見ない。
+
+## 2026-08-22 代表化の帯を端末内上限の整数比へ移す（android `2.1.4-android.47`・[I-271]）
+
+`LocalFallbackPipeline` の密度帯は代表化上限の `3/2` と `2/3`、cluster帯は `25/6`、`2/1`、`1/1` で境界を算出する。cluster数も出荷時上限120を基準にbandを整数scalingする。端末内の出荷値80–120では、密度境界180/80、cluster境界500/240/120と各band値9/7/5/3を維持する。
+
+Androidはserver設定を搬送しないため、本段は端末内limitを受け取る決定的な計算seamまでを持つ。serverの24-marks-per-cluster capは既定count 73–119の出力を3から4/5へ変えるため、2026-08-22作者裁定で移植対象外とした。server設定同期、UI、永続化、network/APIは追加していない。

@@ -1,7 +1,8 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// 写生 (Stage 0.5) acceptance, web side. T-9 (the grain is a real option, wired
-// from both places that can start a draw) and T-10 (the genealogy edge).
+// Sketch-from-life (Stage 0.5) acceptance, web side. T-9 verifies that the
+// grain is a real option wired from both places that can start a draw; T-10
+// verifies the genealogy edge.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -68,8 +69,9 @@ test('T-9: the grain is selectable from the work menu, not only from a first dra
 
 test('T-9: the describe tab sends the chosen grain, and replays stored prose only when nothing moved', () => {
 	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-	assert.match(page, /sketch:\s*resolvedSketchMode !== 'off'/);
-	assert.match(page, /sketch_grain: resolvedSketchGrain/);
+	const currentWork = read('./features/run/current-work.ts');
+	assert.match(currentWork, /sketch:\s*sketchOn/);
+	assert.match(currentWork, /sketch_grain: resolvedSketchGrain/);
 	assert.match(page, /!submitTextChanged && !submitGrainChanged \? sketchText : null/);
 });
 
@@ -128,11 +130,12 @@ test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () 
 	}
 
 	// And the paint path says whether the layer runs at all.
-	const paint = page.slice(page.indexOf("apiFetch('/api/paint/stream'"));
-	assert.match(paint.slice(0, 900), /sketch: resolvedSketchMode !== 'off'/);
+	const currentWork = read('./features/run/current-work.ts');
+	const paint = currentWork.slice(currentWork.indexOf("capabilities.apiFetch('/api/paint/stream'"));
+	assert.match(paint.slice(0, 900), /sketch: sketchOn/);
 });
 
-// ═══════════════════ 写生の状態 (sketch_state) — contract sketch-state-is-recorded
+// ═══════════════════ Sketch-from-life state (sketch_state)
 //
 // T-6 (a work with no record is not a work drawn with the layer off) and
 // T-10 (the menu says "not recommended", and only the menu).

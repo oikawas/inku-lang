@@ -16,14 +16,19 @@ import { test } from 'node:test';
 
 const MODAL = readFileSync(new URL('./components/AIRefineModal.svelte', import.meta.url), 'utf-8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf-8');
+const RUN_OWNER = readFileSync(new URL('./features/run/current-work.ts', import.meta.url), 'utf-8');
 
 test('T-164  paintOne takes a model for one run, and prefers it over the page setting', () => {
 	// Declared on the options bag, so every caller may pass one...
-	assert.match(PAGE, /\n\t\tstage1Model\?: string;\n\t\tstage2Model\?: string;/);
+	assert.match(RUN_OWNER, /\n\tstage1Model\?: string;\n\tstage2Model\?: string;/);
 	// ...and read with ??, so a caller that passes nothing is unaffected and an
 	// empty string is not silently swapped for the page's model.
-	assert.match(PAGE, /const resolvedStage1Model = options\.stage1Model \?\? qualifiedModelId\(/);
-	assert.match(PAGE, /const resolvedStage2Model = options\.stage2Model \?\? qualifiedModelId\(/);
+	assert.match(RUN_OWNER, /const resolvedStage1Model = options\.stage1Model \?\? defaults\.stage1Model/);
+	assert.match(RUN_OWNER, /const resolvedStage2Model = options\.stage2Model \?\? defaults\.stage2Model/);
+	// The page resolves its ordinary settings before crossing the narrow run
+	// boundary, so route state does not leak into the canonical owner.
+	assert.match(PAGE, /stage1Model: qualifiedModelId\(stage1Provider, stage1Model\)/);
+	assert.match(PAGE, /stage2Model: qualifiedModelId\(stage2Provider, stage2Model\)/);
 });
 
 test('T-165  the refinement sends the picked model with every generation it draws', () => {

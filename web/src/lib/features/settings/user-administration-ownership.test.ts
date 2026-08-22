@@ -2,7 +2,7 @@
 //
 // This source-level seam keeps account administration in the route-instance
 // Settings owner while session identity stays on the page and unsaved form
-// values, especially passwords, stay inside the modal that owns the inputs.
+// values, especially passwords, stay inside the focused view that owns the inputs.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -11,6 +11,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const OWNER = read('./state.svelte.ts');
 const PAGE = read('../../../routes/+page.svelte');
 const MODAL = read('../../components/SettingsModal.svelte');
+const VIEW = read('./UserAdministrationSettings.svelte');
 const PROPS = MODAL.slice(MODAL.indexOf('type Props'), MODAL.indexOf('}: Props = $props()'));
 
 test('Stage 2C gives user and group administration one Settings owner', () => {
@@ -28,7 +29,7 @@ test('Stage 2C gives user and group administration one Settings owner', () => {
 	}
 });
 
-test('user administration types and Modal boundary are canonical on SettingsController', () => {
+test('user administration types and focused view boundary are canonical on SettingsController', () => {
 	for (const typeName of ['SettingsUserItem', 'SettingsUserGroup', 'CreateSettingsUserInput', 'UpdateSettingsUserInput']) {
 		assert.match(OWNER, new RegExp(`export type ${typeName}`));
 		assert.doesNotMatch(MODAL, new RegExp(`type ${typeName}`));
@@ -41,10 +42,11 @@ test('user administration types and Modal boundary are canonical on SettingsCont
 	]) {
 		assert.doesNotMatch(PROPS, new RegExp(prop), prop);
 	}
-	assert.match(MODAL, /const users = \$derived\(settings\.users\)/);
-	assert.match(MODAL, /settings\.loadUserAdministration/);
-	assert.match(MODAL, /settings\.addUser/);
-	assert.match(MODAL, /settings\.updateGroup/);
+	assert.match(OWNER, /readonly userAdministration: SettingsUserAdministration/);
+	assert.match(MODAL, /administration=\{settings\.userAdministration\}/);
+	assert.match(VIEW, /administration\.load/);
+	assert.match(VIEW, /administration\.addUser/);
+	assert.match(VIEW, /administration\.updateGroup/);
 });
 
 test('session identity stays page-owned behind one named refresh capability', () => {
@@ -61,13 +63,14 @@ test('session identity stays page-owned behind one named refresh capability', ()
 	assert.match(PROPS, /loginPassword: string;/);
 });
 
-test('unsaved administration drafts stay in SettingsModal and passwords are transient', () => {
+test('unsaved administration drafts stay in the focused input view and passwords are transient', () => {
 	for (const name of [
 		'newUserName', 'newUserEmail', 'newUserPassword', 'newUserPermissionGroups', 'newUserGroupId',
 		'selectedUserId', 'editUserName', 'editUserEmail', 'editUserPassword', 'editUserPermissionGroups',
 		'editUserGroupId', 'newGroupName', 'editGroupId', 'editGroupName'
 	]) {
-		assert.match(MODAL, new RegExp(`let ${name}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), name);
+		assert.match(VIEW, new RegExp(`let ${name}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), name);
+		assert.doesNotMatch(MODAL, new RegExp(`let ${name}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), name);
 		assert.doesNotMatch(PAGE, new RegExp(`let ${name}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), name);
 		assert.doesNotMatch(OWNER, new RegExp(`let ${name}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), name);
 	}

@@ -60,9 +60,14 @@ flowchart LR
     COMPOSER["composer.py"]
     SCHEMA["schema.py"]
     COERCE["coerce/"]
-    ENGINE["render_engines/default.py"]
-    RENDERER["renderer.py + stroke_engine.py"]
     RENDERING["api_core/rendering.py"]
+    REGISTRY["render_engines/__init__.py\ncurrent_render_engine()"]
+    DEFAULT_INIT["render_engines/default/__init__.py"]
+    ADAPTER["default/adapter.py\nDefaultRenderEngine"]
+    ENGINE["default/engine.py\ncanonical render_result()"]
+    DOMAINS["default domain modules\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `marks.py` / `dispatch.py`"]
+    RENDERER["renderer.py\nSVG-only互換facade"]
+    STROKE["stroke_engine.py\n共有stroke処理"]
     DB["db.py"]
     ANALYSIS["shared/inku_analysis"]
 
@@ -75,11 +80,19 @@ flowchart LR
     RENDER_ROUTER --> COERCE
     COERCE --> SCHEMA
     RENDER_ROUTER --> RENDERING
-    RENDERING --> ENGINE
-    ENGINE --> RENDERER
+    RENDERING --> REGISTRY
+    REGISTRY --> DEFAULT_INIT
+    DEFAULT_INIT --> ADAPTER
+    ADAPTER --> ENGINE
+    ENGINE --> DOMAINS
+    DOMAINS --> STROKE
+    RENDERER -->|"render() → render_result().svg"| ENGINE
+    RENDERING -.->|"互換: SVG_PROFILES / new_render_seed"| RENDERER
     RENDERING --> DB
     RENDERING -->|"PNG rasterize"| ANALYSIS
 ```
+
+正規経路は `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()` である。`renderer.py` はSVGだけを返す既存呼出し向けの互換facadeであり、`renderer.render()` はcanonical resultの `.svg` へ委譲する。`api_core/rendering.py` には `SVG_PROFILES` / `new_render_seed` の互換参照が残るが、`render_engines/default/` から `renderer.py` への逆importは0件である。
 
 ## Router分類
 

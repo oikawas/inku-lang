@@ -26,12 +26,15 @@ def _inject_blur_filters(
     blur_elems: list[tuple[str, str]],
 ) -> str:
     """Inject Gaussian blur definitions and attach them to performed marks."""
+    # Map keys include the amplitude name and resolved standard deviation because
+    # shapes with the same amplitude can need different deviations due to size.
     filter_xml = "".join(
         f'<filter id="{filter_id}" x="-30%" y="-30%" width="160%" height="160%">'
         f'<feGaussianBlur in="SourceGraphic" stdDeviation="{fmt(std)}"/>'
         f"</filter>"
         for filter_id, std in sorted(blur_needed.items())
     )
+    # svgwrite serializes an empty definitions element as `<defs />`, with a space.
     if "<defs />" in svg:
         svg = svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
     elif "<defs/>" in svg:
@@ -83,6 +86,8 @@ def render_result(
 ) -> RenderEngineResult:
     source_score = score
     profile = document._normalize_svg_profile(svg_profile)
+    # Build the canvas before resolving the score because `_resolve_at_region`
+    # needs it. Resolution replaces only instructions and preserves this canvas.
     canvas = canvas_size_for_aspect(
         canvas_aspect or document._score_canvas_aspect(score)
     )
@@ -117,10 +122,15 @@ def render_result(
     texture_filters = marks._texture_filter_weights(score) if use_filters else set()
     blur_elems: list[tuple[str, str]] = []
     elem_idx = 0
+    # Resolve support once and pass it down explicitly. Keeping it out of module
+    # globals makes every rendering handoff visible and prevents missed context.
     sheet = layers._score_support(score)
     ordered_instructions = sorted(
         enumerate(score.instructions), key=lambda pair: pair[1].mode == "carve"
     )
+    # Placement belongs to the composition seed; touch belongs to the performance
+    # seed. Use `is None` so zero remains valid, and fall back to the performance
+    # seed when older works have no composition seed so their replay stays stable.
     placement_seed = composition_seed if composition_seed is not None else render_seed
     for ins_idx, ins in ordered_instructions:
         expanded = (
@@ -172,6 +182,8 @@ def render_result(
                     variation = single.variation
                     assert variation is not None
                     std = marks._blur_std_px(variation, single, canvas)
+                    # Blur is dimension-dependent, so its ID includes the resolved
+                    # standard deviation instead of naming only the amplitude.
                     filter_id = (
                         f"blur-{variation.amplitude}-{int(round(std * 10))}"
                     )

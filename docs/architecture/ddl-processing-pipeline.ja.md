@@ -11,7 +11,7 @@
 | Stage 1.5 | core DDL → effective DDL | 決定的。現行は焦点書換えのみ、明示変奏時だけ軸を動かす | `ddl_expander.py` |
 | Stage 2 | effective DDL → JSON Score | LLM tool/schema。空・短すぎる出力は理由つきで1回retryし、timeout・空retry後は決定的fallback（`compose_fallback`へ記録） | `composer.py`; `render.py:_call_compose_detail` |
 | coerce/validation | Score → renderable Score | `auto_repair`時のみ。不正relation等はdrop。要求配達とhard ceilingを行い、記述が抽象色を一つだけ名指す条件ではcolor cycleをその色へ畳む。分岐の発火は`coerce_branch_counts`（trace時） | `coerce/` |
-| Render Engine | Score + seeds + color map → SVG + metadata | 同一Score・同一render seed・同一条件で再現 | `render_engines/default.py`; `renderer.py` |
+| Render Engine | Score + seeds + color map → SVG + metadata | 同一Score・同一render seed・同一条件で再現 | `render_engines/__init__.py`; `render_engines/default/adapter.py`; `render_engines/default/engine.py`; `renderer.py`（SVG-only互換facade） |
 | 履歴・系譜 | pipeline生成物 → DB row/node/edge | DB transaction。edgeは明示parent+kindのみ | `rendering.py`; `db.py` |
 
 判定単位の詳細（どの条件で・何が起き・何が記録されるか）は `description-to-svg.ja.md` が持つ。
@@ -128,7 +128,7 @@ flowchart LR
 | pluginはStage 1直後 | `_call_compose_detail`: `manager.expand` → `expand_intermediate_for_lang` → `compose` |
 | 後段はplugin namespace非依存 | plugin文書はcore DDL/instructionへ閉じ、未知参照をdrop。provenanceだけmetadataへ残す |
 | drop-only優先 | invalid relationは`_drop_invalid_relations`。ただしcoerceは要求配達repairと、単一の名指し色だけを残す決定的規則も持つため、完全なdrop-onlyではない |
-| 再現性 | `renderer.py`のseed派生と凍結corpus。暗黙のfresh seedを採った回はそのseedをmetadata/DBへ保存 |
+| 再現性 | `render_engines/default/determinism.py`のseed派生（`renderer.py`が互換re-export）と凍結corpus。暗黙のfresh seedを採った回はそのseedをmetadata/DBへ保存 |
 | 過去engineを選び直さない | `current_render_engine()`は現行1 engine。履歴のdisplay SVGは保存済みを返す |
 | 歳時記single source | `saijiki.py`からprompt、markers、relation literals、API表示、referenceを導出 |
 

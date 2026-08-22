@@ -130,7 +130,7 @@ LLMを呼ばない。焦点の書き換えだけを行い、新しい文を足�
 
 ## 演奏 — Render Engine
 
-確定したScoreと、`render_seed`・`wild`・色カタログの写像・`canvas`（Scoreの中）から、現行engine（`render_engines/default.py`）がSVGと演奏metadataを作る。**同じScore・同じrender seed・同じ描画条件は同じ作品を再現する** — これが凍結corpusが守る契約である。過去のengineを選び直すAPIは無く、履歴のdisplay SVGは保存済みを返す。
+確定したScoreと、`render_seed`・`wild`・色カタログの写像・`canvas`（Scoreの中）から、registryが選ぶ`render_engines/default/adapter.py`を介してcanonical `render_engines/default/engine.py`がSVGと演奏metadataを作る。`renderer.py`は既存のSVG-only呼出し向け互換facadeである。**同じScore・同じrender seed・同じ描画条件は同じ作品を再現する** — これが凍結corpusが守る契約である。過去のengineを選び直すAPIは無く、履歴のdisplay SVGは保存済みを返す。
 
 ## 同一性と保存
 

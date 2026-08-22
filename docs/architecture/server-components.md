@@ -60,9 +60,14 @@ flowchart LR
     COMPOSER["composer.py"]
     SCHEMA["schema.py"]
     COERCE["coerce/"]
-    ENGINE["render_engines/default.py"]
-    RENDERER["renderer.py + stroke_engine.py"]
     RENDERING["api_core/rendering.py"]
+    REGISTRY["render_engines/__init__.py\ncurrent_render_engine()"]
+    DEFAULT_INIT["render_engines/default/__init__.py"]
+    ADAPTER["default/adapter.py\nDefaultRenderEngine"]
+    ENGINE["default/engine.py\ncanonical render_result()"]
+    DOMAINS["default domain modules\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `marks.py` / `dispatch.py`"]
+    RENDERER["renderer.py\nSVG-only compatibility facade"]
+    STROKE["stroke_engine.py\nshared stroke processing"]
     DB["db.py"]
     ANALYSIS["shared/inku_analysis"]
 
@@ -75,11 +80,19 @@ flowchart LR
     RENDER_ROUTER --> COERCE
     COERCE --> SCHEMA
     RENDER_ROUTER --> RENDERING
-    RENDERING --> ENGINE
-    ENGINE --> RENDERER
+    RENDERING --> REGISTRY
+    REGISTRY --> DEFAULT_INIT
+    DEFAULT_INIT --> ADAPTER
+    ADAPTER --> ENGINE
+    ENGINE --> DOMAINS
+    DOMAINS --> STROKE
+    RENDERER -->|"render() → render_result().svg"| ENGINE
+    RENDERING -.->|"compat: SVG_PROFILES / new_render_seed"| RENDERER
     RENDERING --> DB
     RENDERING -->|"PNG rasterization"| ANALYSIS
 ```
+
+The canonical path is `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()`. `renderer.py` is the compatibility facade for existing SVG-only callers; `renderer.render()` delegates to the canonical result's `.svg`. `api_core/rendering.py` retains compatibility references to `SVG_PROFILES` and `new_render_seed`, but there are zero reverse imports from `render_engines/default/` to `renderer.py`.
 
 ## Router groups
 

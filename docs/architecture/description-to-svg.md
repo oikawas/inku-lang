@@ -130,7 +130,7 @@ There are about thirty branches, in four families.
 
 ## Performance — Render Engine
 
-From the settled Score plus `render_seed`, `wild`, the color-catalog mapping, and `canvas` (inside the Score), the current engine (`render_engines/default.py`) produces the SVG and the performance metadata. **The same Score, the same render seed, and the same conditions reproduce the same work** — the contract the frozen corpora guard. There is no API to choose a past engine; history display returns the stored SVG.
+From the settled Score plus `render_seed`, `wild`, the color-catalog mapping, and `canvas` (inside the Score), canonical `render_engines/default/engine.py` produces the SVG and performance metadata through the registry-selected `render_engines/default/adapter.py`. `renderer.py` is the compatibility facade for existing SVG-only callers. **The same Score, the same render seed, and the same conditions reproduce the same work** — the contract the frozen corpora guard. There is no API to choose a past engine; history display returns the stored SVG.
 
 ## Identity and persistence
 

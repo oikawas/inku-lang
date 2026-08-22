@@ -10,9 +10,9 @@ from xml.etree import ElementTree
 
 import pytest
 
-from inku_server import renderer
 from inku_server.master_grid import fmt
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.render_engines.default import marks
 from inku_server.renderer import (
     AMPLITUDE_CLAMP_RATIO,
     MATERIAL_INTENSITY,
@@ -502,7 +502,7 @@ def test_performance_touch_filter_is_unchanged_at_unit_1000():
 
 def test_texture_filter_xml_is_unchanged_at_unit_1000(monkeypatch):
     """単位換算だけを見るため強度は起点 (m0) に固定する。"""
-    monkeypatch.setattr(renderer, "MATERIAL_INTENSITY_LEVEL", "m0")
+    monkeypatch.setattr(marks, "MATERIAL_INTENSITY_LEVEL", "m0")
     assert _texture_filter_xml("pencil", SQUARE) == (
         '<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%">'
         '<feTurbulence type="fractalNoise" baseFrequency="0.900000" numOctaves="2" '

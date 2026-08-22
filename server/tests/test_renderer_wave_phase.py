@@ -11,12 +11,12 @@ import re
 
 import pytest
 
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.renderer import (
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
     _segment_count,
-    _seed_for_instruction,
     render,
 )
 from inku_server.schema import Instruction, Score, Variation

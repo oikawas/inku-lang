@@ -15,10 +15,10 @@ import pytest
 
 from inku_server.renderer import (
     _edge_contour_with_anchors,
-    _seed_for_instruction,
     _stroke_width_px,
     render,
 )
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS, synthesize_along
 

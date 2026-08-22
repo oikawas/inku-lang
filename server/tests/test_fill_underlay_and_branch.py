@@ -41,6 +41,7 @@ from PIL import Image
 
 import inku_server.renderer as renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.render_engines.default import marks
 from inku_server.renderer import (
     FILL_COVERAGE_BRANCH,
@@ -872,7 +873,7 @@ def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
         payload = dict(CIRCLE, weight=tool, filled=True)
         contour = _contour(payload)
         layers = renderer._field_tone_patches(
-            contour, renderer._seed_for_instruction(
+            contour, _seed_for_instruction(
                 Instruction.model_validate(payload), SEED
             ), 2 * payload["radius"] * CANVAS.unit,
         )

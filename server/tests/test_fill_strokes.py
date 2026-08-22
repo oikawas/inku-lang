@@ -13,13 +13,13 @@ import re
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.renderer import (
     FILL_REACH_WIDTHS_MIN,
     FILL_REACH_WIDTHS_SPAN,
     _fill_scan_angle,
     _fill_scan_spacing,
     _scanline_segments,
-    _seed_for_instruction,
     _stroke_width_px,
     render,
 )

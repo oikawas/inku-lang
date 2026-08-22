@@ -18,11 +18,11 @@ import pytest
 from inku_server.coerce import coerce_score
 from inku_server.composer import _score_tool_schema
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.renderer import (
     MIN_STROKE_WIDTH,
     THINNESS_TO_WIDTH_SCALE,
     WEIGHT_TO_STROKE_WIDTH,
-    _seed_for_instruction,
     _stroke_width_px,
     render,
 )

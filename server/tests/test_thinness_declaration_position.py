@@ -27,7 +27,7 @@ from typing import Iterator
 import pytest
 
 from inku_server import composer
-from inku_server.renderer import _seed_for_instruction
+from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.schema import Instruction, Score
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

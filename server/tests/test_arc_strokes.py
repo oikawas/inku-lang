@@ -17,7 +17,8 @@ from xml.etree import ElementTree
 
 import pytest
 
-from inku_server.renderer import _seed_for_instruction, render
+from inku_server.render_engines.default.determinism import _seed_for_instruction
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS
 

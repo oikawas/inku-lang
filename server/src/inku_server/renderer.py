@@ -19,8 +19,6 @@ from .render_engines.default.determinism import (
     _WORK_COLOR_SEED_FIELDS as _WORK_COLOR_SEED_FIELDS,
     _hash01,
     _needs_blur,
-    _needs_contour_variation as _needs_contour_variation,
-    _seed_for_instruction as _seed_for_instruction,
     _variation_seed_fields as _variation_seed_fields,
     new_render_seed as new_render_seed,
 )

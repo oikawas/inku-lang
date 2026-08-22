@@ -184,6 +184,12 @@ def test_performance_tables_match_sources() -> None:
     assert performance["svg_profiles"] == sorted(SVG_PROFILES)
 
 
+def test_seed_summary_names_the_canonical_determinism_owner() -> None:
+    summary = _ref()["performance"]["seed_summary"]
+    assert "default.determinism._seed_for_instruction" in summary
+    assert "renderer._seed_for_instruction" not in summary
+
+
 def test_verification_thresholds_match_geometry_module() -> None:
     thresholds = _ref()["verification"]["geometry_thresholds"]
     assert thresholds == {

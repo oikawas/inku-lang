@@ -16,34 +16,8 @@
 	import { saveBlob } from '$lib/features/export/save-target';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import type { SheetVariant } from '$lib/contactSheet';
-
-	export type LineageNode = {
-		id: string;
-		state: 'active' | 'lineage_only' | 'tombstone';
-		description_hash?: string | null;
-		render_hash?: string | null;
-		at: number;
-		deleted_at?: number | null;
-		child_count?: number;
-		// Why this node has no contents. 'deleted' is gone for good; 'not_permitted'
-		// still exists and its owner can hand it over. Both draw as an empty dashed
-		// card, so the word is the only thing that separates them -- and the second
-		// is the one where asking gets you somewhere.
-		redacted?: 'deleted' | 'not_permitted' | null;
-		history?: HistoryItem | null;
-	};
-	export type LineageEdge = {
-		id: string;
-		parent_node_id: string;
-		child_node_id: string;
-		derivation_kind: string;
-		metadata?: Record<string, unknown>;
-	};
-	export type LineageGraph = { focus_node_id: string; nodes: LineageNode[]; edges: LineageEdge[] };
+	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
-
-	/** One of the works the server found close to the one on screen. */
-	type NearbyWork = { id?: string; input: string; svg: string };
 
 	type Props = {
 		graph: LineageGraph | null;
@@ -78,7 +52,7 @@
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
-		/** 写生 (Stage 0.5): redraw a work at a different grain, as its child. */
+		/** Redraw a work with a different sketch-from-life grain as its child. */
 		onDrawSketchGrain: (node: LineageNode, grain: SketchGrain, signal?: AbortSignal) => Promise<void>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -138,7 +112,7 @@
 	let activeEditNode = $state<LineageNode | null>(null);
 	let editMode = $state<'description' | 'ddl' | null>(null);
 	let editDraft = $state('');
-	// 写生 (Stage 0.5): the grain lives on the edit shelf, next to editing the
+	// Sketch from life (Stage 0.5): the grain lives on the edit shelf beside
 	// description and the instructions -- not on the refinement radio, because
 	// changing it re-runs 0.5 and Stage 1 and is not deterministic.
 	let activeSketchNode = $state<LineageNode | null>(null);
@@ -399,7 +373,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function openNode(node: LineageNode): Promise<void> {
 		if (overviewOpen) closeOverview();
-		// 選択中の作品を押し直しても取り直さない（ダブルクリックで二重に取りにいかないため）
+		// Do not reload the selected work; a double-click must not fetch twice.
 		else if (node.id === graph?.focus_node_id) return;
 		await onOpenNode(node);
 	}
@@ -1157,7 +1131,7 @@ $effect(() => {
 	.orientation-toggle button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
-	/* 寸法は header button 側 (--btn-sm-*) に従う。ここでは色だけを上書きする。 */
+	/* Dimensions follow the header button tokens; only color is overridden here. */
 	.detach-btn { background: var(--ddl-btn-bg); border-color: var(--ddl-btn-border); color: var(--ddl-btn-fg); font-weight: 600; box-shadow: var(--ddl-btn-shadow); white-space: nowrap; }
 	.detach-btn:hover { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
@@ -1189,7 +1163,7 @@ $effect(() => {
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
-	/* 作品の星。押しても作品は切り替えない（選択はカード本体） */
+	/* Work star: pressing it does not select the work; the card owns selection. */
 	.card-star { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	/* The revision mark rides beside the star in the same shell: the two are
@@ -1231,7 +1205,7 @@ $effect(() => {
 	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 210px; border: 1px solid var(--border2); border-radius: 6px; padding: 0 0 4px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
 	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font-size: 0.82rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
 	.card-dropdown-menu button:hover { background: var(--bg2); }
-	/* メニュー見出し: 帯を敷いて項目と明確に分ける */
+	/* A band separates the menu heading clearly from its actions. */
 	.card-dropdown-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; }
 	.card-dropdown-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.02em; }
 	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }

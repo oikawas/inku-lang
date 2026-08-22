@@ -20,7 +20,8 @@
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
-	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
+	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
+	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
@@ -377,7 +378,6 @@
 	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
-	let nearbyHistory = $state<Iteration[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
 	let variationGridIncludesReading = $state(false);
@@ -422,11 +422,6 @@
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
-	let lineageGraph = $state<LineageGraph | null>(null);
-	let lineageLoading = $state(false);
-	let lineageError = $state<string | null>(null);
-	let lineageLoadedFocus = $state<string | null>(null);
-	let lineageRequestId = 0;
 	let lineageDetached = $state(false);
 	let zoom         = $state(1);
 	let canvasFitZoom = $state(1);
@@ -756,6 +751,7 @@
 	}
 
 	const apiFetch = createApiFetch();
+	const lineageState = new LineageQueryState(apiFetch);
 	const settings = createSettingsController({
 		apiFetch,
 		currentUser: () => currentUser,
@@ -800,28 +796,6 @@
 			return svg;
 		} catch {
 			return '';
-		}
-	}
-
-	let nearbyHistoryRequestId = 0;
-	let nearbyHistoryLoadedId: string | null = null;
-
-	async function loadNearbyHistory(historyId: string | null | undefined) {
-		const normalizedHistoryId = historyId ?? null;
-		if (normalizedHistoryId === nearbyHistoryLoadedId) return;
-		nearbyHistoryLoadedId = normalizedHistoryId;
-		const requestId = ++nearbyHistoryRequestId;
-		nearbyHistory = [];
-		if (!historyId) return;
-		try {
-			const response = await apiFetch(`/api/history/${historyId}/neighbors`, { cache: 'no-store' });
-			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const items = await response.json();
-			if (requestId === nearbyHistoryRequestId) {
-				nearbyHistory = Array.isArray(items) ? items : [];
-			}
-		} catch {
-			if (requestId === nearbyHistoryRequestId) nearbyHistory = [];
 		}
 	}
 
@@ -1918,7 +1892,7 @@
 	let displayedHistoryItem = $state<Iteration | null>(null);
 	$effect(() => {
 		const historyId = displayedHistoryItem?.id ?? result?.history_id ?? null;
-		void loadNearbyHistory(historyId);
+		void lineageState.loadNearby(historyId);
 	});
 	let historySelectionSyncRequest = 0;
 	// Which listing request is the current one. Every other async route on this
@@ -2144,7 +2118,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 					activeRunTokensIn = tokensIn;
 					activeRunTokensOut = tokensOut;
 				},
-				loadNearbyHistory,
+				loadNearbyHistory: lineageState.loadNearby,
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => {
 					if (currentUser) {
@@ -3150,14 +3124,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		historyManager.applyStarState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
-		if (lineageGraph) {
-			lineageGraph = {
-				...lineageGraph,
-				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
-					? { ...node, history: { ...node.history, starred: item.starred, note: hasNote ? item.note : node.history.note } }
-					: node)
-			};
-		}
+		lineageState.applyStarState(item);
 	}
 
 	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
@@ -3197,14 +3164,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		historyManager.applyForRevisionState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, for_revision: item.for_revision };
-		if (lineageGraph) {
-			lineageGraph = {
-				...lineageGraph,
-				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
-					? { ...node, history: { ...node.history, for_revision: item.for_revision } }
-					: node)
-			};
-		}
+		lineageState.applyForRevisionState(item);
 	}
 
 	async function toggleHistoryForRevision(item: HistoryForRevisionTarget | null | undefined, event?: Event): Promise<void> {
@@ -3250,14 +3210,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		historyManager.applyForShareState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, ...next };
-		if (lineageGraph) {
-			lineageGraph = {
-				...lineageGraph,
-				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
-					? { ...node, history: { ...node.history, ...next } }
-					: node)
-			};
-		}
+		lineageState.applyForShareState(item);
 	}
 
 	async function toggleHistoryForShare(item: HistoryForShareTarget | null | undefined, event?: Event): Promise<void> {
@@ -3472,7 +3425,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		}
 		historyManager.selectedIds = [];
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
-		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
+		if (lineageState.graph?.focus_node_id) await lineageState.load(lineageState.graph.focus_node_id, true);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
 		// The strip re-seats its cursor once the listing has been read again, and
 		// the canvas has to be showing the work the badge is on. Left to itself
@@ -3634,81 +3587,12 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		outputTab = source;
 	}
 
-async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
-	if (!nodeId || (!force && lineageLoadedFocus === nodeId)) return;
-	const requestId = ++lineageRequestId;
-	lineageLoading = true;
-	lineageError = null;
-	try {
-		const url = "/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=" + descendantDepth + "&node_limit=200";
-		const r = await apiFetch(url, { cache: "no-store" });
-		if (!r.ok) throw new Error("HTTP " + r.status);
-		const graph = await r.json() as LineageGraph;
-		if (requestId !== lineageRequestId) return;
-		lineageGraph = graph;
-		lineageLoadedFocus = nodeId;
-	} catch (cause) {
-		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
-	} finally {
-		if (requestId === lineageRequestId) lineageLoading = false;
-	}
-}
-
-
-async function loadLineageBranch(nodeId: string): Promise<void> {
-	if (!lineageGraph) return;
-	const focusNodeId = lineageGraph.focus_node_id;
-	const requestId = ++lineageRequestId;
-	lineageLoading = true;
-	lineageError = null;
-	try {
-		const r = await apiFetch("/api/lineage/" + encodeURIComponent(nodeId) + "?descendant_depth=1&node_limit=200", { cache: "no-store" });
-		if (!r.ok) throw new Error("HTTP " + r.status);
-		const branch = await r.json() as LineageGraph;
-		if (requestId !== lineageRequestId || lineageGraph?.focus_node_id !== focusNodeId) return;
-		const nodes = new Map(lineageGraph.nodes.map((node) => [node.id, node]));
-		const edges = new Map(lineageGraph.edges.map((edge) => [edge.id, edge]));
-		for (const node of branch.nodes) nodes.set(node.id, node);
-		for (const edge of branch.edges) edges.set(edge.id, edge);
-		lineageGraph = { ...lineageGraph, nodes: [...nodes.values()], edges: [...edges.values()] };
-	} catch (cause) {
-		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
-	} finally {
-		if (requestId === lineageRequestId) lineageLoading = false;
-	}
-}
-
-
-async function loadLineageOverview(): Promise<void> {
-	const focusNodeId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
-	if (!focusNodeId || !lineageGraph) return;
-	const childIds = new Set(lineageGraph.edges.map((edge) => edge.child_node_id));
-	const rootNodeId = lineageGraph.nodes.find((node) => !childIds.has(node.id))?.id ?? focusNodeId;
-	const requestId = ++lineageRequestId;
-	lineageLoading = true;
-	lineageError = null;
-	try {
-		const url = "/api/lineage/" + encodeURIComponent(rootNodeId) + "?descendant_depth=200&node_limit=200";
-		const r = await apiFetch(url, { cache: "no-store" });
-		if (!r.ok) throw new Error("HTTP " + r.status);
-		const overview = await r.json() as LineageGraph;
-		if (requestId !== lineageRequestId) return;
-		lineageGraph = { ...overview, focus_node_id: focusNodeId };
-		lineageLoadedFocus = focusNodeId;
-	} catch (cause) {
-		if (requestId === lineageRequestId) lineageError = cause instanceof Error ? cause.message : String(cause);
-	} finally {
-		if (requestId === lineageRequestId) lineageLoading = false;
-	}
-}
-
-
 async function openLineageNode(node: LineageNode): Promise<void> {
 	if (!node.history) return;
 	loadIterationItem(node.history);
 	outputTab = 'lineage';
 	lineageDetached = false;
-	await fetchLineage(node.id, true);
+	await lineageState.load(node.id, true);
 }
 
 // In the Lineage tab, double-click opens the work in Canvas; single-click only selects it.
@@ -3751,7 +3635,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	// land on the canvas tab and show it. The lineage is still refreshed below.
 	outputTab = 'canvas';
 	loadIterationItem(saved);
-	await fetchLineage(nodeId, true);
+	await lineageState.load(nodeId, true);
 }
 
 async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
@@ -3936,8 +3820,8 @@ async function openCurrentDdlEditor(): Promise<void> {
 	const nodeId = currentLineageNodeId;
 	if (!nodeId) return;
 	const item = displayedHistoryItem ?? historyItems.find((entry) => entry.id === result?.history_id) ?? null;
-	if (!lineageGraph?.nodes.some((entry) => entry.id === nodeId)) await fetchLineage(nodeId, true);
-	const node = lineageGraph?.nodes.find((entry) => entry.id === nodeId) ?? null;
+	if (!lineageState.graph?.nodes.some((entry) => entry.id === nodeId)) await lineageState.load(nodeId, true);
+	const node = lineageState.graph?.nodes.find((entry) => entry.id === nodeId) ?? null;
 	if (!node) return;
 	openLineageDdlEditor(node.history ? node : { ...node, history: item });
 }
@@ -3959,8 +3843,8 @@ function closeDdlDialog(): void {
 // Refresh the lineage tree when the comparison dialog closes so adopted
 // results (saved as children) appear without reopening the tab.
 function refreshLineageAfterRefine(): void {
-	const focusId = lineageGraph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
-	if (focusId) void fetchLineage(focusId, true);
+	const focusId = lineageState.graph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	if (focusId) void lineageState.load(focusId, true);
 }
 
 // The DDL dialog draws through Stage 2 only, so its picker moves the global
@@ -4000,11 +3884,11 @@ async function promoteLineageNode(node: LineageNode): Promise<void> {
 	if (contextVersion !== targetContextVersion) return;
 	if (displayedHistoryItem?.id === promoted.id) {
 		displayedHistoryItem = promoted;
-		await Promise.all([fetchLineage(node.id, true), syncHistoryStripToItem(promoted)]);
+		await Promise.all([lineageState.load(node.id, true), syncHistoryStripToItem(promoted)]);
 	} else {
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 		await Promise.all([
-			fetchLineage(node.id, true),
+			lineageState.load(node.id, true),
 			activeHistoryId ? fetchHistoryOffset(0, { anchorId: activeHistoryId }) : fetchHistoryOffset(historyOffset, { preserveSelection: true }),
 		]);
 	}
@@ -4022,7 +3906,7 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	const updated = await r.json() as Iteration;
 	if (contextVersion !== targetContextVersion) return;
 	updateHistoryStarState(updated);
-	await fetchLineage(node.id, true);
+	await lineageState.load(node.id, true);
 }
 
 function detachLineage(): void {
@@ -4031,8 +3915,6 @@ function detachLineage(): void {
 	lineageDetached = true;
 	displayedHistoryItem = null;
 	historyCursor = -1;
-	lineageGraph = null;
-	lineageLoadedFocus = null;
 	outputTab = 'canvas';
 }
 
@@ -4042,7 +3924,7 @@ const currentLineageNodeId = $derived(displayedHistoryItem?.lineage_node_id ?? r
 const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(displayedHistoryItem?.ddl ?? ddl));
 
 $effect(() => {
-	if (outputTab === 'lineage' && currentLineageNodeId) void fetchLineage(currentLineageNodeId);
+	if (outputTab === 'lineage' && currentLineageNodeId) void lineageState.load(currentLineageNodeId);
 });
 
 	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
@@ -4073,11 +3955,7 @@ $effect(() => {
 		}
 		lineageIntermediateNotice = null;
 
-		lineageRequestId += 1;
-		lineageLoading = false;
-		lineageError = null;
-		lineageGraph = null;
-		lineageLoadedFocus = null;
+		lineageState.reset();
 	}
 
 	function loadIterationItem(it: Iteration) {
@@ -4139,7 +4017,7 @@ $effect(() => {
 		};
 		error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
-		if (preserveLineageTab && it.lineage_node_id) void fetchLineage(it.lineage_node_id, true);
+		if (preserveLineageTab && it.lineage_node_id) void lineageState.load(it.lineage_node_id, true);
 		fitCanvasZoom();
 		// The listing carries thumbnails, not drawings, so the work being put on
 		// the canvas fetches its own. One request for the one work being looked
@@ -4157,7 +4035,7 @@ $effect(() => {
 	}
 
 	function openNearbyHistory(id: string): void {
-		const item = nearbyHistory.find((candidate) => candidate.id === id);
+		const item = lineageState.nearby.find((candidate) => candidate.id === id);
 		if (item) loadIterationItem(item);
 	}
 
@@ -5865,7 +5743,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:exportWrapEl
 				exportCardOnly={!uiVisibility.work_tools}
 				{result}
-				{nearbyHistory}
+				nearbyHistory={lineageState.nearby}
 				onOpenNearbyHistory={openNearbyHistory}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
@@ -5957,9 +5835,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
-				{lineageGraph}
-				{lineageLoading}
-				{lineageError}
+				lineageGraph={lineageState.graph}
+				lineageLoading={lineageState.loading}
+				lineageError={lineageState.error}
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
 				onOpenLineageNodeInCanvas={openLineageNodeInCanvas}
@@ -5986,8 +5864,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onSaveLineageNote={saveLineageNote}
 				onAskTrashLineage={askTrash}
 				onDetachLineage={detachLineage}
-				onLoadLineageOverview={loadLineageOverview}
-				onLoadLineageBranch={loadLineageBranch}
+				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
+				onLoadLineageBranch={lineageState.loadBranch}
 				onPaintOne={paintOne}
 				onVisionAdvice={requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}

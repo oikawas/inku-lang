@@ -34,6 +34,7 @@ flowchart LR
     COMPONENTS["components/\ninput, canvas, history, lineage, settings"]
     FEATURES["features/<name>/\nbatch, export, catalog, inspection, Wild"]
     RUN["features/run/current-work.ts\none Paint request, stream, and saved-work projection"]
+    LINEAGE_STATE["features/history/lineage-state.svelte.ts\nroute-instance lineage queries + nearby works"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instance Settings shell + Server / model-provider / user-group administration"]
     SETTINGS_MODAL["SettingsModal.svelte\nSettings shell view"]
     USER_ADMIN_VIEW["features/settings/UserAdministrationSettings.svelte\nuser/group focused view"]
@@ -51,6 +52,8 @@ flowchart LR
     PAGE --> COMPONENTS
     PAGE --> FEATURES
     PAGE -->|"resolved defaults + named capabilities"| RUN
+    PAGE -->|"create owner + wire current focus/actions"| LINEAGE_STATE
+    RUN -->|"loadNearby capability"| LINEAGE_STATE
     PAGE -->|"create factory + wire external dependencies"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -64,6 +67,8 @@ flowchart LR
     SETTINGS -->|"named runtime operations"| RUNTIME_VIEW
     SETTINGS -->|"named settings and administration operations"| TRANSPORT
     RUN -->|"Paint stream + unread-word feedback"| TRANSPORT
+    LINEAGE_STATE -->|"lineage + neighbor queries"| TRANSPORT
+    LINEAGE_STATE -->|"graph/loading/error + nearby works"| COMPONENTS
     TRANSPORT --> API
     FEATURES -->|"load registration"| PERSIST
     FEATURES -->|"model_settings slice"| USERSET
@@ -79,8 +84,9 @@ flowchart LR
 
 | Owner | Examples | Boundary |
 |---|---|---|
-| Component/page memory | Current result, tab, selected history, lineage graph | Lost on reload; not Server-canonical |
+| Component/page memory | Current result, tab, and selected history | Lost on reload; not Server-canonical |
 | Stateless run feature | One Paint request, stream progress, and immediate saved-work projection | `runCurrentWork` receives resolved defaults and named capabilities; outer loops, route state, and AbortControllers stay with the page |
+| Route-instance lineage query owner | Lineage graph/loading/error, stale-response identity, branch/overview merge, and nearby works | One `LineageQueryState` per route; current focus selection and lineage actions remain with the page during Stage 5A |
 | Route-instance feature owner | Settings dialog visibility, tab and detail level; Server and model-provider administration; user/group lists, status, and operations | One `createSettingsController` per route; focused views receive only their required `userAdministration`, `database`/`db_backup`, `render_limits`, or `output_save`/`render_concurrency` slices and named operations |
 | Focused component memory | Unsaved API keys, account forms and passwords, and user/group selection | Kept only by the component that renders the input: account drafts in `UserAdministrationSettings.svelte`, API-key drafts in `SettingsModal.svelte` |
 | localStorage | UI language, Settings detail level, Wild, batch retry, result log, export and orientation settings | Browser-local |
@@ -90,6 +96,8 @@ flowchart LR
 | Server DB | History, SVG, Score, lineage | A client does not choose trusted SVG content |
 
 `+page.svelte` remains the screen orchestrator, while `features/run/current-work.ts` owns one Paint request, its NDJSON progress, and the immediate nearby-history, saved-lineage, generation-count, and unread-word effects. The page resolves its current settings and supplies narrow named capabilities; it retains the current result, outer submit/replay/batch/demo/refinement loops, stale-result decisions, and AbortController ownership.
+
+Stage 5A places lineage and nearby-work query state in one route-instance `LineageQueryState`. It owns request identity, loading/error, graph replacement, branch/overview merge, reset invalidation, and same-history neighbor deduplication. `runCurrentWork` receives its `loadNearby` method directly. The page still owns history-strip paging, `HistoryManagerState`, external refresh, mutation APIs, replay, current-focus choice, and Canvas/refinement actions until the later Stage 5 units.
 
 The Settings shell, Server administration, model-provider administration, and user/group administration state machines are owned by the route-instance `features/settings/state.svelte.ts`. The page wires the signed-in actor, session/user-settings refresh, external per-tab loaders, drawing-time model-catalog loader, and render-concurrency setter into the factory. Login/logout, the canonical current actor, and drawing-time model selection stay on the page. `SettingsModal.svelte` receives one `SettingsController` as the Settings shell. The user/group tab passes only the narrow `userAdministration` submodel and required session props to `UserAdministrationSettings.svelte`; account-form/password drafts stay in that input view, while API-key drafts stay in the modal. The database/backup tab passes only `database`/`db_backup` to `DatabaseAdministrationSettings.svelte`, the render-limits tab only `render_limits` to `RenderLimitsSettings.svelte`, and the server-runtime tab only `output_save`/`render_concurrency` to `ServerRuntimeSettings.svelte`, each with required named operations. Status and operation ownership stays in the route-instance feature owner. The owner never copies a secret from an operation argument into state, confirmation, or error output.
 

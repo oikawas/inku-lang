@@ -7,7 +7,7 @@
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import OutputTabsContent from './OutputTabsContent.svelte';
-	import type { LineageGraph, LineageNode } from './LineagePanel.svelte';
+	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import VariationLanes from './VariationLanes.svelte';
@@ -36,7 +36,6 @@
 	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; compose_fallback_used?: boolean; compose_retry_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; compose_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
-	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 	type VariationAmplitude = 'small' | 'medium' | 'large';
@@ -46,7 +45,7 @@
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
-		nearbyHistory: NearbyHistory[];
+		nearbyHistory: NearbyWork[];
 		onOpenNearbyHistory: (id: string) => void;
 		unsavedRefinementPreview: boolean;
 		lineageIntermediateNotice: string | null;
@@ -429,7 +428,7 @@
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
-	// 推敲要素の選択は前回の指定を引き継ぐ。
+	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
 	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'variation'];
 	let refineKind = $state<RefineKind>('touch');
@@ -444,7 +443,7 @@
 		refineKind = kind;
 		try { localStorage.setItem(REFINE_KIND_KEY, kind); } catch {}
 	}
-	// 「読み取りを変える」は DDL 由来の作品では出せないので、復元値がそれなら外す。
+	// DDL-origin works cannot vary interpretation, so remove a restored choice.
 	$effect(() => {
 		if (statusDdlOrigin && refineKind === 'reading') refineKind = 'touch';
 	});
@@ -557,7 +556,7 @@
 				.replace('{composition}', result.composition_seed == null ? t().seedBaseLabel : String(result.composition_seed))
 			: ''
 	);
-	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれた作品を明示する。
+	// Since v1.98, identify works drawn with fallback DDL after Stage 1 failed.
 	const interpretFallbackReason = $derived(
 		statusHistoryItem
 			? (statusHistoryItem.interpret_fallback ?? null)
@@ -613,11 +612,11 @@
 	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
 	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
 	const detailSeedText = $derived(statusHistoryItem?.seed_text ?? result?.seed_text ?? '');
-	// 暴れる: null は「この列を持つ前の作品」で、OFF とは別の状態。
+	// Wild: null predates the column and is different from Off.
 	const detailWild = $derived(statusHistoryItem?.render_wild ?? result?.render_wild ?? null);
 	const detailVariationAmplitude = $derived(statusHistoryItem?.variation_amplitude ?? result?.variation_amplitude ?? '');
 	const detailVariationSeed = $derived(statusHistoryItem?.variation_seed ?? result?.variation_seed ?? null);
-	// 写生 (Stage 0.5). Two things about the work: what the layer did (fine /
+	// Sketch from life (Stage 0.5). Two things about the work: what the layer did (fine /
 	// coarse / fallback / off / not_applicable) and the grain. The prose the
 	// layer wrote is deliberately not here -- the describe panel already holds
 	// it, at the length it deserves. A row with no state at all is a work drawn
@@ -655,7 +654,7 @@
 		: amplitude === 'medium' ? t().variationMedium
 		: amplitude === 'large' ? t().variationLarge
 		: amplitude;
-	// 由来の群は、系譜も派生もバッチもコメントも無い作品では丸ごと出さない。
+	// Hide the provenance group when the work has no lineage, derivation, batch, or note.
 	const hasOriginDetails = $derived(
 		statusGeneration != null || detailDerivationKind != null || !!detailBatchRunId || !!detailNote
 	);
@@ -669,7 +668,7 @@
 		else if (presentationMode) closePresentationMode();
 	}}
 	onpointerdown={(event) => {
-		// 生成情報ドロワーは、外を押したら閉じる。開閉ボタン自身は自分でトグルする。
+		// Clicking outside closes the generation drawer; its button toggles itself.
 		if (!generationInfoOpen) return;
 		const target = event.target as Node | null;
 		if (!target) return;
@@ -1874,11 +1873,11 @@
 		stroke-linejoin: round;
 	}
 	.refine-paint-actions { align-items: stretch; }
-	/* 速度目安は描画ボタンの直下に単独行で置く */
+	/* Keep the speed estimate on its own row directly below the draw button. */
 	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
-	/* 変奏の子であることが見えるよう、変奏ラジオの直下に段落ちさせる */
+	/* Indent amplitude below Variation to make the parent-child relation visible. */
 	.variation-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
-	/* 小・中・大は常に横 3 列（後段の .model-choice-grid に負けないよう詳細度を上げる） */
+	/* Small, medium, and large stay in three columns; beat the later model grid. */
 	.variation-amplitude-field .model-choice-grid.variation-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 	.variation-amplitude-field .model-choice { padding: 6px; gap: 5px; }
 	.variation-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
@@ -1911,8 +1910,8 @@
 	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
 	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
 	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
-	/* 候補はウインドウの残り高さに収める。行は等分し、カードは行の高さを埋める。 */
-	/* 候補が 1 枚なら 1 列にしてダイアログ幅いっぱいに見せる */
+	/* Fit candidates into the remaining height; rows divide it and cards fill each row. */
+	/* A single candidate uses one column and fills the dialog width. */
 	.variation-grid {
 		display: grid;
 		grid-template-columns: repeat(var(--variation-cols, 2), minmax(0, 1fr));
@@ -1926,7 +1925,7 @@
 		min-width: 0;
 		min-height: 0;
 	}
-	/* 未描画でも候補が並ぶ場所だと分かるよう、同じ枠を破線で示す */
+	/* A dashed frame marks the candidate slot before it has been drawn. */
 	.variation-grid-placeholder {
 		display: grid;
 		place-items: center;
@@ -2005,7 +2004,7 @@
 		background: var(--accent);
 		color: var(--accent-fg);
 	}
-	/* 保存済みは選択と区別できる塗りにし、押せない状態にする */
+	/* A saved candidate has a distinct fill and cannot be pressed again. */
 	.variation-select.saved {
 		border-color: var(--accent);
 		background: color-mix(in srgb, var(--accent) 20%, var(--panel));

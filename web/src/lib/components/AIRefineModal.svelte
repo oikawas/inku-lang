@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
-  import type { LineageNode } from './LineagePanel.svelte';
+  import type { LineageNode } from '$lib/features/history/types';
   import HistoryThumbnail from './HistoryThumbnail.svelte';
   import ModelCardPicker from './ModelCardPicker.svelte';
   import RunStatus from './RunStatus.svelte';
@@ -98,7 +98,7 @@
     return labels[kind] ?? kind;
   }
 
-  // 変奏 seed はサーバーが採番する (UI が seed 空間を持たない)。
+  // The Server assigns variation seeds; the UI does not own the seed space.
   async function allocateVariationSeed(amplitude: string): Promise<number> {
     const response = await fetch('/api/variation/seeds', {
       method: 'POST',
@@ -238,10 +238,10 @@
   .gen-value { min-width:38px; text-align:center; font-size:.9rem; font-variant-numeric:tabular-nums; }
   .advanced-settings { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg2); } .advanced-settings summary { font-size:.75rem; font-weight:600; color:var(--fg2); cursor:pointer; user-select:none; }
   .checkbox-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; } .checkbox-group label { display:flex; align-items:center; gap:8px; font-size:.74rem; cursor:pointer; } .checkbox-group input { width:14px; height:14px; accent-color:var(--accent); margin:0; }
-  /* 変奏の強度は変奏チェックボックスに従属するので、段落ち + border-left で示す (調整ダイアログと同型)。 */
+  /* Indentation and a left border show that amplitude belongs to Variation. */
   .variation-amplitude-field { grid-column: 1 / -1; margin: 2px 0 0 20px; padding-left: 10px; border-left: 2px solid var(--border2); }
   .variation-amplitude-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  /* .checkbox-group label / input より詳細度を上げる (同グリッド内のため)。 */
+  /* Beat the checkbox label/input specificity because they share this grid. */
   .variation-amplitude-field .amplitude-choice { display:flex; align-items:center; gap:6px; padding:6px; border:1px solid var(--border); border-radius:var(--r); background:var(--panel); color:var(--fg2); font-size:.68rem; cursor:pointer; }
   .variation-amplitude-field .amplitude-choice.checked { border-color: var(--accent); color: var(--fg); }
   .variation-amplitude-field .amplitude-choice input { width:12px; height:12px; accent-color:var(--accent); margin:0; }

@@ -34,6 +34,7 @@ import {
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const MODAL = read('./components/SettingsModal.svelte');
 const PAGE = read('../routes/+page.svelte');
+const SETTINGS = read('./features/settings/state.svelte.ts');
 
 /**
  * The four, written out here rather than read from the module under test.
@@ -110,13 +111,13 @@ test('T-47  the detailed mode hides none of them', () => {
 
 // ------------------------------------------------------------------- T-48
 
-test('T-48  the page asks both gates, and still asks the old one unchanged', () => {
-	assert.match(PAGE, /from '\$lib\/settingsDetail'/);
+test('T-48  the Settings owner asks both gates, and still asks the old one unchanged', () => {
+	assert.match(SETTINGS, /from '\$lib\/settingsDetail'/);
 	// The permission call is untouched -- the two gates compose rather than one
 	// swallowing the other, so a member outside the administrators group cannot
 	// reach an administrator tab by turning the switch on.
 	assert.match(
-		PAGE,
+		SETTINGS,
 		/canAccessSettingsTabFor\(tab, currentUser\) && settingsTabShownAtDetail\(tab, settingsDetail\)/
 	);
 	assert.equal(canAccessSettingsTab('server_misc', { permission_groups: ['users'] }), false);
@@ -153,13 +154,13 @@ test('T-50  the tab the dialog falls back to is one no gate can hide', () => {
 	assert.equal((ADMIN_ONLY_SETTINGS_TABS as readonly string[]).includes('export'), false);
 	assert.equal(canAccessSettingsTab('export', { permission_groups: ['users'] }), true);
 	assert.equal(settingsTabShownAtDetail('export', 'standard'), true);
-	assert.match(PAGE, /return canAccessSettingsTab\(preferred\) \? preferred : 'export';/);
+	assert.match(SETTINGS, /return canAccessSettingsTab\(preferred\) \? preferred : 'export';/);
 });
 
 // ------------------------------------------------------------------- T-51
 
 test('T-51  narrowing the dialog moves off a tab that has just gone', () => {
-	const setter = PAGE.slice(PAGE.indexOf('function setSettingsDetail'));
+	const setter = SETTINGS.slice(SETTINGS.indexOf('function setSettingsDetail'));
 	const body = setter.slice(0, setter.indexOf('\n\t}'));
 	assert.match(body, /settingsDetail = detail;/);
 	// Through selectSettingsTab, so the tab it lands on loads what it needs --
@@ -189,6 +190,7 @@ test('T-52  the remembered mode is read through the normaliser', () => {
 	assert.equal(normalizeSettingsDetail(null), 'standard');
 	assert.equal(normalizeSettingsDetail('full'), 'standard');
 	assert.equal(normalizeSettingsDetail(undefined), 'standard');
-	assert.match(PAGE, /normalizeSettingsDetail\(localStorage\.getItem\(SETTINGS_DETAIL_KEY\)\)/);
-	assert.match(PAGE, /localStorage\.setItem\(SETTINGS_DETAIL_KEY, detail\)/);
+	assert.match(SETTINGS, /normalizeSettingsDetail\(localStorage\.getItem\(SETTINGS_DETAIL_KEY\)\)/);
+	assert.match(SETTINGS, /localStorage\.setItem\(SETTINGS_DETAIL_KEY, detail\)/);
+	assert.match(PAGE, /createSettingsController\(\{/);
 });

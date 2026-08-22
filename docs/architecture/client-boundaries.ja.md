@@ -33,6 +33,9 @@ flowchart LR
     PAGE["+page.svelte\n画面orchestration"]
     COMPONENTS["components/\n入力・canvas・history・lineage・settings"]
     FEATURES["features/<name>/\nbatch/export/catalog/inspection/wild等"]
+    SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server管理"]
+    SETTINGS_MODAL["SettingsModal.svelte\ntyped controller境界"]
+    TRANSPORT["transport/api-fetch.ts\n認証済みHTTP transport"]
     PERSIST["persisted-settings.ts"]
     USERSET["user-settings.ts"]
     PAYLOAD["render-payload.ts"]
@@ -42,6 +45,11 @@ flowchart LR
 
     PAGE --> COMPONENTS
     PAGE --> FEATURES
+    PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
+    PAGE --> SETTINGS_MODAL
+    SETTINGS_MODAL -->|"SettingsController"| SETTINGS
+    SETTINGS -->|"名前付き設定・管理操作"| TRANSPORT
+    TRANSPORT --> API
     FEATURES -->|"load registration"| PERSIST
     FEATURES -->|"model_settings slice"| USERSET
     FEATURES -->|"request slice"| PAYLOAD
@@ -57,13 +65,14 @@ flowchart LR
 | 所有者 | 例 | 境界 |
 |---|---|---|
 | component/page memory | 描画中のresult、tab、history選択、lineage graph | reloadで消える。server正本ではない |
-| localStorage | UI language、wild、batch retry、result log、export設定、表示向き | browser-local |
+| route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理statusと操作 | `createSettingsController`をrouteごとに1回生成し、modalへtyped objectとして渡す |
+| localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
 | IndexedDB | File System Access APIのfolder handle | structured cloneが必要でlocalStorage外 |
 | user server settings | catalog、model inspection等の`model_settings` slice | login user単位、`user-settings.ts`で集約 |
 | render payload | catalog/wild等のrequest field | `render-payload.ts`のkind別contributor |
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
-`+page.svelte` は依然大きなorchestratorだが、UI componentとfeature stateは分離されている。主要表示は記述入力、canvas/refine/lineage、batch、demo、history manager、settingsで構成される。
+`+page.svelte` は依然大きなorchestratorだが、設定shellとserver管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者・各tabのloader・render同時実行数のsetterを配線し、`SettingsModal.svelte` は個別の管理status/callback群やraw transportではなく1個の `SettingsController` を受け取る。model providerとuser/group管理は後続stageの境界であり、このownerにはAPI keyやpassword編集値を入れない。
 
 ## CLI境界
 

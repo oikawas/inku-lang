@@ -33,6 +33,9 @@ flowchart LR
     PAGE["+page.svelte\nscreen orchestration"]
     COMPONENTS["components/\ninput, canvas, history, lineage, settings"]
     FEATURES["features/<name>/\nbatch, export, catalog, inspection, Wild"]
+    SETTINGS["features/settings/state.svelte.ts\nroute-instance Settings shell + Server administration"]
+    SETTINGS_MODAL["SettingsModal.svelte\ntyped controller boundary"]
+    TRANSPORT["transport/api-fetch.ts\nauthenticated HTTP transport"]
     PERSIST["persisted-settings.ts"]
     USERSET["user-settings.ts"]
     PAYLOAD["render-payload.ts"]
@@ -42,6 +45,11 @@ flowchart LR
 
     PAGE --> COMPONENTS
     PAGE --> FEATURES
+    PAGE -->|"create factory + wire external dependencies"| SETTINGS
+    PAGE --> SETTINGS_MODAL
+    SETTINGS_MODAL -->|"SettingsController"| SETTINGS
+    SETTINGS -->|"named settings and administration operations"| TRANSPORT
+    TRANSPORT --> API
     FEATURES -->|"load registration"| PERSIST
     FEATURES -->|"model_settings slice"| USERSET
     FEATURES -->|"request slice"| PAYLOAD
@@ -57,13 +65,14 @@ flowchart LR
 | Owner | Examples | Boundary |
 |---|---|---|
 | Component/page memory | Current result, tab, selected history, lineage graph | Lost on reload; not Server-canonical |
-| localStorage | UI language, Wild, batch retry, result log, export and orientation settings | Browser-local |
+| Route-instance feature owner | Settings dialog visibility, tab and detail level; Server administration status and operations | One `createSettingsController` per route, passed to the modal as a typed object |
+| localStorage | UI language, Settings detail level, Wild, batch retry, result log, export and orientation settings | Browser-local |
 | IndexedDB | File System Access folder handle | Needs structured clone, outside localStorage |
 | User Server settings | Catalog and model-inspection `model_settings` slices | Per login user through `user-settings.ts` |
 | Render payload | Catalog, Wild, and related request fields | Contributors grouped by request kind in `render-payload.ts` |
 | Server DB | History, SVG, Score, lineage | A client does not choose trusted SVG content |
 
-`+page.svelte` remains a large orchestrator, though UI components and feature state are separated. Main surfaces cover description input, canvas/refinement/lineage, batch, demo, history management, and settings.
+`+page.svelte` remains a large orchestrator, but the Settings shell and Server-administration state machine are owned by the route-instance `features/settings/state.svelte.ts`. The page wires the signed-in actor, per-tab loaders, and render-concurrency setter into the factory. `SettingsModal.svelte` receives one `SettingsController`, rather than individual administration status/callback props or raw transport. Model-provider and user/group administration remain later-stage boundaries; the controller does not own API keys or password-edit values.
 
 ## CLI boundary
 

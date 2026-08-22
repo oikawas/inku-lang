@@ -8,16 +8,9 @@
 	import { onMount, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
 	import {
-		canAccessSettingsTab as canAccessSettingsTabFor,
-		defaultSettingsTab as defaultSettingsTabFor,
 		holdsPermissionGroup,
 		type PermissionGroup
 	} from '$lib/permissionGroups';
-	import {
-		normalizeSettingsDetail,
-		settingsTabShownAtDetail,
-		type SettingsDetailLevel
-	} from '$lib/settingsDetail';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
@@ -63,6 +56,10 @@
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { createApiFetch } from '$lib/transport/api-fetch';
+	import {
+		createSettingsController,
+		type SettingsTab
+	} from '$lib/features/settings/state.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
@@ -124,16 +121,12 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
-	// Which of the settings dialog's tabs are on show. Kept in the browser, not
-	// on the member: it is a preference about this screen, and saving it would
-	// need a field the server does not have.
-	const SETTINGS_DETAIL_KEY = 'inku-settings-detail';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
 	const APP_VERSION = __APP_VERSION__;
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
-	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
+	// vite.config embeds BUILD_NUMBER's mtime. Treat an unreadable value as null.
 	const buildDateLabel = $derived.by(() => {
 		const stamp = new Date(__BUILD_DATE__);
 		if (Number.isNaN(stamp.getTime())) return null;
@@ -249,94 +242,6 @@
 		preview_url?: string;
 		preview_url_2x?: string;
 	};
-	type PluginItem = {
-		name: string;
-		namespace?: string;
-		version: string;
-		status: string;
-		entries?: PluginEntry[];
-		reasons?: string[];
-	};
-	type DbBackupEntry = {
-		kind: 'auto' | 'manual';
-		name: string;
-		at: number;
-		size_bytes: number;
-		generation: number | null;
-	};
-
-	type SettingsStatus = {
-		database: {
-			backend: string;
-			driver: string;
-			url: string;
-			database: string | null;
-			is_default: boolean;
-			file_size_bytes: number | null;
-			file_path: string | null;
-			runtime_editable: boolean;
-			note: string;
-		};
-		db_backup: {
-			supported: boolean;
-			interval_days: number;
-			max_generations: number;
-			backup_hour: number;
-			backup_minute: number;
-			last_auto_backup_at: number;
-			next_auto_backup_at: number;
-			backup_dir: string;
-			auto_count: number;
-			manual_count: number;
-			backups: DbBackupEntry[];
-			backups_total_count: number;
-			backups_total_size_bytes: number;
-		};
-		plugins: {
-			enabled: boolean;
-			loaded: PluginItem[];
-			runtime_editable: boolean;
-			note: string;
-		};
-		output_save: {
-			enabled: boolean;
-			output_dir: string;
-			png_size: number;
-			workers: number;
-			queue_limit: number;
-			submitted: number;
-			completed: number;
-			failed: number;
-			skipped: number;
-			note: string;
-		};
-		render_concurrency: {
-			server_limit: number;
-			client_limit: number;
-			min_limit: number;
-			max_limit: number;
-			note: string;
-		};
-		render_limits: {
-			limits: Record<string, number>;
-			defaults: Record<string, number>;
-			groups: Record<string, string[]>;
-			absolute_max: number;
-			bytes_per_mark: Record<string, number>;
-			note: string;
-		};
-		log_retention: {
-			enabled: boolean;
-			retention_days: number;
-			rotate: 'daily' | 'weekly' | 'monthly';
-			compress: boolean;
-			log_dir: string;
-			files: string[];
-			note: string;
-		};
-	};
-
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs' | 'limits';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -431,7 +336,7 @@
 	// only exist once it comes back. Naming the block with the line being painted
 	// put the previous line's work under the next line's number.
 	let batchObservedLine = $state<number | null>(null);
-	// 写生 (Stage 0.5) for the batch, kept apart from the single-mode prose: that
+	// Sketching (Stage 0.5) for the batch, kept apart from the single-mode prose: that
 	// one is an editable draft bound to one description, and a batch must not
 	// overwrite what the author is editing there. Written when a line returns,
 	// the same moment batchActiveDdl is, so the two always describe one work.
@@ -476,8 +381,9 @@
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
-	// v1.98: ddl は入力側 (Stage 1 出力 / ユーザーが書いた DDL)、expandedDdl は展開後
-	// (Stage 1.5 出力 = Stage 2 入力)。旧データは入力側を持たないため null になる。
+	// v1.98: ddl is the input side (Stage 1 output or author-written DDL), while
+	// expandedDdl is the expanded side (Stage 1.5 output and Stage 2 input).
+	// Older records have no input-side value and therefore expose null.
 	let expandedDdl = $state<string | null>(null);
 	let ddlGeneratedBaseline = $state<string | null>(null);
 	let ddlAutoRepairEnabled = $state(true);
@@ -488,7 +394,7 @@
 	// Same read point, same rule, for the limits that took effect on this
 	// drawing. Seven of the nine used to bind in silence (ledger I-154).
 	const limitNotesShown = $derived(limitNotesToShow(result));
-	// 写生 (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
+	// Sketching (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
 	// way a user setting like the color catalog is (contract section 0.3.1).
 	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
 	// The prose the layer wrote for the run on screen, and the author's edit of
@@ -582,8 +488,7 @@
 	let windowHeight = $state(800);
 	let saijikiOpen  = $state(false);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
-	let settingsOpen = $state(false);
-	// DDL editor dialog (new / edit), shared by 記述タブ new-button and lineage card menu.
+	// DDL editor dialog (new / edit), shared by the Description-tab new button and lineage card menu.
 	let ddlDialogOpen = $state(false);
 	let ddlDialogMode = $state<'new' | 'edit'>('new');
 	let ddlDialogNode = $state<LineageNode | null>(null);
@@ -595,9 +500,6 @@
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
 	let leftPanelCollapsed = $state(false);
-	let settingsMode = $state<'model' | 'settings'>('settings');
-	let settingsTab  = $state<SettingsTab>('connection');
-	let settingsDetail = $state<SettingsDetailLevel>('standard');
 	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(true);
@@ -636,7 +538,6 @@
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let modelSelectionAllowVision = $state(true);
-	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
 	// This server belongs to one person and signs them in by itself. The doors
@@ -754,7 +655,7 @@
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', effectEn: 'Draws as a run of dots.', exampleEn: 'Enclose with a dotted line', svg: lineSvg('stroke-dasharray="1 12"') },
 			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
-			// おもて: eleven words, one contour, eleven interiors (saijiki-surface.ts).
+			// Surface: eleven words, one contour, eleven interiors (saijiki-surface.ts).
 			...SURFACE_PREVIEWS,
 			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', effectEn: 'Draws in a white tone. Mind the contrast against the ground.', exampleEn: 'A white circle', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
 			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', effectEn: 'Draws in black, giving the strongest contour.', exampleEn: 'A black circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
@@ -872,9 +773,6 @@
 	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.effectiveId) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
-	let settingsStatus = $state<SettingsStatus | null>(null);
-	let settingsStatusError = $state<string | null>(null);
-	let settingsStatusLoading = $state(false);
 	let pluginEntries = $state<PluginEntry[]>([]);
 	let modelSettings = $state<ModelSettings | null>(null);
 	let modelSettingsStatus = $state<string | null>(null);
@@ -891,10 +789,6 @@
 		registerModelCatalog(availableModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
-	let dbBackupStatus = $state<string | null>(null);
-	let outputSaveStatus = $state<string | null>(null);
-	let logRetentionStatus = $state<string | null>(null);
-	let renderLimitsStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -952,9 +846,9 @@
 	};
 
 	/**
-	 * v1.98: サーバーが返す失敗詳細を人が読める 1 行にする。
-	 * プロバイダ由来の失敗（提供終了・認証・レート制限）は種別の説明を頭に置き、
-	 * 原因を追えるようにプロバイダの原文メッセージを必ず併記する。
+	 * v1.98: Turn a Server failure detail into one human-readable line.
+	 * Provider failures (retirement, authentication, and rate limiting) lead
+	 * with their category and retain the provider's original message for diagnosis.
 	 */
 	function describeApiError(detail: unknown, status: number): string {
 		if (detail === 'render capacity is full') return t().errorRenderBusy;
@@ -977,6 +871,18 @@
 	}
 
 	const apiFetch = createApiFetch();
+	const settings = createSettingsController({
+		apiFetch,
+		currentUser: () => currentUser,
+		setCurrentUser: (actor) => { currentUser = actor; },
+		loadAvailableModels,
+		loadModelSettings,
+		loadUserSettings,
+		loadExportTemplates,
+		cancelModelSelection: restoreModelSelection,
+		setRenderFanoutLimit: (limit) => { renderFanoutLimit = limit; },
+		describeApiError
+	});
 
 	/** Failed response -> Error carrying the localized message, never the raw body. */
 	async function apiError(r: Response): Promise<Error> {
@@ -1180,35 +1086,6 @@
 			console.warn('failed to save vision model', e);
 			throw e;
 		}
-	}
-
-	function isSettingsContentTab(tab: SettingsTab | undefined): tab is Exclude<SettingsTab, 'connection'> {
-		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
-	}
-
-	// Two gates, both of which have to open: the permission group says whether
-	// this member may see the tab at all, the detail level says whether they
-	// asked to. The tab bar in SettingsModal asks the second one the same way.
-	function canAccessSettingsTab(tab: SettingsTab) {
-		return canAccessSettingsTabFor(tab, currentUser) && settingsTabShownAtDetail(tab, settingsDetail);
-	}
-
-	function defaultSettingsTab(): SettingsTab {
-		const preferred = defaultSettingsTabFor(currentUser);
-		// `plugins` -- what a member outside the administrators group would land
-		// on -- is one of the tabs the standard mode hides. `export` is the
-		// fallback because no gate can hide it: it is neither administrator-only
-		// nor detailed-only, and T-50 executes that claim.
-		return canAccessSettingsTab(preferred) ? preferred : 'export';
-	}
-
-	function setSettingsDetail(detail: SettingsDetailLevel) {
-		settingsDetail = detail;
-		try { localStorage.setItem(SETTINGS_DETAIL_KEY, detail); } catch { /* private browsing */ }
-		// Narrowing the dialog can hide the tab that is open. Route the move
-		// through selectSettingsTab so the new tab loads what it needs, the way
-		// it would if the member had pressed it.
-		if (settingsOpen && !canAccessSettingsTab(settingsTab)) selectSettingsTab(defaultSettingsTab());
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -1697,45 +1574,10 @@
 		void updateUiMode('custom', { ...uiCustom, [key]: visible });
 	}
 
-	async function updateUserSettingsTab(tab: typeof settingsTab) {
-		if (!currentUser || !isSettingsContentTab(tab)) return;
-		const previousUser = currentUser;
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ settings_tab: tab })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-		} catch (e) {
-			currentUser = previousUser;
-			console.warn('failed to update settings tab', e);
-		}
-	}
-
-	function openSettings(tab: typeof settingsTab | null = null) {
-		settingsMode = 'settings';
-		const candidate = tab ?? (isSettingsContentTab(currentUser?.settings_tab) ? currentUser.settings_tab : defaultSettingsTab());
-		const nextTab = canAccessSettingsTab(candidate) ? candidate : defaultSettingsTab();
-		settingsTab = nextTab;
-		settingsOpen = true;
-		if (nextTab === 'models') void loadModelSettings();
-		if (nextTab === 'db' || nextTab === 'server_misc' || nextTab === 'logs') void loadSettingsStatus();
-		if (nextTab === 'users') void loadUserSettings();
-		if (nextTab === 'export') void loadExportTemplates();
-	}
-
 	function openModelSelection(allowVision = true) {
 		modelSelectionAllowVision = allowVision;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
-		settingsMode = 'model';
-		settingsTab = 'connection';
-		settingsOpen = true;
-		void loadAvailableModels();
+		settings.openModelSelection();
 	}
 
 	async function persistModelSelection() {
@@ -1775,10 +1617,10 @@
 	async function confirmModelSelection() {
 		modelSelectionSnapshot = null;
 		await persistModelSelection();
-		settingsOpen = false;
+		settings.finishModelSelection();
 	}
 
-	function cancelModelSelection() {
+	function restoreModelSelection() {
 		if (modelSelectionSnapshot) {
 			stage1Provider = modelSelectionSnapshot.stage1Provider;
 			stage1Model = modelSelectionSnapshot.stage1Model;
@@ -1788,12 +1630,6 @@
 			visionModel = modelSelectionSnapshot.visionModel;
 		}
 		modelSelectionSnapshot = null;
-		settingsOpen = false;
-	}
-
-	function closeSettingsModal() {
-		if (settingsMode === 'model') cancelModelSelection();
-		else settingsOpen = false;
 	}
 
 	function openCatalogModal() {
@@ -1861,16 +1697,6 @@
 		} catch (e) {
 			console.warn('failed to load color catalogs', e);
 		}
-	}
-
-	function selectSettingsTab(tab: typeof settingsTab) {
-		if (!canAccessSettingsTab(tab)) return;
-		settingsTab = tab;
-		void updateUserSettingsTab(tab);
-		if (tab === 'models') void loadModelSettings();
-		if (tab === 'db' || tab === 'server_misc' || tab === 'logs') void loadSettingsStatus();
-		if (tab === 'users') void loadUserSettings();
-		if (tab === 'export') void loadExportTemplates();
 	}
 
 	async function loadModelSettings() {
@@ -2287,223 +2113,6 @@
 		}
 	}
 
-	async function loadSettingsStatus() {
-		if (!currentUser || !isAdmin) {
-			settingsStatus = null;
-			settingsStatusError = currentUser
-				? t().settingsAdminOnlyMessage
-				: t().loginRequiredMessage;
-			return;
-		}
-		settingsStatusLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/status');
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			settingsStatus = await r.json();
-			settingsStatusError = null;
-			dbBackupStatus = null;
-			outputSaveStatus = null;
-			logRetentionStatus = null;
-			renderLimitsStatus = null;
-		} catch (e) {
-			settingsStatus = null;
-			settingsStatusError = e instanceof Error ? e.message : String(e);
-		} finally {
-			settingsStatusLoading = false;
-		}
-	}
-
-	// ── User plugin management (backend contract may not be deployed yet) ──
-	let pluginActionStatus = $state<string | null>(null);
-
-	function pluginErrorMessage(status: number, detail: unknown): string {
-		if (status === 404 || status === 405 || status === 501) {
-			return getLang() === 'ja'
-				? 'このプラグイン管理機能はサーバー側が未実装です（バックエンド待ち）。'
-				: 'This plugin management endpoint is not implemented on the server yet.';
-		}
-		if (Array.isArray(detail)) return (detail as string[]).join(' / ');
-		if (typeof detail === 'string') return detail;
-		return `HTTP ${status}`;
-	}
-
-	async function loadPluginContent(id: string): Promise<string | null> {
-		pluginActionStatus = null;
-		try {
-			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/content`);
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
-				return null;
-			}
-			const data = await r.json() as { content?: string };
-			return data.content ?? '';
-		} catch (e) {
-			pluginActionStatus = e instanceof Error ? e.message : String(e);
-			return null;
-		}
-	}
-
-	// Returns null on success, or an array of validation reasons / messages on failure.
-	async function savePlugin(id: string, content: string): Promise<string[] | null> {
-		pluginActionStatus = null;
-		try {
-			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, {
-				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
-			}
-			await loadSettingsStatus();
-			return null;
-		} catch (e) {
-			return [e instanceof Error ? e.message : String(e)];
-		}
-	}
-
-	async function createPlugin(content: string, filename: string): Promise<string[] | null> {
-		pluginActionStatus = null;
-		try {
-			const r = await apiFetch('/api/plugins', {
-				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, filename }),
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				return Array.isArray(d.detail) ? d.detail as string[] : [pluginErrorMessage(r.status, d.detail)];
-			}
-			await loadSettingsStatus();
-			return null;
-		} catch (e) {
-			return [e instanceof Error ? e.message : String(e)];
-		}
-	}
-
-	async function deletePlugin(id: string): Promise<boolean> {
-		pluginActionStatus = null;
-		try {
-			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' });
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
-				return false;
-			}
-			await loadSettingsStatus();
-			return true;
-		} catch (e) {
-			pluginActionStatus = e instanceof Error ? e.message : String(e);
-			return false;
-		}
-	}
-
-	async function setPluginEnabled(id: string, enabled: boolean): Promise<boolean> {
-		pluginActionStatus = null;
-		try {
-			const r = await apiFetch(`/api/plugins/${encodeURIComponent(id)}/enabled`, {
-				method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				pluginActionStatus = pluginErrorMessage(r.status, d.detail);
-				return false;
-			}
-			await loadSettingsStatus();
-			return true;
-		} catch (e) {
-			pluginActionStatus = e instanceof Error ? e.message : String(e);
-			return false;
-		}
-	}
-
-	async function updateDbBackupSettings(
-		intervalDays: number,
-		maxGenerations: number,
-		backupHour: number,
-		backupMinute: number
-	) {
-		dbBackupStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/db-backup', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					interval_days: intervalDays,
-					max_generations: maxGenerations,
-					backup_hour: backupHour,
-					backup_minute: backupMinute
-				})
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const nextBackup = await r.json() as SettingsStatus['db_backup'];
-			if (settingsStatus) settingsStatus = { ...settingsStatus, db_backup: nextBackup };
-		} catch (e) {
-			dbBackupStatus = t().settingsDbBackupSaveFailed;
-			console.warn('failed to update DB backup settings', e);
-		}
-	}
-
-	async function runDbBackupNow() {
-		dbBackupStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/db-backup/run', { method: 'POST' });
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			await loadSettingsStatus();
-			dbBackupStatus = t().settingsDbBackupRunDone;
-		} catch (e) {
-			dbBackupStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	async function updateOutputSaveSettings(enabled: boolean, outputDir: string, pngSize: number) {
-		outputSaveStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/output-save', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ enabled, output_dir: outputDir, png_size: pngSize })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const nextOutputSave = await r.json() as SettingsStatus['output_save'];
-			if (settingsStatus) settingsStatus = { ...settingsStatus, output_save: nextOutputSave };
-			outputSaveStatus = t().settingsOutputSaveSaved;
-		} catch (e) {
-			outputSaveStatus = e instanceof Error ? e.message : String(e);
-			console.warn('failed to update output save settings', e);
-		}
-	}
-
-	async function updateRenderConcurrencySettings(serverLimit: number, clientLimit: number) {
-		renderConcurrencyStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/render-concurrency', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ server_limit: serverLimit, client_limit: clientLimit })
-			});
-			if (!r.ok) throw await apiError(r);
-			const next = await r.json() as SettingsStatus['render_concurrency'];
-			if (settingsStatus) settingsStatus = { ...settingsStatus, render_concurrency: next };
-			// Apply to this tab at once; other tabs pick it up on their next load.
-			renderFanoutLimit = next.client_limit;
-			renderConcurrencyStatus = t().settingsRenderConcurrencySaved;
-		} catch (e) {
-			renderConcurrencyStatus = e instanceof Error ? e.message : String(e);
-			console.warn('failed to update render concurrency settings', e);
-		}
-	}
-
 	async function loadPublicAppInfo() {
 		currentRenderEngineVersion = null;
 		currentDdlVersion = null;
@@ -2543,52 +2152,6 @@
 		}
 	}
 
-	// A null patch means "restore the defaults". Only the changed field is sent;
-	// the server merges it over the stored set, rounds the result, and returns
-	// what took effect -- so the panel is refreshed from the RESPONSE, never
-	// from what was typed.
-	async function updateRenderLimits(patch: Record<string, number> | null) {
-		renderLimitsStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/limits', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(patch === null ? { reset_to_defaults: true } : patch)
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const nextLimits = await r.json() as SettingsStatus['render_limits'];
-			if (settingsStatus) settingsStatus = { ...settingsStatus, render_limits: nextLimits };
-			renderLimitsStatus = t().settingsRenderLimitsSaved;
-		} catch (e) {
-			renderLimitsStatus = e instanceof Error ? e.message : String(e);
-			console.warn('failed to update render limits', e);
-		}
-	}
-
-	async function updateLogRetentionSettings(enabled: boolean, retentionDays: number, rotate: string, compress: boolean) {
-		logRetentionStatus = null;
-		try {
-			const r = await apiFetch('/api/settings/log-retention', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ enabled, retention_days: retentionDays, rotate, compress })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const nextLogRetention = await r.json() as SettingsStatus['log_retention'];
-			if (settingsStatus) settingsStatus = { ...settingsStatus, log_retention: nextLogRetention };
-			logRetentionStatus = t().settingsLogRetentionSaved;
-		} catch (e) {
-			logRetentionStatus = e instanceof Error ? e.message : String(e);
-			console.warn('failed to update log retention settings', e);
-		}
-	}
-
 	async function loadCurrentUser() {
 		try {
 			const r = await apiFetch('/api/auth/me');
@@ -2599,7 +2162,7 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -2614,8 +2177,7 @@
 			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = null;
-			settingsStatus = null;
-			settingsStatusError = t().loginRequiredMessage;
+			settings.resetForLoggedOut();
 			historyItems = [];
 			historyTotal = 0;
 			trashItems = [];
@@ -2654,7 +2216,7 @@
 			// logged in and now gets a 401, so without reading them again the
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			await Promise.all([loadAvailableModels(), loadUserSettings(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -2682,8 +2244,7 @@
 		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
-		settingsStatus = null;
-		settingsStatusError = t().loginRequiredMessage;
+		settings.resetForLoggedOut();
 		users = [];
 		groups = [];
 		historyItems = [];
@@ -2925,7 +2486,7 @@
 		}
 	}
 
-	// ── エクスポートファイル名 ────────────────────────────────
+	// ── Export filenames ────────────────────────────────────
 	function exportFilename(ext: string, size?: number): string {
 		const now = new Date();
 		const pad = (n: number) => String(n).padStart(2, '0');
@@ -2984,10 +2545,10 @@
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
 	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
 	let historyStarredOnly = $state(false);
-	// The strip's own 推敲のみ filter. Separate from the manager's: the two
+	// The strip's own revision-only filter. Separate from the manager's: the two
 	// boxes are filtered independently, the same way starred already is.
 	let historyForRevisionOnly = $state(false);
-	// The strip's own 共有のみ filter, beside the other two. The manager keeps its
+	// The strip's own shared-only filter, beside the other two. The manager keeps its
 	// own copy for the same reason the revision mark does: the two boxes filter
 	// independently.
 	let historyForShareOnly = $state(false);
@@ -3042,7 +2603,7 @@
 		return input;
 	});
 
-	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれたかどうか。
+	// v1.98: Whether Stage 1 failed and the work used fallback DDL.
 	const interpretFallbackReason = $derived(
 		displayedHistoryItem
 			? (displayedHistoryItem.interpret_fallback ?? null)
@@ -3163,7 +2724,7 @@
 		/** Per-feature overrides for the render request; built by the features. */
 		renderOverrides?: RenderOverrides;
 		compositionSeed?: number;
-		// 変奏 (v2.0): 両方そろって初めてサーバーが展開層をずらす。
+		// Variation (v2.0): the Server shifts the expansion layer only when both values exist.
 		variationAmplitude?: string;
 		variationSeed?: number;
 		interpretationSeed?: string;
@@ -3177,7 +2738,7 @@
 		lineageParentNodeId?: string | null;
 		derivationKind?: DerivationKind | null;
 		derivationMetadata?: Record<string, unknown>;
-		// 写生 (Stage 0.5). `sketchMode` says whether the layer runs and at which
+		// Sketching (Stage 0.5). `sketchMode` says whether the layer runs and at which
 		// grain; `sketchText` hands the server prose it already has, so a redraw
 		// of a saved work replays instead of asking a non-deterministic layer again.
 		sketchMode?: SketchMode;
@@ -3339,7 +2900,7 @@ if (unreadWords.length > 0) {
 	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides } = {}): Promise<{
 		score: Score;
 		svg: string;
-		// Stage 2 に渡った展開後 DDL (v1.98)
+		// Expanded DDL passed to Stage 2 (v1.98).
 		ddl?: string | null;
 		source_ddl?: string | null;
 		stage2_model?: string | null;
@@ -3421,7 +2982,7 @@ if (unreadWords.length > 0) {
 
 	// The strip badge marks what the canvas is showing, not what was saved last.
 	// A batch can be stepped off the latest render — clicking a thumbnail or
-	// leaving the バッチ tab stops the follow — and from then on the badge has to
+	// leaving the Batch tab stops the follow — and from then on the badge has to
 	// stay on the artwork on screen instead of chasing every new line. It clears
 	// when that artwork is not in the newest window, rather than pointing at a
 	// neighbour.
@@ -3633,7 +3194,7 @@ if (unreadWords.length > 0) {
 		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
 		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
 		const submitTextChanged = input.trim() !== submitSource.trim();
-		// 写生 (Stage 0.5). The grain edge fires only when the grain differs from
+		// Sketching (Stage 0.5). The grain edge fires only when the grain differs from
 		// the parent's, exactly as description_edit fires only when the text does;
 		// one edge, one cause, so a changed description stays a description edit.
 		const submitParentGrain = normalizeSketchGrain(displayedHistoryItem?.sketch_grain);
@@ -3879,7 +3440,7 @@ if (unreadWords.length > 0) {
 		stopBatch();
 	}
 
-	// ── Replay (Stage 2 のみ) ────────────────────────────────
+	// ── Replay (Stage 2 only) ───────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
@@ -4849,7 +4410,7 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	await fetchLineage(node.id, true);
 }
 
-// 系譜タブ: ダブルクリックは作品タブへ移す（シングルクリックは選択のまま）。
+// In the Lineage tab, double-click opens the work in Canvas; single-click only selects it.
 async function openLineageNodeInCanvas(node: LineageNode): Promise<void> {
 	if (!node.history) return;
 	loadIterationItem(node.history);
@@ -4914,7 +4475,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
-/** 写生 (Stage 0.5): redraw a saved work at a different grain, as its child.
+/** Sketching (Stage 0.5): redraw a saved work at a different grain, as its child.
  *  The prose is written again -- the grain is what changed, so replaying the
  *  stored prose would leave the parameter dead. */
 async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal): Promise<void> {
@@ -5374,7 +4935,7 @@ $effect(() => {
 			saijikiOpen = false;
 			userMenuOpen = false;
 			if (profileOpen) closeProfile();
-			if (settingsOpen) closeSettingsModal();
+			if (settings.opened) settings.close();
 			if (catalogOpen) cancelCatalogSelection();
 			historyManager.open = false;
 			confirmAction = null;
@@ -5383,7 +4944,7 @@ $effect(() => {
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || profileOpen || settingsOpen || catalogOpen || historyManager.open || confirmAction) return true;
+		if (!currentUser || profileOpen || settings.opened || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -5970,7 +5531,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return results;
 	}
 
-	// 変奏の seed はサーバーが採番する。seed 空間の管理と重複回避を UI に持ち込まない。
+	// The Server allocates variation seeds; seed-space ownership and deduplication stay out of the UI.
 	async function allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]> {
 		const r = await apiFetch("/api/variation/seeds", {
 			method: "POST",
@@ -6033,7 +5594,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (Number.isFinite(candidate.result.composition_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.composition_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
-			// 変奏の seed 採番はサーバー側なので、候補生成前に count 個まとめて確保する。
+			// Allocate all variation seeds before candidate generation because the Server owns numbering.
 			const variationSeeds = kind === "variation" ? await allocateVariationSeeds(amplitude ?? "medium", count) : [];
 			// The label is lifted out of the job so the lane can be named before the
 			// job that fills it has started.
@@ -6634,9 +6195,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
-			// Anything but 'detailed' means standard, so a cleared or corrupted
-			// entry opens the dialog at its narrow width rather than throwing.
-			settingsDetail = normalizeSettingsDetail(localStorage.getItem(SETTINGS_DETAIL_KEY));
+			settings.restoreDetail();
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
@@ -6707,7 +6266,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{currentUser}
 		bind:userMenuOpen
 		bind:userMenuWrapEl
-		{settingsOpen}
+		settingsOpen={settings.opened}
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
@@ -6720,7 +6279,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}
-		onOpenSettings={() => openSettings()}
+		onOpenSettings={() => settings.openSettings()}
 		onToggleTheme={() => void updateUiTheme(!darkMode)}
 		onOpenAppInfo={() => (appInfoOpen = true)}
 	/>
@@ -6821,7 +6380,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- DDL ツール -->
+					<!-- DDL tools -->
 					{#if inputMode === 'single'}
 						<section class="panel-section ddl-tools-section">
 							<Tooltip placement="left" text={t().tooltipDdlEdit}>
@@ -6833,7 +6392,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- 指示書から描画したときの状況表示。入力欄ではなくボタンの下に出す -->
+					<!-- DDL-run status belongs below the action buttons, not inside the input field. -->
 					{#snippet ddlRunStatus()}
 						<RunStatus
 							label={stageLabel || t().stageDdlGenerating}
@@ -6845,7 +6404,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						/>
 					{/snippet}
 
-					<!-- 写生 (Stage 0.5). Above the instructions because it comes before
+					<!-- Sketching (Stage 0.5). Above the instructions because it comes before
 					     them: the author reads the prose the layer wrote, and may
 					     rewrite it. What is left here is what Stage 1 reads. -->
 					{#if inputMode === 'single' && (sketchText !== null || result !== null)}
@@ -6885,7 +6444,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- 解釈 (正規化DDL・閲覧専用) -->
+					<!-- Interpretation: normalized DDL, read-only. -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
 							<DdlViewer
@@ -6900,8 +6459,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- 展開層が落としたもの。編集中の指摘 (DDL エディタ) と対で、
-					     消えた後にしか分からない側をここが受け持つ。 -->
+					<!-- What the expansion layer removed. This complements editor-time
+					     DDL warnings by reporting the side only known after expansion. -->
 					{#if pluginWarningsShown.length > 0 && inputMode === 'single'}
 						<section class="panel-section plugin-warnings">
 							<div class="plugin-warnings-title">{t().ddlPluginWarningsTitle}</div>
@@ -6911,8 +6470,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- どの上限が効いたか。墨が減った理由は絵からは読めず、
-					     効いた設定の名前を言えるのはここだけ。 -->
+					<!-- Which limits took effect. The image cannot explain why ink was
+					     reduced; only this response can name the active settings. -->
 					{#if limitNotesShown.length > 0 && inputMode === 'single'}
 						<section class="panel-section limit-notes">
 							<div class="limit-notes-title">{t().renderLimitNotesTitle}</div>
@@ -6930,7 +6489,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- 統計 -->
+					<!-- Statistics -->
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
 							<Tooltip placement="right" text={t().tooltipStatsToggle}>
@@ -7220,34 +6779,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 <!-- ══ SETTINGS MODAL ══ -->
-{#if settingsOpen}
+{#if settings.opened}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			settings={settings}
 			{singleUserMode}
-			{settingsMode}
-			{settingsTab}
-			{settingsDetail}
 			{stage1Provider}
 			{stage1Model}
 			{stage2Provider}
 			{stage2Model}
 			{visionProvider}
 			{visionModel}
-			providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
+			providerGroups={settings.mode === 'model' ? availableModelCatalog : modelCatalog}
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			bind:includeThinking
-			{settingsStatus}
-			{settingsStatusError}
-			{settingsStatusLoading}
 			bind:modelSettings
 			{modelSettingsStatus}
 			{modelFetchResults}
 			{modelSettingsLoading}
-			{dbBackupStatus}
-			{outputSaveStatus}
-			{logRetentionStatus}
-			{renderLimitsStatus}
 			{currentUser}
 			{uiMode}
 			{uiCustom}
@@ -7289,9 +6839,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 			onChooseDownloadFolder={chooseDownloadFolder}
 			onClearDownloadFolder={clearDownloadFolder}
-			onClose={closeSettingsModal}
-			onSelectSettingsTab={selectSettingsTab}
-			onSetSettingsDetail={setSettingsDetail}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
 			onSetStage2Provider={setStage2Provider}
@@ -7308,20 +6855,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSaveModelProvider={saveModelProvider}
 			onSaveModelSettings={saveModelSettings}
 			onLoadModelSettings={loadModelSettings}
-			onLoadSettingsStatus={loadSettingsStatus}
-			{pluginActionStatus}
-			onLoadPluginContent={loadPluginContent}
-			onSavePlugin={savePlugin}
-			onCreatePlugin={createPlugin}
-			onDeletePlugin={deletePlugin}
-			onSetPluginEnabled={setPluginEnabled}
-			onUpdateDbBackupSettings={updateDbBackupSettings}
-			onRunDbBackupNow={runDbBackupNow}
-			onUpdateOutputSaveSettings={updateOutputSaveSettings}
-			{renderConcurrencyStatus}
-			onUpdateRenderConcurrencySettings={updateRenderConcurrencySettings}
-			onUpdateLogRetentionSettings={updateLogRetentionSettings}
-			onUpdateRenderLimits={updateRenderLimits}
 			onLoadUserSettings={loadUserSettings}
 			onLogin={login}
 			onLogout={logout}
@@ -7335,7 +6868,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetEditGroup={setEditGroup}
 			onClearEditGroup={clearEditGroup}
 			onSaveGroupEdit={saveGroupEdit}
-			onCancelModelSelection={cancelModelSelection}
 			onConfirmModelSelection={confirmModelSelection}
 			onAddExportTemplate={addExportTemplate}
 			onUpdateExportTemplate={updateExportTemplate}
@@ -7573,13 +7105,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--danger-fg:    #ffffff;
 		--r:            4px;
 		--r-lg:         8px;
-		/* 小型ボタン (ghost / ツールバー) の寸法。テーマに依らないので light 側にのみ置く。
-		   個々のコンポーネントで px を書かず、必ずこのトークンを参照する。 */
+		/* Small-button dimensions for ghost and toolbar controls. They are
+		   theme-independent, so define them once here and reference the tokens. */
 		--btn-sm-font-size: 11px;
 		--btn-sm-padding:   4px 10px;
 		--btn-sm-radius:    var(--r);
-		/* 指示書 (DDL) を扱うボタンの琥珀色。3 コンポーネントで同じリテラルが
-		   複製されていたものをトークン化した (Build 739)。両テーマ共通。 */
+		/* Amber colors for DDL controls. Build 739 replaced literals duplicated
+		   across three components with these tokens, shared by both themes. */
 		--ddl-btn-bg:           #fff7e8;
 		--ddl-btn-border:       #d8b36a;
 		--ddl-btn-fg:           #6c4a10;
@@ -7587,26 +7119,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--ddl-btn-border-hover: #bd8f34;
 		--ddl-btn-fg-hover:     #4f360b;
 		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
-		/* 名前空間付きの参照のうち、このサーバーが持っていない名前の色。
-		   赤 (--danger) は使わない: プラグインは後から足せるので、いま無い名前が
-		   明日は有効になる。琥珀は「間違い」ではなく「まだ無い」を言う。 */
+		/* A namespaced reference that this Server does not currently provide.
+		   Avoid danger red: a later plugin may make the name valid. Amber says
+		   "not available yet", rather than "incorrect". */
 		--ddl-token-unknown-fg:     #8a5a12;
 		--ddl-token-unknown-bg:     rgba(191, 136, 32, 0.12);
 		--ddl-token-unknown-border: rgba(191, 136, 32, 0.42);
-		/* 系譜で、起点からスター付き作品までの経路を引く色 */
+		/* Lineage path from the origin to a starred work. */
 		--star-path:    #d97a1f;
-		/* 星を付けた状態のボタン。5 コンポーネントが同じリテラルを複製し、
-		   ダークの値を持っていたのは履歴マネージャの 1 箇所だけだった。
-		   その 1 箇所の値をダーク側の正本として採った。 */
+		/* Starred-button colors. Five components duplicated the literals, while
+		   only History Manager had dark-theme values; those values became canonical. */
 		--star-fg:      #d59b21;
 		--star-bg:      #fff6ce;
 		--star-border:  rgba(213,155,33,0.45);
-		/* サムネイルの上に浮く星の台座。下地は作品そのもの (どちらのテーマでも
-		   紙の色) なので、--floating-control-* と違いテーマで反転させない。 */
+		/* Plate behind a star over a thumbnail. Its ground is the artwork's paper
+		   in either theme, so it does not invert like --floating-control-*. */
 		--thumb-plate-bg:     rgba(255,255,255,0.86);
 		--thumb-plate-fg:     rgba(40,36,30,0.42);
 		--thumb-plate-border: rgba(0,0,0,0.12);
-		/* 同じ台座でも数字は読ませる必要があるので、星より濃い字の色を持つ。 */
+		/* Numbers on the same plate need a darker foreground than the star. */
 		--thumb-plate-fg-read: rgba(40,36,30,0.72);
 	}
 
@@ -8074,7 +7605,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		border-bottom: none;
 	}
 
-	/* 写生 (Stage 0.5). Reads as prose, not as code: the instructions below it
+	/* Sketching (Stage 0.5). Reads as prose, not as code: the instructions below it
 	   are monospace because they are a score, this is the author's own language. */
 	.sketch-section { display: grid; gap: 6px; }
 	.sketch-head { display: flex; align-items: center; gap: 8px; }

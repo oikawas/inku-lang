@@ -15,97 +15,8 @@
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
+	import type { SettingsController, SettingsTab, PluginItem } from '$lib/features/settings/state.svelte';
 	import { markWeight } from '$lib/markWeight';
-
-	type PluginItem = {
-		name: string;
-		namespace?: string;
-		version: string;
-		status: string;
-		path?: string;
-		reasons?: string[];
-		entries?: Array<{ qualified_name: string; note_ja: string; note_en: string }>;
-		id?: string;
-		enabled?: boolean;
-	};
-	type DbBackupEntry = {
-		kind: 'auto' | 'manual';
-		name: string;
-		at: number;
-		size_bytes: number;
-		generation: number | null;
-	};
-
-	type SettingsStatus = {
-		database: {
-			backend: string;
-			driver: string;
-			url: string;
-			database: string | null;
-			is_default: boolean;
-			file_size_bytes: number | null;
-			file_path: string | null;
-			runtime_editable: boolean;
-			note: string;
-		};
-		db_backup: {
-			supported: boolean;
-			interval_days: number;
-			max_generations: number;
-			backup_hour: number;
-			backup_minute: number;
-			last_auto_backup_at: number;
-			next_auto_backup_at: number;
-			backup_dir: string;
-			auto_count: number;
-			manual_count: number;
-			backups: DbBackupEntry[];
-			backups_total_count: number;
-			backups_total_size_bytes: number;
-		};
-		plugins: {
-			enabled: boolean;
-			loaded: PluginItem[];
-			runtime_editable: boolean;
-			note: string;
-		};
-		output_save: {
-			enabled: boolean;
-			output_dir: string;
-			png_size: number;
-			workers: number;
-			queue_limit: number;
-			submitted: number;
-			completed: number;
-			failed: number;
-			skipped: number;
-			note: string;
-		};
-		render_concurrency: {
-			server_limit: number;
-			client_limit: number;
-			min_limit: number;
-			max_limit: number;
-			note: string;
-		};
-		render_limits: {
-			limits: Record<string, number>;
-			defaults: Record<string, number>;
-			groups: Record<string, string[]>;
-			absolute_max: number;
-			bytes_per_mark: Record<string, number>;
-			note: string;
-		};
-		log_retention: {
-			enabled: boolean;
-			retention_days: number;
-			rotate: 'daily' | 'weekly' | 'monthly';
-			compress: boolean;
-			log_dir: string;
-			files: string[];
-			note: string;
-		};
-	};
 	type PermissionGroup = 'admins' | 'leaders' | 'users';
 	type UserGroup = {
 		id: string;
@@ -123,8 +34,6 @@
 		image_generation_count: number;
 		at: number;
 	};
-	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs' | 'limits';
 	type ModelProviderSetting = {
 		label?: string;
 		kind?: string;
@@ -149,10 +58,8 @@
 	};
 
 	type Props = {
+		settings: SettingsController;
 		singleUserMode: boolean;
-		settingsMode: SettingsMode;
-		settingsTab: SettingsTab;
-		settingsDetail: SettingsDetailLevel;
 		stage1Provider: Provider;
 		stage1Model: string;
 		stage2Provider: Provider;
@@ -163,17 +70,10 @@
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
 		includeThinking: boolean;
-		settingsStatus: SettingsStatus | null;
-		settingsStatusError: string | null;
-		settingsStatusLoading: boolean;
 		modelSettings: ModelSettings | null;
 		modelSettingsStatus: string | null;
 		modelFetchResults: Record<string, ModelFetchResult>;
 		modelSettingsLoading: boolean;
-		dbBackupStatus: string | null;
-		outputSaveStatus: string | null;
-		logRetentionStatus: string | null;
-		renderLimitsStatus: string | null;
 		currentUser: UserItem | null;
 		uiMode: UiMode;
 		uiCustom: UiCustomVisibility;
@@ -214,9 +114,6 @@
 		canvasAspectEnabled: boolean;
 		onChooseDownloadFolder: () => void | Promise<void>;
 		onClearDownloadFolder: () => void | Promise<void>;
-		onClose: () => void;
-		onSelectSettingsTab: (tab: SettingsTab) => void;
-		onSetSettingsDetail: (detail: SettingsDetailLevel) => void;
 		onSetStage1Provider: (provider: Provider) => void;
 		onSetStage1Model: (model: string) => void;
 		onSetStage2Provider: (provider: Provider) => void;
@@ -233,20 +130,6 @@
 		onSaveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => void | Promise<void>;
 		onSaveModelSettings: () => void | Promise<void>;
 		onLoadModelSettings: () => void | Promise<void>;
-		onLoadSettingsStatus: () => void;
-		pluginActionStatus: string | null;
-		onLoadPluginContent: (id: string) => Promise<string | null>;
-		onSavePlugin: (id: string, content: string) => Promise<string[] | null>;
-		onCreatePlugin: (content: string, filename: string) => Promise<string[] | null>;
-		onDeletePlugin: (id: string) => Promise<boolean>;
-		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
-		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => void | Promise<void>;
-		onRunDbBackupNow: () => void | Promise<void>;
-		onUpdateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
-		renderConcurrencyStatus: string | null;
-		onUpdateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => void | Promise<void>;
-		onUpdateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => void | Promise<void>;
-		onUpdateRenderLimits: (patch: Record<string, number> | null) => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
@@ -264,15 +147,12 @@
 		onAddExportTemplate: () => void | Promise<void>;
 		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => void | Promise<void>;
 		onRemoveExportTemplate: (id: string) => void | Promise<void>;
-		onCancelModelSelection: () => void;
 		onConfirmModelSelection: () => void;
 	};
 
 	let {
+		settings,
 		singleUserMode,
-		settingsMode,
-		settingsTab,
-		settingsDetail,
 		stage1Provider,
 		stage1Model,
 		stage2Provider,
@@ -283,17 +163,10 @@
 		visionProviderGroups,
 		allowVisionSelection,
 		includeThinking = $bindable(),
-		settingsStatus,
-		settingsStatusError,
-		settingsStatusLoading,
 		modelSettings = $bindable(),
 		modelSettingsStatus,
 		modelFetchResults,
 		modelSettingsLoading,
-		dbBackupStatus,
-		outputSaveStatus,
-		logRetentionStatus,
-		renderLimitsStatus,
 		currentUser,
 		uiMode,
 		uiCustom,
@@ -334,9 +207,6 @@
 		canvasAspectEnabled,
 		onChooseDownloadFolder,
 		onClearDownloadFolder,
-		onClose,
-		onSelectSettingsTab,
-		onSetSettingsDetail,
 		onSetStage1Provider,
 		onSetStage1Model,
 		onSetStage2Provider,
@@ -353,20 +223,6 @@
 		onSaveModelProvider,
 		onSaveModelSettings,
 		onLoadModelSettings,
-		onLoadSettingsStatus,
-		pluginActionStatus,
-		onLoadPluginContent,
-		onSavePlugin,
-		onCreatePlugin,
-		onDeletePlugin,
-		onSetPluginEnabled,
-		onUpdateDbBackupSettings,
-		onRunDbBackupNow,
-		onUpdateOutputSaveSettings,
-		renderConcurrencyStatus,
-		onUpdateRenderConcurrencySettings,
-		onUpdateLogRetentionSettings,
-		onUpdateRenderLimits,
 		onLoadUserSettings,
 		onLogin,
 		onLogout,
@@ -384,9 +240,41 @@
 		onAddExportTemplate,
 		onUpdateExportTemplate,
 		onRemoveExportTemplate,
-		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
+
+	const settingsMode = $derived(settings.mode);
+	const settingsTab = $derived(settings.tab);
+	const settingsDetail = $derived(settings.detail);
+	const settingsStatus = $derived(settings.status);
+	const settingsStatusError = $derived(settings.statusError);
+	const settingsStatusLoading = $derived(settings.statusLoading);
+	const dbBackupStatus = $derived(settings.dbBackupStatus);
+	const outputSaveStatus = $derived(settings.outputSaveStatus);
+	const logRetentionStatus = $derived(settings.logRetentionStatus);
+	const renderLimitsStatus = $derived(settings.renderLimitsStatus);
+	const pluginActionStatus = $derived(settings.pluginActionStatus);
+	const renderConcurrencyStatus = $derived(settings.renderConcurrencyStatus);
+	const onClose = () => settings.close();
+	const onSelectSettingsTab = (tab: SettingsTab) => settings.selectTab(tab);
+	const onSetSettingsDetail = (detail: SettingsDetailLevel) => settings.setDetail(detail);
+	const onLoadSettingsStatus = () => void settings.loadStatus();
+	const onLoadPluginContent = (id: string) => settings.loadPluginContent(id);
+	const onSavePlugin = (id: string, content: string) => settings.savePlugin(id, content);
+	const onCreatePlugin = (content: string, filename: string) => settings.createPlugin(content, filename);
+	const onDeletePlugin = (id: string) => settings.deletePlugin(id);
+	const onSetPluginEnabled = (id: string, enabled: boolean) => settings.setPluginEnabled(id, enabled);
+	const onUpdateDbBackupSettings = (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) =>
+		settings.updateDbBackupSettings(intervalDays, maxGenerations, backupHour, backupMinute);
+	const onRunDbBackupNow = () => settings.runDbBackupNow();
+	const onUpdateOutputSaveSettings = (enabled: boolean, outputDir: string, pngSize: number) =>
+		settings.updateOutputSaveSettings(enabled, outputDir, pngSize);
+	const onUpdateRenderConcurrencySettings = (serverLimit: number, clientLimit: number) =>
+		settings.updateRenderConcurrencySettings(serverLimit, clientLimit);
+	const onUpdateLogRetentionSettings = (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) =>
+		settings.updateLogRetentionSettings(enabled, retentionDays, rotate, compress);
+	const onUpdateRenderLimits = (patch: Record<string, number> | null) => settings.updateRenderLimits(patch);
+	const onCancelModelSelection = () => settings.close();
 
 	// The tab bar asks the same question the page's guard asks, from the same
 	// module: a button the guard would refuse to act on must not be drawn.
@@ -2133,7 +2021,7 @@
 	}
 	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
 	.generation-model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
-	/* 取り消し線は退役にだけ引く。有料プラン限定は「消えた」のではない */
+	/* Strike through retired models only; a paid-plan model has not disappeared. */
 	.generation-model-grid button.eol strong { text-decoration: line-through; }
 	.eol-mark { color: var(--danger); font-weight: 600; }
 	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }

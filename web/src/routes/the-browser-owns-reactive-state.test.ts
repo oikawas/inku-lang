@@ -26,7 +26,11 @@ test('the browser owns every module-scoped reactive setting', () => {
 	const layout = readFileSync(join(ROUTES_DIR, '+layout.ts'), 'utf8');
 	assert.match(layout, /^export const ssr = false;$/m);
 
-	const instanceScoped = ['elapsed.svelte.ts', 'historyManagerState.svelte.ts'];
+	const instanceScoped = [
+		'elapsed.svelte.ts',
+		'features/settings/state.svelte.ts',
+		'historyManagerState.svelte.ts'
+	];
 	const moduleScoped = [
 		'features/batch/failure-report.svelte.ts',
 		'features/batch/settings.svelte.ts',

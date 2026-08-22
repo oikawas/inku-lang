@@ -256,11 +256,6 @@
 		sketch_open?: boolean;
 		ddl_expanded_open?: boolean;
 	};
-	type UserGroup = {
-		id: string;
-		name: string;
-		at: number;
-	};
 	type UserItem = {
 		id: string;
 		username: string;
@@ -767,25 +762,7 @@
 		registerModelCatalog(availableModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
-	let users = $state<UserItem[]>([]);
-	let groups = $state<UserGroup[]>([]);
-	let newUserName = $state('');
-	let newUserEmail = $state('');
-	let newUserPassword = $state('');
-	let newUserPermissionGroups = $state<PermissionGroup[]>(['users']);
-	let newUserGroupId = $state('');
-	let selectedUserId = $state<string | null>(null);
-	let editUserName = $state('');
-	let editUserEmail = $state('');
-	let editUserPassword = $state('');
-	let editUserPermissionGroups = $state<PermissionGroup[]>(['users']);
-	let editUserGroupId = $state('');
-	let newGroupName = $state('');
-	let editGroupId = $state<string | null>(null);
-	let editGroupName = $state('');
-	let userSettingsStatus = $state<string | null>(null);
-	let userSettingsLoading = $state(false);
-	let userSettingsRequestId = 0;
+	let currentUserSettingsRequestId = 0;
 	let authToken = $state<string | null>(null);
 	let currentUser = $state<UserItem | null>(null);
 	// What the signed-in member may do, derived once. Every gate below asks these
@@ -793,9 +770,6 @@
 	// land on the same questions, and a condition spelled out in twenty places is
 	// twenty places to keep in step.
 	const isAdmin = $derived(holdsPermissionGroup(currentUser, 'admins'));
-	// Leaders administer members; an admin outranks the distinction, so the
-	// leader-only branches are the ones that must exclude them.
-	const isLeaderOnly = $derived(!isAdmin && holdsPermissionGroup(currentUser, 'leaders'));
 	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
 	let uiModeSaving = $state(false);
 	let uiModeSaveError = $state(false);
@@ -854,7 +828,7 @@
 		currentUser: () => currentUser,
 		setCurrentUser: (actor) => { currentUser = actor; },
 		loadAvailableModels,
-		loadUserSettings,
+		refreshCurrentUserSettings,
 		loadExportTemplates,
 		cancelModelSelection: restoreModelSelection,
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
@@ -1719,49 +1693,23 @@
 		}
 	}
 
-	async function loadUserSettings() {
-		const requestId = ++userSettingsRequestId;
-		userSettingsLoading = true;
+	// This request clock belongs to the page's session actor. Administration
+	// lists have a separate clock in the Settings owner, which awaits this refresh.
+	async function refreshCurrentUserSettings(): Promise<boolean> {
+		const requestId = ++currentUserSettingsRequestId;
 		try {
 			const meResponse = await apiFetch('/api/auth/me', { cache: 'no-store' });
 			if (!meResponse.ok) throw new Error(t().loginRequiredMessage);
 			const actor = await meResponse.json() as UserItem;
-			if (requestId !== userSettingsRequestId) return;
+			if (requestId !== currentUserSettingsRequestId) return false;
 			currentUser = actor;
 			applyUserTheme(actor);
 			applyDownloadFolderSettings(actor);
 			applyUserModelSettings(actor);
 			authToken = 'cookie';
-			if (!holdsPermissionGroup(actor, 'admins')) {
-				users = [];
-				groups = [];
-				userSettingsStatus = null;
-				return;
-			}
-			const [groupsResponse, usersResponse] = await Promise.all([
-				apiFetch('/api/user-groups', { cache: 'no-store' }),
-				apiFetch('/api/users', { cache: 'no-store' }),
-			]);
-			if (!groupsResponse.ok || !usersResponse.ok) throw new Error(t().userInfoLoadFailed);
-			const [nextGroups, nextUsers] = await Promise.all([
-				groupsResponse.json() as Promise<UserGroup[]>,
-				usersResponse.json() as Promise<UserItem[]>,
-			]);
-			if (requestId !== userSettingsRequestId) return;
-			groups = nextGroups;
-			users = nextUsers;
-			if (!newUserGroupId && groups[0]) newUserGroupId = groups[0].id;
-			if (selectedUserId) {
-				const selected = users.find((user) => user.id === selectedUserId);
-				if (selected) setEditUser(selected);
-				else clearEditUser();
-			}
-			userSettingsStatus = null;
-		} catch (e) {
-			if (requestId !== userSettingsRequestId) return;
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			if (requestId === userSettingsRequestId) userSettingsLoading = false;
+			return true;
+		} catch {
+			return false;
 		}
 	}
 
@@ -1842,7 +1790,7 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), loadUserSettings(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			await Promise.all([loadAvailableModels(), settings.loadUserAdministration(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1896,13 +1844,12 @@
 			// logged in and now gets a 401, so without reading them again the
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), loadUserSettings(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			await Promise.all([loadAvailableModels(), settings.loadUserAdministration(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
 			loginStatus = message;
-			userSettingsStatus = message;
 		}
 	}
 
@@ -1925,8 +1872,6 @@
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
 		settings.resetForLoggedOut();
-		users = [];
-		groups = [];
 		historyItems = [];
 		historyTotal = 0;
 		trashItems = [];
@@ -1990,179 +1935,11 @@
 			profileCurrentPassword = '';
 			profileNewPassword = '';
 			profileStatus = t().profileSavedMessage;
-			await loadUserSettings();
+			await settings.loadUserAdministration();
 		} catch (e) {
 			profileStatus = e instanceof Error ? e.message : String(e);
 		} finally {
 			profileSaving = false;
-		}
-	}
-
-	async function addUser() {
-		const name = newUserName.trim();
-		const email = newUserEmail.trim();
-		if (isLeaderOnly) {
-			newUserPermissionGroups = ['users'];
-			newUserGroupId = currentUser?.group_id ?? '';
-		}
-		if (!name || !email || newUserPassword.length < 8) {
-			userSettingsStatus = t().userValidationCreate;
-			return;
-		}
-		try {
-			const r = await apiFetch('/api/users', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: name, email, password: newUserPassword, permission_groups: newUserPermissionGroups, group_id: newUserGroupId || null })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			newUserName = '';
-			newUserEmail = '';
-			newUserPassword = '';
-			newUserPermissionGroups = ['users'];
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	async function updateUser(user: UserItem, patch: Partial<UserItem> & { password?: string }) {
-		try {
-			const r = await apiFetch(`/api/users/${user.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(patch)
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-			await loadUserSettings();
-		}
-	}
-
-	function setEditUser(user: UserItem) {
-		selectedUserId = user.id;
-		editUserName = user.username;
-		editUserEmail = user.email;
-		editUserPassword = '';
-		editUserPermissionGroups = [...user.permission_groups];
-		editUserGroupId = user.group_id ?? '';
-	}
-
-	function clearEditUser() {
-		selectedUserId = null;
-		editUserName = '';
-		editUserEmail = '';
-		editUserPassword = '';
-		editUserPermissionGroups = ['users'];
-		editUserGroupId = '';
-	}
-
-	async function saveUserEdit() {
-		const user = users.find((item) => item.id === selectedUserId);
-		if (!user) return;
-		const username = editUserName.trim();
-		const email = editUserEmail.trim();
-		if (!username || !email) {
-			userSettingsStatus = t().userValidationUpdate;
-			return;
-		}
-		if (editUserPassword && editUserPassword.length < 8) {
-			userSettingsStatus = t().userPasswordTooShort;
-			return;
-		}
-		const patch: Partial<UserItem> & { password?: string } = {
-			username,
-			email,
-			permission_groups: isLeaderOnly ? ['users'] : editUserPermissionGroups,
-			group_id: isLeaderOnly ? (currentUser?.group_id ?? null) : (editUserGroupId || null),
-		};
-		if (editUserPassword) patch.password = editUserPassword;
-		await updateUser(user, patch);
-	}
-
-	async function removeUser(id: string) {
-		try {
-			const r = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			if (selectedUserId === id) clearEditUser();
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	async function addGroup() {
-		const name = newGroupName.trim();
-		if (!name) return;
-		try {
-			const r = await apiFetch('/api/user-groups', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			newGroupName = '';
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	async function removeGroup(group: UserGroup) {
-		try {
-			const r = await apiFetch(`/api/user-groups/${group.id}`, { method: 'DELETE' });
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	function setEditGroup(group: UserGroup) {
-		editGroupId = group.id;
-		editGroupName = group.name;
-	}
-
-	function clearEditGroup() {
-		editGroupId = null;
-		editGroupName = '';
-	}
-
-	async function saveGroupEdit() {
-		const id = editGroupId;
-		const name = editGroupName.trim();
-		if (!id || !name) return;
-		try {
-			const r = await apiFetch(`/api/user-groups/${id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			clearEditGroup();
-			await loadUserSettings();
-		} catch (e) {
-			userSettingsStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -6485,26 +6262,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onToggleHistoryStripField={(field) => void updateHistoryStripFields(toggleHistoryStripField(historyStripFields, field))}
 			onSetUiMode={(mode) => void updateUiMode(mode)}
 			onSetUiCustomItem={updateUiCustomItem}
-			{userSettingsStatus}
-			{userSettingsLoading}
+			{loginStatus}
 			bind:loginUserName
 			bind:loginPassword
-			{users}
-			{groups}
-			bind:newUserName
-			bind:newUserEmail
-			bind:newUserPassword
-			bind:newUserPermissionGroups
-			bind:newUserGroupId
-			{selectedUserId}
-			bind:editUserName
-			bind:editUserEmail
-			bind:editUserPassword
-			bind:editUserPermissionGroups
-			bind:editUserGroupId
-			bind:newGroupName
-			bind:editGroupName
-			{editGroupId}
 			bind:autoRepairEnabled={ddlAutoRepairEnabled}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
 			bind:animationExportSettings={exportSettings.animation}
@@ -6521,19 +6281,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetStage2Model={setStage2Model}
 			onSetVisionProvider={setVisionProvider}
 			onSetVisionModel={setVisionModel}
-			onLoadUserSettings={loadUserSettings}
 			onLogin={login}
 			onLogout={logout}
-			onAddUser={addUser}
-			onSetEditUser={setEditUser}
-			onClearEditUser={clearEditUser}
-			onSaveUserEdit={saveUserEdit}
-			onRemoveUser={removeUser}
-			onAddGroup={addGroup}
-			onRemoveGroup={removeGroup}
-			onSetEditGroup={setEditGroup}
-			onClearEditGroup={clearEditGroup}
-			onSaveGroupEdit={saveGroupEdit}
 			onConfirmModelSelection={confirmModelSelection}
 			onAddExportTemplate={addExportTemplate}
 			onUpdateExportTemplate={updateExportTemplate}
@@ -6699,8 +6448,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<ShareModal
 			itemId={shareTarget.id}
 			itemLabel={shareTarget.source_text ?? shareTarget.input ?? shareTarget.id}
-			users={users.map((u) => ({ id: u.id, name: u.username }))}
-			groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+			users={settings.users.map((u) => ({ id: u.id, name: u.username }))}
+			groups={settings.groups.map((g) => ({ id: g.id, name: g.name }))}
 			isJapanese={getLang() === 'ja'}
 			onClose={() => (shareTarget = null)}
 		/>

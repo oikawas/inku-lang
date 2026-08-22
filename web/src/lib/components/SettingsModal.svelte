@@ -15,30 +15,18 @@
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
+	import type { PermissionGroup } from '$lib/permissionGroups';
 	import type {
+		CreateSettingsUserInput,
 		ModelProviderSetting,
 		PluginItem,
 		SettingsController,
-		SettingsTab
+		SettingsTab,
+		SettingsUserGroup,
+		SettingsUserItem,
+		UpdateSettingsUserInput
 	} from '$lib/features/settings/state.svelte';
 	import { markWeight } from '$lib/markWeight';
-	type PermissionGroup = 'admins' | 'leaders' | 'users';
-	type UserGroup = {
-		id: string;
-		name: string;
-		at: number;
-	};
-	type UserItem = {
-		id: string;
-		username: string;
-		email: string;
-		permission_groups: PermissionGroup[];
-		permission_group_labels: string[];
-		group_id: string | null;
-		group_name: string | null;
-		image_generation_count: number;
-		at: number;
-	};
 
 	type Props = {
 		settings: SettingsController;
@@ -53,7 +41,7 @@
 		visionProviderGroups: ProviderGroup[];
 		allowVisionSelection: boolean;
 		includeThinking: boolean;
-		currentUser: UserItem | null;
+		currentUser: SettingsUserItem | null;
 		uiMode: UiMode;
 		uiCustom: UiCustomVisibility;
 		uiModeSaving: boolean;
@@ -64,26 +52,9 @@
 		onToggleHistoryStripField: (field: HistoryStripField) => void;
 		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onSetUiCustomItem: (key: UiVisibilityKey, visible: boolean) => void;
-		userSettingsStatus: string | null;
-		userSettingsLoading: boolean;
+		loginStatus: string | null;
 		loginUserName: string;
 		loginPassword: string;
-		users: UserItem[];
-		groups: UserGroup[];
-		newUserName: string;
-		newUserEmail: string;
-		newUserPassword: string;
-		newUserPermissionGroups: PermissionGroup[];
-		newUserGroupId: string;
-		selectedUserId: string | null;
-		editUserName: string;
-		editUserEmail: string;
-		editUserPassword: string;
-		editUserPermissionGroups: PermissionGroup[];
-		editUserGroupId: string;
-		newGroupName: string;
-		editGroupId: string | null;
-		editGroupName: string;
 		autoRepairEnabled: boolean;
 		pngAlphaWhite: boolean;
 		exportTemplates: ExportTemplate[];
@@ -99,19 +70,8 @@
 		onSetStage2Model: (model: string) => void;
 		onSetVisionProvider: (provider: Provider) => void;
 		onSetVisionModel: (model: string) => void;
-		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
-		onAddUser: () => void | Promise<void>;
-		onSetEditUser: (user: UserItem) => void;
-		onClearEditUser: () => void;
-		onSaveUserEdit: () => void | Promise<void>;
-		onRemoveUser: (id: string) => void | Promise<void>;
-		onAddGroup: () => void | Promise<void>;
-		onRemoveGroup: (group: UserGroup) => void | Promise<void>;
-		onSetEditGroup: (group: UserGroup) => void;
-		onClearEditGroup: () => void;
-		onSaveGroupEdit: () => void | Promise<void>;
 		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
 		onAddExportTemplate: () => void | Promise<void>;
 		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => void | Promise<void>;
@@ -143,26 +103,9 @@
 		onToggleHistoryStripField,
 		onSetUiMode,
 		onSetUiCustomItem,
-		userSettingsStatus,
-		userSettingsLoading,
+		loginStatus,
 		loginUserName = $bindable(),
 		loginPassword = $bindable(),
-		users,
-		groups,
-		newUserName = $bindable(),
-		newUserEmail = $bindable(),
-		newUserPassword = $bindable(),
-		newUserPermissionGroups = $bindable(),
-		newUserGroupId = $bindable(),
-		selectedUserId,
-		editUserName = $bindable(),
-		editUserEmail = $bindable(),
-		editUserPassword = $bindable(),
-		editUserPermissionGroups = $bindable(),
-		editUserGroupId = $bindable(),
-		newGroupName = $bindable(),
-		editGroupId,
-		editGroupName = $bindable(),
 		autoRepairEnabled = $bindable(true),
 		pngAlphaWhite = $bindable(),
 		exportTemplates,
@@ -178,19 +121,8 @@
 		onSetStage2Model,
 		onSetVisionProvider,
 		onSetVisionModel,
-		onLoadUserSettings,
 		onLogin,
 		onLogout,
-		onAddUser,
-		onSetEditUser,
-		onClearEditUser,
-		onSaveUserEdit,
-		onRemoveUser,
-		onAddGroup,
-		onRemoveGroup,
-		onSetEditGroup,
-		onClearEditGroup,
-		onSaveGroupEdit,
 		onSetCanvasAspectEnabled,
 		onAddExportTemplate,
 		onUpdateExportTemplate,
@@ -214,6 +146,10 @@
 	const modelSettingsStatus = $derived(settings.modelSettingsStatus);
 	const modelFetchResults = $derived(settings.modelFetchResults);
 	const modelSettingsLoading = $derived(settings.modelSettingsLoading);
+	const users = $derived(settings.users);
+	const groups = $derived(settings.groups);
+	const userSettingsStatus = $derived(loginStatus ?? settings.userAdministrationStatus);
+	const userSettingsLoading = $derived(settings.userAdministrationLoading);
 	const onClose = () => settings.close();
 	const onSelectSettingsTab = (tab: SettingsTab) => settings.selectTab(tab);
 	const onSetSettingsDetail = (detail: SettingsDetailLevel) => settings.setDetail(detail);
@@ -244,6 +180,114 @@
 	const onSaveModelProvider = (provider: Provider, patch?: Partial<ModelProviderSetting>) => settings.saveModelProvider(provider, patch);
 	const onSaveModelSettings = () => settings.saveModelSettings();
 	const onLoadModelSettings = () => settings.loadModelSettings();
+	const onLoadUserSettings = () => settings.loadUserAdministration();
+
+	// Unsaved account drafts stay with these inputs. Passwords cross into the
+	// controller only as transient operation arguments and are never controller state.
+	let newUserName = $state('');
+	let newUserEmail = $state('');
+	let newUserPassword = $state('');
+	let newUserPermissionGroups = $state<PermissionGroup[]>(['users']);
+	let newUserGroupId = $state('');
+	let selectedUserId = $state<string | null>(null);
+	let editUserName = $state('');
+	let editUserEmail = $state('');
+	let editUserPassword = $state('');
+	let editUserPermissionGroups = $state<PermissionGroup[]>(['users']);
+	let editUserGroupId = $state('');
+	let newGroupName = $state('');
+	let editGroupId = $state<string | null>(null);
+	let editGroupName = $state('');
+	let groupListDefaulted = $state<SettingsUserGroup[] | null>(null);
+
+	function onSetEditUser(user: SettingsUserItem): void {
+		selectedUserId = user.id;
+		editUserName = user.username;
+		editUserEmail = user.email;
+		editUserPassword = '';
+		editUserPermissionGroups = [...user.permission_groups];
+		editUserGroupId = user.group_id ?? '';
+	}
+
+	function onClearEditUser(): void {
+		selectedUserId = null;
+		editUserName = '';
+		editUserEmail = '';
+		editUserPassword = '';
+		editUserPermissionGroups = ['users'];
+		editUserGroupId = '';
+	}
+
+	$effect(() => {
+		const nextGroups = groups;
+		if (nextGroups === groupListDefaulted) return;
+		groupListDefaulted = nextGroups;
+		if (!newUserGroupId && nextGroups[0]) newUserGroupId = nextGroups[0].id;
+	});
+
+	// An authoritative reload refreshes the selected draft or clears a selection
+	// whose user was removed; ordinary typing does not retrigger this reconciliation.
+	$effect(() => {
+		const availableUsers = users;
+		if (!selectedUserId) return;
+		const selected = availableUsers.find((user) => user.id === selectedUserId);
+		if (selected) onSetEditUser(selected);
+		else onClearEditUser();
+	});
+
+	async function onAddUser(): Promise<void> {
+		const input: CreateSettingsUserInput = {
+			username: newUserName,
+			email: newUserEmail,
+			password: newUserPassword,
+			permission_groups: newUserPermissionGroups,
+			group_id: newUserGroupId || null
+		};
+		if (!await settings.addUser(input)) return;
+		newUserName = '';
+		newUserEmail = '';
+		newUserPassword = '';
+		newUserPermissionGroups = ['users'];
+	}
+
+	async function onSaveUserEdit(): Promise<void> {
+		if (!selectedUserId) return;
+		const input: UpdateSettingsUserInput = {
+			username: editUserName,
+			email: editUserEmail,
+			permission_groups: editUserPermissionGroups,
+			group_id: editUserGroupId || null
+		};
+		if (editUserPassword) input.password = editUserPassword;
+		if (await settings.updateUser(selectedUserId, input)) editUserPassword = '';
+	}
+
+	async function onRemoveUser(id: string): Promise<void> {
+		if (await settings.removeUser(id) && selectedUserId === id) onClearEditUser();
+	}
+
+	async function onAddGroup(): Promise<void> {
+		if (await settings.addGroup(newGroupName)) newGroupName = '';
+	}
+
+	async function onRemoveGroup(group: SettingsUserGroup): Promise<void> {
+		await settings.removeGroup(group);
+	}
+
+	function onSetEditGroup(group: SettingsUserGroup): void {
+		editGroupId = group.id;
+		editGroupName = group.name;
+	}
+
+	function onClearEditGroup(): void {
+		editGroupId = null;
+		editGroupName = '';
+	}
+
+	async function onSaveGroupEdit(): Promise<void> {
+		if (!editGroupId) return;
+		if (await settings.updateGroup(editGroupId, editGroupName)) onClearEditGroup();
+	}
 
 	// The tab bar asks the same question the page's guard asks, from the same
 	// module: a button the guard would refuse to act on must not be drawn.

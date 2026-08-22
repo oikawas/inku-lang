@@ -44,18 +44,18 @@ test('the first load asks for what the strip shows, not for a manager page', () 
 
 // ── The wiring ──────────────────────────────────────────────────────────────
 // Not one of the contract's gates. Measured after writing them: putting the old
-// ternary back into +page.svelte restores the whole 50 MB defect and turns
+// ternary back into the browsing owner restores the whole 50 MB defect and turns
 // nothing red, because every gate above drives the extracted function and no
 // gate watches the road to it. Extraction does not move the thoroughfare. This
-// reads the page's source, the way the trash-view gate next door does, since
+// reads the owner's source, the way the trash-view gate next door does, since
 // `test:unit` is node --test with no DOM to render the component in.
-const PAGE_SOURCE = readFileSync(
-	fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)),
+const BROWSING_SOURCE = readFileSync(
+	fileURLToPath(new URL('./features/history/browsing-state.svelte.ts', import.meta.url)),
 	'utf-8'
 );
 
-test('the page asks the shared decision instead of deciding again inline', () => {
-	const assignments = [...PAGE_SOURCE.matchAll(/const listLimit = ([^;]*);/g)];
+test('the browsing owner asks the shared decision instead of deciding again inline', () => {
+	const assignments = [...BROWSING_SOURCE.matchAll(/const listLimit = ([^;]*);/g)];
 	assert.equal(assignments.length, 1, 'expected exactly one listLimit assignment');
 	assert.match(assignments[0][1], /^historyListLimit\(/);
 });

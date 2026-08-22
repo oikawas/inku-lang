@@ -5,10 +5,10 @@
 // the tab" no longer jump the five-second floor.
 //
 // The decisions live in `historyRefreshDecision.ts` so these can drive them.
-// But a decision the page does not call is a decision that measures nothing --
+// But a decision the browsing owner does not call measures nothing --
 // extracting a function does not move the thoroughfare -- so every behavioural
-// check here has a companion that reads `+page.svelte` and confirms the page
-// still goes through it. Removing the call in the page and neutering the
+// check here has a companion that reads the owner and confirms live traffic
+// still goes through it. Removing the call and neutering the
 // function are different perturbations, and each must turn something red.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -25,11 +25,15 @@ const PAGE_SOURCE = readFileSync(
 	fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)),
 	'utf-8'
 );
+const BROWSING_SOURCE = readFileSync(
+	fileURLToPath(new URL('./features/history/browsing-state.svelte.ts', import.meta.url)),
+	'utf-8'
+);
 
-/** The body of one function in the page, braces matched. */
+/** The body of one function, with braces matched. */
 function functionBody(source: string, signature: string): string {
 	const start = source.indexOf(signature);
-	assert.notEqual(start, -1, `${signature} is gone from +page.svelte`);
+	assert.notEqual(start, -1, `${signature} is gone from its owner`);
 	let depth = 0;
 	for (let i = source.indexOf('{', start); i < source.length; i += 1) {
 		if (source[i] === '{') depth += 1;
@@ -46,7 +50,7 @@ function functionBody(source: string, signature: string): string {
 // Matched without the closing paren so that restoring the parameter still
 // slices the function rather than aborting the file. What the parameter list
 // holds is T-7's business, and it says so by name.
-const REFRESH = functionBody(PAGE_SOURCE, 'async function refreshHistoryForExternalSave(');
+const REFRESH = functionBody(BROWSING_SOURCE, 'async refreshExternal(');
 const MOUNT = functionBody(PAGE_SOURCE, 'onMount(() =>');
 
 const NOTHING_IN_THE_WAY: HistoryRefreshConditions = {
@@ -81,12 +85,12 @@ test('T-1 an unchanged answer means the listing is not fetched', () => {
 	}
 });
 
-test('T-1 the page asks the cheap question before it fetches the listing', () => {
+test('T-1 the browsing owner asks the cheap question before it fetches the listing', () => {
 	// The wiring half. Without this, deleting the early return from the page
 	// leaves every behavioural check above still green.
-	const asked = REFRESH.indexOf('fetchHistoryState()');
+	const asked = REFRESH.indexOf('this.fetchHistoryState()');
 	const decided = REFRESH.indexOf('historyStripIsCurrent(');
-	const fetched = REFRESH.indexOf('fetchHistoryOffset(');
+	const fetched = REFRESH.indexOf('this.fetchOffset(');
 	assert.notEqual(asked, -1, 'the refresh no longer asks /api/history/state');
 	assert.notEqual(decided, -1, 'the refresh no longer consults the decision');
 	assert.notEqual(fetched, -1, 'the refresh no longer fetches the listing at all');
@@ -99,9 +103,9 @@ test('T-1 the page asks the cheap question before it fetches the listing', () =>
 		'the decision no longer stops the round'
 	);
 	// The strip is what it compares against, so it needs the strip's numbers.
-	assert.match(REFRESH, /total: historyTotal/);
-	assert.match(REFRESH, /newestId: historyItems\[0\]\?\.id \?\? null/);
-	assert.match(REFRESH, /newestAt: historyItems\[0\]\?\.at \?\? null/);
+	assert.match(REFRESH, /total: this\.total/);
+	assert.match(REFRESH, /newestId: this\.items\[0\]\?\.id \?\? null/);
+	assert.match(REFRESH, /newestAt: this\.items\[0\]\?\.at \?\? null/);
 });
 
 // ── T-2: something changed, so it is fetched ────────────────────────────────
@@ -136,7 +140,7 @@ test('T-2 an answer that did not arrive falls through and fetches', () => {
 	// The safe direction: a server that cannot answer costs bandwidth, a client
 	// that treats silence as "nothing changed" costs the user their work
 	// appearing at all.
-	assert.match(REFRESH, /const state = await fetchHistoryState\(\);/);
+	assert.match(REFRESH, /const state = await this\.fetchHistoryState\(\);/);
 	assert.match(REFRESH, /if \(state && /, 'a missing answer must not count as unchanged');
 });
 
@@ -198,28 +202,28 @@ test('T-11 a strip that cannot show the newest work first is never current', () 
 	assert.equal(historyStripIsCurrent(SAME, { ...HELD, showsTheNewestFirst: true }), true);
 });
 
-test('T-11 the page derives that from the same state the guards read', () => {
+test('T-11 the owner derives that from the same state the guards read', () => {
 	assert.match(
 		REFRESH,
 		// The strip carries two filters now, and either one means the page in
 		// hand is not the plain newest-first listing.
-		/showsTheNewestFirst: historyOffset === 0 && !historyStripFiltered/,
-		'the page no longer tells the comparison whether the strip can answer'
+		/showsTheNewestFirst: this\.offset === 0 && !this\.filtered/,
+		'the owner no longer tells the comparison whether the strip can answer'
 	);
 });
 
-test('T-6 the page hands the guards its live values', () => {
+test('T-6 the owner hands the guards its live values', () => {
 	// A guard fed a constant is a guard that never fires. Each of these names
 	// the page's own state.
-	assert.match(REFRESH, /signedIn: !!authToken/);
-	assert.match(REFRESH, /managerOpen: historyManager\.open/);
-	assert.match(REFRESH, /starredOnly: historyStarredOnly/);
-	assert.match(REFRESH, /offset: historyOffset/);
-	assert.match(REFRESH, /loading,/);
-	assert.match(REFRESH, /visible: document\.visibilityState === 'visible'/);
-	assert.match(REFRESH, /inFlight: externalHistoryRefreshInFlight/);
-	assert.match(REFRESH, /lastRefreshAt: lastExternalHistoryRefreshAt/);
-	assert.match(REFRESH, /minGapMs: EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS/);
+	assert.match(REFRESH, /signedIn: this\.deps\.signedIn\(\)/);
+	assert.match(REFRESH, /managerOpen: this\.manager\.open/);
+	assert.match(REFRESH, /starredOnly: this\.starredOnly/);
+	assert.match(REFRESH, /offset: this\.offset/);
+	assert.match(REFRESH, /loading: this\.deps\.drawing\(\)/);
+	assert.match(REFRESH, /visible: this\.deps\.visible\(\)/);
+	assert.match(REFRESH, /inFlight: this\.externalRefreshInFlight/);
+	assert.match(REFRESH, /lastRefreshAt: this\.lastExternalRefreshAt/);
+	assert.match(REFRESH, /minGapMs: HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS/);
 	assert.match(REFRESH, /if \(historyRefreshBlockedBy\(\{[^}]*\}\)\) return;/s);
 	// The page must hold no second copy of the guards, or removing one from the
 	// module changes nothing.
@@ -254,12 +258,12 @@ test('T-7 no caller can ask the floor to be skipped', () => {
 	);
 });
 
-test('T-7 the page calls the refresh with nothing to force', () => {
-	assert.match(PAGE_SOURCE, /async function refreshHistoryForExternalSave\(\): Promise<void>/);
-	const calls = PAGE_SOURCE.match(/refreshHistoryForExternalSave\([^)]*\)/g) ?? [];
+test('T-7 the page calls the owner refresh with nothing to force', () => {
+	assert.match(BROWSING_SOURCE, /async refreshExternal\(\): Promise<void>/);
+	const calls = PAGE_SOURCE.match(/history\.refreshExternal\([^)]*\)/g) ?? [];
 	assert.ok(calls.length >= 3, `expected the timer and both handlers, found ${calls.length}`);
 	for (const call of calls) {
-		assert.equal(call, 'refreshHistoryForExternalSave()', `${call} still forces the round`);
+		assert.equal(call, 'history.refreshExternal()', `${call} still forces the round`);
 	}
 });
 
@@ -287,13 +291,13 @@ test('T-8 the page still listens for the tab coming back', () => {
 	assert.match(MOUNT, /window\.addEventListener\('focus', onHistoryWindowFocus\)/);
 	assert.match(
 		MOUNT,
-		/function onHistoryVisibilityChange\(\) \{\s*if \(document\.visibilityState === 'visible'\) void refreshHistoryForExternalSave\(\);\s*\}/
+		/function onHistoryVisibilityChange\(\) \{\s*if \(document\.visibilityState === 'visible'\) void history\.refreshExternal\(\);\s*\}/
 	);
 	assert.match(
 		MOUNT,
-		/function onHistoryWindowFocus\(\) \{\s*void refreshHistoryForExternalSave\(\);\s*\}/
+		/function onHistoryWindowFocus\(\) \{\s*void history\.refreshExternal\(\);\s*\}/
 	);
 	// And the twelve-second timer is untouched: the contract changes what a
 	// round costs, not how often one happens.
-	assert.match(MOUNT, /window\.setInterval\(\(\) => \{\s*void refreshHistoryForExternalSave\(\);\s*\}, EXTERNAL_HISTORY_REFRESH_MS\)/);
+	assert.match(MOUNT, /window\.setInterval\(\(\) => \{\s*void history\.refreshExternal\(\);\s*\}, HISTORY_EXTERNAL_REFRESH_MS\)/);
 });

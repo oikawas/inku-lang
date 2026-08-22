@@ -48,7 +48,7 @@
 | DATA-LINEAGE | 系譜node/edge | 明示された親とderivation kindだけをedge化 | `LineageNodeRow`, `LineageEdgeRow`, `db.py:add_item`; `test_lineage_acceptance.py` | §21、Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-SAIJIKI | 歳時記 | prompt、marker、relation、Web表示、referenceの語彙正本 | `saijiki.py` (`SAIJIKI`, `prompt_block`, `display_categories`); `test_saijiki_golden.py` | Project Context「語彙」 | 確認済み | 公開可 |
 | DATA-FALLBACK | fallbackの記録 | 各層のfallbackを列として保存（Stage 1 = `interpret_fallback`、Stage 2 = `compose_fallback`、写生 = `sketch_state`）。記録なし（列導入前の作品）とfallbackでないを区別する | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context「設計契約」 | 確認済み | 公開可 |
-| WEB-FEATURES | Web feature modules | batch、export、catalog、inspection、wild等を分離 | `web/src/lib/features/<name>/` | Project Context「web」 | 確認済み | 公開可 |
+| WEB-FEATURES | Web feature modules | batch、export、catalog、inspection、wild、Settings管理、1回のPaint run、lineage query、history browsingを分離 | `web/src/lib/features/<name>/` | Project Context「web」 | 確認済み | 公開可 |
 | WEB-REGISTRY | 3設定登録簿 | localStorage、user settings、render payloadを集約 | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context「web」 | 確認済み | 公開可 |
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |

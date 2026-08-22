@@ -106,20 +106,13 @@
 		type CanvasAspectId,
 	} from '$lib/plugins/system/canvas-aspect';
 	import {
-		HistoryManagerState,
 		type HistoryItem,
 		type Score
 	} from '$lib/historyManagerState.svelte';
-	import { historyListLimit } from '$lib/historyListLimit';
-	import { historyRefreshBlockedBy, historyStripIsCurrent, type HistoryState } from '$lib/historyRefreshDecision';
 	import {
-		alignHistoryOffset,
-		historyNavDisabled,
-		historyNavTarget,
-		historyPageTarget,
-		resolveStripSelection,
-		type HistoryNavTarget
-	} from '$lib/historyNavigation';
+		HISTORY_EXTERNAL_REFRESH_MS,
+		HistoryBrowsingState
+	} from '$lib/features/history/browsing-state.svelte';
 	import { hashDigest } from '$lib/hashIdentity';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
@@ -143,8 +136,6 @@
 	// two numbers is what the picker ever shows.
 	const BATCH_PROMPT_HISTORY_LIMIT = 50;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
-	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
-	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 	type VariationAmplitude = 'small' | 'medium' | 'large';
 
@@ -1148,7 +1139,7 @@
 		if (!value) {
 			result = null;
 			displayedHistoryItem = null;
-			historyCursor = -1;
+			history.clearSelection();
 			outputTab = 'canvas';
 			exportMenuOpen = false;
 			fitCanvasZoom();
@@ -1173,7 +1164,7 @@
 		canvasAspectId = nextAspectId;
 		result = null;
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		outputTab = 'canvas';
 		exportMenuOpen = false;
 		fitCanvasZoom();
@@ -1698,7 +1689,7 @@
 			authToken = 'cookie';
 			loginStatus = null;
 			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
-			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
+			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
@@ -1713,11 +1704,7 @@
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			loginStatus = null;
 			settings.resetForLoggedOut();
-			historyItems = [];
-			historyTotal = 0;
-			trashItems = [];
-			trashTotal = 0;
-			historyManager.clear();
+			history.clear();
 		}
 	}
 
@@ -1740,11 +1727,7 @@
 			applyUserTheme(data.user);
 			applyUserModelSettings(data.user);
 			loginStatus = null;
-			historyItems = [];
-			historyTotal = 0;
-			trashItems = [];
-			trashTotal = 0;
-			historyManager.clear();
+			history.clear();
 			loginPassword = '';
 			// loadColorCatalogs and fetchPrompts ride here because I-086 put both
 			// endpoints behind the guard. The startup fetch runs before anyone has
@@ -1752,7 +1735,7 @@
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
 			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
-			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
+			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
@@ -1779,11 +1762,7 @@
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		loginStatus = null;
 		settings.resetForLoggedOut();
-		historyItems = [];
-		historyTotal = 0;
-		trashItems = [];
-		trashTotal = 0;
-		historyManager.clear();
+		history.clear();
 	}
 
 	function openProfile() {
@@ -1885,52 +1864,38 @@
 	let tokensOutStage2 = $state<number | null>(null);
 
 	// ── History ─────────────────────────────────────────────
-	let historyItems = $state<Iteration[]>([]);
-	let historyTotal = $state(0);
-	let historyOffset = $state(0);
-	let historyCursor = $state(-1);
 	let displayedHistoryItem = $state<Iteration | null>(null);
 	$effect(() => {
 		const historyId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		void lineageState.loadNearby(historyId);
 	});
-	let historySelectionSyncRequest = 0;
-	// Which listing request is the current one. Every other async route on this
-	// page already carries one of these; the strip's did not, so an answer that
-	// came back late overwrote a newer one without anything noticing.
-	let historyFetchRequest = 0;
-	let trashFetchRequest = 0;
-	// How many listing requests are out. The nav buttons read it: pressing while
-	// one is on its way asks for the same offset again, because the offset has
-	// not moved yet, and both presses then land on the same work.
-	let historyFetchInFlight = $state(0);
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
-	const historyWindowSize = $derived(visibleThumbCount);
-	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
-	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
-	let historyStarredOnly = $state(false);
-	// The strip's own revision-only filter. Separate from the manager's: the two
-	// boxes are filtered independently, the same way starred already is.
-	let historyForRevisionOnly = $state(false);
-	// The strip's own shared-only filter, beside the other two. The manager keeps its
-	// own copy for the same reason the revision mark does: the two boxes filter
-	// independently.
-	let historyForShareOnly = $state(false);
-	// Whether the strip is showing a filtered listing rather than the whole one.
-	// Three places ask this to decide whether the page in hand is the plain
-	// newest-first listing: what to seed the manager with, what the strip may
-	// slice, and whether a freshness check may compare its first item with the
-	// newest work. Read through one name so a fourth filter cannot be added to
-	// some of them and forgotten in the rest.
-	const historyStripFiltered = $derived(historyStarredOnly || historyForRevisionOnly || historyForShareOnly);
-	let trashItems = $state<Iteration[]>([]);
-	let trashTotal = $state(0);
-	let externalHistoryRefreshInFlight = false;
-	let lastExternalHistoryRefreshAt = 0;
-	const historyManager = new HistoryManagerState(apiFetch, (items, total) => {
-		trashItems = items;
-		trashTotal = total;
+	const history = new HistoryBrowsingState({
+		apiFetch,
+		signedIn: () => !!authToken,
+		drawing: () => loading,
+		visible: () => document.visibilityState === 'visible',
+		navigationLocked: () => demoRunning,
+		currentHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? null,
+		currentItem: () => displayedHistoryItem,
+		managerPageSize: estimatedHistoryManagerPageSize,
+		onStarredFilterCleared: showHistoryStarredFilterClearedNotice,
+		onOtherFilterCleared: showHistoryForRevisionFilterClearedNotice
 	});
+	const historyManager = history.manager;
+	const historyItems = $derived(history.items);
+	const historyTotal = $derived(history.total);
+	const historyOffset = $derived(history.offset);
+	const historyCursor = $derived(history.cursor);
+	const historyWindowSize = $derived(history.windowSize);
+	const historyPage = $derived(history.page);
+	const historyTotalPages = $derived(history.totalPages);
+	const historyStarredOnly = $derived(history.starredOnly);
+	const historyForRevisionOnly = $derived(history.forRevisionOnly);
+	const historyForShareOnly = $derived(history.forShareOnly);
+	const historyStripFiltered = $derived(history.filtered);
+	const trashItems = $derived(history.trashItems);
+	const trashTotal = $derived(history.trashTotal);
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void } | null>(null);
 
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
@@ -2255,36 +2220,6 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		return data;
 	}
 
-	// The strip badge marks what the canvas is showing, not what was saved last.
-	// A batch can be stepped off the latest render — clicking a thumbnail or
-	// leaving the Batch tab stops the follow — and from then on the badge has to
-	// stay on the artwork on screen instead of chasing every new line. It clears
-	// when that artwork is not in the newest window, rather than pointing at a
-	// neighbour.
-	// While the reader has paged back through the strip, a finished batch line or
-	// demo render must not drag them to the newest page. Only the count moves;
-	// the window itself is refetched when the run ends (refreshHistoryAfterRun).
-	// The same guard already protects the strip from externally saved works.
-	async function refreshHistoryAfterServerSave() {
-		if (historyOffset !== 0) {
-			if (!historyStripFiltered) historyTotal += 1;
-			return;
-		}
-		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
-		await fetchHistoryOffset(0);
-		if (!activeHistoryId) {
-			historyCursor = 0;
-			return;
-		}
-		historyCursor = historyItems.findIndex((item) => item.id === activeHistoryId);
-	}
-
-	// Catch the paged-away strip up once the run is over, staying on the page the
-	// reader chose. Page 0 needs nothing: it was refreshed after every save.
-	async function refreshHistoryAfterRun() {
-		if (!authToken || historyOffset === 0) return;
-		await fetchHistoryOffset(historyOffset, { preserveSelection: true });
-	}
 
 	function sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
@@ -2360,7 +2295,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				demoTotalTokensIn += currentTokensIn;
 				demoTotalTokensOut += currentTokensOut;
 				demoRenderCount += 1;
-				if (settings.save_db) await refreshHistoryAfterServerSave();
+				if (settings.save_db) await history.refreshAfterServerSave();
 				if (Date.now() >= timeoutAt) break;
 				const intervalRemainingMs = settings.interval_seconds * 1000 - (Date.now() - startedAt);
 				const timeoutRemainingMs = timeoutAt - Date.now();
@@ -2378,7 +2313,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			}
 		}
 		if (demoRunId === runId) {
-			await refreshHistoryAfterRun();
+			await history.refreshAfterRun();
 			demoTimedOut = Date.now() >= timeoutAt;
 			demoCurrentStartedAt = null;
 			stopTimer();
@@ -2418,7 +2353,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 
 	function stopDemo() {
 		demoRunId += 1;
-		void refreshHistoryAfterRun();
+		void history.refreshAfterRun();
 		demoTimedOut = false;
 		demoCurrentStartedAt = null;
 		loading = false;
@@ -2496,7 +2431,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		activeRunMode = submittedMode;
 		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null;
@@ -2553,7 +2488,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
-					await fetchHistoryOffset(0, { anchorId: r.history_id });
+					await history.fetchOffset(0, { anchorId: r.history_id });
 					displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 				}
 			} else {
@@ -2611,7 +2546,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 						if (inputMode === 'batch' && batchAutoFollowLatest) {
 							displayLatestBatchRender();
 						}
-						await refreshHistoryAfterServerSave();
+						await history.refreshAfterServerSave();
 						batchSuccess += 1;
 						return true;
 					} catch (e) {
@@ -2678,7 +2613,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				batchTotal = batchLineTotal;
 
 				elapsedTotalMs = Date.now() - _timerStart;
-				await refreshHistoryAfterRun();
+				await history.refreshAfterRun();
 				publishFailureReport();
 				// A run that was stopped leaves lines to finish; one that reached the
 				// end leaves none. Either way the answer is now different.
@@ -2739,7 +2674,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		replayStopRequested = false;
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		const uiLang = getLang();
 		const replayInput = input;
 		const startedAt = Date.now();
@@ -2887,242 +2822,13 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		return Math.max(historyWindowSize, Math.min(100, columns * rows));
 	}
 
-	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean; anchorId?: string } = {}): Promise<boolean> {
-		if (!authToken) {
-			historyItems = [];
-			historyTotal = 0;
-			historyOffset = 0;
-			return false;
-		}
-		const safeOffset = Math.max(0, offset);
-		// Taken before anything is asked for, so an answer can tell whether it is
-		// still the answer to the current question. This function writes the four
-		// quantities the whole strip is read from, and had nothing stopping a slow
-		// answer from putting its page back over a newer one -- four of its
-		// callers do not even await it, one of them the resize effect, which fires
-		// on every 89-pixel boundary the window edge is dragged across.
-		const requestId = ++historyFetchRequest;
-		historyFetchInFlight += 1;
-		const selectedHistoryId = options.anchorId ?? (options.preserveSelection
-			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? result?.history_id ?? null
-			: null);
-		try {
-			const listLimit = historyListLimit({
-				anchorId: options.anchorId ?? null,
-				offset: safeOffset,
-				starredOnly: historyStarredOnly,
-				windowSize: historyWindowSize,
-				managerPageSize: estimatedHistoryManagerPageSize()
-			});
-			const params = new URLSearchParams({
-				offset: String(safeOffset),
-				limit: String(listLimit),
-				// The strip draws thumbnails. A work that is opened, replayed, put
-				// on a sheet or saved again fetches its own drawing then.
-				include_svg: 'false',
-			});
-			if (historyStarredOnly) params.set('starred', 'true');
-			// The two marks are independent, so asking for both means both.
-			if (historyForRevisionOnly) params.set('for_revision', 'true');
-			if (historyForShareOnly) params.set('for_share', 'true');
-			if (options.anchorId) params.set('anchor_id', options.anchorId);
-			const r = await apiFetch(`/api/history?${params.toString()}`);
-			if (requestId !== historyFetchRequest) return false;
-			if (!r.ok) return false;
-			const data = await r.json();
-			const resolvedOffset = Number.isFinite(data.offset) ? Number(data.offset) : safeOffset;
-			if (data.items.length === 0 && data.total > 0 && resolvedOffset > 0 && !options.anchorId) {
-				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
-				return await fetchHistoryOffset(lastOffset);
-			}
-			const stripItems = resolvedOffset === 0 && !historyStripFiltered
-				? data.items.slice(0, historyWindowSize)
-				: data.items;
-			// Immediately before the four quantities are written, so no await added
-			// later can slip between the check and what it is protecting.
-			if (requestId !== historyFetchRequest) return false;
-			historyItems = stripItems; historyTotal = data.total; historyOffset = resolvedOffset;
-			if (selectedHistoryId) {
-				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
-				if (selectedIndex >= 0) historyCursor = selectedIndex;
-				else if (options.anchorId || options.preserveSelection) historyCursor = -1;
-				else if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
-			} else {
-				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
-				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
-			}
-			if (!historyManager.open && resolvedOffset === 0 && !historyStripFiltered) {
-				// The strip's items are what we have; the manager's page size is a
-				// different quantity, so it is passed separately. The manager is
-				// seeded, not filled: it fetches its own page when it opens.
-				historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
-			}
-			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
-		} catch {
-			return false;
-		} finally {
-			historyFetchInFlight = Math.max(0, historyFetchInFlight - 1);
-		}
-	}
-
-	async function syncHistoryStripToItem(item: Pick<Iteration, 'id' | 'trashed' | 'history_visibility'>): Promise<void> {
-		const requestId = ++historySelectionSyncRequest;
-		if (!item.id || item.trashed || item.history_visibility === 'lineage_only') {
-			historyCursor = -1;
-			return;
-		}
-		const localIndex = resolveStripSelection(historyItems, item);
-		if (localIndex >= 0) {
-			historyCursor = localIndex;
-			return;
-		}
-		historyCursor = -1;
-		let found = await fetchHistoryOffset(0, { anchorId: item.id });
-		if (requestId !== historySelectionSyncRequest) {
-			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
-			return;
-		}
-		if (!found && historyStripFiltered) {
-			// Both filters come off together: which of them was hiding the work
-			// is not known from here, and the point is to show it.
-			const clearedStarred = historyStarredOnly;
-			historyStarredOnly = false;
-			historyForRevisionOnly = false;
-			historyForShareOnly = false;
-			if (clearedStarred) showHistoryStarredFilterClearedNotice();
-			else showHistoryForRevisionFilterClearedNotice();
-			found = await fetchHistoryOffset(0, { anchorId: item.id });
-		}
-		if (requestId !== historySelectionSyncRequest) {
-			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
-			return;
-		}
-		if (!found) historyCursor = -1;
-	}
-
-	async function fetchHistoryState(): Promise<HistoryState | null> {
-		try {
-			const r = await apiFetch('/api/history/state');
-			if (!r.ok) return null;
-			const data = await r.json();
-			if (!Number.isFinite(data?.total)) return null;
-			return {
-				total: Number(data.total),
-				newest_at: data.newest_at ?? null,
-				newest_id: data.newest_id ?? null,
-			};
-		} catch {
-			return null;
-		}
-	}
-
-	async function refreshHistoryForExternalSave(): Promise<void> {
-		const now = Date.now();
-		if (historyRefreshBlockedBy({
-			signedIn: !!authToken,
-			managerOpen: historyManager.open,
-			starredOnly: historyStarredOnly,
-			offset: historyOffset,
-			loading,
-			visible: document.visibilityState === 'visible',
-			inFlight: externalHistoryRefreshInFlight,
-			now,
-			lastRefreshAt: lastExternalHistoryRefreshAt,
-			minGapMs: EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS,
-		})) return;
-		externalHistoryRefreshInFlight = true;
-		lastExternalHistoryRefreshAt = now;
-		try {
-			// Ask what changed before carrying the gallery. Most rounds find
-			// nothing and stop here; a failed answer falls through and fetches,
-			// so a server that cannot answer degrades to the old behaviour.
-			// The guards above mean the strip is at offset 0 and unstarred, so
-			// its first item is the newest work and its total is the same count.
-			const state = await fetchHistoryState();
-			if (state && historyStripIsCurrent(state, {
-				total: historyTotal,
-				newestId: historyItems[0]?.id ?? null,
-				newestAt: historyItems[0]?.at ?? null,
-				showsTheNewestFirst: historyOffset === 0 && !historyStripFiltered,
-			})) return;
-			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
-			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
-			else await fetchHistoryOffset(0, { preserveSelection: true });
-			if (historyManager.open && historyManager.view === 'active' && historyManager.page === 0 && !historyManager.search.trim() && !historyManager.starredOnly) {
-				await historyManager.fetch({ view: 'active', page: 0, search: '', starredOnly: false, silent: true });
-			}
-		} finally {
-			externalHistoryRefreshInFlight = false;
-		}
-	}
-
-	/**
-	 * One page newer.
-	 *
-	 * Lands on the oldest work of that page, which is the work immediately newer
-	 * than the one that was on screen. Landing on its newest instead -- what this
-	 * did before -- stepped over everything in between, and was the only one of
-	 * the four steps that did not read continuously.
-	 */
-	async function gotoHistoryNewerPage(): Promise<void> {
-		const target = historyPageTarget(historyNavState, 'newer');
-		if (!target) return;
-		if (!(await fetchHistoryOffset(target.offset))) return;
-		loadIteration(historyNavIndex(target));
-	}
-
-	async function gotoHistoryLatestPage(): Promise<void> {
-		const target = historyPageTarget(historyNavState, 'latest');
-		if (!target) return;
-		if (!(await fetchHistoryOffset(target.offset))) return;
-		loadIteration(historyNavIndex(target));
-	}
-
-	async function gotoHistoryOlderPage(): Promise<void> {
-		const target = historyPageTarget(historyNavState, 'older');
-		if (!target) return;
-		if (!(await fetchHistoryOffset(target.offset))) return;
-		loadIteration(historyNavIndex(target));
-	}
-
-	async function gotoHistoryOldestPage(): Promise<void> {
-		const target = historyPageTarget(historyNavState, 'oldest');
-		if (!target) return;
-		if (!(await fetchHistoryOffset(target.offset))) return;
-		loadIteration(historyNavIndex(target));
-	}
-
-	async function fetchTrashPage(): Promise<void> {
-		if (!authToken) {
-			trashItems = [];
-			trashTotal = 0;
-			return;
-		}
-		// Same reason as the listing above: this one also writes state a late
-		// answer could put back over a newer one.
-		const requestId = ++trashFetchRequest;
-		try {
-			// No drawings: what this call is for is the count, and the manager owns
-			// what the trash view puts on screen. Asking for a hundred works with
-			// their pictures cost 11 MB for a single heavy work, and every one of
-			// those bytes was thrown away -- nothing reads `trashItems`.
-			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true&include_svg=false`);
-			if (requestId !== trashFetchRequest) return;
-			if (!r.ok) return;
-			const data = await r.json();
-			if (requestId !== trashFetchRequest) return;
-			trashItems = data.items; trashTotal = data.total;
-		} catch { /* ignore */ }
-	}
 
 	type HistoryStarTarget = { id?: string; starred?: boolean; note?: string | null };
 
 	function updateHistoryStarState(item: HistoryStarTarget) {
 		if (!item.id) return;
 		const hasNote = Object.prototype.hasOwnProperty.call(item, "note");
-		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
-		historyManager.applyStarState(item);
-		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
+		history.applyStarState(item);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
 		lineageState.applyStarState(item);
 	}
@@ -3143,8 +2849,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			updateHistoryStarState(updated);
 			const refreshes: Promise<unknown>[] = [];
 			if (historyStarredOnly) {
-				if (!updated.starred) historyStarredOnly = false;
-				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+				if (!updated.starred) history.clearStarredFilter();
+				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
 			}
 			if (historyManager.starredOnly) refreshes.push(historyManager.fetch());
 			if (refreshes.length > 0) await Promise.all(refreshes);
@@ -3160,9 +2866,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	// the two are separate columns, and a work can carry either, both or neither.
 	function updateHistoryForRevisionState(item: HistoryForRevisionTarget) {
 		if (!item.id) return;
-		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
-		historyManager.applyForRevisionState(item);
-		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		history.applyForRevisionState(item);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, for_revision: item.for_revision };
 		lineageState.applyForRevisionState(item);
 	}
@@ -3186,8 +2890,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				// The work just left the listing the strip is showing, so the
 				// filter comes off rather than leaving the strip on a work it no
 				// longer holds -- the same rule the starred filter follows.
-				if (!updated.for_revision) historyForRevisionOnly = false;
-				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+				if (!updated.for_revision) history.clearForRevisionFilter();
+				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
 			}
 			if (historyManager.forRevisionOnly) refreshes.push(historyManager.fetch());
 			if (refreshes.length > 0) await Promise.all(refreshes);
@@ -3206,9 +2910,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	function updateHistoryForShareState(item: HistoryForShareTarget) {
 		if (!item.id) return;
 		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
-		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
-		historyManager.applyForShareState(item);
-		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, ...next } : it);
+		history.applyForShareState(item);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, ...next };
 		lineageState.applyForShareState(item);
 	}
@@ -3235,8 +2937,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				// The work just left the listing the strip is showing, so the
 				// filter comes off rather than leaving the strip on a work it no
 				// longer holds -- the rule the other two marks already follow.
-				if (!updated.for_share) historyForShareOnly = false;
-				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+				if (!updated.for_share) history.clearForShareFilter();
+				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
 			}
 			if (historyManager.forShareOnly) refreshes.push(historyManager.fetch());
 			if (refreshes.length > 0) await Promise.all(refreshes);
@@ -3283,13 +2985,13 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		} catch { /* ignore */ }
 		if (options.countGeneration) await refreshCurrentUserOnly();
 		if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
-			await fetchHistoryOffset(0, { anchorId: saved.id });
+			await history.fetchOffset(0, { anchorId: saved.id });
 		} else {
 			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
-			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
+			if (activeHistoryId) await history.fetchOffset(0, { anchorId: activeHistoryId });
 			else {
-				await fetchHistoryOffset(historyOffset, { preserveSelection: true });
-				historyCursor = -1;
+				await history.fetchOffset(historyOffset, { preserveSelection: true });
+				history.clearSelection();
 			}
 		}
 		return saved;
@@ -3343,8 +3045,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			}
 			demoCurrentSaved = true;
 			demoSaveStatus = t().demoSavedCurrent;
-			await fetchHistoryOffset(0);
-			historyCursor = 0;
+			await history.fetchOffset(0);
+			history.setCursor(0);
 		} catch (e) {
 			demoError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -3387,7 +3089,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		tokensInStage2 = null;
 		tokensOutStage2 = null;
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		resetZoom();
 	}
 
@@ -3414,19 +3116,19 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
 			if (path === '/api/history/trash') {
 				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
-				historyCursor = -1;
+				history.clearSelection();
 			} else if (path === '/api/history/restore') {
 				displayedHistoryItem = { ...displayedHistoryItem, trashed: false };
-				void syncHistoryStripToItem(displayedHistoryItem);
+				void history.syncToItem(displayedHistoryItem);
 			} else if (path === '/api/history/permanent-delete') {
 				displayedHistoryItem = null;
-				historyCursor = -1;
+				history.clearSelection();
 			}
 		}
 		historyManager.selectedIds = [];
-		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
+		await Promise.all([history.fetchOffset(historyOffset), history.fetchTrashPage(), historyManager.fetch()]);
 		if (lineageState.graph?.focus_node_id) await lineageState.load(lineageState.graph.focus_node_id, true);
-		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
+		if (historyItems.length === 0 && historyOffset > 0) await history.fetchOffset(Math.max(0, historyOffset - historyWindowSize));
 		// The strip re-seats its cursor once the listing has been read again, and
 		// the canvas has to be showing the work the badge is on. Left to itself
 		// the canvas kept the work that just left the listing, so the badge sat
@@ -3470,9 +3172,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 
 	function loadIteration(idx: number) {
 		if (demoRunning) return;
-		if (idx < 0 || idx >= historyItems.length) return;
-		historyCursor = idx;
-		loadIterationItem(historyItems[idx]);
+		const item = history.select(idx);
+		if (item) loadIterationItem(item);
 	}
 
 	function currentComparisonItem(): Iteration | null {
@@ -3622,12 +3323,10 @@ function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
 
 async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
 	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.');
-	let found = await fetchHistoryOffset(0, { anchorId: historyId });
+	let found = await history.fetchOffset(0, { anchorId: historyId });
 	if (!found && historyStripFiltered) {
-		historyStarredOnly = false;
-		historyForRevisionOnly = false;
-		historyForShareOnly = false;
-		found = await fetchHistoryOffset(0, { anchorId: historyId });
+		history.clearFilters();
+		found = await history.fetchOffset(0, { anchorId: historyId });
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
 	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved work could not be loaded.');
@@ -3884,12 +3583,12 @@ async function promoteLineageNode(node: LineageNode): Promise<void> {
 	if (contextVersion !== targetContextVersion) return;
 	if (displayedHistoryItem?.id === promoted.id) {
 		displayedHistoryItem = promoted;
-		await Promise.all([lineageState.load(node.id, true), syncHistoryStripToItem(promoted)]);
+		await Promise.all([lineageState.load(node.id, true), history.syncToItem(promoted)]);
 	} else {
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 		await Promise.all([
 			lineageState.load(node.id, true),
-			activeHistoryId ? fetchHistoryOffset(0, { anchorId: activeHistoryId }) : fetchHistoryOffset(historyOffset, { preserveSelection: true }),
+			activeHistoryId ? history.fetchOffset(0, { anchorId: activeHistoryId }) : history.fetchOffset(historyOffset, { preserveSelection: true }),
 		]);
 	}
 }
@@ -3914,7 +3613,7 @@ function detachLineage(): void {
 	pendingCanvasAspectDerivation = null;
 	lineageDetached = true;
 	displayedHistoryItem = null;
-	historyCursor = -1;
+	history.clearSelection();
 	outputTab = 'canvas';
 }
 
@@ -3965,7 +3664,7 @@ $effect(() => {
 		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
 		displayedHistoryItem = it;
-		void syncHistoryStripToItem(it);
+		void history.syncToItem(it);
 		lineageDetached = false;
 		const itemDDL = it.ddl ?? '';
 		const sourceText = it.source_text ?? it.input;
@@ -4047,67 +3746,55 @@ $effect(() => {
 
 	/** One work older. */
 	async function gotoPrev() {
-		const target = historyNavTarget(historyNavState, 'older');
-		if (!target) return;
-		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
+		const item = await history.move('older');
+		if (!item) return;
 		// Read after the await, not before it. Read before, a tab the user chose
 		// while the page was arriving was quietly put back to the one they left.
 		const preservedTab = outputTab;
-		loadIteration(historyNavIndex(target));
+		loadIterationItem(item);
 		outputTab = preservedTab;
 	}
 
 	/** One work newer. */
 	async function gotoNext() {
-		const target = historyNavTarget(historyNavState, 'newer');
-		if (!target) return;
-		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
+		const item = await history.move('newer');
+		if (!item) return;
 		const preservedTab = outputTab;
-		loadIteration(historyNavIndex(target));
+		loadIterationItem(item);
 		outputTab = preservedTab;
 	}
 
 	async function gotoLatest() {
-		const target = historyNavTarget(historyNavState, 'latest');
-		if (!target) return;
-		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
-		loadIteration(historyNavIndex(target));
+		const item = await history.move('latest');
+		if (item) loadIterationItem(item);
 	}
 
-	// Where the strip is standing, as historyNavigation.ts reads it. The canvas's
-	// six buttons and the strip's three all decide from this one value.
-	const historyNavState = $derived({
-		cursor: historyCursor,
-		offset: historyOffset,
-		total: historyTotal,
-		windowSize: historyWindowSize,
-		busy: historyFetchInFlight > 0,
-		locked: demoRunning
-	});
-	const historyNavButtonsDisabled = $derived(historyNavDisabled(historyNavState));
-	// The strip's pager. "Latest" is counted in works so it agrees with the
-	// canvas's; the other two step a page and are disabled when there is no page
-	// that way to step to.
-	const historyPageNavDisabled = $derived({
-		latest: historyNavButtonsDisabled.latest,
-		newer: historyPageTarget(historyNavState, 'newer') === null,
-		older: historyPageTarget(historyNavState, 'older') === null,
-		oldest: historyPageTarget(historyNavState, 'oldest') === null
-	});
+	async function gotoHistoryNewerPage(): Promise<void> {
+		const item = await history.movePage('newer');
+		if (item) loadIterationItem(item);
+	}
+
+	async function gotoHistoryOlderPage(): Promise<void> {
+		const item = await history.movePage('older');
+		if (item) loadIterationItem(item);
+	}
+
+	async function gotoHistoryLatestPage(): Promise<void> {
+		const item = await history.movePage('latest');
+		if (item) loadIterationItem(item);
+	}
+
+	async function gotoHistoryOldestPage(): Promise<void> {
+		const item = await history.movePage('oldest');
+		if (item) loadIterationItem(item);
+	}
+
+	// Both canvas controls and the strip pager read one owner projection.
+	const historyNavButtonsDisabled = $derived(history.navDisabled);
+	const historyPageNavDisabled = $derived(history.pageDisabled);
 	// Left as it was: 0 / N is how "nothing is selected" is shown, and is not a
 	// claim about which work is current.
 	const navPos       = $derived(historyOffset + historyCursor + 1);
-
-	/**
-	 * The index a target names, once the page it names is in hand.
-	 *
-	 * 'oldest-on-page' cannot be a number in the module: how many works the page
-	 * actually holds is only known after the answer arrives.
-	 */
-	function historyNavIndex(target: HistoryNavTarget): number {
-		return target.select === 'oldest-on-page' ? historyItems.length - 1 : target.select;
-	}
-
 	// ── Saijiki ─────────────────────────────────────────────
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
@@ -4139,22 +3826,22 @@ $effect(() => {
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		stage2Model = v;
 	}
 	function setVisionProvider(v: Provider) {
@@ -4293,7 +3980,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		colorCatalogSettings.selected = id;
 	}
 
@@ -4334,7 +4021,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const svg = await r.text();
 			result = { ...result, svg, render_seed: nextSeed, composition_seed: placementSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_change' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
-			historyCursor = -1;
+			history.clearSelection();
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
@@ -4379,10 +4066,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = 'canvas';
 			if (r.history_id) {
-				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				await history.fetchOffset(0, { anchorId: r.history_id });
 				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 			} else {
-				historyCursor = -1;
+				history.clearSelection();
 			}
 			fitCanvasZoom();
 		} catch (e) {
@@ -4428,10 +4115,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			tokensOutStage2 = r.tokens_out_stage2;
 			outputTab = "canvas";
 			if (r.history_id) {
-				await fetchHistoryOffset(0, { anchorId: r.history_id });
+				await history.fetchOffset(0, { anchorId: r.history_id });
 				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 			} else {
-				historyCursor = -1;
+				history.clearSelection();
 			}
 			fitCanvasZoom();
 		} catch (e) {
@@ -4839,7 +4526,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function showVariationCandidate(candidate: VariationCandidate) {
 		resetTargetScopedState({ preserveVariationCandidates: true });
-		historyCursor = -1;
+		history.clearSelection();
 		ddl = candidate.result.source_ddl ?? candidate.result.ddl;
 		expandedDdl = candidate.result.ddl;
 		ddlGeneratedBaseline = ddl;
@@ -4880,7 +4567,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				if (saved?.id && result === candidate.result) {
 					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
 					displayedHistoryItem = saved;
-					void syncHistoryStripToItem(saved);
+					void history.syncToItem(saved);
 				}
 			}
 		} finally {
@@ -4973,7 +4660,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		resetTargetScopedState();
 		batchAutoFollowLatest = true;
 		displayedHistoryItem = null;
-		historyCursor = -1;
+		history.clearSelection();
 		displayLatestBatchRender();
 	}
 
@@ -5128,28 +4815,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function openHistoryManager() {
 		if (demoRunning) return;
-		historyManager.openWith(historyItems, historyTotal, trashTotal);
+		history.openManager();
 	}
 
 	function setHistoryStarredOnly(value: boolean) {
-		historyStarredOnly = value;
-		historyOffset = 0;
-		historyCursor = -1;
-		void fetchHistoryOffset(0);
+		history.setStarredOnly(value);
 	}
 
 	function setHistoryForRevisionOnly(value: boolean) {
-		historyForRevisionOnly = value;
-		historyOffset = 0;
-		historyCursor = -1;
-		void fetchHistoryOffset(0);
+		history.setForRevisionOnly(value);
 	}
 
 	function setHistoryForShareOnly(value: boolean) {
-		historyForShareOnly = value;
-		historyOffset = 0;
-		historyCursor = -1;
-		void fetchHistoryOffset(0);
+		history.setForShareOnly(value);
 	}
 
 	$effect(() => {
@@ -5324,23 +5002,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		event.preventDefault();
 	}
 
-	const historyNavSpan = $derived(historyWindowSize);
-	let lastHistoryWindowSize = 0;
+	const historyNavSpan = $derived(history.windowSize);
 
 	$effect(() => {
-		const size = historyWindowSize;
-		if (lastHistoryWindowSize === 0) {
-			lastHistoryWindowSize = size;
-			return;
-		}
-		if (size === lastHistoryWindowSize) return;
-		lastHistoryWindowSize = size;
-		if (!authToken || historyTotal <= 0) return;
-		// Seated on the new grid before the request goes out. Fetching the old
-		// offset under the new page size is what made the pager show works twice
-		// going older and step over them going newer.
-		historyOffset = alignHistoryOffset(historyOffset, size, historyTotal);
-		void fetchHistoryOffset(historyOffset);
+		void history.resize(visibleThumbCount);
 	});
 
 	// ── Mount ───────────────────────────────────────────────
@@ -5354,15 +5019,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		window.addEventListener('resize', onResize);
 		document.addEventListener('keydown', handleKeydown, true);
 		const externalHistoryRefreshTimer = window.setInterval(() => {
-			void refreshHistoryForExternalSave();
-		}, EXTERNAL_HISTORY_REFRESH_MS);
+			void history.refreshExternal();
+		}, HISTORY_EXTERNAL_REFRESH_MS);
 		// Coming back to the tab still refreshes at once; what it no longer does
 		// is jump the floor. Both of these fire on a single alt-tab.
 		function onHistoryVisibilityChange() {
-			if (document.visibilityState === 'visible') void refreshHistoryForExternalSave();
+			if (document.visibilityState === 'visible') void history.refreshExternal();
 		}
 		function onHistoryWindowFocus() {
-			void refreshHistoryForExternalSave();
+			void history.refreshExternal();
 		}
 		document.addEventListener('visibilitychange', onHistoryVisibilityChange);
 		window.addEventListener('focus', onHistoryWindowFocus);

@@ -39,7 +39,7 @@ test('the rail hides signing out when the server signs you in by itself', () => 
 });
 
 test('the settings panel hides signing out but keeps the way back', () => {
-	const source = read(join(COMPONENTS_DIR, 'SettingsModal.svelte'));
+	const source = read(join(ROUTES_DIR, '..', 'lib', 'features', 'settings', 'UserAdministrationSettings.svelte'));
 	const sessionRow = region(source, '<div class="user-session-row">', '{/if}\n');
 	assert.match(sessionRow, /\{#if !singleUserMode\}/, 'sign-out should be behind the single-user gate');
 

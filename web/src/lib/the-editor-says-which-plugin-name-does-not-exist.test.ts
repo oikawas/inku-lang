@@ -181,10 +181,11 @@ test('T-9: nothing to say means nothing on screen', () => {
 
 test('T-8/T-9: the page reads the response and hides the empty frame', () => {
 	const page = read('../routes/+page.svelte');
+	const runOwner = read('./features/run/current-work.ts');
 	assert.match(page, /pluginWarningsShown = \$derived\(pluginWarningsToShow\(result\)\)/);
 	assert.match(page, /\{#if pluginWarningsShown\.length > 0 && inputMode === 'single'\}/);
 	assert.match(page, /\{#each pluginWarningsShown as warning\}/);
-	assert.match(page, /plugin_warnings\?: string\[\] \| null;/, 'the response field is typed');
+	assert.match(runOwner, /plugin_warnings\?: string\[\] \| null;/, 'the response field is typed');
 });
 
 // ── T-10 / T-11: the colour ────────────────────────────────────────────────

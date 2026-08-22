@@ -35,7 +35,7 @@
 
 ### C-01 `web/src/routes/+page.svelte`
 
-feature registryとcomponent分離は進んでいるが、API orchestration、model/settings、paint/compose、history、lineage、refinementを同じpageが依然所有する。循環importは確認していないが、変更影響が集中するseamである。
+feature registry、Settings管理、1回のPaint request、lineage query、history browsingにはroute-instanceまたはstateless ownerができた。一方、session/current-work state、外側のPaint/compose loop、history mutation/replay/current-focus action、refinementはpageに集中しており、変更頻度の高いseamであり続ける。
 
 ### C-02 `server/src/inku_server/db.py`
 

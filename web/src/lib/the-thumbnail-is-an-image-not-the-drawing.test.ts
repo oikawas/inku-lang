@@ -113,7 +113,7 @@ test('the listings that show works side by side all use this component', () => {
 // on 28ce4237: three GET senders in the web client.
 const SENDERS = [
 	{
-		file: '../routes/+page.svelte',
+		file: './features/history/browsing-state.svelte.ts',
 		what: "the strip's listing",
 		pattern: /limit: String\(listLimit\),\s*(?:\/\/[^\n]*\n\s*)*include_svg: 'false'/,
 		sendsFalse: true
@@ -128,7 +128,7 @@ const SENDERS = [
 	// Was named below as the one sender left asking for drawings; ruled on
 	// 2026-08-16 after a work of 11,068,576 bytes was measured in production.
 	{
-		file: '../routes/+page.svelte',
+		file: './features/history/browsing-state.svelte.ts',
 		what: "the trash count's listing",
 		pattern: /\/api\/history\?offset=0&limit=100&trashed=true&include_svg=false/,
 		sendsFalse: true
@@ -147,9 +147,12 @@ test('every other listing sender is accounted for', () => {
 	// writes nothing keeps receiving every drawing and nothing goes wrong loudly.
 	// A fifth sender appearing makes this fail and has to be decided about.
 	const page = readFileSync(fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)), 'utf-8');
+	const browsing = readFileSync(fileURLToPath(new URL('./features/history/browsing-state.svelte.ts', import.meta.url)), 'utf-8');
 	const manager = readFileSync(fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url)), 'utf-8');
-	const getters = [...page.matchAll(/apiFetch\(`\/api\/history\?/g)].length
-		+ [...manager.matchAll(/apiFetch\(`\/api\/history\?/g)].length;
+	const getters = [page, browsing, manager].reduce(
+		(total, source) => total + [...source.matchAll(/apiFetch\(\s*(?:`|')\/api\/history\?/g)].length,
+		0
+	);
 	assert.equal(getters, 4, 'four senders ask the listing for works');
 
 	// The fourth: the sender that reads whether the last batch reached the end of
@@ -161,12 +164,12 @@ test('every other listing sender is accounted for', () => {
 	// left asking the listing for drawings. Only the URLs whose query is spelled
 	// out are read here; the ones built from a URLSearchParams are covered by
 	// their own patterns above, and their text says nothing about what they ask.
-	const spelledOut = [...page.matchAll(/apiFetch\(`\/api\/history\?[^`]*`/g)]
+	const spelledOut = [...`${page}\n${browsing}`.matchAll(/apiFetch\(\s*(?:`|')\/api\/history\?[^`']*(?:`|')/g)]
 		.map((m) => m[0])
 		.filter((url) => !url.includes('${'));
-	assert.equal(spelledOut.length, 1, 'one listing URL is spelled out in the page');
+	assert.equal(spelledOut.length, 1, 'one listing URL is spelled out in the page or browsing owner');
 	assert.ok(
 		spelledOut.every((url) => url.includes('include_svg=false')),
-		'a listing URL spelled out in the page must carry include_svg=false'
+		'a listing URL spelled out in the page or browsing owner must carry include_svg=false'
 	);
 });

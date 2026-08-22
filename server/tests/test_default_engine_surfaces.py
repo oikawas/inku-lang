@@ -142,6 +142,7 @@ def _import_names(module_name: str) -> set[str]:
 
 
 def test_t4_t5_surfaces_have_one_way_dependencies_and_shrink_the_facade() -> None:
+    engine = importlib.import_module("inku_server.render_engines.default.engine")
     surfaces = importlib.import_module("inku_server.render_engines.default.surfaces")
     imports = _import_names("inku_server.render_engines.default.surfaces")
     forbidden = ("renderer", "layers", "marks")
@@ -157,8 +158,8 @@ def test_t4_t5_surfaces_have_one_way_dependencies_and_shrink_the_facade() -> Non
         "weight_style",
         "texture_filter_weights",
     )
-    assert isinstance(renderer._SURFACE_MARK_STYLE.weight_style, MappingProxyType)
-    assert isinstance(renderer._SURFACE_MARK_STYLE.texture_filter_weights, frozenset)
+    assert isinstance(engine._SURFACE_MARK_STYLE.weight_style, MappingProxyType)
+    assert isinstance(engine._SURFACE_MARK_STYLE.texture_filter_weights, frozenset)
 
     renderer_lines = Path(renderer.__file__).read_text(encoding="utf-8").splitlines()
     assert len(renderer_lines) < 5368

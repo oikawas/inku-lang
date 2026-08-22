@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import importlib
 import inspect
@@ -70,7 +71,7 @@ def test_t1_default_engine_import_path_is_a_package_with_the_same_adapter() -> N
     ]
 
 
-def test_t2_renderer_reexports_the_canonical_determinism_objects() -> None:
+def test_t2_renderer_reexports_only_the_retained_determinism_objects() -> None:
     determinism = importlib.import_module(
         "inku_server.render_engines.default.determinism"
     )
@@ -80,24 +81,36 @@ def test_t2_renderer_reexports_the_canonical_determinism_objects() -> None:
         "_SEED_INSTRUCTION_FIELDS",
         "_SEED_ARRANGEMENT_FIELDS",
         "_variation_seed_fields",
-        "_seed_for_instruction",
         "new_render_seed",
-        "_hash_to_unit",
-        "_value_noise_1d",
-        "_periodic_value_noise_1d",
         "_hash01",
-        "_wave_phase",
+        "_needs_blur",
     )
 
     for name in names:
         assert getattr(renderer, name) is getattr(determinism, name)
+
+    assert not hasattr(renderer, "_seed_for_instruction")
+    assert not hasattr(renderer, "_needs_contour_variation")
 
 
 def test_t4_default_package_does_not_import_the_renderer_facade() -> None:
     package = Path(renderer.__file__).with_name("render_engines") / "default"
 
     for source in sorted(package.glob("*.py")):
-        text = source.read_text(encoding="utf-8")
-        assert "inku_server.renderer" not in text
-        assert "from ...renderer" not in text
-        assert "from ..renderer" not in text
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        imported = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        imported.update(
+            node.module or alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        )
+
+        assert not any(
+            name == "renderer" or name.endswith(".renderer") for name in imported
+        )

@@ -6,19 +6,15 @@
 
 from __future__ import annotations
 
-import logging
-
 from .color_catalogs import DEFAULT_COLOR_CATALOG_ID as DEFAULT_COLOR_CATALOG_ID
-from .master_grid import fmt
-from .plugins import CanvasSize, canvas_size_for_aspect
+from .plugins import canvas_size_for_aspect as canvas_size_for_aspect
 from .schema import Score
 from .render_engines.default.determinism import (
     _SEED_ARRANGEMENT_FIELDS as _SEED_ARRANGEMENT_FIELDS,
     _SEED_INSTRUCTION_FIELDS as _SEED_INSTRUCTION_FIELDS,
     _VARIATION_SEED_FIELDS_ALL as _VARIATION_SEED_FIELDS_ALL,
     _WORK_COLOR_SEED_FIELDS as _WORK_COLOR_SEED_FIELDS,
-    _hash01,
-    _needs_blur,
+    _hash01 as _hash01,
     _variation_seed_fields as _variation_seed_fields,
     new_render_seed as new_render_seed,
 )
@@ -29,9 +25,7 @@ from .render_engines.default import layers as _layers
 from .render_engines.default import surfaces as _surfaces
 from .render_engines.default import marks as _marks
 from .render_engines.default import dispatch as _dispatch
-from .svg_compat import validate_compat_svg
-
-logger = logging.getLogger(__name__)
+from .render_engines.default import engine as _engine
 
 CANVAS_PX = _marks.CANVAS_PX
 WEIGHT_TO_STROKE_WIDTH = _marks.WEIGHT_TO_STROKE_WIDTH
@@ -215,8 +209,6 @@ COLOR_MAP = _palette.COLOR_MAP
 SVG_PROFILES = _document.SVG_PROFILES
 HUE_HINTS = _palette.HUE_HINTS
 
-BACKGROUND = "#ffffff"
-
 FRAME_LO = _planning.FRAME_LO
 FRAME_HI = _planning.FRAME_HI
 _scatter_pos = _planning._scatter_pos
@@ -280,61 +272,6 @@ _line_perp_offsets = _planning._line_perp_offsets
 _point_on_line = _planning._point_on_line
 
 
-def _inject_blur_filters(
-    svg: str,
-    blur_needed: dict[str, float],
-    blur_elems: list[tuple[str, str]],
-) -> str:
-    """feGaussianBlur フィルター定義を defs に注入し、対象要素に filter 属性を付与する。
-
-    blur_needed の key は filter id (振幅名 + std 値)。滲みは図形寸法比なので
-    同じ振幅語でも図形ごとに std が変わる。
-    """
-    filter_xml = "".join(
-        f'<filter id="{filter_id}" x="-30%" y="-30%" width="160%" height="160%">'
-        f'<feGaussianBlur in="SourceGraphic" stdDeviation="{fmt(std)}"/>'
-        f"</filter>"
-        for filter_id, std in sorted(blur_needed.items())
-    )
-    # svgwrite は "<defs />" を出力する (スペースあり)
-    if "<defs />" in svg:
-        svg = svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
-    elif "<defs/>" in svg:
-        svg = svg.replace("<defs/>", f"<defs>{filter_xml}</defs>", 1)
-    else:
-        svg = svg.replace("<defs>", f"<defs>{filter_xml}", 1)
-
-    for eid, filter_id in blur_elems:
-        id_start = svg.find(f'id="{eid}"')
-        if id_start < 0:
-            continue
-        tag_start = svg.rfind("<", 0, id_start)
-        tag_end = svg.find(">", id_start)
-        if tag_start < 0 or tag_end < 0:
-            continue
-        if ' filter="' in svg[tag_start:tag_end]:
-            continue
-        svg = svg.replace(
-            f'id="{eid}"', f'id="{eid}" filter="url(#{filter_id})"', 1
-        )
-    return svg
-
-
-def _inject_texture_filters(
-    svg: str, filters: set[str], canvas: CanvasSize
-) -> str:
-    if not filters:
-        return svg
-    filter_xml = "".join(
-        _texture_filter_xml(weight, canvas) for weight in sorted(filters)
-    )
-    if "<defs />" in svg:
-        return svg.replace("<defs />", f"<defs>{filter_xml}</defs>", 1)
-    if "<defs/>" in svg:
-        return svg.replace("<defs/>", f"<defs>{filter_xml}</defs>", 1)
-    return svg.replace("<defs>", f"<defs>{filter_xml}", 1)
-
-
 _score_canvas_aspect = _document._score_canvas_aspect
 _score_canvas_ground = _document._score_canvas_ground
 
@@ -366,14 +303,6 @@ _GROUND_LAYER_BUILDERS = _layers._GROUND_LAYER_BUILDERS
 _render_canvas_ground = _layers._render_canvas_ground
 
 
-SurfaceMarkStyle = _surfaces.SurfaceMarkStyle
-_SURFACE_MARK_STYLE = SurfaceMarkStyle(
-    mark_width_px=_mark_width_px,
-    weight_style=WEIGHT_STYLE,
-    texture_filter_weights=TEXTURE_FILTER_WEIGHTS,
-)
-MarkSurfaceOps = _marks.MarkSurfaceOps
-_MARK_SURFACE_OPS = _dispatch._MARK_SURFACE_OPS
 SURFACE_MARK_MAX = _surfaces.SURFACE_MARK_MAX
 HATCH_SPAN_SEED_STRIDE = _surfaces.HATCH_SPAN_SEED_STRIDE
 SURFACE_DAB_SAMPLES = _surfaces.SURFACE_DAB_SAMPLES
@@ -426,172 +355,16 @@ def render(
     composition_seed: int | None = None,
     wild: bool = False,
 ) -> str:
-    profile = _normalize_svg_profile(svg_profile)
-    # Built before the score is resolved because `_resolve_at_region` needs it.
-    # Resolution only replaces `instructions` and passes `canvas` through, so
-    # the aspect read here is the same one the old order read after it.
-    canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
-    score = _resolve_performance_score(
-        score, render_seed, canvas, composition_seed=composition_seed
-    )
-    structured = profile != "display"
-    use_filters = profile == "display"
-    cmap = {**COLOR_MAP, **(color_map or {})}
-    work_assignment = _work_color_assignment(cmap, render_seed, catalog_id)
-    dwg = _new_svg_drawing(canvas)
-    bg = work_assignment.get(score.background, cmap.get(score.background, BACKGROUND))
-    ground_layer, ground_defs_xml = _render_canvas_ground(
-        dwg, score, canvas, bg, profile=profile, render_seed=render_seed
-    )
-    surface_filter_xml: list[str] = []
-    solid_mottle_filter_xml: list[str] = []
-    performance_filter_xml: str | None = None
-    artboard, content, presence_content = _build_root_groups(
-        dwg, canvas, bg, ground_layer, structured=structured
-    )
-
-    if use_filters and render_seed is not None:
-        performance_filter_id, performance_filter_xml = _performance_touch_filter(
-            render_seed, canvas
-        )
-        content["filter"] = f"url(#{performance_filter_id})"
-
-    blur_needed: dict[str, float] = {}
-    texture_filters = _texture_filter_weights(score) if use_filters else set()
-    blur_elems: list[tuple[str, str]] = []
-    elem_idx = 0
-
-    # The sheet this work is worked on. Resolved once from the ground the work
-    # names, then handed down by argument -- never held in a module variable,
-    # because the more places read it the quieter a missed hand-over gets.
-    sheet = _score_support(score)
-    ordered_instructions = sorted(
-        enumerate(score.instructions), key=lambda pair: pair[1].mode == "carve"
-    )
-    # Placement is the composition seed's, the touch stays the performance
-    # seed's. Read with `is None` and never with `or`: 0 is a seed a caller can
-    # legitimately state, and it is how the rest of the server reads this field
-    # (db.py:1911). Without a composition seed the placement falls back to the
-    # performance seed, so every drawing made before this split replays.
-    placement_seed = composition_seed if composition_seed is not None else render_seed
-    for ins_idx, ins in ordered_instructions:
-        expanded = (
-            _expand_arrangement(
-                ins, placement_seed, canvas, performance_seed=render_seed
-            )
-            if ins.arrangement
-            else [ins]
-        )
-        instruction_group = (
-            dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content
-        )
-        for mark_idx, single in enumerate(expanded):
-            solid_mottle_id: str | None = None
-            if (
-                profile != "compat"
-                and _is_noncomputer_solid_fill(
-                    single, surface_ops=_MARK_SURFACE_OPS
-                )
-            ):
-                solid_mottle_id, solid_mottle_seed = _solid_mottle_filter_id(
-                    single, render_seed, ins_idx, mark_idx
-                )
-                solid_mottle_filter_xml.append(
-                    _solid_mottle_filter_xml(solid_mottle_id, solid_mottle_seed)
-                )
-            element = _render_instruction(
-                dwg,
-                single,
-                cmap,
-                canvas,
-                work_assignment=work_assignment,
-                use_filters=use_filters,
-                solid_mottle_filter_id=solid_mottle_id,
-                render_seed=render_seed,
-                ins_idx=ins_idx,
-                mark_idx=mark_idx,
-                wild=wild,
-                support=sheet,
-            )
-            if element is not None:
-                if structured:
-                    element["id"] = _mark_svg_id(single, ins_idx, mark_idx)
-                elif _needs_blur(single.variation):
-                    v = single.variation
-                    assert v is not None
-                    # 滲みは図形寸法比なので、filter は振幅名ではなく値で識別する
-                    std = _blur_std_px(v, single, canvas)
-                    filter_id = f"blur-{v.amplitude}-{int(round(std * 10))}"
-                    blur_needed[filter_id] = std
-                    eid = f"e{elem_idx}"
-                    element["id"] = eid
-                    blur_elems.append((eid, filter_id))
-                instruction_group.add(element)
-            surface_group, surface_filter = _render_surface_texture(
-                dwg,
-                single,
-                cmap,
-                work_assignment,
-                canvas,
-                profile=profile,
-                render_seed=render_seed,
-                ins_idx=ins_idx,
-                mark_idx=mark_idx,
-                wild=wild,
-                use_filters=use_filters,
-                support=sheet,
-                mark_style=_SURFACE_MARK_STYLE,
-            )
-            if surface_group is not None:
-                instruction_group.add(surface_group)
-            if surface_filter is not None:
-                surface_filter_xml.append(surface_filter)
-            elem_idx += 1
-        if structured:
-            content.add(instruction_group)
-
-    is_print = (
-        _score_canvas_ground(score) is not None
-        and _score_canvas_ground(score).material == "mezzotint"
-        or any(ins.weight in {"burin", "drypoint"} for ins in score.instructions)
-    )
-    if is_print and render_seed is not None:
-        plate_opacity = 0.02 + _hash01(0, int(render_seed), "plate-tone") * 0.04
-        plate = dwg.rect(
-            insert=(0, 0),
-            size=(canvas.width, canvas.height),
-            fill="#111111",
-            opacity=plate_opacity,
-            id="layer_15_plate_tone",
-        )
-        content.add(plate)
-
-    presence_layer = _render_presence_layer(
-        dwg, score, cmap, canvas, work_assignment=work_assignment
-    )
-    if presence_layer is not None:
-        presence_content.add(presence_layer)
-
-    _attach_root_groups(dwg, artboard, content, structured=structured)
-    svg = dwg.tostring()
-    svg = _inject_extra_defs(
-        svg,
-        [
-            ground_defs_xml or "",
-            *surface_filter_xml,
-            *solid_mottle_filter_xml,
-            performance_filter_xml or "",
-        ],
-    )
-    svg = _inject_texture_filters(svg, texture_filters, canvas)
-    if blur_elems:
-        svg = _inject_blur_filters(svg, blur_needed, blur_elems)
-    if structured:
-        svg = _inject_svg_document_metadata(svg, profile=profile)
-    svg = _apply_master_grid(svg)
-    if profile == "compat":
-        validate_compat_svg(svg)
-    return svg
+    return _engine.render_result(
+        score,
+        color_map=color_map,
+        catalog_id=catalog_id,
+        canvas_aspect=canvas_aspect,
+        svg_profile=svg_profile,
+        render_seed=render_seed,
+        composition_seed=composition_seed,
+        wild=wild,
+    ).svg
 
 
 _score_visual_load = _layers._score_visual_load

@@ -4010,18 +4010,25 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
 def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):
     """The wild flag reaches the renderer from the request, both ways (not vacuous)."""
     headers, _user, _group = auth_context
-    import inku_server.render_engines.default.adapter as default_engine_adapter
+    import inku_server.render_engines.default.engine as default_engine
+    from inku_server.render_engines.base import RenderEngineResult
 
     captured: dict = {}
 
-    def fake_render_svg(
+    def fake_render_result(
         score, *, color_map=None, catalog_id=None, canvas_aspect=None, svg_profile=None,
         render_seed=None, composition_seed=None, wild=False
     ):
         captured["wild"] = wild
-        return '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+        return RenderEngineResult(
+            svg='<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+            metadata={
+                "render_engine_id": "default",
+                "render_engine_version": "40",
+            },
+        )
 
-    monkeypatch.setattr(default_engine_adapter, "render_svg", fake_render_svg)
+    monkeypatch.setattr(default_engine, "render_result", fake_render_result)
     score = {
         "version": "0.1.0",
         "background": "white",

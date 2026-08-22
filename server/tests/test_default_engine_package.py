@@ -83,7 +83,6 @@ def test_t2_renderer_reexports_only_the_retained_determinism_objects() -> None:
         "_variation_seed_fields",
         "new_render_seed",
         "_hash01",
-        "_needs_blur",
     )
 
     for name in names:
@@ -91,6 +90,7 @@ def test_t2_renderer_reexports_only_the_retained_determinism_objects() -> None:
 
     assert not hasattr(renderer, "_seed_for_instruction")
     assert not hasattr(renderer, "_needs_contour_variation")
+    assert not hasattr(renderer, "_needs_blur")
 
 
 def test_t4_default_package_does_not_import_the_renderer_facade() -> None:

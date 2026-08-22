@@ -39,8 +39,10 @@ def test_t324_rejects_every_outside_structure(fragment: str):
 
 
 def test_t328_renderer_checks_the_compat_document_before_return(monkeypatch):
+    from inku_server.render_engines.default import engine
+
     checked: list[str] = []
-    monkeypatch.setattr(renderer, "validate_compat_svg", checked.append)
+    monkeypatch.setattr(engine, "validate_compat_svg", checked.append)
 
     svg = renderer.render(
         Score.model_validate(

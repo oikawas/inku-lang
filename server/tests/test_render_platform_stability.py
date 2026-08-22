@@ -26,6 +26,7 @@ import pathlib
 import sys
 
 from inku_server import renderer
+from inku_server.render_engines.default import marks
 from inku_server.render_engines.default import planning
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -187,7 +188,7 @@ def _draw_stability_cases() -> dict[str, str]:
 
 def _moved_under_one_ulp(monkeypatch) -> set[str]:
     before = _draw_stability_cases()
-    monkeypatch.setattr(renderer, "math", _OneUlpMath())
+    monkeypatch.setattr(marks, "math", _OneUlpMath())
     monkeypatch.setattr(planning, "math", _OneUlpMath())
     after = _draw_stability_cases()
     monkeypatch.undo()
@@ -215,7 +216,7 @@ def test_one_ulp_of_arc_length_does_not_change_fragment_shape(monkeypatch) -> No
     before = renderer._contact_fragments(
         points, coverage=0.2, grain_px=3.0, seed=0, closed=False
     )
-    monkeypatch.setattr(renderer, "math", _PreviousUlpHypotMath())
+    monkeypatch.setattr(marks, "math", _PreviousUlpHypotMath())
     after = renderer._contact_fragments(
         points, coverage=0.2, grain_px=3.0, seed=0, closed=False
     )
@@ -242,7 +243,7 @@ def test_without_the_stabilisers_the_same_perturbation_is_seen(monkeypatch) -> N
         " this test there and add the set it reports"
     )
     monkeypatch.setattr(planning, "_quantise_instructions", lambda items: items)
-    monkeypatch.setattr(renderer, "_quantise_contact_length", lambda value: value)
+    monkeypatch.setattr(marks, "_quantise_contact_length", lambda value: value)
     moved = _moved_under_one_ulp(monkeypatch)
     assert moved == (MOVED_WITHOUT_ARRANGEMENT_QUANTISER | expected_contact)
 

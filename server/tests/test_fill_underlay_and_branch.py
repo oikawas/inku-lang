@@ -41,6 +41,7 @@ from PIL import Image
 
 import inku_server.renderer as renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.render_engines.default import marks
 from inku_server.renderer import (
     FILL_COVERAGE_BRANCH,
     FILL_COVERAGE_TARGET,
@@ -113,7 +114,7 @@ def _centerlines(payload: dict, monkeypatch) -> list[list[tuple[float, float]]]:
             captured.append(list(centerline))
         return synthesize_along(centerline, *args, **kwargs)
 
-    monkeypatch.setattr(renderer, "synthesize_along", recording)
+    monkeypatch.setattr(marks, "synthesize_along", recording)
     _svg(payload)
     # A copy: the patch is still in place for the rest of the test, so a caller
     # that renders again would silently see its own strokes appended to this.
@@ -136,7 +137,7 @@ def _raster_lines(payload: dict, monkeypatch) -> list[tuple[tuple, tuple, float]
         captured.append((tuple(start), tuple(end), width))
         return original(start, end, width)
 
-    monkeypatch.setattr(renderer, "_raster_band", recording)
+    monkeypatch.setattr(marks, "_raster_band", recording)
     _svg(payload)
     return list(captured)
 
@@ -752,7 +753,7 @@ def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
     # 層 0 枚で 1 度描いて突き合わせる** — 記述が求めた墨を受入の側で建て直すと、
     # 建て直しの側が間違っていても気づけない。
     with monkeypatch.context() as patched:
-        patched.setattr(renderer, "FILL_FIELD_TONE_LAYERS", 0)
+        patched.setattr(marks, "FILL_FIELD_TONE_LAYERS", 0)
         flat = {tool: _underlay_opacity(_svg(dict(CIRCLE, weight=tool, filled=True)))
                 for tool in TEXTURE_TOOLS}
     for tool in TEXTURE_TOOLS:

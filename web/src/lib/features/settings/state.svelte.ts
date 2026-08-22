@@ -203,6 +203,20 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 	describeApiError: (detail: unknown, status: number) => string;
 };
 
+export type SettingsUserAdministration = {
+	readonly users: SettingsUserItem[];
+	readonly groups: SettingsUserGroup[];
+	readonly status: string | null;
+	readonly loading: boolean;
+	load: () => Promise<void>;
+	addUser: (input: CreateSettingsUserInput) => Promise<boolean>;
+	updateUser: (id: string, input: UpdateSettingsUserInput) => Promise<boolean>;
+	removeUser: (id: string) => Promise<boolean>;
+	addGroup: (name: string) => Promise<boolean>;
+	removeGroup: (group: SettingsUserGroup) => Promise<boolean>;
+	updateGroup: (id: string, name: string) => Promise<boolean>;
+};
+
 export type SettingsController = {
 	readonly opened: boolean;
 	readonly mode: SettingsMode;
@@ -222,10 +236,7 @@ export type SettingsController = {
 	readonly modelFetchResults: Record<string, ModelFetchResult>;
 	readonly modelSettingsLoading: boolean;
 	readonly modelCatalog: ProviderGroup[];
-	readonly users: SettingsUserItem[];
-	readonly groups: SettingsUserGroup[];
-	readonly userAdministrationStatus: string | null;
-	readonly userAdministrationLoading: boolean;
+	readonly userAdministration: SettingsUserAdministration;
 	restoreDetail: () => void;
 	setDetail: (detail: SettingsDetailLevel) => void;
 	openSettings: (tab?: SettingsTab | null) => void;
@@ -256,13 +267,6 @@ export type SettingsController = {
 	saveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => Promise<void>;
 	saveModelSettings: () => Promise<void>;
 	loadModelSettings: () => Promise<void>;
-	loadUserAdministration: () => Promise<void>;
-	addUser: (input: CreateSettingsUserInput) => Promise<boolean>;
-	updateUser: (id: string, input: UpdateSettingsUserInput) => Promise<boolean>;
-	removeUser: (id: string) => Promise<boolean>;
-	addGroup: (name: string) => Promise<boolean>;
-	removeGroup: (group: SettingsUserGroup) => Promise<boolean>;
-	updateGroup: (id: string, name: string) => Promise<boolean>;
 };
 
 function isSettingsContentTab(tab: string | null | undefined): tab is Exclude<SettingsTab, 'connection'> {
@@ -1051,6 +1055,22 @@ export function createSettingsController<TActor extends SettingsActor>(
 		}
 	}
 
+	// This facade narrows view capabilities without creating another owner: every
+	// getter and operation still closes over the single route-instance state above.
+	const userAdministration: SettingsUserAdministration = {
+		get users() { return users; },
+		get groups() { return groups; },
+		get status() { return userAdministrationStatus; },
+		get loading() { return userAdministrationLoading; },
+		load: loadUserAdministration,
+		addUser,
+		updateUser,
+		removeUser,
+		addGroup,
+		removeGroup,
+		updateGroup
+	};
+
 	return {
 		get opened() { return settingsOpen; },
 		get mode() { return settingsMode; },
@@ -1070,10 +1090,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		get modelFetchResults() { return modelFetchResults; },
 		get modelSettingsLoading() { return modelSettingsLoading; },
 		get modelCatalog() { return modelCatalog; },
-		get users() { return users; },
-		get groups() { return groups; },
-		get userAdministrationStatus() { return userAdministrationStatus; },
-		get userAdministrationLoading() { return userAdministrationLoading; },
+		userAdministration,
 		restoreDetail,
 		setDetail: setSettingsDetail,
 		openSettings,
@@ -1103,13 +1120,6 @@ export function createSettingsController<TActor extends SettingsActor>(
 		saveModelProviderMemo,
 		saveModelProvider,
 		saveModelSettings,
-		loadModelSettings,
-		loadUserAdministration,
-		addUser,
-		updateUser,
-		removeUser,
-		addGroup,
-		removeGroup,
-		updateGroup
+		loadModelSettings
 	};
 }

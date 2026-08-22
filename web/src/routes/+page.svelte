@@ -1790,7 +1790,7 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), settings.loadUserAdministration(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1844,7 +1844,7 @@
 			// logged in and now gets a 401, so without reading them again the
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), settings.loadUserAdministration(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
 			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -1935,7 +1935,7 @@
 			profileCurrentPassword = '';
 			profileNewPassword = '';
 			profileStatus = t().profileSavedMessage;
-			await settings.loadUserAdministration();
+			await settings.userAdministration.load();
 		} catch (e) {
 			profileStatus = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -6448,8 +6448,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<ShareModal
 			itemId={shareTarget.id}
 			itemLabel={shareTarget.source_text ?? shareTarget.input ?? shareTarget.id}
-			users={settings.users.map((u) => ({ id: u.id, name: u.username }))}
-			groups={settings.groups.map((g) => ({ id: g.id, name: g.name }))}
+			users={settings.userAdministration.users.map((u) => ({ id: u.id, name: u.username }))}
+			groups={settings.userAdministration.groups.map((g) => ({ id: g.id, name: g.name }))}
 			isJapanese={getLang() === 'ja'}
 			onClose={() => (shareTarget = null)}
 		/>

@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `a69730d743da478eb7d3b3e9c8c9b50fa008ccfd`、app `v2.13.39 / Build 926` である。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `88506e0e10ffa38fdeeac3f74dfe1c5f07b3e37c`、app `v2.13.47 / Build 946` である。
 
 ## 推奨閲覧順
 

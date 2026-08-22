@@ -62,6 +62,7 @@
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
+	import { createApiFetch } from '$lib/transport/api-fetch';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
@@ -975,20 +976,7 @@
 		return `HTTP ${status}`;
 	}
 
-	// The server holds a fixed number of render slots and refuses immediately
-	// (no queueing) when they are all taken, so a fan-out such as the 4-candidate
-	// grid can lose requests to a 503 that a short wait would have avoided.
-	// Retry that one condition here; every other status is passed through.
-	const RENDER_CAPACITY_RETRIES = 3;
-
-	function delay(ms: number, signal?: AbortSignal | null): Promise<void> {
-		return new Promise((resolve, reject) => {
-			if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
-			const timer = window.setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
-			function onAbort() { window.clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); }
-			signal?.addEventListener('abort', onAbort, { once: true });
-		});
-	}
+	const apiFetch = createApiFetch();
 
 	/** Failed response -> Error carrying the localized message, never the raw body. */
 	async function apiError(r: Response): Promise<Error> {
@@ -1021,21 +1009,6 @@
 			return svg;
 		} catch {
 			return '';
-		}
-	}
-
-	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-		const headers = new Headers(init.headers);
-		for (let attempt = 0; ; attempt += 1) {
-			const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
-			if (response.status !== 503 || attempt >= RENDER_CAPACITY_RETRIES) return response;
-			const body = await response.clone().text().catch(() => '');
-			if (!body.includes('render capacity is full')) return response;
-			// Slots free in well under the Retry-After of 1s the server suggests,
-			// so back off in shorter steps but never longer than it asked for.
-			const retryAfterMs = Number(response.headers.get('Retry-After')) * 1000;
-			const backoffMs = 200 * 2 ** attempt;
-			await delay(Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? Math.min(retryAfterMs, backoffMs) : backoffMs, init.signal);
 		}
 	}
 

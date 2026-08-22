@@ -59,8 +59,11 @@ const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主
 const val DemoCanvasAspectId = "pixel9_landscape_safe"
 /** Bookkeeping the demo loop puts in front of the prose it saves. */
 const val DemoHistoryInputPrefix = "[demo] "
-/** The same, for a batch line: `#<line number> <prose>`. */
-private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
+
+/** The prose that determines a history row's parent description. */
+internal fun sourceTextOf(item: HistoryItemEntity): String =
+    (item.sourceText ?: item.originalInput).trim()
+
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
@@ -1097,38 +1100,14 @@ class InkuViewModel @JvmOverloads constructor(
     /**
      * Whether the description differs from the one its parent was painted from.
      *
-     * web compares against `source_text` (+page.svelte:3220-3221), a second
-     * column holding the prose without the bookkeeping a batch or demo line
-     * carries. This client now has that column too, and reads it the way the
-     * server does -- `source_text` when there is one, `input` when there is not
-     * (`db.py:1835`).
-     *
-     * The prefix stripping stays as the fallback rather than being deleted with
-     * the column's arrival: `original_input` still keeps the prefix (`#3 …` from
-     * a batch line, `[demo] …` from the demo loop), the describe box holds
-     * sometimes the stored string and sometimes the prose alone, and any row
-     * written before this column existed has NULL there. Comparing the raw
-     * strings on those rows would report an edit nobody made and write
-     * `description_edit` for a redraw.
+     * Like the server and web, this is a single choice: `source_text` when it
+     * exists, otherwise `original_input`. No second interpretation is applied
+     * to either value.
      */
     private fun descriptionChanged(prompt: String, parent: HistoryItemEntity): Boolean {
         val text = prompt.trim()
-        val stored = (parent.sourceText ?: parent.originalInput).trim()
-        return text != stored && text != strippedHistoryInput(stored)
+        return text != sourceTextOf(parent)
     }
-
-    private fun strippedHistoryInput(stored: String): String = when {
-        stored.startsWith(DemoHistoryInputPrefix) -> stored.removePrefix(DemoHistoryInputPrefix).trim()
-        else -> BatchHistoryInputPrefix.replaceFirst(stored, "").trim()
-    }
-
-    /**
-     * The prose a work was painted from: `source_text` when the row has one and
-     * `original_input` with its bookkeeping cut when it does not, which is the
-     * server's own fallback (`db.py:1835`) with this client's strip behind it.
-     */
-    private fun sourceTextOf(item: HistoryItemEntity): String =
-        item.sourceText?.trim() ?: strippedHistoryInput(item.originalInput)
 
     private fun runSubmit(current: InkuUiState) {
         if (current.prompt.isBlank()) {

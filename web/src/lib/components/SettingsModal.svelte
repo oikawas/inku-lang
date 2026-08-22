@@ -10,6 +10,7 @@
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import DatabaseAdministrationSettings from '$lib/features/settings/DatabaseAdministrationSettings.svelte';
 	import RenderLimitsSettings from '$lib/features/settings/RenderLimitsSettings.svelte';
+	import ServerRuntimeSettings from '$lib/features/settings/ServerRuntimeSettings.svelte';
 	import UserAdministrationSettings from '$lib/features/settings/UserAdministrationSettings.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -723,106 +724,17 @@
 				onRunBackupNow={onRunDbBackupNow}
 			/>
 		{:else if settingsTab === 'server_misc'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsOutputSaveTitle}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					<label class="setting-toggle">
-						<input
-							type="checkbox"
-							checked={settingsStatus.output_save.enabled}
-							onchange={(e) => onUpdateOutputSaveSettings((e.currentTarget as HTMLInputElement).checked, settingsStatus?.output_save.output_dir ?? '', settingsStatus?.output_save.png_size ?? 2160)}
-						/>
-						<span>{t().settingsOutputSaveEnabled}</span>
-					</label>
-					<label class="server-path-row">
-						<span>{t().settingsOutputSaveDir}</span>
-						<div class="server-path-input-row">
-							<input
-								value={settingsStatus.output_save.output_dir}
-								placeholder={t().settingsOutputSaveDirPlaceholder}
-								onchange={(e) => onUpdateOutputSaveSettings(settingsStatus?.output_save.enabled ?? true, (e.currentTarget as HTMLInputElement).value, settingsStatus?.output_save.png_size ?? 2160)}
-							/>
-							<button class="ghost-btn primary-inline" onclick={() => onUpdateOutputSaveSettings(settingsStatus?.output_save.enabled ?? true, settingsStatus?.output_save.output_dir ?? '', settingsStatus?.output_save.png_size ?? 2160)}>{t().profileSaveButton}</button>
-						</div>
-					</label>
-					<label class="server-path-row compact-control">
-						<span>{t().settingsOutputSavePngSize}</span>
-						<select
-							value={String(settingsStatus.output_save.png_size)}
-							onchange={(e) => onUpdateOutputSaveSettings(settingsStatus?.output_save.enabled ?? true, settingsStatus?.output_save.output_dir ?? '', Number((e.currentTarget as HTMLSelectElement).value))}
-						>
-							<option value="1080">1080px</option>
-							<option value="2160">2160px</option>
-						</select>
-					</label>
-					<div class="settings-readonly-grid compact">
-						<span class="nowrap-label">
-							{t().settingsOutputSaveWorkers}
-							<span class="info-dot" aria-label={t().settingsOutputSaveWorkersHelp}>
-								i
-								<span class="info-tooltip">{t().settingsOutputSaveWorkersHelp}</span>
-							</span>
-						</span><strong>{settingsStatus.output_save.workers} / {settingsStatus.output_save.queue_limit}</strong>
-						<span>{t().settingsOutputSaveStats}</span><strong>{settingsStatus.output_save.submitted} / {settingsStatus.output_save.completed} / {settingsStatus.output_save.failed} / {settingsStatus.output_save.skipped}</strong>
-					</div>
-					<div class="db-test-result">{t().settingsOutputSaveNoteLabel}: {t().settingsOutputSaveNote}</div>
-					{#if outputSaveStatus}
-						<div class="inline-message">{outputSaveStatus}</div>
-					{/if}
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsRenderConcurrencyTitle}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					<label class="server-path-row compact-control">
-						<span>
-							{t().settingsRenderConcurrencyServer}
-							<span class="info-dot" aria-label={t().settingsRenderConcurrencyServerHelp}>
-								i
-								<span class="info-tooltip">{t().settingsRenderConcurrencyServerHelp}</span>
-							</span>
-						</span>
-						<input
-							type="number"
-							min={settingsStatus.render_concurrency.min_limit}
-							max={settingsStatus.render_concurrency.max_limit}
-							value={settingsStatus.render_concurrency.server_limit}
-							onchange={(e) => onUpdateRenderConcurrencySettings(Number((e.currentTarget as HTMLInputElement).value), settingsStatus?.render_concurrency.client_limit ?? 4)}
-						/>
-					</label>
-					<label class="server-path-row compact-control">
-						<span>
-							{t().settingsRenderConcurrencyClient}
-							<span class="info-dot" aria-label={t().settingsRenderConcurrencyClientHelp}>
-								i
-								<span class="info-tooltip">{t().settingsRenderConcurrencyClientHelp}</span>
-							</span>
-						</span>
-						<input
-							type="number"
-							min={settingsStatus.render_concurrency.min_limit}
-							max={settingsStatus.render_concurrency.max_limit}
-							value={settingsStatus.render_concurrency.client_limit}
-							onchange={(e) => onUpdateRenderConcurrencySettings(settingsStatus?.render_concurrency.server_limit ?? 2, Number((e.currentTarget as HTMLInputElement).value))}
-						/>
-					</label>
-					<div class="db-test-result">{t().settingsRenderConcurrencyRange(settingsStatus.render_concurrency.min_limit, settingsStatus.render_concurrency.max_limit)}</div>
-					{#if renderConcurrencyStatus}
-						<div class="inline-message">{renderConcurrencyStatus}</div>
-					{/if}
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
-			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
-			</div>
+			<ServerRuntimeSettings
+				status={settingsStatus ? { output_save: settingsStatus.output_save, render_concurrency: settingsStatus.render_concurrency } : null}
+				statusError={settingsStatusError}
+				loading={settingsStatusLoading}
+				{outputSaveStatus}
+				{renderConcurrencyStatus}
+				{isAdmin}
+				onReload={onLoadSettingsStatus}
+				onUpdateOutputSave={onUpdateOutputSaveSettings}
+				onUpdateRenderConcurrency={onUpdateRenderConcurrencySettings}
+			/>
 		{:else if settingsTab === 'logs'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsLogRetentionTitle}</div>
@@ -1576,7 +1488,6 @@
 		font-size: 12px;
 	}
 	.settings-readonly-grid span { color: var(--fg3); }
-	.settings-readonly-grid .nowrap-label { white-space: nowrap; }
 	.settings-readonly-grid strong { color: var(--fg); font-weight: 500; min-width: 0; word-break: break-word; }
 	.settings-readonly-grid code {
 		min-width: 0;
@@ -1618,85 +1529,6 @@
 		font-size: 12px;
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
-	}
-	.server-path-row {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-		margin-top: 10px;
-		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-	}
-	.server-path-input-row {
-		display: flex;
-		gap: 8px;
-	}
-	.server-path-input-row input {
-		flex: 1;
-		min-width: 0;
-		padding: 5px 7px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg);
-		font-size: 12px;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	}
-	.server-path-row.compact-control {
-		width: max-content;
-	}
-	.server-path-row select {
-		min-width: 110px;
-		padding: 5px 7px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg);
-		font-size: 12px;
-		font-family: inherit;
-	}
-	.info-dot {
-		position: relative;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 14px;
-		height: 14px;
-		margin-left: 5px;
-		border: 1px solid var(--border2);
-		border-radius: 50%;
-		color: var(--fg3);
-		font-size: 10px;
-		line-height: 1;
-		text-transform: none;
-		letter-spacing: 0;
-		cursor: help;
-	}
-	.info-tooltip {
-		position: absolute;
-		left: 50%;
-		bottom: calc(100% + 8px);
-		z-index: 20;
-		width: min(260px, 70vw);
-		transform: translateX(-50%);
-		padding: 7px 9px;
-		border-radius: var(--r);
-		background: var(--tooltip-bg);
-		color: var(--tooltip-fg);
-		font-size: 11px;
-		line-height: 1.5;
-		text-align: left;
-		white-space: normal;
-		text-transform: none;
-		letter-spacing: 0;
-		opacity: 0;
-		pointer-events: none;
-	}
-	.info-dot:hover .info-tooltip,
-	.info-dot:focus .info-tooltip {
-		opacity: 1;
 	}
 	.model-provider-row label {
 		display: flex;

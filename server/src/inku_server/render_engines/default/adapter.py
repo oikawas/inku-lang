@@ -1,10 +1,28 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
-from ..renderer import build_texture_metadata, render as render_svg
-from ..schema import Score
-from .base import RenderEngineResult
+from ...schema import Score
+from ..base import RenderEngineResult
+
+RenderSvg = Callable[..., str]
+BuildTextureMetadata = Callable[..., dict[str, Any]]
+
+render_svg: RenderSvg | None = None
+build_texture_metadata: BuildTextureMetadata | None = None
+
+
+def _bind_renderer(
+    *,
+    render: RenderSvg,
+    texture_metadata: BuildTextureMetadata,
+) -> None:
+    """Bind the facade entrypoints without importing the facade from this package."""
+    global render_svg, build_texture_metadata
+    render_svg = render
+    build_texture_metadata = texture_metadata
 
 
 @dataclass(frozen=True)
@@ -24,6 +42,8 @@ class DefaultRenderEngine:
         composition_seed: int | None = None,
         wild: bool = False,
     ) -> RenderEngineResult:
+        if render_svg is None or build_texture_metadata is None:
+            raise RuntimeError("default render engine facade is not bound")
         svg = render_svg(
             score,
             color_map=color_map,

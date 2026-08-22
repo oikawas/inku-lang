@@ -21,8 +21,8 @@ import re
 
 import pytest
 
-import inku_server.renderer as renderer
 import inku_server.stroke_engine as stroke_engine
+from inku_server.render_engines.default import determinism
 from inku_server.renderer import render
 from inku_server.schema import Score
 
@@ -95,10 +95,10 @@ def _engine_15_seed_material():
     触っていない」ことなので、比較は太さの軸を足す前の材料で行う。段 3 の側は
     `test_thinness_axis.py` が別に留めている。
     """
-    original = renderer._SEED_INSTRUCTION_FIELDS
+    original = determinism._SEED_INSTRUCTION_FIELDS
     reverted = tuple(name for name in original if name != "thinness")
     assert len(reverted) == len(original) - 1, "allowlist から thinness が消えている"
-    renderer._SEED_INSTRUCTION_FIELDS = reverted
+    determinism._SEED_INSTRUCTION_FIELDS = reverted
     original_resistance = stroke_engine.RESISTANCE
     # engine 19 (地の抵抗) はストローク合成そのものを動かすので、engine 15 との
     # バイト比較は抵抗を切った状態で行う。段 3 の `thinness` と同じ扱い。
@@ -107,7 +107,7 @@ def _engine_15_seed_material():
     try:
         yield
     finally:
-        renderer._SEED_INSTRUCTION_FIELDS = original
+        determinism._SEED_INSTRUCTION_FIELDS = original
         stroke_engine.RESISTANCE = original_resistance
 
 

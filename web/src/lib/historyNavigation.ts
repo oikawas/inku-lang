@@ -6,7 +6,8 @@
  * number, the modal from its own. They disagreed about which way is newer, about
  * what "latest" counts in, and about where a press lands when it crosses a page.
  *
- * All of it is pure and lives here rather than in `+page.svelte` for the same
+ * All of it is pure and lives here; the route-instance browsing owner applies
+ * the answers. This is for the same
  * reason `historyListLimit.ts` and `historyRefreshDecision.ts` do: `test:unit`
  * is node --test with no DOM, so a decision left inside a component is a
  * decision no gate can reach.

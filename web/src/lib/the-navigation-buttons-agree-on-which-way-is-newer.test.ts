@@ -52,6 +52,7 @@ const JA = read('lib/i18n/ja.ts');
 const EN = read('lib/i18n/en.ts');
 const TYPES = read('lib/i18n/types.ts');
 const PAGE = read('routes/+page.svelte');
+const BROWSING = read('lib/features/history/browsing-state.svelte.ts');
 const CANVAS = read('lib/components/CanvasPanel.svelte');
 const STRIP = read('lib/components/HistoryStrip.svelte');
 const MODAL = read('lib/components/HistoryManager.svelte');
@@ -242,9 +243,10 @@ test('T-9  from no selection, every direction arrives at the newest work', () =>
 
 // ── T-10 ────────────────────────────────────────────────────────────────────
 test('T-10  the page decides nothing about navigation by itself', () => {
-	assert.match(PAGE, /from '\$lib\/historyNavigation'/);
+	assert.ok(!PAGE.includes("from '$lib/historyNavigation'"), 'the page still imports the decision module');
 	for (const fn of ['historyNavDisabled(', 'historyNavTarget(', 'historyPageTarget(', 'alignHistoryOffset(']) {
-		assert.ok(PAGE.includes(fn), `+page.svelte never calls ${fn}`);
+		assert.ok(BROWSING.includes(fn), `the browsing owner never calls ${fn}`);
+		assert.ok(!PAGE.includes(fn), `+page.svelte still calls ${fn}`);
 	}
 	// Importing the module and then working the answer out anyway is exactly the
 	// failure this contract is guarding against: the judgement moves out, the
@@ -502,12 +504,12 @@ test('T-21  while a listing is on its way, nothing may be pressed', () => {
 
 // ── T-22 ────────────────────────────────────────────────────────────────────
 test("T-22  a late listing answer cannot put its page back over a newer one", () => {
-	const body = bodyOf(PAGE, 'async function fetchHistoryOffset(offset: number');
-	const assignAt = body.indexOf('historyItems = stripItems');
+	const body = bodyOf(BROWSING, 'async fetchOffset(offset: number');
+	const assignAt = body.indexOf('this.items = stripItems');
 	assert.ok(assignAt > 0, 'the strip is no longer written where this gate is looking');
 	const lastAwait = body.lastIndexOf('await ', assignAt);
 	assert.ok(lastAwait > 0, 'nothing is awaited before the strip is written');
-	const guard = /if \(requestId !== historyFetchRequest\) return/g;
+	const guard = /if \(requestId !== this\.fetchRequest\) return/g;
 	const guards = [...body.matchAll(guard)].map((m) => m.index!);
 	assert.ok(guards.length > 0, 'the listing fetch takes no request number');
 	// Between the last await and the assignment, not merely somewhere above it:
@@ -520,12 +522,12 @@ test("T-22  a late listing answer cannot put its page back over a newer one", ()
 
 // ── T-23 ────────────────────────────────────────────────────────────────────
 test('T-23  and neither can a late trash answer', () => {
-	const body = bodyOf(PAGE, 'async function fetchTrashPage(): Promise<void> {');
-	const assignAt = body.indexOf('trashItems = data.items');
+	const body = bodyOf(BROWSING, 'async fetchTrashPage(): Promise<void> {');
+	const assignAt = body.indexOf('this.trashItems = data.items');
 	assert.ok(assignAt > 0, 'the trash list is no longer written where this gate is looking');
 	const lastAwait = body.lastIndexOf('await ', assignAt);
 	assert.ok(lastAwait > 0);
-	const guards = [...body.matchAll(/if \(requestId !== trashFetchRequest\) return/g)].map((m) => m.index!);
+	const guards = [...body.matchAll(/if \(requestId !== this\.trashRequest\) return/g)].map((m) => m.index!);
 	assert.ok(guards.length > 0, 'the trash fetch takes no request number');
 	assert.ok(guards.some((at) => at > lastAwait && at < assignAt));
 });
@@ -576,15 +578,15 @@ test('T-26  the demo lock reaches the canvas, and every nav button on it', () =>
 
 // ── T-27 ────────────────────────────────────────────────────────────────────
 test('T-27  clearing the starred filter for the user is said out loud', () => {
-	const body = bodyOf(PAGE, 'async function syncHistoryStripToItem(');
-	const clearedAt = body.indexOf('historyStarredOnly = false;');
+	const body = bodyOf(BROWSING, 'async syncToItem(');
+	const clearedAt = body.indexOf('this.starredOnly = false;');
 	assert.ok(clearedAt > 0, 'the rescue no longer clears the filter');
 	// The same block, not merely the same function: a notice further down would
 	// fire on routes that never cleared anything.
 	const blockEnd = body.indexOf('\n\t\t}', clearedAt);
 	assert.ok(blockEnd > clearedAt);
 	const block = body.slice(clearedAt, blockEnd);
-	assert.match(block, /showHistoryStarredFilterClearedNotice\(\)/);
+	assert.match(block, /this\.deps\.onStarredFilterCleared\(\)/);
 
 	for (const [name, pack] of [['ja.ts', JA], ['en.ts', EN], ['types.ts', TYPES]] as const) {
 		assert.match(pack, /\bhistoryStarredFilterClearedNotice\b/, `${name} has no string for it`);

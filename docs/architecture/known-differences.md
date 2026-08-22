@@ -35,7 +35,7 @@
 
 ### C-01 `web/src/routes/+page.svelte`
 
-Feature registries and components have been separated, but API orchestration, model/settings, Paint/compose, history, lineage, and refinement still meet in the page.
+Feature registries, Settings administration, one Paint request, lineage queries, and history browsing have route-instance or stateless owners. The page still concentrates session/current-work state, outer Paint/compose loops, history mutation/replay/current-focus actions, and refinement, so it remains a high-change seam.
 
 ### C-02 `server/src/inku_server/db.py`
 

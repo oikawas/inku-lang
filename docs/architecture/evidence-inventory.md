@@ -48,7 +48,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | DATA-LINEAGE | Lineage nodes and edges | Connect only an explicit parent and derivation kind | `LineageNodeRow`; `LineageEdgeRow`; `db.py:add_item`; `test_lineage_acceptance.py` | §21; Project Context | Confirmed |
 | DATA-SAIJIKI | Saijiki | Vocabulary source for prompts, markers, relation literals, display, and references | `saijiki.py`; `test_saijiki_golden.py` | Project Context | Confirmed |
 | DATA-FALLBACK | Fallback records | Store each layer's fallback as a column (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`, Sketch from life = `sketch_state`), keeping "unrecorded" (works older than the column) apart from "not a fallback" | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context | Confirmed |
-| WEB-FEATURES | Web feature modules | Separate batch, export, catalog, inspection, Wild, and related state | `web/src/lib/features/<name>/` | Project Context | Confirmed |
+| WEB-FEATURES | Web feature modules | Separate batch, export, catalog, inspection, Wild, Settings administration, one Paint run, lineage queries, and history browsing | `web/src/lib/features/<name>/` | Project Context | Confirmed |
 | WEB-REGISTRY | Three settings registries | Collect local storage, user settings, and render payload fields | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context | Confirmed |
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |

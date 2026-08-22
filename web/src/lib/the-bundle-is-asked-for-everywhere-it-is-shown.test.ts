@@ -23,6 +23,7 @@ const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'u
 const SOURCES = [
 	{ name: 'historyManagerState.svelte.ts', source: read('./historyManagerState.svelte.ts') },
 	{ name: 'components/HistoryManager.svelte', source: read('./components/HistoryManager.svelte') },
+	{ name: 'features/history/browsing-state.svelte.ts', source: read('./features/history/browsing-state.svelte.ts') },
 	{ name: 'routes/+page.svelte', source: read('../routes/+page.svelte') }
 ] as const;
 
@@ -60,12 +61,13 @@ test('T-203  the state each filter reads is per-box, not shared between them', (
 	// The strip and the manager filter independently -- that is how the two
 	// already-working marks behave, and a share filter wired to one state would
 	// make pressing it in one box silently change the other.
-	const page = SOURCES[2].source;
+	const browsing = SOURCES[2].source;
+	const page = SOURCES[3].source;
 	const manager = SOURCES[1].source;
 	const state = SOURCES[0].source;
 
-	assert.match(page, /let historyForShareOnly = \$state\(false\);/);
-	assert.match(page, /if \(historyForShareOnly\) params\.set\('for_share', 'true'\);/);
+	assert.match(browsing, /forShareOnly = \$state\(false\);/);
+	assert.match(browsing, /if \(this\.forShareOnly\) params\.set\('for_share', 'true'\);/);
 	assert.match(state, /forShareOnly = \$state\(false\);/);
 	assert.match(state, /if \(forShareOnly\) params\.set\('for_share', 'true'\);/);
 	assert.match(manager, /if \(historyManagerForShareOnly\) params\.set\('for_share', 'true'\);/);
@@ -73,6 +75,7 @@ test('T-203  the state each filter reads is per-box, not shared between them', (
 	// And both boxes offer a way to raise it. A filter nothing can turn on is a
 	// request that is never sent, whatever the counts above say.
 	assert.match(page, /function setHistoryForShareOnly\(value: boolean\)/);
+	assert.match(browsing, /setForShareOnly\(value: boolean\): void/);
 	assert.match(state, /setForShareOnly = \(value: boolean\) =>/);
 	assert.match(read('./components/HistoryStrip.svelte'), /onSetForShareOnly\(!historyForShareOnly\)/);
 	assert.match(manager, /onSetForShareOnly\(!historyManagerForShareOnly\)/);

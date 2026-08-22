@@ -3,10 +3,10 @@
 // T-12: the settings tabs are handed out by permission group.
 //
 // The decision is executed here, not matched in the source: a regex over
-// +page.svelte would stay green against an implementation that had quietly
-// become a constant.  The page still asks the question at the same place --
-// canAccessSettingsTab calls straight through -- so this reaches the wiring the
-// page uses, and the last check below is what says so.
+// the settings owner would stay green against an implementation that had
+// quietly become a constant. The owner still asks the question at the same
+// place -- canAccessSettingsTab calls straight through -- so this reaches the
+// wiring the UI uses, and the last check below is what says so.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -46,9 +46,9 @@ test('the users group opens none of them, and neither does a leader', () => {
 	assert.equal(defaultSettingsTab(plain), 'plugins');
 	assert.equal(holdsPermissionGroup(plain, 'admins'), false);
 
-	// And the page reaches this module rather than keeping its own copy: the
+	// And the settings owner reaches this module rather than keeping its own copy: the
 	// two checks above would pass over a decision nothing calls.
-	const page = readFileSync(join(ROUTES_DIR, '+page.svelte'), 'utf8');
-	assert.match(page, /from '\$lib\/permissionGroups'/);
-	assert.match(page, /canAccessSettingsTabFor\(tab, currentUser\)/);
+	const owner = readFileSync(join(ROUTES_DIR, '..', 'lib', 'features', 'settings', 'state.svelte.ts'), 'utf8');
+	assert.match(owner, /from '\$lib\/permissionGroups'/);
+	assert.match(owner, /canAccessSettingsTabFor\(tab, currentUser\)/);
 });

@@ -8,7 +8,7 @@
  * it rebuilt no part of the page because nothing had changed. So the round now
  * asks a cheap question first, and only fetches when the answer moves.
  *
- * Both functions are pure: `+page.svelte` holds the live values and calls in.
+ * Both functions are pure: `HistoryBrowsingState` holds the live values and calls in.
  * Keeping them here is not tidiness -- `test:unit` is node --test with no DOM,
  * so a decision left inside the component is a decision no gate can reach.
  */

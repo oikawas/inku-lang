@@ -7,7 +7,9 @@ from xml.etree import ElementTree
 import pytest
 
 import inku_server.renderer as renderer
-from inku_server.renderer import _seed_for_instruction, render
+from inku_server.render_engines.default import determinism
+from inku_server.render_engines.default.determinism import _seed_for_instruction
+from inku_server.renderer import render
 from inku_server.schema import Arrangement, Instruction, Score
 
 
@@ -187,8 +189,8 @@ SEED_INSENSITIVE_FIELDS = [
 
 
 def test_seed_allowlists_match_the_renderer_contract():
-    assert set(renderer._SEED_INSTRUCTION_FIELDS) == EXPECTED_SEED_INSTRUCTION_FIELDS
-    assert set(renderer._SEED_ARRANGEMENT_FIELDS) == EXPECTED_SEED_ARRANGEMENT_FIELDS
+    assert set(determinism._SEED_INSTRUCTION_FIELDS) == EXPECTED_SEED_INSTRUCTION_FIELDS
+    assert set(determinism._SEED_ARRANGEMENT_FIELDS) == EXPECTED_SEED_ARRANGEMENT_FIELDS
 
 
 def test_every_instruction_and_arrangement_field_is_classified():

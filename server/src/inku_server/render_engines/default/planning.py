@@ -25,6 +25,8 @@ from ...plugins import CanvasSize
 from ...schema import Arrangement, Instruction, Score
 from ...stroke_engine import GRAMMARS
 from .determinism import _hash01, _seed_for_instruction
+from .palette import _norm_label as _norm_label
+from .palette import _render_effect_hint
 
 logger = logging.getLogger("inku_server.renderer")
 
@@ -936,47 +938,6 @@ def _resolve_performance_score(
     return Score.model_validate(data)
 
 
-def _render_effect_hint(color_hint: str | None) -> str | None:
-    """color_cycle 時も、色選択ではなく描画効果に関わるヒントだけは残す。"""
-    if not color_hint:
-        return None
-    hint = _norm_label(color_hint)
-    effect_tokens = (
-        "membrane",
-        "haze",
-        "fog",
-        "mist",
-        "atmosphere",
-        "膜",
-        "霞",
-        "霧",
-        "靄",
-        "soft light",
-        "柔らかな光",
-        "陽光",
-        "日差し",
-        "scent",
-        "fragrance",
-        "香り",
-        "匂",
-        "waiting buds",
-        "開花を待つ蕾",
-        "蕾",
-        "つぼみ",
-        "five-sense",
-        "五感",
-        "fade directional",
-        "fade=directional",
-        "fade outward",
-        "fade=outward",
-        "reflection",
-        "反射",
-        "映り",
-    )
-    kept = [token for token in effect_tokens if token in hint]
-    return "; ".join(kept) if kept else None
-
-
 # engine 24: `fade` declares how a group falls off, so each member carries its
 # own ceiling instead of one constant for the whole group. The pairs are the
 # near and the far end of the ramp (author ruling A-1 = F1); the fill keeps the
@@ -1540,10 +1501,6 @@ def _expand_arrangement(
         # which for a tiling is the coordinate nobody stated.
         return _quantise_instructions(expanded)
     return _quantise_instructions(_fit_group_to_anchor(ins, expanded))
-
-
-def _norm_label(value: str) -> str:
-    return re.sub(r"[\s:_()'\".,/-]+", " ", value.lower()).strip()
 
 
 def _line_perp_offsets(

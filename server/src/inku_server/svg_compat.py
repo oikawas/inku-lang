@@ -64,6 +64,9 @@ PORTABLE_SVG_POLICY = PortableSvgPolicy(
         "polyline": _COMMON_PAINT_ATTRIBUTES | frozenset({"points"}),
         "polygon": _COMMON_PAINT_ATTRIBUTES | frozenset({"points"}),
         "path": _COMMON_PAINT_ATTRIBUTES | frozenset({"d"}),
+        "linearGradient": frozenset({"id", "x1", "x2", "y1", "y2"}),
+        "radialGradient": frozenset({"id"}),
+        "stop": frozenset({"offset", "stop-color", "stop-opacity"}),
         "pattern": frozenset(
             {
                 "height",

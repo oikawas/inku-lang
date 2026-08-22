@@ -8,6 +8,7 @@
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import DatabaseAdministrationSettings from '$lib/features/settings/DatabaseAdministrationSettings.svelte';
 	import UserAdministrationSettings from '$lib/features/settings/UserAdministrationSettings.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -532,40 +533,6 @@
 		);
 	});
 
-	function formatBytes(bytes: number | null | undefined): string {
-		if (bytes == null) return '-';
-		if (bytes < 1024) return `${bytes} B`;
-		const units = ['KB', 'MB', 'GB', 'TB'];
-		let value = bytes / 1024;
-		let unit = units[0];
-		for (let i = 1; i < units.length && value >= 1024; i += 1) {
-			value /= 1024;
-			unit = units[i];
-		}
-		return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
-	}
-
-	function formatTimestamp(ms: number): string {
-		if (!ms) return '-';
-		return new Date(ms).toLocaleString();
-	}
-
-	// What the current settings will ask of the disk: the automatic copies are
-	// pruned to max_generations, so that is the ceiling. Manual copies are never
-	// pruned and are therefore not something the settings can predict.
-	const dbBackupEstimatedBytes = $derived(
-		settingsStatus ? (settingsStatus.database.file_size_bytes ?? 0) * settingsStatus.db_backup.max_generations : 0
-	);
-
-	function saveDbBackupSettings(patch: { intervalDays?: number; maxGenerations?: number; hour?: number; minute?: number }) {
-		const current = settingsStatus?.db_backup;
-		void onUpdateDbBackupSettings(
-			patch.intervalDays ?? current?.interval_days ?? 7,
-			patch.maxGenerations ?? current?.max_generations ?? 4,
-			patch.hour ?? current?.backup_hour ?? 3,
-			patch.minute ?? current?.backup_minute ?? 0
-		);
-	}
 
 </script>
 
@@ -771,131 +738,16 @@
 				</div>
 			{/if}
 		{:else if settingsTab === 'db'}
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsCurrentDb}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					<div class="settings-readonly-grid">
-						<span>Backend</span><strong>{settingsStatus.database.backend}</strong>
-						<span>Driver</span><strong>{settingsStatus.database.driver}</strong>
-						<span>URL</span><code>{settingsStatus.database.url}</code>
-						<span>Database</span><strong>{settingsStatus.database.database ?? '-'}</strong>
-						<span>Default</span><strong>{settingsStatus.database.is_default ? t().settingsYes : t().settingsNo}</strong>
-						<span>{t().settingsDbFileSize}</span><strong>{formatBytes(settingsStatus.database.file_size_bytes)}</strong>
-					</div>
-					<div class="db-test-result">{settingsStatus.database.note}</div>
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsDbBackupTitle}</div>
-				{#if settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if settingsStatus}
-					{#if !settingsStatus.db_backup.supported}
-						<div class="inline-message">{t().settingsDbBackupUnsupported}</div>
-					{/if}
-					<div class="db-backup-grid">
-						<div class="db-backup-field">
-							<span>{t().settingsDbBackupInterval}</span>
-							<NumberStepper
-								label={t().settingsDbBackupInterval}
-								min={1}
-								max={365}
-								value={settingsStatus.db_backup.interval_days}
-								disabled={!settingsStatus.db_backup.supported}
-								onChange={(value) => saveDbBackupSettings({ intervalDays: value })}
-							/>
-						</div>
-						<div class="db-backup-field">
-							<span>{t().settingsDbBackupMaxGenerations}</span>
-							<NumberStepper
-								label={t().settingsDbBackupMaxGenerations}
-								min={1}
-								max={100}
-								value={settingsStatus.db_backup.max_generations}
-								disabled={!settingsStatus.db_backup.supported}
-								onChange={(value) => saveDbBackupSettings({ maxGenerations: value })}
-							/>
-						</div>
-						<div class="db-backup-field db-backup-time">
-							<span>{t().settingsDbBackupTime}</span>
-							<div class="db-backup-time-fields">
-								<NumberStepper
-									min={0}
-									max={23}
-									label={t().settingsDbBackupTimeHourLabel}
-									value={settingsStatus.db_backup.backup_hour}
-									disabled={!settingsStatus.db_backup.supported}
-									onChange={(value) => saveDbBackupSettings({ hour: value })}
-								/>
-								<span class="db-backup-time-unit">{t().settingsDbBackupTimeHourUnit}</span>
-								<NumberStepper
-									min={0}
-									max={59}
-									label={t().settingsDbBackupTimeMinuteLabel}
-									value={settingsStatus.db_backup.backup_minute}
-									disabled={!settingsStatus.db_backup.supported}
-									onChange={(value) => saveDbBackupSettings({ minute: value })}
-								/>
-								<span class="db-backup-time-unit">{t().settingsDbBackupTimeMinuteUnit}</span>
-							</div>
-						</div>
-					</div>
-					<div class="db-backup-hint">{t().settingsDbBackupTimeHint}</div>
-					<div class="settings-readonly-grid compact">
-						<span>{t().settingsDbBackupLastAuto}</span><strong>{formatTimestamp(settingsStatus.db_backup.last_auto_backup_at)}</strong>
-						<span>{t().settingsDbBackupNextAuto}</span><strong>{formatTimestamp(settingsStatus.db_backup.next_auto_backup_at)}</strong>
-						<span>{t().settingsDbBackupEstimatedDisk}</span><strong title={t().settingsDbBackupEstimatedDiskHint}>{formatBytes(dbBackupEstimatedBytes)}</strong>
-						<span>Directory</span><code>{settingsStatus.db_backup.backup_dir}</code>
-						<span>Saved</span><strong>{t().settingsDbBackupStoredCounts(settingsStatus.db_backup.auto_count, settingsStatus.db_backup.manual_count)}</strong>
-					</div>
-					<div class="popover-group-label db-backup-list-label">{t().settingsDbBackupListTitle}</div>
-					{#if settingsStatus.db_backup.backups.length === 0}
-						<div class="inline-message">{t().settingsDbBackupListEmpty}</div>
-					{:else}
-						<div class="db-backup-list-wrap">
-							<table class="db-backup-list">
-								<thead>
-									<tr>
-										<th>{t().settingsDbBackupListGeneration}</th>
-										<th>{t().settingsDbBackupListKind}</th>
-										<th>{t().settingsDbBackupListAt}</th>
-										<th>{t().settingsDbBackupListSize}</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each settingsStatus.db_backup.backups as entry (entry.name)}
-										<tr>
-											<td class="db-backup-generation">{entry.generation ?? '—'}</td>
-											<td>{entry.kind === 'auto' ? t().settingsDbBackupKindAuto : t().settingsDbBackupKindManual}</td>
-											<td>{formatTimestamp(entry.at)}</td>
-											<td class="db-backup-size">{formatBytes(entry.size_bytes)}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-						<div class="db-backup-hint">
-							{t().settingsDbBackupListTotal(settingsStatus.db_backup.backups_total_count, formatBytes(settingsStatus.db_backup.backups_total_size_bytes))}
-							{#if settingsStatus.db_backup.backups_total_count > settingsStatus.db_backup.backups.length}
-								{t().settingsDbBackupListTruncated(settingsStatus.db_backup.backups.length)}
-							{/if}
-						</div>
-					{/if}
-					{#if dbBackupStatus}
-						<div class="inline-message">{dbBackupStatus}</div>
-					{/if}
-				{:else}
-					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
-				{/if}
-			</div>
-			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReload}</button>
-				<button class="ghost-btn primary-inline" onclick={onRunDbBackupNow} disabled={settingsStatusLoading || !isAdmin || !settingsStatus?.db_backup.supported}>{t().settingsDbBackupRunNow}</button>
-			</div>
+			<DatabaseAdministrationSettings
+				status={settingsStatus ? { database: settingsStatus.database, db_backup: settingsStatus.db_backup } : null}
+				statusError={settingsStatusError}
+				loading={settingsStatusLoading}
+				backupStatus={dbBackupStatus}
+				{isAdmin}
+				onReload={onLoadSettingsStatus}
+				onUpdateBackupSettings={onUpdateDbBackupSettings}
+				onRunBackupNow={onRunDbBackupNow}
+			/>
 		{:else if settingsTab === 'server_misc'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsOutputSaveTitle}</div>
@@ -1848,7 +1700,6 @@
 	.limits-field :global(.number-stepper) { width: min(136px, 100%); }
 	.db-backup-grid {
 		display: grid;
-		/* The time takes two number fields, so it claims two of these tracks. */
 		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 		gap: 10px;
 		margin-top: 10px;
@@ -1863,30 +1714,6 @@
 		display: flex; align-items: center; gap: 10px;
 		font-size: var(--btn-sm-font-size);
 	}
-	.db-backup-field {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-	}
-	.db-backup-time { grid-column: span 2; }
-	.db-backup-time-fields {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		min-width: 0;
-	}
-	.db-backup-time-fields :global(.number-stepper) { flex: 1 1 0; }
-	.db-backup-time-unit {
-		flex: 0 0 auto;
-		color: var(--fg2);
-		font-size: 11px;
-		letter-spacing: 0;
-		text-transform: none;
-	}
 	.db-backup-grid select {
 		min-width: 0;
 		padding: 5px 7px;
@@ -1898,49 +1725,6 @@
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 	}
-	.db-backup-hint {
-		margin-top: 6px;
-		color: var(--fg3);
-		font-size: 10px;
-		line-height: 1.5;
-	}
-	.db-backup-list-label {
-		margin-top: 14px;
-	}
-	.db-backup-list-wrap {
-		margin-top: 6px;
-		max-height: 190px;
-		overflow: auto;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-	}
-	.db-backup-list {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-	}
-	.db-backup-list th {
-		position: sticky;
-		top: 0;
-		z-index: 1;
-		padding: 5px 8px;
-		background: var(--panel2);
-		border-bottom: 1px solid var(--border);
-		color: var(--fg3);
-		font-weight: 500;
-		text-align: left;
-		white-space: nowrap;
-	}
-	.db-backup-list td {
-		padding: 4px 8px;
-		border-bottom: 1px solid var(--border);
-		color: var(--fg2);
-		white-space: nowrap;
-	}
-	.db-backup-list tr:last-child td { border-bottom: none; }
-	.db-backup-generation,
-	.db-backup-size { text-align: right; }
 	.server-path-row {
 		display: flex;
 		flex-direction: column;

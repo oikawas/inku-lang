@@ -19,11 +19,10 @@ from inku_server.composer import (
     _literal_relation_types,
 )
 from inku_server.renderer import (
-    _needs_contour_variation,
     _resolve_performance_score,
     render,
 )
-from inku_server.schema import Score, migrate_score_payload
+from inku_server.schema import Instruction, Score, migrate_score_payload
 from inku_server.stroke_engine import synthesize_stroke
 
 
@@ -604,6 +603,47 @@ def test_touching_svg_geometry_and_replay_contract_across_200_seeds() -> None:
     assert len(seen_poses) > 1
 
 
+_CONTOUR_VARIATION_DIMS = frozenset({"position_x", "position_y", "radius"})
+
+
+def _expected_arc_element_kind(instruction: Instruction) -> str:
+    """State the expected SVG branch from Score vocabulary, not product code."""
+    variation = instruction.variation
+    if variation is None or variation.quality in ("none", "pink"):
+        return "path"
+    if _CONTOUR_VARIATION_DIMS.intersection(variation.dimensions):
+        return "polyline"
+    return "path"
+
+
+@pytest.mark.parametrize(
+    ("variation", "expected_kind"),
+    [
+        (None, "path"),
+        ({"quality": "pink", "dimensions": ["radius"]}, "path"),
+        ({"quality": "perlin", "dimensions": ["angle"]}, "path"),
+        ({"quality": "perlin", "dimensions": ["radius"]}, "polyline"),
+    ],
+)
+def test_arc_element_kind_is_stated_from_score_vocabulary(
+    variation: dict | None, expected_kind: str
+) -> None:
+    payload = {
+        "primitive": "arc",
+        "center": [0.5, 0.5],
+        "radius": 0.2,
+        "angle_start": 20,
+        "angle_end": 160,
+    }
+    if variation is not None:
+        payload["variation"] = variation
+    score = Score.model_validate({"instructions": [payload]})
+    instruction = score.instructions[0]
+
+    assert _expected_arc_element_kind(instruction) == expected_kind
+    assert _svg_arcs(render(score, render_seed=41))[0]["kind"] == expected_kind
+
+
 def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
     arcs = _svg_arcs(svg)
     expected_arc_count = sum(
@@ -618,9 +658,7 @@ def _assert_touching_pairs_from_svg(score: Score, svg: str) -> None:
         arc = arcs[arc_index]
         # A performed arc is a sampled polyline; an unperformed one stays a
         # single arc command.
-        expected_kind = (
-            "polyline" if _needs_contour_variation(instruction.variation) else "path"
-        )
+        expected_kind = _expected_arc_element_kind(instruction)
         assert arc["kind"] == expected_kind
         arc_by_instruction[instruction_index] = arc
         arc_index += 1

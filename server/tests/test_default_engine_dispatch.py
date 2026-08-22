@@ -219,3 +219,31 @@ def test_t5_dispatch_keeps_the_two_field_frozen_surface_projection() -> None:
 
 def test_t6_renderer_is_smaller_after_dispatch_extraction() -> None:
     assert len(Path(renderer.__file__).read_text().splitlines()) < 1144
+
+
+def test_renderer_does_not_reexport_determinism_private_helpers() -> None:
+    assert not hasattr(renderer, "_seed_for_instruction")
+    assert not hasattr(renderer, "_needs_contour_variation")
+
+
+def test_tests_do_not_read_determinism_helpers_through_renderer() -> None:
+    tests_root = Path(__file__).parent
+    names = {"_seed_for_instruction", "_needs_contour_variation"}
+    offenders: set[tuple[str, str]] = set()
+
+    for path in tests_root.glob("test_*.py"):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "inku_server.renderer":
+                offenders.update(
+                    (path.name, alias.name) for alias in node.names if alias.name in names
+                )
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "renderer"
+                and node.attr in names
+            ):
+                offenders.add((path.name, node.attr))
+
+    assert offenders == set()

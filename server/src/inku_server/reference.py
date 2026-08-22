@@ -429,7 +429,8 @@ def _performance() -> dict[str, Any]:
         "seed_summary": (
             "The JSON Score is deterministic; wobble and scatter are performed by "
             "the renderer from a performance seed (per-instruction, derived in "
-            "renderer._seed_for_instruction). composition_seed re-salts intermediate "
+            "default.determinism._seed_for_instruction). composition_seed re-salts "
+            "intermediate "
             "expansion (expand_intermediate_ddl) to produce a sibling reading "
             "without changing the score's meaning."
         ),

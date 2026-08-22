@@ -33,6 +33,7 @@ flowchart LR
     PAGE["+page.svelte\n画面orchestration"]
     COMPONENTS["components/\n入力・canvas・history・lineage・settings"]
     FEATURES["features/<name>/\nbatch/export/catalog/inspection/wild等"]
+    RUN["features/run/current-work.ts\n1回のPaint request・stream・保存直後projection"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server/model provider/user・group管理"]
     SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
     USER_ADMIN_VIEW["features/settings/UserAdministrationSettings.svelte\nuser・group focused view"]
@@ -49,6 +50,7 @@ flowchart LR
 
     PAGE --> COMPONENTS
     PAGE --> FEATURES
+    PAGE -->|"解決済みdefault + 名前付きcapability"| RUN
     PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -61,6 +63,7 @@ flowchart LR
     SETTINGS_MODAL -->|"output_save/render_concurrency slice"| RUNTIME_VIEW
     SETTINGS -->|"名前付きruntime操作"| RUNTIME_VIEW
     SETTINGS -->|"名前付き設定・管理操作"| TRANSPORT
+    RUN -->|"Paint stream + unread-word feedback"| TRANSPORT
     TRANSPORT --> API
     FEATURES -->|"load registration"| PERSIST
     FEATURES -->|"model_settings slice"| USERSET
@@ -77,6 +80,7 @@ flowchart LR
 | 所有者 | 例 | 境界 |
 |---|---|---|
 | component/page memory | 描画中のresult、tab、history選択、lineage graph | reloadで消える。server正本ではない |
+| stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`は解決済みdefaultと名前付きcapabilityを受け取る。外側loop、route state、AbortControllerはpageに残る |
 | route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。focused viewへは`userAdministration`、`database`/`db_backup`、`render_limits`、または`output_save`/`render_concurrency`の必要sliceと名前付き操作だけを渡す |
 | focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
@@ -85,7 +89,9 @@ flowchart LR
 | render payload | catalog/wild等のrequest field | `render-payload.ts`のkind別contributor |
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
-`+page.svelte` は依然大きなorchestratorだが、設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
+`+page.svelte`は画面orchestratorに留まり、`features/run/current-work.ts`が1回のPaint request、NDJSON進行、直後のnearby history・saved lineage・generation count・unread word effectを所有する。pageは現在設定を解決して狭い名前付きcapabilityを渡す。current result、外側のsubmit/replay/batch/demo/refinement loop、stale result判断、AbortControllerの所有はpageに残る。
+
+設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
 
 ## CLI境界
 

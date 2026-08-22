@@ -11,7 +11,7 @@
 		holdsPermissionGroup,
 		type PermissionGroup
 	} from '$lib/permissionGroups';
-	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
+	import { highlightDDL } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -25,8 +25,7 @@
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
-	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
-	import { paintStageHandlers, paintStageLabel, readPaintStream, type PaintStage1Event } from '$lib/paintStream';
+	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
@@ -68,6 +67,12 @@
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
+	import {
+		runCurrentWork,
+		type InstructionLang,
+		type PaintOptions,
+		type PaintResult
+	} from '$lib/features/run/current-work';
 	import { loadPersistedSettings } from '$lib/features/persisted-settings';
 	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
@@ -139,78 +144,6 @@
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
 	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
-	type InstructionLang = 'auto' | 'ja' | 'en';
-
-	type PaintResult = {
-		svg: string;
-		score: Score;
-		stage1_model?: string | null;
-		stage2_model?: string | null;
-		render_build_number?: string | null;
-		render_color_profile?: Record<string, string> | null;
-		render_engine_id?: string | null;
-		render_engine_version?: string | null;
-		ddl_version?: string | null;
-		ddl_engine_version?: string | null;
-		render_hash?: string | null;
-		render_hash_short?: string | null;
-		render_color_catalog_id?: string | null;
-		render_color_catalog_name?: string | null;
-		render_color_catalog_sub?: string | null;
-		render_color_map?: Record<string, string> | null;
-		render_canvas_aspect?: string | null;
-		render_canvas_aspect_id?: string | null;
-		render_canvas_aspect_ratio?: number | null;
-		render_seed?: number | null;
-		render_wild?: boolean | null;
-		composition_seed?: number | null;
-		interpretation_seed?: string | null;
-		seed_text?: string | null;
-		sketch_text?: string | null;
-		sketch_grain?: string | null;
-		sketch_fallback_used?: boolean;
-		sketch_state?: string | null;
-		instruction_lang_requested?: string | null;
-		instruction_lang_resolved?: string | null;
-		ui_lang?: string | null;
-		history_id?: string | null;
-		history_at?: number | null;
-		description_hash?: string | null;
-		lineage_node_id?: string | null;
-		lineage_parent_node_id?: string | null;
-		derivation_kind?: DerivationKind | null;
-		derivation_metadata?: Record<string, unknown>;
-		elapsed_stage1_ms: number;
-		elapsed_stage2_ms: number;
-		elapsed_total_ms: number;
-		source_ddl?: string | null;
-		// What the expansion layer removed and why. It reaches the record on
-		// every path; until now nothing showed it to the person who wrote the
-		// sentence that went missing.
-		plugin_warnings?: string[] | null;
-		// Which of the nine limits took effect, and where the numbers came from.
-		// `render_limits` says what was used; only the source says whether a
-		// redraw replayed the work's own ceiling (ledger I-154).
-		render_limits?: Record<string, number> | null;
-		render_limits_source?: string | null;
-		render_limit_notes?: string[] | null;
-		focus?: string | null;
-		variation_amplitude?: string | null;
-		variation_seed?: number | null;
-		variation_moved_axes?: Array<{ axis: string; from: string; to: string }>;
-		interpret_fallback_used?: boolean;
-		interpret_fallback_reasons?: string[];
-		// Stage 2's counterpart. The response is the only place it exists, which
-		// is why a work saved from here has to carry it into the save.
-		compose_fallback_used?: boolean;
-		compose_retry_reasons?: string[];
-		tokens_in_stage1: number | null;
-		tokens_out_stage1: number | null;
-		tokens_in_stage2: number | null;
-		tokens_out_stage2: number | null;
-		user_generation_count?: number | null;
-	};
-	type DerivationKind = 'touch_change' | 'layout_change' | 'catalog_change' | 'reinterpretation' | 'model_comparison' | 'language_comparison' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'variation' | 'sketch_grain_change';
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 	type VariationAmplitude = 'small' | 'medium' | 'large';
 
@@ -2170,45 +2103,6 @@
 		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
 	}
 
-	// ── Core paint (2-stage) ─────────────────────────────────
-	type PaintOptions = {
-		historyInput?: string;
-		saveHistory?: boolean;
-		saveArtifacts?: boolean;
-		countGeneration?: boolean;
-		canvasAspectId?: CanvasAspectId;
-		renderSeed?: number;
-		/** Per-feature overrides for the render request; built by the features. */
-		renderOverrides?: RenderOverrides;
-		compositionSeed?: number;
-		// Variation (v2.0): the Server shifts the expansion layer only when both values exist.
-		variationAmplitude?: string;
-		variationSeed?: number;
-		interpretationSeed?: string;
-		seedText?: string;
-		signal?: AbortSignal;
-		sourceText?: string;
-		displayLabel?: string;
-		batchLineNumber?: number;
-		batchRunId?: string;
-		historyVisibility?: 'normal' | 'lineage_only';
-		lineageParentNodeId?: string | null;
-		derivationKind?: DerivationKind | null;
-		derivationMetadata?: Record<string, unknown>;
-		// Sketching (Stage 0.5). `sketchMode` says whether the layer runs and at which
-		// grain; `sketchText` hands the server prose it already has, so a redraw
-		// of a saved work replays instead of asking a non-deterministic layer again.
-		sketchMode?: SketchMode;
-		sketchText?: string | null;
-		// Qualified model ids for this run only, when the caller is a dialog that
-		// asked the reader which model to use. Absent means the page's own
-		// setting, which is what every other caller wants.
-		stage1Model?: string;
-		stage2Model?: string;
-		// Called when interpretation finishes, before rendering starts.
-		onStage1?: (event: PaintStage1Event) => void;
-	};
-
 async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
 	const r = await apiFetch('/api/refine/vision-advice', {
 		method: 'POST',
@@ -2224,91 +2118,41 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 }
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		const uiLang = getLang();
-		activeRunTokensIn = null;
-		activeRunTokensOut = null;
-		const historyInput = options.historyInput ?? text;
-		// The effective id, not the raw field: what is sent is what was asked for,
-		// and it is the same value the run status names and the work records.
-		const resolvedStage1Model = options.stage1Model ?? qualifiedModelId(stage1Provider, stage1Model);
-		const resolvedStage2Model = options.stage2Model ?? qualifiedModelId(stage2Provider, stage2Model);
-
-		stage1UserPrompt = text;
-		const resolvedSketchMode = options.sketchMode ?? sketchMode;
-		const resolvedSketchGrain = sketchGrainOf(resolvedSketchMode);
-		const sketchOn = resolvedSketchMode !== 'off';
-		// Until the first event arrives there is nothing to read, so the label
-		// names the layer that was asked for rather than the one after it.
-		stageLabel = paintStageLabel('requested', t(), { sketchOn });
-		const r = await apiFetch('/api/paint/stream', {
-			method: 'POST',
-			signal: options.signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				description: text,
-				sketch: resolvedSketchMode !== 'off',
-				...(resolvedSketchGrain ? { sketch_grain: resolvedSketchGrain } : {}),
-				...(options.sketchText ? { sketch_text: options.sketchText } : {}),
-				stage1_model: resolvedStage1Model,
-				stage2_model: resolvedStage2Model,
-				include_thinking: includeThinking,
-				instruction_lang: instructionLang,
-				ui_lang: uiLang,
-				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
-				render_seed: options.renderSeed,
-				composition_seed: options.compositionSeed,
-				variation_amplitude: options.variationAmplitude ?? null,
-				variation_seed: options.variationSeed ?? null,
-				interpretation_seed: options.interpretationSeed,
-				seed_text: options.seedText,
-				auto_repair: ddlAutoRepairEnabled,
-				save_history: options.saveHistory ?? true,
-				save_artifacts: options.saveArtifacts ?? true,
-				count_generation: options.countGeneration ?? true,
-				history_input: historyInput,
-				history_source_text: options.sourceText ?? text,
-				history_display_label: options.displayLabel ?? null,
-				batch_line_number: options.batchLineNumber ?? null,
-				batch_run_id: options.batchRunId ?? null,
-				history_visibility: options.historyVisibility ?? 'normal',
-				lineage_parent_node_id: options.lineageParentNodeId ?? null,
-				derivation_kind: options.derivationKind ?? null,
-				derivation_metadata: options.derivationMetadata ?? {},
-				...renderSettingsPayload('paint', options.renderOverrides)
-			})
-		});
-		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown };
-			throw new Error(describeApiError(d.detail, r.status));
-		}
-		const data = await readPaintStream<{ ddl: string; thinking: string | null } & PaintResult>(r, {
-			describeError: describeApiError,
-			...paintStageHandlers(t(), (label) => { stageLabel = label; }, {
-				sketchOn,
-				onStage1: (stage1) => {
-					activeRunTokensIn = stage1.tokens_in;
-					activeRunTokensOut = stage1.tokens_out;
-					options.onStage1?.(stage1);
+		return runCurrentWork(
+			text,
+			options,
+			{
+				uiLang: getLang(),
+				strings: t(),
+				// Resolve page settings before crossing the feature boundary. A
+				// caller's one-run override still wins inside the coordinator.
+				stage1Model: qualifiedModelId(stage1Provider, stage1Model),
+				stage2Model: qualifiedModelId(stage2Provider, stage2Model),
+				includeThinking,
+				instructionLang,
+				canvasAspectId: effectiveCanvasAspectId(),
+				ddlAutoRepairEnabled,
+				sketchMode,
+				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
+			},
+			{
+				apiFetch,
+				describeApiError,
+				setStage1UserPrompt: (prompt) => { stage1UserPrompt = prompt; },
+				setStageLabel: (label) => { stageLabel = label; },
+				setActiveRunTokens: (tokensIn, tokensOut) => {
+					activeRunTokensIn = tokensIn;
+					activeRunTokensOut = tokensOut;
+				},
+				loadNearbyHistory,
+				attachSavedLineage: () => { lineageDetached = false; },
+				updateGenerationCount: (count) => {
+					if (currentUser) {
+						currentUser = { ...currentUser, image_generation_count: count };
+					}
 				}
-			})
-		});
-		activeRunTokensIn = null;
-		activeRunTokensOut = null;
-		await loadNearbyHistory(data.history_id);
-const unreadWords = interpretationFeedback(text, data.ddl)
-	.filter((part) => part.tone === 'weak')
-	.flatMap((part) => part.text.match(/[一-龯々ぁ-んァ-ヶー]{2,}|[A-Za-z][A-Za-z'-]+/g) ?? []);
-if (unreadWords.length > 0) {
-	void apiFetch('/api/feedback/unread-words', {
-		method: 'POST', headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ words: unreadWords, context: text })
-	}).catch(() => undefined);
-}
-		if ((options.saveHistory ?? true) && data.lineage_node_id) lineageDetached = false;
-		if (currentUser && typeof data.user_generation_count === 'number') {
-			currentUser = { ...currentUser, image_generation_count: data.user_generation_count };
-		}
-		return data;
+			}
+		);
 	}
 
 	type InterpretResult = {

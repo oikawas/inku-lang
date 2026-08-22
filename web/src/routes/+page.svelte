@@ -256,23 +256,6 @@
 		sketch_open?: boolean;
 		ddl_expanded_open?: boolean;
 	};
-	type ModelProviderSetting = {
-		label?: string;
-		kind?: string;
-		default_base_url?: string;
-		requires_api_key?: boolean;
-		memo?: string;
-		models?: ModelOption[];
-		base_url: string;
-		api_key_set: boolean;
-		api_key_hint: string | null;
-		api_key?: string;
-		clear_api_key?: boolean;
-		enabled_models?: Record<string, boolean>;
-	};
-	type ModelSettings = {
-		providers: Record<string, ModelProviderSetting>;
-	};
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -774,18 +757,13 @@
 
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
-	let modelSettings = $state<ModelSettings | null>(null);
-	let modelSettingsStatus = $state<string | null>(null);
-	let modelFetchResults = $state<Record<string, { type: 'success' | 'error'; message: string }>>({});
-	let modelSettingsLoading = $state(false);
-	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	// Teach models.ts which providers this server serves, so that a reference
 	// qualified with an operator-added provider is recognised as qualified.
 	$effect(() => {
-		registerModelCatalog(modelCatalog);
+		registerModelCatalog(settings.modelCatalog);
 		registerModelCatalog(availableModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
@@ -876,10 +854,10 @@
 		currentUser: () => currentUser,
 		setCurrentUser: (actor) => { currentUser = actor; },
 		loadAvailableModels,
-		loadModelSettings,
 		loadUserSettings,
 		loadExportTemplates,
 		cancelModelSelection: restoreModelSelection,
+		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		setRenderFanoutLimit: (limit) => { renderFanoutLimit = limit; },
 		describeApiError
 	});
@@ -1699,27 +1677,6 @@
 		}
 	}
 
-	async function loadModelSettings() {
-		if (!isAdmin) {
-			modelSettings = null;
-			modelSettingsStatus = t().settingsAdminOnlyMessage;
-			return;
-		}
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', { cache: 'no-store' });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = null;
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
 	async function loadAvailableModels() {
 		if (!currentUser) {
 			availableModelsLoaded = false;
@@ -1759,283 +1716,6 @@
 			reconcileDemoPromptModel();
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
-		}
-	}
-
-	function updateModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
-		if (!modelSettings) return;
-		const current = modelSettings.providers[provider] ?? { base_url: '', api_key_set: false, api_key_hint: null };
-		modelSettings = {
-			...modelSettings,
-			providers: {
-				...modelSettings.providers,
-				[provider]: { ...current, ...patch },
-			},
-		};
-	}
-
-	async function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
-		if (!modelSettings || !provider || !isAdmin) return;
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers: {
-						[provider]: {
-							label: patch.label ?? provider,
-							kind: patch.kind,
-							requires_api_key: patch.requires_api_key,
-							memo: patch.memo,
-							models: patch.models ?? [],
-							base_url: patch.base_url ?? patch.default_base_url ?? '',
-							api_key: patch.api_key || undefined,
-							enabled_models: patch.enabled_models ?? {},
-						},
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-			throw e;
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	function askDeleteModelProvider(provider: Provider) {
-		const providerLabel = modelCatalog.find((item) => item.id === provider)?.label ?? provider;
-		confirmAction = {
-			message: t().settingsModelDeleteServiceConfirm(providerLabel),
-			destructive: true,
-			run: () => { void deleteModelProvider(provider); },
-		};
-	}
-
-	async function deleteModelProvider(provider: Provider) {
-		if (!isAdmin) return;
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ providers: { [provider]: { delete: true } } }),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	async function fetchProviderModels(provider: Provider) {
-		if (!isAdmin) return;
-		modelSettingsLoading = true;
-		const nextResults = { ...modelFetchResults };
-		delete nextResults[provider];
-		modelFetchResults = nextResults;
-		try {
-			const r = await apiFetch(`/api/settings/models/${encodeURIComponent(provider)}/fetch-models`, {
-				method: 'POST',
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelFetchModelsSaved;
-			modelFetchResults = { ...modelFetchResults, [provider]: { type: 'success', message: t().settingsModelFetchModelsSaved } };
-			await loadAvailableModels();
-		} catch (e) {
-			const message = e instanceof Error ? e.message : String(e);
-			modelFetchResults = { ...modelFetchResults, [provider]: { type: 'error', message } };
-			modelSettingsStatus = message;
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	function askClearModelApiKey(provider: Provider) {
-		const providerLabel = modelCatalog.find((item) => item.id === provider)?.label ?? provider;
-		confirmAction = {
-			message: t().settingsModelClearApiKeyConfirm(providerLabel),
-			destructive: true,
-			runLabel: t().settingsModelClearApiKey,
-			run: () => { void clearModelApiKey(provider); },
-		};
-	}
-
-	async function clearModelApiKey(provider: Provider) {
-		if (!isAdmin) return;
-		modelSettingsLoading = true;
-		try {
-			const current = modelSettings?.providers[provider];
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers: {
-						[provider]: {
-							base_url: current?.base_url,
-							clear_api_key: true,
-							enabled_models: current?.enabled_models ?? {},
-						},
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelApiKeyCleared;
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	function modelProviderPayload(id: string, provider: ModelProviderSetting, labelOverride?: string, memoOverride?: string) {
-		const catalogProvider = modelCatalog.find((item) => item.id === id);
-		return {
-			label: labelOverride ?? catalogProvider?.label,
-			kind: catalogProvider?.kind,
-			requires_api_key: catalogProvider?.requires_api_key,
-			memo: memoOverride ?? catalogProvider?.memo,
-			models: provider.models ?? catalogProvider?.models ?? [],
-			base_url: provider.base_url,
-			api_key: provider.api_key || undefined,
-			clear_api_key: !!provider.clear_api_key,
-			enabled_models: provider.enabled_models ?? {},
-		};
-	}
-
-	async function saveModelProviderName(provider: Provider, label: string) {
-		if (!modelSettings || !isAdmin) return;
-		const providerSettings = modelSettings.providers[provider];
-		if (!providerSettings) return;
-		const nextLabel = label.trim();
-		if (!nextLabel) return;
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers: {
-						[provider]: modelProviderPayload(provider, providerSettings, nextLabel),
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	async function saveModelProviderMemo(provider: Provider, memo: string) {
-		if (!modelSettings || !isAdmin) return;
-		const providerSettings = modelSettings.providers[provider];
-		if (!providerSettings) return;
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers: {
-						[provider]: modelProviderPayload(provider, providerSettings, undefined, memo),
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}) {
-		if (!modelSettings || !isAdmin) return;
-		const currentProviderSettings = modelSettings.providers[provider];
-		const providerSettings = currentProviderSettings ? { ...currentProviderSettings, ...patch } : null;
-		if (!providerSettings) return;
-		modelSettingsLoading = true;
-		try {
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers: {
-						[provider]: modelProviderPayload(provider, providerSettings),
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
-		}
-	}
-
-	async function saveModelSettings() {
-		if (!modelSettings || !isAdmin) return;
-		modelSettingsLoading = true;
-		try {
-			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => {
-				return [id, modelProviderPayload(id, provider)];
-			}));
-			const r = await apiFetch('/api/settings/models', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					providers,
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; settings: ModelSettings };
-			modelCatalog = data.catalog;
-			modelSettings = data.settings;
-			modelSettingsStatus = t().settingsModelSaved;
-			await loadAvailableModels();
-		} catch (e) {
-			modelSettingsStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			modelSettingsLoading = false;
 		}
 	}
 
@@ -6790,14 +6470,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{stage2Model}
 			{visionProvider}
 			{visionModel}
-			providerGroups={settings.mode === 'model' ? availableModelCatalog : modelCatalog}
+			providerGroups={settings.mode === 'model' ? availableModelCatalog : settings.modelCatalog}
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			bind:includeThinking
-			bind:modelSettings
-			{modelSettingsStatus}
-			{modelFetchResults}
-			{modelSettingsLoading}
 			{currentUser}
 			{uiMode}
 			{uiCustom}
@@ -6845,16 +6521,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetStage2Model={setStage2Model}
 			onSetVisionProvider={setVisionProvider}
 			onSetVisionModel={setVisionModel}
-			onUpdateModelProvider={updateModelProvider}
-			onAddModelProvider={addModelProvider}
-			onAskDeleteModelProvider={askDeleteModelProvider}
-			onAskClearModelApiKey={askClearModelApiKey}
-			onFetchModelList={fetchProviderModels}
-			onSaveModelProviderName={saveModelProviderName}
-			onSaveModelProviderMemo={saveModelProviderMemo}
-			onSaveModelProvider={saveModelProvider}
-			onSaveModelSettings={saveModelSettings}
-			onLoadModelSettings={loadModelSettings}
 			onLoadUserSettings={loadUserSettings}
 			onLogin={login}
 			onLogout={logout}

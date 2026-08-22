@@ -37,6 +37,7 @@ flowchart LR
     SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
     USER_ADMIN_VIEW["features/settings/UserAdministrationSettings.svelte\nuser・group focused view"]
     DATABASE_VIEW["features/settings/DatabaseAdministrationSettings.svelte\ndatabase・backup focused view"]
+    LIMITS_VIEW["features/settings/RenderLimitsSettings.svelte\nrender limits focused view"]
     TRANSPORT["transport/api-fetch.ts\n認証済みHTTP transport"]
     PERSIST["persisted-settings.ts"]
     USERSET["user-settings.ts"]
@@ -54,6 +55,8 @@ flowchart LR
     SETTINGS -->|"userAdministration submodel"| USER_ADMIN_VIEW
     SETTINGS_MODAL -->|"database/db_backup slice"| DATABASE_VIEW
     SETTINGS -->|"名前付きdatabase操作"| DATABASE_VIEW
+    SETTINGS_MODAL -->|"render_limits slice"| LIMITS_VIEW
+    SETTINGS -->|"名前付きlimits操作"| LIMITS_VIEW
     SETTINGS -->|"名前付き設定・管理操作"| TRANSPORT
     TRANSPORT --> API
     FEATURES -->|"load registration"| PERSIST
@@ -71,7 +74,7 @@ flowchart LR
 | 所有者 | 例 | 境界 |
 |---|---|---|
 | component/page memory | 描画中のresult、tab、history選択、lineage graph | reloadで消える。server正本ではない |
-| route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。user/group focused viewへは狭い`userAdministration` submodelだけを渡し、database/backup focused viewへは`database`/`db_backup` status sliceと名前付き操作だけを渡す |
+| route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。user/group focused viewへは狭い`userAdministration` submodel、database/backup focused viewへは`database`/`db_backup` status slice、render limits focused viewへは`render_limits` sliceを、それぞれ必要な名前付き操作だけと一緒に渡す |
 | focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
 | IndexedDB | File System Access APIのfolder handle | structured cloneが必要でlocalStorage外 |
@@ -79,7 +82,7 @@ flowchart LR
 | render payload | catalog/wild等のrequest field | `render-payload.ts`のkind別contributor |
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
-`+page.svelte` は依然大きなorchestratorだが、設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` status sliceとreload・設定更新・即時backupの名前付き操作だけを渡し、statusと操作のownerはroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
+`+page.svelte` は依然大きなorchestratorだが、設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` status sliceとreload・設定更新・即時backupの名前付き操作だけを渡す。render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` sliceとreload・更新の名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
 
 ## CLI境界
 

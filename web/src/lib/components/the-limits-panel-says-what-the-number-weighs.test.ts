@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import { WEIGHTED_LIMIT_FIELD, markWeight } from '../markWeight.ts';
 
 const COMPONENTS_DIR = dirname(fileURLToPath(import.meta.url));
-const panel = readFileSync(join(COMPONENTS_DIR, 'SettingsModal.svelte'), 'utf8');
+const panel = readFileSync(join(COMPONENTS_DIR, '../features/settings/RenderLimitsSettings.svelte'), 'utf8');
 
 // The measured cost of one mark, as the server sends it.
 const BYTES_PER_MARK = { pen: 12924, brush_thick: 16138 };
@@ -76,8 +76,8 @@ test('the panel draws it inside the limits field, from the value and the sent co
 	const field = panel.slice(start, end);
 
 	assert.match(field, /markWeight\(\s*field,/);
-	assert.match(field, /settingsStatus\.render_limits\.limits\[field\]/);
-	assert.match(field, /settingsStatus\.render_limits\.bytes_per_mark/);
+	assert.match(field, /status\.limits\[field\]/);
+	assert.match(field, /status\.bytes_per_mark/);
 	assert.match(field, /settingsRenderLimitsWeight\(weight\.low, weight\.high\)/);
 
 	// And the panel reads the cost from the response rather than keeping a copy:

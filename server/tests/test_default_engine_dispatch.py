@@ -1,4 +1,4 @@
-"""Stage 4-3 guards for the default engine mark domain boundary."""
+"""Stage 5 guards for the default engine instruction dispatch boundary."""
 
 from __future__ import annotations
 
@@ -6,10 +6,15 @@ import ast
 import dataclasses
 import hashlib
 import importlib
+import inspect
 from pathlib import Path
 
+import pytest
+import svgwrite
+
 import inku_server.renderer as renderer
-from inku_server.schema import Score
+from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
+from inku_server.schema import Instruction, Score
 
 
 PROFILE_DIGESTS = {
@@ -103,12 +108,12 @@ def _representative_score() -> Score:
                     "color": "blue",
                     "filled": True,
                 },
-            ],
+            ]
         }
     )
 
 
-def test_t3_mark_profiles_keep_the_pre_move_bytes() -> None:
+def test_t4_dispatch_profiles_keep_the_pre_move_bytes() -> None:
     score = _representative_score()
 
     for profile, expected in PROFILE_DIGESTS.items():
@@ -116,58 +121,101 @@ def test_t3_mark_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_renderer_facade_uses_canonical_mark_owners() -> None:
-    marks = importlib.import_module("inku_server.render_engines.default.marks")
+def test_t3_unknown_primitive_keeps_the_explicit_fallback() -> None:
+    instruction = Instruction.model_construct(primitive="unknown")
+    canvas = canvas_size_for_aspect(None)
+    drawing = svgwrite.Drawing(size=(canvas.width, canvas.height))
 
-    for name in (
-        "WEIGHT_TO_STROKE_WIDTH",
-        "WEIGHT_STYLE",
-        "TEXTURE_FILTER_WEIGHTS",
-        "FILL_COVERAGE_BRANCH",
-        "_mark_width_px",
-        "_texture_filter_xml",
-        "_line_with_variation",
-        "_stroke_attrs",
-        "_material_outline_profile",
-        "_render_fill_strokes",
-        "_render_fill_texture",
-        "_interior_fill",
-        "_render_hand_stroke",
-        "_render_contour_hand_stroke",
-        "_render_arc_hand_stroke",
-        "_render_corner_shape",
+    with pytest.raises(
+        NotImplementedError,
+        match=r"^primitive 'unknown' not yet supported$",
     ):
-        assert getattr(renderer, name) is getattr(marks, name)
+        renderer._render_instruction(
+            drawing,
+            instruction,
+            canvas=canvas,
+            support=renderer._score_support(Score(instructions=[])),
+        )
 
-    assert renderer.render.__module__ == "inku_server.renderer"
+
+def test_t3_dispatch_signature_keeps_the_renderer_contract() -> None:
+    parameters = inspect.signature(renderer._render_instruction).parameters
+
+    assert list(parameters) == [
+        "dwg",
+        "ins",
+        "cmap",
+        "canvas",
+        "work_assignment",
+        "use_filters",
+        "solid_mottle_filter_id",
+        "support",
+        "render_seed",
+        "ins_idx",
+        "mark_idx",
+        "wild",
+    ]
+    assert parameters["cmap"].default is renderer.COLOR_MAP
+    assert parameters["canvas"].default is None
+    assert parameters["work_assignment"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["support"].default is inspect.Parameter.empty
+
+
+def test_t1_renderer_facade_uses_the_canonical_dispatch() -> None:
+    dispatch = importlib.import_module("inku_server.render_engines.default.dispatch")
+
+    assert renderer._render_instruction is dispatch._render_instruction
     assert renderer._render_instruction.__module__ == (
         "inku_server.render_engines.default.dispatch"
     )
+    assert renderer.render.__module__ == "inku_server.renderer"
 
 
-def test_t1_marks_has_a_small_frozen_surface_projection() -> None:
-    marks = importlib.import_module("inku_server.render_engines.default.marks")
+def test_t2_dispatch_order_is_explicit_and_has_no_registry() -> None:
+    dispatch = importlib.import_module("inku_server.render_engines.default.dispatch")
+    source = inspect.getsource(dispatch._render_instruction)
+    primitives = [
+        "line",
+        "circle",
+        "ellipse",
+        "cloudform",
+        "square",
+        "triangle",
+        "polygon",
+        "arc",
+    ]
 
-    assert dataclasses.is_dataclass(marks.MarkSurfaceOps)
-    assert [field.name for field in dataclasses.fields(marks.MarkSurfaceOps)] == [
+    offsets = [source.index(f'if ins.primitive == "{name}":') for name in primitives]
+    assert offsets == sorted(offsets)
+    assert "NotImplementedError" in source
+    assert "registry" not in source
+    assert "getattr(" not in source
+
+
+def test_t5_dispatch_imports_only_explicit_lower_domains() -> None:
+    dispatch = importlib.import_module("inku_server.render_engines.default.dispatch")
+    path = Path(dispatch.__file__)
+    tree = ast.parse(path.read_text())
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module is not None:
+                modules.add(node.module.rsplit(".", 1)[-1])
+            modules.update(alias.name.split(".", 1)[0] for alias in node.names)
+
+    assert not {"renderer", "layers", "document", "engine"} & modules
+
+
+def test_t5_dispatch_keeps_the_two_field_frozen_surface_projection() -> None:
+    dispatch = importlib.import_module("inku_server.render_engines.default.dispatch")
+
+    projection = dispatch._MARK_SURFACE_OPS
+    assert [field.name for field in dataclasses.fields(projection)] == [
         "fills_interior",
         "scatter",
     ]
-    assert marks.MarkSurfaceOps.__dataclass_params__.frozen is True
+    assert type(projection).__dataclass_params__.frozen is True
 
 
-def test_t1_marks_does_not_import_orchestration_domains() -> None:
-    path = Path(renderer.__file__).parent / "render_engines" / "default" / "marks.py"
-    tree = ast.parse(path.read_text())
-    imported = {
-        alias.name
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.Import, ast.ImportFrom))
-        for alias in node.names
-    }
-
-    assert not {"renderer", "surfaces", "layers"} & imported
-
-
-def test_t1_renderer_is_smaller_after_mark_extraction() -> None:
-    assert len(Path(renderer.__file__).read_text().splitlines()) < 4554
+def test_t6_renderer_is_smaller_after_dispatch_extraction() -> None:
+    assert len(Path(renderer.__file__).read_text().splitlines()) < 1144

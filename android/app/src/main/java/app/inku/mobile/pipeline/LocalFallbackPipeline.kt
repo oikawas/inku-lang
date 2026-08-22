@@ -1620,30 +1620,59 @@ class LocalFallbackPipeline(
     }
 
     private fun densityLabel(originalCount: Int): String {
+        return densityLabel(originalCount, MAX_VISUAL_CLUSTERED_COUNT)
+    }
+
+    private fun densityLabel(originalCount: Int, representedCountMax: Int): String {
+        // Keep the server's integer pairs: floor division lands on exactly 180 and 80
+        // for the shipping ceiling without a floating-point boundary wobble.
         return when {
-            originalCount >= 180 -> "high"
-            originalCount >= 80 -> "medium"
+            originalCount >= bandThreshold(3, 2, representedCountMax) -> "high"
+            originalCount >= bandThreshold(2, 3, representedCountMax) -> "medium"
             else -> "low"
         }
     }
 
     private fun clusterCount(originalCount: Int): Int {
-        return when {
-            originalCount >= 500 -> 9
-            originalCount >= LITERAL_COUNT_THRESHOLD -> 7
-            originalCount >= 120 -> 5
+        return clusterCount(originalCount, MAX_VISUAL_CLUSTERED_COUNT)
+    }
+
+    private fun clusterCount(
+        originalCount: Int,
+        representedCountMax: Int,
+    ): Int {
+        val band = when {
+            originalCount >= bandThreshold(25, 6, representedCountMax) -> 9
+            originalCount >= bandThreshold(2, 1, representedCountMax) -> 7
+            originalCount >= bandThreshold(1, 1, representedCountMax) -> 5
             else -> 3
         }
+        // A band describes a ceiling's worth of ink, so it scales with that ceiling.
+        return maxOf(1, band * representedCountMax / MAX_VISUAL_CLUSTERED_COUNT)
     }
 
     private fun clusteredVisualCount(originalCount: Int): Int {
-        return if (originalCount <= MAX_VISUAL_CLUSTERED_COUNT) {
+        return clusteredVisualCount(
+            originalCount,
+            MIN_VISUAL_CLUSTERED_COUNT,
+            MAX_VISUAL_CLUSTERED_COUNT,
+        )
+    }
+
+    private fun clusteredVisualCount(
+        originalCount: Int,
+        representedCountMin: Int,
+        representedCountMax: Int,
+    ): Int {
+        return if (originalCount <= representedCountMax) {
             originalCount
         } else {
-            // Both ends of the representative band the prompt and SPEC name. The floor was
-            // 48 here, which is below the band the rest of the system speaks of.
-            minOf(MAX_VISUAL_CLUSTERED_COUNT, maxOf(MIN_VISUAL_CLUSTERED_COUNT, (originalCount * 0.42).toInt()))
+            minOf(representedCountMax, maxOf(representedCountMin, (originalCount * 0.42).toInt()))
         }
+    }
+
+    private fun bandThreshold(numerator: Int, denominator: Int, representedCountMax: Int): Int {
+        return representedCountMax * numerator / denominator
     }
 
     /**
@@ -1998,12 +2027,6 @@ class LocalFallbackPipeline(
         private const val PERF_TAG = "InkuPerf"
         private const val MAX_EXPANDED_PRIMITIVES = 400
         private const val MAX_EXPANDED_PER_INSTRUCTION = 240
-        // The point where a stated number stops being drawn as stated. It happens to
-        // equal MAX_EXPANDED_PER_INSTRUCTION today, but it is a DIFFERENT rule from a
-        // different field (server: Limits.literal_count_threshold), so it is named
-        // separately -- pointing the cluster split at the per-instruction cap would
-        // assert an identity the server does not have.
-        private const val LITERAL_COUNT_THRESHOLD = 240
         // The two ends of the representative band the prompt and SPEC name: a request too
         // large to count is shown as 80-120 marks. Both belong to the same rule.
         private const val MIN_VISUAL_CLUSTERED_COUNT = 80

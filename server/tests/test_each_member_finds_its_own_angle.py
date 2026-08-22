@@ -43,6 +43,7 @@ import pytest
 
 from inku_server import renderer
 from inku_server.render_engines import current_render_engine
+from inku_server.render_engines.default import planning
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS, HAND_GROUP_ROT
@@ -172,7 +173,7 @@ def _withhold_rotations(monkeypatch) -> None:
     engine 23's.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_rotations", lambda items, arr, member_seed: items
+        planning, "_apply_member_rotations", lambda items, arr, member_seed: items
     )
 
 
@@ -209,14 +210,14 @@ def _members_through_render(monkeypatch, instruction: Instruction, **kwargs):
     see the caller stop passing one, or start passing the other.
     """
     captured: list[list[Instruction]] = []
-    original = renderer._apply_member_rotations
+    original = planning._apply_member_rotations
 
     def spy(items, arr, member_seed):
         turned = original(items, arr, member_seed)
         captured.append(turned)
         return turned
 
-    monkeypatch.setattr(renderer, "_apply_member_rotations", spy)
+    monkeypatch.setattr(planning, "_apply_member_rotations", spy)
     _draw(instruction, **kwargs)
     assert len(captured) == 1
     return captured[0]

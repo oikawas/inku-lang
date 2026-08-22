@@ -36,7 +36,7 @@ import json
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server import renderer
+from inku_server.render_engines.default import planning
 from inku_server.renderer import (
     _anchor,
     _expand_arrangement,
@@ -251,11 +251,11 @@ def test_wave_swing_still_scales_with_the_stated_amplitude(
     amplitude alone; left on, it adds a term that does not double and the ratio
     would be 1.9-something for a correct implementation.
     """
-    monkeypatch.setattr(renderer, "_PATH_JITTER", 0.0)
+    monkeypatch.setattr(planning, "_PATH_JITTER", 0.0)
 
-    monkeypatch.setattr(renderer, "_PATH_WAVE_AMPLITUDE", 0.22)
+    monkeypatch.setattr(planning, "_PATH_WAVE_AMPLITUDE", 0.22)
     narrow = _extent_px(PATH_WAVE, aspect)[1]
-    monkeypatch.setattr(renderer, "_PATH_WAVE_AMPLITUDE", 0.44)
+    monkeypatch.setattr(planning, "_PATH_WAVE_AMPLITUDE", 0.44)
     wide = _extent_px(PATH_WAVE, aspect)[1]
 
     assert wide / narrow == pytest.approx(2.0, abs=TOLERANCE)
@@ -280,7 +280,7 @@ def test_cluster_centres_stay_proportional(monkeypatch, aspect: str):
     `path="none"` the centres come from `_scatter_pos` and an implementation
     that wired that site up would stay green here.
     """
-    monkeypatch.setattr(renderer, "_density_radius", lambda density, preserve: 0.0)
+    monkeypatch.setattr(planning, "_density_radius", lambda density, preserve: 0.0)
 
     def offsets(target: str) -> list[tuple[float, float]]:
         _, points = _placed(CLUSTER_ON_PATH, target)
@@ -350,7 +350,7 @@ def test_square_canvas_svg_is_byte_identical_without_the_rule(
         )
 
     with_rule = draw()
-    monkeypatch.setattr(renderer, "_short_side_scales", lambda canvas: (1.0, 1.0))
+    monkeypatch.setattr(planning, "_short_side_scales", lambda canvas: (1.0, 1.0))
     without_rule = draw()
 
     assert with_rule == without_rule

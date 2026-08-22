@@ -59,6 +59,7 @@ from inku_server.color_catalogs import (
 from inku_server import stroke_engine as se
 from inku_server.layer_versions import DDL_ENGINE_VERSION
 from inku_server.render_engines import current_render_engine
+from inku_server.render_engines.default import planning
 from inku_server.schema import Instruction, Score, Variation
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
@@ -2163,12 +2164,12 @@ def _render_arrangement_case(raw: dict, composition_seed: int | None = None) -> 
 @contextlib.contextmanager
 def _withheld(name: str) -> Iterator[None]:
     """Draw as the previous engine did, by making one rule a pass-through."""
-    original = getattr(renderer, name)
-    setattr(renderer, name, lambda items, arr, member_seed: items)
+    original = getattr(planning, name)
+    setattr(planning, name, lambda items, arr, member_seed: items)
     try:
         yield
     finally:
-        setattr(renderer, name, original)
+        setattr(planning, name, original)
 
 
 def _assert_size_cases_discriminate(cases: dict[str, dict]) -> None:

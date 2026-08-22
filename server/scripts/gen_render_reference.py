@@ -22,6 +22,7 @@ from typing import Any, get_args
 from inku_server import renderer
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
+from inku_server.render_engines.default import planning
 from inku_server.renderer import render
 from inku_server.schema import GroundMaterial, Instruction, Score
 
@@ -973,12 +974,12 @@ SIZE_CASES = (
 @contextlib.contextmanager
 def _member_sizes_withheld() -> Iterator[None]:
     """Draw as engine 24 did: the group expands, and every member is congruent."""
-    original = renderer._apply_member_sizes
-    renderer._apply_member_sizes = lambda items, arr, member_seed: items
+    original = planning._apply_member_sizes
+    planning._apply_member_sizes = lambda items, arr, member_seed: items
     try:
         yield
     finally:
-        renderer._apply_member_sizes = original
+        planning._apply_member_sizes = original
 
 
 def _assert_size_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
@@ -1013,12 +1014,12 @@ STATED_ANGLE_CASES = ("G-angle-stated-zero-edge", "G-angle-stated-30-edge")
 @contextlib.contextmanager
 def _member_rotations_withheld() -> Iterator[None]:
     """Draw as engine 25 did: the group expands, and every member shares an angle."""
-    original = renderer._apply_member_rotations
-    renderer._apply_member_rotations = lambda items, arr, member_seed: items
+    original = planning._apply_member_rotations
+    planning._apply_member_rotations = lambda items, arr, member_seed: items
     try:
         yield
     finally:
-        renderer._apply_member_rotations = original
+        planning._apply_member_rotations = original
 
 
 def _assert_angle_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:

@@ -37,6 +37,7 @@ import re
 import pytest
 
 from inku_server import renderer
+from inku_server.render_engines.default import planning
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
@@ -121,7 +122,7 @@ def _draw_as_frozen(score: dict, monkeypatch) -> str:
     nothing to drop, so what comes back is the engine-23 drawing.
     """
     monkeypatch.setattr(
-        renderer, "_apply_fade_levels", lambda items, arr, center=None: items
+        planning, "_apply_fade_levels", lambda items, arr, center=None: items
     )
     return _draw(score)
 
@@ -137,7 +138,7 @@ def _without_member_sizes(monkeypatch) -> None:
     claim.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
+        planning, "_apply_member_sizes", lambda items, arr, member_seed: items
     )
 
 

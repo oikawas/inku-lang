@@ -26,6 +26,7 @@ import pathlib
 import sys
 
 from inku_server import renderer
+from inku_server.render_engines.default import planning
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
@@ -187,6 +188,7 @@ def _draw_stability_cases() -> dict[str, str]:
 def _moved_under_one_ulp(monkeypatch) -> set[str]:
     before = _draw_stability_cases()
     monkeypatch.setattr(renderer, "math", _OneUlpMath())
+    monkeypatch.setattr(planning, "math", _OneUlpMath())
     after = _draw_stability_cases()
     monkeypatch.undo()
     return {case_id for case_id in before if before[case_id] != after[case_id]}
@@ -239,7 +241,7 @@ def test_without_the_stabilisers_the_same_perturbation_is_seen(monkeypatch) -> N
         f"no contact-length recording for {sys.platform!r}; measure it by running"
         " this test there and add the set it reports"
     )
-    monkeypatch.setattr(renderer, "_quantise_instructions", lambda items: items)
+    monkeypatch.setattr(planning, "_quantise_instructions", lambda items: items)
     monkeypatch.setattr(renderer, "_quantise_contact_length", lambda value: value)
     moved = _moved_under_one_ulp(monkeypatch)
     assert moved == (MOVED_WITHOUT_ARRANGEMENT_QUANTISER | expected_contact)

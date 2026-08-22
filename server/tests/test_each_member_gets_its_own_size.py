@@ -37,6 +37,7 @@ import pytest
 
 from inku_server import renderer
 from inku_server.render_engines import current_render_engine
+from inku_server.render_engines.default import planning
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS, HAND_GROUP_SIZE
@@ -123,7 +124,7 @@ def _withhold_sizes(monkeypatch) -> None:
     device engine 24's own gates used to read engine 23's.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
+        planning, "_apply_member_sizes", lambda items, arr, member_seed: items
     )
 
 
@@ -136,14 +137,14 @@ def _members_through_render(monkeypatch, instruction: Instruction, **kwargs):
     cannot see the caller stop passing one.
     """
     captured: list[list[Instruction]] = []
-    original = renderer._apply_member_sizes
+    original = planning._apply_member_sizes
 
     def spy(items, arr, member_seed):
         sized = original(items, arr, member_seed)
         captured.append(sized)
         return sized
 
-    monkeypatch.setattr(renderer, "_apply_member_sizes", spy)
+    monkeypatch.setattr(planning, "_apply_member_sizes", spy)
     _draw(instruction, **kwargs)
     assert len(captured) == 1
     return captured[0]

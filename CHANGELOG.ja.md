@@ -7968,3 +7968,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **`VersionInfoPanelTest`の期待表示を`CompatibilityConstants.renderEngineId`と`renderEngineVersion`から組み立てる。** 古い`default 26` literalを外し、testの責務を現行番号の独立固定ではなく、VersionInfoPanelが製品互換定数へ結線されていることの確認に限定した。
 - **製品挙動は変えていない。** production Kotlin、表示文字列、Gradle dependency、runner、Espresso stub、保存形式、Room、pipeline、render、server/web/sharedは変更していない。I-064も未変更で残る。
 - **検証:** 最初の計装はscreen OFF・keyguard表示中の環境redでCompose hierarchy前に停止した。private I-362でread-only preflightを実装し、unlock後の有効なfail-firstは古いliteralだけで1/1 failure。実装後greenとbranch-tip finalは同じ1 testがexit 0。各runはAPK保持flagとDB退避を使い、history 2、lineage 2、schema 9、thumbnail 1,239件を保持した。全instrumentation、全JVM suite、screenshot、reference生成、pentalaは行っていない。
+
+### Android `2.1.4-android.61` — 履歴gridで作品をその場でStar／解除する（2026-08-23・[I-363]）
+
+- **履歴画面の各作品card右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを追加した。** controlのtapは既存`toggleStar(HistoryListItem)`だけを呼び、cardの作品選択を発火させない。
+- **既存のcard tapとlong press Star切替を維持した。** 選択枠、thumbnail、作品title、検索、Starのみfilter、順序、件数も変えていない。既存`HistoryListItem.starred`、toggle action、`HistoryBadge`だけを使い、新しいproducer、ViewModel action、repository/DAO/query、Room/schema/migration、i18n、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新helperの未実装参照2件だけでexit 1。実装中は`HistoryGridStarControlTest`がexit 0、branch-tip finalもexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

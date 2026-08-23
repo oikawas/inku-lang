@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.60` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.61` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2148,3 +2148,9 @@ I-360のmodel tooltipへ、作品が保存した短縮render hashを既存の`F`
 `VersionInfoPanelTest`のrender engine期待表示は、古い`default 26` literalではなく、製品画面と同じ`CompatibilityConstants.renderEngineId`と`renderEngineVersion`から組み立てる。testの責務を「現行engine番号を別に固定する」ことから「VersionInfoPanelが製品互換定数へ結線されている」ことへ限定した。
 
 製品Kotlin、表示内容、Gradle dependency、runner、Espresso stub、保存形式、Room、pipeline、render、server/web/sharedは変更していない。最初の計装は画面OFF・keyguard表示中のためCompose hierarchy前で失敗したので、private I-362でread-only preflightを追加した。unlock後のfail-firstは古いliteralだけで1/1 failure、実装後とbranch-tip finalは同じ1 testがgreen。各runはAPK保持flagとDB退避を使い、history 2、lineage 2、schema 9、thumbnail 1,239件を保持した。I-064は未変更で残る。
+
+## 2026-08-23 履歴gridで作品をその場でStar／解除する（android `2.1.4-android.61`・[I-363]）
+
+履歴画面の各作品card右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを置く。controlのtapは既存`toggleStar(HistoryListItem)`だけを呼び、cardの作品選択を発火させない。既存のcard tap、long pressによるStar切替、選択枠、thumbnail、作品title、検索、Starのみfilter、順序と件数は維持する。
+
+既存`HistoryListItem.starred`、toggle action、`HistoryBadge`だけを使い、新しいstate producer、ViewModel action、repository/DAO/query、Room/schema/migration、i18n、pipeline、render、server/web/sharedは変更していない。focused JVM testはproduction edit前に新helperの未実装参照2件だけでfailし、実装中とbranch-tip finalでgreenになった。

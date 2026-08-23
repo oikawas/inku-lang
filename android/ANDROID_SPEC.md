@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.60` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.61` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2650,3 +2650,9 @@ The UI reads only the existing `HistoryListItem.renderHashShort` and `canvasAspe
 `VersionInfoPanelTest` now builds its expected render-engine text from the same `CompatibilityConstants.renderEngineId` and `renderEngineVersion` used by the product instead of retaining the stale literal `default 26`. The test now checks that VersionInfoPanel is wired to the product compatibility values; it no longer independently freezes the current engine number.
 
 No production Kotlin, visible text, Gradle dependency, runner, Espresso stub, persistence format, Room, pipeline, rendering, server, Web, or shared path changed. The first instrumentation attempt failed before the Compose hierarchy because the device screen was off behind the keyguard, so private task I-362 added a read-only display preflight. After unlock, fail-first failed only on the old literal; the same one test passed after implementation and at the branch tip. Every run used the APK-retention flag and a database evacuation, preserving two history rows, two lineage rows, schema version 9, and 1,239 thumbnails. I-064 remains unchanged and open.
+
+## 2026-08-23 Toggling a work Star in place from the history grid (android `2.1.4-android.61`, [I-363])
+
+Every work card in the history screen now keeps a visible `★` or `☆` control at its upper right, reflecting the saved Star state. Tapping that control calls only the existing `toggleStar(HistoryListItem)` path and does not select the card. Existing card taps, long-press Star toggling, selection rings, thumbnails, work titles, search, Star-only filtering, ordering, and counts are preserved.
+
+The change uses only the existing `HistoryListItem.starred`, toggle action, and `HistoryBadge`. It adds no state producer, ViewModel action, repository or DAO query, Room schema or migration, i18n, pipeline, rendering, server, Web, or shared path. The focused JVM test failed before production editing only on the two unresolved references to the planned helper, then passed during implementation and at the branch tip.

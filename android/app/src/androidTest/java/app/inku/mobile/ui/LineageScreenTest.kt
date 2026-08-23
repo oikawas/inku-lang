@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,6 +81,7 @@ class LineageScreenTest {
     private lateinit var application: Application
     private var viewModel: InkuViewModel? = null
     private var store: ViewModelStore? = null
+    private val generatedThumbnailHashes = mutableSetOf<String>()
 
     @Before
     fun setUp() {
@@ -103,6 +105,10 @@ class LineageScreenTest {
         // than the guarantee: this one blocks until the scheduled thumbnail
         // write is on disk, so the close below cannot land on top of it.
         repository.close()
+        generatedThumbnailHashes.forEach { renderHash ->
+            File(application.filesDir, "thumbnails/$renderHash.webp").delete()
+        }
+        generatedThumbnailHashes.clear()
         database.close()
     }
 
@@ -363,12 +369,54 @@ class LineageScreenTest {
         assertNull("a detached run must write no edge", edgeOf(saved))
     }
 
+    // --- T-8: a lineage card edits its saved DDL and returns on the child ---
+
+    @Test
+    fun t8_ddlActionEditsTheCardAndRefocusesTheSavedChild() {
+        val (root, _, grand) = seedThreeGenerations()
+        showLineage()
+        openLineageOn(grand, cards = 3)
+        useModelAndPrompt(grand.originalInput)
+
+        val ddlActions = composeTestRule.onAllNodesWithTag(DDL_ENTRY_TAG)
+        ddlActions.assertCountEquals(3)
+        ddlActions[0].performClick()
+        awaitState("the card DDL action to open the saved work") {
+            it.ddlEditorOpen && it.selectedHistory?.id == root.id
+        }
+        assertEquals(root.normalizedDdl, vm().state.value.ddl)
+        assertEquals(AppTab.Lineage, vm().state.value.tab)
+
+        vm().setDdl(EDITED_DDL)
+        awaitState("the edited DDL to reach shared state") {
+            it.ddl == EDITED_DDL && it.ddlEditedAfterGeneration
+        }
+        vm().closeDdlEditor()
+        vm().drawFromDdl()
+        val saved = awaitNewestAfter(3)
+        generatedThumbnailHashes += saved.renderHash
+
+        assertEquals(root.lineageNodeId, edgeOf(saved)?.parentNodeId)
+        assertEquals("ddl_edit", edgeOf(saved)?.derivationKind)
+        awaitState("the saved child to become the selected work") {
+            it.selectedHistory?.id == saved.id && it.tab == AppTab.Lineage
+        }
+        awaitState("the lineage to refocus on the saved child") {
+            it.lineageGraph?.let { graph ->
+                graph.focusNodeId == saved.lineageNodeId &&
+                    graph.nodes.any { node -> node.id == saved.lineageNodeId } &&
+                    graph.nodes.any { node -> node.id == root.lineageNodeId }
+            } == true
+        }
+    }
+
     private companion object {
         const val STAGE_MODEL = "gpt-4o-mini"
         const val ROOT_DESCRIPTION = "赤い円を5個、横に並べる"
         const val CHILD_DESCRIPTION = "黒い太筆の線を3本、斜めに置く"
         const val GRAND_DESCRIPTION = "青い三角を2つ、上に重ねる"
         const val FIRST_DRAWING = "緑の四角を4つ、下に敷く"
+        const val EDITED_DDL = "紫の線を2本、中央に並べる"
         const val FIRST_KIND = "description_edit"
         const val SECOND_KIND = "ddl_edit"
         const val DETACH_LABEL = "新しい起点にする"

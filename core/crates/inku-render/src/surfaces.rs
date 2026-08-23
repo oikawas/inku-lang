@@ -44,6 +44,7 @@ struct DabSpec<'a> {
     seed: Seed,
     index: i64,
     class_name: &'a str,
+    use_filters: bool,
 }
 
 fn texture_name(texture: SurfaceTexture) -> &'static str {
@@ -451,6 +452,7 @@ fn dab(
         salted_seed(spec.seed, "surface-stroke", spec.index),
         false,
         spec.class_name,
+        spec.use_filters,
     )
 }
 
@@ -465,6 +467,7 @@ fn stroke_element(
     seed: Seed,
     closed: bool,
     class_name: &str,
+    use_filters: bool,
 ) -> Element {
     let stroke = synthesize_contour(ContourStrokeRequest {
         centerline,
@@ -487,7 +490,7 @@ fn stroke_element(
             .attr("stroke", "none")
             .attr("class", class_name),
         instruction.weight,
-        context.use_filters,
+        use_filters,
     )
 }
 
@@ -542,6 +545,7 @@ fn sweep(
         salted_seed(seed, "surface-stroke", index),
         false,
         class_name,
+        context.use_filters,
     ))
 }
 
@@ -606,6 +610,7 @@ fn grain_pattern(
                         seed,
                         index: index as i64,
                         class_name: "surface-grain-dab",
+                        use_filters: false,
                     },
                 ));
             }
@@ -659,6 +664,7 @@ fn render_vectors(
                         seed,
                         index: index as i64,
                         class_name: "surface-stroke-v1",
+                        use_filters: context.use_filters,
                     },
                 ));
             }
@@ -782,6 +788,7 @@ fn render_vectors(
                         seed,
                         index: index as i64,
                         class_name: &format!("surface-stroke-v1 aquatint-step-{}", step + 1),
+                        use_filters: context.use_filters,
                     },
                 ));
             }
@@ -826,6 +833,7 @@ fn render_vectors(
                         salted_seed(seed, "surface-stroke", 90_000 + ring as i64),
                         true,
                         &format!("surface-stroke-v1 bleed-ring-{}", ring + 1),
+                        context.use_filters,
                     ));
                 } else {
                     group.push(

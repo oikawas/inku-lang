@@ -354,3 +354,27 @@ fn display_owns_material_filters_but_compat_remains_filter_free() {
     assert!(!compat.svg.contains("<filter"));
     assert!(!compat.svg.contains("filter=\""));
 }
+
+#[test]
+fn display_grain_tile_is_reusable_and_not_filtered_per_dab() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"weight":"pencil","surface":{"texture":"grain"}}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display,
+            render_seed: Some(431),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    let pattern_start = output.svg.find("<pattern id=\"surface_pattern_").unwrap();
+    let pattern_end = pattern_start + output.svg[pattern_start..].find("</pattern>").unwrap();
+    assert!(!output.svg[pattern_start..pattern_end].contains("filter=\""));
+    assert!(output.svg.contains("surface-grain-carrier-v1"));
+}

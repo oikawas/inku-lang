@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::determinism::hash01;
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
@@ -278,6 +279,30 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         if structured {
             content.push(instruction_group);
         }
+    }
+    let is_print = ground
+        .as_ref()
+        .is_some_and(|ground| ground.material == crate::types::GroundMaterial::Mezzotint)
+        || performance.score.instructions.iter().any(|instruction| {
+            matches!(
+                instruction.weight,
+                crate::types::Weight::Burin | crate::types::Weight::Drypoint
+            )
+        });
+    if is_print && let Some(seed) = request.options.render_seed {
+        content.push(
+            Element::new("rect")
+                .attr("id", "layer_15_plate_tone")
+                .attr("x", "0")
+                .attr("y", "0")
+                .attr("width", format_number(request.options.canvas.width))
+                .attr("height", format_number(request.options.canvas.height))
+                .attr("fill", "#111111")
+                .attr(
+                    "opacity",
+                    format_number(0.02 + hash01(0, seed, "plate-tone") * 0.04),
+                ),
+        );
     }
     let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
     let ground = ground.as_ref().and_then(|ground| {

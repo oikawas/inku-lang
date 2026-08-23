@@ -263,3 +263,33 @@ fn candidate_preserves_every_ground_between_background_and_content() {
         }
     }
 }
+
+#[test]
+fn print_tools_add_plate_tone_after_marks_only_with_a_render_seed() {
+    let make_request = |render_seed| RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"line","from":[0.1,0.2],"to":[0.9,0.8],"weight":"drypoint"}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed,
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let seeded = render(make_request(Some(431))).unwrap();
+    let mark = seeded.svg.find("stroke-engine-v1").unwrap();
+    let plate = seeded.svg.find("id=\"layer_15_plate_tone\"").unwrap();
+    assert!(mark < plate);
+    assert!(!seeded.svg.contains("<filter"));
+    assert!(
+        !render(make_request(None))
+            .unwrap()
+            .svg
+            .contains("layer_15_plate_tone")
+    );
+}

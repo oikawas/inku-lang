@@ -35,6 +35,13 @@
 		planRefinementCandidates,
 		runRefinementFanout
 	} from '$lib/features/canvas/refinement-fanout';
+	import {
+		projectRefinementRedrawResult,
+		runLayoutRedraw,
+		runReadingRedraw,
+		runTouchRedraw,
+		type RefinementRedrawProjection
+	} from '$lib/features/canvas/refinement-redraw';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -3723,6 +3730,24 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		colorCatalogSettings.selected = id;
 	}
 
+	// Svelte assignments and current-view ownership stay in the route; the action
+	// module decides only which result fields make up the redraw projection.
+	function applyRefinementRedrawProjection(projection: RefinementRedrawProjection): void {
+		ddl = projection.ddl;
+		expandedDdl = projection.expandedDdl;
+		ddlGeneratedBaseline = projection.ddl;
+		thinking = projection.thinking;
+		result = projection.result;
+		displayedHistoryItem = null;
+		elapsedStage1Ms = projection.elapsedStage1Ms;
+		elapsedStage2Ms = projection.elapsedStage2Ms;
+		elapsedTotalMs = projection.elapsedTotalMs;
+		tokensInStage1 = projection.tokensInStage1;
+		tokensOutStage1 = projection.tokensOutStage1;
+		tokensInStage2 = projection.tokensInStage2;
+		tokensOutStage2 = projection.tokensOutStage2;
+	}
+
 	async function varyPerformance() {
 		if (!result || refinementSession.busy) return;
 		// Ask before the words are carried into a child (contract § stage 4).
@@ -3732,30 +3757,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		reloading = true;
 		reloadError = null;
 		try {
-			const usedSeeds = new Set<number>();
-			if (Number.isFinite(result.render_seed ?? NaN)) usedSeeds.add(Number(result.render_seed));
-			const nextSeed = createSafeIntegerSeed(usedSeeds);
-			// The placement on screen was drawn with composition_seed when the work has one and
-			// with render_seed otherwise (renderer.py:3058). Send that same value so changing the
-			// touch keeps the composition, which is what this operation says it does. It is also
-			// carried onto the result below: without that, a second touch change would find no
-			// composition_seed and fall back to the new performance seed, moving the composition.
-			const placementSeed = result.composition_seed ?? result.render_seed ?? null;
-			const r = await apiFetch('/api/render-svg', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					score: result.score,
-					canvas_aspect: refinementCanvasAspectId(),
-					render_seed: nextSeed,
-					composition_seed: placementSeed,
-					...workReferencePayload(refinementWorkId()),
-					...renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId())),
-				})
+			result = await runTouchRedraw({
+				current: result,
+				canvasAspectId: refinementCanvasAspectId(),
+				parentNodeId,
+				workReference: workReferencePayload(refinementWorkId()),
+				renderPayload: renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId()))
+			}, {
+				apiFetch,
+				apiError,
+				createRenderSeed: createSafeIntegerSeed,
+				currentResult: () => result!
 			});
-			if (!r.ok) throw await apiError(r);
-			const svg = await r.text();
-			result = { ...result, svg, render_seed: nextSeed, composition_seed: placementSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_change' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
 			history.clearSelection();
 			outputTab = 'canvas';
@@ -3779,23 +3792,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		loading = true;
 		error = null;
 		try {
-			const usedSeeds = new Set<number>();
-			if (Number.isFinite(result.composition_seed ?? NaN)) usedSeeds.add(Number(result.composition_seed));
-			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
-			const r = await paintOne(source, { compositionSeed: nextVarySeed, historyInput: source, sourceText: source, canvasAspectId: refinementCanvasAspectId(), renderOverrides: inPlaceRedrawOverrides(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_change' : null, derivationMetadata: { composition_seed: nextVarySeed } });
-			ddl = r.source_ddl ?? r.ddl;
-			expandedDdl = r.ddl;
-			ddlGeneratedBaseline = ddl;
-			thinking = r.thinking;
-			result = r;
-			displayedHistoryItem = null;
-			elapsedStage1Ms = r.elapsed_stage1_ms;
-			elapsedStage2Ms = r.elapsed_stage2_ms;
-			elapsedTotalMs = r.elapsed_total_ms;
-			tokensInStage1 = r.tokens_in_stage1;
-			tokensOutStage1 = r.tokens_out_stage1;
-			tokensInStage2 = r.tokens_in_stage2;
-			tokensOutStage2 = r.tokens_out_stage2;
+			const r = await runLayoutRedraw({
+				source,
+				current: result,
+				canvasAspectId: refinementCanvasAspectId(),
+				renderOverrides: inPlaceRedrawOverrides(),
+				parentNodeId
+			}, {
+				createCompositionSeed: createSafeIntegerSeed,
+				paint: paintOne
+			});
+			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
 			outputTab = 'canvas';
 			if (r.history_id) {
 				await history.fetchOffset(0, { anchorId: r.history_id });
@@ -3825,22 +3832,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		error = null;
 		const previousDdl = ddl;
 		try {
-			const interpretationSeed = createInterpretationSeed();
-			const r = await paintOne(source, { historyInput: source, sourceText: source, canvasAspectId: refinementCanvasAspectId(), renderOverrides: inPlaceRedrawOverrides(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
+			const r = await runReadingRedraw({
+				source,
+				canvasAspectId: refinementCanvasAspectId(),
+				renderOverrides: inPlaceRedrawOverrides(),
+				parentNodeId
+			}, {
+				createInterpretationSeed,
+				paint: paintOne
+			});
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
-			ddl = r.source_ddl ?? r.ddl;
-			expandedDdl = r.ddl;
-			ddlGeneratedBaseline = ddl;
-			thinking = r.thinking;
-			result = r;
-			displayedHistoryItem = null;
-			elapsedStage1Ms = r.elapsed_stage1_ms;
-			elapsedStage2Ms = r.elapsed_stage2_ms;
-			elapsedTotalMs = r.elapsed_total_ms;
-			tokensInStage1 = r.tokens_in_stage1;
-			tokensOutStage1 = r.tokens_out_stage1;
-			tokensInStage2 = r.tokens_in_stage2;
-			tokensOutStage2 = r.tokens_out_stage2;
+			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
 			outputTab = "canvas";
 			if (r.history_id) {
 				await history.fetchOffset(0, { anchorId: r.history_id });

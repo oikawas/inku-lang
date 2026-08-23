@@ -8,6 +8,7 @@
 pub mod contact;
 pub mod determinism;
 pub mod geometry;
+pub mod placement;
 pub mod stroke;
 pub mod support;
 pub mod types;

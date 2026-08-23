@@ -4,11 +4,12 @@
 //   npm run lint:i18n            report
 //   npm run lint:i18n -- --list  also print every allowed exception it matched
 //
-// It reads the four channels the English UI actually lives in:
+// It reads the five channels the English UI actually lives in:
 //   1. src/lib/i18n/en.ts               (the i18n pack; values only, never key names)
 //   2. isJapanese ? '…' : '…'           (ternaries inside components)
 //   3. getLang() === 'ja' ? '…' : '…'   (branches in +page.svelte and friends)
 //   4. 日本語 / English                  (bilingual labels in component markup)
+//   5. effectEn / exampleEn              (English Saijiki preview prose)
 //
 // Every rule below has its prose counterpart in GLOSSARY.md. When you change one,
 // change the other in the same commit — the file and this script are one pair.
@@ -118,7 +119,7 @@ const PROPER = new Set([
 	'Display', 'Compatibility', 'Standard', 'Square', 'Web', 'Vary', 'Another', 'Requires', 'Copy',
 ]);
 
-// ── read the three channels ───────────────────────────────────────────────
+// ── read the five channels ───────────────────────────────────────────────
 function pack(file) {
 	const out = [];
 	let cur = null;
@@ -148,6 +149,7 @@ function walk(dir, acc = []) {
 const TERNARY = /isJapanese \? '((?:[^'\\]|\\.)*)' : '((?:[^'\\]|\\.)*)'/g;
 const GETLANG = /getLang\(\) === 'ja'\s*\n?\s*\? '((?:[^'\\]|\\.)*)'\s*\n?\s*: '((?:[^'\\]|\\.)*)'/g;
 const BILINGUAL_LABEL = />\s*([^<>\n]*[\u3040-\u30ff\u3400-\u9fff][^<>\n]*?)\s+\/\s+([A-Za-z][^<>\n]*?)\s*</g;
+const SAIJIKI_EN_FIELD = /\b(effectEn|exampleEn)\s*:\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g;
 
 // The same shape picks a language code as picks a label: `isJapanese ? 'ja' :
 // 'en'` is which language to read a DDL in, not two words to put on screen.
@@ -166,6 +168,21 @@ for (const file of walk(SRC)) {
 			if (re !== BILINGUAL_LABEL && isLangCodePair(m[1], m[2])) continue;
 			const line = body.slice(0, m.index).split('\n').length;
 			strings.push({ where: `${relative(SRC, file)}:${line}`, key: null, text: m[2] });
+		}
+	}
+	// Test fixtures may deliberately contain forbidden English. Production
+	// Saijiki data can move between modules, so scan every non-test source file
+	// instead of pinning this channel to today's two filenames.
+	if (!/\.test\.(?:ts|js)$/.test(file)) {
+		SAIJIKI_EN_FIELD.lastIndex = 0;
+		let m;
+		while ((m = SAIJIKI_EN_FIELD.exec(body)) !== null) {
+			const line = body.slice(0, m.index).split('\n').length;
+			strings.push({
+				where: `${relative(SRC, file)}:${line} ${m[1]}`,
+				key: null,
+				text: m[2],
+			});
 		}
 	}
 }

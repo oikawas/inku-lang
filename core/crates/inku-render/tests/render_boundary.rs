@@ -293,3 +293,33 @@ fn print_tools_add_plate_tone_after_marks_only_with_a_render_seed() {
             .contains("layer_15_plate_tone")
     );
 }
+
+#[test]
+fn hand_fills_are_tool_fields_while_machine_fills_remain_regions() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[
+              {"primitive":"circle","center":[0.3,0.5],"radius":0.18,"weight":"pencil","filled":true},
+              {"primitive":"square","position":[0.58,0.32],"size":[0.30,0.30],"weight":"rotring","filled":true},
+              {"primitive":"triangle","position":[0.10,0.10],"size":[0.16,0.16],"weight":"brush_thick","surface":{"texture":"solid"}}
+            ]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed: Some(431),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    assert!(output.svg.contains("class=\"fill-v2\""));
+    assert!(output.svg.contains("fill-stroke-v1 strokes-"));
+    assert!(output.svg.contains("class=\"solid-fill-v1\""));
+    assert!(output.svg.contains("<polygon"));
+    assert!(!output.svg.contains("<clipPath"));
+    assert!(!output.svg.contains("NaN"));
+}

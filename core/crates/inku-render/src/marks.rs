@@ -5,6 +5,7 @@ use std::fmt;
 
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::{instruction_seed, needs_contour_variation, needs_path_variation};
+use crate::fills::render_interior_fill;
 use crate::geometry::{
     ArcGeometry, arc_points, arc_points_with_variation, circle_points,
     closed_contour_with_variation, edge_contour_with_anchors, ellipse_perimeter,
@@ -56,12 +57,12 @@ pub struct MarkContext<'a> {
 }
 
 #[derive(Clone)]
-struct MarkStyle {
-    color: String,
-    width: f64,
-    fill: bool,
-    stroke_opacity: f64,
-    fill_opacity: Option<f64>,
+pub(crate) struct MarkStyle {
+    pub(crate) color: String,
+    pub(crate) width: f64,
+    pub(crate) fill: bool,
+    pub(crate) stroke_opacity: f64,
+    pub(crate) fill_opacity: Option<f64>,
     linecap: &'static str,
     dash: Option<String>,
 }
@@ -169,7 +170,7 @@ fn fade_level(hint: &str) -> Option<f64> {
     value.parse().ok()
 }
 
-fn mark_style(instruction: &Instruction, context: MarkContext<'_>) -> MarkStyle {
+pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) -> MarkStyle {
     let fill = instruction.filled
         || instruction
             .surface
@@ -354,7 +355,7 @@ fn split_at_breaks(points: &[Point], minimum: usize) -> Vec<Vec<Point>> {
     runs
 }
 
-fn polygon_path(points: &[Point]) -> String {
+pub(crate) fn polygon_path(points: &[Point]) -> String {
     if points
         .iter()
         .any(|point| !point.x.is_finite() || !point.y.is_finite())
@@ -733,7 +734,9 @@ pub fn render_instruction(
             };
             if uses_hand_stroke(instruction.weight) {
                 let mut group = Element::new("g");
-                group.push(apply_style(geometry, &style, true).attr("stroke", "none"));
+                if let Some(fill) = render_interior_fill(instruction, &contour, &style, context) {
+                    group.push(fill);
+                }
                 group.push(hand_contour(
                     instruction,
                     &contour,
@@ -912,7 +915,9 @@ pub fn render_instruction(
             );
             if uses_hand_stroke(instruction.weight) {
                 let mut group = Element::new("g");
-                group.push(geometry.attr("stroke", "none"));
+                if let Some(fill) = render_interior_fill(instruction, &sampled, &style, context) {
+                    group.push(fill);
+                }
                 group.push(hand_contour(
                     instruction,
                     &sampled,
@@ -959,7 +964,9 @@ fn render_corner_shape(
     );
     if uses_hand_stroke(instruction.weight) {
         let mut group = Element::new("g");
-        group.push(geometry.attr("stroke", "none"));
+        if let Some(fill) = render_interior_fill(instruction, &contour.points, style, context) {
+            group.push(fill);
+        }
         group.push(hand_contour(
             instruction,
             &contour.points,

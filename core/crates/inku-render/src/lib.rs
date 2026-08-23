@@ -10,6 +10,7 @@ pub mod arrangement;
 pub mod cloudform;
 pub mod contact;
 pub mod determinism;
+pub mod fills;
 pub mod geometry;
 pub mod ground;
 pub mod group;

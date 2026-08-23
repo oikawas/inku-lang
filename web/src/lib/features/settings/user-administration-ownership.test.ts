@@ -1,7 +1,7 @@
 // Run with the focused Stage 2C command in the contract.
 //
 // This source-level seam keeps account administration in the route-instance
-// Settings owner while session identity stays on the page and unsaved form
+// Settings owner while session identity stays in its route-instance owner and unsaved form
 // values, especially passwords, stay inside the focused view that owns the inputs.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,6 +10,7 @@ import { test } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const OWNER = read('./state.svelte.ts');
 const USER_OWNER = read('./user-administration.svelte.ts');
+const SESSION_OWNER = read('../session/state.svelte.ts');
 const PAGE = read('../../../routes/+page.svelte');
 const MODAL = read('../../components/SettingsModal.svelte');
 const VIEW = read('./UserAdministrationSettings.svelte');
@@ -50,16 +51,18 @@ test('user administration types and focused view boundary are canonical on Setti
 	assert.match(VIEW, /administration\.updateGroup/);
 });
 
-test('session identity stays page-owned behind one named refresh capability', () => {
-	assert.match(PAGE, /let currentUser(?:\s*:[^=]+)?\s*=\s*\$state/);
-	assert.match(PAGE, /async function login\(/);
-	assert.match(PAGE, /async function logout\(/);
-	assert.match(PAGE, /async function refreshCurrentUserSettings\(/);
+test('session identity has one owner behind one named refresh capability', () => {
+	assert.match(SESSION_OWNER, /currentUser = \$state<UserItem \| null>/);
+	assert.match(SESSION_OWNER, /async login\(/);
+	assert.match(SESSION_OWNER, /async logout\(/);
+	assert.match(SESSION_OWNER, /async refreshCurrentUserSettings\(/);
+	assert.doesNotMatch(PAGE, /let currentUser(?:\s*:[^=]+)?\s*=\s*\$state/);
+	assert.doesNotMatch(PAGE, /async function (?:login|logout|refreshCurrentUserSettings)\(/);
 	assert.doesNotMatch(OWNER, /let currentUser(?:\s*:[^=]+)?\s*=\s*\$state/);
 	assert.doesNotMatch(OWNER, /function (?:login|logout)\(/);
 	assert.match(USER_OWNER, /refreshCurrentUserSettings:/);
 	assert.match(USER_OWNER, /await deps\.refreshCurrentUserSettings\(\)/);
-	assert.match(PAGE, /refreshCurrentUserSettings,/);
+	assert.match(PAGE, /refreshCurrentUserSettings: \(\) => session\.refreshCurrentUserSettings\(\)/);
 	assert.match(PROPS, /loginUserName: string;/);
 	assert.match(PROPS, /loginPassword: string;/);
 });

@@ -7,10 +7,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
-	import {
-		holdsPermissionGroup,
-		type PermissionGroup
-	} from '$lib/permissionGroups';
 	import { highlightDDL } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
@@ -54,8 +50,7 @@
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
-	import { normalizeHistoryStripFields, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
+	import { toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -77,10 +72,8 @@
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { createApiFetch } from '$lib/transport/api-fetch';
-	import {
-		createSettingsController,
-		type SettingsTab
-	} from '$lib/features/settings/state.svelte';
+	import { createSessionState, type UserItem, type UserModelSettings } from '$lib/features/session/state.svelte';
+	import { createSettingsController } from '$lib/features/settings/state.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
@@ -101,7 +94,6 @@
 	import { BatchState } from '$lib/features/batch/state.svelte';
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
-	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -174,40 +166,6 @@
 		// "" when the document ships none at that scale.
 		preview_url?: string;
 		preview_url_2x?: string;
-	};
-	type UserModelSettings = {
-		stage1_provider: Provider;
-		stage1_model: string;
-		stage2_provider: Provider;
-		stage2_model: string;
-		vision_provider: Provider;
-		vision_model: string;
-		okugaki_provider?: Provider;
-		okugaki_model?: string;
-		instruction_caption_visible?: boolean;
-		color_catalog_id?: string;
-		sketch_open?: boolean;
-		ddl_expanded_open?: boolean;
-	};
-	type UserItem = {
-		id: string;
-		username: string;
-		email: string;
-		permission_groups: PermissionGroup[];
-		permission_group_labels: string[];
-		group_id: string | null;
-		group_name: string | null;
-		ui_theme?: 'light' | 'dark';
-		ui_mode?: UiMode;
-		ui_custom?: UiCustomVisibility;
-		history_strip_fields?: HistoryStripField[];
-		tooltips_enabled?: boolean;
-		download_folder_enabled?: boolean;
-		download_folder_name?: string | null;
-		settings_tab?: SettingsTab;
-		model_settings?: UserModelSettings;
-		image_generation_count: number;
-		at: number;
 	};
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
@@ -339,7 +297,6 @@
 	let leftPanelCollapsed = $state(false);
 	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
-	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
@@ -610,33 +567,6 @@
 		registerModelCatalog(availableModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
-	let currentUserSettingsRequestId = 0;
-	let authToken = $state<string | null>(null);
-	let currentUser = $state<UserItem | null>(null);
-	// What the signed-in member may do, derived once. Every gate below asks these
-	// rather than reading the membership list itself: the per-work sharing rules
-	// land on the same questions, and a condition spelled out in twenty places is
-	// twenty places to keep in step.
-	const isAdmin = $derived(holdsPermissionGroup(currentUser, 'admins'));
-	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
-	let uiModeSaving = $state(false);
-	let uiModeSaveError = $state(false);
-	let historyStripFieldsSaving = $state(false);
-	let historyStripFieldsSaveError = $state(false);
-	const historyStripFields = $derived(normalizeHistoryStripFields(currentUser?.history_strip_fields));
-	const uiMode = $derived(normalizeUiMode(currentUser?.ui_mode));
-	const uiCustom = $derived(normalizeUiCustom(currentUser?.ui_custom));
-	const uiVisibility = $derived(resolveUiVisibility(uiMode, uiCustom));
-	let loginUserName = $state('admin');
-	let loginPassword = $state('');
-	let loginPasswordVisible = $state(false);
-	let loginStatus = $state<string | null>(null);
-	let profileOpen = $state(false);
-	let profileEmail = $state('');
-	let profileCurrentPassword = $state('');
-	let profileNewPassword = $state('');
-	let profileStatus = $state<string | null>(null);
-	let profileSaving = $state(false);
 
 	type ProviderFailure = {
 		code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
@@ -671,16 +601,28 @@
 	}
 
 	const apiFetch = createApiFetch();
+	const session = createSessionState({
+		apiFetch,
+		describeApiError,
+		applyModelSettings: applyUserModelSettings,
+		afterAuthenticated: completeAuthentication,
+		afterSignedOut: resetAfterSignedOut,
+		refreshUserAdministration: () => settings.userAdministration.load(),
+		onVisibilityChanged: (visibility) => {
+			if (!visibility.input_modes) inputMode = 'single';
+			if (!visibility.work_tools) outputTab = 'canvas';
+		}
+	});
 	const batch = new BatchState<BatchPaintResult, Iteration>({
 		apiFetch,
-		signedIn: () => currentUser !== null,
+		signedIn: () => session.currentUser !== null,
 		paintable: (text) => !!pipelineDescription(text).trim(),
 		setFailureReport: batchFailureReportStore.set,
 		describeApiError,
 	});
 	const demo = new DemoState({
 		apiFetch,
-		signedIn: () => currentUser !== null,
+		signedIn: () => session.currentUser !== null,
 		instructionLang: () => instructionLang,
 		uiLang: getLang,
 		describeApiError,
@@ -688,10 +630,10 @@
 	const lineageState = new LineageQueryState(apiFetch);
 	const settings = createSettingsController({
 		apiFetch,
-		currentUser: () => currentUser,
-		setCurrentUser: (actor) => { currentUser = actor; },
+		currentUser: () => session.currentUser,
+		setCurrentUser: (actor) => session.setCurrentUser(actor),
 		loadAvailableModels,
-		refreshCurrentUserSettings,
+		refreshCurrentUserSettings: () => session.refreshCurrentUserSettings(),
 		loadExportTemplates,
 		cancelModelSelection: restoreModelSelection,
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
@@ -733,61 +675,6 @@
 		}
 	}
 
-	// The server holds the intent and the folder's name; the handle itself lives
-	// in this browser's IndexedDB, so the two are applied together on sign-in.
-	function applyDownloadFolderSettings(user: UserItem | null) {
-		downloadFolderSettings.applyUser(user);
-		void downloadFolderSettings.refresh();
-	}
-
-	async function updateDownloadFolder(update: { enabled?: boolean; name?: string | null }) {
-		if (!currentUser) return;
-		const previousUser = currentUser;
-		const body: Record<string, unknown> = {};
-		if (update.enabled !== undefined) body.download_folder_enabled = update.enabled;
-		if (update.name !== undefined) body.download_folder_name = update.name ?? '';
-		currentUser = {
-			...currentUser,
-			...(update.enabled !== undefined ? { download_folder_enabled: update.enabled } : {}),
-			...(update.name !== undefined ? { download_folder_name: update.name } : {}),
-		};
-		downloadFolderSettings.applyUser(currentUser);
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			downloadFolderSettings.applyUser(currentUser);
-		} catch (e) {
-			currentUser = previousUser;
-			downloadFolderSettings.applyUser(previousUser);
-			console.warn('failed to update the download folder setting', e);
-		}
-	}
-
-	async function chooseDownloadFolder() {
-		const name = await downloadFolderSettings.choose();
-		if (name === null) return;
-		await updateDownloadFolder({ enabled: true, name });
-	}
-
-	async function clearDownloadFolder() {
-		await downloadFolderSettings.clear();
-		await updateDownloadFolder({ enabled: false, name: null });
-	}
-
-	function applyUserTheme(user: UserItem | null) {
-		// No stored preference (signed out, or a row without one) follows the
-		// release default rather than falling back to light.
-		darkMode = (user?.ui_theme ?? 'dark') === 'dark';
-	}
-
 	function modelsFor(provider: Provider) {
 		const group = availableModelCatalog.find((item) => item.id === provider);
 		if (group) return group.models;
@@ -816,11 +703,11 @@
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
 		instructionCaptionVisible = visible;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { instruction_caption_visible: visible } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
@@ -829,7 +716,7 @@
 		if (!nextModel || nextModel === okugakiModel) return;
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -837,7 +724,7 @@
 				body: JSON.stringify({ model_settings: { okugaki_provider: provider, okugaki_model: model.trim() } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) {
 			okugakiModel = previous;
 			console.warn('failed to save okugaki model', e);
@@ -852,7 +739,7 @@
 		const prevModel = visionModel;
 		visionProvider = provider;
 		visionModel = model;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -860,7 +747,7 @@
 				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) {
 			visionProvider = prevProvider;
 			visionModel = prevModel;
@@ -907,7 +794,7 @@
 	}
 
 	async function loadPluginStorage() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			return;
 		}
@@ -934,7 +821,7 @@
 	}
 
 	async function saveCanvasAspectPluginValue() {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
 				method: 'PUT',
@@ -948,7 +835,7 @@
 	}
 
 	async function setCanvasAspectEnabled(value: boolean) {
-		if (!isAdmin) return;
+		if (!session.isAdmin) return;
 		canvasAspectEnabled = value;
 		canvasAspectMenuOpen = false;
 		if (!value) {
@@ -963,7 +850,7 @@
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
-		if (!isAdmin) return;
+		if (!session.isAdmin) return;
 		const nextAspectId = normalizeCanvasAspectId(id);
 		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
@@ -987,7 +874,7 @@
 	}
 
 	async function loadExportTemplates() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 			exportTemplateStatus = null;
 			return;
@@ -1010,7 +897,7 @@
 		const next = normalizeExportTemplates(nextTemplates);
 		exportTemplates = next;
 		exportTemplateStatus = null;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/export-templates', {
 				method: 'PUT',
@@ -1048,133 +935,6 @@
 		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
-	async function updateUiTheme(nextDarkMode: boolean) {
-		if (!currentUser) return;
-		const previousDarkMode = darkMode;
-		const previousUser = currentUser;
-		darkMode = nextDarkMode;
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ui_theme: nextDarkMode ? 'dark' : 'light' })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-		} catch (e) {
-			currentUser = previousUser;
-			darkMode = previousDarkMode;
-			console.warn('failed to update UI theme', e);
-		}
-	}
-
-	async function updateUiMode(nextMode: UiMode, nextCustom: UiCustomVisibility = uiCustom) {
-		if (!currentUser || uiModeSaving) return;
-		const previousUser = currentUser;
-		const normalizedCustom = nextMode === 'simple' ? {} : normalizeUiCustom(nextCustom);
-		uiModeSaving = true;
-		uiModeSaveError = false;
-		currentUser = { ...currentUser, ui_mode: nextMode, ui_custom: normalizedCustom };
-		const nextVisibility = resolveUiVisibility(nextMode, normalizedCustom);
-		if (!nextVisibility.input_modes) inputMode = 'single';
-		if (!nextVisibility.work_tools) outputTab = 'canvas';
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ui_mode: nextMode, ui_custom: normalizedCustom })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			const savedCustom = normalizeUiCustom(updatedUser.ui_custom);
-			const customMatches = UI_VISIBILITY_KEYS.every((key) => savedCustom[key] === normalizedCustom[key]);
-			if (updatedUser.ui_mode !== nextMode || !customMatches) {
-				throw new Error('UI mode settings were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			uiModeSaveError = true;
-			console.warn('failed to update UI mode', e);
-		} finally {
-			uiModeSaving = false;
-		}
-	}
-
-	/** Save which facts the strip prints, and check the server kept them.
-	 *
-	 *  The saved value is compared field by field rather than by length: an
-	 *  empty list is a legitimate answer, and a length check would read the
-	 *  server dropping the key and the reader asking for nothing as the same
-	 *  thing. */
-	async function updateHistoryStripFields(next: HistoryStripField[]) {
-		if (!currentUser || historyStripFieldsSaving) return;
-		const previousUser = currentUser;
-		historyStripFieldsSaving = true;
-		historyStripFieldsSaveError = false;
-		currentUser = { ...currentUser, history_strip_fields: next };
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ history_strip_fields: next })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			const saved = normalizeHistoryStripFields(updatedUser.history_strip_fields);
-			if (saved.length !== next.length || saved.some((field, index) => field !== next[index])) {
-				throw new Error('history strip fields were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			historyStripFieldsSaveError = true;
-			console.warn('failed to update history strip fields', e);
-		} finally {
-			historyStripFieldsSaving = false;
-		}
-	}
-
-	async function updateTooltipsEnabled(enabled: boolean) {
-		if (!currentUser) return;
-		const previousUser = currentUser;
-		currentUser = { ...currentUser, tooltips_enabled: enabled };
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tooltips_enabled: enabled })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			if (updatedUser.tooltips_enabled !== enabled) {
-				throw new Error('Tooltip settings were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			console.warn('failed to update tooltip settings', e);
-		}
-	}
-
-	function updateUiCustomItem(key: UiVisibilityKey, visible: boolean) {
-		void updateUiMode('custom', { ...uiCustom, [key]: visible });
-	}
-
 	function openModelSelection(allowVision = true) {
 		modelSelectionAllowVision = allowVision;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
@@ -1182,8 +942,8 @@
 	}
 
 	async function persistModelSelection() {
-		if (!currentUser) return;
-		const previousUser = currentUser;
+		if (!session.currentUser) return;
+		const previousUser = session.currentUser;
 		// What the page owns; the features add their own fields to the save.
 		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
@@ -1207,10 +967,11 @@
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(describeApiError(d.detail, r.status));
 			}
-			currentUser = await r.json() as UserItem;
-			applyUserModelSettings(currentUser);
+			const actor = await r.json() as UserItem;
+			session.setCurrentUser(actor);
+			applyUserModelSettings(actor);
 		} catch (e) {
-			currentUser = previousUser;
+			session.setCurrentUser(previousUser);
 			console.warn('failed to update model selection', e);
 		}
 	}
@@ -1245,11 +1006,11 @@
 	// The selection rides in the user's model_settings: a drawing needs a session,
 	// so a browser-wide value would only ever be the wrong user's.
 	async function persistColorCatalogSelection(selected: string) {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save color catalog selection', e); }
 	}
 	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
@@ -1259,11 +1020,11 @@
 	// A failed save leaves the fold as the user just set it -- it is a view
 	// state, and refolding it under them would be worse than forgetting it.
 	async function persistDescribePanelFolds(fields: Record<string, boolean>) {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
@@ -1301,7 +1062,7 @@
 	}
 
 	async function loadAvailableModels() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			availableModelsLoaded = false;
 			return;
 		}
@@ -1313,7 +1074,7 @@
 			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
-				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
+				applyUserModelSettings({ ...session.currentUser, model_settings: data.settings.model_settings });
 			}
 			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
@@ -1339,26 +1100,6 @@
 			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
-		}
-	}
-
-	// This request clock belongs to the page's session actor. Administration
-	// lists have a separate clock in the Settings owner, which awaits this refresh.
-	async function refreshCurrentUserSettings(): Promise<boolean> {
-		const requestId = ++currentUserSettingsRequestId;
-		try {
-			const meResponse = await apiFetch('/api/auth/me', { cache: 'no-store' });
-			if (!meResponse.ok) throw new Error(t().loginRequiredMessage);
-			const actor = await meResponse.json() as UserItem;
-			if (requestId !== currentUserSettingsRequestId) return false;
-			currentUser = actor;
-			applyUserTheme(actor);
-			applyDownloadFolderSettings(actor);
-			applyUserModelSettings(actor);
-			authToken = 'cookie';
-			return true;
-		} catch {
-			return false;
 		}
 	}
 
@@ -1429,155 +1170,35 @@
 		}
 	}
 
-	async function loadCurrentUser() {
-		try {
-			const r = await apiFetch('/api/auth/me');
-			if (!r.ok) throw new Error('session expired');
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-			applyUserModelSettings(currentUser);
-			authToken = 'cookie';
-			loginStatus = null;
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
-			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
-			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
-			if (historyItems.length > 0) loadIteration(0);
-		} catch {
-			authToken = null;
-			currentUser = null;
-			applyUserTheme(null);
-			batch.clearPromptHistory();
-			demo.resetForSignedOut();
-			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
-			exportTemplateStatus = null;
-			canvasAspectEnabled = true;
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			loginStatus = null;
-			settings.resetForLoggedOut();
-			history.clear();
-		}
+	async function completeAuthentication(source: 'resume' | 'login'): Promise<void> {
+		if (source === 'login') history.clear();
+		await Promise.all([
+			loadAvailableModels(),
+			settings.userAdministration.load(),
+			settings.loadStatus(),
+			batch.loadPromptHistory(),
+			demo.loadSettings(),
+			loadPluginStorage(),
+			loadPluginVocabulary(),
+			loadExportTemplates(),
+			loadClientConfig(),
+			...(source === 'login' ? [loadColorCatalogs(), fetchPrompts()] : [])
+		]);
+		demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
+		await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
+		if (historyItems.length > 0) loadIteration(0);
 	}
 
-	async function login() {
-		loginStatus = null;
-		try {
-			const r = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'same-origin',
-				body: JSON.stringify({ username: loginUserName, password: loginPassword })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const data = await r.json() as { user: UserItem };
-			authToken = 'cookie';
-			currentUser = data.user;
-			applyUserTheme(data.user);
-			applyUserModelSettings(data.user);
-			loginStatus = null;
-			history.clear();
-			loginPassword = '';
-			// loadColorCatalogs and fetchPrompts ride here because I-086 put both
-			// endpoints behind the guard. The startup fetch runs before anyone has
-			// logged in and now gets a 401, so without reading them again the
-			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
-			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
-			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
-			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
-			if (historyItems.length > 0) loadIteration(0);
-		} catch (e) {
-			const message = e instanceof Error ? e.message : String(e);
-			loginStatus = message;
-		}
-	}
-
-	async function logout() {
-		if (currentUser || authToken) {
-			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-		}
+	function resetAfterSignedOut(): void {
 		userMenuOpen = false;
-		profileOpen = false;
-		authToken = null;
-		currentUser = null;
-		uiModeSaveError = false;
-		applyUserTheme(null);
 		batch.clearPromptHistory();
 		demo.resetForSignedOut();
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
 		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-		loginStatus = null;
 		settings.resetForLoggedOut();
 		history.clear();
-	}
-
-	function openProfile() {
-		if (!currentUser) return;
-		profileEmail = currentUser.email;
-		profileCurrentPassword = '';
-		profileNewPassword = '';
-		profileStatus = null;
-		profileOpen = true;
-		userMenuOpen = false;
-	}
-
-	function closeProfile() {
-		if (profileSaving) return;
-		profileOpen = false;
-		profileCurrentPassword = '';
-		profileNewPassword = '';
-	}
-
-	async function saveProfile() {
-		if (!currentUser) return;
-		const email = profileEmail.trim();
-		if (!email) {
-			profileStatus = t().userValidationUpdate;
-			return;
-		}
-		if (profileNewPassword && profileNewPassword.length < 8) {
-			profileStatus = t().userPasswordTooShort;
-			return;
-		}
-		if (profileNewPassword && !profileCurrentPassword) {
-			profileStatus = t().profileCurrentPasswordRequired;
-			return;
-		}
-		profileSaving = true;
-		profileStatus = null;
-		try {
-			const body: { email: string; password?: string; current_password?: string } = { email };
-			if (profileNewPassword) {
-				body.password = profileNewPassword;
-				body.current_password = profileCurrentPassword;
-			}
-			const r = await apiFetch('/api/auth/me/profile', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body),
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-			profileEmail = currentUser.email;
-			profileCurrentPassword = '';
-			profileNewPassword = '';
-			profileStatus = t().profileSavedMessage;
-			await settings.userAdministration.load();
-		} catch (e) {
-			profileStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			profileSaving = false;
-		}
 	}
 
 	// ── Export filenames ────────────────────────────────────
@@ -1623,7 +1244,7 @@
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const history = new HistoryBrowsingState({
 		apiFetch,
-		signedIn: () => !!authToken,
+		signedIn: () => !!session.authToken,
 		drawing: () => loading,
 		visible: () => document.visibilityState === 'visible',
 		navigationLocked: () => demoRunning,
@@ -1636,7 +1257,7 @@
 	const historyManager = history.manager;
 	const historyMutations = new HistoryMutations({
 		apiFetch,
-		signedIn: () => !!authToken,
+		signedIn: () => !!session.authToken,
 		browsing: history,
 		currentItem: () => displayedHistoryItem,
 		setCurrentItem: (item) => { displayedHistoryItem = item; },
@@ -1839,11 +1460,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				},
 				loadNearbyHistory: lineageState.loadNearby,
 				attachSavedLineage: () => { lineageDetached = false; },
-				updateGenerationCount: (count) => {
-					if (currentUser) {
-						currentUser = { ...currentUser, image_generation_count: count };
-					}
-				}
+				updateGenerationCount: (count) => session.updateGenerationCount(count)
 			}
 		);
 	}
@@ -2396,18 +2013,6 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 
-	async function refreshCurrentUserOnly(): Promise<void> {
-		try {
-			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
-			if (!r.ok) return;
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-		} catch {
-			/* ignore */
-		}
-	}
-
 	async function pushHistory(it: Iteration, options: SaveHistoryOptions = {}): Promise<Iteration | null> {
 		return saveHistoryItem(it, options, {
 			catalogId: colorCatalogSettings.effectiveId,
@@ -2417,11 +2022,11 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			uiLang: getLang()
 		}, {
 			apiFetch,
-			signedIn: () => !!authToken,
+			signedIn: () => !!session.authToken,
 			ensureSvg: ensureIterationSvg,
 			composeFallbackFor: (item) => item.compose_fallback
 				?? (typeof item.compose_fallback_used === 'boolean' ? composeFallbackValue(item) : null),
-			refreshCountedUser: refreshCurrentUserOnly,
+			refreshCountedUser: async () => { await session.refreshCurrentUserSettings(); },
 			activeHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null,
 			currentOffset: () => historyOffset,
 			fetchOffset: (offset, fetchOptions) => history.fetchOffset(offset, fetchOptions),
@@ -2542,8 +2147,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		stage2Model: () => stage2Model,
 		loading: () => loading,
 		input: () => input,
-		currentUser: () => currentUser,
-		setCurrentUser: (user) => { currentUser = user as UserItem; },
+		currentUser: () => session.currentUser,
+		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
 		targetContextVersion: () => targetContextVersion,
 		apiFetch,
 		interpretOne,
@@ -3052,7 +2657,7 @@ $effect(() => {
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;
-			if (profileOpen) closeProfile();
+			if (session.profileOpen) session.closeProfile();
 			if (settings.opened) settings.close();
 			if (catalogOpen) cancelCatalogSelection();
 			historyManager.open = false;
@@ -3062,7 +2667,7 @@ $effect(() => {
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || profileOpen || settings.opened || catalogOpen || historyManager.open || confirmAction) return true;
+		if (!session.currentUser || session.profileOpen || settings.opened || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -4134,7 +3739,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
-			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), session.loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => {
@@ -4152,7 +3757,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	$effect(() => exportSettings.persist());
 	$effect(() => {
 		if (typeof document === 'undefined') return;
-		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+		document.documentElement.dataset.theme = session.darkMode ? 'dark' : 'light';
 	});
 	$effect(() => {
 		const mode = inputMode;
@@ -4175,13 +3780,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 <!-- ══════════════════════════════════════════════════════════ -->
 <!--  ROOT                                                       -->
 <!-- ══════════════════════════════════════════════════════════ -->
-{#if !currentUser}
+{#if !session.currentUser}
 	<AuthPanel
-		bind:loginUserName
-		bind:loginPassword
-		bind:loginPasswordVisible
-		{loginStatus}
-		onLogin={login}
+		bind:loginUserName={session.loginUserName}
+		bind:loginPassword={session.loginPassword}
+		bind:loginPasswordVisible={session.loginPasswordVisible}
+		loginStatus={session.loginStatus}
+		onLogin={() => session.login()}
 		appVersion={APP_VERSION}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
@@ -4189,33 +3794,33 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {:else}
 <div
 	class="root"
-	class:tooltips-disabled={!tooltipsEnabled}
-	class:ui-hide-input-modes={!uiVisibility.input_modes}
-	class:ui-hide-drawing-settings={!uiVisibility.drawing_settings}
-	class:ui-hide-ddl-tools={!uiVisibility.ddl_tools}
-	class:ui-hide-detail-status={!uiVisibility.detail_status}
-	class:ui-hide-work-tools={!uiVisibility.work_tools}
-	class:ui-hide-history={!uiVisibility.history}
+	class:tooltips-disabled={!session.tooltipsEnabled}
+	class:ui-hide-input-modes={!session.uiVisibility.input_modes}
+	class:ui-hide-drawing-settings={!session.uiVisibility.drawing_settings}
+	class:ui-hide-ddl-tools={!session.uiVisibility.ddl_tools}
+	class:ui-hide-detail-status={!session.uiVisibility.detail_status}
+	class:ui-hide-work-tools={!session.uiVisibility.work_tools}
+	class:ui-hide-history={!session.uiVisibility.history}
 >
 	<AppRail
-		{currentUser}
+		currentUser={session.currentUser}
 		bind:userMenuOpen
 		bind:userMenuWrapEl
 		settingsOpen={settings.opened}
-		{darkMode}
+		darkMode={session.darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
 		{singleUserMode}
-		showAuxiliary={uiVisibility.auxiliary}
-		{uiMode}
-		{tooltipsEnabled}
-		onSetUiMode={(mode) => void updateUiMode(mode)}
-		onToggleTooltips={() => void updateTooltipsEnabled(!tooltipsEnabled)}
+		showAuxiliary={session.uiVisibility.auxiliary}
+		uiMode={session.uiMode}
+		tooltipsEnabled={session.tooltipsEnabled}
+		onSetUiMode={(mode) => void session.updateUiMode(mode)}
+		onToggleTooltips={() => void session.updateTooltipsEnabled(!session.tooltipsEnabled)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
-		onOpenProfile={openProfile}
-		onLogout={logout}
+		onOpenProfile={() => { session.openProfile(); userMenuOpen = false; }}
+		onLogout={() => session.logout()}
 		onOpenSettings={() => settings.openSettings()}
-		onToggleTheme={() => void updateUiTheme(!darkMode)}
+		onToggleTheme={() => void session.updateUiTheme(!session.darkMode)}
 		onOpenAppInfo={() => (appInfoOpen = true)}
 	/>
 
@@ -4497,7 +4102,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:promptStage2Expanded
 				bind:exportMenuOpen
 				bind:exportWrapEl
-				exportCardOnly={!uiVisibility.work_tools}
+				exportCardOnly={!session.uiVisibility.work_tools}
 				{result}
 				nearbyHistory={lineageState.nearby}
 				onOpenNearbyHistory={openNearbyHistory}
@@ -4604,7 +4209,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			/>
 		</div><!-- /body -->
 
-			{#if uiVisibility.history}
+			{#if session.uiVisibility.history}
 			<HistoryStrip
 			{historyItems}
 			{historyTotal}
@@ -4639,7 +4244,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
 			{developerMode}
-			{historyStripFields}
+			historyStripFields={session.historyStripFields}
 		/>
 			{/if}
 	</div><!-- /main-shell -->
@@ -4703,20 +4308,20 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			bind:includeThinking
-			{currentUser}
-			{uiMode}
-			{uiCustom}
-			{uiModeSaving}
-			{uiModeSaveError}
-			{historyStripFields}
-			{historyStripFieldsSaving}
-			{historyStripFieldsSaveError}
-			onToggleHistoryStripField={(field) => void updateHistoryStripFields(toggleHistoryStripField(historyStripFields, field))}
-			onSetUiMode={(mode) => void updateUiMode(mode)}
-			onSetUiCustomItem={updateUiCustomItem}
-			{loginStatus}
-			bind:loginUserName
-			bind:loginPassword
+			currentUser={session.currentUser}
+			uiMode={session.uiMode}
+			uiCustom={session.uiCustom}
+			uiModeSaving={session.uiModeSaving}
+			uiModeSaveError={session.uiModeSaveError}
+			historyStripFields={session.historyStripFields}
+			historyStripFieldsSaving={session.historyStripFieldsSaving}
+			historyStripFieldsSaveError={session.historyStripFieldsSaveError}
+			onToggleHistoryStripField={(field) => void session.updateHistoryStripFields(toggleHistoryStripField(session.historyStripFields, field))}
+			onSetUiMode={(mode) => void session.updateUiMode(mode)}
+			onSetUiCustomItem={(key, visible) => session.updateUiCustomItem(key, visible)}
+			loginStatus={session.loginStatus}
+			bind:loginUserName={session.loginUserName}
+			bind:loginPassword={session.loginPassword}
 			bind:autoRepairEnabled={ddlAutoRepairEnabled}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
 			bind:animationExportSettings={exportSettings.animation}
@@ -4725,16 +4330,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{exportTemplateStatus}
 			{canvasAspectEnabled}
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
-			onChooseDownloadFolder={chooseDownloadFolder}
-			onClearDownloadFolder={clearDownloadFolder}
+			onChooseDownloadFolder={() => session.chooseDownloadFolder()}
+			onClearDownloadFolder={() => session.clearDownloadFolder()}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
 			onSetStage2Provider={setStage2Provider}
 			onSetStage2Model={setStage2Model}
 			onSetVisionProvider={setVisionProvider}
 			onSetVisionModel={setVisionModel}
-			onLogin={login}
-			onLogout={logout}
+			onLogin={() => session.login()}
+			onLogout={() => session.logout()}
 			onConfirmModelSelection={confirmModelSelection}
 			onAddExportTemplate={addExportTemplate}
 			onUpdateExportTemplate={updateExportTemplate}
@@ -4811,19 +4416,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	</div>
 {/if}
 
-{#if profileOpen && currentUser}
+{#if session.profileOpen && session.currentUser}
 		{#await import('$lib/components/ProfileModal.svelte') then { default: ProfileModal }}
 			<ProfileModal
-				username={currentUser.username}
-				email={currentUser.email}
-				generationCount={currentUser.image_generation_count}
-				status={profileStatus}
-			saving={profileSaving}
-			bind:profileEmail
-			bind:profileCurrentPassword
-			bind:profileNewPassword
-			onClose={closeProfile}
-			onSave={saveProfile}
+				username={session.currentUser.username}
+				email={session.currentUser.email}
+				generationCount={session.currentUser.image_generation_count}
+				status={session.profileStatus}
+			saving={session.profileSaving}
+			bind:profileEmail={session.profileEmail}
+			bind:profileCurrentPassword={session.profileCurrentPassword}
+			bind:profileNewPassword={session.profileNewPassword}
+			onClose={() => session.closeProfile()}
+			onSave={() => session.saveProfile()}
 		/>
 		{/await}
 {/if}

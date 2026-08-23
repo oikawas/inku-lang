@@ -1,0 +1,447 @@
+/* These selectors are loaded once by CanvasRefinementWorkspace. The class names
+   are feature-local, allowing the three focused views to share the original
+   style source without duplicating CSS in the compiled bundle. */
+	.refine-shell {
+		align-self: stretch;
+		width: min(1120px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.refine-modal-backdrop { position: fixed; inset: 0; z-index: 1390; border: 0; padding: 0; background: rgba(0, 0, 0, .68); cursor: default; }
+	.refine-shell.menu-modal { position: fixed; z-index: 1400; inset: 24px; align-self: auto; width: auto; height: auto; max-height: none; overflow: hidden; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px rgba(0, 0, 0, .55); }
+	.refine-modal-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+	.refine-modal-header h2 { margin: 0; color: var(--fg); font-size: 1rem; }
+	.refine-modal-header button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+	.refine-shell .refine-panel,
+	.refine-shell .compare-panel {
+		align-self: auto;
+		width: 100%;
+		max-height: none;
+		min-height: 0;
+		flex: 1;
+	}
+	.refine-panel {
+		align-self: stretch;
+		width: min(980px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px;
+		box-sizing: border-box;
+	}
+	.variation-grid-status {
+		font-size: 12px;
+		color: var(--fg3);
+		line-height: 1.5;
+	}
+	.refine-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.refine-target-column {
+		position: sticky;
+		top: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+	}
+	.refine-target-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.refine-target-card {
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.refine-workspace {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.refine-action-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-bottom: 2px;
+	}
+	.refine-section-head {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.refine-section-title {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--fg);
+	}
+	.refine-selection-hint {
+		font-size: 11px;
+		color: var(--fg3);
+	}
+	.touch-seed-field { display: grid; gap: 5px; color: var(--fg2); font-size: 12px; }
+	.touch-seed-field input { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r); padding: 8px 9px; color: var(--fg); background: var(--bg); font: inherit; }
+	.touch-seed-field small { color: var(--fg3); font-size: 11px; line-height: 1.4; }
+	.refine-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.refine-choice-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
+	.refine-info-mark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 15px;
+		height: 15px;
+		border: 1px solid var(--border2);
+		border-radius: 50%;
+		color: var(--fg3);
+		font-size: 10px;
+		font-weight: 600;
+		font-style: normal;
+		flex: 0 0 auto;
+	}
+	.refine-cost-indicator {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		min-height: 34px;
+		color: var(--fg3);
+		font-size: 11px;
+		white-space: nowrap;
+	}
+	.refine-cost-indicator svg {
+		width: 15px;
+		height: 15px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.7;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.refine-paint-actions { align-items: stretch; }
+	/* Keep the speed estimate on its own row directly below the draw button. */
+	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
+	/* Indent amplitude below Variation to make the parent-child relation visible. */
+	.variation-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
+	/* Small, medium, and large stay in three columns; beat the later model grid. */
+	.variation-amplitude-field .model-choice-grid.variation-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+	.variation-amplitude-field .model-choice { padding: 6px; gap: 5px; }
+	.variation-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
+	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }
+	.refine-action-wrap { width: min(210px, 100%); }
+	.refine-action-wrap .tooltip-wrap,
+	.refine-action-wrap .paint-btn { width: 100%; }
+	.refine-action-wrap .paint-btn { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
+	.refine-save-actions {
+		margin-bottom: 12px;
+		display: flex;
+		justify-content: flex-end;
+	}
+	.refine-save-actions .tooltip-wrap { width: fit-content; max-width: 100%; }
+	.refine-save-actions button {
+		width: auto;
+		max-width: 100%;
+		padding: 10px 16px;
+		font-weight: 500;
+	}
+	.refine-candidates-section {
+		border-top: 1px dashed var(--border);
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	.refine-save-btn { border: 1px solid var(--action-bg); border-radius: var(--r); background: var(--action-bg); color: var(--action-fg); cursor: pointer; }
+	.refine-save-btn:hover:not(:disabled) { background: var(--action-hover); }
+	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
+	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
+	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
+	/* Fit candidates into the remaining height; rows divide it and cards fill each row. */
+	/* A single candidate uses one column and fills the dialog width. */
+	.variation-grid {
+		display: grid;
+		grid-template-columns: repeat(var(--variation-cols, 2), minmax(0, 1fr));
+		grid-auto-rows: minmax(0, 1fr);
+		gap: 10px;
+		min-height: 0;
+		max-height: calc(100vh - 200px);
+	}
+	.variation-card-wrap {
+		position: relative;
+		min-width: 0;
+		min-height: 0;
+	}
+	/* A dashed frame marks the candidate slot before it has been drawn. */
+	.variation-grid-placeholder {
+		display: grid;
+		place-items: center;
+		flex: 1 1 auto;
+		min-height: 180px;
+		max-height: calc(100vh - 200px);
+		padding: 24px;
+		border: 1px dashed var(--border2);
+		border-radius: var(--r);
+		background: var(--bg2);
+		text-align: center;
+	}
+	.variation-grid-placeholder span {
+		max-width: 30em;
+		color: var(--fg3);
+		font-size: 12px;
+		line-height: 1.6;
+	}
+	.variation-card {
+		display: grid;
+		grid-template-rows: minmax(0, 1fr) auto;
+		width: 100%;
+		height: 100%;
+		min-height: 150px;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		overflow: hidden;
+		cursor: pointer;
+	}
+	.variation-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+	.variation-card.saved { opacity: 0.62; }
+	.variation-card-art {
+		display: block;
+		min-height: 0;
+		background: var(--bg2);
+	}
+	.variation-card-art svg {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+	.variation-card-meta {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1px;
+		padding: 6px 8px;
+		font-size: 10px;
+		line-height: 1.25;
+		text-align: left;
+		color: var(--fg3);
+	}
+	.variation-card-meta span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.variation-select {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		border: 1px solid var(--border2);
+		background: color-mix(in srgb, var(--panel) 88%, transparent);
+		color: var(--fg2);
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.variation-select.selected {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: var(--accent-fg);
+	}
+	/* A saved candidate has a distinct fill and cannot be pressed again. */
+	.variation-select.saved {
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+		color: var(--accent);
+		cursor: default;
+		opacity: 1;
+	}
+
+	.compare-panel {
+		align-self: stretch;
+		width: min(1120px, calc(100% - 136px));
+		max-height: calc(100% - 28px);
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px;
+		box-sizing: border-box;
+	}
+	.compare-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+	}
+	.compare-head-settings { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+	.compare-action-wrap {
+		width: min(260px, 34%);
+		min-width: 210px;
+	}
+	.compare-action-wrap .tooltip-wrap { width: 100%; }
+	.compare-action-wrap .paint-btn { margin-top: 0; }
+	/* While comparing, let the status widen past the button width so the full
+	   model name shows without truncation. The view marks its wrapper as running
+	   so this rule does not depend on RunStatus's internal markup. */
+	.compare-action-wrap.running { width: auto; min-width: 0; max-width: 62%; }
+	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
+	.model-metadata-hover > .model-choice { width: 100%; }
+	.model-metadata-hover:hover .model-hover-card,
+	.model-metadata-hover:focus-within .model-hover-card { display: block; }
+	.refine-settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+	.refine-model-row { margin-top: 6px; }
+
+	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }
+	.compare-mode-tabs button.active { border-bottom-color: var(--accent); color: var(--fg); font-weight: 600; }
+	.compare-fixed-model { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--fg2); }
+	.compare-fixed-model select { min-width: 240px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; }
+	.model-choice-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		gap: 8px;
+	}
+	.lang-combo-hint { margin: 8px 0 0; font-size: 11px; color: var(--fg3); }
+	.lang-combo-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+	.lang-combo strong { white-space: nowrap; }
+	.model-choice {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 8px;
+		align-items: start;
+		padding: 8px;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: 11px;
+	}
+	.model-choice.checked { border-color: var(--accent); color: var(--fg); }
+	.model-choice.target {
+		border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+		border-left-width: 4px;
+		background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+		color: var(--fg);
+	}
+	.model-choice.target small { color: color-mix(in srgb, var(--accent) 72%, var(--fg3)); }
+	.model-choice.failed {
+		border-color: color-mix(in srgb, #cf3f35 70%, var(--border));
+		background: color-mix(in srgb, #cf3f35 12%, var(--panel));
+		color: var(--fg);
+	}
+	.model-choice.failed small { color: #b8332d; }
+	.model-choice.disabled { opacity: 0.48; }
+	.model-choice strong,
+	.model-choice small {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.model-choice small { color: var(--fg3); margin-top: 2px; }
+	.model-choice-count,
+	.model-target-meta {
+		font-size: 11px;
+		color: var(--fg3);
+	}
+	.model-compare-stage {
+		display: grid;
+		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+		gap: 14px;
+		align-items: start;
+	}
+	.model-target-card,
+	.model-inspection-card {
+		border: 1px solid var(--border);
+		background: var(--panel);
+		padding: 8px;
+		min-width: 0;
+	}
+	.model-target-card {
+		position: sticky;
+		top: 0;
+	}
+	.comparison-label {
+		font-size: 11px;
+		color: var(--fg3);
+		margin-bottom: 5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.comparison-art {
+		background: var(--bg2);
+		overflow: hidden;
+	}
+	.comparison-art > svg { width: 100%; height: 100%; display: block; }
+	.comparison-art > .canvas-art { width: 100%; height: 100%; display: block; }
+	.model-target-meta { margin-top: 7px; }
+	.model-results-column {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+	.model-inspection-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 10px;
+	}
+	.model-inspection-card { position: relative; }
+	.model-inspection-card.saved {
+		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+	}
+	.model-comparison-art-wrap { position: relative; }
+	.model-adopt-select:disabled { cursor: default; opacity: 1; }
+	.model-result-actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.model-result-star {
+		width: 30px;
+		height: 30px;
+		border: 1px solid var(--border);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: 17px;
+		cursor: pointer;
+	}
+	.model-result-star.starred {
+		color: var(--star-fg);
+		border-color: var(--star-border);
+		background: var(--star-bg);
+	}
+	.model-result-star:disabled { opacity: 0.45; cursor: not-allowed; }
+	.model-inspection-card pre {
+		margin: 8px 0 0;
+		max-height: 120px;
+		overflow: auto;
+		white-space: pre-wrap;
+		font-size: 10px;
+		line-height: 1.45;
+		color: var(--fg3);
+	}

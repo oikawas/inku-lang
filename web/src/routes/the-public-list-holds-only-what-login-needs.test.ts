@@ -22,6 +22,7 @@ import { test } from 'node:test';
 
 const ROUTES_DIR = dirname(fileURLToPath(import.meta.url));
 const PAGE = readFileSync(join(ROUTES_DIR, '+page.svelte'), 'utf8');
+const SESSION = readFileSync(join(ROUTES_DIR, '..', 'lib', 'features', 'session', 'state.svelte.ts'), 'utf8');
 
 /** The text between two markers, so a check cannot be satisfied elsewhere. */
 function region(source: string, open: string, close: string): string {
@@ -34,13 +35,14 @@ function region(source: string, open: string, close: string): string {
 
 /** The body of `login()`, from its declaration to the one that follows it. */
 function loginBody(): string {
-	return region(PAGE, 'async function login()', 'async function logout()');
+	return region(SESSION, 'async login()', 'async logout()');
 }
 
 test('signing in reads the catalog list and the prompts', () => {
-	const body = loginBody();
-	assert.match(body, /loadColorCatalogs\(\)/, 'login() should read the catalog list');
-	assert.match(body, /fetchPrompts\(\)/, 'login() should read the prompts');
+	const login = loginBody();
+	const afterAuthentication = region(PAGE, "async function completeAuthentication(source: 'resume' | 'login')", 'function resetAfterSignedOut()');
+	assert.match(login, /afterAuthenticated\('login'\)/, 'login() should invoke its post-authentication boundary');
+	assert.match(afterAuthentication, /source === 'login' \? \[loadColorCatalogs\(\), fetchPrompts\(\)\] : \[\]/, 'login should read the protected catalog and prompt lists');
 });
 
 test('the cut is a cut: login()s region is not the file and not its neighbour', () => {
@@ -50,13 +52,13 @@ test('the cut is a cut: login()s region is not the file and not its neighbour', 
 	// asks for either list.
 	const body = loginBody();
 
-	assert.ok(body.length < PAGE.length / 4, 'the region should be a small part of the page');
+	assert.ok(body.length < SESSION.length / 4, 'the region should be a small part of Session');
 	assert.ok(body.includes('loginPassword'), 'the region should be the sign-in code');
 
 	// The neighbouring function has the same call list one function above, and
 	// `downloadCurrentCard` is where perturbation P-10 moves the call to. Neither
 	// body may be inside the region, or the first test is measuring the page.
-	assert.doesNotMatch(body, /async function loadCurrentUser\(/);
+	assert.doesNotMatch(body, /async loadCurrentUser\(/);
 	assert.doesNotMatch(body, /async function downloadCurrentCard\(/);
-	assert.doesNotMatch(body, /async function logout\(/);
+	assert.doesNotMatch(body, /async logout\(/);
 });

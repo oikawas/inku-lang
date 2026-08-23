@@ -179,12 +179,13 @@ test('T-9: nothing to say means nothing on screen', () => {
 	assert.deepEqual(pluginWarningsToShow({ plugin_warnings: ['   '] }), []);
 });
 
-test('T-8/T-9: the page reads the response and hides the empty frame', () => {
+test('T-8/T-9: Work reads the response and the route hides the empty frame', () => {
 	const page = read('../routes/+page.svelte');
+	const work = read('./features/work/state.svelte.ts');
 	const runOwner = read('./features/run/current-work.ts');
-	assert.match(page, /pluginWarningsShown = \$derived\(pluginWarningsToShow\(result\)\)/);
-	assert.match(page, /\{#if pluginWarningsShown\.length > 0 && inputMode === 'single'\}/);
-	assert.match(page, /\{#each pluginWarningsShown as warning\}/);
+	assert.match(work, /get pluginWarningsShown\(\) \{ return pluginWarningsToShow\(result\); \}/);
+	assert.match(page, /\{#if work\.pluginWarningsShown\.length > 0 && work\.inputMode === 'single'\}/);
+	assert.match(page, /\{#each work\.pluginWarningsShown as warning\}/);
 	assert.match(runOwner, /plugin_warnings\?: string\[\] \| null;/, 'the response field is typed');
 });
 

@@ -68,11 +68,11 @@ test('T-9: the grain is selectable from the work menu, not only from a first dra
 });
 
 test('T-9: the describe tab sends the chosen grain, and replays stored prose only when nothing moved', () => {
-	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/run/current-work.ts');
 	assert.match(currentWork, /sketch:\s*sketchOn/);
 	assert.match(currentWork, /sketch_grain: resolvedSketchGrain/);
-	assert.match(page, /!submitTextChanged && !submitGrainChanged \? sketchText : null/);
+	assert.match(work, /!submitTextChanged && !submitGrainChanged \? sketchText : null/);
 });
 
 // ----------------------------------------------------------------- T-10 (edge)
@@ -118,11 +118,13 @@ test('T-10: the new kind does not ride on an existing one', () => {
 test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () => {
 	// Renaming or adding an API key means counting the senders: a receiver drops
 	// what it does not know, so a missed sender stays a silent 200. Inside the
-	// page there are several places that post to /api/compose directly rather
-	// than through composeOne, and each one is a place the four consumers below
+	// the route and Work owner there are several places that post to /api/compose
+	// directly rather than through composeOne, and each one is a place the four consumers below
 	// Stage 1 could quietly go back to reading the raw description.
 	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-	const bodies = page.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1);
+	const work = read('./features/work/state.svelte.ts');
+	const refinement = read('./features/canvas/refinement-coordinator.svelte.ts');
+	const bodies = [page, work, refinement].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1));
 	assert.ok(bodies.length >= 4, `expected the known /api/compose senders, found ${bodies.length}`);
 	for (const [i, body] of bodies.entries()) {
 		const head = body.slice(0, 900);
@@ -172,16 +174,17 @@ test('T-6: an absent or unknown state is not rounded to a real one', () => {
 
 test('T-6: both places that put a work on screen carry its state, and the panel shows it', () => {
 	const page = read('../routes/+page.svelte');
+	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/history/current-work.ts');
 	const generationInfo = read('./features/canvas/CanvasGenerationInfo.svelte');
-	assert.match(page, /sketchState = normalizeSketchState\(state\)/);
+	assert.match(work, /sketchState = normalizeSketchState\(state\)/);
 	// A fresh run and a saved work reopened. Wiring one and not the other leaves
 	// half the works reading as though they predate the column. Saved-work field
 	// mapping now belongs to the canonical current-work projection.
-	assert.match(page, /adoptSketch\(r\.sketch_text \?\? null, r\.sketch_grain, input, r\.sketch_state\)/);
+	assert.match(work, /adoptSketch\(r\.sketch_text \?\? null, r\.sketch_grain, input, r\.sketch_state\)/);
 	assert.match(currentWork, /sketchState: item\.sketch_state/);
-	assert.match(page, /adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
-	assert.match(page, /sketchStateNote\(sketchState, getLang\(\) === 'ja'\)/);
+	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
+	assert.match(page, /sketchStateNote\(work\.sketchState, getLang\(\) === 'ja'\)/);
 	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });
 

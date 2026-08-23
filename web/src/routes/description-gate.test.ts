@@ -18,6 +18,7 @@ import { pipelineDescription } from '../lib/description-labels.ts';
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
 const batchOwner = fs.readFileSync(path.join(here, '../lib/features/batch/state.svelte.ts'), 'utf8');
+const workOwner = fs.readFileSync(path.join(here, '../lib/features/work/state.svelte.ts'), 'utf8');
 
 /** The single-mode gate, as the page writes it. */
 const canSubmitSingle = (input: string) => !!pipelineDescription(input).trim();
@@ -48,7 +49,7 @@ test('batch counts the lines that have something left to draw', () => {
 
 test('the page gates on the cut text, not on the raw text', () => {
 	// The perturbation this catches: canSubmit going back to `!!input.trim()`.
-	const gate = page.slice(page.indexOf('const canSubmit'));
+	const gate = workOwner.slice(workOwner.indexOf('const canSubmit'));
 	const body = gate.slice(0, gate.indexOf(');'));
 	assert.match(body, /pipelineDescription\(input\)\.trim\(\)/);
 	assert.doesNotMatch(body, /!!input\.trim\(\)/);
@@ -58,7 +59,7 @@ test('the page gates on the cut text, not on the raw text', () => {
 
 	// The rule is imported, never re-typed: the server owns it and the editor's
 	// meter already reads the same copy.
-	assert.match(page, /import \{ pipelineDescription \} from '\$lib\/description-labels'/);
+	assert.match(workOwner, /import \{ pipelineDescription \} from '\$lib\/description-labels'/);
 });
 
 test('the batch run paints the same lines the counter counted', () => {

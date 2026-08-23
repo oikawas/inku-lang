@@ -14,10 +14,14 @@ test('T-303/T-304: page and panel use one route-instance Canvas viewport owner',
 	const owner = read('./viewport-state.svelte.ts');
 	const page = read('../../../routes/+page.svelte');
 	const panel = read('../../components/CanvasPanel.svelte');
+	const work = read('../work/state.svelte.ts');
+	const refinement = read('./refinement-coordinator.svelte.ts');
 
 	assert.match(owner, /export class CanvasViewportState/);
 	assert.match(page, /new CanvasViewportState\(\)/);
-	assert.ok((page.match(/canvasViewport\.fit\(\)/g) ?? []).length >= 10);
+	const fitCalls = [page, work, refinement]
+		.reduce((count, source) => count + (source.match(/(?:canvasViewport|deps\.fitCanvas\(\))\.fit?\(?/g) ?? []).length, 0);
+	assert.ok(fitCalls >= 10);
 	assert.doesNotMatch(page, /let zoom\s*=\s*\$state/);
 	assert.doesNotMatch(page, /function fitCanvasZoom/);
 	assert.doesNotMatch(page, /\bresetZoom\b/);

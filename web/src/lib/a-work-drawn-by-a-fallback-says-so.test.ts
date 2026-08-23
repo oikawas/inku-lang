@@ -31,6 +31,8 @@ import { en } from './i18n/en.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PAGE = read('../routes/+page.svelte');
+const WORK = read('./features/work/state.svelte.ts');
+const REFINEMENT = read('./features/canvas/refinement-coordinator.svelte.ts');
 const HISTORY_SAVE = read('./features/history/save.ts');
 const DEMO_STATE = read('./features/demo/state.svelte.ts');
 const CANVAS = read('./components/CanvasPanel.svelte');
@@ -181,25 +183,25 @@ test('T-237 every refinement passes through the gate before it draws', () => {
 	// Counted from the source, because the refinements do not leave from one
 	// place: eight actions start one, and a gate on seven of them is a gate on
 	// none of the works that go through the eighth.
-	const REFINEMENTS = [
-		'async function submit(',
-		'async function replay(',
-		'async function varyPerformance(',
-		'async function varyComposition(',
-		'async function varyInterpretation(',
-		'async function generateVariationCandidates(',
-		'async function drawLineageDescriptionEdit(',
-		'async function drawLineageSketchGrain(',
-		'async function drawLineageDdlEdit('
+	const REFINEMENTS: Array<[string, string]> = [
+		[WORK, 'async function submit('],
+		[WORK, 'async function replay('],
+		[REFINEMENT, 'async function varyPerformance('],
+		[REFINEMENT, 'async function varyComposition('],
+		[REFINEMENT, 'async function varyInterpretation('],
+		[REFINEMENT, 'async function generateVariationCandidates('],
+		[PAGE, 'async function drawLineageDescriptionEdit('],
+		[PAGE, 'async function drawLineageSketchGrain('],
+		[PAGE, 'async function drawLineageDdlEdit(']
 	];
 	const ungated: string[] = [];
-	for (const opening of REFINEMENTS) {
-		const start = PAGE.indexOf(opening);
-		assert.notEqual(start, -1, `the page no longer has ${opening} -- recount the entry points`);
+	for (const [source, opening] of REFINEMENTS) {
+		const start = source.indexOf(opening);
+		assert.notEqual(start, -1, `the canonical owner no longer has ${opening} -- recount the entry points`);
 		// The gate belongs at the head of the action, before anything is drawn
 		// or saved. Only the opening stretch is read, so a call further down
 		// (after the work is already written) does not count as gated.
-		const head = PAGE.slice(start, start + 1400);
+		const head = source.slice(start, start + 1400);
 		if (!head.includes('confirmFallbackRefine(')) ungated.push(opening);
 	}
 	assert.deepEqual(ungated, [], `these refinements draw without asking: ${ungated.join(', ')}`);
@@ -207,7 +209,7 @@ test('T-237 every refinement passes through the gate before it draws', () => {
 	// The gate itself has to be able to say no. A dialog whose cancel resolves
 	// nothing leaves the caller waiting for ever, and one that resolves true
 	// would run the refinement the author refused.
-	assert.ok(PAGE.includes('cancelRun: () => resolve(false)'), 'cancelling never reaches the caller');
+	assert.ok(WORK.includes('cancelRun: () => resolve(false)'), 'cancelling never reaches the caller');
 	assert.ok(PAGE.includes('cancel?.()'), 'the dialog does not run its cancel callback');
 });
 
@@ -223,8 +225,8 @@ test('T-238 the same work is not asked about twice', () => {
 	// And remembering is only done after the author answered: the page calls it
 	// from `run`, never beside the dialog.
 	assert.ok(
-		/run: \(\) => \{ rememberFallbackRefineConfirm\(/.test(PAGE),
-		'the page remembers the answer somewhere other than in the answer'
+		/run: \(\) => \{ rememberFallbackRefineConfirm\(/.test(WORK),
+		'the Work owner remembers the answer somewhere other than in the answer'
 	);
 });
 

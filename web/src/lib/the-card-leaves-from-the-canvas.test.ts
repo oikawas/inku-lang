@@ -23,7 +23,7 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const JA = read('./i18n/ja.ts');
 const EN = read('./i18n/en.ts');
 const TYPES = read('./i18n/types.ts');
-const CANVAS = read('./components/CanvasPanel.svelte');
+const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 const PAGE = read('../routes/+page.svelte');
 
 /** The export menu only -- the list that carries SVG, PNG and the card. */
@@ -58,9 +58,9 @@ test('the label reads 共有カード / Share card, and the old one is gone', ()
 // ── T-2: the position ───────────────────────────────────────────────────────
 
 test('the card is the last of the three ways out, after PNG', () => {
-	const menu = exportMenu(CANVAS);
+	const menu = exportMenu(ARTWORK);
 	const png = menu.indexOf('onDownloadPNG');
-	const card = menu.indexOf('downloadCardFromCanvas');
+	const card = menu.indexOf('onDownloadCard');
 	assert.notEqual(png, -1, 'the PNG entry left the canvas export menu');
 	assert.notEqual(card, -1, 'the card entry is not in the canvas export menu');
 	assert.ok(card > png, 'the card must come after PNG, not before it');
@@ -73,7 +73,7 @@ test('the card is the last of the three ways out, after PNG', () => {
 // ── T-3: a work with no id cannot be carded ─────────────────────────────────
 
 test('the card button is disabled when the shown work has no history id', () => {
-	const button = cardButton(exportMenu(CANVAS));
+	const button = cardButton(exportMenu(ARTWORK));
 	const disabled = button.match(/disabled=\{([^}]*)\}/);
 	assert.ok(disabled, 'the card button has no disabled expression');
 	// history_id is optional on a result, and displayedHistoryItem can be null,

@@ -9,7 +9,8 @@ import { test } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const VIEW_URL = new URL('./ServerRuntimeSettings.svelte', import.meta.url);
 const VIEW = existsSync(VIEW_URL) ? read('./ServerRuntimeSettings.svelte') : '';
-const OWNER = read('./state.svelte.ts');
+const OWNER = read('./server-administration.svelte.ts');
+const SHARED_STYLES = read('./settings-modal.css');
 const MODAL = read('../../components/SettingsModal.svelte');
 const SERVER_BRANCH = MODAL.slice(
 	MODAL.indexOf("{:else if settingsTab === 'server_misc'}"),
@@ -46,7 +47,7 @@ test('server-runtime-specific styles move without globalizing shared primitives'
 	}
 	for (const shared of ['.popover-group', '.settings-readonly-grid', '.inline-message']) {
 		assert.match(VIEW, new RegExp(shared.replace('.', '\\.') + '\\s*\\{'), shared);
-		assert.match(MODAL, new RegExp(shared.replace('.', '\\.') + '\\s*\\{'), shared);
+		assert.match(SHARED_STYLES, new RegExp(shared.replace('.', '\\.') + '\\s*\\{'), shared);
 	}
 	assert.match(VIEW, /\.settings-readonly-grid \.nowrap-label/);
 	assert.doesNotMatch(MODAL, /\.settings-readonly-grid \.nowrap-label/);

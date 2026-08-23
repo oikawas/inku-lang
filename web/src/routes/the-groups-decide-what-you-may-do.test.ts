@@ -48,7 +48,7 @@ test('the users group opens none of them, and neither does a leader', () => {
 
 	// And the settings owner reaches this module rather than keeping its own copy: the
 	// two checks above would pass over a decision nothing calls.
-	const owner = readFileSync(join(ROUTES_DIR, '..', 'lib', 'features', 'settings', 'state.svelte.ts'), 'utf8');
+	const owner = readFileSync(join(ROUTES_DIR, '..', 'lib', 'features', 'settings', 'navigation-state.svelte.ts'), 'utf8');
 	assert.match(owner, /from '\$lib\/permissionGroups'/);
 	assert.match(owner, /canAccessSettingsTabFor\(tab, currentUser\)/);
 });

@@ -29,123 +29,102 @@ Webはserver作品を操作する参照UI、CLIはserverの公開APIを測るcli
 ## Web内部
 
 ```mermaid
-flowchart LR
-    PAGE["+page.svelte\n画面orchestration"]
-    COMPONENTS["components/\n入力・canvas・history・lineage・settings"]
-    FEATURES["features/<name>/\nbatch/export/catalog/inspection/wild等"]
-    RUN["features/run/current-work.ts\n1回のPaint request・stream・保存直後projection"]
-    LINEAGE_STATE["features/history/lineage-state.svelte.ts\nroute-instance lineage query + nearby作品"]
-    HISTORY_STATE["features/history/browsing-state.svelte.ts\nroute-instanceのstrip query・paging・filter・refresh・manager連携"]
-    HISTORY_MUTATIONS["features/history/mutations.ts\nroute-instanceのmark・lifecycle mutation調停"]
-    HISTORY_WORK["features/history/{save,replay,current-work,lineage-actions}.ts\n保存・replay・current-work・lineage action調停"]
-    CANVAS_VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instanceのzoom・fit・pan・pointer/keyboard操作"]
-    REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nroute-instanceのbusy・cancel・fan-out進行・candidate選択"]
-    REFINE_FANOUT["features/canvas/refinement-fanout.ts\nstatelessな5 kind plan・bounded execution"]
-    REFINE_REDRAW["features/canvas/refinement-redraw.ts\nstatelessなsingle redraw seed・request・result projection"]
-    REFINE_ACTIONS["features/canvas/refinement-actions.ts\nstatelessなcandidate保存・Canvas projection"]
-    CANVAS_INFO["features/canvas/CanvasGenerationInfo.svelte\ngeneration info focused view"]
-    CANVAS_PRESENTATION["features/canvas/CanvasPresentationOverlay.svelte\npresentation focused view"]
-    CANVAS_REFINEMENT["features/canvas/CanvasRefinementWorkspace.svelte\nrefinement workspace focused view"]
-    HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query・cache・実測page size"]
-    SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server/model provider/user・group管理"]
-    SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
-    USER_ADMIN_VIEW["features/settings/UserAdministrationSettings.svelte\nuser・group focused view"]
-    DATABASE_VIEW["features/settings/DatabaseAdministrationSettings.svelte\ndatabase・backup focused view"]
-    LIMITS_VIEW["features/settings/RenderLimitsSettings.svelte\nrender limits focused view"]
-    RUNTIME_VIEW["features/settings/ServerRuntimeSettings.svelte\nserver runtime focused view"]
+flowchart TB
+    PAGE["+page.svelte\nroute lifecycle・shell state・owner配線"]
+    SESSION["features/session/state.svelte.ts\nlogin・profile・actor・member preference"]
+    WORK["features/work/state.svelte.ts\nsingle-work input・submit/replay/stop・result・timer/token"]
+    RUN["features/run/current-work.ts\nstatelessな1回のPaint operation・stream projection"]
+    HISTORY["features/history/*\nroute-instance browsing・lineage・mutationとstateless work action"]
+    VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom・fit・pan・input処理"]
+    REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nbusy・cancel・進行・candidate"]
+    REFINE_COORD["features/canvas/refinement-coordinator.svelte.ts\ntarget identity・redraw・fan-out・adopt・save調停"]
+    REFINE_OPS["features/canvas/{refinement-redraw,refinement-fanout,refinement-actions}.ts\nstateless refinement operation"]
+    SETTINGS["features/settings/state.svelte.ts\ntyped aggregate"]
+    SETTINGS_SLICES["features/settings/{navigation-state,server-administration,model-administration,user-administration}.svelte.ts\nroute-instance Settings owner"]
+    COMPONENTS["components/\nroute-facing input・history・lineage・modal shell"]
+    CANVAS_PANEL["CanvasPanel.svelte\nCanvas tab・overlay composition"]
+    CANVAS_ART["CanvasArtworkWorkspace.svelte\ncurrent artwork・control・export・zoom view"]
+    CANVAS_REFINE["CanvasRefinementWorkspace.svelte\nstateless refinement shell"]
+    REFINE_VIEWS["Refinement{Adjust,ModelCompare,LanguageCompare}View.svelte\ncapability-local focused view"]
+    SETTINGS_MODAL["SettingsModal.svelte\nSettings tab composition"]
+    SETTINGS_VIEWS["features/settings/*Settings.svelte\nselection・model・plugin・export・appearance・database・runtime・limits・users"]
     TRANSPORT["transport/api-fetch.ts\n認証済みHTTP transport"]
-    PERSIST["persisted-settings.ts"]
-    USERSET["user-settings.ts"]
-    PAYLOAD["render-payload.ts"]
-    LOCAL[("localStorage")]
-    INDEXED[("IndexedDB / browser folder handle")]
+    REGISTRIES["persisted-settings.ts / user-settings.ts / render-payload.ts"]
+    LOCAL[("localStorage / IndexedDB")]
     API["Server API"]
 
+    PAGE -->|"各1回生成"| SESSION
+    PAGE -->|"各1回生成"| WORK
+    PAGE -->|"各1回生成"| REFINE_COORD
+    PAGE -->|"各1回生成"| SETTINGS
+    PAGE -->|"各1回生成"| HISTORY
+    PAGE -->|"各1回生成"| VIEWPORT
     PAGE --> COMPONENTS
-    PAGE --> FEATURES
-    PAGE -->|"解決済みdefault + 名前付きcapability"| RUN
-    PAGE -->|"owner生成 + current focus/action配線"| LINEAGE_STATE
-    RUN -->|"loadNearby capability"| LINEAGE_STATE
-    PAGE -->|"owner生成 + current work/notice配線"| HISTORY_STATE
-    HISTORY_STATE -->|"必ず1個だけ生成"| HISTORY_MANAGER
-    PAGE -->|"owner生成 + current canvas capability"| HISTORY_MUTATIONS
-    COMPONENTS -->|"名前付きmutation action"| HISTORY_MUTATIONS
-    HISTORY_MUTATIONS -->|"strip/trash/manager projection"| HISTORY_STATE
-    HISTORY_MUTATIONS -->|"mark projection + focused query refresh"| LINEAGE_STATE
-    PAGE -->|"解決済みdefault + route UI/Canvas適用"| HISTORY_WORK
-    COMPONENTS -->|"名前付きreplay/focus/lineage action"| HISTORY_WORK
-    HISTORY_WORK -->|"listing reconcile"| HISTORY_STATE
-    HISTORY_WORK -->|"note projection"| HISTORY_MUTATIONS
-    HISTORY_WORK -->|"focus/query refresh"| LINEAGE_STATE
-    PAGE -->|"routeごとにowner生成 + global shortcut gate"| CANVAS_VIEWPORT
-    COMPONENTS -->|"typed CanvasViewport"| CANVAS_VIEWPORT
-    PAGE -->|"session調停・保存・Canvas適用"| REFINE_SESSION
-    COMPONENTS -->|"typed RefinementSession"| REFINE_SESSION
-    PAGE -->|"解決済みinput + named candidate factory"| REFINE_FANOUT
-    PAGE -->|"解決済みinput + named transport/paint capability"| REFINE_REDRAW
-    PAGE -->|"typed input + named capability"| REFINE_ACTIONS
-    REFINE_ACTIONS -->|"既存save operation"| HISTORY_WORK
-    COMPONENTS -->|"CanvasPanelからtyped display props"| CANVAS_INFO
-    COMPONENTS -->|"CanvasPanelからtyped display props + callbacks"| CANVAS_PRESENTATION
-    COMPONENTS -->|"CanvasPanelからtyped owner + display props + callbacks"| CANVAS_REFINEMENT
-    PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
-    PAGE --> SETTINGS_MODAL
-    SETTINGS_MODAL -->|"SettingsController"| SETTINGS
-    SETTINGS_MODAL -->|"session表示・入力props"| USER_ADMIN_VIEW
-    SETTINGS -->|"userAdministration submodel"| USER_ADMIN_VIEW
-    SETTINGS_MODAL -->|"database/db_backup slice"| DATABASE_VIEW
-    SETTINGS -->|"名前付きdatabase操作"| DATABASE_VIEW
-    SETTINGS_MODAL -->|"render_limits slice"| LIMITS_VIEW
-    SETTINGS -->|"名前付きlimits操作"| LIMITS_VIEW
-    SETTINGS_MODAL -->|"output_save/render_concurrency slice"| RUNTIME_VIEW
-    SETTINGS -->|"名前付きruntime操作"| RUNTIME_VIEW
-    SETTINGS -->|"名前付き設定・管理操作"| TRANSPORT
-    RUN -->|"Paint stream + unread-word feedback"| TRANSPORT
-    LINEAGE_STATE -->|"lineage + neighbor query"| TRANSPORT
-    LINEAGE_STATE -->|"graph/loading/error + nearby作品"| COMPONENTS
-    HISTORY_STATE -->|"strip/trash query + external state probe"| TRANSPORT
-    HISTORY_MUTATIONS -->|"mark PATCH + lifecycle POST"| TRANSPORT
-    HISTORY_WORK -->|"history save + replay + promote/note"| TRANSPORT
-    HISTORY_STATE -->|"strip選択/paging/filter state"| COMPONENTS
-    HISTORY_MANAGER -->|"manager state"| COMPONENTS
+
+    WORK -->|"解決済みdefault + named capability"| RUN
+    WORK -->|"選択・refresh・lineage capability"| HISTORY
+    WORK -->|"fit要求"| VIEWPORT
+    WORK --> REFINE_SESSION
+    REFINE_COORD -->|"typed Work subset"| WORK
+    REFINE_COORD --> REFINE_SESSION
+    REFINE_COORD --> REFINE_OPS
+    REFINE_COORD -->|"save・reseat・parent capability"| HISTORY
+    REFINE_COORD -->|"fit capability"| VIEWPORT
+
+    SETTINGS --> SETTINGS_SLICES
+    SETTINGS_SLICES --> TRANSPORT
+    SESSION --> TRANSPORT
+    RUN --> TRANSPORT
+    HISTORY --> TRANSPORT
+    REFINE_COORD --> TRANSPORT
+
+    COMPONENTS --> CANVAS_PANEL
+    CANVAS_PANEL --> CANVAS_ART
+    CANVAS_PANEL --> CANVAS_REFINE
+    CANVAS_REFINE --> REFINE_VIEWS
+    CANVAS_PANEL -->|"typed owner + named callback"| REFINE_SESSION
+    COMPONENTS --> SETTINGS_MODAL
+    SETTINGS_MODAL --> SETTINGS_VIEWS
+    SETTINGS_VIEWS -->|"typed Settings slice"| SETTINGS
+
+    REGISTRIES --> LOCAL
+    REGISTRIES --> API
     TRANSPORT --> API
-    FEATURES -->|"load registration"| PERSIST
-    FEATURES -->|"model_settings slice"| USERSET
-    FEATURES -->|"request slice"| PAYLOAD
-    PERSIST --> LOCAL
-    USERSET -->|"PATCH /api/auth/me/settings"| API
-    PAYLOAD -->|"paint/compose/render payload"| API
-    FEATURES -->|"export target"| INDEXED
-    COMPONENTS -->|"history/lineage/export API"| API
 ```
 
 ## Webの状態と永続化
 
 | 所有者 | 例 | 境界 |
 |---|---|---|
-| component/page memory | 描画中のresult、output tab、replay modal/loading、Canvasへのcurrent-work適用 | reloadで消える。server正本ではない。history itemからのfield projectionはstateless history featureが作る |
-| stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`は解決済みdefaultと名前付きcapabilityを受け取る。外側loop、route state、AbortControllerはpageに残る |
+| route shell memory | output tab、modal表示、短い表示用projection、lifecycle配線 | reloadで消える。server正本ではない。domain workflowはrouteごとに1回生成し、routeへ複製しない |
+| route-instance Session owner | login/logout、current actor、profile編集、memberのUI/history preference、download folder preference | routeごとに1個の`createSessionState`。認証後処理はnamed boundaryを通り、password値はoperation内に留まる |
+| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demo run調停 | routeごとに1個の`createWorkState`。AbortControllerとstale-run判断を所有し、requestやstate copyを増やさずstateless Paint operationを呼ぶ |
+| stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`はWorkから解決済みdefaultと名前付きcapabilityを受ける。route/component stateと外側run ownershipはoperationへ入らない |
 | route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge、nearby作品 | routeごとに1個の`LineageQueryState`。query stateをhistory action moduleやpageへ複製しない |
 | route-instance history browsing owner | stripのitems/count/offset/選択、filter、paging/resize、stale-response identity、trash summary、external refresh、mark projection、manager連携 | routeごとに1個の`HistoryBrowsingState`が既存`HistoryManagerState`を必ず1個だけ生成する。managerのrequest/cache/page-size意味論は複製しない |
-| route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとpage-owned current canvasへ名前付きprojectionだけを渡す |
-| stateless history work operations | 保存用history payload、saved-work replay、history→current-work projection、saved-child/promote/note調停 | `save.ts`、`replay.ts`、`current-work.ts`、`lineage-actions.ts`がtyped inputと名前付きcapabilityだけを受ける。route UI、AbortController、Canvas適用はpageに残る |
+| route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとcurrent-work capabilityへ名前付きprojectionだけを渡す |
+| stateless history work operations | 保存用history payload、saved-work replay、history→current-work projection、saved-child/promote/note調停 | `save.ts`、`replay.ts`、`current-work.ts`、`lineage-actions.ts`がtyped inputと名前付きcapabilityだけを受ける。route UIと該当するWorkまたはRefinement ownerがstateと適用判断を保持する |
 | route-instance Canvas viewport owner | zoom、measured fit zoom、pan、pointer capture、keyboardによるzoom/pan | routeごとに1個の`CanvasViewportState`。`CanvasPanel`はtyped ownerを受け、pageはglobal shortcutのeligibilityとwork切替時の`fit()`要求だけを結線する |
-| route-instance refinement session owner | single/grid/save busy、elapsed/token、fan-out slot、AbortController、candidate selection | routeごとに1個の`RefinementSessionState`。active controllerだけがprogress/error/finishをcommitし、`CanvasPanel`はtyped ownerへcancel/toggleを送る。candidate request/save/Canvas applyはpageに残る |
-| stateless refinement fan-out | 5 kindのcandidate plan、composition seed除外、alternate catalog順序、variation seed割当呼び出し、label、bounded indexed execution | `refinement-fanout.ts`がtyped snapshot、1個のAbortSignal、named candidate factoryを受ける。route/session stateとHTTP transportは所有せず、pageが解決済みconcurrency limitを渡し、execution前に返却labelをseatする |
-| stateless single-redraw action | touch/layout/readingのseed選択、touch request/result構築、Paint invocation option、current-result field projection | `refinement-redraw.ts`が解決済みinputとnamed transport/seed/Paint capabilityを受ける。pageはfallback確認、lineage parent materialization、session/loading/error、history reseat、reading diff、output tab、viewport適用を保持する |
-| stateless refinement candidate actions | candidate→current Canvas projection、選択snapshotの逐次history保存、stale/identity調停 | `refinement-actions.ts`がtyped candidateとnamed save/context capabilityを受ける。route/session/history/Canvas stateを所有せず、pageが最終代入とview coordinationを保持する |
+| route-instance refinement session owner | single/grid/save busy、elapsed/token、fan-out slot、AbortController、candidate selection | routeごとに1個の`RefinementSessionState`。active controllerだけがprogress/error/finishをcommitし、coordinatorとCanvas viewがtyped ownerを共有する |
+| route-instance refinement coordinator | target identity、precondition、candidate request transport、fan-out/session調停、redraw/save adoption、history reseat、Canvas fit | routeごとに1個の`createRefinementCoordinator`。明示的なtyped Work subsetとnamed history/render/catalog capabilityを受け、mutable stateやrequestを複製しない |
+| stateless refinement fan-out | 5 kindのcandidate plan、composition seed除外、alternate catalog順序、variation seed割当呼び出し、label、bounded indexed execution | `refinement-fanout.ts`がcoordinatorからtyped snapshot、1個のAbortSignal、named candidate factoryを受ける。route/session stateとHTTP transportは所有しない |
+| stateless single-redraw action | touch/layout/readingのseed選択、touch request/result構築、Paint invocation option、current-result field projection | `refinement-redraw.ts`が解決済みinputとnamed transport/seed/Paint capabilityを受ける。target check、session/loading/error、history reseat、reading diff、view選択、viewport適用はcoordinatorが保持する |
+| stateless refinement candidate actions | candidate→current Canvas projection、選択snapshotの逐次history保存、stale/identity調停 | `refinement-actions.ts`がtyped candidateとnamed save/context capabilityを受ける。coordinatorがprojectionとsaved identityをcanonical Work ownerへ適用する |
+| Canvas current-artwork focused view | current artwork、corner control、status mark、navigation、export、caption、empty motif、zoom表示 | `CanvasArtworkWorkspace.svelte`がtyped display propsと唯一の`CanvasViewportState`を受ける。`CanvasPanel`はtab/overlay compositionと共有work選択を保持する |
 | Canvas generation-information focused view | 詳細・prompt・score tab、作品由来情報の表示、drawer固有のscroll element | `CanvasGenerationInfo.svelte`がtyped display propsを受けて描画する。開閉、outside/Escape、tab別scroll memory、共有SVG計測は`CanvasPanel`が所有する |
 | Canvas presentation focused view | fullscreen作品画像、caption、navigation・star・caption・close control | `CanvasPresentationOverlay.svelte`がminimal work markとtyped display props/callbacksを受けて描画する。open state、toolbar、Escape、current workとmutationは`CanvasPanel`が所有する |
-| Canvas refinement workspace focused view | adjust、candidate、model比較、language比較の表示とworkspace固有style | `CanvasRefinementWorkspace.svelte`が既存のtyped refinement-session/model-inspection owner、解決済みprops、named callbackを受けて描画する。output/view/open選択、永続化、Escape/close、current作品画像URL、operationは`CanvasPanel`が所有する |
-| route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。focused viewへは`userAdministration`、`database`/`db_backup`、`render_limits`、または`output_save`/`render_concurrency`の必要sliceと名前付き操作だけを渡す |
-| focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
+| Canvas refinement workspace focused views | stateless workspace shellとadjust/model比較/language比較view | `CanvasRefinementWorkspace.svelte`が3個のcapability-local viewをcomposeする。各viewは自分のtyped state/actionだけを受け、共有styleはfeature stylesheet 1個に置く |
+| route-instance Settings aggregateとslice | navigation/detail、server/plugin操作、model provider操作、user/group操作 | `createSettingsController`が4個のroute-instance sliceを1回ずつcomposeする。aggregateが唯一のdomain入口で、slice stateを複製しない |
+| focused Settings views | model選択/管理、plugin管理、export、appearance、database、runtime、limits、users | `SettingsModal.svelte`はtab shell。各focused viewはlocal draftとmarkupだけを所有し、aggregate全体ではなくtyped sub-capabilityを受ける |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
 | IndexedDB | File System Access APIのfolder handle | structured cloneが必要でlocalStorage外 |
 | user server settings | catalog、model inspection等の`model_settings` slice | login user単位、`user-settings.ts`で集約 |
 | render payload | catalog/wild等のrequest field | `render-payload.ts`のkind別contributor |
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
-`+page.svelte`は画面orchestratorに留まり、`features/run/current-work.ts`が1回のPaint request、NDJSON進行、直後のnearby history・saved lineage・generation count・unread word effectを所有する。pageは現在設定を解決して狭い名前付きcapabilityを渡す。current result、外側のsubmit/replay/batch/demo/refinement loop、stale result判断、AbortControllerの所有はpageに残る。
+`+page.svelte`はroute composition shellとなった。route-instance ownerを各1回生成し、top-level lifecycle、認証画面切替、modal/view表示、build表示、短いcross-owner projection、named capability配線を保持する。`features/work/state.svelte.ts`がcurrent single-work state、submit/replay/stop、Batch/Demo調停を所有し、`features/run/current-work.ts`はstatelessな1回のPaint operationに留まる。`features/session/state.svelte.ts`が認証とmember preferenceを所有する。`features/canvas/refinement-coordinator.svelte.ts`がtarget identityとrefinement orchestrationを所有し、既存session/action moduleを再利用する。
+
+以下のStage 5〜7の段落は、各cut直後の境界を記録した履歴である。現在の収束後の境界は、上の責務表とStage 10の段落を正とする。
 
 Stage 5Aではlineageとnearby作品のquery stateをroute-instanceの`LineageQueryState`へ置く。request identity、loading/error、graph置換、branch/overview merge、reset invalidation、同一historyのneighbor deduplicationをここが所有する。`runCurrentWork`には`loadNearby` methodを直接渡す。
 
@@ -171,7 +150,9 @@ Stage 7Bでは`CanvasPresentationOverlay.svelte`がfullscreen作品画像、capt
 
 Stage 7Cでは`CanvasRefinementWorkspace.svelte`がbackdrop、shell、adjust/candidate表示、model/language比較表示、refinement専用styleを所有する。`CanvasPanel`はoutput/view/open state、refinement kindの永続化とDDL-origin補正、amplitude/touch word ownership、Escape/close、current作品画像URL、全operationを保持する。focused viewは既存のtyped refinement-session/model-inspection owner、解決済みdisplay props、named callbackを受け取り、mutable ownerやtransportを追加しない。
 
-設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
+Stage 10では行数ではなく変更理由に沿って5つの高変更面を収束させた。refinement workspaceはstateless shell配下の3 focused view、Canvas current-artwork表示は1 focused workspace、Settings stateは1 aggregate配下の4 route-instance slice、Settings表示はtab shell配下のfocused view、route workflowはSession・Work・Refinementの各1 ownerになった。forwardingだけのlayer、rune stateの複製、request、serialization、polling、追加await boundaryは導入しない。
+
+`features/settings/state.svelte.ts`のSettings aggregateはnavigation、server、model provider、user/groupのsliceを各1回生成する。pageはsigned-in actorとnamed external loaderだけを渡す。`SettingsModal.svelte`はmodal/tab compositionだけを行い、focused viewへtyped sub-capabilityを渡す。account/password、API key、plugin、export、appearanceのdraftは描画するfocused view内だけに留まる。秘密値は既存operation境界だけを通り、aggregate state、確認dialog、errorへ複製しない。
 
 ## CLI境界
 

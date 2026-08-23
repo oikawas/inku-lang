@@ -7,10 +7,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
-	import {
-		holdsPermissionGroup,
-		type PermissionGroup
-	} from '$lib/permissionGroups';
 	import { highlightDDL } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
@@ -21,27 +17,8 @@
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
-	import {
-		RefinementSessionState,
-		type RefineKind,
-		type VariationAmplitude,
-		type VariationCandidate
-	} from '$lib/features/canvas/refinement-session.svelte';
-	import {
-		projectRefinementCandidate,
-		saveRefinementCandidates
-	} from '$lib/features/canvas/refinement-actions';
-	import {
-		planRefinementCandidates,
-		runRefinementFanout
-	} from '$lib/features/canvas/refinement-fanout';
-	import {
-		projectRefinementRedrawResult,
-		runLayoutRedraw,
-		runReadingRedraw,
-		runTouchRedraw,
-		type RefinementRedrawProjection
-	} from '$lib/features/canvas/refinement-redraw';
+	import { createRefinementCoordinator } from '$lib/features/canvas/refinement-coordinator.svelte';
+	import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -54,8 +31,7 @@
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
-	import { normalizeHistoryStripFields, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
+	import { toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -77,10 +53,9 @@
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { createApiFetch } from '$lib/transport/api-fetch';
-	import {
-		createSettingsController,
-		type SettingsTab
-	} from '$lib/features/settings/state.svelte';
+	import { createSessionState, type UserItem, type UserModelSettings } from '$lib/features/session/state.svelte';
+	import { createWorkState } from '$lib/features/work/state.svelte';
+	import { createSettingsController } from '$lib/features/settings/state.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
@@ -88,7 +63,7 @@
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
-	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
+	import { renderSettingsPayload } from '$lib/features/render-payload';
 	import {
 		runCurrentWork,
 		type InstructionLang,
@@ -101,7 +76,6 @@
 	import { BatchState } from '$lib/features/batch/state.svelte';
 	import { DemoState } from '$lib/features/demo/state.svelte';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
-	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -175,141 +149,10 @@
 		preview_url?: string;
 		preview_url_2x?: string;
 	};
-	type UserModelSettings = {
-		stage1_provider: Provider;
-		stage1_model: string;
-		stage2_provider: Provider;
-		stage2_model: string;
-		vision_provider: Provider;
-		vision_model: string;
-		okugaki_provider?: Provider;
-		okugaki_model?: string;
-		instruction_caption_visible?: boolean;
-		color_catalog_id?: string;
-		sketch_open?: boolean;
-		ddl_expanded_open?: boolean;
-	};
-	type UserItem = {
-		id: string;
-		username: string;
-		email: string;
-		permission_groups: PermissionGroup[];
-		permission_group_labels: string[];
-		group_id: string | null;
-		group_name: string | null;
-		ui_theme?: 'light' | 'dark';
-		ui_mode?: UiMode;
-		ui_custom?: UiCustomVisibility;
-		history_strip_fields?: HistoryStripField[];
-		tooltips_enabled?: boolean;
-		download_folder_enabled?: boolean;
-		download_folder_name?: string | null;
-		settings_tab?: SettingsTab;
-		model_settings?: UserModelSettings;
-		image_generation_count: number;
-		at: number;
-	};
-	// ── Input ───────────────────────────────────────────────
-	const DEFAULT_INPUT = '山の向こうに月が昇る';
-	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
-	let input       = $state(DEFAULT_INPUT);
-	let touchSeedText = $state('');
-	const instructionLang: InstructionLang = 'auto';
-	let stage1UserPrompt = $state('');
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
-
-	// ── Loading ─────────────────────────────────────────────
-	let loading    = $state(false);
-	let activeRunMode = $state<'single' | 'batch' | 'demo' | null>(null);
-	let submitAbortController: AbortController | null = null;
-	let submitStopRequested = false;
-	let replayAbortController: AbortController | null = null;
-	let replayStopRequested = false;
-	let stageLabel = $state('');
 	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
-	let error        = $state<string | null>(null);
-	// ── Replay ──────────────────────────────────────────────
-	let reloading   = $state(false);
-	let reloadError = $state<string | null>(null);
-	let replayComparison = $state<ReplayComparison | null>(null);
-
-	// ── Result ──────────────────────────────────────────────
-	let ddl      = $state<string | null>(null);
-	// v1.98: ddl is the input side (Stage 1 output or author-written DDL), while
-	// expandedDdl is the expanded side (Stage 1.5 output and Stage 2 input).
-	// Older records have no input-side value and therefore expose null.
-	let expandedDdl = $state<string | null>(null);
-	let ddlGeneratedBaseline = $state<string | null>(null);
-	let ddlAutoRepairEnabled = $state(true);
-	let thinking = $state<string | null>(null);
-	let result   = $state<PaintResult | null>(null);
-	// One read point for every draw path: whatever sets `result` shows them.
-	const pluginWarningsShown = $derived(pluginWarningsToShow(result));
-	// Same read point, same rule, for the limits that took effect on this
-	// drawing. Seven of the nine used to bind in silence (ledger I-154).
-	const limitNotesShown = $derived(limitNotesToShow(result));
-	// Sketching (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
-	// way a user setting like the color catalog is (contract section 0.3.1).
-	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
-	// The prose the layer wrote for the run on screen, and the author's edit of
-	// it. Editing and painting again sends the edited prose instead of calling
-	// the layer, so what the author reads is what Stage 1 reads.
-	let sketchText = $state<string | null>(null);
-	// Which description the prose was written for. Prose written for one text is
-	// not prose for another, and the description can be edited after a run.
-	let sketchSource = $state<string | null>(null);
-	let sketchDraft = $state('');
-	let sketchEditing = $state(false);
-	// What the record says the layer did for the work on screen. `null` is a work
-	// whose record is absent -- drawn before the column existed -- and the note
-	// tells that apart from 'off', which is a choice the author made.
-	let sketchState = $state<SketchState | null>(null);
-
-	/** The prose to send for this description, or null to let the layer write it.
-	 *  Used by the paths that re-run one stage over a description already on
-	 *  screen (model and language comparison): holding the prose fixed is what
-	 *  makes those a comparison of models rather than of two different texts. */
-	function sketchTextFor(text: string): string | null {
-		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
-			? sketchText
-			: null;
-	}
-
-	/** What every request that begins at Stage 2 sends. Those paths never run
-	 *  0.5 -- they carry the prose the work already has, so the four consumers
-	 *  below Stage 1 read what a paint would have given them. */
-	function sketchPayloadFor(text: string): Record<string, string> {
-		const prose = sketchTextFor(text);
-		if (!prose) return {};
-		const grain = sketchGrainOf(sketchMode);
-		return { sketch_text: prose, ...(grain ? { sketch_grain: grain } : {}) };
-	}
-
-	/** Show the prose a run or a saved work was painted from, and select the
-	 *  grain it used so a redraw starts from the same place. A work with no
-	 *  prose (painted with the layer off, or made before it existed) turns the
-	 *  control off rather than silently painting it at the default grain.
-	 *
-	 *  The control still lands on 'off' for every work with no prose -- what the
-	 *  author is going to draw next is a separate question from what the work on
-	 *  screen was drawn through. The state is what keeps the two apart: it is
-	 *  carried whole, so the note can say "drawn without the layer" and "drawn
-	 *  before the layer was recorded" as the different things they are. */
-	function adoptSketch(
-		text: string | null,
-		grain: unknown,
-		source: string | null = null,
-		state: unknown = null
-	): void {
-		sketchText = text;
-		sketchSource = source;
-		sketchDraft = text ?? '';
-		sketchEditing = false;
-		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
-		sketchState = normalizeSketchState(state);
-	}
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
@@ -318,7 +161,6 @@
 	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
-	let targetContextVersion = 0;
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -339,16 +181,13 @@
 	let leftPanelCollapsed = $state(false);
 	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
-	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
-	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId } | null>(null);
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
-	let lineageDetached = $state(false);
 	const canvasViewport = new CanvasViewportState();
 	let promptStage1Expanded = $state(false);
 	let promptStage2Expanded = $state(false);
@@ -610,33 +449,6 @@
 		registerModelCatalog(availableModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
-	let currentUserSettingsRequestId = 0;
-	let authToken = $state<string | null>(null);
-	let currentUser = $state<UserItem | null>(null);
-	// What the signed-in member may do, derived once. Every gate below asks these
-	// rather than reading the membership list itself: the per-work sharing rules
-	// land on the same questions, and a condition spelled out in twenty places is
-	// twenty places to keep in step.
-	const isAdmin = $derived(holdsPermissionGroup(currentUser, 'admins'));
-	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
-	let uiModeSaving = $state(false);
-	let uiModeSaveError = $state(false);
-	let historyStripFieldsSaving = $state(false);
-	let historyStripFieldsSaveError = $state(false);
-	const historyStripFields = $derived(normalizeHistoryStripFields(currentUser?.history_strip_fields));
-	const uiMode = $derived(normalizeUiMode(currentUser?.ui_mode));
-	const uiCustom = $derived(normalizeUiCustom(currentUser?.ui_custom));
-	const uiVisibility = $derived(resolveUiVisibility(uiMode, uiCustom));
-	let loginUserName = $state('admin');
-	let loginPassword = $state('');
-	let loginPasswordVisible = $state(false);
-	let loginStatus = $state<string | null>(null);
-	let profileOpen = $state(false);
-	let profileEmail = $state('');
-	let profileCurrentPassword = $state('');
-	let profileNewPassword = $state('');
-	let profileStatus = $state<string | null>(null);
-	let profileSaving = $state(false);
 
 	type ProviderFailure = {
 		code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
@@ -671,27 +483,65 @@
 	}
 
 	const apiFetch = createApiFetch();
+	const session = createSessionState({
+		apiFetch,
+		describeApiError,
+		applyModelSettings: applyUserModelSettings,
+		afterAuthenticated: completeAuthentication,
+		afterSignedOut: resetAfterSignedOut,
+		refreshUserAdministration: () => settings.userAdministration.load(),
+		onVisibilityChanged: (visibility) => {
+			if (!visibility.input_modes) work.inputMode = 'single';
+			if (!visibility.work_tools) outputTab = 'canvas';
+		}
+	});
 	const batch = new BatchState<BatchPaintResult, Iteration>({
 		apiFetch,
-		signedIn: () => currentUser !== null,
+		signedIn: () => session.currentUser !== null,
 		paintable: (text) => !!pipelineDescription(text).trim(),
 		setFailureReport: batchFailureReportStore.set,
 		describeApiError,
 	});
 	const demo = new DemoState({
 		apiFetch,
-		signedIn: () => currentUser !== null,
-		instructionLang: () => instructionLang,
+		signedIn: () => session.currentUser !== null,
+		instructionLang: () => work.instructionLang,
 		uiLang: getLang,
 		describeApiError,
 	});
 	const lineageState = new LineageQueryState(apiFetch);
+	const work = createWorkState({
+		apiFetch,
+		describeApiError,
+		session,
+		batch,
+		demo,
+		refinementSession,
+		history: () => history,
+		lineageState,
+		canvasViewport,
+		models: {
+			stage1Provider: () => stage1Provider,
+			stage1Model: () => stage1Model,
+			stage2Provider: () => stage2Provider,
+			stage2Model: () => stage2Model,
+			includeThinking: () => includeThinking,
+			available: () => availableModelCatalog
+		},
+		canvasAspectId: effectiveCanvasAspectId,
+		resetTargetScopedState,
+		ensureVisibleLineageParentId,
+		showCanvas: () => { outputTab = 'canvas'; },
+		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
+		displayLatestBatchRender,
+		pushHistory
+	});
 	const settings = createSettingsController({
 		apiFetch,
-		currentUser: () => currentUser,
-		setCurrentUser: (actor) => { currentUser = actor; },
+		currentUser: () => session.currentUser,
+		setCurrentUser: (actor) => session.setCurrentUser(actor),
 		loadAvailableModels,
-		refreshCurrentUserSettings,
+		refreshCurrentUserSettings: () => session.refreshCurrentUserSettings(),
 		loadExportTemplates,
 		cancelModelSelection: restoreModelSelection,
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
@@ -733,61 +583,6 @@
 		}
 	}
 
-	// The server holds the intent and the folder's name; the handle itself lives
-	// in this browser's IndexedDB, so the two are applied together on sign-in.
-	function applyDownloadFolderSettings(user: UserItem | null) {
-		downloadFolderSettings.applyUser(user);
-		void downloadFolderSettings.refresh();
-	}
-
-	async function updateDownloadFolder(update: { enabled?: boolean; name?: string | null }) {
-		if (!currentUser) return;
-		const previousUser = currentUser;
-		const body: Record<string, unknown> = {};
-		if (update.enabled !== undefined) body.download_folder_enabled = update.enabled;
-		if (update.name !== undefined) body.download_folder_name = update.name ?? '';
-		currentUser = {
-			...currentUser,
-			...(update.enabled !== undefined ? { download_folder_enabled: update.enabled } : {}),
-			...(update.name !== undefined ? { download_folder_name: update.name } : {}),
-		};
-		downloadFolderSettings.applyUser(currentUser);
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			downloadFolderSettings.applyUser(currentUser);
-		} catch (e) {
-			currentUser = previousUser;
-			downloadFolderSettings.applyUser(previousUser);
-			console.warn('failed to update the download folder setting', e);
-		}
-	}
-
-	async function chooseDownloadFolder() {
-		const name = await downloadFolderSettings.choose();
-		if (name === null) return;
-		await updateDownloadFolder({ enabled: true, name });
-	}
-
-	async function clearDownloadFolder() {
-		await downloadFolderSettings.clear();
-		await updateDownloadFolder({ enabled: false, name: null });
-	}
-
-	function applyUserTheme(user: UserItem | null) {
-		// No stored preference (signed out, or a row without one) follows the
-		// release default rather than falling back to light.
-		darkMode = (user?.ui_theme ?? 'dark') === 'dark';
-	}
-
 	function modelsFor(provider: Provider) {
 		const group = availableModelCatalog.find((item) => item.id === provider);
 		if (group) return group.models;
@@ -816,11 +611,11 @@
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
 		instructionCaptionVisible = visible;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { instruction_caption_visible: visible } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
@@ -829,7 +624,7 @@
 		if (!nextModel || nextModel === okugakiModel) return;
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -837,7 +632,7 @@
 				body: JSON.stringify({ model_settings: { okugaki_provider: provider, okugaki_model: model.trim() } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) {
 			okugakiModel = previous;
 			console.warn('failed to save okugaki model', e);
@@ -852,7 +647,7 @@
 		const prevModel = visionModel;
 		visionProvider = provider;
 		visionModel = model;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -860,7 +655,7 @@
 				body: JSON.stringify({ model_settings: { vision_provider: provider, vision_model: model } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) {
 			visionProvider = prevProvider;
 			visionModel = prevModel;
@@ -889,7 +684,7 @@
 		else if (conditions.catalogId) colorCatalogSettings.selected = conditions.catalogId;
 		// Not conditional: a work with no prose was drawn with the layer off, and
 		// leaving the switch where it is would resume under other conditions.
-		sketchMode = sketchModeOf(conditions.sketchGrain);
+		work.sketchMode = sketchModeOf(conditions.sketchGrain);
 		if (conditions.wild !== null) wildSettings.set(conditions.wild);
 		if (conditions.canvasAspectId) canvasAspectId = normalizeCanvasAspectId(conditions.canvasAspectId);
 	}
@@ -897,17 +692,17 @@
 	async function resumeInterruptedBatch() {
 		try {
 			await batch.resumeInterrupted({
-				blocked: () => loading || refinementSession.gridBusy,
+				blocked: () => work.loading || refinementSession.gridBusy,
 				applyConditions: applyBatchRunConditions,
-				run: (lines) => submit({ resumeLines: lines }),
+				run: (lines) => work.submit({ resumeLines: lines }),
 			});
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			work.error = e instanceof Error ? e.message : String(e);
 		}
 	}
 
 	async function loadPluginStorage() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			return;
 		}
@@ -934,7 +729,7 @@
 	}
 
 	async function saveCanvasAspectPluginValue() {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
 				method: 'PUT',
@@ -948,12 +743,12 @@
 	}
 
 	async function setCanvasAspectEnabled(value: boolean) {
-		if (!isAdmin) return;
+		if (!session.isAdmin) return;
 		canvasAspectEnabled = value;
 		canvasAspectMenuOpen = false;
 		if (!value) {
-			result = null;
-			displayedHistoryItem = null;
+			work.result = null;
+			work.displayedHistoryItem = null;
 			history.clearSelection();
 			outputTab = 'canvas';
 			exportMenuOpen = false;
@@ -963,7 +758,7 @@
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
-		if (!isAdmin) return;
+		if (!session.isAdmin) return;
 		const nextAspectId = normalizeCanvasAspectId(id);
 		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
@@ -971,14 +766,14 @@
 			await saveCanvasAspectPluginValue();
 			return;
 		}
-		const existingPending = pendingCanvasAspectDerivation;
+		const existingPending = work.pendingCanvasAspectDerivation;
 		const parentNodeId = existingPending?.parentNodeId ?? await ensureVisibleLineageParentId();
-		pendingCanvasAspectDerivation = parentNodeId
+		work.pendingCanvasAspectDerivation = parentNodeId
 			? { parentNodeId, fromAspectId: existingPending?.fromAspectId ?? currentAspectId, toAspectId: nextAspectId }
 			: null;
 		canvasAspectId = nextAspectId;
-		result = null;
-		displayedHistoryItem = null;
+		work.result = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		outputTab = 'canvas';
 		exportMenuOpen = false;
@@ -987,7 +782,7 @@
 	}
 
 	async function loadExportTemplates() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 			exportTemplateStatus = null;
 			return;
@@ -1010,7 +805,7 @@
 		const next = normalizeExportTemplates(nextTemplates);
 		exportTemplates = next;
 		exportTemplateStatus = null;
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/export-templates', {
 				method: 'PUT',
@@ -1048,133 +843,6 @@
 		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
-	async function updateUiTheme(nextDarkMode: boolean) {
-		if (!currentUser) return;
-		const previousDarkMode = darkMode;
-		const previousUser = currentUser;
-		darkMode = nextDarkMode;
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ui_theme: nextDarkMode ? 'dark' : 'light' })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-		} catch (e) {
-			currentUser = previousUser;
-			darkMode = previousDarkMode;
-			console.warn('failed to update UI theme', e);
-		}
-	}
-
-	async function updateUiMode(nextMode: UiMode, nextCustom: UiCustomVisibility = uiCustom) {
-		if (!currentUser || uiModeSaving) return;
-		const previousUser = currentUser;
-		const normalizedCustom = nextMode === 'simple' ? {} : normalizeUiCustom(nextCustom);
-		uiModeSaving = true;
-		uiModeSaveError = false;
-		currentUser = { ...currentUser, ui_mode: nextMode, ui_custom: normalizedCustom };
-		const nextVisibility = resolveUiVisibility(nextMode, normalizedCustom);
-		if (!nextVisibility.input_modes) inputMode = 'single';
-		if (!nextVisibility.work_tools) outputTab = 'canvas';
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ui_mode: nextMode, ui_custom: normalizedCustom })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			const savedCustom = normalizeUiCustom(updatedUser.ui_custom);
-			const customMatches = UI_VISIBILITY_KEYS.every((key) => savedCustom[key] === normalizedCustom[key]);
-			if (updatedUser.ui_mode !== nextMode || !customMatches) {
-				throw new Error('UI mode settings were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			uiModeSaveError = true;
-			console.warn('failed to update UI mode', e);
-		} finally {
-			uiModeSaving = false;
-		}
-	}
-
-	/** Save which facts the strip prints, and check the server kept them.
-	 *
-	 *  The saved value is compared field by field rather than by length: an
-	 *  empty list is a legitimate answer, and a length check would read the
-	 *  server dropping the key and the reader asking for nothing as the same
-	 *  thing. */
-	async function updateHistoryStripFields(next: HistoryStripField[]) {
-		if (!currentUser || historyStripFieldsSaving) return;
-		const previousUser = currentUser;
-		historyStripFieldsSaving = true;
-		historyStripFieldsSaveError = false;
-		currentUser = { ...currentUser, history_strip_fields: next };
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ history_strip_fields: next })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			const saved = normalizeHistoryStripFields(updatedUser.history_strip_fields);
-			if (saved.length !== next.length || saved.some((field, index) => field !== next[index])) {
-				throw new Error('history strip fields were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			historyStripFieldsSaveError = true;
-			console.warn('failed to update history strip fields', e);
-		} finally {
-			historyStripFieldsSaving = false;
-		}
-	}
-
-	async function updateTooltipsEnabled(enabled: boolean) {
-		if (!currentUser) return;
-		const previousUser = currentUser;
-		currentUser = { ...currentUser, tooltips_enabled: enabled };
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tooltips_enabled: enabled })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const updatedUser = await r.json() as UserItem;
-			if (updatedUser.tooltips_enabled !== enabled) {
-				throw new Error('Tooltip settings were not persisted by the server');
-			}
-			currentUser = updatedUser;
-		} catch (e) {
-			currentUser = previousUser;
-			console.warn('failed to update tooltip settings', e);
-		}
-	}
-
-	function updateUiCustomItem(key: UiVisibilityKey, visible: boolean) {
-		void updateUiMode('custom', { ...uiCustom, [key]: visible });
-	}
-
 	function openModelSelection(allowVision = true) {
 		modelSelectionAllowVision = allowVision;
 		modelSelectionSnapshot = { stage1Provider, stage1Model, stage2Provider, stage2Model, visionProvider, visionModel };
@@ -1182,8 +850,8 @@
 	}
 
 	async function persistModelSelection() {
-		if (!currentUser) return;
-		const previousUser = currentUser;
+		if (!session.currentUser) return;
+		const previousUser = session.currentUser;
 		// What the page owns; the features add their own fields to the save.
 		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
@@ -1207,10 +875,11 @@
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(describeApiError(d.detail, r.status));
 			}
-			currentUser = await r.json() as UserItem;
-			applyUserModelSettings(currentUser);
+			const actor = await r.json() as UserItem;
+			session.setCurrentUser(actor);
+			applyUserModelSettings(actor);
 		} catch (e) {
-			currentUser = previousUser;
+			session.setCurrentUser(previousUser);
 			console.warn('failed to update model selection', e);
 		}
 	}
@@ -1245,11 +914,11 @@
 	// The selection rides in the user's model_settings: a drawing needs a session,
 	// so a browser-wide value would only ever be the wrong user's.
 	async function persistColorCatalogSelection(selected: string) {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save color catalog selection', e); }
 	}
 	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
@@ -1259,11 +928,11 @@
 	// A failed save leaves the fold as the user just set it -- it is a view
 	// state, and refolding it under them would be worse than forgetting it.
 	async function persistDescribePanelFolds(fields: Record<string, boolean>) {
-		if (!currentUser) return;
+		if (!session.currentUser) return;
 		try {
 			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
+			session.setCurrentUser(await r.json() as UserItem);
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
@@ -1301,7 +970,7 @@
 	}
 
 	async function loadAvailableModels() {
-		if (!currentUser) {
+		if (!session.currentUser) {
 			availableModelsLoaded = false;
 			return;
 		}
@@ -1313,7 +982,7 @@
 			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
-				applyUserModelSettings({ ...currentUser, model_settings: data.settings.model_settings });
+				applyUserModelSettings({ ...session.currentUser, model_settings: data.settings.model_settings });
 			}
 			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
@@ -1339,26 +1008,6 @@
 			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
-		}
-	}
-
-	// This request clock belongs to the page's session actor. Administration
-	// lists have a separate clock in the Settings owner, which awaits this refresh.
-	async function refreshCurrentUserSettings(): Promise<boolean> {
-		const requestId = ++currentUserSettingsRequestId;
-		try {
-			const meResponse = await apiFetch('/api/auth/me', { cache: 'no-store' });
-			if (!meResponse.ok) throw new Error(t().loginRequiredMessage);
-			const actor = await meResponse.json() as UserItem;
-			if (requestId !== currentUserSettingsRequestId) return false;
-			currentUser = actor;
-			applyUserTheme(actor);
-			applyDownloadFolderSettings(actor);
-			applyUserModelSettings(actor);
-			authToken = 'cookie';
-			return true;
-		} catch {
-			return false;
 		}
 	}
 
@@ -1429,155 +1078,35 @@
 		}
 	}
 
-	async function loadCurrentUser() {
-		try {
-			const r = await apiFetch('/api/auth/me');
-			if (!r.ok) throw new Error('session expired');
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-			applyUserModelSettings(currentUser);
-			authToken = 'cookie';
-			loginStatus = null;
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
-			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
-			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
-			if (historyItems.length > 0) loadIteration(0);
-		} catch {
-			authToken = null;
-			currentUser = null;
-			applyUserTheme(null);
-			batch.clearPromptHistory();
-			demo.resetForSignedOut();
-			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
-			exportTemplateStatus = null;
-			canvasAspectEnabled = true;
-			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-			loginStatus = null;
-			settings.resetForLoggedOut();
-			history.clear();
-		}
+	async function completeAuthentication(source: 'resume' | 'login'): Promise<void> {
+		if (source === 'login') history.clear();
+		await Promise.all([
+			loadAvailableModels(),
+			settings.userAdministration.load(),
+			settings.loadStatus(),
+			batch.loadPromptHistory(),
+			demo.loadSettings(),
+			loadPluginStorage(),
+			loadPluginVocabulary(),
+			loadExportTemplates(),
+			loadClientConfig(),
+			...(source === 'login' ? [loadColorCatalogs(), fetchPrompts()] : [])
+		]);
+		demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
+		await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
+		if (historyItems.length > 0) loadIteration(0);
 	}
 
-	async function login() {
-		loginStatus = null;
-		try {
-			const r = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'same-origin',
-				body: JSON.stringify({ username: loginUserName, password: loginPassword })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const data = await r.json() as { user: UserItem };
-			authToken = 'cookie';
-			currentUser = data.user;
-			applyUserTheme(data.user);
-			applyUserModelSettings(data.user);
-			loginStatus = null;
-			history.clear();
-			loginPassword = '';
-			// loadColorCatalogs and fetchPrompts ride here because I-086 put both
-			// endpoints behind the guard. The startup fetch runs before anyone has
-			// logged in and now gets a 401, so without reading them again the
-			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
-			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
-			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
-			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
-			if (historyItems.length > 0) loadIteration(0);
-		} catch (e) {
-			const message = e instanceof Error ? e.message : String(e);
-			loginStatus = message;
-		}
-	}
-
-	async function logout() {
-		if (currentUser || authToken) {
-			try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-		}
+	function resetAfterSignedOut(): void {
 		userMenuOpen = false;
-		profileOpen = false;
-		authToken = null;
-		currentUser = null;
-		uiModeSaveError = false;
-		applyUserTheme(null);
 		batch.clearPromptHistory();
 		demo.resetForSignedOut();
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
 		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
-		loginStatus = null;
 		settings.resetForLoggedOut();
 		history.clear();
-	}
-
-	function openProfile() {
-		if (!currentUser) return;
-		profileEmail = currentUser.email;
-		profileCurrentPassword = '';
-		profileNewPassword = '';
-		profileStatus = null;
-		profileOpen = true;
-		userMenuOpen = false;
-	}
-
-	function closeProfile() {
-		if (profileSaving) return;
-		profileOpen = false;
-		profileCurrentPassword = '';
-		profileNewPassword = '';
-	}
-
-	async function saveProfile() {
-		if (!currentUser) return;
-		const email = profileEmail.trim();
-		if (!email) {
-			profileStatus = t().userValidationUpdate;
-			return;
-		}
-		if (profileNewPassword && profileNewPassword.length < 8) {
-			profileStatus = t().userPasswordTooShort;
-			return;
-		}
-		if (profileNewPassword && !profileCurrentPassword) {
-			profileStatus = t().profileCurrentPasswordRequired;
-			return;
-		}
-		profileSaving = true;
-		profileStatus = null;
-		try {
-			const body: { email: string; password?: string; current_password?: string } = { email };
-			if (profileNewPassword) {
-				body.password = profileNewPassword;
-				body.current_password = profileCurrentPassword;
-			}
-			const r = await apiFetch('/api/auth/me/profile', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body),
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-			profileEmail = currentUser.email;
-			profileCurrentPassword = '';
-			profileNewPassword = '';
-			profileStatus = t().profileSavedMessage;
-			await settings.userAdministration.load();
-		} catch (e) {
-			profileStatus = e instanceof Error ? e.message : String(e);
-		} finally {
-			profileSaving = false;
-		}
 	}
 
 	// ── Export filenames ────────────────────────────────────
@@ -1599,36 +1128,19 @@
 	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
 	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
 	let includeThinking = $state(false);
-
-	// ── Timer ───────────────────────────────────────────────
-	let elapsedStage1Ms = $state(0);
-	let elapsedStage2Ms = $state(0);
-	let elapsedTotalMs  = $state(0);
-	let liveMs          = $state(0);
-	let _timerStart     = 0;
-	let _timerHandle: ReturnType<typeof setInterval> | null = null;
-
-	// ── Tokens ──────────────────────────────────────────────
-	let tokensInStage1  = $state<number | null>(null);
-	let tokensOutStage1 = $state<number | null>(null);
-	let tokensInStage2  = $state<number | null>(null);
-	let tokensOutStage2 = $state<number | null>(null);
-
-	// ── History ─────────────────────────────────────────────
-	let displayedHistoryItem = $state<Iteration | null>(null);
 	$effect(() => {
-		const historyId = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id ?? null;
 		void lineageState.loadNearby(historyId);
 	});
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const history = new HistoryBrowsingState({
 		apiFetch,
-		signedIn: () => !!authToken,
-		drawing: () => loading,
+		signedIn: () => !!session.authToken,
+		drawing: () => work.loading,
 		visible: () => document.visibilityState === 'visible',
 		navigationLocked: () => demoRunning,
-		currentHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? null,
-		currentItem: () => displayedHistoryItem,
+		currentHistoryId: () => work.displayedHistoryItem?.id ?? work.result?.history_id ?? null,
+		currentItem: () => work.displayedHistoryItem,
 		managerPageSize: estimatedHistoryManagerPageSize,
 		onStarredFilterCleared: showHistoryStarredFilterClearedNotice,
 		onOtherFilterCleared: showHistoryForRevisionFilterClearedNotice
@@ -1636,10 +1148,10 @@
 	const historyManager = history.manager;
 	const historyMutations = new HistoryMutations({
 		apiFetch,
-		signedIn: () => !!authToken,
+		signedIn: () => !!session.authToken,
 		browsing: history,
-		currentItem: () => displayedHistoryItem,
-		setCurrentItem: (item) => { displayedHistoryItem = item; },
+		currentItem: () => work.displayedHistoryItem,
+		setCurrentItem: (item) => { work.displayedHistoryItem = item; },
 		applyLineageStarState: (item) => lineageState.applyStarState(item),
 		applyLineageForRevisionState: (item) => lineageState.applyForRevisionState(item),
 		applyLineageForShareState: (item) => lineageState.applyForShareState(item),
@@ -1647,8 +1159,8 @@
 		reloadLineage: (nodeId) => lineageState.load(nodeId, true),
 		displayCurrentItem: loadIterationItem,
 		clearCurrentWork: () => {
-			displayedHistoryItem = null;
-			result = null;
+			work.displayedHistoryItem = null;
+			work.result = null;
 		}
 	});
 	const toggleHistoryStar = historyMutations.toggleStar;
@@ -1676,703 +1188,7 @@
 	const batchSketchGrainLabel = $derived(
 		sketchModeLabel(sketchModeOf(batch.sketchGrain), getLang() === 'ja')
 	);
-	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(demo.running);
-	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
-	// The gate reads what the drawing reads.  The meter already cut the text
-	// (InputPanel), so a description greyed out end to end must not be sendable:
-	// the same rule, moved to the door instead of a second rule written here.
-	const canSubmit     = $derived(
-		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batch.nonEmpty > 0 : false
-	);
-	const currentInstructionText = $derived.by(() => {
-		if (displayedHistoryItem?.input) return displayedHistoryItem.input;
-		if (inputMode === 'demo' || activeRunMode === 'demo') return demo.generatedPrompt;
-		if (inputMode === 'batch' || activeRunMode === 'batch') return batch.latestPrompt;
-		return input;
-	});
-
-	// v1.98: Whether Stage 1 failed and the work used fallback DDL.
-	const interpretFallbackReason = $derived(
-		displayedHistoryItem
-			? (displayedHistoryItem.interpret_fallback ?? null)
-			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
-	);
-
-	// Stage 2's counterpart, read the same two ways: a saved work has a column,
-	// a work still on the canvas has only the response it was drawn by.
-	const composeFallbackRaw = $derived(
-		displayedHistoryItem
-			? (displayedHistoryItem.compose_fallback ?? null)
-			: (result ? composeFallbackValue(result) : null)
-	);
-	const composeFallbackDrawnReason = $derived(composeFallbackReason(composeFallbackRaw));
-	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
-
-	// Which works this screen has already asked about. Kept here and not on the
-	// server: the question is about this sitting, not about the work (contract
-	// §5-7). See $lib/fallbackRefineGate.
-	const fallbackRefineAsked = new Set<string>();
-
-	/** The work a refinement started from the canvas would descend from.
-	 *  Built from the same two derivations the badges read, so the dialog and
-	 *  the mark can never disagree about whether the words were lost. */
-	function currentRefineParent(): FallbackRefineParent {
-		return {
-			id: displayedHistoryItem?.id ?? result?.history_id ?? null,
-			interpret_fallback: interpretFallbackReason,
-			compose_fallback: composeFallbackRaw
-		};
-	}
-
-	/** Whether the next drawing from the input panel would hang under a parent.
-	 *  Detached, or with nothing on the canvas, it is a new work rather than a
-	 *  refinement, and nothing is being carried forward to ask about. Mirrors
-	 *  the parent expression submit() and replay() compute for themselves. */
-	function submitWouldRefine(): boolean {
-		const parentNodeId = pendingCanvasAspectDerivation?.parentNodeId
-			?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
-		return parentNodeId !== null;
-	}
-
-	/** Ask before refining from a work drawn by a fallback, and wait for the
-	 *  answer. Resolves true when the refinement may go ahead -- which is
-	 *  immediately, and without a dialog, for every unmarked work. */
-	function confirmFallbackRefine(parent: FallbackRefineParent): Promise<boolean> {
-		if (!needsFallbackRefineConfirm(parent, fallbackRefineAsked)) return Promise.resolve(true);
-		return new Promise((resolve) => {
-			confirmAction = {
-				message: t().confirmRefineFromFallbackMessage,
-				runLabel: t().confirmRefineFromFallbackContinue,
-				run: () => { rememberFallbackRefineConfirm(parent, fallbackRefineAsked); resolve(true); },
-				cancelRun: () => resolve(false)
-			};
-		});
-	}
-
-	// Standalone DDL-authored artworks have no instruction; gate instruction-only refine paths.
-	const statusDdlOrigin = $derived((displayedHistoryItem?.display_label ?? null) === DDL_ORIGIN_LABEL);
-
-	// ── Running-indicator state ─────────────────────────────
-	// Tokens confirmed by the stage1 event of the paint currently in flight.
-	// Cleared when that paint finishes; completed runs are folded into the
-	// per-flow totals below.
-	let activeRunTokensIn = $state<number | null>(null);
-	let activeRunTokensOut = $state<number | null>(null);
-
-	// Model names shown by every running indicator, provider first.
-	const stage1ModelLabel = $derived(
-		modelDisplayName(qualifiedModelId(stage1Provider, stage1Model), availableModelCatalog, stage1Provider)
-	);
-	const stage2ModelLabel = $derived(
-		modelDisplayName(qualifiedModelId(stage2Provider, stage2Model), availableModelCatalog, stage2Provider)
-	);
-
-	// Flows that issue several paints per run keep their own running totals.
-	function addTokens(total: number | null, delta: number | null | undefined): number | null {
-		if (delta === null || delta === undefined) return total;
-		return (total ?? 0) + delta;
-	}
-
-	function paintTokensIn(r: PaintResult): number | null {
-		return addTokens(r.tokens_in_stage1 ?? null, r.tokens_in_stage2);
-	}
-
-	function paintTokensOut(r: PaintResult): number | null {
-		return addTokens(r.tokens_out_stage1 ?? null, r.tokens_out_stage2);
-	}
-
-	// ── Timer ───────────────────────────────────────────────
-	function startTimer() {
-		_timerStart = Date.now();
-		liveMs = 0;
-		_timerHandle = setInterval(() => {
-			const now = Date.now();
-			liveMs = now - _timerStart;
-			demo.updateLiveTime(now);
-		}, 100);
-	}
-	function stopTimer() {
-		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
-	}
-
-async function requestVisionRefineAdvice(historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) {
-	const r = await apiFetch('/api/refine/vision-advice', {
-		method: 'POST',
-		signal,
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ history_id: historyId, model, instruction, direction, enabled_kinds: enabledKinds, language: getLang() })
-	});
-	if (!r.ok) {
-		const data = await r.json().catch(() => ({})) as { detail?: unknown };
-		throw new Error(describeApiError(data.detail, r.status));
-	}
-	return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string };
-}
-
-	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null } & PaintResult> {
-		return runCurrentWork(
-			text,
-			options,
-			{
-				uiLang: getLang(),
-				strings: t(),
-				// Resolve page settings before crossing the feature boundary. A
-				// caller's one-run override still wins inside the coordinator.
-				stage1Model: qualifiedModelId(stage1Provider, stage1Model),
-				stage2Model: qualifiedModelId(stage2Provider, stage2Model),
-				includeThinking,
-				instructionLang,
-				canvasAspectId: effectiveCanvasAspectId(),
-				ddlAutoRepairEnabled,
-				sketchMode,
-				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
-			},
-			{
-				apiFetch,
-				describeApiError,
-				setStage1UserPrompt: (prompt) => { stage1UserPrompt = prompt; },
-				setStageLabel: (label) => { stageLabel = label; },
-				setActiveRunTokens: (tokensIn, tokensOut) => {
-					activeRunTokensIn = tokensIn;
-					activeRunTokensOut = tokensOut;
-				},
-				loadNearbyHistory: lineageState.loadNearby,
-				attachSavedLineage: () => { lineageDetached = false; },
-				updateGenerationCount: (count) => {
-					if (currentUser) {
-						currentUser = { ...currentUser, image_generation_count: count };
-					}
-				}
-			}
-		);
-	}
-
-	type InterpretResult = {
-		ddl: string;
-		thinking: string | null;
-		tokens_in: number | null;
-		tokens_out: number | null;
-	};
-
-	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
-		const uiLang = getLang();
-		stage1UserPrompt = text;
-		const resolvedStage1Model = modelOverride ?? qualifiedModelId(stage1Provider, stage1Model);
-		const r = await apiFetch('/api/interpret', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				description: text,
-				...(sketchTextFor(text) ? { sketch_text: sketchTextFor(text) } : {}),
-				model: resolvedStage1Model,
-				include_thinking: includeThinking,
-				instruction_lang: langOverride ?? instructionLang,
-				ui_lang: uiLang,
-				expand_intermediate: true,
-			})
-		});
-		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown };
-			throw new Error(describeApiError(d.detail, r.status));
-		}
-		const data = await r.json() as {
-			ddl: string;
-			thinking: string | null;
-			tokens_in?: number | null;
-			tokens_out?: number | null;
-		};
-		return {
-			ddl: data.ddl,
-			thinking: data.thinking,
-			tokens_in: data.tokens_in ?? null,
-			tokens_out: data.tokens_out ?? null,
-		};
-	}
-
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides } = {}): Promise<{
-		score: Score;
-		svg: string;
-		// Expanded DDL passed to Stage 2 (v1.98).
-		ddl?: string | null;
-		source_ddl?: string | null;
-		stage2_model?: string | null;
-		render_build_number?: string | null;
-		render_color_profile?: Record<string, string> | null;
-		render_engine_id?: string | null;
-		render_engine_version?: string | null;
-		render_hash?: string | null;
-		render_hash_short?: string | null;
-		render_color_catalog_id?: string | null;
-		render_color_catalog_name?: string | null;
-		render_color_catalog_sub?: string | null;
-		render_color_map?: Record<string, string> | null;
-		render_canvas_aspect?: string | null;
-		render_canvas_aspect_id?: string | null;
-		render_canvas_aspect_ratio?: number | null;
-		render_seed?: number | null;
-		render_wild?: boolean | null;
-		composition_seed?: number | null;
-		instruction_lang_requested?: string | null;
-		instruction_lang_resolved?: string | null;
-		ui_lang?: string | null;
-		elapsed_ms: number;
-		tokens_in: number | null;
-		tokens_out: number | null;
-		sketch_text?: string | null;
-		sketch_grain?: string | null;
-		sketch_state?: string | null;
-	}> {
-		const uiLang = getLang();
-		const resolvedStage2Model = modelOverride ?? qualifiedModelId(stage2Provider, stage2Model);
-		const r = await apiFetch('/api/compose', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				ddl: currentDdl,
-				model: resolvedStage2Model,
-				description: originalText,
-				...sketchPayloadFor(originalText),
-				instruction_lang: langOverride ?? instructionLang,
-				ui_lang: uiLang,
-				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
-				auto_repair: ddlAutoRepairEnabled,
-				...renderSettingsPayload('compose', renderOptions.renderOverrides),
-				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
-			})
-		});
-		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown };
-			throw new Error(describeApiError(d.detail, r.status));
-		}
-		const data = await r.json() as {
-			score: Score;
-			svg: string;
-			stage2_model?: string | null;
-			render_build_number?: string | null;
-			render_color_profile?: Record<string, string> | null;
-			render_engine_id?: string | null;
-			render_engine_version?: string | null;
-			render_hash?: string | null;
-			render_hash_short?: string | null;
-			render_color_catalog_id?: string | null;
-			render_color_catalog_name?: string | null;
-			render_color_catalog_sub?: string | null;
-			render_color_map?: Record<string, string> | null;
-			render_canvas_aspect?: string | null;
-			render_canvas_aspect_id?: string | null;
-			render_canvas_aspect_ratio?: number | null;
-			render_seed?: number | null;
-			render_wild?: boolean | null;
-			composition_seed?: number | null;
-			elapsed_ms: number;
-			tokens_in: number | null;
-			tokens_out: number | null;
-		};
-		return data;
-	}
-
-	async function startDemo() {
-		if (loading || refinementSession.gridBusy) return;
-		clearInput();
-		error = null;
-		displayedHistoryItem = null;
-		activeRunMode = 'demo';
-		loading = true;
-		startTimer();
-		await demo.start({
-			canvasAspectId: effectiveCanvasAspectId,
-			// Demo follows the catalog modal, including "from the description";
-			// it has no separate catalog or wild-mode setting of its own.
-			renderOverrides: () => ({
-				...colorCatalogOverride(colorCatalogSettings.selected),
-				...wildOverride(false),
-			}),
-			paintInstruction: (prompt, paintOptions) => paintOne(prompt, paintOptions),
-			onLatestResult: (painted) => {
-				const sourceDdl = painted.source_ddl ?? painted.ddl;
-				ddl = sourceDdl;
-				expandedDdl = painted.ddl;
-				ddlGeneratedBaseline = sourceDdl;
-				thinking = painted.thinking;
-				result = painted;
-				outputTab = 'canvas';
-				canvasViewport.fit();
-				elapsedStage1Ms = painted.elapsed_stage1_ms;
-				elapsedStage2Ms = painted.elapsed_stage2_ms;
-				elapsedTotalMs = painted.elapsed_total_ms;
-				tokensInStage1 = painted.tokens_in_stage1;
-				tokensOutStage1 = painted.tokens_out_stage1;
-				tokensInStage2 = painted.tokens_in_stage2;
-				tokensOutStage2 = painted.tokens_out_stage2;
-			},
-			onRunFinished: () => {
-				stopTimer();
-				loading = false;
-				activeRunMode = null;
-				stageLabel = '';
-			},
-			refreshAfterServerSave: () => history.refreshAfterServerSave(),
-			refreshAfterRun: () => history.refreshAfterRun(),
-		});
-	}
-
-	function stopDemo() {
-		demo.stop();
-		loading = false;
-		activeRunMode = null;
-		stageLabel = '';
-		stopTimer();
-	}
-
-	// ── Submit ──────────────────────────────────────────────
-	function requestSubmit() {
-		if (inputMode === 'single' && ddlEditedAfterGeneration && !loading && !reloading) {
-			confirmAction = {
-				message: t().confirmDdlOverwriteMessage,
-				runLabel: t().confirmOk,
-				hideCancel: false,
-				run: () => { void submit(); },
-				secondaryLabel: t().ddlPaintButton,
-				secondaryRun: () => { void replay(); },
-			};
-			return;
-		}
-		void submit();
-	}
-
-	/**
-	 * `resumeLines` finishes a batch that stopped part-way: the lines it names are
-	 * painted in place of the whole box, each keeping the number the prompt gave
-	 * it. Everything else about the run is unchanged.
-	 */
-	async function submit(options: { resumeLines?: NumberedLine[] } = {}) {
-		if (!canSubmit || loading || refinementSession.gridBusy) return;
-		// Ask before resetTargetScopedState and before any intermediate save.
-		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
-		resetTargetScopedState();
-		try {
-			await ensureVisibleLineageParentId();
-		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
-			return;
-		}
-
-		if (inputMode === 'batch') {
-			await submitBatch(options);
-			return;
-		}
-		if (inputMode !== 'single') return;
-
-		const abortController = new AbortController();
-		submitAbortController = abortController;
-		submitStopRequested = false;
-		const canvasAspectDerivation = pendingCanvasAspectDerivation;
-		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
-		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
-		const submitTextChanged = input.trim() !== submitSource.trim();
-		// Sketching (Stage 0.5). The grain edge fires only when the grain differs from
-		// the parent's, exactly as description_edit fires only when the text does;
-		// one edge, one cause, so a changed description stays a description edit.
-		const submitParentGrain = normalizeSketchGrain(displayedHistoryItem?.sketch_grain);
-		const submitGrain = sketchGrainOf(sketchMode);
-		const submitGrainChanged = submitGrain !== submitParentGrain;
-		const submitDerivationKind: DerivationKind | null = submitDerivationKindOf({
-			hasParent: submitParentNodeId !== null,
-			canvasAspectChanged: canvasAspectDerivation !== null,
-			textChanged: submitTextChanged,
-			grainChanged: submitGrainChanged
-		});
-		// A redraw at the same grain replays the prose it was painted from; the
-		// layer is not deterministic, so calling it again would not be a replay.
-		// An edited prose wins over the stored one, and a changed grain has to be
-		// written anew.
-		const sketchEdited = sketchDraft.trim() !== '' && sketchDraft.trim() !== (sketchText ?? '').trim();
-		const submitSketchText = sketchEdited
-			? sketchDraft.trim()
-			: (!submitTextChanged && !submitGrainChanged ? sketchText : null);
-		const submitDerivationMetadata = canvasAspectDerivation
-			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
-			: {};
-
-		loading = true; error = null;
-		activeRunMode = 'single';
-		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
-		displayedHistoryItem = null;
-		history.clearSelection();
-		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
-		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		startTimer();
-
-		try {
-			stageLabel = t().stageDdlGenerating;
-			const r = await paintOne(input, {
-				sourceText: input,
-				canvasAspectId: effectiveCanvasAspectId(),
-				lineageParentNodeId: submitParentNodeId,
-				sketchText: submitSketchText,
-				derivationKind: submitDerivationKind,
-				derivationMetadata: submitDerivationMetadata,
-				signal: abortController.signal,
-				onStage1: (stage1) => {
-					elapsedStage1Ms = stage1.elapsed_ms;
-					tokensInStage1 = stage1.tokens_in;
-					tokensOutStage1 = stage1.tokens_out;
-					ddl = stage1.ddl;
-					expandedDdl = null;
-					ddlGeneratedBaseline = stage1.ddl;
-					thinking = stage1.thinking;
-					stageLabel = t().stageImageGenerating;
-					reloading = true;
-				}
-			});
-			if (submitStopRequested) return;
-			reloading = false;
-			elapsedStage1Ms = r.elapsed_stage1_ms;
-			elapsedStage2Ms = r.elapsed_stage2_ms;
-			elapsedTotalMs = r.elapsed_total_ms;
-			tokensInStage1 = r.tokens_in_stage1;
-			tokensOutStage1 = r.tokens_out_stage1;
-			tokensInStage2 = r.tokens_in_stage2;
-			tokensOutStage2 = r.tokens_out_stage2;
-			ddl = r.source_ddl ?? r.ddl;
-			expandedDdl = r.ddl;
-			ddlGeneratedBaseline = ddl;
-			thinking = r.thinking;
-			result = r; outputTab = 'canvas';
-			adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
-			canvasViewport.fit();
-			if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
-				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
-				lineageDetached = false;
-				await history.fetchOffset(0, { anchorId: r.history_id });
-				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
-			}
-		} catch (cause) {
-			if (!(submitStopRequested || abortController.signal.aborted)) {
-				error = cause instanceof Error ? cause.message : String(cause);
-				result = null;
-			}
-		} finally {
-			if (submitAbortController === abortController) submitAbortController = null;
-			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = '';
-		}
-	}
-
-	async function submitBatch(options: { resumeLines?: NumberedLine[] }): Promise<void> {
-		const batchCanvasAspectId = effectiveCanvasAspectId();
-		const batchCatalogId = colorCatalogSettings.selected;
-		loading = true; error = null;
-		activeRunMode = 'batch';
-		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
-		displayedHistoryItem = null;
-		history.clearSelection();
-		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
-		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		outputTab = 'canvas';
-		startTimer();
-
-		try {
-			await batch.run({
-				resumeLines: options.resumeLines,
-				canvasAspectId: batchCanvasAspectId,
-				renderOverrides: colorCatalogOverride(batchCatalogId),
-				maxRetries: batchSettings.maxRetries,
-				paintLine: (text, paintOptions) => paintOne(text, paintOptions),
-				onLatestResult: (painted) => {
-					thinking = painted.thinking;
-					if (inputMode === 'batch' && batch.autoFollowLatest) displayLatestBatchRender();
-				},
-				onPaintComplete: () => { elapsedTotalMs = Date.now() - _timerStart; },
-				refreshAfterServerSave: () => history.refreshAfterServerSave(),
-				refreshAfterRun: () => history.refreshAfterRun(),
-			});
-		} catch (cause) {
-			if (!batch.interrupted) {
-				error = cause instanceof Error ? cause.message : String(cause);
-				result = null;
-			}
-		} finally {
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = '';
-		}
-	}
-
-	function stopBatch() {
-		if (activeRunMode === 'batch') {
-			batch.stop();
-			return;
-		}
-		if (activeRunMode !== 'single') return;
-		submitStopRequested = true;
-		submitAbortController?.abort();
-	}
-	function stopReplay() {
-		if (!reloading) return;
-		replayStopRequested = true;
-		replayAbortController?.abort();
-	}
-
-	function stopDdlRender() {
-		if (replayAbortController) {
-			stopReplay();
-			return;
-		}
-		stopBatch();
-	}
-
-	// ── Replay (Stage 2 only) ───────────────────────────────
-	async function replay() {
-		if (!ddl || reloading) return;
-		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
-		resetTargetScopedState();
-		try {
-			await ensureVisibleLineageParentId();
-		} catch (cause) {
-			reloadError = cause instanceof Error ? cause.message : String(cause);
-			return;
-		}
-		const canvasAspectDerivation = pendingCanvasAspectDerivation;
-		const replayParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
-		const replayKind: DerivationKind | null = canvasAspectDerivation
-			? 'canvas_aspect_change'
-			: replayParentNodeId ? (ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline ? 'ddl_edit' : 'replay') : null;
-		const replayDerivationMetadata = canvasAspectDerivation
-			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
-			: {};
-		const abortController = new AbortController();
-		replayAbortController = abortController;
-		replayStopRequested = false;
-		reloading = true; reloadError = null;
-		displayedHistoryItem = null;
-		history.clearSelection();
-		const uiLang = getLang();
-		const replayInput = input;
-		const startedAt = Date.now();
-		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
-		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		stageLabel = t().stageStructuring('');
-		startTimer();
-		try {
-			const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
-			const r = await apiFetch('/api/compose', {
-				method: 'POST',
-				signal: abortController.signal,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					ddl,
-					model: resolvedStage2Model,
-					description: replayInput,
-					...sketchPayloadFor(replayInput),
-					instruction_lang: instructionLang,
-					ui_lang: uiLang,
-					canvas_aspect: effectiveCanvasAspectId(),
-					auto_repair: ddlAutoRepairEnabled,
-					...renderSettingsPayload('compose')
-				})
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const d = await r.json() as {
-				score: Score;
-				svg: string;
-				stage2_model?: string | null;
-				render_build_number?: string | null;
-				render_color_profile?: Record<string, string> | null;
-				render_engine_id?: string | null;
-				render_engine_version?: string | null;
-				render_color_catalog_id?: string | null;
-				render_color_catalog_name?: string | null;
-				render_color_catalog_sub?: string | null;
-				render_color_map?: Record<string, string> | null;
-				render_canvas_aspect?: string | null;
-				render_canvas_aspect_id?: string | null;
-				render_canvas_aspect_ratio?: number | null;
-				render_seed?: number | null;
-				render_wild?: boolean | null;
-				composition_seed?: number | null;
-				instruction_lang_requested?: string | null;
-				instruction_lang_resolved?: string | null;
-				ui_lang?: string | null;
-				render_hash?: string | null;
-				render_hash_short?: string | null;
-				tokens_in: number | null;
-				tokens_out: number | null;
-			};
-			const elapsedMs = Date.now() - startedAt;
-			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
-			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
-			const replayMetadata = {
-				render_build_number: d.render_build_number,
-				render_color_profile: d.render_color_profile,
-				render_engine_id: d.render_engine_id,
-				render_engine_version: d.render_engine_version,
-				render_color_catalog_id: d.render_color_catalog_id,
-				render_color_catalog_name: d.render_color_catalog_name,
-				render_color_catalog_sub: d.render_color_catalog_sub,
-				render_color_map: d.render_color_map,
-				render_canvas_aspect: d.render_canvas_aspect,
-				render_canvas_aspect_id: d.render_canvas_aspect_id,
-				render_canvas_aspect_ratio: d.render_canvas_aspect_ratio,
-				render_seed: d.render_seed,
-				composition_seed: d.composition_seed,
-				instruction_lang_requested: d.instruction_lang_requested,
-				instruction_lang_resolved: d.instruction_lang_resolved,
-				ui_lang: d.ui_lang,
-				render_hash: d.render_hash,
-				render_hash_short: d.render_hash_short
-			};
-			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, ...replayMetadata }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, ...replayMetadata, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
-			if (result) {
-				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
-			}
-			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
-			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
-			const savedHistory = await pushHistory({
-				input: replayInput,
-				ddl,
-				score: d.score,
-				svg: d.svg,
-				at: Date.now(),
-				elapsed_ms: elapsedMs,
-				stage1_model: resolvedStage1Model,
-				stage2_model: savedStage2Model,
-				tokens_in: d.tokens_in,
-				tokens_out: d.tokens_out,
-				catalog_id: colorCatalogSettings.effectiveId !== 'default' ? colorCatalogSettings.effectiveId : null
-			}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
-			if (savedHistory && result) {
-				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
-				lineageDetached = false;
-				displayedHistoryItem = savedHistory;
-				result = {
-					...result,
-					history_id: savedHistory.id,
-					history_at: savedHistory.at,
-					render_hash: savedHistory.render_hash,
-					render_hash_short: savedHistory.render_hash_short,
-				};
-			}
-			outputTab = 'canvas';
-			canvasViewport.fit();
-		} catch (e) {
-			if (!replayStopRequested && !abortController.signal.aborted) {
-				reloadError = e instanceof Error ? e.message : String(e);
-			}
-		} finally {
-			if (replayAbortController === abortController) replayAbortController = null;
-			replayStopRequested = false;
-			stopTimer();
-			stageLabel = '';
-			reloading = false;
-		}
-	}
 
 	// ── History ─────────────────────────────────────────────
 	// A prediction, used only for the first fetch made before the manager opens.
@@ -2396,33 +1212,21 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 
-	async function refreshCurrentUserOnly(): Promise<void> {
-		try {
-			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
-			if (!r.ok) return;
-			currentUser = await r.json() as UserItem;
-			applyUserTheme(currentUser);
-			applyDownloadFolderSettings(currentUser);
-		} catch {
-			/* ignore */
-		}
-	}
-
 	async function pushHistory(it: Iteration, options: SaveHistoryOptions = {}): Promise<Iteration | null> {
 		return saveHistoryItem(it, options, {
 			catalogId: colorCatalogSettings.effectiveId,
 			catalogMode: colorCatalogSettings.isAuto ? 'auto' : 'fixed',
 			canvasAspectId: effectiveCanvasAspectId(),
-			instructionLang,
+			instructionLang: work.instructionLang,
 			uiLang: getLang()
 		}, {
 			apiFetch,
-			signedIn: () => !!authToken,
+			signedIn: () => !!session.authToken,
 			ensureSvg: ensureIterationSvg,
 			composeFallbackFor: (item) => item.compose_fallback
 				?? (typeof item.compose_fallback_used === 'boolean' ? composeFallbackValue(item) : null),
-			refreshCountedUser: refreshCurrentUserOnly,
-			activeHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null,
+			refreshCountedUser: async () => { await session.refreshCurrentUserSettings(); },
+			activeHistoryId: () => work.displayedHistoryItem?.id ?? work.result?.history_id ?? historyItems[historyCursor]?.id ?? null,
 			currentOffset: () => historyOffset,
 			fetchOffset: (offset, fetchOptions) => history.fetchOffset(offset, fetchOptions),
 			clearSelection: () => history.clearSelection()
@@ -2435,42 +1239,15 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			stage2Model: qualifiedModelId(stage2Provider, stage2Model),
 			effectiveCatalogId: colorCatalogSettings.effectiveId,
 			canvasAspectId: effectiveCanvasAspectId(),
-			instructionLang,
+			instructionLang: work.instructionLang,
 			uiLang: getLang(),
 			savedStatus: t().demoSavedCurrent,
-			onSaved: (saved) => { result = saved; },
+			onSaved: (saved) => { work.result = saved; },
 			refreshHistory: async () => {
 				await history.fetchOffset(0);
 				history.setCursor(0);
 			},
 		});
-	}
-
-	function clearInput() {
-		resetTargetScopedState();
-		pendingCanvasAspectDerivation = null;
-		if (inputMode === 'single') input = '';
-		if (inputMode === 'batch') batch.clearInput();
-		if (inputMode === 'demo') demo.clearInput();
-		ddl = inputMode === 'single' ? '' : null;
-		expandedDdl = null;
-		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
-		thinking = null;
-		result = null;
-		stage1UserPrompt = '';
-		error = null;
-		reloadError = null;
-		outputTab = 'canvas';
-		elapsedStage1Ms = 0;
-		elapsedStage2Ms = 0;
-		elapsedTotalMs = 0;
-		tokensInStage1 = null;
-		tokensOutStage1 = null;
-		tokensInStage2 = null;
-		tokensOutStage2 = null;
-		displayedHistoryItem = null;
-		history.clearSelection();
-		canvasViewport.fit();
 	}
 
 	function toggleHistorySelection(id: string) {
@@ -2513,17 +1290,17 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 	function currentComparisonItem(): Iteration | null {
-		if (displayedHistoryItem) return displayedHistoryItem;
-		if (!result) return null;
+		if (work.displayedHistoryItem) return work.displayedHistoryItem;
+		if (!work.result) return null;
 		return {
-			input,
-			ddl,
-			score: result.score,
-			svg: result.svg,
+			input: work.input,
+			ddl: work.ddl,
+			score: work.result.score,
+			svg: work.result.svg,
 			at: Date.now(),
-			elapsed_ms: result.elapsed_total_ms,
-			stage1_model: result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
-			stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
+			elapsed_ms: work.result.elapsed_total_ms,
+			stage1_model: work.result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
+			stage2_model: work.result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 		};
 	}
 
@@ -2533,41 +1310,81 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	// Model comparison and language comparison own their selection, their results
 	// and their run state; the page lends the artwork, the two paint stages and
 	// the history writes.
+	const refinement = createRefinementCoordinator({
+		apiFetch,
+		apiError,
+		work,
+		session: refinementSession,
+		history: {
+			clearSelection: () => history.clearSelection(),
+			fetchOffset: (offset, options) => history.fetchOffset(offset, options),
+			items: () => historyItems,
+			syncToItem: (item) => history.syncToItem(item)
+		},
+		models: {
+			stage1: () => qualifiedModelId(stage1Provider, stage1Model),
+			stage2: () => qualifiedModelId(stage2Provider, stage2Model)
+		},
+		catalog: {
+			defaultId: () => defaultCatalogId,
+			effectiveId: () => colorCatalogSettings.effectiveId,
+			available: () => colorCatalogs,
+			name: catalogName
+		},
+		render: {
+			canvasAspectId: effectiveCanvasAspectId,
+			wild: () => effectiveRefineWild,
+			fanoutLimit: () => renderFanoutLimit
+		},
+		seeds: {
+			composition: createSafeIntegerSeed,
+			interpretation: createInterpretationSeed
+		},
+		lineageParentId: currentLineageParentId,
+		ensureVisibleLineageParentId,
+		buildDdlDiffParts,
+		setInterpretationDiffParts: (parts) => { interpretationDiffParts = parts; },
+		pushHistory,
+		resetTargetScopedState,
+		showCanvas: () => { outputTab = 'canvas'; },
+		fitCanvas: () => canvasViewport.fit()
+	});
+
 	const modelInspection = createModelInspection({
 		availableModelCatalog: () => availableModelCatalog,
-		result: () => result,
+		result: () => work.result,
 		stage1Provider: () => stage1Provider,
 		stage1Model: () => stage1Model,
 		stage2Provider: () => stage2Provider,
 		stage2Model: () => stage2Model,
-		loading: () => loading,
-		input: () => input,
-		currentUser: () => currentUser,
-		setCurrentUser: (user) => { currentUser = user as UserItem; },
-		targetContextVersion: () => targetContextVersion,
+		loading: () => work.loading,
+		input: () => work.input,
+		currentUser: () => session.currentUser,
+		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
+		targetContextVersion: () => refinement.contextVersion,
 		apiFetch,
-		interpretOne,
-		composeOne,
+		interpretOne: work.interpretOne,
+		composeOne: work.composeOne,
 		ensureVisibleLineageParentId,
 		pushHistory: (it, options) => pushHistory(it as unknown as Iteration, options),
 		toggleHistoryStar,
-		addTokens,
+		addTokens: work.addTokens,
 		statusModelName,
 		effectiveCanvasAspectId,
 	});
 
 	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
-		if (demoRunning || reloading) return;
-		const contextVersion = targetContextVersion;
-		reloading = true;
-		reloadError = null;
+		if (demoRunning || work.reloading) return;
+		const contextVersion = refinement.contextVersion;
+		work.reloading = true;
+		work.reloadError = null;
 		try {
 			const comparison = await replaySavedHistoryItem(it, source, {
 				effectiveCatalogId: colorCatalogSettings.effectiveId,
 				effectiveCanvasAspectId: effectiveCanvasAspectId(),
 				currentRenderEngineVersion,
 				renderPayload: (item, catalogId) => ({
-					...workReferencePayload(item.id),
+					...refinement.workReferencePayload(item.id),
 					...renderSettingsPayload('render-svg', {
 						...colorCatalogOverride(catalogId),
 						...wildOverride(Boolean(item.render_wild))
@@ -2579,20 +1396,20 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				apiFetch,
 				apiError,
 				ensureSvg: ensureIterationSvg,
-				acceptRendered: () => contextVersion === targetContextVersion
+				acceptRendered: () => contextVersion === refinement.contextVersion
 			});
 			if (!comparison) return;
-			replayComparison = comparison;
+			work.replayComparison = comparison;
 		} catch (e) {
-			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
+			if (contextVersion === refinement.contextVersion) work.reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
-			reloading = false;
+			work.reloading = false;
 		}
 	}
 
 	function closeReplayComparison() {
-		const source = replayComparison?.source;
-		replayComparison = null;
+		const source = work.replayComparison?.source;
+		work.replayComparison = null;
 		if (!source) return;
 		if (source === 'history-manager') {
 			historyManager.open = true;
@@ -2605,7 +1422,7 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	if (!node.history) return;
 	loadIterationItem(node.history);
 	outputTab = 'lineage';
-	lineageDetached = false;
+	work.lineageDetached = false;
 	await lineageState.load(node.id, true);
 }
 
@@ -2655,8 +1472,8 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
-	if (!(await confirmFallbackRefine(node.history))) return;
-	const rendered = await paintOne(sourceText, {
+	if (!(await work.confirmFallbackRefine(node.history))) return;
+	const rendered = await work.paintOne(sourceText, {
 		sourceText,
 		historyInput: sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
@@ -2679,10 +1496,10 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
-	if (!(await confirmFallbackRefine(node.history))) return;
+	if (!(await work.confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	if (!sourceText.trim()) return;
-	const rendered = await paintOne(sourceText, {
+	const rendered = await work.paintOne(sourceText, {
 		sourceText,
 		historyInput: sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
@@ -2707,9 +1524,9 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
-	if (!(await confirmFallbackRefine(node.history))) return;
+	if (!(await work.confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
-	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
+	const composed = await work.composeOne(nextDdl, sourceText, signal, undefined, undefined, {
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
 		renderOverrides: {
@@ -2770,7 +1587,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
-	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
+	const composed = await work.composeOne(nextDdl, '', signal, undefined, undefined, {
 		canvasAspectId: effectiveCanvasAspectId(),
 	});
 	const saved = await pushHistory({
@@ -2832,7 +1649,7 @@ function openNewDdlDialog(): void {
 async function openCurrentDdlEditor(): Promise<void> {
 	const nodeId = currentLineageNodeId;
 	if (!nodeId) return;
-	const item = displayedHistoryItem ?? historyItems.find((entry) => entry.id === result?.history_id) ?? null;
+	const item = work.displayedHistoryItem ?? historyItems.find((entry) => entry.id === work.result?.history_id) ?? null;
 	if (!lineageState.graph?.nodes.some((entry) => entry.id === nodeId)) await lineageState.load(nodeId, true);
 	const node = lineageState.graph?.nodes.find((entry) => entry.id === nodeId) ?? null;
 	if (!node) return;
@@ -2856,7 +1673,7 @@ function closeDdlDialog(): void {
 // Refresh the lineage tree when the comparison dialog closes so adopted
 // results (saved as children) appear without reopening the tab.
 function refreshLineageAfterRefine(): void {
-	const focusId = lineageState.graph?.focus_node_id ?? displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+	const focusId = lineageState.graph?.focus_node_id ?? work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null;
 	if (focusId) void lineageState.load(focusId, true);
 }
 
@@ -2892,10 +1709,10 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promi
 async function promoteLineageNode(node: LineageNode): Promise<void> {
 	await promoteSavedLineageNode(node, {
 		apiFetch,
-		contextVersion: () => targetContextVersion,
-		currentItem: () => displayedHistoryItem,
-		setCurrentItem: (item) => { displayedHistoryItem = item; },
-		activeHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null,
+		contextVersion: () => refinement.contextVersion,
+		currentItem: () => work.displayedHistoryItem,
+		setCurrentItem: (item) => { work.displayedHistoryItem = item; },
+		activeHistoryId: () => work.displayedHistoryItem?.id ?? work.result?.history_id ?? historyItems[historyCursor]?.id ?? null,
 		currentOffset: () => historyOffset,
 		syncToItem: (item) => history.syncToItem(item),
 		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
@@ -2906,7 +1723,7 @@ async function promoteLineageNode(node: LineageNode): Promise<void> {
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	await saveSavedLineageNote(node, note, {
 		apiFetch,
-		contextVersion: () => targetContextVersion,
+		contextVersion: () => refinement.contextVersion,
 		applyStarState: (item) => historyMutations.applyStarState(item),
 		loadLineage: (id) => lineageState.load(id, true)
 	});
@@ -2914,31 +1731,30 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 
 function detachLineage(): void {
 	resetTargetScopedState();
-	pendingCanvasAspectDerivation = null;
-	lineageDetached = true;
-	displayedHistoryItem = null;
+	work.pendingCanvasAspectDerivation = null;
+	work.lineageDetached = true;
+	work.displayedHistoryItem = null;
 	history.clearSelection();
 	outputTab = 'canvas';
 }
 
-const currentLineageNodeId = $derived(displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null);
+const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null);
 // The description tab's edit button needs both a node to branch from and a DDL
 // to load into the editor.
-const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(displayedHistoryItem?.ddl ?? ddl));
+const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(work.displayedHistoryItem?.ddl ?? work.ddl));
 
 $effect(() => {
 	if (outputTab === 'lineage' && currentLineageNodeId) void lineageState.load(currentLineageNodeId);
 });
 
 	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
-		targetContextVersion += 1;
-		refinementSession.reset({ preserveCandidates: options.preserveVariationCandidates });
+		refinement.resetTarget(options);
 
 		modelInspection.reset();
 
 		interpretationDiffParts = [];
-		reloadError = null;
-		replayComparison = null;
+		work.reloadError = null;
+		work.replayComparison = null;
 		if (lineageIntermediateNoticeTimer !== null) {
 			window.clearTimeout(lineageIntermediateNoticeTimer);
 			lineageIntermediateNoticeTimer = null;
@@ -2953,20 +1769,20 @@ $effect(() => {
 		const preserveLineageTab = outputTab === 'lineage';
 		const projection = projectHistoryCurrentWork(it);
 		resetTargetScopedState();
-		pendingCanvasAspectDerivation = null;
-		inputMode = 'single';
-		displayedHistoryItem = it;
+		work.pendingCanvasAspectDerivation = null;
+		work.inputMode = 'single';
+		work.displayedHistoryItem = it;
 		void history.syncToItem(it);
-		lineageDetached = false;
-		expandedDdl = projection.expandedDdl;
-		input = projection.sourceText;
-		ddl = projection.ddl;
-		ddlGeneratedBaseline = projection.ddl;
-		thinking = projection.thinking;
-		stage1UserPrompt = projection.sourceText;
-		adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
-		result = projection.result;
-		error = null;
+		work.lineageDetached = false;
+		work.expandedDdl = projection.expandedDdl;
+		work.input = projection.sourceText;
+		work.ddl = projection.ddl;
+		work.ddlGeneratedBaseline = projection.ddl;
+		work.thinking = projection.thinking;
+		work.stage1UserPrompt = projection.sourceText;
+		work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
+		work.result = projection.result;
+		work.error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
 		if (preserveLineageTab && it.lineage_node_id) void lineageState.load(it.lineage_node_id, true);
 		canvasViewport.fit();
@@ -2980,8 +1796,8 @@ $effect(() => {
 	async function fillCanvasSvg(it: Iteration): Promise<void> {
 		const target = it.id;
 		const svg = await ensureIterationSvg(it);
-		if (!svg || displayedHistoryItem?.id !== target || !result) return;
-		result = { ...result, svg };
+		if (!svg || work.displayedHistoryItem?.id !== target || !work.result) return;
+		work.result = { ...work.result, svg };
 		canvasViewport.fit();
 	}
 
@@ -2991,7 +1807,7 @@ $effect(() => {
 	}
 
 	const currentRenderedAt = $derived.by(() => {
-		const at = displayedHistoryItem?.at ?? result?.history_at ?? null;
+		const at = work.displayedHistoryItem?.at ?? work.result?.history_at ?? null;
 		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	});
 
@@ -3052,7 +1868,7 @@ $effect(() => {
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;
-			if (profileOpen) closeProfile();
+			if (session.profileOpen) session.closeProfile();
 			if (settings.opened) settings.close();
 			if (catalogOpen) cancelCatalogSelection();
 			historyManager.open = false;
@@ -3062,7 +1878,7 @@ $effect(() => {
 	}
 
 	function shouldIgnoreCanvasShortcut(e: KeyboardEvent) {
-		if (!currentUser || profileOpen || settings.opened || catalogOpen || historyManager.open || confirmAction) return true;
+		if (!session.currentUser || session.profileOpen || settings.opened || catalogOpen || historyManager.open || confirmAction) return true;
 		const target = e.target;
 		if (!(target instanceof HTMLElement)) return false;
 		if (target.isContentEditable) return true;
@@ -3077,22 +1893,22 @@ $effect(() => {
 
 	// ── Model selection ─────────────────────────────────────
 	function setStage1Provider(v: Provider) {
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		stage1Provider = v; stage1Model = modelsFor(v)[0]?.id ?? stage1Model;
 	}
 	function setStage1Model(v: string) {
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		stage1Model = v;
 	}
 	function setStage2Provider(v: Provider) {
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		stage2Provider = v; stage2Model = modelsFor(v)[0]?.id ?? stage2Model;
 	}
 	function setStage2Model(v: string) {
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		stage2Model = v;
 	}
@@ -3156,7 +1972,7 @@ $effect(() => {
 		return parts;
 	}
 
-	const unsavedRefinementPreview = $derived(!!result && !result.lineage_node_id && !!result.lineage_parent_node_id && !!result.derivation_kind);
+	const unsavedRefinementPreview = $derived(!!work.result && !work.result.lineage_node_id && !!work.result.lineage_parent_node_id && !!work.result.derivation_kind);
 
 	function showLineageIntermediateNotice(): void {
 		lineageIntermediateNotice = t().lineageIntermediateSavedNotice;
@@ -3195,27 +2011,27 @@ $effect(() => {
 	}
 
 	function currentLineageParentId(): string | null {
-		if (lineageDetached) return null;
-		return displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null;
+		if (work.lineageDetached) return null;
+		return work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null;
 	}
 
 async function ensureLineageParentId(): Promise<string | null> {
 	const existing = currentLineageParentId();
-	if (existing || !result || !ddl || !result.lineage_parent_node_id || !result.derivation_kind) return existing;
+	if (existing || !work.result || !work.ddl || !work.result.lineage_parent_node_id || !work.result.derivation_kind) return existing;
 	const saved = await pushHistory({
-		...result,
-		input: input.trim(), ddl, score: result.score, svg: result.svg, at: Date.now(),
-		elapsed_ms: result.elapsed_total_ms ?? 0,
-		tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
-		tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
+		...work.result,
+		input: work.input.trim(), ddl: work.ddl, score: work.result.score, svg: work.result.svg, at: Date.now(),
+		elapsed_ms: work.result.elapsed_total_ms ?? 0,
+		tokens_in: (work.result.tokens_in_stage1 ?? 0) + (work.result.tokens_in_stage2 ?? 0) || null,
+		tokens_out: (work.result.tokens_out_stage1 ?? 0) + (work.result.tokens_out_stage2 ?? 0) || null,
 	}, {
-		sourceText: input.trim(), historyVisibility: 'lineage_only',
-		lineageParentNodeId: result.lineage_parent_node_id,
-		derivationKind: result.derivation_kind,
-		derivationMetadata: result.derivation_metadata ?? {},
+		sourceText: work.input.trim(), historyVisibility: 'lineage_only',
+		lineageParentNodeId: work.result.lineage_parent_node_id,
+		derivationKind: work.result.derivation_kind,
+		derivationMetadata: work.result.derivation_metadata ?? {},
 	});
 	if (!saved?.lineage_node_id) return null;
-	result = { ...result, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
+	work.result = { ...work.result, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id, description_hash: saved.description_hash };
 	return saved.lineage_node_id;
 }
 
@@ -3223,531 +2039,31 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const materializingIntermediate = unsavedRefinementPreview;
 	const nodeId = await ensureLineageParentId();
 	if (materializingIntermediate && !nodeId) {
-		error = t().lineageIntermediateSaveFailed;
-		throw new Error(error);
+		work.error = t().lineageIntermediateSaveFailed;
+		throw new Error(work.error);
 	}
 	if (materializingIntermediate) showLineageIntermediateNotice();
 	return nodeId;
 }
 
 	function setSelectedCatalog(id: string) {
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		colorCatalogSettings.selected = id;
-	}
-
-	// Svelte assignments and current-view ownership stay in the route; the action
-	// module decides only which result fields make up the redraw projection.
-	function applyRefinementRedrawProjection(projection: RefinementRedrawProjection): void {
-		ddl = projection.ddl;
-		expandedDdl = projection.expandedDdl;
-		ddlGeneratedBaseline = projection.ddl;
-		thinking = projection.thinking;
-		result = projection.result;
-		displayedHistoryItem = null;
-		elapsedStage1Ms = projection.elapsedStage1Ms;
-		elapsedStage2Ms = projection.elapsedStage2Ms;
-		elapsedTotalMs = projection.elapsedTotalMs;
-		tokensInStage1 = projection.tokensInStage1;
-		tokensOutStage1 = projection.tokensOutStage1;
-		tokensInStage2 = projection.tokensInStage2;
-		tokensOutStage2 = projection.tokensOutStage2;
-	}
-
-	async function varyPerformance() {
-		if (!result || refinementSession.busy) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
-		const contextVersion = targetContextVersion;
-		const parentNodeId = await ensureVisibleLineageParentId();
-		if (contextVersion !== targetContextVersion || !result) return;
-		refinementSession.beginSingle();
-		reloading = true;
-		reloadError = null;
-		try {
-			const redrawn = await runTouchRedraw({
-				current: result,
-				canvasAspectId: refinementCanvasAspectId(),
-				parentNodeId,
-				workReference: workReferencePayload(refinementWorkId()),
-				renderPayload: renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId()))
-			}, {
-				apiFetch,
-				apiError,
-				createRenderSeed: createSafeIntegerSeed,
-				isCurrentTarget: () => contextVersion === targetContextVersion,
-				currentResult: () => result!
-			});
-			if (!redrawn) return;
-			result = redrawn;
-			displayedHistoryItem = null;
-			history.clearSelection();
-			outputTab = 'canvas';
-			canvasViewport.fit();
-		} catch (e) {
-			if (contextVersion === targetContextVersion) {
-				reloadError = e instanceof Error ? e.message : String(e);
-			}
-		} finally {
-			reloading = false;
-			if (contextVersion === targetContextVersion) refinementSession.finishSingle();
-		}
-	}
-
-	async function varyComposition() {
-		if (!result || refinementSession.busy || loading) return;
-		const source = input.trim();
-		if (!source) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
-		const parentNodeId = await ensureVisibleLineageParentId();
-		refinementSession.beginSingle();
-		loading = true;
-		error = null;
-		try {
-			const r = await runLayoutRedraw({
-				source,
-				current: result,
-				canvasAspectId: refinementCanvasAspectId(),
-				renderOverrides: inPlaceRedrawOverrides(),
-				parentNodeId
-			}, {
-				createCompositionSeed: createSafeIntegerSeed,
-				paint: paintOne
-			});
-			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
-			outputTab = 'canvas';
-			if (r.history_id) {
-				await history.fetchOffset(0, { anchorId: r.history_id });
-				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
-			} else {
-				history.clearSelection();
-			}
-			canvasViewport.fit();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			loading = false;
-			refinementSession.finishSingle();
-			stopTimer();
-		}
-	}
-
-	async function varyInterpretation() {
-		if (!result || refinementSession.busy || loading) return;
-		const source = input.trim();
-		if (!source) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
-		const parentNodeId = await ensureVisibleLineageParentId();
-		refinementSession.beginSingle();
-		loading = true;
-		error = null;
-		const previousDdl = ddl;
-		try {
-			const r = await runReadingRedraw({
-				source,
-				canvasAspectId: refinementCanvasAspectId(),
-				renderOverrides: inPlaceRedrawOverrides(),
-				parentNodeId
-			}, {
-				createInterpretationSeed,
-				paint: paintOne
-			});
-			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
-			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
-			outputTab = "canvas";
-			if (r.history_id) {
-				await history.fetchOffset(0, { anchorId: r.history_id });
-				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
-			} else {
-				history.clearSelection();
-			}
-			canvasViewport.fit();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			loading = false;
-			refinementSession.finishSingle();
-			stopTimer();
-		}
-	}
-
-	function composeCandidateResult(source: string, baseDdl: string, data: PaintResult & { ddl: string; thinking?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null }): PaintResult & { ddl: string; thinking: string | null } {
-		return {
-			...data,
-			ddl: data.ddl,
-			thinking: data.thinking ?? thinking,
-			stage1_model: result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
-			stage2_model: data.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-			elapsed_stage1_ms: 0,
-			elapsed_stage2_ms: data.elapsed_ms ?? 0,
-			elapsed_total_ms: data.elapsed_ms ?? 0,
-			tokens_in_stage1: null,
-			tokens_out_stage1: null,
-			tokens_in_stage2: data.tokens_in ?? null,
-			tokens_out_stage2: data.tokens_out ?? null,
-			user_generation_count: null,
-		};
-	}
-
-	function refinementCatalogId(): string {
-		return result?.render_color_catalog_id ?? displayedHistoryItem?.catalog_id ?? defaultCatalogId;
-	}
-
-	// The saved work a redraw is a redraw OF. The server reads that work's own
-	// recorded colors, so a catalog definition that has since changed, been
-	// renamed, or been retired no longer repaints it. The catalog id keeps being
-	// sent alongside -- it is the nameplate, and only the colors moved.
-	//
-	// Null means there is no saved work yet: an unsaved result was just drawn
-	// from today's definition, so today's definition is the one it remembers.
-	function refinementWorkId(): string | null {
-		return result?.history_id ?? displayedHistoryItem?.id ?? null;
-	}
-
-	function workReferencePayload(workId: string | null | undefined): Record<string, string> {
-		return workId ? { work_id: workId } : {};
-	}
-
-	// The two in-place redraws (vary the layout, reinterpret) keep the artwork's
-	// catalog but have never carried the level or the switch: they omit the level
-	// so the parent's is inherited, and draw tame. Preserved as-is.
-	function inPlaceRedrawOverrides(): RenderOverrides {
-		return {
-			...colorCatalogOverride(refinementCatalogId()),
-			...wildOverride(false)
-		};
-	}
-
-	// A refinement redraws against the artwork it refines: its catalog, the level
-	// the author chose for this round, and the switch the artwork was drawn with.
-	function refinementRenderOverrides(): RenderOverrides {
-		return {
-			...colorCatalogOverride(refinementCatalogId()),
-			...wildOverride(effectiveRefineWild)
-		};
-	}
-
-	function refinementCanvasAspectId(): CanvasAspectId {
-		return normalizeCanvasAspectId(result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? effectiveCanvasAspectId());
-	}
-
-	async function renderWordTouchCandidate(seedText: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		if (!result) throw new Error("missing result");
-		const normalizedSeedText = seedText.trim();
-		if (!normalizedSeedText) throw new Error(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
-		const r = await apiFetch('/api/render-score', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				score: result.score,
-				input: input.trim(),
-				ddl: ddl ?? '',
-				canvas_aspect: refinementCanvasAspectId(),
-				// Same reasoning as varyPerformance: the placement on screen followed render_seed
-				// when the work carries no composition_seed, so sending the raw field would send
-				// null and let the placement follow the new performance seed instead.
-				composition_seed: result.composition_seed ?? result.render_seed ?? null,
-				interpretation_seed: result.interpretation_seed,
-				seed_text: normalizedSeedText,
-				...workReferencePayload(refinementWorkId()),
-				...renderSettingsPayload('render-score', colorCatalogOverride(refinementCatalogId())),
-			}),
-		});
-		if (!r.ok) throw await apiError(r);
-		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score' | 'render_seed'>;
-		return {
-			id: `word-touch-${String(data.render_seed)}`,
-			label,
-			selected: false,
-			result: {
-				...result,
-				...data,
-				ddl: ddl ?? '',
-				thinking,
-				history_id: null,
-				history_at: null,
-				lineage_node_id: null,
-				lineage_parent_node_id: currentLineageParentId(),
-				derivation_kind: currentLineageParentId() ? 'touch_change' : null,
-				derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: data.render_seed, seed_text: normalizedSeedText },
-			},
-		};
-	}
-
-	async function composeVariationCandidate(compositionSeed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = input.trim();
-		const baseDdl = ddl ?? "";
-		const r = await apiFetch("/api/compose", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				ddl: baseDdl,
-				description: source,
-				...sketchPayloadFor(source),
-				model: qualifiedModelId(stage2Provider, stage2Model),
-				instruction_lang: instructionLang,
-				ui_lang: getLang(),
-				canvas_aspect: refinementCanvasAspectId(),
-				auto_repair: ddlAutoRepairEnabled,
-				composition_seed: compositionSeed,
-				...renderSettingsPayload('compose', refinementRenderOverrides()),
-				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
-			})
-		});
-		if (!r.ok) throw await apiError(r);
-		const data = await r.json();
-		return { id: `comp-${compositionSeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_change' : null, derivation_metadata: { composition_seed: compositionSeed } } };
-	}
-
-	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = input.trim();
-		const interpretationSeed = createInterpretationSeed();
-		const r = await paintOne(source, {
-			historyInput: source,
-			sourceText: source,
-			saveHistory: false,
-			saveArtifacts: false,
-			countGeneration: false,
-			canvasAspectId: refinementCanvasAspectId(),
-			sketchText: sketchTextFor(source),
-			interpretationSeed,
-			signal,
-			renderOverrides: refinementRenderOverrides(),
-			lineageParentNodeId: currentLineageParentId(),
-		});
-		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
-	}
-
-	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		if (!result) throw new Error("missing result");
-		const source = input.trim();
-		const fromCatalogId = refinementCatalogId();
-		const r = await apiFetch("/api/render-score", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				score: result.score,
-				input: source,
-				ddl: ddl ?? "",
-				canvas_aspect: refinementCanvasAspectId(),
-				render_seed: result.render_seed,
-				composition_seed: result.composition_seed,
-				interpretation_seed: result.interpretation_seed,
-				...renderSettingsPayload('render-score', colorCatalogOverride(catalogId)),
-			}),
-		});
-		if (!r.ok) throw await apiError(r);
-		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, "svg" | "score">;
-		return {
-			id: "catalog-" + catalogId + "-" + label,
-			label,
-			selected: false,
-			result: {
-				...result,
-				...data,
-				ddl: ddl ?? "",
-				thinking,
-				history_id: null,
-				history_at: null,
-				lineage_node_id: null,
-				lineage_parent_node_id: currentLineageParentId(),
-				derivation_kind: currentLineageParentId() ? "catalog_change" : null,
-				derivation_metadata: { catalog_id_from: fromCatalogId, catalog_id_to: catalogId },
-			},
-		};
-	}
-
-	async function variationCandidateLabel(amplitude: VariationAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = input.trim();
-		const baseDdl = ddl ?? "";
-		const r = await apiFetch("/api/compose", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				ddl: baseDdl,
-				description: source,
-				...sketchPayloadFor(source),
-				model: qualifiedModelId(stage2Provider, stage2Model),
-				instruction_lang: instructionLang,
-				ui_lang: getLang(),
-				canvas_aspect: refinementCanvasAspectId(),
-				auto_repair: ddlAutoRepairEnabled,
-				variation_amplitude: amplitude,
-				variation_seed: seed,
-				...renderSettingsPayload('compose', refinementRenderOverrides()),
-				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
-			})
-		});
-		if (!r.ok) throw await apiError(r);
-		const data = await r.json();
-		return {
-			id: `variation-${amplitude}-${seed}`,
-			label,
-			selected: false,
-			result: {
-				...composeCandidateResult(source, baseDdl, data),
-				lineage_parent_node_id: currentLineageParentId(),
-				derivation_kind: currentLineageParentId() ? 'variation' : null,
-				derivation_metadata: { variation_amplitude: amplitude, variation_seed: seed },
-			},
-		};
-	}
-
-	// The Server allocates variation seeds; seed-space ownership and deduplication stay out of the UI.
-	async function allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]> {
-		const r = await apiFetch("/api/variation/seeds", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ amplitude, count })
-		});
-		if (!r.ok) throw await apiError(r);
-		return (await r.json()).seeds as number[];
-	}
-
-	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) {
-		if (!result || refinementSession.gridBusy || loading) return;
-		const source = input.trim();
-		if (!source || !ddl) return;
-		const normalizedTouchWords = touchWords?.trim() ?? '';
-		if (kind === 'touch' && !normalizedTouchWords) {
-			refinementSession.setStatus(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
-			return;
-		}
-		if (kind === 'touch' && count === 4) {
-			refinementSession.setStatus(getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.');
-			return;
-		}
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
-		const contextVersion = targetContextVersion;
-		await ensureVisibleLineageParentId();
-		if (contextVersion !== targetContextVersion) return;
-		const taskLabel = kind === "touch"
-			? t().canvasVaryPerformance
-			: kind === "layout"
-				? t().canvasVaryComposition
-				: kind === "reading"
-					? t().canvasVaryInterpretation
-					: kind === "variation"
-						? t().variationTitle
-						: t().canvasVaryColor;
-		const abortController = refinementSession.beginGrid({
-			includesReading: kind === 'reading',
-			taskLabel,
-			count
-		});
-		const abortTimer = window.setTimeout(() => {
-			refinementSession.enableAbort(abortController);
-		}, 3000);
-		try {
-			const plans = await planRefinementCandidates({
-				kind,
-				count,
-				touchWords: normalizedTouchWords,
-				amplitude,
-				signal: abortController.signal,
-				labels: {
-					touch: t().canvasVaryPerformance,
-					layout: t().canvasVaryComposition,
-					reading: t().canvasVaryInterpretation,
-					variation: t().variationTitle,
-					color: t().canvasVaryColor,
-					noAlternateCatalog: t().refineNoAlternateCatalog
-				},
-				currentCompositionSeed: result.composition_seed,
-				previousCandidates: refinementSession.candidates,
-				availableCatalogIds: colorCatalogs.map((catalog) => catalog.id),
-				currentCatalogId: refinementCatalogId()
-			}, {
-				createCompositionSeed: createSafeIntegerSeed,
-				allocateVariationSeeds,
-				catalogName,
-				renderTouch: renderWordTouchCandidate,
-				renderLayout: composeVariationCandidate,
-				renderReading: interpretationVariationCandidate,
-				renderVariation: variationCandidateLabel,
-				renderColor: renderColorCatalogCandidate
-			});
-			refinementSession.setPlans(abortController, plans.map((plan) => plan.label));
-			const candidates = await runRefinementFanout(plans.map((plan) => plan.run), renderFanoutLimit, {
-				onStart: (index) => refinementSession.seatSlot(abortController, index, 'running'),
-				onDone: (index) => { refinementSession.finishSlot(abortController, index); },
-			});
-			refinementSession.commitCandidates(abortController, candidates);
-			for (const candidate of candidates) {
-				refinementSession.addTokens(abortController, paintTokensIn(candidate.result), paintTokensOut(candidate.result));
-			}
-		} catch (e) {
-			if (!(e instanceof DOMException && e.name === "AbortError")) {
-				refinementSession.failGrid(abortController, e instanceof Error ? e.message : String(e));
-			}
-		} finally {
-			window.clearTimeout(abortTimer);
-			refinementSession.finishGrid(abortController);
-		}
-	}
-
-	function showVariationCandidate(candidate: VariationCandidate) {
-		const projection = projectRefinementCandidate(candidate);
-		resetTargetScopedState({ preserveVariationCandidates: true });
-		history.clearSelection();
-		ddl = projection.ddl;
-		expandedDdl = projection.expandedDdl;
-		ddlGeneratedBaseline = ddl;
-		thinking = projection.thinking;
-		result = projection.result;
-		displayedHistoryItem = null;
-		outputTab = "canvas";
-		canvasViewport.fit();
-	}
-
-	async function saveSelectedVariationCandidates() {
-		const contextVersion = targetContextVersion;
-		const selected = refinementSession.candidates.filter((candidate) => candidate.selected && !candidate.saved);
-		if (selected.length === 0) {
-			refinementSession.setStatus(t().variationGridEmpty);
-			return;
-		}
-		refinementSession.beginSave();
-		try {
-			await saveRefinementCandidates({
-				candidates: selected,
-				sourceText: () => input.trim(),
-				fallbackCatalogId: () => colorCatalogSettings.effectiveId
-			}, {
-				saveHistory: pushHistory,
-				isCurrentContext: () => contextVersion === targetContextVersion,
-				markSaved: (id) => refinementSession.markSaved(id),
-				isCurrentResult: (candidateResult) => result === candidateResult,
-				adoptSavedIdentity: (candidateResult, saved) => {
-					result = { ...candidateResult, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
-					displayedHistoryItem = saved;
-					void history.syncToItem(saved);
-				}
-			});
-		} finally {
-			if (contextVersion === targetContextVersion) refinementSession.finishSave();
-		}
 	}
 
 	// ── Download ────────────────────────────────────────────
 	// Exporting owns the profile round trip, the canvas rasterisation and the
 	// capture-date stamp; the page only lends it the artwork and the fetch wrapper.
 	const { downloadSVG, downloadPNG } = createExportActions({
-		result: () => result,
-		input: () => input,
-		displayedHistoryItem: () => displayedHistoryItem,
+		result: () => work.result,
+		input: () => work.input,
+		displayedHistoryItem: () => work.displayedHistoryItem,
 		apiFetch,
 		apiError,
 		exportFilename,
-		refinementCatalogId,
-		refinementCanvasAspectId,
+		refinementCatalogId: refinement.refinementCatalogId,
+		refinementCanvasAspectId: refinement.refinementCanvasAspectId,
 		effectiveCanvasAspectId,
 	});
 
@@ -3755,7 +2071,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// the listed item when one is selected and the fresh drawing otherwise. The
 	// page shape and the seal come from the same settings the history modal uses.
 	async function downloadCurrentCard(): Promise<void> {
-		const id = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		const id = work.displayedHistoryItem?.id ?? work.result?.history_id ?? null;
 		if (!id) return;
 		await downloadCard(apiFetch, id, exportSettings.card);
 	}
@@ -3809,10 +2125,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function displayLatestBatchRender(): void {
 		if (!batch.latestResult) return;
-		result = batch.latestResult;
-		ddl = batch.latestDdl;
-		ddlGeneratedBaseline = batch.latestDdl;
-		thinking = batch.latestThinking;
+		work.result = batch.latestResult;
+		work.ddl = batch.latestDdl;
+		work.ddlGeneratedBaseline = batch.latestDdl;
+		work.thinking = batch.latestThinking;
 		outputTab = 'canvas';
 		canvasViewport.fit();
 	}
@@ -3820,7 +2136,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function resumeBatchLatestFollow(): void {
 		resetTargetScopedState();
 		batch.startFollowingLatest();
-		displayedHistoryItem = null;
+		work.displayedHistoryItem = null;
 		history.clearSelection();
 		displayLatestBatchRender();
 	}
@@ -3868,12 +2184,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return width > 0 && height > 0 ? { ratioW: width, ratioH: height } : null;
 	}
 
-	const statusStage1Model = $derived(displayedHistoryItem
-		? (displayedHistoryItem.stage1_model ? statusModelName(displayedHistoryItem.stage1_model) : '-')
-		: (result?.stage1_model ? statusModelName(result.stage1_model) : '-'));
-	const statusStage2Model = $derived(displayedHistoryItem
-		? (displayedHistoryItem.stage2_model ? statusModelName(displayedHistoryItem.stage2_model) : '-')
-		: (result?.stage2_model ? statusModelName(result.stage2_model) : '-'));
+	const statusStage1Model = $derived(work.displayedHistoryItem
+		? (work.displayedHistoryItem.stage1_model ? statusModelName(work.displayedHistoryItem.stage1_model) : '-')
+		: (work.result?.stage1_model ? statusModelName(work.result.stage1_model) : '-'));
+	const statusStage2Model = $derived(work.displayedHistoryItem
+		? (work.displayedHistoryItem.stage2_model ? statusModelName(work.displayedHistoryItem.stage2_model) : '-')
+		: (work.result?.stage2_model ? statusModelName(work.result.stage2_model) : '-'));
 	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
 	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
 	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? t().colorCatalogAuto : currentCatalog.name);
@@ -3883,50 +2199,50 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// default, and a work saved before the colors were recorded is marked as
 	// having no record -- that one draws from today's definition, not its own.
 	const statusCatalogName = $derived.by(() => {
-		const work = displayedHistoryItem ?? result ?? null;
-		if (!work) return '-';
-		const catalogId = work.render_color_catalog_id
-			?? (displayedHistoryItem ? displayedHistoryItem.catalog_id : null)
+		const renderedWork = work.displayedHistoryItem ?? work.result ?? null;
+		if (!renderedWork) return '-';
+		const catalogId = renderedWork.render_color_catalog_id
+			?? (work.displayedHistoryItem ? work.displayedHistoryItem.catalog_id : null)
 			?? null;
 		if (!catalogId) return '-';
-		const plate = catalogNameplate(colorCatalogs, renamedCatalogIds, catalogId, work.render_color_catalog_name);
+		const plate = catalogNameplate(colorCatalogs, renamedCatalogIds, catalogId, renderedWork.render_color_catalog_name);
 		const notes: string[] = [];
 		if (plate.retired) notes.push(t().colorCatalogRetired);
-		const colorMap = work.render_color_map;
+		const colorMap = renderedWork.render_color_map;
 		if (!colorMap || Object.keys(colorMap).length === 0) notes.push(t().colorCatalogNoRecord);
 		return notes.length ? t().colorCatalogNote(plate.name, notes) : plate.name;
 	});
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
 	const nextCanvasName = $derived(currentCanvasAspect.label);
-	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);
+	const displayCanvasAspect = $derived(svgAspect(work.result?.svg) ?? currentCanvasAspect);
 	const statusCanvasName = $derived.by(() => {
-		const canvasId = displayedHistoryItem?.render_canvas_aspect_id ?? displayedHistoryItem?.render_canvas_aspect ?? displayedHistoryItem?.score?.canvas ?? result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? null;
+		const canvasId = work.displayedHistoryItem?.render_canvas_aspect_id ?? work.displayedHistoryItem?.render_canvas_aspect ?? work.displayedHistoryItem?.score?.canvas ?? work.result?.render_canvas_aspect_id ?? work.result?.render_canvas_aspect ?? work.result?.score?.canvas ?? null;
 		return canvasId ? getCanvasAspectOption(canvasId).label : '-';
 	});
 	// The digest, not the stored `<scheme>:<digest>`: the scheme is a property of
 	// the value rather than part of it, and nothing in the app takes a prefixed
 	// string as input. See lib/hashIdentity.ts.
 	const statusHashFull = $derived(hashDigest(
-		displayedHistoryItem?.render_hash
-			?? result?.render_hash
+		work.displayedHistoryItem?.render_hash
+			?? work.result?.render_hash
 			?? ''
 	));
 	const statusHashLabel = $derived((
-		displayedHistoryItem?.render_hash_short
-			?? displayedHistoryItem?.render_hash?.slice(-4)
-			?? result?.render_hash_short
-			?? result?.render_hash?.slice(-4)
+		work.displayedHistoryItem?.render_hash_short
+			?? work.displayedHistoryItem?.render_hash?.slice(-4)
+			?? work.result?.render_hash_short
+			?? work.result?.render_hash?.slice(-4)
 			?? ''
 	).toUpperCase());
 	const statusHistoryItem = $derived.by(() => {
-		if (displayedHistoryItem) return displayedHistoryItem;
-		if (result?.history_id) {
-			return historyItems.find((item) => item.id === result?.history_id) ?? {
-				id: result.history_id,
+		if (work.displayedHistoryItem) return work.displayedHistoryItem;
+		if (work.result?.history_id) {
+			return historyItems.find((item) => item.id === work.result?.history_id) ?? {
+				id: work.result.history_id,
 				starred: false,
 			};
 		}
-		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
+		if (work.inputMode === 'demo' || work.activeRunMode === 'demo') return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
 	const replayableStatusHistoryItem = $derived(
@@ -3936,7 +2252,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	);
 	// What a refine inherits when nothing is overridden: the work on screen, or
 	// the global setting when nothing is on screen.
-	const targetWild = $derived(displayedHistoryItem?.render_wild ?? result?.render_wild ?? wildSettings.enabled);
+	const targetWild = $derived(work.displayedHistoryItem?.render_wild ?? work.result?.render_wild ?? wildSettings.enabled);
 	const effectiveRefineWild = $derived(refineWildOverride ?? targetWild === true);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
@@ -4017,41 +2333,41 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return tokenPair(input, output);
 	}
 	const scoreJsonPayload = $derived.by(() => {
-		if (!result) return null;
+		if (!work.result) return null;
 		const payload: Record<string, unknown> = {};
-		if (result.stage1_model !== undefined) payload.stage1_model = result.stage1_model;
-		if (result.stage2_model !== undefined) payload.stage2_model = result.stage2_model;
-		if (result.render_build_number !== undefined) payload.render_build_number = result.render_build_number;
-		if (result.render_color_profile !== undefined) payload.render_color_profile = result.render_color_profile;
-		if (result.render_engine_id !== undefined) payload.render_engine_id = result.render_engine_id;
-		if (result.render_engine_version !== undefined) payload.render_engine_version = result.render_engine_version;
-		if (result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = result.render_canvas_aspect;
-		if (result.render_canvas_aspect_id !== undefined) payload.render_canvas_aspect_id = result.render_canvas_aspect_id;
-		if (result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = result.render_canvas_aspect_ratio;
-		if (result.instruction_lang_requested !== undefined) payload.instruction_lang_requested = result.instruction_lang_requested;
-		if (result.instruction_lang_resolved !== undefined) payload.instruction_lang_resolved = result.instruction_lang_resolved;
-		if (result.seed_text !== undefined) payload.seed_text = result.seed_text;
-		const derivationMetadata = result.derivation_metadata ?? {};
-		const resolvedLang = result.instruction_lang_resolved ?? null;
+		if (work.result.stage1_model !== undefined) payload.stage1_model = work.result.stage1_model;
+		if (work.result.stage2_model !== undefined) payload.stage2_model = work.result.stage2_model;
+		if (work.result.render_build_number !== undefined) payload.render_build_number = work.result.render_build_number;
+		if (work.result.render_color_profile !== undefined) payload.render_color_profile = work.result.render_color_profile;
+		if (work.result.render_engine_id !== undefined) payload.render_engine_id = work.result.render_engine_id;
+		if (work.result.render_engine_version !== undefined) payload.render_engine_version = work.result.render_engine_version;
+		if (work.result.render_canvas_aspect !== undefined) payload.render_canvas_aspect = work.result.render_canvas_aspect;
+		if (work.result.render_canvas_aspect_id !== undefined) payload.render_canvas_aspect_id = work.result.render_canvas_aspect_id;
+		if (work.result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = work.result.render_canvas_aspect_ratio;
+		if (work.result.instruction_lang_requested !== undefined) payload.instruction_lang_requested = work.result.instruction_lang_requested;
+		if (work.result.instruction_lang_resolved !== undefined) payload.instruction_lang_resolved = work.result.instruction_lang_resolved;
+		if (work.result.seed_text !== undefined) payload.seed_text = work.result.seed_text;
+		const derivationMetadata = work.result.derivation_metadata ?? {};
+		const resolvedLang = work.result.instruction_lang_resolved ?? null;
 		payload.stage1_instruction_lang = typeof derivationMetadata.stage1_language === 'string' ? derivationMetadata.stage1_language : resolvedLang;
 		payload.stage2_instruction_lang = typeof derivationMetadata.stage2_language === 'string' ? derivationMetadata.stage2_language : resolvedLang;
-		if (result.ui_lang !== undefined) payload.ui_lang = result.ui_lang;
-		if (result.render_hash !== undefined) payload.render_hash = result.render_hash;
-		if (result.render_hash_short !== undefined) payload.render_hash_short = result.render_hash_short;
-		if (result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = result.render_color_catalog_id;
-		if (result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = result.render_color_catalog_name;
-		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;
-		if (result.render_color_map !== undefined) payload.render_color_map = result.render_color_map;
-		if (result.render_seed !== undefined) payload.render_seed = result.render_seed;
-		if (result.composition_seed !== undefined) payload.composition_seed = result.composition_seed;
-		if (result.interpretation_seed !== undefined) payload.interpretation_seed = result.interpretation_seed;
-		if (result.description_hash !== undefined) payload.description_hash = result.description_hash;
-		payload.elapsed_ms = displayedHistoryItem?.elapsed_ms ?? result.elapsed_total_ms;
-		payload.tokens_in = displayedHistoryItem?.tokens_in ?? ((result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null);
-		payload.tokens_out = displayedHistoryItem?.tokens_out ?? ((result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null);
-		if (result.derivation_kind !== undefined) payload.derivation_kind = result.derivation_kind;
-		if (result.derivation_metadata !== undefined) payload.derivation_metadata = result.derivation_metadata;
-		payload.score = result.score;
+		if (work.result.ui_lang !== undefined) payload.ui_lang = work.result.ui_lang;
+		if (work.result.render_hash !== undefined) payload.render_hash = work.result.render_hash;
+		if (work.result.render_hash_short !== undefined) payload.render_hash_short = work.result.render_hash_short;
+		if (work.result.render_color_catalog_id !== undefined) payload.render_color_catalog_id = work.result.render_color_catalog_id;
+		if (work.result.render_color_catalog_name !== undefined) payload.render_color_catalog_name = work.result.render_color_catalog_name;
+		if (work.result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = work.result.render_color_catalog_sub;
+		if (work.result.render_color_map !== undefined) payload.render_color_map = work.result.render_color_map;
+		if (work.result.render_seed !== undefined) payload.render_seed = work.result.render_seed;
+		if (work.result.composition_seed !== undefined) payload.composition_seed = work.result.composition_seed;
+		if (work.result.interpretation_seed !== undefined) payload.interpretation_seed = work.result.interpretation_seed;
+		if (work.result.description_hash !== undefined) payload.description_hash = work.result.description_hash;
+		payload.elapsed_ms = work.displayedHistoryItem?.elapsed_ms ?? work.result.elapsed_total_ms;
+		payload.tokens_in = work.displayedHistoryItem?.tokens_in ?? ((work.result.tokens_in_stage1 ?? 0) + (work.result.tokens_in_stage2 ?? 0) || null);
+		payload.tokens_out = work.displayedHistoryItem?.tokens_out ?? ((work.result.tokens_out_stage1 ?? 0) + (work.result.tokens_out_stage2 ?? 0) || null);
+		if (work.result.derivation_kind !== undefined) payload.derivation_kind = work.result.derivation_kind;
+		if (work.result.derivation_metadata !== undefined) payload.derivation_metadata = work.result.derivation_metadata;
+		payload.score = work.result.score;
 		return payload;
 	});
 	const scoreJsonText = $derived(scoreJsonPayload ? JSON.stringify(scoreJsonPayload, null, 2) : '');
@@ -4134,7 +2450,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
-			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), session.loadCurrentUser(), fetchPrompts()]);
 		})();
 
 		return () => {
@@ -4152,14 +2468,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	$effect(() => exportSettings.persist());
 	$effect(() => {
 		if (typeof document === 'undefined') return;
-		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+		document.documentElement.dataset.theme = session.darkMode ? 'dark' : 'light';
 	});
 	$effect(() => {
-		const mode = inputMode;
+		const mode = work.inputMode;
 		const wasMode = previousInputMode;
 		if (mode === wasMode) return;
 		previousInputMode = mode;
-		if (mode === 'batch' && (activeRunMode === 'batch' || batch.latestResult)) {
+		if (mode === 'batch' && (work.activeRunMode === 'batch' || batch.latestResult)) {
 			untrack(resumeBatchLatestFollow);
 		} else if (wasMode === 'batch') {
 			batch.stopFollowingLatest();
@@ -4175,13 +2491,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 <!-- ══════════════════════════════════════════════════════════ -->
 <!--  ROOT                                                       -->
 <!-- ══════════════════════════════════════════════════════════ -->
-{#if !currentUser}
+{#if !session.currentUser}
 	<AuthPanel
-		bind:loginUserName
-		bind:loginPassword
-		bind:loginPasswordVisible
-		{loginStatus}
-		onLogin={login}
+		bind:loginUserName={session.loginUserName}
+		bind:loginPassword={session.loginPassword}
+		bind:loginPasswordVisible={session.loginPasswordVisible}
+		loginStatus={session.loginStatus}
+		onLogin={() => session.login()}
 		appVersion={APP_VERSION}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
@@ -4189,33 +2505,33 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {:else}
 <div
 	class="root"
-	class:tooltips-disabled={!tooltipsEnabled}
-	class:ui-hide-input-modes={!uiVisibility.input_modes}
-	class:ui-hide-drawing-settings={!uiVisibility.drawing_settings}
-	class:ui-hide-ddl-tools={!uiVisibility.ddl_tools}
-	class:ui-hide-detail-status={!uiVisibility.detail_status}
-	class:ui-hide-work-tools={!uiVisibility.work_tools}
-	class:ui-hide-history={!uiVisibility.history}
+	class:tooltips-disabled={!session.tooltipsEnabled}
+	class:ui-hide-input-modes={!session.uiVisibility.input_modes}
+	class:ui-hide-drawing-settings={!session.uiVisibility.drawing_settings}
+	class:ui-hide-ddl-tools={!session.uiVisibility.ddl_tools}
+	class:ui-hide-detail-status={!session.uiVisibility.detail_status}
+	class:ui-hide-work-tools={!session.uiVisibility.work_tools}
+	class:ui-hide-history={!session.uiVisibility.history}
 >
 	<AppRail
-		{currentUser}
+		currentUser={session.currentUser}
 		bind:userMenuOpen
 		bind:userMenuWrapEl
 		settingsOpen={settings.opened}
-		{darkMode}
+		darkMode={session.darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
 		{singleUserMode}
-		showAuxiliary={uiVisibility.auxiliary}
-		{uiMode}
-		{tooltipsEnabled}
-		onSetUiMode={(mode) => void updateUiMode(mode)}
-		onToggleTooltips={() => void updateTooltipsEnabled(!tooltipsEnabled)}
+		showAuxiliary={session.uiVisibility.auxiliary}
+		uiMode={session.uiMode}
+		tooltipsEnabled={session.tooltipsEnabled}
+		onSetUiMode={(mode) => void session.updateUiMode(mode)}
+		onToggleTooltips={() => void session.updateTooltipsEnabled(!session.tooltipsEnabled)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
-		onOpenProfile={openProfile}
-		onLogout={logout}
+		onOpenProfile={() => { session.openProfile(); userMenuOpen = false; }}
+		onLogout={() => session.logout()}
 		onOpenSettings={() => settings.openSettings()}
-		onToggleTheme={() => void updateUiTheme(!darkMode)}
+		onToggleTheme={() => void session.updateUiTheme(!session.darkMode)}
 		onOpenAppInfo={() => (appInfoOpen = true)}
 	/>
 
@@ -4227,17 +2543,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<div class="left-panel">
 				<div class="panel-scroll">
 					<InputPanel
-						{sketchMode}
-						onSelectSketchMode={(mode) => (sketchMode = mode)}
-						bind:inputMode
-						bind:input
+						sketchMode={work.sketchMode}
+						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
+						bind:inputMode={work.inputMode}
+						bind:input={work.input}
 						bind:batchInput={batch.input}
 						lineNumbersText={batch.lineNumbersText}
 						batchNonEmpty={batch.nonEmpty}
 						{batchRunning}
-						{singleRunning}
-						hideRunStatus={reloading}
-						singleDdlReady={ddl !== null}
+						singleRunning={work.singleRunning}
+						hideRunStatus={work.reloading}
+						singleDdlReady={work.ddl !== null}
 						batchActiveLine={batch.activeLine}
 						batchObservedLine={batch.observedLine}
 						batchRunningLineText={batch.runningLineText}
@@ -4251,7 +2567,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchActiveTokensOut={batch.activeTokensOut}
 						batchTokensInTotal={batch.tokensInTotal}
 						batchTokensOutTotal={batch.tokensOutTotal}
-						{liveMs}
+						liveMs={work.liveMs}
 						batchFailureReport={batchFailureReportStore.report}
 						batchPromptHistory={batch.promptHistory}
 						canResumeBatch={batch.canResume}
@@ -4276,17 +2592,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						demoSaveStatus={demo.saveStatus}
 						demoError={demo.error}
 						lockNonDemo={demoRunning}
-						{canSubmit}
-						generationDisabled={refinementSession.gridBusy || reloading}
-						{error}
-						{stageLabel}
+						canSubmit={work.canSubmit}
+						generationDisabled={refinementSession.gridBusy || work.reloading}
+						error={work.error}
+						stageLabel={work.stageLabel}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
-						{stage1ModelLabel}
-						{stage2ModelLabel}
-						runTokensIn={activeRunTokensIn}
-						runTokensOut={activeRunTokensOut}
+						stage1ModelLabel={work.stage1ModelLabel}
+						stage2ModelLabel={work.stage2ModelLabel}
+						runTokensIn={work.activeRunTokensIn}
+						runTokensOut={work.activeRunTokensOut}
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}
@@ -4295,28 +2611,28 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
-						onClearInput={clearInput}
+						onClearInput={work.clearInput}
 						onRememberBatchPrompt={(prompt) => batch.rememberPrompt(prompt)}
 						onDemoSettingsChange={(next) => demo.saveSettings(next)}
 						onSaveCurrentDemo={saveCurrentDemoToHistory}
-						onStartDemo={startDemo}
-						onStopDemo={stopDemo}
-						onSubmit={requestSubmit}
-						onStop={stopBatch}
+						onStartDemo={work.startDemo}
+						onStopDemo={work.stopDemo}
+						onSubmit={work.requestSubmit}
+						onStop={work.stopBatch}
 					/>
 
 					<!-- thinking -->
-					{#if thinking}
+					{#if work.thinking}
 						<section class="panel-section">
 							<details class="thinking-details">
 								<summary>{t().thinkingLabel}</summary>
-								<pre>{thinking}</pre>
+								<pre>{work.thinking}</pre>
 							</details>
 						</section>
 					{/if}
 
 					<!-- DDL tools -->
-					{#if inputMode === 'single'}
+					{#if work.inputMode === 'single'}
 						<section class="panel-section ddl-tools-section">
 							<Tooltip placement="left" text={t().tooltipDdlEdit}>
 								<button class="ddl-new-btn" type="button" disabled={!canEditCurrentDdl} onclick={openCurrentDdlEditor}>{t().ddlEditButton}</button>
@@ -4330,19 +2646,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- DDL-run status belongs below the action buttons, not inside the input field. -->
 					{#snippet ddlRunStatus()}
 						<RunStatus
-							label={stageLabel || t().stageDdlGenerating}
-							stage2Model={stage2ModelLabel}
-							elapsedMs={liveMs}
-							tokensIn={activeRunTokensIn}
-							tokensOut={activeRunTokensOut}
-							onStop={stopDdlRender}
+							label={work.stageLabel || t().stageDdlGenerating}
+							stage2Model={work.stage2ModelLabel}
+							elapsedMs={work.liveMs}
+							tokensIn={work.activeRunTokensIn}
+							tokensOut={work.activeRunTokensOut}
+							onStop={work.stopDdlRender}
 						/>
 					{/snippet}
 
 					<!-- Sketching (Stage 0.5). Above the instructions because it comes before
 					     them: the author reads the prose the layer wrote, and may
 					     rewrite it. What is left here is what Stage 1 reads. -->
-					{#if inputMode === 'single' && (sketchText !== null || result !== null)}
+					{#if work.inputMode === 'single' && (work.sketchText !== null || work.result !== null)}
 						<section class="panel-section sketch-section">
 							<div class="sketch-head">
 								<Tooltip placement="right" text={t().tooltipSketchToggle}>
@@ -4351,55 +2667,55 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 										<span class="sketch-title">{t().sketchLabel}</span>
 									</button>
 								</Tooltip>
-								{#if sketchText !== null}
-									<span class="sketch-grain">{t().sketchGrainLabel}: {sketchModeLabel(sketchModeOf(result?.sketch_grain ?? sketchGrainOf(sketchMode)), getLang() === 'ja')}</span>
+								{#if work.sketchText !== null}
+									<span class="sketch-grain">{t().sketchGrainLabel}: {sketchModeLabel(sketchModeOf(work.result?.sketch_grain ?? sketchGrainOf(work.sketchMode)), getLang() === 'ja')}</span>
 									<!-- Editing needs the prose on screen, so the button unfolds the
 									     section rather than acting on what the author cannot see. -->
-									<button type="button" class="sketch-edit-btn" onclick={() => { sketchEditing = !sketchEditing; if (sketchEditing) describePanelSettings.revealSketch(); }}>
-										{sketchEditing ? t().ddlDoneBtn : t().ddlEditBtn}
+									<button type="button" class="sketch-edit-btn" onclick={() => { work.sketchEditing = !work.sketchEditing; if (work.sketchEditing) describePanelSettings.revealSketch(); }}>
+										{work.sketchEditing ? t().ddlDoneBtn : t().ddlEditBtn}
 									</button>
 								{/if}
 							</div>
 							{#if describePanelSettings.sketchOpen}
-								{#if result?.sketch_fallback_used}
+								{#if work.result?.sketch_fallback_used}
 									<p class="sketch-note">{t().sketchFallbackNote}</p>
-								{:else if sketchText === null}
+								{:else if work.sketchText === null}
 									<!-- No prose. Which of the silences this is comes from the
 									     record, not from the absence: a work drawn with the
 									     layer off and a work drawn before the layer was
 									     recorded read the same here otherwise. -->
-									<p class="sketch-note">{sketchStateNote(sketchState, getLang() === 'ja')}</p>
-								{:else if sketchEditing}
-									<textarea class="sketch-editor" rows="7" bind:value={sketchDraft} spellcheck="true"></textarea>
+									<p class="sketch-note">{sketchStateNote(work.sketchState, getLang() === 'ja')}</p>
+								{:else if work.sketchEditing}
+									<textarea class="sketch-editor" rows="7" bind:value={work.sketchDraft} spellcheck="true"></textarea>
 									<p class="sketch-note">{t().sketchEditHint}</p>
 								{:else}
-									<p class="sketch-body">{sketchDraft}</p>
+									<p class="sketch-body">{work.sketchDraft}</p>
 								{/if}
 							{/if}
 						</section>
 					{/if}
 
 					<!-- Interpretation: normalized DDL, read-only. -->
-					{#if ddl !== null && inputMode === 'single'}
+					{#if work.ddl !== null && work.inputMode === 'single'}
 						<section class="panel-section">
 							<DdlViewer
-								{ddl}
-								{expandedDdl}
+								ddl={work.ddl}
+								expandedDdl={work.expandedDdl}
 								label={t().ddlLabel}
 								expandedLabel={t().ddlExpandedLabel}
-								onPaint={() => { void replay(); }}
-								paintDisabled={loading || reloading || refinementSession.gridBusy}
-								runStatus={reloading ? ddlRunStatus : null}
+								onPaint={() => { void work.replay(); }}
+								paintDisabled={work.loading || work.reloading || refinementSession.gridBusy}
+								runStatus={work.reloading ? ddlRunStatus : null}
 							/>
 						</section>
 					{/if}
 
 					<!-- What the expansion layer removed. This complements editor-time
 					     DDL warnings by reporting the side only known after expansion. -->
-					{#if pluginWarningsShown.length > 0 && inputMode === 'single'}
+					{#if work.pluginWarningsShown.length > 0 && work.inputMode === 'single'}
 						<section class="panel-section plugin-warnings">
 							<div class="plugin-warnings-title">{t().ddlPluginWarningsTitle}</div>
-							{#each pluginWarningsShown as warning}
+							{#each work.pluginWarningsShown as warning}
 								<p class="plugin-warning-line">{warning}</p>
 							{/each}
 						</section>
@@ -4407,16 +2723,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 					<!-- Which limits took effect. The image cannot explain why ink was
 					     reduced; only this response can name the active settings. -->
-					{#if limitNotesShown.length > 0 && inputMode === 'single'}
+					{#if work.limitNotesShown.length > 0 && work.inputMode === 'single'}
 						<section class="panel-section limit-notes">
 							<div class="limit-notes-title">{t().renderLimitNotesTitle}</div>
-							{#each limitNotesShown as note}
+							{#each work.limitNotesShown as note}
 								<p class="limit-note-line">{note}</p>
 							{/each}
 						</section>
 					{/if}
 
-					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
+					{#if interpretationDiffParts.length > 0 && work.inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
 								<div class:removed={part.kind === "removed"} class:added={part.kind === "added"} class:same={part.kind === "same"}>{part.kind === "removed" ? "−" : part.kind === "added" ? "+" : " "} {part.text}</div>
@@ -4425,7 +2741,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{/if}
 
 					<!-- Statistics -->
-					{#if result && elapsedTotalMs > 0}
+					{#if work.result && work.elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
 							<Tooltip placement="right" text={t().tooltipStatsToggle}>
 								<button class="stats-toggle" onclick={resultLogSettings.toggle}>
@@ -4436,38 +2752,38 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							{#if resultLogSettings.open}
 								<div class="stats-detail">
 									<div class="stats-grid">
-										{#if elapsedStage1Ms > 0}
+										{#if work.elapsedStage1Ms > 0}
 											<div class="stats-row">
 												<span class="stats-key">{t().statsInterp}</span>
 												<span class="stats-value">
-													<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage1Ms / 1000).toFixed(1)}s</span>
-													<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage1, tokensOutStage1)}</span>
+													<span><span class="stats-metric-label">{t().statsElapsed}</span>{(work.elapsedStage1Ms / 1000).toFixed(1)}s</span>
+													<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(work.tokensInStage1, work.tokensOutStage1)}</span>
 												</span>
 											</div>
 										{/if}
-										{#if interpretFallbackReason}
+										{#if work.interpretFallbackReason}
 											<div class="stats-row">
 												<span class="stats-key">{t().interpretFallbackBadge}</span>
-												<span class="stats-value"><span>{t().interpretFallbackHint(interpretFallbackReason)}</span></span>
+												<span class="stats-value"><span>{t().interpretFallbackHint(work.interpretFallbackReason)}</span></span>
 											</div>
 										{/if}
 										<!-- Three states, always shown: see CanvasPanel's drawer. -->
 										<div class="stats-row">
 											<span class="stats-key">{t().composeFallbackBadge}</span>
-											<span class="stats-value"><span>{t().composeFallbackRecord(composeFallbackRecord)}{composeFallbackDrawnReason ? ` (${t().composeFallbackHint(composeFallbackDrawnReason)})` : ''}</span></span>
+											<span class="stats-value"><span>{t().composeFallbackRecord(work.composeFallbackRecord)}{work.composeFallbackDrawnReason ? ` (${t().composeFallbackHint(work.composeFallbackDrawnReason)})` : ''}</span></span>
 										</div>
 										<div class="stats-row">
 											<span class="stats-key">{t().statsStruct}</span>
 											<span class="stats-value">
-												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedStage2Ms / 1000).toFixed(1)}s</span>
-												<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(tokensInStage2, tokensOutStage2)}</span>
+												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(work.elapsedStage2Ms / 1000).toFixed(1)}s</span>
+												<span><span class="stats-metric-label">{t().statsTokens}</span>{tokenPair(work.tokensInStage2, work.tokensOutStage2)}</span>
 											</span>
 										</div>
 										<div class="stats-row stats-total">
 											<span class="stats-key">{t().statsTotal}</span>
 											<span class="stats-value">
-												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(elapsedTotalMs / 1000).toFixed(1)}s</span>
-												<span><span class="stats-metric-label">{t().statsTokens}</span>{totalTokenPair(tokensInStage1, tokensOutStage1, tokensInStage2, tokensOutStage2)}</span>
+												<span><span class="stats-metric-label">{t().statsElapsed}</span>{(work.elapsedTotalMs / 1000).toFixed(1)}s</span>
+												<span><span class="stats-metric-label">{t().statsTokens}</span>{totalTokenPair(work.tokensInStage1, work.tokensOutStage1, work.tokensInStage2, work.tokensOutStage2)}</span>
 											</span>
 										</div>
 									</div>
@@ -4497,13 +2813,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:promptStage2Expanded
 				bind:exportMenuOpen
 				bind:exportWrapEl
-				exportCardOnly={!uiVisibility.work_tools}
-				{result}
+				exportCardOnly={!session.uiVisibility.work_tools}
+				result={work.result}
 				nearbyHistory={lineageState.nearby}
 				onOpenNearbyHistory={openNearbyHistory}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
-				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
+				allowEmptyOutputTabs={work.inputMode === 'demo' || work.activeRunMode === 'demo'}
 				{currentRenderedAt}
 				navLatestDisabled={historyNavButtonsDisabled.latest}
 				navNewerDisabled={historyNavButtonsDisabled.newer}
@@ -4515,9 +2831,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvasAspectHeight={displayCanvasAspect.ratioH}
 				viewport={canvasViewport}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batch.input : demo.generatedPrompt)}
-				instructionText={currentInstructionText}
-				{ddl}
+				stage1PromptText={work.stage1UserPrompt || (work.inputMode === 'single' ? work.input : work.inputMode === 'batch' ? batch.input : demo.generatedPrompt)}
+				instructionText={work.currentInstructionText}
+				ddl={work.ddl}
 				{copiedPrompt}
 				{scoreJsonText}
 				{scoreJsonLines}
@@ -4531,7 +2847,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusCatalogName}
 				{statusCanvasName}
 				{statusGeneration}
-				{stageLabel}
+				stageLabel={work.stageLabel}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}
@@ -4546,24 +2862,24 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
-				replayDisabled={!replayableStatusHistoryItem || reloading}
+				replayDisabled={!replayableStatusHistoryItem || work.reloading}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
-				currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
+				currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 				onDownloadCard={downloadCurrentCard}
-				onVaryPerformance={varyPerformance}
-				onVaryComposition={varyComposition}
-				onVaryInterpretation={varyInterpretation}
+				onVaryPerformance={refinement.varyPerformance}
+				onVaryComposition={refinement.varyComposition}
+				onVaryInterpretation={refinement.varyInterpretation}
 				bind:instructionCaptionVisible
 				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
 				{refinementSession}
-				runTokensIn={activeRunTokensIn}
-				runTokensOut={activeRunTokensOut}
+				runTokensIn={work.activeRunTokensIn}
+				runTokensOut={work.activeRunTokensOut}
 				{modelInspection}
-				bind:touchSeedText
-				onGenerateVariationCandidates={generateVariationCandidates}
-				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
-				onShowVariationCandidate={showVariationCandidate}
+				bind:touchSeedText={work.touchSeedText}
+				onGenerateVariationCandidates={refinement.generateVariationCandidates}
+				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}
+				onShowVariationCandidate={refinement.showVariationCandidate}
 				{activeComparisonItem}
 				lineageGraph={lineageState.graph}
 				lineageLoading={lineageState.loading}
@@ -4579,8 +2895,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageSketchGrain={drawLineageSketchGrain}
 				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
-				statusDdlOrigin={statusDdlOrigin}
-				statusTenkei={displayedHistoryItem?.tenkei ?? null}
+				statusDdlOrigin={work.statusDdlOrigin}
+				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
 				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
 				refineDrawingModelGroups={availableModelCatalog}
@@ -4596,15 +2912,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDetachLineage={detachLineage}
 				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
 				onLoadLineageBranch={lineageState.loadBranch}
-				onPaintOne={paintOne}
-				onVisionAdvice={requestVisionRefineAdvice}
+				onPaintOne={work.paintOne}
+				onVisionAdvice={work.requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.animation}
 				{apiFetch}
 			/>
 		</div><!-- /body -->
 
-			{#if uiVisibility.history}
+			{#if session.uiVisibility.history}
 			<HistoryStrip
 			{historyItems}
 			{historyTotal}
@@ -4639,7 +2955,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
 			{developerMode}
-			{historyStripFields}
+			historyStripFields={session.historyStripFields}
 		/>
 			{/if}
 	</div><!-- /main-shell -->
@@ -4666,13 +2982,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
 			initialDdl={ddlDialogInitial}
 			drawing={ddlDialogDrawing}
-			{stage1ModelLabel}
-			{stage2ModelLabel}
+			stage1ModelLabel={work.stage1ModelLabel}
+			stage2ModelLabel={work.stage2ModelLabel}
 			drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
 			drawingModelGroups={availableModelCatalog}
 			onSelectDrawingModel={selectDdlDialogDrawingModel}
-			runTokensIn={activeRunTokensIn}
-			runTokensOut={activeRunTokensOut}
+			runTokensIn={work.activeRunTokensIn}
+			runTokensOut={work.activeRunTokensOut}
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
 		previewForPlugin={pluginPreview}
@@ -4703,21 +3019,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			visionProviderGroups={availableVisionModelCatalog}
 			allowVisionSelection={modelSelectionAllowVision}
 			bind:includeThinking
-			{currentUser}
-			{uiMode}
-			{uiCustom}
-			{uiModeSaving}
-			{uiModeSaveError}
-			{historyStripFields}
-			{historyStripFieldsSaving}
-			{historyStripFieldsSaveError}
-			onToggleHistoryStripField={(field) => void updateHistoryStripFields(toggleHistoryStripField(historyStripFields, field))}
-			onSetUiMode={(mode) => void updateUiMode(mode)}
-			onSetUiCustomItem={updateUiCustomItem}
-			{loginStatus}
-			bind:loginUserName
-			bind:loginPassword
-			bind:autoRepairEnabled={ddlAutoRepairEnabled}
+			currentUser={session.currentUser}
+			uiMode={session.uiMode}
+			uiCustom={session.uiCustom}
+			uiModeSaving={session.uiModeSaving}
+			uiModeSaveError={session.uiModeSaveError}
+			historyStripFields={session.historyStripFields}
+			historyStripFieldsSaving={session.historyStripFieldsSaving}
+			historyStripFieldsSaveError={session.historyStripFieldsSaveError}
+			onToggleHistoryStripField={(field) => void session.updateHistoryStripFields(toggleHistoryStripField(session.historyStripFields, field))}
+			onSetUiMode={(mode) => void session.updateUiMode(mode)}
+			onSetUiCustomItem={(key, visible) => session.updateUiCustomItem(key, visible)}
+			loginStatus={session.loginStatus}
+			bind:loginUserName={session.loginUserName}
+			bind:loginPassword={session.loginPassword}
+			bind:autoRepairEnabled={work.ddlAutoRepairEnabled}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
 			bind:animationExportSettings={exportSettings.animation}
 			bind:cardExportSettings={exportSettings.card}
@@ -4725,16 +3041,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{exportTemplateStatus}
 			{canvasAspectEnabled}
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
-			onChooseDownloadFolder={chooseDownloadFolder}
-			onClearDownloadFolder={clearDownloadFolder}
+			onChooseDownloadFolder={() => session.chooseDownloadFolder()}
+			onClearDownloadFolder={() => session.clearDownloadFolder()}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
 			onSetStage2Provider={setStage2Provider}
 			onSetStage2Model={setStage2Model}
 			onSetVisionProvider={setVisionProvider}
 			onSetVisionModel={setVisionModel}
-			onLogin={login}
-			onLogout={logout}
+			onLogin={() => session.login()}
+			onLogout={() => session.logout()}
 			onConfirmModelSelection={confirmModelSelection}
 			onAddExportTemplate={addExportTemplate}
 			onUpdateExportTemplate={updateExportTemplate}
@@ -4811,19 +3127,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	</div>
 {/if}
 
-{#if profileOpen && currentUser}
+{#if session.profileOpen && session.currentUser}
 		{#await import('$lib/components/ProfileModal.svelte') then { default: ProfileModal }}
 			<ProfileModal
-				username={currentUser.username}
-				email={currentUser.email}
-				generationCount={currentUser.image_generation_count}
-				status={profileStatus}
-			saving={profileSaving}
-			bind:profileEmail
-			bind:profileCurrentPassword
-			bind:profileNewPassword
-			onClose={closeProfile}
-			onSave={saveProfile}
+				username={session.currentUser.username}
+				email={session.currentUser.email}
+				generationCount={session.currentUser.image_generation_count}
+				status={session.profileStatus}
+			saving={session.profileSaving}
+			bind:profileEmail={session.profileEmail}
+			bind:profileCurrentPassword={session.profileCurrentPassword}
+			bind:profileNewPassword={session.profileNewPassword}
+			onClose={() => session.closeProfile()}
+			onSave={() => session.saveProfile()}
 		/>
 		{/await}
 {/if}
@@ -4887,8 +3203,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{historyPreviewText}
 			{shortModel}
 			{apiFetch}
-			currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
-			currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
+			currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
+			currentLineageRootId={work.displayedHistoryItem?.lineage_root_node_id ?? null}
 			isJapanese={getLang() === 'ja'}
 			onShareItem={singleUserMode ? null : (item) => (shareTarget = item)}
 		/>
@@ -4908,15 +3224,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{/await}
 {/if}
 
-{#if replayComparison}
+{#if work.replayComparison}
 	{#await import('$lib/components/ReplayComparisonModal.svelte') then { default: ReplayComparisonModal }}
 		<ReplayComparisonModal
-			originalSvg={replayComparison.originalSvg}
-			replayedSvg={replayComparison.replayedSvg}
-			recordedVersion={replayComparison.recordedVersion}
-			currentVersion={replayComparison.currentVersion}
-			versionMessage={replayComparison.versionMessage}
-			provisionalSeed={replayComparison.provisionalSeed}
+			originalSvg={work.replayComparison.originalSvg}
+			replayedSvg={work.replayComparison.replayedSvg}
+			recordedVersion={work.replayComparison.recordedVersion}
+			currentVersion={work.replayComparison.currentVersion}
+			versionMessage={work.replayComparison.versionMessage}
+			provisionalSeed={work.replayComparison.provisionalSeed}
 			onClose={closeReplayComparison}
 		/>
 	{/await}

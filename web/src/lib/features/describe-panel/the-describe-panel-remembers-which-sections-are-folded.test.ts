@@ -112,7 +112,7 @@ test('T-18: the sketch body is inside the fold and the head is not', () => {
 
 test('T-18: opening the editor unfolds the prose it edits', () => {
 	const page = read('../../../routes/+page.svelte');
-	assert.match(page, /sketchEditing = !sketchEditing; if \(sketchEditing\) describePanelSettings\.revealSketch\(\)/);
+	assert.match(page, /work\.sketchEditing = !work\.sketchEditing; if \(work\.sketchEditing\) describePanelSettings\.revealSketch\(\)/);
 });
 
 // ------------------------------------------------ T-19 (the folds are saved)

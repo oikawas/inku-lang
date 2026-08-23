@@ -24,7 +24,7 @@ import {
 } from './historyStripFields.ts';
 
 const STRIP = readFileSync(new URL('./components/HistoryStrip.svelte', import.meta.url), 'utf-8');
-const PANEL = readFileSync(new URL('./components/SettingsModal.svelte', import.meta.url), 'utf-8');
+const PANEL = readFileSync(new URL('./features/settings/AppearanceSettings.svelte', import.meta.url), 'utf-8');
 const JA = readFileSync(new URL('./i18n/ja.ts', import.meta.url), 'utf-8');
 const EN = readFileSync(new URL('./i18n/en.ts', import.meta.url), 'utf-8');
 

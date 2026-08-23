@@ -10,27 +10,27 @@ const read = (path: string): string => {
 	catch { return ''; }
 };
 
-test('T-326: page delegates refinement planning and fan-out but keeps transport and session coordination', () => {
+test('T-326: coordinator delegates refinement planning and fan-out but keeps transport and session coordination', () => {
 	const fanout = read('./refinement-fanout.ts');
-	const page = read('../../../routes/+page.svelte');
+	const coordinator = read('./refinement-coordinator.svelte.ts');
 
 	assert.match(fanout, /export async function planRefinementCandidates/);
 	assert.match(fanout, /export async function runRefinementFanout/);
-	assert.match(page, /planRefinementCandidates\(/);
-	assert.match(page, /runRefinementFanout\(/);
-	assert.doesNotMatch(page, /function colorCatalogCandidateIds\(/);
-	assert.doesNotMatch(page, /function runWithLimit</);
+	assert.match(coordinator, /planRefinementCandidates\(/);
+	assert.match(coordinator, /runRefinementFanout\(/);
+	assert.doesNotMatch(coordinator, /function colorCatalogCandidateIds\(/);
+	assert.doesNotMatch(coordinator, /function runWithLimit</);
 
-	assert.match(page, /async function renderWordTouchCandidate\(/);
-	assert.match(page, /async function composeVariationCandidate\(/);
-	assert.match(page, /async function interpretationVariationCandidate\(/);
-	assert.match(page, /async function variationCandidateLabel\(/);
-	assert.match(page, /async function renderColorCatalogCandidate\(/);
-	assert.match(page, /async function allocateVariationSeeds\(/);
+	assert.match(coordinator, /async function renderWordTouchCandidate\(/);
+	assert.match(coordinator, /async function composeVariationCandidate\(/);
+	assert.match(coordinator, /async function interpretationVariationCandidate\(/);
+	assert.match(coordinator, /async function variationCandidateLabel\(/);
+	assert.match(coordinator, /async function renderColorCatalogCandidate\(/);
+	assert.match(coordinator, /async function allocateVariationSeeds\(/);
 
-	const generateStart = page.indexOf('async function generateVariationCandidates');
-	const showStart = page.indexOf('function showVariationCandidate', generateStart);
-	const generate = page.slice(generateStart, showStart);
+	const generateStart = coordinator.indexOf('async function generateVariationCandidates');
+	const showStart = coordinator.indexOf('function showVariationCandidate', generateStart);
+	const generate = coordinator.slice(generateStart, showStart);
 	assert.match(generate, /refinementSession\.beginGrid\(/);
 	assert.match(generate, /window\.setTimeout\(/);
 	assert.match(generate, /refinementSession\.setPlans\(/);

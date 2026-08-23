@@ -10,24 +10,31 @@ const read = (path: string): string => {
 	catch { return ''; }
 };
 
-test('T-345: refinement workspace has one feature-local focused view', () => {
-	const view = read('./CanvasRefinementWorkspace.svelte');
+test('T-1001/T-1002: refinement shell composes three capability-local views', () => {
+	const shell = read('./CanvasRefinementWorkspace.svelte');
+	const adjust = read('./RefinementAdjustView.svelte');
+	const models = read('./RefinementModelCompareView.svelte');
+	const languages = read('./RefinementLanguageCompareView.svelte');
+	const styles = read('./refinement-workspace.css');
 	const panel = read('../../components/CanvasPanel.svelte');
 
-	assert.match(view, /class="refine-shell"/);
-	assert.match(view, /class="refine-panel"/);
-	assert.match(view, /class="compare-panel"/);
-	assert.match(view, /class="variation-grid"/);
-	assert.match(view, /\.refine-shell \{/);
-	assert.match(view, /\.compare-panel \{/);
-	assert.match(view, /Same picker and same semantics as DdlEditorDialog/);
-	assert.match(view, /Fit candidates into the remaining height/);
+	assert.match(shell, /import RefinementAdjustView/);
+	assert.match(shell, /import RefinementModelCompareView/);
+	assert.match(shell, /import RefinementLanguageCompareView/);
+	assert.match(shell, /<RefinementAdjustView/);
+	assert.match(shell, /<RefinementModelCompareView/);
+	assert.match(shell, /<RefinementLanguageCompareView/);
+	assert.match(adjust, /class="refine-panel"/);
+	assert.match(adjust, /class="variation-grid"/);
+	assert.match(adjust, /Same picker and same semantics as DdlEditorDialog/);
+	assert.match(models, /class="compare-mode-tabs"/);
+	assert.match(languages, /LANGUAGE_COMBOS/);
+	assert.match(styles, /Fit candidates into the remaining height/);
+	assert.doesNotMatch(styles, /:global\(/, 'external CSS must use standard selectors');
 
 	assert.match(panel, /import CanvasRefinementWorkspace from '\$lib\/features\/canvas\/CanvasRefinementWorkspace\.svelte'/);
 	assert.match(panel, /<CanvasRefinementWorkspace/);
 	assert.doesNotMatch(panel, /class="refine-shell"/);
-	assert.doesNotMatch(panel, /\.refine-shell \{/);
-	assert.doesNotMatch(panel, /\.compare-panel \{/);
 });
 
 test('T-346: CanvasPanel keeps refinement view coordination and local choices', () => {
@@ -54,21 +61,24 @@ test('T-346: CanvasPanel keeps refinement view coordination and local choices', 
 	assert.doesNotMatch(view, /\$state\(|localStorage|onMount|URL\.createObjectURL/);
 });
 
-test('T-347/T-348: all three views use the existing typed owners and narrow callbacks', () => {
-	const view = read('./CanvasRefinementWorkspace.svelte');
+test('T-1002/T-1005: focused refinement views reuse typed owners without cross-view capabilities', () => {
+	const shell = read('./CanvasRefinementWorkspace.svelte');
+	const adjust = read('./RefinementAdjustView.svelte');
+	const models = read('./RefinementModelCompareView.svelte');
+	const languages = read('./RefinementLanguageCompareView.svelte');
 
-	assert.match(view, /type Props = \{/);
-	assert.match(view, /refinementSession: RefinementSession/);
-	assert.match(view, /modelInspection: ModelInspection/);
-	assert.match(view, /type RefinementView = 'adjust' \| 'compare' \| 'language'/);
-	assert.match(view, /view: RefinementView/);
-	assert.match(view, /onSetRefineKind: \(kind: RefineKind\)/);
-	assert.match(view, /onClose: \(\) => void/);
-	assert.match(view, /width: min\(1120px, calc\(100% - 136px\)\)/);
-	assert.doesNotMatch(view, /\bany\b|apiFetch|CanvasPanel|\+page|createContext|setContext|getContext/);
-
-	const adjust = view.indexOf("view === 'adjust'");
-	const compare = view.indexOf("view === 'compare'");
-	const language = view.indexOf('LANGUAGE_COMBOS');
-	assert.ok(adjust >= 0 && compare > adjust && language >= 0, 'the three workspace views are incomplete');
+	assert.match(shell, /type RefinementView = 'adjust' \| 'compare' \| 'language'/);
+	assert.match(shell, /view: RefinementView/);
+	assert.match(shell, /onClose: \(\) => void/);
+	assert.match(adjust, /refinementSession: RefinementSession/);
+	assert.match(adjust, /onSetRefineKind: \(kind: RefineKind\)/);
+	assert.doesNotMatch(adjust, /modelInspection/);
+	assert.match(models, /modelInspection: ModelInspection/);
+	assert.doesNotMatch(models, /onGenerateVariationCandidates|touchSeedText|LANGUAGE_COMBOS/);
+	assert.match(languages, /modelInspection: ModelInspection/);
+	assert.doesNotMatch(languages, /onGenerateVariationCandidates|touchSeedText|compareMode/);
+	for (const source of [shell, adjust, models, languages]) {
+		assert.doesNotMatch(source, /\bany\b|apiFetch|CanvasPanel|\+page|createContext|setContext|getContext/);
+		assert.doesNotMatch(source, /\$state\(|localStorage|onMount|URL\.createObjectURL/);
+	}
 });

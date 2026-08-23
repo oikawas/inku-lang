@@ -4,15 +4,15 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer boundary refreshed 2026-08-22 |
-| Public branch / commit | `main` / `88506e0e10ffa38fdeeac3f74dfe1c5f07b3e37c` |
-| Public uncommitted changes | None at the refreshed snapshot |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 937` |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer boundary refreshed 2026-08-22; Web client boundary refreshed 2026-08-23 |
+| Source branch / implementation commit | `refactor/i346-stage10-five-surface-convergence` / `9366e7218a2c4426003179a4e13d2db250ed6b35` |
+| Source uncommitted changes | None at the implementation snapshot; this document synchronizes that snapshot |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 973` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `946` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `973` |
 | Render Engine | implementation `default / 40` |
 | DDL | `ddl_version=3`; `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.47`; implementation reports Render Engine `35` |
+| Android | `android/VERSION` = `2.1.4-android.56`; implementation reports Render Engine `35` |
 
 Environment-variable names may appear, but values, credentials, production DB contents, and deployment-specific identifiers were outside the investigation.
 
@@ -48,7 +48,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | DATA-LINEAGE | Lineage nodes and edges | Connect only an explicit parent and derivation kind | `LineageNodeRow`; `LineageEdgeRow`; `db.py:add_item`; `test_lineage_acceptance.py` | §21; Project Context | Confirmed |
 | DATA-SAIJIKI | Saijiki | Vocabulary source for prompts, markers, relation literals, display, and references | `saijiki.py`; `test_saijiki_golden.py` | Project Context | Confirmed |
 | DATA-FALLBACK | Fallback records | Store each layer's fallback as a column (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`, Sketch from life = `sketch_state`), keeping "unrecorded" (works older than the column) apart from "not a fallback" | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context | Confirmed |
-| WEB-FEATURES | Web feature modules | Separate batch, export, catalog, inspection, Wild, Settings administration, one Paint run, lineage queries, and history browsing | `web/src/lib/features/<name>/` | Project Context | Confirmed |
+| WEB-FEATURES | Web feature modules | Route-instance Session, Work, Refinement, Settings slices, history/lineage/viewport owners; stateless Paint/refinement operations; focused Canvas and Settings views | `web/src/lib/features/<name>/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte` | Project Context | Confirmed |
 | WEB-REGISTRY | Three settings registries | Collect local storage, user settings, and render payload fields | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context | Confirmed |
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |

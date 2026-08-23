@@ -29,13 +29,13 @@
 ## 文書間で注意が必要な語
 
 - SPECの「Rendererは非決定的」「同じScoreから違うSVG」は、render seedを変えた演奏の説明である。Project Contextと実装の契約は「同じScore + 同じseed + 同じ描画条件は同じ作品」。本群は後者を再現性の表現に使う。
-- `SPEC.ja.md` の文書Version `v1.92.0` とapp version `v2.11.18` は別namespaceとして記録した。これ自体を不一致とは判定しない。
+- `SPEC.ja.md` の文書Version `v1.92.0` とapp version `v2.13.47` は別namespaceとして記録した。これ自体を不一致とは判定しない。
 
 ## 集中が疑われる箇所
 
 ### C-01 `web/src/routes/+page.svelte`
 
-feature registry、Settings管理、1回のPaint request、lineage query、history browsingにはroute-instanceまたはstateless ownerができた。一方、session/current-work state、外側のPaint/compose loop、history mutation/replay/current-focus action、refinementはpageに集中しており、変更頻度の高いseamであり続ける。
+Session、current-workのsubmit/replay/stop、refinement orchestrationとtarget identity、Settings管理slice、最大のCanvas/Settings viewにはroute-instanceまたはfocused ownerができた。pageはroute lifecycle、modal/view state、component配線、history/lineageのcross-owner action、短い表示用projectionを保持する。composition seamではあるが、高変更workflow 3件のcanonical writerではなくなった。
 
 ### C-02 `server/src/inku_server/db.py`
 
@@ -60,7 +60,7 @@ request/response schema、provider failure、fallback、Stage orchestration、tr
 ## 今後確認すべき質問
 
 1. Android仕様メモ冒頭のsnapshotと外部provider「未実装」を、現行コードに合わせて更新するか。
-2. page、DB、render routerの責任集中を、次の機能変更時にどのseamから分離するか。
+2. 残るroute shell/history-lineage調停、DB module、render routerのどれを、次に変更理由から集中度reviewするか。
 3. Android JVM testをCIへ追加するか。server/CLI/Web/docsのgateは`checks.yml`（台帳I-192）でCIに入った。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

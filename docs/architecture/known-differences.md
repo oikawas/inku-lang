@@ -29,13 +29,13 @@
 ## Terms that need context
 
 - “The Renderer is non-deterministic” and “different SVG from the same Score” in the specification describe different render seeds. The implementation contract is: same JSON Score + same render seed + same performance conditions reproduce the same work.
-- `SPEC.ja.md` document version `v1.92.0` and app `v2.11.18` are separate namespaces, not a mismatch.
+- `SPEC.ja.md` document version `v1.92.0` and app `v2.13.47` are separate namespaces, not a mismatch.
 
 ## Concentrated responsibilities
 
 ### C-01 `web/src/routes/+page.svelte`
 
-Feature registries, Settings administration, one Paint request, lineage queries, and history browsing have route-instance or stateless owners. The page still concentrates session/current-work state, outer Paint/compose loops, history mutation/replay/current-focus actions, and refinement, so it remains a high-change seam.
+Session, current-work submit/replay/stop, refinement orchestration and target identity, Settings administration slices, and the largest Canvas/Settings views now have route-instance or focused owners. The page retains route lifecycle, modal/view state, component wiring, history/lineage cross-owner actions, and short presentation projections. It remains a composition seam, but it is no longer the canonical writer for the three high-change workflows.
 
 ### C-02 `server/src/inku_server/db.py`
 
@@ -60,7 +60,7 @@ Every major node and edge in this set has public implementation evidence. The di
 ## Follow-up questions
 
 1. Should the opening Android snapshot and external-provider statement be aligned with current code?
-2. Which seam should first separate responsibility from the page, DB module, or render router?
+2. Should the remaining route-shell/history-lineage coordination, DB module, or render router be the next concentration reviewed by change reason?
 3. Should the Android JVM tests move into CI? The Server, CLI, Web, and document gates entered CI with `checks.yml` (ledger I-192).
 
 These questions are not copied automatically into `PROJECT_CONTEXT.ja.md` or `SPEC.ja.md`.

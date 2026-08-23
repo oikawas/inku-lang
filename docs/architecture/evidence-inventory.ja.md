@@ -4,15 +4,15 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer境界更新 2026-08-22 |
-| 公開側 branch / commit | `main` / `88506e0e10ffa38fdeeac3f74dfe1c5f07b3e37c` |
-| 公開側の未コミット変更 | なし（更新後snapshot確認時） |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 937` |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer境界更新 2026-08-22、Web client境界更新 2026-08-23 |
+| source branch / 実装commit | `refactor/i346-stage10-five-surface-convergence` / `9366e7218a2c4426003179a4e13d2db250ed6b35` |
+| source未コミット変更 | 実装snapshot時はなし。本書がそのsnapshotへ同期する |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 973` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `946` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `973` |
 | Render Engine | 実装 `default` / `40` |
 | DDL | `ddl_version=3` / `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.47`、実装が名乗る Render Engine `35` |
+| Android | `android/VERSION` = `2.1.4-android.56`、実装が名乗る Render Engine `35` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -48,7 +48,7 @@
 | DATA-LINEAGE | 系譜node/edge | 明示された親とderivation kindだけをedge化 | `LineageNodeRow`, `LineageEdgeRow`, `db.py:add_item`; `test_lineage_acceptance.py` | §21、Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-SAIJIKI | 歳時記 | prompt、marker、relation、Web表示、referenceの語彙正本 | `saijiki.py` (`SAIJIKI`, `prompt_block`, `display_categories`); `test_saijiki_golden.py` | Project Context「語彙」 | 確認済み | 公開可 |
 | DATA-FALLBACK | fallbackの記録 | 各層のfallbackを列として保存（Stage 1 = `interpret_fallback`、Stage 2 = `compose_fallback`、写生 = `sketch_state`）。記録なし（列導入前の作品）とfallbackでないを区別する | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context「設計契約」 | 確認済み | 公開可 |
-| WEB-FEATURES | Web feature modules | batch、export、catalog、inspection、wild、Settings管理、1回のPaint run、lineage query、history browsingを分離 | `web/src/lib/features/<name>/` | Project Context「web」 | 確認済み | 公開可 |
+| WEB-FEATURES | Web feature modules | route-instanceのSession・Work・Refinement・Settings slice・history/lineage/viewport owner、stateless Paint/refinement operation、focused Canvas/Settings view | `web/src/lib/features/<name>/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte` | Project Context「web」 | 確認済み | 公開可 |
 | WEB-REGISTRY | 3設定登録簿 | localStorage、user settings、render payloadを集約 | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context「web」 | 確認済み | 公開可 |
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |

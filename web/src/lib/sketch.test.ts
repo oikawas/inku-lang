@@ -172,12 +172,17 @@ test('T-6: an absent or unknown state is not rounded to a real one', () => {
 
 test('T-6: both places that put a work on screen carry its state, and the panel shows it', () => {
 	const page = read('../routes/+page.svelte');
+	const currentWork = read('./features/history/current-work.ts');
+	const generationInfo = read('./features/canvas/CanvasGenerationInfo.svelte');
 	assert.match(page, /sketchState = normalizeSketchState\(state\)/);
 	// A fresh run and a saved work reopened. Wiring one and not the other leaves
-	// half the works reading as though they predate the column.
+	// half the works reading as though they predate the column. Saved-work field
+	// mapping now belongs to the canonical current-work projection.
 	assert.match(page, /adoptSketch\(r\.sketch_text \?\? null, r\.sketch_grain, input, r\.sketch_state\)/);
-	assert.match(page, /adoptSketch\(it\.sketch_text \?\? null, it\.sketch_grain, sourceText, it\.sketch_state\)/);
+	assert.match(currentWork, /sketchState: item\.sketch_state/);
+	assert.match(page, /adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
 	assert.match(page, /sketchStateNote\(sketchState, getLang\(\) === 'ja'\)/);
+	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });
 
 test('T-6/T-2: the one sender that saves a drawing carries the state too', () => {

@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import { COLOR_KEY_ORDER, colorMapEntries, colorWordLabel } from './colors.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const PANEL = read('./components/CanvasPanel.svelte');
+const INFO = read('./features/canvas/CanvasGenerationInfo.svelte');
 
 // ------------------------------------------------------------------- T-41
 
@@ -31,9 +31,9 @@ test('T-41  the catalog tagline is not shown; the name already said it', () => {
 	// "Lantern & Dew" already tells the reader what "night air, lantern, dew"
 	// tells them -- so the row said nothing about this work. The reader that
 	// localised it went with it rather than being left with no reader.
-	assert.doesNotMatch(PANEL, /detailCatalogSub/);
-	assert.doesNotMatch(PANEL, /render_color_catalog_sub/);
-	assert.doesNotMatch(PANEL, /catalogSubLine/);
+	assert.doesNotMatch(INFO, /detailCatalogSub/);
+	assert.doesNotMatch(INFO, /render_color_catalog_sub/);
+	assert.doesNotMatch(INFO, /catalogSubLine/);
 	assert.doesNotMatch(read('./colors.ts'), /catalogSubLine/);
 	for (const key of ['provenanceLabelCatalogSub', 'provenanceHintCatalogSub']) {
 		for (const pack of ['./i18n/ja.ts', './i18n/en.ts', './i18n/types.ts']) {
@@ -45,8 +45,8 @@ test('T-41  the catalog tagline is not shown; the name already said it', () => {
 test('T-41  and the catalog name it stood under is still there', () => {
 	// Which of the fourteen catalogs translated the colours is the fact that is
 	// about this work, and it stays.
-	assert.match(PANEL, /t\(\)\.provenanceHintCatalog\)/);
-	assert.match(PANEL, /<dd>\{statusCatalogName\}<\/dd>/);
+	assert.match(INFO, /t\(\)\.provenanceHintCatalog\)/);
+	assert.match(INFO, /<dd>\{statusCatalogName\}<\/dd>/);
 });
 
 // ------------------------------------------------------------------- T-42
@@ -94,19 +94,19 @@ test('T-42  the Japanese word is the saijiki word, not a gloss', () => {
 // ------------------------------------------------------------------- T-43
 
 test('T-43  the map row is shown only when the work carries one', () => {
-	assert.match(PANEL, /\{#if detailColorMap\.length > 0\}/);
+	assert.match(INFO, /\{#if detailColorMap\.length > 0\}/);
 	assert.match(
-		PANEL,
+		INFO,
 		/colorMapEntries\(statusHistoryItem\?\.render_color_map \?\? result\?\.render_color_map\)/
 	);
-	assert.match(PANEL, /colorWordLabel\(entry\.key, isJapanese\)/);
+	assert.match(INFO, /colorWordLabel\(entry\.key, isJapanese\)/);
 	// A chip carries its own hex, so the exact colour is one hover away.
-	assert.match(PANEL, /title=\{entry\.code\}/);
+	assert.match(INFO, /title=\{entry\.code\}/);
 });
 
 test('T-43  and the drawer no longer asks for what only that line needed', () => {
 	// The catalog table and the rename table were passed in for the sub line.
 	// A prop nothing reads is a prop that goes stale without anything saying so.
-	assert.doesNotMatch(PANEL, /colorCatalogs/);
-	assert.doesNotMatch(PANEL, /renamedCatalogIds/);
+	assert.doesNotMatch(INFO, /colorCatalogs/);
+	assert.doesNotMatch(INFO, /renamedCatalogIds/);
 });

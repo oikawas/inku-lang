@@ -24,6 +24,7 @@ pub mod planning;
 pub mod render;
 pub mod stroke;
 pub mod support;
+mod surface_geometry;
 pub mod surfaces;
 pub mod svg;
 pub mod types;

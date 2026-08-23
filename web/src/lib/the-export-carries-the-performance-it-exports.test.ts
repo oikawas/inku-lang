@@ -25,16 +25,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const PAGE = read('../routes/+page.svelte');
+const REPLAY = read('./features/history/replay.ts');
 const DOWNLOAD = read('./features/export/download.ts');
-
-/** The body of the /api/render-svg call inside replayHistoryItem. */
-const REPLAY = (() => {
-	const start = PAGE.indexOf('async function replayHistoryItem');
-	assert.notEqual(start, -1, 'replayHistoryItem is gone');
-	const body = PAGE.slice(start);
-	return body.slice(0, body.indexOf('const r = await r'));
-})();
 
 // ------------------------------------------------------------------- T-56
 
@@ -42,15 +34,15 @@ test('T-56  the replay sends the seed that places the marks', () => {
 	// Both, not one: sending only the performance seed is what made the marks
 	// move, because the renderer then places them from it.
 	assert.match(REPLAY, /render_seed: replaySeed,/);
-	assert.match(REPLAY, /composition_seed: it\.composition_seed \?\? null,/);
+	assert.match(REPLAY, /composition_seed: item\.composition_seed \?\? null,/);
 });
 
 test('T-56  it reads the placement seed off the work, not off the screen', () => {
-	// `it` is the history item being replayed. Reading the seed from the work
+	// `item` is the history item being replayed. Reading the seed from the work
 	// currently drawn would replay every item with the same placement.
 	const line = REPLAY.match(/composition_seed: ([^,]+),/);
 	assert.ok(line, 'the replay sends no composition seed');
-	assert.match(line[1], /^it\./);
+	assert.match(line[1], /^item\./);
 });
 
 // ------------------------------------------------------------------- T-57

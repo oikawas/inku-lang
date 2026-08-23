@@ -1,11 +1,11 @@
-"""The Android reference fixtures must be what today's tree bakes (F-1..F-4).
+"""The Android reference fixtures must match their declared owners (F-1..F-4).
 
-The corpus is filed by the engine version that governs it, so "today's tree"
-means the current version directory plus the five fixtures no engine governs.
-Older versions are not rebaked -- an engine 22 tree cannot produce engine 21's
-expectations -- so F-4 holds them by manifest instead. Rebaking them is exactly
-the failure this layout exists to prevent: it rewrites expectations the port
-still holds, and turned 7 of 159 JVM tests red when engine 22 merged.
+The corpus is filed by the Android engine version that consumes it. Flat files
+and any declared version that still matches the server generator are rebaked by
+F-1. A deliberately lagging renderer directory cannot be reproduced by a newer
+server tree, so F-4 holds it by manifest instead. Rebaking an older directory is
+exactly the failure this layout exists to prevent: it rewrites expectations the
+port still holds, and turned 7 of 159 JVM tests red when engine 22 merged.
 
 `gen_android_reference.py` is run by hand, and nothing watched its output. On
 2026-08-04 five of the 53 files had been stale since `4eef595c` (the commit that
@@ -34,8 +34,6 @@ import sys
 
 import pytest
 
-from inku_server import renderer
-
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # `android/` is permanently excluded from every pentala sync path (standing rule
@@ -45,6 +43,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 ANDROID_TREE = ROOT / "android"
 FIXTURES = ANDROID_TREE / "app/src/test/resources/server_reference"
 GENERATOR = ROOT / "server/scripts/gen_android_reference.py"
+ANDROID_COMPATIBILITY = (
+    ANDROID_TREE
+    / "app/src/main/java/app/inku/mobile/data/model/CompatibilityConstants.kt"
+)
+ANDROID_REFERENCE_CORPUS = (
+    ANDROID_TREE / "app/src/test/java/app/inku/mobile/ReferenceCorpus.kt"
+)
+ANDROID_RENDERER = (
+    ANDROID_TREE / "app/src/main/java/app/inku/mobile/render/DefaultSvgRenderer.kt"
+)
 
 android_only = pytest.mark.skipif(
     not ANDROID_TREE.is_dir(), reason="android/ is absent (pentala)"
@@ -94,9 +102,38 @@ def _load_generator(out_dir: pathlib.Path):
     return module
 
 
+def _kotlin_string_constant(path: pathlib.Path, name: str) -> str:
+    """Read a version from the Android declaration that owns fixture routing."""
+    source = path.read_text(encoding="utf-8")
+    match = re.search(rf"\bconst val {re.escape(name)}\s*=\s*\"([^\"]+)\"", source)
+    assert match is not None, f"{name} is not declared in {path}"
+    return match.group(1)
+
+
+def _android_render_engine_dir() -> pathlib.Path:
+    version = _kotlin_string_constant(ANDROID_COMPATIBILITY, "renderEngineVersion")
+    return FIXTURES / f"render-engine-{version}"
+
+
+def _android_ddl_engine_dir() -> pathlib.Path:
+    version = _kotlin_string_constant(ANDROID_REFERENCE_CORPUS, "ddlEngineVersion")
+    return FIXTURES / f"ddl-engine-{version}"
+
+
+def _android_arrangement_quantum() -> int:
+    """Derive decimal precision from the Android renderer's quantizer."""
+    source = ANDROID_RENDERER.read_text(encoding="utf-8")
+    match = re.search(
+        r"round\(value \* (1(?:_000)+)\.0\) / \1\.0",
+        source,
+    )
+    assert match is not None, "the Android arrangement quantizer is not recognizable"
+    return len(match.group(1).replace("_", "")) - 1
+
+
 def _fixture_path(name: str) -> pathlib.Path:
-    """Resolve a fixture the way the generator files it, rather than guessing."""
-    return _load_generator(FIXTURES).out_path(name)
+    """Resolve a renderer fixture through Android's declared compatibility version."""
+    return _android_render_engine_dir() / name
 
 
 def _files_under(root: pathlib.Path, subdirectories: set[str]) -> set[str]:
@@ -112,20 +149,23 @@ def _files_under(root: pathlib.Path, subdirectories: set[str]) -> set[str]:
 @android_only
 @baked_here_only
 def test_every_android_fixture_matches_a_fresh_bake(tmp_path) -> None:
-    """F-1 currency: rebaking the current version reproduces every checked-in byte.
+    """F-1 currency: rebaking matching declared versions reproduces every byte.
 
     This is a record, not a property -- it says the files on disk are what the
     current tree produces. That is the failure it exists for: a change moves the
     drawing, the fixtures are not rebaked, and the port stays green against an
     expectation the server no longer holds.
 
-    It reaches only what the generator writes. Older version directories are held
-    by F-4, because this tree cannot bake them at all.
+    It reaches flat files and only version directories where Android's declaration
+    equals the generator's current version. Lagging directories are held by F-4,
+    because this tree cannot bake them at all.
     """
     module = _load_generator(tmp_path)
     module.main()
 
-    current = {module.render_engine_dir().name, module.ddl_engine_dir().name}
+    declared = {_android_render_engine_dir().name, _android_ddl_engine_dir().name}
+    generated = {module.render_engine_dir().name, module.ddl_engine_dir().name}
+    current = declared & generated
     baked = _files_under(tmp_path, current)
     committed = _files_under(FIXTURES, current)
     assert baked == committed
@@ -160,7 +200,8 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
     2026-08-09.
     """
     fixture = json.loads(_fixture_path("renderer_arrangement.json").read_text())
-    assert fixture["arrangement_quantum"] == renderer.ARRANGEMENT_QUANTUM
+    quantum = _android_arrangement_quantum()
+    assert fixture["arrangement_quantum"] == quantum
 
     stored = [
         case
@@ -177,8 +218,8 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
         for anchor in case["anchors"]
         for value in anchor
     )
-    assert decimals <= renderer.ARRANGEMENT_QUANTUM
-    assert decimals == renderer.ARRANGEMENT_QUANTUM
+    assert decimals <= quantum
+    assert decimals == quantum
 
 
 @android_only
@@ -214,11 +255,10 @@ def test_every_version_directory_matches_its_manifest() -> None:
         for path in FIXTURES.iterdir()
         if path.is_dir() and VERSION_DIRECTORY.match(path.name)
     )
-    module = _load_generator(FIXTURES)
     names = {path.name for path in directories}
-    # The current versions must be among them; the older ones are why this exists.
-    assert module.render_engine_dir().name in names
-    assert module.ddl_engine_dir().name in names
+    # Android's declared versions must be present; server may be newer by design.
+    assert _android_render_engine_dir().name in names
+    assert _android_ddl_engine_dir().name in names
     assert len(names) > 2, f"only the current versions are filed: {sorted(names)}"
 
     for directory in directories:

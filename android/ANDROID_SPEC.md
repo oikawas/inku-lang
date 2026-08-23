@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.51` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.52` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2596,3 +2596,9 @@ The I-349 selection ring, tap behavior, scrolling to the selected work, interact
 A model provider is now resolved in three steps: an explicit prefix naming a configured provider, exact ownership by exactly one enabled provider, then the default-local provider. If multiple providers publish the same model, or none owns it, routing no longer chooses the first list entry and proceeds to default-local. Disabled providers do not count as owners; an explicit prefix naming a disabled provider keeps that identity and stops before execution instead of redirecting elsewhere.
 
 Prefix-like unknown words and colons inside model IDs remain unchanged. OpenAI-compatible requests remove only their own leading provider prefix. No per-stage provider setting, `ModelRequest`, provider catalog, Room schema or migration, pipeline, rendering, persistence, server, Web, or shared path changed.
+
+## 2026-08-23 Starring a work directly in the history strip (android `2.1.4-android.52`, [I-354])
+
+Each thumbnail in the ordinary Compose history strip now has a `★` or `☆` control at its upper-right corner for starring or unstarring the work in place. The Star control is a separate tap target from selecting the thumbnail, so starring does not replace the work shown on the canvas. The existing drawing and refinement lock disables both actions.
+
+The UI uses only the existing `HistoryListItem.starred` state and `toggleStar(HistoryListItem)` action. I-349's selection ring, tap, scrolling, and visibility rules and I-350's model label are preserved. No new state producer, ViewModel action, repository or DAO query, Room schema or migration, persistence, pipeline, rendering, server, Web, or shared path changed.

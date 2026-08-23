@@ -7914,3 +7914,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **provider選択を明示prefix、enabled providerによる完全一致の単独所有、default-localの3段規則へ揃えた。** 所有者が0件または複数なら一覧の先頭を選ばずdefault-localへ進むため、Roomの並び順で答えが変わらない。
 - **disabled providerは所有者へ数えず、明示指定されたdisabled providerは別providerへredirectせず実行前に停止する。** 未知prefixらしき語とモデルID内部のcolonを保持し、OpenAI互換requestは自providerの先頭prefixだけを外す。Stage別設定、`ModelRequest`、provider catalog、Room/schema/migration、pipeline、render、永続化、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新resolver/helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`RoutingModelProviderTest`はexit 0。全JVM suite、計装、実機、network、実モデル、Room migration、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.52` — 履歴stripで作品をその場でStar／解除する（2026-08-23・[I-354]）
+
+- **各履歴サムネイル右上に`★`／`☆`のStar controlを追加した。** サムネイル選択とは別のtap targetで、Star操作だけではキャンバスの選択作品を切り替えない。描画・推敲中は既存lockに従って両操作を無効にする。
+- **既存`HistoryListItem.starred`と`toggleStar(HistoryListItem)`だけを結線した。** I-349の選択枠、tap、scroll、表示条件とI-350のモデル名表示を保ち、新しいproducer、ViewModel action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`HistoryThumbnailStripTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

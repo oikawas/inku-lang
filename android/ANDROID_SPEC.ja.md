@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.51` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.52` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2094,3 +2094,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 モデルのproviderは、設定済みproviderの明示prefix、enabled providerによる完全一致の単独所有、default-localの順で解決する。同じモデルを複数providerが公開する場合と所有者がない場合は一覧の先頭を選ばずdefault-localへ進む。disabled providerは単独所有へ数えず、明示prefixでdisabled providerを指定した場合は別providerへredirectせず実行前に停止する。
 
 未知のprefixらしき語やモデルID内部のcolonはそのまま保持する。OpenAI互換requestでは自providerの先頭prefixだけを外す。Stage別provider設定、`ModelRequest`、provider catalog、Room/schema/migration、pipeline、render、永続化、server/web/sharedは変更していない。
+
+## 2026-08-23 履歴stripで作品をその場でStar／解除する（android `2.1.4-android.52`・[I-354]）
+
+通常Compose画面の履歴stripで、各サムネイル右上の`★`／`☆`から作品をStar／解除できる。Star controlはサムネイルの作品選択とは別のtap targetで、Starを押してもキャンバスの選択作品を切り替えない。描画・推敲中は既存lockに従って両操作を無効にする。
+
+既存の`HistoryListItem.starred`と`toggleStar(HistoryListItem)`だけを使う。I-349の選択枠、tap、scroll、表示条件とI-350のモデル名表示を保ち、新しいstate producer、ViewModel action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。

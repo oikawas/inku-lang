@@ -31,6 +31,10 @@
 		projectRefinementCandidate,
 		saveRefinementCandidates
 	} from '$lib/features/canvas/refinement-actions';
+	import {
+		planRefinementCandidates,
+		runRefinementFanout
+	} from '$lib/features/canvas/refinement-fanout';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -421,6 +425,8 @@
 	};
 	let modelSelectionSnapshot = $state<ModelSelectionSnapshot | null>(null);
 	let modelSelectionAllowVision = $state(true);
+	// The Server config supplies the candidate-grid cap so it tracks render slots;
+	// apiFetch handles 503 retries when other work temporarily occupies a slot.
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
 	// This server belongs to one person and signs them in by itself. The doors
@@ -4001,21 +4007,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
 	}
 
-	// Refinement keeps its draw (author's ruling, 2026-08-01). The batch and the
-	// demo now send catalog_mode=auto and let the server read each description,
-	// but this fills a grid of alternatives for the author to choose between:
-	// reading the description would answer once and collapse four cards into one.
-	function colorCatalogCandidateIds(count: 1 | 4): string[] {
-		const currentId = refinementCatalogId();
-		const candidates = colorCatalogs.map((catalog) => catalog.id).filter((id) => id && id !== currentId);
-		for (let index = candidates.length - 1; index > 0; index -= 1) {
-			const swapIndex = Math.floor(Math.random() * (index + 1));
-			[candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
-		}
-		if (candidates.length === 0) throw new Error(t().refineNoAlternateCatalog);
-		return Array.from({ length: count }, (_, index) => candidates[index % candidates.length]);
-	}
-
 	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!result) throw new Error("missing result");
 		const source = input.trim();
@@ -4093,31 +4084,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
-	// Fan-out cap for candidate grids, served by GET /api/client-config so it can
-	// track the server's own render slot count. The 503 retry in apiFetch covers
-	// slots taken by other work.
-
-	// The hooks are per job rather than per completion: a fan-out that only counts
-	// finishes cannot say which jobs are in flight, and the progress it draws
-	// looks like nothing happening until everything lands at once.
-	async function runWithLimit<T>(
-		thunks: Array<() => Promise<T>>,
-		limit: number,
-		hooks?: { onStart?: (index: number) => void; onDone?: (index: number) => void }
-	): Promise<T[]> {
-		const results = new Array<T>(thunks.length);
-		let next = 0;
-		const workers = Array.from({ length: Math.max(1, Math.min(limit, thunks.length)) }, async () => {
-			for (let index = next++; index < thunks.length; index = next++) {
-				hooks?.onStart?.(index);
-				results[index] = await thunks[index]();
-				hooks?.onDone?.(index);
-			}
-		});
-		await Promise.all(workers);
-		return results;
-	}
-
 	// The Server allocates variation seeds; seed-space ownership and deduplication stay out of the UI.
 	async function allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]> {
 		const r = await apiFetch("/api/variation/seeds", {
@@ -4165,42 +4131,36 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			refinementSession.enableAbort(abortController);
 		}, 3000);
 		try {
-			const usedVarySeeds = new Set<number>();
-			if (Number.isFinite(result.composition_seed ?? NaN)) usedVarySeeds.add(Number(result.composition_seed));
-			for (const candidate of refinementSession.candidates) {
-				if (Number.isFinite(candidate.result.composition_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.composition_seed));
-			}
-			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
-			// Allocate all variation seeds before candidate generation because the Server owns numbering.
-			const variationSeeds = kind === "variation" ? await allocateVariationSeeds(amplitude ?? "medium", count) : [];
-			// The label is lifted out of the job so the lane can be named before the
-			// job that fills it has started.
-			const plans = Array.from({ length: count }, (_, index) => {
-				const sequence = index + 1;
-				if (kind === "touch") {
-					const label = t().canvasVaryPerformance;
-					return { label, run: () => renderWordTouchCandidate(normalizedTouchWords, label, abortController.signal) };
-				}
-				if (kind === "layout") {
-					const compositionSeed = createSafeIntegerSeed(usedVarySeeds);
-					usedVarySeeds.add(compositionSeed);
-					const label = t().canvasVaryComposition + " " + sequence;
-					return { label, run: () => composeVariationCandidate(compositionSeed, label, abortController.signal) };
-				}
-				if (kind === "reading") {
-					const label = t().canvasVaryInterpretation + " " + sequence;
-					return { label, run: () => interpretationVariationCandidate(label, abortController.signal) };
-				}
-				if (kind === "variation") {
-					const label = t().variationTitle + " " + sequence;
-					return { label, run: () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], label, abortController.signal) };
-				}
-				const catalogId = catalogIds[index];
-				const label = t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId);
-				return { label, run: () => renderColorCatalogCandidate(catalogId, label, abortController.signal) };
+			const plans = await planRefinementCandidates({
+				kind,
+				count,
+				touchWords: normalizedTouchWords,
+				amplitude,
+				signal: abortController.signal,
+				labels: {
+					touch: t().canvasVaryPerformance,
+					layout: t().canvasVaryComposition,
+					reading: t().canvasVaryInterpretation,
+					variation: t().variationTitle,
+					color: t().canvasVaryColor,
+					noAlternateCatalog: t().refineNoAlternateCatalog
+				},
+				currentCompositionSeed: result.composition_seed,
+				previousCandidates: refinementSession.candidates,
+				availableCatalogIds: colorCatalogs.map((catalog) => catalog.id),
+				currentCatalogId: refinementCatalogId()
+			}, {
+				createCompositionSeed: createSafeIntegerSeed,
+				allocateVariationSeeds,
+				catalogName,
+				renderTouch: renderWordTouchCandidate,
+				renderLayout: composeVariationCandidate,
+				renderReading: interpretationVariationCandidate,
+				renderVariation: variationCandidateLabel,
+				renderColor: renderColorCatalogCandidate
 			});
 			refinementSession.setPlans(abortController, plans.map((plan) => plan.label));
-			const candidates = await runWithLimit(plans.map((plan) => plan.run), renderFanoutLimit, {
+			const candidates = await runRefinementFanout(plans.map((plan) => plan.run), renderFanoutLimit, {
 				onStart: (index) => refinementSession.seatSlot(abortController, index, 'running'),
 				onDone: (index) => { refinementSession.finishSlot(abortController, index); },
 			});

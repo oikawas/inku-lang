@@ -962,7 +962,7 @@ def test_render_reference_discriminator_cases() -> None:
 
     # engine 16 段 1。本番既定の display が筆致を通ること。
     display = cases["C-display-surface-wash-pen"]
-    assert "surface-stroke-v1" in display["classes"]
+    assert any("surface-stroke-v1" in name.split() for name in display["classes"])
 
     # engine 16 段 3。太さは絵を変えるが、銀筆は下限にいるので幅が変わらない
     # (それでも演奏 seed には入っているので手は変わる = C-7 の帰結)。

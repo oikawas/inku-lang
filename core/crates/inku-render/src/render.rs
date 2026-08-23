@@ -7,6 +7,7 @@ use crate::determinism::hash01;
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
+use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::{PerformanceRequest, resolve_performance};
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
@@ -232,6 +233,32 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         .or(request.options.render_seed);
     let structured = profile != SvgProfile::Display;
     let mut content = Element::new("g").attr("id", "layer_10_content");
+    let use_filters = profile == SvgProfile::Display;
+    let mut material_definitions = Vec::new();
+    if use_filters {
+        for weight in [
+            crate::types::Weight::Pencil,
+            crate::types::Weight::Crayon,
+            crate::types::Weight::Chalk,
+            crate::types::Weight::BrushThick,
+            crate::types::Weight::Drypoint,
+        ] {
+            if performance
+                .score
+                .instructions
+                .iter()
+                .any(|instruction| instruction.weight == weight)
+                && let Some(filter) = texture_filter(weight, request.options.canvas)
+            {
+                material_definitions.push(filter);
+            }
+        }
+        if let Some(seed) = request.options.render_seed {
+            let (filter_id, filter) = performance_touch_filter(seed, request.options.canvas);
+            content.set_attr("filter", format!("url(#{filter_id})"));
+            material_definitions.push(filter);
+        }
+    }
     let mut surface_definitions = Vec::new();
     for (instruction_index, instruction) in ordered {
         let expanded = if instruction.arrangement.is_some() {
@@ -257,6 +284,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
                 instruction_index,
                 mark_index,
                 wild: request.options.wild,
+                use_filters,
                 support,
             };
             let base_mark = render_instruction(single, context)?;
@@ -314,6 +342,9 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         )
     });
     let mut document = Document::new(request.options.canvas);
+    for definition in material_definitions {
+        document.push_definition(definition);
+    }
     if let Some(ground) = &ground {
         for definition in &ground.definitions {
             document.push_definition(definition.clone());

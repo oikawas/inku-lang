@@ -246,7 +246,12 @@ fn candidate_preserves_every_ground_between_background_and_content() {
                 output.svg.contains("<pattern"),
                 "ground pattern: {material}"
             );
-            assert!(!output.svg.contains("<filter"));
+            if profile == SvgProfile::Display {
+                assert!(output.svg.contains("<filter"));
+                assert!(output.svg.contains("url(#performance_touch_431)"));
+            } else {
+                assert!(!output.svg.contains("<filter"));
+            }
             assert!(!output.svg.contains("<clipPath"));
             assert_eq!(
                 serde_json::to_string(
@@ -322,4 +327,30 @@ fn hand_fills_are_tool_fields_while_machine_fills_remain_regions() {
     assert!(output.svg.contains("<polygon"));
     assert!(!output.svg.contains("<clipPath"));
     assert!(!output.svg.contains("NaN"));
+}
+
+#[test]
+fn display_owns_material_filters_but_compat_remains_filter_free() {
+    let make_request = |profile| RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"line","from":[0.1,0.2],"to":[0.9,0.8],"weight":"pencil"}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: profile,
+            render_seed: Some(431),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let display = render(make_request(SvgProfile::Display)).unwrap();
+    assert!(display.svg.contains("id=\"texture-pencil\""));
+    assert!(display.svg.contains("filter=\"url(#texture-pencil)\""));
+    assert!(display.svg.contains("id=\"performance_touch_431\""));
+    let compat = render(make_request(SvgProfile::Compat)).unwrap();
+    assert!(!compat.svg.contains("<filter"));
+    assert!(!compat.svg.contains("filter=\""));
 }

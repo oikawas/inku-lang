@@ -9,6 +9,7 @@ use crate::geometry::stroke_sample_count;
 use crate::marks::{
     MarkContext, MarkStyle, contour_stroke_path, grid_step, polygon_path, uses_hand_stroke,
 };
+use crate::materials::with_texture_filter;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
 use crate::types::{Instruction, Point, Seed, SurfaceTexture};
@@ -99,11 +100,15 @@ fn stroke_path(
         support: context.support,
         terminal: StrokeTerminal::Loaded,
     });
-    Element::new("path")
-        .attr("d", contour_stroke_path(&stroke))
-        .attr("fill", &style.color)
-        .attr("fill-opacity", format_number(opacity))
-        .attr("stroke", "none")
+    with_texture_filter(
+        Element::new("path")
+            .attr("d", contour_stroke_path(&stroke))
+            .attr("fill", &style.color)
+            .attr("fill-opacity", format_number(opacity))
+            .attr("stroke", "none"),
+        instruction.weight,
+        context.use_filters,
+    )
 }
 
 /// Render the interior requested by a filled closed mark.

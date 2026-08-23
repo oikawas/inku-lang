@@ -11,6 +11,7 @@ use crate::geometry::{
     closed_contour_with_variation, edge_contour_with_anchors, ellipse_perimeter,
     line_with_variation, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
 };
+use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::planning::instruction_anchor;
 use crate::stroke::{
@@ -53,6 +54,7 @@ pub struct MarkContext<'a> {
     pub instruction_index: usize,
     pub mark_index: usize,
     pub wild: bool,
+    pub use_filters: bool,
     pub support: Support,
 }
 
@@ -558,7 +560,11 @@ fn hand_line(
             false,
         ));
     }
-    rotate(group, instruction, context.canvas)
+    rotate(
+        with_texture_filter(group, instruction.weight, context.use_filters),
+        instruction,
+        context.canvas,
+    )
 }
 
 fn hand_contour(
@@ -581,25 +587,29 @@ fn hand_contour(
         support: instruction_support(instruction, context.support),
         terminal: StrokeTerminal::Taper,
     });
-    Element::new("g")
-        .attr(
-            "class",
-            format!(
-                "contour-stroke-v1 controls-{} events-{}",
-                stroke.samples.len(),
-                stroke.event_count
-            ),
-        )
-        .tap(|group| {
-            group.push(
-                Element::new("path")
-                    .attr("d", contour_stroke_path(&stroke))
-                    .attr("fill", &style.color)
-                    .attr("fill-opacity", format_number(style.stroke_opacity))
-                    .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
-                    .attr("stroke", "none"),
-            );
-        })
+    with_texture_filter(
+        Element::new("g")
+            .attr(
+                "class",
+                format!(
+                    "contour-stroke-v1 controls-{} events-{}",
+                    stroke.samples.len(),
+                    stroke.event_count
+                ),
+            )
+            .tap(|group| {
+                group.push(
+                    Element::new("path")
+                        .attr("d", contour_stroke_path(&stroke))
+                        .attr("fill", &style.color)
+                        .attr("fill-opacity", format_number(style.stroke_opacity))
+                        .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
+                        .attr("stroke", "none"),
+                );
+            }),
+        instruction.weight,
+        context.use_filters,
+    )
 }
 
 trait ElementTap {

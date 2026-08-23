@@ -16,6 +16,7 @@ pub mod ground;
 pub mod group;
 pub mod layers;
 pub mod marks;
+pub mod materials;
 pub mod palette;
 pub mod performance;
 pub mod placement;

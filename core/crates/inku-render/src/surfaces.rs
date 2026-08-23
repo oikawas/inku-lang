@@ -13,6 +13,7 @@ use crate::geometry::{
 use crate::marks::{
     MarkContext, contour_stroke_path, grid_step, mark_width, rotate, uses_hand_stroke,
 };
+use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
@@ -477,13 +478,17 @@ fn stroke_element(
         support: context.support,
         terminal: StrokeTerminal::Taper,
     });
-    Element::new("path")
-        .attr("d", contour_stroke_path(&stroke))
-        .attr("fill", color)
-        .attr("fill-opacity", format_number(opacity))
-        .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
-        .attr("stroke", "none")
-        .attr("class", class_name)
+    with_texture_filter(
+        Element::new("path")
+            .attr("d", contour_stroke_path(&stroke))
+            .attr("fill", color)
+            .attr("fill-opacity", format_number(opacity))
+            .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
+            .attr("stroke", "none")
+            .attr("class", class_name),
+        instruction.weight,
+        context.use_filters,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -932,6 +937,7 @@ mod tests {
             instruction_index: 2,
             mark_index: 3,
             wild: false,
+            use_filters: false,
             support: DEFAULT_SUPPORT,
         }
     }

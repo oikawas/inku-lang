@@ -8719,3 +8719,9 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **Shipping results for the 80–120 pair are unchanged.** Density boundaries stay 180/80; cluster boundaries stay 500/240/120 with values 9/7/5/3. No server-setting synchronization, UI, persistence, network, or API path was added.
 - **The first implementation also ported the server's fixed 24-marks-per-cluster cap and acceptance stopped.** It produced a reachable shipping-default change from 3 to 4/5 for counts 73–119, so the author excluded the cap and a remediation fail-first ran before production was edited again.
 - **Verification:** the initial fail-first produced 3 tests / 3 failures and the remediation fail-first produced 3 tests / 2 failures. After remediation, the three focused JVM tests were green during implementation, in the worker's final run, and in acceptance. Full JVM, instrumentation, devices, reference generation, and pentala were out of scope.
+
+### Android `2.1.4-android.48` — each refinement candidate shows its turn (2026-08-23, [I-348])
+
+- **During a four-candidate run, completed candidates show a check, the current candidate shows the opposite mascot, and candidates not yet started show a middle dot.** The numbered lanes stay in fixed positions and do not make sequential generation look like parallel fan-out. The row is absent for one candidate and while not busy.
+- **This UI change reads only the existing candidate count, completed candidates, and busy state.** No ViewModel, repository, pipeline, rendering, persistence, server, Web, or shared path changed.
+- **Verification:** the focused pre-production test exited 1 on the missing symbols. The same three tests exited 0 during implementation and at the branch tip. Full JVM, instrumentation, devices, screenshots, reference generation, and pentala were out of scope.

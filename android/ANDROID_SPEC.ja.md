@@ -3,9 +3,9 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-22。
+最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.47` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.48` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2070,3 +2070,9 @@ DDL は `解釈` の欄と DDL エディタから読める。**4 つ目のタブ
 `LocalFallbackPipeline` の密度帯は代表化上限の `3/2` と `2/3`、cluster帯は `25/6`、`2/1`、`1/1` で境界を算出する。cluster数も出荷時上限120を基準にbandを整数scalingする。端末内の出荷値80–120では、密度境界180/80、cluster境界500/240/120と各band値9/7/5/3を維持する。
 
 Androidはserver設定を搬送しないため、本段は端末内limitを受け取る決定的な計算seamまでを持つ。serverの24-marks-per-cluster capは既定count 73–119の出力を3から4/5へ変えるため、2026-08-22作者裁定で移植対象外とした。server設定同期、UI、永続化、network/APIは追加していない。
+
+## 2026-08-23 推敲候補の順番を画面に見せる（android `2.1.4-android.48`・[I-348]）
+
+4候補を推敲している間、候補ごとのlaneを1列に置き、生成済みをチェック、現在の1候補を選択中と反対のMascot、未着手を中点で示す。番号は1から4まで固定位置に残る。Androidの候補生成は逐次なので、同時に動くMascotは1体だけであり、Webの並列fan-outを移植した表示にはしない。1候補生成と非busy時にはlane列を出さない。
+
+表示は既存の`refinementCount`、`refinementCandidates.size`、`refinementBusy`だけから導出する。ViewModel、repository、pipeline、render、永続化、server/web/sharedは変更していない。

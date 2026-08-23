@@ -4,9 +4,9 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-22.
+Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.47` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.48` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2572,3 +2572,9 @@ values"** — today's T-7 goes no further than the grid.
 `LocalFallbackPipeline` now computes density boundaries as `3/2` and `2/3` of the representation maximum, and cluster boundaries as `25/6`, `2/1`, and `1/1`. Cluster bands also use integer scaling from the shipping maximum of 120. With the shipping 80–120 pair, density boundaries remain 180/80 and cluster boundaries and values remain 500/240/120 and 9/7/5/3.
 
 Android does not transport server settings, so this stage provides only the deterministic calculation seam for device-local limits. The server's fixed 24-marks-per-cluster cap was excluded by the 2026-08-22 author ruling because it changes shipping output for counts 73–119 from 3 to 4/5. No server-setting synchronization, UI, persistence, network, or API path was added.
+
+## 2026-08-23 Showing each refinement candidate's turn (android `2.1.4-android.48`, [I-348])
+
+While four refinement candidates are being generated, one row keeps a lane for each candidate: completed candidates show a check, the current candidate shows the mascot opposite the selected one, and candidates not yet started show a middle dot. Numbers one through four stay in fixed positions. Android generates candidates sequentially, so only one mascot moves at a time; the row does not imply that Web's parallel fan-out was ported. The row is absent for a single candidate and whenever generation is not busy.
+
+The display is derived only from the existing `refinementCount`, `refinementCandidates.size`, and `refinementBusy` values. No ViewModel, repository, pipeline, rendering, persistence, server, Web, or shared path changed.

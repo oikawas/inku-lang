@@ -7890,3 +7890,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **出荷値80–120の結果は不変。** 密度境界180/80、cluster境界500/240/120、band値9/7/5/3を維持する。server設定同期、UI、永続化、network/APIは追加していない。
 - **最初の実装はserverの24-marks-per-cluster capまで移植し、受入で停止した。** 既定count 73–119が3から4/5へ変わる到達可能な差だったため、作者裁定でcapを対象外とし、修正用fail-firstを本体再編集前に追加した。
 - **検証:** 初回fail-first 3 tests / 3 failures、修正fail-first 3 tests / 2 failures。修正後のfocused JVM 3 testsは実装中・worker最終・受入側でgreen。JVM全走、計装、実機、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.48` — 推敲候補の順番を画面に見せる（2026-08-23・[I-348]）
+
+- **4候補の生成中、生成済みをチェック、現在の1候補を反対Mascot、未着手を中点で示す。** 1から4のlaneを固定位置に置き、逐次生成を並列fan-outのようには見せない。1候補と非busy時には表示しない。
+- **既存の候補数・生成済み候補・busy stateだけを読むUI変更である。** ViewModel、repository、pipeline、render、永続化、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは未実装symbolでexit 1。実装中とbranch-tip finalは同じ3 testsがexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

@@ -21,6 +21,7 @@ import { test } from 'node:test';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
+const replay = fs.readFileSync(path.join(here, '../lib/features/history/replay.ts'), 'utf8');
 
 function body(fnName: string): string {
 	const start = page.indexOf(`async function ${fnName}(`);
@@ -39,9 +40,9 @@ function request(fnName: string): string {
 }
 
 test('every redraw of a saved work names the work it is redrawing', () => {
-	// varyPerformance and renderWordTouchCandidate are the two touch refinements;
-	// replayHistoryItem is the history list drawing a saved work again. All three
-	// send the same Score back and would otherwise be repainted by today's catalog.
+	// varyPerformance and renderWordTouchCandidate are the two touch refinements.
+	// The history replay now owns its request in the history module and receives
+	// only the page-built work reference and render preferences.
 	for (const fn of ['varyPerformance', 'renderWordTouchCandidate']) {
 		assert.match(
 			request(fn),
@@ -49,11 +50,9 @@ test('every redraw of a saved work names the work it is redrawing', () => {
 			`${fn} must send the work whose colors it is redrawing`
 		);
 	}
-	assert.match(
-		request('replayHistoryItem'),
-		/workReferencePayload\(it\.id\)/,
-		'replayHistoryItem must send the work it is replaying'
-	);
+	const replayWiring = page.slice(page.indexOf('async function replayHistoryItem'), page.indexOf('function closeReplayComparison'));
+	assert.match(replayWiring, /workReferencePayload\(item\.id\)/);
+	assert.match(replay, /\.\.\.defaults\.renderPayload\(item, catalogId\)/);
 });
 
 test('a redraw keeps sending the catalog id as the nameplate', () => {

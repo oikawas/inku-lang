@@ -114,6 +114,18 @@
 		HistoryBrowsingState
 	} from '$lib/features/history/browsing-state.svelte';
 	import { HistoryMutations } from '$lib/features/history/mutations';
+	import { saveHistoryItem, type SaveHistoryOptions } from '$lib/features/history/save';
+	import {
+		replayHistoryItem as replaySavedHistoryItem,
+		type ReplayComparison,
+		type ReplaySource
+	} from '$lib/features/history/replay';
+	import { projectHistoryCurrentWork } from '$lib/features/history/current-work';
+	import {
+		focusSavedLineageChild,
+		promoteLineageNode as promoteSavedLineageNode,
+		saveLineageNote as saveSavedLineageNote
+	} from '$lib/features/history/lineage-actions';
 	import { hashDigest } from '$lib/hashIdentity';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
@@ -141,16 +153,6 @@
 	type VariationAmplitude = 'small' | 'medium' | 'large';
 
 	type Iteration = HistoryItem;
-	type ReplaySource = 'history-manager' | 'canvas' | 'refine' | 'lineage';
-	type ReplayComparison = {
-		source: ReplaySource;
-		originalSvg: string;
-		replayedSvg: string;
-		recordedVersion: string | null;
-		currentVersion: string | null;
-		versionMessage: string | null;
-		provisionalSeed: number | null;
-	};
 
 	type PluginEntry = {
 		qualified_name: string;
@@ -2856,41 +2858,25 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
-		if (!authToken) return null;
-		// Saving a work again stores the drawing it already has. An item that
-		// came from the listing does not carry one, and saving it as it stands
-		// would store a work with no picture -- a failure that shows up only when
-		// somebody opens the copy.
-		const svgToSave = await ensureIterationSvg(it);
-		// What this work says about its compose stage. A work that already
-		// carries a record keeps it; a fresh paint result is read for one. A work
-		// with neither -- an older row being saved again -- sends no key at all,
-		// because claiming 'none' would put a statement in the row that nothing
-		// recorded.
-		const composeFallback = it.compose_fallback
-			?? (typeof it.compose_fallback_used === 'boolean' ? composeFallbackValue(it) : null);
-		let saved: Iteration | null = null;
-		try {
-			const r = await apiFetch('/api/history', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, catalog_mode: it.catalog_mode ?? (colorCatalogSettings.isAuto ? 'auto' : 'fixed'), render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}), ...(composeFallback === null ? {} : { compose_fallback: composeFallback }) })
-			});
-			if (r.ok) saved = await r.json() as Iteration;
-		} catch { /* ignore */ }
-		if (options.countGeneration) await refreshCurrentUserOnly();
-		if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
-			await history.fetchOffset(0, { anchorId: saved.id });
-		} else {
-			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
-			if (activeHistoryId) await history.fetchOffset(0, { anchorId: activeHistoryId });
-			else {
-				await history.fetchOffset(historyOffset, { preserveSelection: true });
-				history.clearSelection();
-			}
-		}
-		return saved;
+	async function pushHistory(it: Iteration, options: SaveHistoryOptions = {}): Promise<Iteration | null> {
+		return saveHistoryItem(it, options, {
+			catalogId: colorCatalogSettings.effectiveId,
+			catalogMode: colorCatalogSettings.isAuto ? 'auto' : 'fixed',
+			canvasAspectId: effectiveCanvasAspectId(),
+			instructionLang,
+			uiLang: getLang()
+		}, {
+			apiFetch,
+			signedIn: () => !!authToken,
+			ensureSvg: ensureIterationSvg,
+			composeFallbackFor: (item) => item.compose_fallback
+				?? (typeof item.compose_fallback_used === 'boolean' ? composeFallbackValue(item) : null),
+			refreshCountedUser: refreshCurrentUserOnly,
+			activeHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null,
+			currentOffset: () => historyOffset,
+			fetchOffset: (offset, fetchOptions) => history.fetchOffset(offset, fetchOptions),
+			clearSelection: () => history.clearSelection()
+		});
 	}
 
 	async function saveCurrentDemoToHistory(): Promise<void> {
@@ -3075,53 +3061,30 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || reloading) return;
 		const contextVersion = targetContextVersion;
-		const hasRecordedSeed = it.render_seed != null;
-		const hasSeedText = Boolean(it.seed_text?.trim());
-		const provisionalSeed = !hasRecordedSeed && !hasSeedText ? 0 : null;
-		const replaySeed = hasRecordedSeed ? Number(it.render_seed) : provisionalSeed;
 		reloading = true;
 		reloadError = null;
 		try {
-			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? colorCatalogSettings.effectiveId;
-			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas ?? effectiveCanvasAspectId();
-			const r = await apiFetch('/api/render-svg', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					score: it.score,
-					canvas_aspect: canvasId,
-					render_seed: replaySeed,
-					// The comparison this feeds is meant to show what the engine
-					// version did. Leaving the placement seed behind moved the
-					// marks as well, and that difference was read as the
-					// engine's -- it is the one thing this screen must not lie
-					// about. Raw, not `?? replaySeed`: renderer.py:3486 already
-					// falls back to the performance seed when there is none.
-					composition_seed: it.composition_seed ?? null,
-					seed_text: it.seed_text,
-					...workReferencePayload(it.id),
-					...renderSettingsPayload('render-svg', { ...colorCatalogOverride(catalogId), ...wildOverride(Boolean(it.render_wild)) }),
-				})
+			const comparison = await replaySavedHistoryItem(it, source, {
+				effectiveCatalogId: colorCatalogSettings.effectiveId,
+				effectiveCanvasAspectId: effectiveCanvasAspectId(),
+				currentRenderEngineVersion,
+				renderPayload: (item, catalogId) => ({
+					...workReferencePayload(item.id),
+					...renderSettingsPayload('render-svg', {
+						...colorCatalogOverride(catalogId),
+						...wildOverride(Boolean(item.render_wild))
+					})
+				}),
+				versionMismatchMessage: (recorded, current) => t().historyReplayVersionMismatch(recorded, current),
+				versionNotRecordedMessage: (current) => t().historyReplayVersionNotRecorded(current)
+			}, {
+				apiFetch,
+				apiError,
+				ensureSvg: ensureIterationSvg,
+				acceptRendered: () => contextVersion === targetContextVersion
 			});
-			if (!r.ok) throw await apiError(r);
-			const svg = await r.text();
-			if (contextVersion !== targetContextVersion) return;
-			const versionMessage = currentRenderEngineVersion
-				? (it.render_engine_version
-					? (it.render_engine_version === currentRenderEngineVersion
-						? null
-						: t().historyReplayVersionMismatch(it.render_engine_version, currentRenderEngineVersion))
-					: t().historyReplayVersionNotRecorded(currentRenderEngineVersion))
-				: null;
-			replayComparison = {
-				source,
-				originalSvg: await ensureIterationSvg(it),
-				replayedSvg: svg,
-				recordedVersion: it.render_engine_version ?? null,
-				currentVersion: currentRenderEngineVersion,
-				versionMessage,
-				provisionalSeed,
-			};
+			if (!comparison) return;
+			replayComparison = comparison;
 		} catch (e) {
 			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -3174,19 +3137,20 @@ function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
 }
 
 async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
-	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.');
-	let found = await history.fetchOffset(0, { anchorId: historyId });
-	if (!found && historyStripFiltered) {
-		history.clearFilters();
-		found = await history.fetchOffset(0, { anchorId: historyId });
-	}
-	const saved = historyItems.find((item) => item.id === historyId);
-	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved work could not be loaded.');
-	// Description / DDL edits produce a single artwork, not a candidate set, so
-	// land on the canvas tab and show it. The lineage is still refreshed below.
-	outputTab = 'canvas';
-	loadIterationItem(saved);
-	await lineageState.load(nodeId, true);
+	await focusSavedLineageChild(historyId, nodeId, {
+		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
+		filtered: () => historyStripFiltered,
+		clearFilters: () => history.clearFilters(),
+		items: () => historyItems,
+		displayCurrentItem: (item) => {
+			// Description / DDL edits produce one artwork, not a candidate set.
+			outputTab = 'canvas';
+			loadIterationItem(item);
+		},
+		loadLineage: (id) => lineageState.load(id, true),
+		missingIdentityError: () => new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.'),
+		missingWorkError: () => new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved work could not be loaded.')
+	});
 }
 
 async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
@@ -3428,36 +3392,26 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promi
 }
 
 async function promoteLineageNode(node: LineageNode): Promise<void> {
-	const contextVersion = targetContextVersion;
-	const r = await apiFetch(`/api/lineage/${encodeURIComponent(node.id)}/promote`, { method: 'POST' });
-	if (!r.ok) return;
-	const promoted = await r.json() as Iteration;
-	if (contextVersion !== targetContextVersion) return;
-	if (displayedHistoryItem?.id === promoted.id) {
-		displayedHistoryItem = promoted;
-		await Promise.all([lineageState.load(node.id, true), history.syncToItem(promoted)]);
-	} else {
-		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
-		await Promise.all([
-			lineageState.load(node.id, true),
-			activeHistoryId ? history.fetchOffset(0, { anchorId: activeHistoryId }) : history.fetchOffset(historyOffset, { preserveSelection: true }),
-		]);
-	}
+	await promoteSavedLineageNode(node, {
+		apiFetch,
+		contextVersion: () => targetContextVersion,
+		currentItem: () => displayedHistoryItem,
+		setCurrentItem: (item) => { displayedHistoryItem = item; },
+		activeHistoryId: () => displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null,
+		currentOffset: () => historyOffset,
+		syncToItem: (item) => history.syncToItem(item),
+		fetchOffset: (offset, options) => history.fetchOffset(offset, options),
+		loadLineage: (id) => lineageState.load(id, true)
+	});
 }
 
 async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
-	if (!node.history?.id) return;
-	const contextVersion = targetContextVersion;
-	const r = await apiFetch(`/api/history/${encodeURIComponent(node.history.id)}/star`, {
-		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ starred: !!node.history.starred, note: note.trim().slice(0, 240) })
+	await saveSavedLineageNote(node, note, {
+		apiFetch,
+		contextVersion: () => targetContextVersion,
+		applyStarState: (item) => historyMutations.applyStarState(item),
+		loadLineage: (id) => lineageState.load(id, true)
 	});
-	if (!r.ok) throw new Error(`HTTP ${r.status}`);
-	const updated = await r.json() as Iteration;
-	if (contextVersion !== targetContextVersion) return;
-	historyMutations.applyStarState(updated);
-	await lineageState.load(node.id, true);
 }
 
 function detachLineage(): void {
@@ -3512,60 +3466,21 @@ $effect(() => {
 	function loadIterationItem(it: Iteration) {
 		if (demoRunning) return;
 		const preserveLineageTab = outputTab === 'lineage';
+		const projection = projectHistoryCurrentWork(it);
 		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		inputMode = 'single';
 		displayedHistoryItem = it;
 		void history.syncToItem(it);
 		lineageDetached = false;
-		const itemDDL = it.ddl ?? '';
-		const sourceText = it.source_text ?? it.input;
-		expandedDdl = it.expanded_ddl ?? null;
-		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
-		stage1UserPrompt = sourceText;
-		adoptSketch(it.sketch_text ?? null, it.sketch_grain, sourceText, it.sketch_state);
-		result = {
-			score: it.score,
-			svg: it.svg,
-			stage1_model: it.stage1_model,
-			stage2_model: it.stage2_model,
-			render_build_number: it.render_build_number,
-			render_color_profile: it.render_color_profile,
-			render_engine_id: it.render_engine_id,
-			render_engine_version: it.render_engine_version,
-			ddl_version: it.ddl_version,
-			ddl_engine_version: it.ddl_engine_version,
-			render_color_catalog_id: it.render_color_catalog_id,
-			render_color_catalog_name: it.render_color_catalog_name,
-			render_color_catalog_sub: it.render_color_catalog_sub,
-			render_color_map: it.render_color_map,
-			render_canvas_aspect: it.render_canvas_aspect,
-			render_canvas_aspect_id: it.render_canvas_aspect_id,
-			render_canvas_aspect_ratio: it.render_canvas_aspect_ratio,
-			instruction_lang_requested: it.instruction_lang_requested,
-			instruction_lang_resolved: it.instruction_lang_resolved,
-			ui_lang: it.ui_lang,
-			seed_text: it.seed_text ?? null,
-			render_hash: it.render_hash,
-			render_hash_short: it.render_hash_short,
-			description_hash: it.description_hash,
-			lineage_node_id: it.lineage_node_id,
-			lineage_parent_node_id: it.lineage_parent_node_id,
-			derivation_kind: it.derivation_kind as DerivationKind | null | undefined,
-			derivation_metadata: it.derivation_metadata,
-			render_seed: it.render_seed == null ? null : Number(it.render_seed),
-			composition_seed: it.composition_seed == null ? null : Number(it.composition_seed),
-			interpretation_seed: it.interpretation_seed ?? null,
-			variation_amplitude: it.variation_amplitude ?? null,
-			variation_seed: it.variation_seed == null ? null : Number(it.variation_seed),
-			elapsed_stage1_ms: 0,
-			elapsed_stage2_ms: 0,
-			elapsed_total_ms: it.elapsed_ms ?? 0,
-			tokens_in_stage1: null,
-			tokens_out_stage1: null,
-			tokens_in_stage2: null,
-			tokens_out_stage2: null,
-		};
+		expandedDdl = projection.expandedDdl;
+		input = projection.sourceText;
+		ddl = projection.ddl;
+		ddlGeneratedBaseline = projection.ddl;
+		thinking = projection.thinking;
+		stage1UserPrompt = projection.sourceText;
+		adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
+		result = projection.result;
 		error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
 		if (preserveLineageTab && it.lineage_node_id) void lineageState.load(it.lineage_node_id, true);

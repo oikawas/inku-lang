@@ -113,6 +113,7 @@
 		HISTORY_EXTERNAL_REFRESH_MS,
 		HistoryBrowsingState
 	} from '$lib/features/history/browsing-state.svelte';
+	import { HistoryMutations } from '$lib/features/history/mutations';
 	import { hashDigest } from '$lib/hashIdentity';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
@@ -1883,6 +1884,26 @@
 		onOtherFilterCleared: showHistoryForRevisionFilterClearedNotice
 	});
 	const historyManager = history.manager;
+	const historyMutations = new HistoryMutations({
+		apiFetch,
+		signedIn: () => !!authToken,
+		browsing: history,
+		currentItem: () => displayedHistoryItem,
+		setCurrentItem: (item) => { displayedHistoryItem = item; },
+		applyLineageStarState: (item) => lineageState.applyStarState(item),
+		applyLineageForRevisionState: (item) => lineageState.applyForRevisionState(item),
+		applyLineageForShareState: (item) => lineageState.applyForShareState(item),
+		focusedLineageNodeId: () => lineageState.graph?.focus_node_id ?? null,
+		reloadLineage: (nodeId) => lineageState.load(nodeId, true),
+		displayCurrentItem: loadIterationItem,
+		clearCurrentWork: () => {
+			displayedHistoryItem = null;
+			result = null;
+		}
+	});
+	const toggleHistoryStar = historyMutations.toggleStar;
+	const toggleHistoryForRevision = historyMutations.toggleForRevision;
+	const toggleHistoryForShare = historyMutations.toggleForShare;
 	const historyItems = $derived(history.items);
 	const historyTotal = $derived(history.total);
 	const historyOffset = $derived(history.offset);
@@ -2823,131 +2844,6 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 
-	type HistoryStarTarget = { id?: string; starred?: boolean; note?: string | null };
-
-	function updateHistoryStarState(item: HistoryStarTarget) {
-		if (!item.id) return;
-		const hasNote = Object.prototype.hasOwnProperty.call(item, "note");
-		history.applyStarState(item);
-		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
-		lineageState.applyStarState(item);
-	}
-
-	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
-		event?.stopPropagation();
-		if (!item?.id) return;
-		const nextStarred = !item.starred;
-		updateHistoryStarState({ ...item, starred: nextStarred });
-		try {
-			const r = await apiFetch(`/api/history/${item.id}/star`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ starred: nextStarred })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const updated = await r.json() as Iteration;
-			updateHistoryStarState(updated);
-			const refreshes: Promise<unknown>[] = [];
-			if (historyStarredOnly) {
-				if (!updated.starred) history.clearStarredFilter();
-				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
-			}
-			if (historyManager.starredOnly) refreshes.push(historyManager.fetch());
-			if (refreshes.length > 0) await Promise.all(refreshes);
-		} catch (e) {
-			updateHistoryStarState(item);
-			console.warn('failed to update history star', e);
-		}
-	}
-
-	type HistoryForRevisionTarget = { id?: string; for_revision?: boolean };
-
-	// The revision mark rides the same paths as the star and never touches it:
-	// the two are separate columns, and a work can carry either, both or neither.
-	function updateHistoryForRevisionState(item: HistoryForRevisionTarget) {
-		if (!item.id) return;
-		history.applyForRevisionState(item);
-		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, for_revision: item.for_revision };
-		lineageState.applyForRevisionState(item);
-	}
-
-	async function toggleHistoryForRevision(item: HistoryForRevisionTarget | null | undefined, event?: Event): Promise<void> {
-		event?.stopPropagation();
-		if (!item?.id) return;
-		const nextForRevision = !item.for_revision;
-		updateHistoryForRevisionState({ ...item, for_revision: nextForRevision });
-		try {
-			const r = await apiFetch(`/api/history/${item.id}/for-revision`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ for_revision: nextForRevision })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const updated = await r.json() as Iteration;
-			updateHistoryForRevisionState(updated);
-			const refreshes: Promise<unknown>[] = [];
-			if (historyForRevisionOnly) {
-				// The work just left the listing the strip is showing, so the
-				// filter comes off rather than leaving the strip on a work it no
-				// longer holds -- the same rule the starred filter follows.
-				if (!updated.for_revision) history.clearForRevisionFilter();
-				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
-			}
-			if (historyManager.forRevisionOnly) refreshes.push(historyManager.fetch());
-			if (refreshes.length > 0) await Promise.all(refreshes);
-		} catch (e) {
-			updateHistoryForRevisionState(item);
-			console.warn('failed to update the revision mark', e);
-		}
-	}
-
-	type HistoryForShareTarget = { id?: string; for_share?: boolean; share_group_id?: string | null };
-
-	// The share mark rides the same paths as the other two, and carries one thing
-	// they do not: a destination. Both keys move together everywhere -- a row left
-	// holding the bit without the group would say it is open with no record of to
-	// whom, which is the one thing this feature exists to say.
-	function updateHistoryForShareState(item: HistoryForShareTarget) {
-		if (!item.id) return;
-		const next = { for_share: item.for_share, share_group_id: item.share_group_id };
-		history.applyForShareState(item);
-		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, ...next };
-		lineageState.applyForShareState(item);
-	}
-
-	async function toggleHistoryForShare(item: HistoryForShareTarget | null | undefined, event?: Event): Promise<void> {
-		event?.stopPropagation();
-		if (!item?.id) return;
-		const nextForShare = !item.for_share;
-		// Optimistic, like the other two marks -- but the destination is NOT
-		// guessed here. Only the server knows which group a bare bit resolves to,
-		// so the local row keeps the destination it had until the answer arrives.
-		updateHistoryForShareState({ ...item, for_share: nextForShare });
-		try {
-			const r = await apiFetch(`/api/history/${item.id}/for-share`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ for_share: nextForShare })
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const updated = await r.json() as Iteration;
-			updateHistoryForShareState(updated);
-			const refreshes: Promise<unknown>[] = [];
-			if (historyForShareOnly) {
-				// The work just left the listing the strip is showing, so the
-				// filter comes off rather than leaving the strip on a work it no
-				// longer holds -- the rule the other two marks already follow.
-				if (!updated.for_share) history.clearForShareFilter();
-				refreshes.push(history.fetchOffset(0, { anchorId: updated.id }));
-			}
-			if (historyManager.forShareOnly) refreshes.push(historyManager.fetch());
-			if (refreshes.length > 0) await Promise.all(refreshes);
-		} catch (e) {
-			updateHistoryForShareState(item);
-			console.warn('failed to update the share mark', e);
-		}
-	}
-
 	async function refreshCurrentUserOnly(): Promise<void> {
 		try {
 			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
@@ -3101,55 +2997,11 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		historyManager.toggleSelectAll();
 	}
 
-	async function postHistoryIds(path: string, ids: string[]) {
-		if (!authToken) return;
-		await apiFetch(path, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ids })
-		});
-		// Taken before the flag below rewrites it: whether the work on the canvas
-		// is one of the works leaving the listing.
-		const displayedLeavesTheListing = !!displayedHistoryItem?.id
-			&& ids.includes(displayedHistoryItem.id)
-			&& (path === '/api/history/trash' || path === '/api/history/permanent-delete');
-		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
-			if (path === '/api/history/trash') {
-				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
-				history.clearSelection();
-			} else if (path === '/api/history/restore') {
-				displayedHistoryItem = { ...displayedHistoryItem, trashed: false };
-				void history.syncToItem(displayedHistoryItem);
-			} else if (path === '/api/history/permanent-delete') {
-				displayedHistoryItem = null;
-				history.clearSelection();
-			}
-		}
-		historyManager.selectedIds = [];
-		await Promise.all([history.fetchOffset(historyOffset), history.fetchTrashPage(), historyManager.fetch()]);
-		if (lineageState.graph?.focus_node_id) await lineageState.load(lineageState.graph.focus_node_id, true);
-		if (historyItems.length === 0 && historyOffset > 0) await history.fetchOffset(Math.max(0, historyOffset - historyWindowSize));
-		// The strip re-seats its cursor once the listing has been read again, and
-		// the canvas has to be showing the work the badge is on. Left to itself
-		// the canvas kept the work that just left the listing, so the badge sat
-		// on one work and the artwork beside it was another.
-		if (displayedLeavesTheListing) {
-			if (historyCursor >= 0 && historyCursor < historyItems.length) {
-				loadIteration(historyCursor);
-			} else {
-				// Nothing left to seat the cursor on: the canvas empties rather
-				// than holding the last work the listing no longer has.
-				displayedHistoryItem = null;
-				result = null;
-			}
-		}
-	}
-
 	function askTrash(ids: string[]) {
 		if (ids.length === 0) return;
 		confirmAction = {
 			message: t().confirmTrashMessage(ids.length),
-			run: () => { void postHistoryIds('/api/history/trash', ids); }
+			run: () => { void historyMutations.postIds('/api/history/trash', ids); }
 		};
 	}
 
@@ -3157,7 +3009,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		if (ids.length === 0) return;
 		confirmAction = {
 			message: t().confirmRestoreMessage(ids.length),
-			run: () => { void postHistoryIds('/api/history/restore', ids); }
+			run: () => { void historyMutations.postIds('/api/history/restore', ids); }
 		};
 	}
 
@@ -3166,7 +3018,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		confirmAction = {
 			message: t().confirmPermanentDeleteMessage(ids.length),
 			destructive: true,
-			run: () => { void postHistoryIds('/api/history/permanent-delete', ids); }
+			run: () => { void historyMutations.postIds('/api/history/permanent-delete', ids); }
 		};
 	}
 
@@ -3604,7 +3456,7 @@ async function saveLineageNote(node: LineageNode, note: string): Promise<void> {
 	if (!r.ok) throw new Error(`HTTP ${r.status}`);
 	const updated = await r.json() as Iteration;
 	if (contextVersion !== targetContextVersion) return;
-	updateHistoryStarState(updated);
+	historyMutations.applyStarState(updated);
 	await lineageState.load(node.id, true);
 }
 

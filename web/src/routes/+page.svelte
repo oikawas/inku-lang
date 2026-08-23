@@ -21,6 +21,12 @@
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
+	import {
+		RefinementSessionState,
+		type RefineKind,
+		type VariationAmplitude,
+		type VariationCandidate
+	} from '$lib/features/canvas/refinement-session.svelte';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -150,8 +156,6 @@
 	// two numbers is what the picker ever shows.
 	const BATCH_PROMPT_HISTORY_LIMIT = 50;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
-	type VariationAmplitude = 'small' | 'medium' | 'large';
 
 	type Iteration = HistoryItem;
 
@@ -361,32 +365,14 @@
 		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
 		sketchState = normalizeSketchState(state);
 	}
-	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	/** Where one candidate of a fan-out is: queued for a lane, drawing, or done. */
-	type VariationSlotState = 'waiting' | 'running' | 'done';
+	const refinementSession = new RefinementSessionState();
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
-	let variationCandidates = $state<VariationCandidate[]>([]);
 	let lineageIntermediateNotice = $state<string | null>(null);
 	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
 	let historyStarredFilterNoticeTimer: number | null = null;
-	let variationGridBusy = $state(false);
-	let variationGridCanAbort = $state(false);
-	let variationGridIncludesReading = $state(false);
-	let variationGridTaskLabel = $state('');
-	// Candidates run concurrently, so progress is "how many have finished",
-	// not "which one is being processed".
-	let variationGridDone = $state(0);
-	let variationGridTotal = $state(0);
-	// One entry per candidate, so the panel can show the fan-out as the several
-	// jobs it is rather than as a single counter that moves once at the end.
-	let variationGridSlots = $state<VariationSlotState[]>([]);
-	let variationGridSlotLabels = $state<string[]>([]);
-	let variationGridAbortController: AbortController | null = null;
-	let variationGridStatus = $state<string | null>(null);
 	let targetContextVersion = 0;
 
 	// ── UI ──────────────────────────────────────────────────
@@ -1052,7 +1038,7 @@
 
 	async function resumeInterruptedBatch() {
 		const resume = batchResume;
-		if (!resume || loading || variationGridBusy) return;
+		if (!resume || loading || refinementSession.gridBusy) return;
 		let works: Iteration[];
 		try {
 			works = await collectBatchRunWorks(resume.runId, resume.lines.length);
@@ -2025,10 +2011,6 @@
 	);
 
 	// Flows that issue several paints per run keep their own running totals.
-	let variationTokensIn = $state<number | null>(null);
-	let variationTokensOut = $state<number | null>(null);
-
-	const variationElapsed = createElapsed();
 	function addTokens(total: number | null, delta: number | null | undefined): number | null {
 		if (delta === null || delta === undefined) return total;
 		return (total ?? 0) + delta;
@@ -2341,7 +2323,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 	async function startDemo() {
-		if (loading || variationGridBusy) return;
+		if (loading || refinementSession.gridBusy) return;
 		clearInput();
 		demoError = null;
 		demoTimedOut = false;
@@ -2401,7 +2383,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	 * it. Everything else about the run is unchanged.
 	 */
 	async function submit(options: { resumeLines?: NumberedLine[] } = {}) {
-		if (!canSubmit || loading || variationGridBusy) return;
+		if (!canSubmit || loading || refinementSession.gridBusy) return;
 		// Before resetTargetScopedState and before the intermediate save below:
 		// the question is asked while nothing has been written yet.
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
@@ -3427,20 +3409,7 @@ $effect(() => {
 
 	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
 		targetContextVersion += 1;
-		if (!options.preserveVariationCandidates) {
-			if (variationGridAbortController) variationGridAbortController.abort();
-			variationGridAbortController = null;
-			variationGridBusy = false;
-			variationGridCanAbort = false;
-			variationCandidates = [];
-			variationGridIncludesReading = false;
-			variationGridTaskLabel = '';
-			variationGridDone = 0;
-			variationGridTotal = 0;
-			variationGridSlots = [];
-			variationGridSlotLabels = [];
-			variationGridStatus = null;
-		}
+		refinementSession.reset({ preserveCandidates: options.preserveVariationCandidates });
 
 		modelInspection.reset();
 
@@ -3745,14 +3714,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	async function varyPerformance() {
-		if (!result || variationBusy) return;
+		if (!result || refinementSession.busy) return;
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
-		variationBusy = true;
-		variationTokensIn = null;
-		variationTokensOut = null;
-		variationElapsed.start();
+		refinementSession.beginSingle();
 		reloading = true;
 		reloadError = null;
 		try {
@@ -3788,22 +3754,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
 			reloading = false;
-			variationBusy = false;
-			variationElapsed.stop();
+			refinementSession.finishSingle();
 		}
 	}
 
 	async function varyComposition() {
-		if (!result || variationBusy || loading) return;
+		if (!result || refinementSession.busy || loading) return;
 		const source = input.trim();
 		if (!source) return;
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
-		variationBusy = true;
-		variationTokensIn = null;
-		variationTokensOut = null;
-		variationElapsed.start();
+		refinementSession.beginSingle();
 		loading = true;
 		error = null;
 		try {
@@ -3836,23 +3798,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
 			loading = false;
-			variationBusy = false;
-			variationElapsed.stop();
+			refinementSession.finishSingle();
 			stopTimer();
 		}
 	}
 
 	async function varyInterpretation() {
-		if (!result || variationBusy || loading) return;
+		if (!result || refinementSession.busy || loading) return;
 		const source = input.trim();
 		if (!source) return;
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
 		const parentNodeId = await ensureVisibleLineageParentId();
-		variationBusy = true;
-		variationTokensIn = null;
-		variationTokensOut = null;
-		variationElapsed.start();
+		refinementSession.beginSingle();
 		loading = true;
 		error = null;
 		const previousDdl = ddl;
@@ -3885,8 +3843,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
 			loading = false;
-			variationBusy = false;
-			variationElapsed.stop();
+			refinementSession.finishSingle();
 			stopTimer();
 		}
 	}
@@ -4169,16 +4126,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) {
-		if (!result || variationGridBusy || loading) return;
+		if (!result || refinementSession.gridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
 		const normalizedTouchWords = touchWords?.trim() ?? '';
 		if (kind === 'touch' && !normalizedTouchWords) {
-			variationGridStatus = getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.';
+			refinementSession.setStatus(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
 			return;
 		}
 		if (kind === 'touch' && count === 4) {
-			variationGridStatus = getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.';
+			refinementSession.setStatus(getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.');
 			return;
 		}
 		// Ask before the words are carried into a child (contract § stage 4).
@@ -4186,15 +4143,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const contextVersion = targetContextVersion;
 		await ensureVisibleLineageParentId();
 		if (contextVersion !== targetContextVersion) return;
-		const abortController = new AbortController();
-		variationGridAbortController = abortController;
-		variationGridBusy = true;
-		variationGridCanAbort = false;
-		variationTokensIn = null;
-		variationTokensOut = null;
-		variationElapsed.start();
-		variationGridIncludesReading = kind === "reading";
-		variationGridTaskLabel = kind === "touch"
+		const taskLabel = kind === "touch"
 			? t().canvasVaryPerformance
 			: kind === "layout"
 				? t().canvasVaryComposition
@@ -4203,20 +4152,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					: kind === "variation"
 						? t().variationTitle
 						: t().canvasVaryColor;
-		variationGridStatus = null;
-		variationGridDone = 0;
-		variationGridTotal = count;
-		// Seated before the seeds are asked for, so the lanes are on screen for
-		// the whole run rather than appearing once the first job starts.
-		variationGridSlotLabels = Array.from({ length: count }, () => '');
-		variationGridSlots = Array.from({ length: count }, () => 'waiting' as VariationSlotState);
+		const abortController = refinementSession.beginGrid({
+			includesReading: kind === 'reading',
+			taskLabel,
+			count
+		});
 		const abortTimer = window.setTimeout(() => {
-			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
+			refinementSession.enableAbort(abortController);
 		}, 3000);
 		try {
 			const usedVarySeeds = new Set<number>();
 			if (Number.isFinite(result.composition_seed ?? NaN)) usedVarySeeds.add(Number(result.composition_seed));
-			for (const candidate of variationCandidates) {
+			for (const candidate of refinementSession.candidates) {
 				if (Number.isFinite(candidate.result.composition_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.composition_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
@@ -4248,40 +4195,23 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				const label = t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId);
 				return { label, run: () => renderColorCatalogCandidate(catalogId, label, abortController.signal) };
 			});
-			variationGridSlotLabels = plans.map((plan) => plan.label);
-			variationGridSlots = plans.map(() => 'waiting' as VariationSlotState);
-			const seatSlot = (index: number, state: VariationSlotState) => {
-				if (variationGridAbortController !== abortController) return;
-				variationGridSlots = variationGridSlots.map((current, i) => i === index ? state : current);
-			};
-			variationCandidates = await runWithLimit(plans.map((plan) => plan.run), renderFanoutLimit, {
-				onStart: (index) => seatSlot(index, 'running'),
-				onDone: (index) => {
-					seatSlot(index, 'done');
-					if (variationGridAbortController === abortController) variationGridDone += 1;
-				},
+			refinementSession.setPlans(abortController, plans.map((plan) => plan.label));
+			const candidates = await runWithLimit(plans.map((plan) => plan.run), renderFanoutLimit, {
+				onStart: (index) => refinementSession.seatSlot(abortController, index, 'running'),
+				onDone: (index) => { refinementSession.finishSlot(abortController, index); },
 			});
-			for (const candidate of variationCandidates) {
-				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
-				variationTokensOut = addTokens(variationTokensOut, paintTokensOut(candidate.result));
+			refinementSession.commitCandidates(abortController, candidates);
+			for (const candidate of candidates) {
+				refinementSession.addTokens(abortController, paintTokensIn(candidate.result), paintTokensOut(candidate.result));
 			}
 		} catch (e) {
-			if (!(e instanceof DOMException && e.name === "AbortError")) variationGridStatus = e instanceof Error ? e.message : String(e);
+			if (!(e instanceof DOMException && e.name === "AbortError")) {
+				refinementSession.failGrid(abortController, e instanceof Error ? e.message : String(e));
+			}
 		} finally {
 			window.clearTimeout(abortTimer);
-			if (variationGridAbortController === abortController) {
-				variationGridAbortController = null;
-				variationGridBusy = false;
-				variationGridCanAbort = false;
-				variationElapsed.stop();
-			}
+			refinementSession.finishGrid(abortController);
 		}
-	}
-
-	function abortVariationCandidates() { variationGridAbortController?.abort(); }
-
-	function toggleVariationCandidate(id: string) {
-		variationCandidates = variationCandidates.map((candidate) => candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate);
 	}
 
 	function showVariationCandidate(candidate: VariationCandidate) {
@@ -4299,13 +4229,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	async function saveSelectedVariationCandidates() {
 		const contextVersion = targetContextVersion;
-		const selected = variationCandidates.filter((candidate) => candidate.selected && !candidate.saved);
+		const selected = refinementSession.candidates.filter((candidate) => candidate.selected && !candidate.saved);
 		if (selected.length === 0) {
-			variationGridStatus = t().variationGridEmpty;
+			refinementSession.setStatus(t().variationGridEmpty);
 			return;
 		}
-		variationGridBusy = true;
-		variationGridStatus = null;
+		refinementSession.beginSave();
 		try {
 			for (const candidate of selected) {
 				const saved = await pushHistory({
@@ -4323,7 +4252,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.effectiveId,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
 				if (contextVersion !== targetContextVersion) return;
-				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
+				refinementSession.markSaved(candidate.id);
 				if (saved?.id && result === candidate.result) {
 					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
 					displayedHistoryItem = saved;
@@ -4331,7 +4260,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}
 			}
 		} finally {
-			if (contextVersion === targetContextVersion) variationGridBusy = false;
+			if (contextVersion === targetContextVersion) refinementSession.finishSave();
 		}
 	}
 
@@ -4876,7 +4805,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{demoError}
 						lockNonDemo={demoRunning}
 						{canSubmit}
-						generationDisabled={variationGridBusy || reloading}
+						generationDisabled={refinementSession.gridBusy || reloading}
 						{error}
 						{stageLabel}
 						{canvasAspectEnabled}
@@ -4987,7 +4916,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								label={t().ddlLabel}
 								expandedLabel={t().ddlExpandedLabel}
 								onPaint={() => { void replay(); }}
-								paintDisabled={loading || reloading || variationGridBusy}
+								paintDisabled={loading || reloading || refinementSession.gridBusy}
 								runStatus={reloading ? ddlRunStatus : null}
 							/>
 						</section>
@@ -5155,29 +5084,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onVaryInterpretation={varyInterpretation}
 				bind:instructionCaptionVisible
 				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
-				{variationBusy}
-				{variationCandidates}
-				{variationGridBusy}
-				{variationGridCanAbort}
-				{variationGridIncludesReading}
-				{variationGridTaskLabel}
-				{variationGridDone}
-				{variationGridTotal}
-				{variationGridSlots}
-				{variationGridSlotLabels}
-				{variationGridStatus}
+				{refinementSession}
 				runTokensIn={activeRunTokensIn}
 				runTokensOut={activeRunTokensOut}
-				variationElapsedMs={variationElapsed.ms}
-				{variationTokensIn}
-				{variationTokensOut}
 				{modelInspection}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
-				onAbortVariationCandidates={abortVariationCandidates}
 				onSaveSelectedVariationCandidates={saveSelectedVariationCandidates}
 				onShowVariationCandidate={showVariationCandidate}
-				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
 				lineageGraph={lineageState.graph}
 				lineageLoading={lineageState.loading}

@@ -39,6 +39,7 @@ flowchart LR
     HISTORY_MUTATIONS["features/history/mutations.ts\nroute-instanceのmark・lifecycle mutation調停"]
     HISTORY_WORK["features/history/{save,replay,current-work,lineage-actions}.ts\n保存・replay・current-work・lineage action調停"]
     CANVAS_VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instanceのzoom・fit・pan・pointer/keyboard操作"]
+    REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nroute-instanceのbusy・cancel・fan-out進行・candidate選択"]
     HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query・cache・実測page size"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server/model provider/user・group管理"]
     SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
@@ -72,6 +73,8 @@ flowchart LR
     HISTORY_WORK -->|"focus/query refresh"| LINEAGE_STATE
     PAGE -->|"routeごとにowner生成 + global shortcut gate"| CANVAS_VIEWPORT
     COMPONENTS -->|"typed CanvasViewport"| CANVAS_VIEWPORT
+    PAGE -->|"candidate生成・保存・Canvas適用"| REFINE_SESSION
+    COMPONENTS -->|"typed RefinementSession"| REFINE_SESSION
     PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -114,6 +117,7 @@ flowchart LR
 | route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとpage-owned current canvasへ名前付きprojectionだけを渡す |
 | stateless history work operations | 保存用history payload、saved-work replay、history→current-work projection、saved-child/promote/note調停 | `save.ts`、`replay.ts`、`current-work.ts`、`lineage-actions.ts`がtyped inputと名前付きcapabilityだけを受ける。route UI、AbortController、Canvas適用はpageに残る |
 | route-instance Canvas viewport owner | zoom、measured fit zoom、pan、pointer capture、keyboardによるzoom/pan | routeごとに1個の`CanvasViewportState`。`CanvasPanel`はtyped ownerを受け、pageはglobal shortcutのeligibilityとwork切替時の`fit()`要求だけを結線する |
+| route-instance refinement session owner | single/grid/save busy、elapsed/token、fan-out slot、AbortController、candidate selection | routeごとに1個の`RefinementSessionState`。active controllerだけがprogress/error/finishをcommitし、`CanvasPanel`はtyped ownerへcancel/toggleを送る。candidate request/save/Canvas applyはpageに残る |
 | route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。focused viewへは`userAdministration`、`database`/`db_backup`、`render_limits`、または`output_save`/`render_concurrency`の必要sliceと名前付き操作だけを渡す |
 | focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
@@ -133,6 +137,8 @@ Stage 5Cでは`HistoryMutations`がstar/revision/shareのoptimistic PATCHとroll
 Stage 5Dではstatelessな4 moduleが、保存用`POST /api/history` payloadと一覧再同期、saved-work replay request/version比較、history itemからcurrent-workへのtyped projection、saved child・promote・noteの複数owner調停を所有する。pageは解決済みbrowser preference、localized message、route target identityを渡し、modal/tab/loading、AbortController、Svelte assignment、Canvas適用・late SVG、lineageからのdraw/refinement actionを保持する。history moduleは`HistoryBrowsingState`、`HistoryMutations`、`LineageQueryState`のstateを複製しない。
 
 Stage 6Aではroute-instanceの`CanvasViewportState`がzoom、fit zoom、pan、drag origin、pointer capture、keyboard mappingを所有する。`CanvasPanel`は個別state/callback群ではなくtyped ownerを受け、ResizeObserverのmeasurementとwheel/pointer eventをnamed operationへ渡す。pageはinput/modal等を除外するglobal shortcut gateと、work/result切替時にviewportをfitへ戻すcompositionだけを保持する。refinement、variation、current result、Canvas markupはこのStageでは移動しない。
+
+Stage 6Bではroute-instanceの`RefinementSessionState`がsingle/grid/save busy、elapsed/token totals、fan-out waiting/running/done、cancel identity、status、candidate selectionを所有する。target resetはactive controllerをabort/invalidateし、late callbackはidentity checkで新しいsessionへ書けない。`CanvasPanel`は個別session propsではなくtyped ownerを受ける。candidate endpoint/plan、history save、Canvas apply、fallback confirm、target context version、single redraw result mappingはpageに残る。
 
 設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
 

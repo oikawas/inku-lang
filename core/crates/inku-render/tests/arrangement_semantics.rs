@@ -54,3 +54,42 @@ fn arrangement_quantization_uses_python_ties_to_even() {
     assert_eq!(quantized.center.unwrap().x, 0.123_456_79);
     assert_eq!(quantized.center.unwrap().y, 0.123_456_788);
 }
+
+#[test]
+fn quantization_reaches_nested_arrangement_values() {
+    let original = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.1,
+        "arrangement":{"count":2,"jitter":0.1234567895,"margin":0.1234567885,
+        "center":[0.1234567895,0.1234567885],"radius":0.1234567895}}"#,
+    );
+    let quantized = quantize_instruction(&original);
+    let arrangement = quantized.arrangement.unwrap();
+    assert_eq!(arrangement.jitter, 0.123_456_79);
+    assert_eq!(arrangement.margin, 0.123_456_788);
+    assert_eq!(arrangement.center.unwrap().x, 0.123_456_79);
+    assert_eq!(arrangement.radius, Some(0.123_456_79));
+}
+
+#[test]
+fn expansion_moves_only_the_geometry_owned_by_the_primitive() {
+    let original = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.05,
+        "position":[0.12,0.34],"arrangement":{"count":2,"layout":"horizontal"}}"#,
+    );
+    let expanded = expand_arrangement(ArrangementRequest {
+        instruction: &original,
+        placement_seed: Some(17),
+        performance_seed: Some(431),
+        canvas: None,
+    });
+    assert_eq!(expanded.len(), 2);
+    assert!(
+        expanded
+            .iter()
+            .all(|item| item.position == original.position)
+    );
+    assert!(
+        expanded.iter().any(|item| item.center != original.center),
+        "the circle center should still receive the arrangement shift"
+    );
+}

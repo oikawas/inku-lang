@@ -465,7 +465,10 @@ pub fn resolve_relation(
             let Some(other_bounds) = previous.get(previous.len() - 2).and_then(|other| {
                 performed_instruction_bounds(other, Some(seed), index.saturating_sub(2))
             }) else {
-                return dropped(instruction, index, "second prior has no performed bounds");
+                return RelationResolution {
+                    instruction: stripped(instruction),
+                    warning: None,
+                };
             };
             let jitter = 0.08 * (hash01(index as i64, seed, "between-jitter") - 0.5);
             clamp_point(Point::new(
@@ -477,7 +480,10 @@ pub fn resolve_relation(
             let prior = &previous[previous.len() - 1];
             if prior.primitive == Primitive::Line {
                 let Some((start, end, _, _)) = endpoint_geometry(prior) else {
-                    return dropped(instruction, index, "prior line has no endpoint geometry");
+                    return RelationResolution {
+                        instruction: stripped(instruction),
+                        warning: None,
+                    };
                 };
                 let t = 0.18 + 0.64 * hash01(index as i64, seed, "along-t");
                 let point = Point::new(

@@ -495,9 +495,11 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
     samples[0].point = start;
     samples[0].lateral = 0.0;
     samples[0].event = None;
+    samples[0].residual = 0.0;
     samples[sample_count - 1].point = end;
     samples[sample_count - 1].lateral = 0.0;
     samples[sample_count - 1].event = None;
+    samples[sample_count - 1].residual = 0.0;
 
     let widths: Vec<f64> = samples.iter().map(|sample| sample.width).collect();
     let (widths, cuts) = support_response(&widths, weight, seed, support);
@@ -736,9 +738,11 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
         samples[0].point = centerline[0];
         samples[0].lateral = 0.0;
         samples[0].event = None;
+        samples[0].residual = 0.0;
         samples[count - 1].point = centerline[count - 1];
         samples[count - 1].lateral = 0.0;
         samples[count - 1].event = None;
+        samples[count - 1].residual = 0.0;
     } else if anchors.is_empty() && count > 2 {
         correct_closed_seam(&mut samples, centerline, &parameters);
     }

@@ -580,7 +580,7 @@ pub struct RenderOptions {
     pub canvas: CanvasSize,
     pub canvas_aspect_id: String,
     pub svg_profile: SvgProfile,
-    pub render_seed: Seed,
+    pub render_seed: Option<Seed>,
     pub composition_seed: Option<Seed>,
     pub wild: bool,
 }

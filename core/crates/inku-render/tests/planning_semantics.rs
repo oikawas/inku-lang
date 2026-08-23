@@ -64,6 +64,28 @@ fn unresolved_relation_is_dropped_with_structured_warning() {
 }
 
 #[test]
+fn canonically_silent_relation_fallbacks_do_not_create_warnings() {
+    let missing_second_bounds = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.03,
+        "relation":{"type":"between"}}"#,
+    );
+    let no_bounds = instruction(r#"{"primitive":"line"}"#);
+    let valid_prior = instruction(r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.1}"#);
+    let between = resolve_relation(&missing_second_bounds, &[no_bounds, valid_prior], 17, 2);
+    assert!(between.instruction.relation.is_none());
+    assert!(between.warning.is_none());
+
+    let along = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.03,
+        "relation":{"type":"along"}}"#,
+    );
+    let degenerate_line = instruction(r#"{"primitive":"line","from":[0.5,0.5],"to":[0.5,0.5]}"#);
+    let along_result = resolve_relation(&along, &[degenerate_line], 17, 1);
+    assert!(along_result.instruction.relation.is_none());
+    assert!(along_result.warning.is_none());
+}
+
+#[test]
 fn along_cloudform_uses_the_performed_contour() {
     let prior = instruction(
         r#"{"primitive":"cloudform","center":[0.5,0.5],"size":[0.5,0.3],

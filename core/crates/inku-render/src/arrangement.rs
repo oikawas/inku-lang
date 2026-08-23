@@ -7,7 +7,9 @@ use crate::placement::{
     rhythm_parameter, short_side_scales,
 };
 use crate::planning::{ensure_line_coordinates, instruction_anchor};
-use crate::types::{ArrangementPath, CanvasSize, Density, Fade, Instruction, Layout, Point, Seed};
+use crate::types::{
+    ArrangementPath, CanvasSize, Density, Fade, Instruction, Layout, Point, Primitive, Seed,
+};
 
 const FRAME_LOW: f64 = 0.02;
 const FRAME_HIGH: f64 = 0.98;
@@ -54,13 +56,27 @@ fn shift_instruction(instruction: &Instruction, delta: Point) -> Instruction {
             );
         }
     }
-    if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
-        shifted.from_ = Some(Point::new(start.x + delta.x, start.y + delta.y));
-        shifted.to = Some(Point::new(end.x + delta.x, end.y + delta.y));
-    } else if let Some(center) = instruction.center {
-        shifted.center = Some(Point::new(center.x + delta.x, center.y + delta.y));
-    } else if let Some(position) = instruction.position {
-        shifted.position = Some(Point::new(position.x + delta.x, position.y + delta.y));
+    match instruction.primitive {
+        Primitive::Line => {
+            if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
+                shifted.from_ = Some(Point::new(start.x + delta.x, start.y + delta.y));
+                shifted.to = Some(Point::new(end.x + delta.x, end.y + delta.y));
+            }
+        }
+        Primitive::Circle
+        | Primitive::Ellipse
+        | Primitive::Arc
+        | Primitive::Polygon
+        | Primitive::Cloudform => {
+            if let Some(center) = instruction.center {
+                shifted.center = Some(Point::new(center.x + delta.x, center.y + delta.y));
+            }
+        }
+        Primitive::Square | Primitive::Triangle => {
+            if let Some(position) = instruction.position {
+                shifted.position = Some(Point::new(position.x + delta.x, position.y + delta.y));
+            }
+        }
     }
     shifted
 }
@@ -152,6 +168,12 @@ pub fn quantize_instruction(instruction: &Instruction) -> Instruction {
         surface.scale = quantize(surface.scale);
         surface.opacity = quantize(surface.opacity);
         surface.bleed = quantize(surface.bleed);
+    }
+    if let Some(arrangement) = result.arrangement.as_mut() {
+        arrangement.jitter = quantize(arrangement.jitter);
+        arrangement.margin = quantize(arrangement.margin);
+        arrangement.center = arrangement.center.map(quantize_point);
+        arrangement.radius = arrangement.radius.map(quantize);
     }
     result
 }

@@ -49,6 +49,8 @@ fn machine_samples_are_seed_independent_and_endpoints_are_pinned() {
     assert_eq!(first.outline, second.outline);
     assert_eq!(first.samples[0].point, args.0);
     assert_eq!(first.samples.last().unwrap().point, args.1);
+    assert_eq!(first.samples.first().unwrap().residual, 0.0);
+    assert_eq!(first.samples.last().unwrap().residual, 0.0);
     assert!(first.samples.iter().all(|sample| sample.event.is_none()));
 }
 

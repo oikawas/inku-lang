@@ -2497,6 +2497,7 @@ private fun HistoryHeader(
 
 /** So that an instrumented test can count the cards rather than the labels. */
 internal const val LINEAGE_NODE_TAG = "lineage_node"
+internal const val LINEAGE_STAR_TAG = "lineage_star"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
 internal const val REFINE_ENTRY_TAG = "refine_entry"
@@ -2522,9 +2523,9 @@ internal fun languageComboTag(comboId: String): String = "language_combo_$comboI
  * screen, each with its thumbnail, its generation and its state, each edge with
  * its Japanese label, and the button that starts a new root.
  *
- * The tools web puts on its cards -- trash, star, note, the colophon, the
- * promotion of a `lineage_only` node, the entry to refinement -- are not here.
- * Some belong to other contracts and some the history screen already has.
+ * The remaining tools web puts on its cards -- trash, note, the colophon and
+ * promotion of a `lineage_only` node -- are not here. Some belong to other
+ * contracts and some need producers this client does not have.
  */
 @Composable
 internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
@@ -2991,6 +2992,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
                         focused = node.id == graph.focusNodeId,
                         derivationKind = kindOf[node.id],
                         onSelect = { viewModel.selectLineageNode(node) },
+                        onToggleStar = viewModel::toggleStar,
                         onRefine = { item, subview -> viewModel.openRefinement(item, subview) },
                         onEditDdl = viewModel::openLineageDdlEditor,
                     )
@@ -3006,6 +3008,7 @@ private fun LineageNodeCard(
     focused: Boolean,
     derivationKind: String?,
     onSelect: () -> Unit,
+    onToggleStar: (HistoryItemEntity) -> Unit,
     onRefine: (HistoryItemEntity, RefinementSubview) -> Unit,
     onEditDdl: (HistoryItemEntity) -> Unit,
 ) {
@@ -3022,12 +3025,20 @@ private fun LineageNodeCard(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             if (history != null) {
-                ArtworkThumbnail(
-                    id = history.item.id,
-                    renderHash = history.item.renderHash,
-                    thumbnailPath = history.item.thumbnailPath,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                )
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+                    ArtworkThumbnail(
+                        id = history.item.id,
+                        renderHash = history.item.renderHash,
+                        thumbnailPath = history.item.thumbnailPath,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    HistoryBadge(
+                        text = if (history.item.starred) "★" else "☆",
+                        selected = history.item.starred,
+                        onClick = { onToggleStar(history.item) },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs).testTag(LINEAGE_STAR_TAG),
+                    )
+                }
             } else {
                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
             }

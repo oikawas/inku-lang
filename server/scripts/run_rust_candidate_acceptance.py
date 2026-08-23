@@ -50,6 +50,13 @@ STYLE_ATTRIBUTES = {
     "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity",
     "stroke-dasharray", "opacity", "filter", "clip-path", "mask",
 }
+NUMERIC_STYLE_ATTRIBUTES = {
+    "fill-opacity",
+    "stroke-width",
+    "stroke-opacity",
+    "stroke-dasharray",
+    "opacity",
+}
 
 REPRESENTATIVE_CASES = (
     "A-pen-line",
@@ -170,7 +177,12 @@ def _visual_signature(root: ET.Element) -> dict[str, object]:
         families[name] += 1
         attributes = tuple(
             sorted(
-                (key, _normalized_numbers(value))
+                (
+                    key,
+                    _normalized_numbers(value)
+                    if _local_name(key) in GEOMETRY_ATTRIBUTES | NUMERIC_STYLE_ATTRIBUTES
+                    else value,
+                )
                 for key, value in element.attrib.items()
                 if _local_name(key) in GEOMETRY_ATTRIBUTES | STYLE_ATTRIBUTES
             )

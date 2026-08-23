@@ -28,6 +28,15 @@ def test_signature_normalizes_serializer_number_spelling() -> None:
     assert tool._signature(left) == tool._signature(right)
 
 
+def test_signature_does_not_read_hex_colours_as_exponents() -> None:
+    tool = _tool()
+    svg = '<svg width="1000" height="1000"><path d="M 0 0" fill="#4e8372"/></svg>'
+
+    visual, _structure = tool._signature(svg)
+
+    assert visual["drawing_families"] == {"path": 1}
+
+
 def test_internal_reference_check_reports_only_missing_targets() -> None:
     tool = _tool()
     root = tool._parse_svg(

@@ -126,6 +126,7 @@
 	}
 	.presentation-stage { position: relative; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 	.presentation-art { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+	.presentation-art :global(svg),
 	.presentation-art .canvas-art { max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; box-shadow: 0 10px 42px rgba(0,0,0,0.42); }
 	.presentation-caption {
 		position: absolute;

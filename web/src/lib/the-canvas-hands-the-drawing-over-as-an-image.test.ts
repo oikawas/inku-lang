@@ -18,13 +18,18 @@ const PANEL = readFileSync(
 	fileURLToPath(new URL('./components/CanvasPanel.svelte', import.meta.url)),
 	'utf-8'
 );
+const PRESENTATION = readFileSync(
+	fileURLToPath(new URL('./features/canvas/CanvasPresentationOverlay.svelte', import.meta.url)),
+	'utf-8'
+);
+const DRAWING_VIEWS = [PANEL, PRESENTATION];
 
 // ── T-73 ────────────────────────────────────────────────────────────────────
 test('T-73  the canvas puts no drawing markup in the page', () => {
 	// Every place that shows the work the canvas is holding. None of them may
 	// hand the SVG text to the parser.
 	assert.equal(
-		[...PANEL.matchAll(/\{@html result\.svg\}/g)].length,
+		DRAWING_VIEWS.reduce((count, source) => count + [...source.matchAll(/\{@html result\.svg\}/g)].length, 0),
 		0,
 		'the drawing is being written into the page as markup again'
 	);
@@ -33,7 +38,10 @@ test('T-73  the canvas puts no drawing markup in the page', () => {
 	// 2026-08-16: the canvas box, the presentation overlay, and the refine
 	// comparison's target card.
 	assert.equal(
-		[...PANEL.matchAll(/<img class="canvas-art" src=\{artworkUrl\}/g)].length,
+		DRAWING_VIEWS.reduce(
+			(count, source) => count + [...source.matchAll(/<img class="canvas-art" src=\{artworkUrl\}/g)].length,
+			0
+		),
 		3,
 		'every view of the current work must draw it as an image'
 	);

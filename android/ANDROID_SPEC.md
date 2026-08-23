@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.61` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.62` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2656,3 +2656,9 @@ No production Kotlin, visible text, Gradle dependency, runner, Espresso stub, pe
 Every work card in the history screen now keeps a visible `★` or `☆` control at its upper right, reflecting the saved Star state. Tapping that control calls only the existing `toggleStar(HistoryListItem)` path and does not select the card. Existing card taps, long-press Star toggling, selection rings, thumbnails, work titles, search, Star-only filtering, ordering, and counts are preserved.
 
 The change uses only the existing `HistoryListItem.starred`, toggle action, and `HistoryBadge`. It adds no state producer, ViewModel action, repository or DAO query, Room schema or migration, i18n, pipeline, rendering, server, Web, or shared path. The focused JVM test failed before production editing only on the two unresolved references to the planned helper, then passed during implementation and at the branch tip.
+
+## 2026-08-24 Editing saved DDL from a lineage card (android `2.1.4-android.62`, [I-364])
+
+Every lineage card with a normal work now has the existing `DDL edit` action after Elements and before Model. The action can target a card other than the current focus and opens the existing editor with that work's saved `normalizedDdl`. Drawing the edit uses the existing `drawFromDdl` and `ddl_edit` save path, keeps the Lineage tab, then reloads the graph focused on the saved child. Tombstones have no action.
+
+No new editor, producer, repository or DAO query, Room schema or migration, persistence format, i18n, LLM processing, pipeline, rendering, server, Web, or shared path was added. One focused device test covers the card action, editor seed value, `ddl_edit` edge, and child refocus. The test removes only the thumbnail for the render hash it creates after closing the repository; the final evacuation preserved two history rows, two lineage rows, schema version 9, and 1,239 thumbnails.

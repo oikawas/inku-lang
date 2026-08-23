@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.61` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.62` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2154,3 +2154,9 @@ I-360のmodel tooltipへ、作品が保存した短縮render hashを既存の`F`
 履歴画面の各作品card右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを置く。controlのtapは既存`toggleStar(HistoryListItem)`だけを呼び、cardの作品選択を発火させない。既存のcard tap、long pressによるStar切替、選択枠、thumbnail、作品title、検索、Starのみfilter、順序と件数は維持する。
 
 既存`HistoryListItem.starred`、toggle action、`HistoryBadge`だけを使い、新しいstate producer、ViewModel action、repository/DAO/query、Room/schema/migration、i18n、pipeline、render、server/web/sharedは変更していない。focused JVM testはproduction edit前に新helperの未実装参照2件だけでfailし、実装中とbranch-tip finalでgreenになった。
+
+## 2026-08-24 系譜カードから保存済みDDLを編集する（android `2.1.4-android.62`・[I-364]）
+
+通常作品を持つ系譜cardに、描画要素の次、モデルの前へ既存`DDL編集`actionを追加する。actionはfocus外cardも対象にでき、保存済み`normalizedDdl`で既存editorを開く。編集後は既存`drawFromDdl`と`ddl_edit`保存経路を使い、成功時にLineage tabを保ったまま新しい子へfocusして系譜を再取得する。tombstoneにはactionを出さない。
+
+新しいeditor、producer、repository/DAO/query、Room/schema/migration、保存形式、i18n、LLM処理、pipeline、render、server/web/sharedは追加していない。focused実機testはcard action、editor初期値、`ddl_edit` edge、子focusを1本で通した。testが作るthumbnailはrepository close後に対象render hashだけを削除し、最終退避でhistory 2、lineage 2、schema 9、thumbnail 1,239件を保持した。

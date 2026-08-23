@@ -7974,3 +7974,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **履歴画面の各作品card右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを追加した。** controlのtapは既存`toggleStar(HistoryListItem)`だけを呼び、cardの作品選択を発火させない。
 - **既存のcard tapとlong press Star切替を維持した。** 選択枠、thumbnail、作品title、検索、Starのみfilter、順序、件数も変えていない。既存`HistoryListItem.starred`、toggle action、`HistoryBadge`だけを使い、新しいproducer、ViewModel action、repository/DAO/query、Room/schema/migration、i18n、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新helperの未実装参照2件だけでexit 1。実装中は`HistoryGridStarControlTest`がexit 0、branch-tip finalもexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.62` — 系譜カードから保存済みDDLを編集する（2026-08-24・[I-364]）
+
+- **通常作品を持つ系譜cardへ既存`DDL編集`actionを追加した。** 描画要素の次、モデルの前に置き、focus外cardを押しても対象作品の保存済み`normalizedDdl`で既存editorを開く。tombstoneには表示しない。
+- **編集後は既存`drawFromDdl`と`ddl_edit`保存を再利用する。** 成功後もLineage tabを保ち、保存した子をselected workとfocus nodeにして既存repositoryから系譜を再取得する。既存card tap、描画要素・モデル・言語action、新しい起点、通常Compose起点の遷移は維持した。新しいproducer、query、schema、engineは無い。
+- **検証:** production edit前はcard action 3件を期待して既存の`ddl_edit`派生label 1件しか無く、対象testだけがexit 1。画面外cardへのtest clickを画面内のfocus外cardへ直した後、focused実機testは実装中1/1、branch-tip final 1/1 green。各run前に画面/keyguard preflightとdata退避を行い、test生成thumbnailは対象hashだけをcleanupした。最終退避はhistory 2、lineage 2、schema 9、thumbnail 1,239件。全instrumentation、全JVM suite、screenshot、reference生成、実モデル、network、pentalaは対象外。

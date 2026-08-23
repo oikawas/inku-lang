@@ -5,10 +5,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod arc;
 pub mod contact;
 pub mod determinism;
 pub mod geometry;
+pub mod group;
 pub mod placement;
+pub mod planning;
 pub mod stroke;
 pub mod support;
 pub mod types;

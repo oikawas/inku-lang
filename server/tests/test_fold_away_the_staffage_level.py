@@ -234,7 +234,7 @@ def test_t5_the_request_model_no_longer_accepts_the_key(db_user) -> None:
 # ── T-6 / T-7: UI ────────────────────────────────────────────────────────────
 
 STAFFAGE_ROWS = (
-    ("components/CanvasPanel.svelte", "developerMode && statusTenkei"),
+    ("features/canvas/CanvasGenerationInfo.svelte", "developerMode && statusTenkei"),
     ("components/HistoryStrip.svelte", "developerMode && it.tenkei"),
 )
 

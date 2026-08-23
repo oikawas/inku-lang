@@ -16,12 +16,15 @@ def test_t327_user_facing_compat_copy_names_the_portable_subset_without_overclai
 
     assert "定義済みportable subset" in ja
     assert "defined portable subset" in en
-    assert "filter / clip-path を使わない" in ja
-    assert "filter / clip-path free" in en
-    assert "defined portable subset" in cli
-    assert "defined portable subset" in " ".join(cli_readme.split())
+    assert "filter-free flat vector fallback" in ja
+    assert "filter-free flat vector fallback" in en
+    assert "filter-free flat vector fallback" in cli
+    assert "filter-free flat vector fallback" in " ".join(cli_readme.split())
     assert "定義済みportable subset" in spec_ja
-    assert "defined portable subset" in spec_en
+    normalized_spec_en = " ".join(spec_en.split())
+    assert "defined portable subset" in normalized_spec_en
+    assert "filter-free flat vector fallback" in spec_ja
+    assert "filter-free flat vector fallback" in normalized_spec_en
     for text in (ja, en, cli, cli_readme, spec_ja, spec_en):
         assert "all SVG editors" not in text
         assert "すべてのSVG editor" not in text

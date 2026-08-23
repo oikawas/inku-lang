@@ -251,8 +251,9 @@ def test_s2_the_other_surface_cases_did_move() -> None:
 # --- S-3 形: 粒が図形の外に出ないこと -------------------------------------- #
 
 
+# Engine 39 moved grain to a fixed-pattern carrier guarded by test_surface_grain_pattern.py.
 @pytest.mark.parametrize(
-    "texture", ("stipple", "grain", "paper_grain", "aquatint", "hatch", "crosshatch")
+    "texture", ("stipple", "paper_grain", "aquatint", "hatch", "crosshatch")
 )
 def test_s3_grains_stay_inside_a_triangle(texture: str) -> None:
     """bbox 一様乱数をやめた直接の証拠。三角形の bbox の半分は図形の外である。

@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.58` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.59` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2638,3 +2638,9 @@ The visible fourteen-character Stage 1 label, thumbnail dimensions, work selecti
 I-359's model tooltip now also shows the work's saved time and saved color-catalog ID. The timestamp uses the same ISO-8601 UTC representation as the Provenance sheet and the existing `Created` and `Color catalog` labels. A non-positive or unconvertible timestamp or a blank catalog ID is shown as `—`.
 
 The UI reads only the existing `HistoryListItem.createdAt` and `colorCatalogId` and never looks up a name from the current color-catalog list. I-359's complete model IDs, missing-Stage-2 marker, no-Stage-1 omission, fourteen-character visible label, thumbnail dimensions, work selection, Star, scrolling, and interaction lock are preserved. No new state, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Showing the work hash and canvas in the history-strip tooltip (android `2.1.4-android.59`, [I-361])
+
+I-360's model tooltip now also shows the work's saved short render hash under the existing `Provenance hash` label with the established `F` prefix and its saved `canvasAspect` under the existing `Canvas` label. A blank value is shown as `—`.
+
+The UI reads only the existing `HistoryListItem.renderHashShort` and `canvasAspect`. It neither loads the full item nor recalculates from current canvas options. I-360's model IDs, saved time, color-catalog ID, no-Stage-1 omission, fourteen-character visible label, thumbnail dimensions, work selection, Star, scrolling, and interaction lock are preserved. No new state, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.

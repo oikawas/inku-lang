@@ -7956,3 +7956,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **I-359のmodel tooltipへ作品の保存日時と保存済み色カタログIDを追加した。** 日時は生成情報sheetと同じISO-8601 UTC表現で、既存の日英labelを再利用する。日時が0以下または変換不能、catalog IDがblankなら`—`とする。
 - **既存`HistoryListItem.createdAt`と`colorCatalogId`だけを読む。** 現在の色カタログ一覧から名前を引かず、I-359のmodel ID、欠落表示、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保った。新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testはtooltip formatterの追加予定4引数の未実装参照12件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.59` — 履歴stripのtooltipに作品hashとキャンバスを表示する（2026-08-23・[I-361]）
+
+- **I-360のmodel tooltipへ保存済み作品hashとキャンバスを追加した。** 短縮render hashは既存の`F` prefix表記と`作品の来歴ハッシュ`label、`canvasAspect`は既存の`キャンバス`labelを使い、blank値は`—`とする。
+- **既存`HistoryListItem.renderHashShort`と`canvasAspect`だけを読む。** full itemを追加loadせず、現在のcanvas optionから再計算しない。I-360のmodel ID、保存日時、色カタログID、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保った。新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testはtooltip formatterの追加予定4引数の未実装参照12件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

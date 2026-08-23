@@ -2295,10 +2295,30 @@ internal fun historyStripModelLabel(modelId: String?): String? {
     return displayName?.compactLabel(14)
 }
 
-internal fun historyStripModelTooltipText(stage1Model: String?, stage2Model: String?): String? {
+internal fun historyStripModelTooltipText(
+    stage1Model: String?,
+    stage2Model: String?,
+    createdAt: Long? = null,
+    colorCatalogId: String? = null,
+    createdLabel: String? = null,
+    colorCatalogLabel: String? = null,
+): String? {
     val stage1 = stage1Model?.trim()?.takeIf(String::isNotEmpty) ?: return null
     val stage2 = stage2Model?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-    return "Stage 1: $stage1\nStage 2: $stage2"
+    val lines = mutableListOf("Stage 1: $stage1", "Stage 2: $stage2")
+    createdLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
+        val created = if (createdAt != null && createdAt > 0L) {
+            runCatching { java.time.Instant.ofEpochMilli(createdAt).toString() }.getOrDefault("—")
+        } else {
+            "—"
+        }
+        lines += "$label: $created"
+    }
+    colorCatalogLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
+        val catalogId = colorCatalogId?.trim()?.takeIf(String::isNotEmpty) ?: "—"
+        lines += "$label: $catalogId"
+    }
+    return lines.joinToString("\n")
 }
 
 internal data class HistoryStripStarControl(
@@ -2369,6 +2389,10 @@ private fun HistoryThumbnailStrip(
                     val tooltipText = historyStripModelTooltipText(
                         stage1Model = historyItem.stage1Model,
                         stage2Model = historyItem.stage2Model,
+                        createdAt = historyItem.createdAt,
+                        colorCatalogId = historyItem.colorCatalogId,
+                        createdLabel = S.generationInfoCreated,
+                        colorCatalogLabel = S.generationInfoColorCatalog,
                     ) ?: return@let
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),

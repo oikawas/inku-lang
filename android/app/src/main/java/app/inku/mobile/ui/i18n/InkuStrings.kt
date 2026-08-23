@@ -313,6 +313,7 @@ interface InkuStrings {
     val generationInfoSeedText: String
     val generationInfoRenderWild: String
     val generationInfoColorCatalog: String
+    val generationInfoColorMap: String
     val generationInfoCanvasAspect: String
     val generationInfoCanvasRatio: String
     val generationInfoRenderHash: String

@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.54` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.55` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2614,3 +2614,9 @@ The UI uses only the existing `LocalClipboardManager` and `renderPromptText` or 
 The ordinary Compose screen and the existing Canvas panel can now open a read-only `Provenance` sheet for the selected work. Saved sketch state, Stage 1 and Stage 2 models and languages, seeds and variation, color catalog, canvas, render hash and engine, creation time, and elapsed time are arranged under Sketch from life, Interpretation, Performance, Identity, and Run. Null, blank, or malformed render metadata is shown as `—` without crashing the sheet.
 
 The sheet reads only the existing `HistoryItemEntity` and `renderMetadataJson`. Generation, derivation, comments, batch data, and tokens have no current Android producer and were not added. No ViewModel state or action, repository or DAO query, Room schema or migration, persistence, lineage fetch, token collection, SVG analysis, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Showing the color map saved on the work (android `2.1.4-android.55`, [I-357])
+
+The Performance section of the Provenance sheet now includes a `Color map` row. It shows each color word, the code saved in the work's `render_color_map`, and a swatch for that code, ordered by color word. The row is absent when the map is missing or empty or the metadata is malformed. An invalid code falls back to a neutral swatch while its saved string remains visible.
+
+The UI uses only the existing `workColorSnapshot(renderMetadataJson)` and never recalculates the assignment from the current color catalog. No producer, color-code rewrite or normalization, ViewModel state or action, repository or DAO query, Room schema or migration, persistence, SVG analysis, pipeline, rendering, server, Web, or shared path changed.

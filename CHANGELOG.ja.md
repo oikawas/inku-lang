@@ -7932,3 +7932,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常Compose画面と既存Canvas panelに、選択中作品の読み取り専用`生成情報`sheetを追加した。** 保存済みの写生、Stage 1／2モデルと言語、各seedと変奏、色カタログ、キャンバス、render hash／engine、作成日時、処理時間を5節に整理し、null／blankまたは壊れたmetadataは`—`で扱う。
 - **既存`HistoryItemEntity`と`renderMetadataJson`だけを読む。** Androidにproducerが無い世代、派生、コメント、batch、tokensは足さず、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、lineage取得、token収集、SVG解析、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新projection helper／typesの未実装symbolだけでexit 1。実装中とbranch-tip finalはexit 0。mainが枝分岐後に別のWeb変更で進んだため、重なり0・競合0を確認してmerge後に`GenerationInfoSheetTest`を1回実行しexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.55` — 作品が保存した色の対応を表示する（2026-08-23・[I-357]）
+
+- **生成情報sheetの演奏sectionに、保存済み`render_color_map`の色語・色コード・swatchを表示する。** 色語順で安定させ、map欠落／空／壊れたmetadataでは行を出さない。不正コードでもsheetを落とさずneutral swatchにし、保存文字列はそのまま残す。
+- **既存`workColorSnapshot(renderMetadataJson)`だけを再利用した。** 現在の色カタログから再計算せず、producer、色コードの書換え／正規化、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、SVG解析、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新color-map projection helper／typeの未実装参照だけでexit 1。実装中とbranch-tip finalの`GenerationInfoColorMapTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

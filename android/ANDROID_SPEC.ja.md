@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.54` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.55` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2112,3 +2112,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 通常Compose画面と既存Canvas panelから、選択中作品の読み取り専用`生成情報`sheetを開ける。保存済みの写生、Stage 1／2モデルと言語、各seedと変奏、色カタログ、キャンバス、render hash／engine、作成日時、処理時間を、写生・解釈・演奏・同一性・実行の5節に整理する。null／blankまたは壊れたrender metadataは`—`で表示し、sheetを落とさない。
 
 既存`HistoryItemEntity`と`renderMetadataJson`だけを読む。Androidにproducerが無い世代、派生、コメント、batch、tokensは表示対象へ足していない。ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、lineage取得、token収集、SVG解析、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 作品が保存した色の対応を表示する（android `2.1.4-android.55`・[I-357]）
+
+生成情報sheetの演奏sectionに`色の対応`を追加する。作品の`render_color_map`が保存した色語、色コード、そのコードのswatchを色語順で表示する。mapが無い、空、またはmetadataが壊れている作品では行自体を出さない。不正な色コードはneutral swatchへfallbackし、保存文字列はそのまま表示する。
+
+既存`workColorSnapshot(renderMetadataJson)`だけを使い、現在の色カタログから割当を再計算しない。producer、色コードの書換え／正規化、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、SVG解析、pipeline、render、server/web/sharedは変更していない。

@@ -2302,6 +2302,10 @@ internal fun historyStripModelTooltipText(
     colorCatalogId: String? = null,
     createdLabel: String? = null,
     colorCatalogLabel: String? = null,
+    renderHashShort: String? = null,
+    canvasAspect: String? = null,
+    renderHashLabel: String? = null,
+    canvasLabel: String? = null,
 ): String? {
     val stage1 = stage1Model?.trim()?.takeIf(String::isNotEmpty) ?: return null
     val stage2 = stage2Model?.trim()?.takeIf(String::isNotEmpty) ?: "—"
@@ -2317,6 +2321,14 @@ internal fun historyStripModelTooltipText(
     colorCatalogLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
         val catalogId = colorCatalogId?.trim()?.takeIf(String::isNotEmpty) ?: "—"
         lines += "$label: $catalogId"
+    }
+    renderHashLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
+        val hash = renderHashShort?.trim()?.takeIf(String::isNotEmpty)?.let { "F$it" } ?: "—"
+        lines += "$label: $hash"
+    }
+    canvasLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
+        val aspect = canvasAspect?.trim()?.takeIf(String::isNotEmpty) ?: "—"
+        lines += "$label: $aspect"
     }
     return lines.joinToString("\n")
 }
@@ -2393,6 +2405,10 @@ private fun HistoryThumbnailStrip(
                         colorCatalogId = historyItem.colorCatalogId,
                         createdLabel = S.generationInfoCreated,
                         colorCatalogLabel = S.generationInfoColorCatalog,
+                        renderHashShort = historyItem.renderHashShort,
+                        canvasAspect = historyItem.canvasAspect,
+                        renderHashLabel = S.generationInfoRenderHash,
+                        canvasLabel = S.generationInfoCanvasAspect,
                     ) ?: return@let
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),

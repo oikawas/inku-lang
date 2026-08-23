@@ -148,15 +148,15 @@
 	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }
 	.refine-action-wrap { width: min(210px, 100%); }
-	.refine-action-wrap :global(.tooltip-wrap),
-	.refine-action-wrap :global(.paint-btn) { width: 100%; }
-	.refine-action-wrap :global(.paint-btn) { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
+	.refine-action-wrap .tooltip-wrap,
+	.refine-action-wrap .paint-btn { width: 100%; }
+	.refine-action-wrap .paint-btn { margin-top: 0; min-height: 34px; font-size: 12px; letter-spacing: 0.03em; }
 	.refine-save-actions {
 		margin-bottom: 12px;
 		display: flex;
 		justify-content: flex-end;
 	}
-	.refine-save-actions :global(.tooltip-wrap) { width: fit-content; max-width: 100%; }
+	.refine-save-actions .tooltip-wrap { width: fit-content; max-width: 100%; }
 	.refine-save-actions button {
 		width: auto;
 		max-width: 100%;
@@ -229,7 +229,7 @@
 		min-height: 0;
 		background: var(--bg2);
 	}
-	.variation-card-art :global(svg) {
+	.variation-card-art svg {
 		display: block;
 		width: 100%;
 		height: 100%;
@@ -299,17 +299,16 @@
 		width: min(260px, 34%);
 		min-width: 210px;
 	}
-	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
-	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
+	.compare-action-wrap .tooltip-wrap { width: 100%; }
+	.compare-action-wrap .paint-btn { margin-top: 0; }
 	/* While comparing, let the status widen past the button width so the full
-	   model name shows without truncation.  Keyed on a class this component
-	   writes: the status element belongs to RunStatus, so a selector naming it
-	   would be scoped away and match nothing. */
+	   model name shows without truncation. The view marks its wrapper as running
+	   so this rule does not depend on RunStatus's internal markup. */
 	.compare-action-wrap.running { width: auto; min-width: 0; max-width: 62%; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
-	.model-metadata-hover:hover :global(.model-hover-card),
-	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
+	.model-metadata-hover:hover .model-hover-card,
+	.model-metadata-hover:focus-within .model-hover-card { display: block; }
 	.refine-settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 	.refine-model-row { margin-top: 6px; }
 
@@ -395,7 +394,7 @@
 		background: var(--bg2);
 		overflow: hidden;
 	}
-	.comparison-art :global(> svg) { width: 100%; height: 100%; display: block; }
+	.comparison-art > svg { width: 100%; height: 100%; display: block; }
 	.comparison-art > .canvas-art { width: 100%; height: 100%; display: block; }
 	.model-target-meta { margin-top: 7px; }
 	.model-results-column {

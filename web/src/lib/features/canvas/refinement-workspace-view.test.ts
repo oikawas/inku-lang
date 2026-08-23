@@ -30,6 +30,7 @@ test('T-1001/T-1002: refinement shell composes three capability-local views', ()
 	assert.match(models, /class="compare-mode-tabs"/);
 	assert.match(languages, /LANGUAGE_COMBOS/);
 	assert.match(styles, /Fit candidates into the remaining height/);
+	assert.doesNotMatch(styles, /:global\(/, 'external CSS must use standard selectors');
 
 	assert.match(panel, /import CanvasRefinementWorkspace from '\$lib\/features\/canvas\/CanvasRefinementWorkspace\.svelte'/);
 	assert.match(panel, /<CanvasRefinementWorkspace/);

@@ -37,6 +37,7 @@ const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'u
 
 const PANEL = read('./components/CanvasPanel.svelte');
 const TABS = read('./components/OutputTabsContent.svelte');
+const INFO = read('./features/canvas/CanvasGenerationInfo.svelte');
 
 /** The strip above the canvas, from its opening tag to its close. */
 function metaStrip(): string {
@@ -66,7 +67,8 @@ test('T-95: it is the drawer\'s own measurement, not a second one', () => {
 	// `detailSvgBytes` is the derivation the drawer reads. Measuring again here
 	// would be a second count of the same drawing, and two counts drift.
 	assert.equal((PANEL.match(/measureSvgWeight\(/g) ?? []).length, 1);
-	assert.equal((PANEL.match(/formatByteSize\(detailSvgBytes\)/g) ?? []).length, 2,
+	assert.equal((PANEL.match(/formatByteSize\(detailSvgBytes\)/g) ?? []).length, 1);
+	assert.equal((INFO.match(/formatByteSize\(detailSvgBytes\)/g) ?? []).length, 1,
 		'the strip and the drawer do not share one formatted value');
 });
 
@@ -103,13 +105,13 @@ test('T-96: the separator does not follow the interface language', () => {
 });
 
 test('T-96: the drawer writes its sizes, counts and tokens the same way', () => {
-	assert.match(PANEL, /\{detailSvgWeight \? groupDigits\(detailSvgWeight\.objects\) : '-'\}/);
-	assert.match(PANEL, /\{detailSvgWeight \? groupDigits\(detailSvgWeight\.points\) : '-'\}/);
-	assert.match(PANEL, /\{detailTokensIn == null \? '-' : groupDigits\(detailTokensIn\)\}/);
-	assert.match(PANEL, /\{detailTokensOut == null \? '-' : groupDigits\(detailTokensOut\)\}/);
+	assert.match(INFO, /\{detailSvgWeight \? groupDigits\(detailSvgWeight\.objects\) : '-'\}/);
+	assert.match(INFO, /\{detailSvgWeight \? groupDigits\(detailSvgWeight\.points\) : '-'\}/);
+	assert.match(INFO, /\{detailTokensIn == null \? '-' : groupDigits\(detailTokensIn\)\}/);
+	assert.match(INFO, /\{detailTokensOut == null \? '-' : groupDigits\(detailTokensOut\)\}/);
 	// A dash, never a zero: grouping a number that was never recorded would
 	// print `0` and claim the work used no tokens.
-	assert.doesNotMatch(PANEL, /groupDigits\(detailTokensIn \?\? 0\)/);
+	assert.doesNotMatch(INFO, /groupDigits\(detailTokensIn \?\? 0\)/);
 });
 
 // ------------------------------------------- T-97 (it keeps the reader's place)
@@ -142,8 +144,8 @@ test('T-97: the pane that scrolls is bound in all three tabs', () => {
 	// Each tab scrolls a different element, and two of them belong to
 	// OutputTabsContent. Without the binding the drawer would remember the
 	// details list and silently forget the other two.
-	assert.match(PANEL, /class="generation-details" bind:this=\{detailsScrollEl\}/);
-	assert.match(PANEL, /bind:scrollEl=\{tabsScrollEl\}/);
+	assert.match(INFO, /class="generation-details" bind:this=\{detailsScrollEl\}/);
+	assert.match(INFO, /bind:scrollEl=\{tabsScrollEl\}/);
 	assert.match(TABS, /class="prompt-section" bind:this=\{scrollEl\}/);
 	assert.match(TABS, /class="score-view" bind:this=\{scrollEl\}/);
 	// And the drawer asks for the right one for the tab it is on.

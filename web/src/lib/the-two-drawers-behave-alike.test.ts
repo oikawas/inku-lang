@@ -15,6 +15,7 @@ import { test } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const SAIJIKI = read('./components/SaijikiDrawer.svelte');
 const PANEL = read('./components/CanvasPanel.svelte');
+const INFO = read('./features/canvas/CanvasGenerationInfo.svelte');
 
 // ------------------------------------------------------------------- T-44
 
@@ -54,14 +55,15 @@ const REVEAL = '0.25s cubic-bezier(0.4, 0, 0.2, 1)';
 test('T-45  the provenance drawer is revealed, not popped into place', () => {
 	// It used to be mounted by {#if}, so it arrived whole with no animation at
 	// all. It stays mounted now and is clipped shut.
-	assert.match(PANEL, /class:open=\{generationInfoOpen\}/);
+	assert.match(PANEL, /open=\{generationInfoOpen\}/);
+	assert.match(INFO, /class:open/);
 	assert.doesNotMatch(PANEL, /\{#if generationInfoOpen\}/);
-	assert.match(PANEL, /\.generation-info \{[^}]*clip-path: inset\(0 0 0 100%\)/);
-	assert.match(PANEL, /\.generation-info\.open \{[^}]*clip-path: inset\(0 0 0 0\)/);
+	assert.match(INFO, /\.generation-info \{[^}]*clip-path: inset\(0 0 0 100%\)/);
+	assert.match(INFO, /\.generation-info\.open \{[^}]*clip-path: inset\(0 0 0 0\)/);
 });
 
 test('T-45  it takes the saijiki drawer\'s own duration and curve', () => {
-	const provenance = PANEL.match(/\.generation-info \{[^}]*transition: clip-path ([^;]+);/);
+	const provenance = INFO.match(/\.generation-info \{[^}]*transition: clip-path ([^;]+);/);
 	assert.ok(provenance, 'the provenance drawer has no reveal');
 	const saijiki = SAIJIKI.match(/\.saijiki-drawer \{[^}]*transition: width ([^;]+);/);
 	assert.ok(saijiki, 'the saijiki drawer has no reveal');
@@ -75,7 +77,7 @@ test('T-45  it takes the saijiki drawer\'s own duration and curve', () => {
 test('T-45  and a drawer that is shut takes no presses', () => {
 	// Clipping hides it without collapsing the box, so the box would otherwise
 	// still swallow clicks meant for the canvas behind it.
-	assert.match(PANEL, /\.generation-info \{[^}]*pointer-events: none/);
-	assert.match(PANEL, /\.generation-info\.open \{[^}]*pointer-events: all/);
-	assert.match(PANEL, /aria-hidden=\{!generationInfoOpen\}/);
+	assert.match(INFO, /\.generation-info \{[^}]*pointer-events: none/);
+	assert.match(INFO, /\.generation-info\.open \{[^}]*pointer-events: all/);
+	assert.match(INFO, /aria-hidden=\{!open\}/);
 });

@@ -58,6 +58,7 @@ test('T-327: touch redraw preserves seed zero, request references, and existing 
 			exclusions.push([...excluded]);
 			return 22;
 		},
+		isCurrentTarget: () => true,
 		currentResult: () => latest
 	});
 
@@ -99,6 +100,29 @@ test('T-327: touch redraw preserves seed zero, request references, and existing 
 			stage1Model: 'late/current'
 		}
 	);
+});
+
+test('T-333: a touch redraw returned for an abandoned target is discarded', async () => {
+	let currentReads = 0;
+	const redrawn = await runTouchRedraw({
+		current: result(),
+		canvasAspectId: aspect,
+		parentNodeId: 'parent-1',
+		workReference: { work_id: 'history-1' },
+		renderPayload: {}
+	}, {
+		apiFetch: async () => new Response('<svg id="stale"/>'),
+		apiError: async () => new Error('unexpected'),
+		createRenderSeed: () => 22,
+		isCurrentTarget: () => false,
+		currentResult: () => {
+			currentReads += 1;
+			return result({ history_id: 'history-2' });
+		}
+	});
+
+	assert.equal(redrawn, null);
+	assert.equal(currentReads, 0);
 });
 
 test('T-328: layout redraw excludes the current seed and passes canonical Paint options', async () => {
@@ -203,6 +227,7 @@ test('T-330: a rejected touch response uses the existing error conversion and re
 			apiFetch: async () => new Response('no', { status: 409 }),
 			apiError: async () => { converted += 1; return expected; },
 			createRenderSeed: () => 22,
+			isCurrentTarget: () => true,
 			currentResult: () => { throw new Error('must not map a rejected response'); }
 		}),
 		(error) => error === expected

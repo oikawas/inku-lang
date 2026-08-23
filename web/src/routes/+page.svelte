@@ -3752,12 +3752,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!result || refinementSession.busy) return;
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await confirmFallbackRefine(currentRefineParent()))) return;
+		const contextVersion = targetContextVersion;
 		const parentNodeId = await ensureVisibleLineageParentId();
+		if (contextVersion !== targetContextVersion || !result) return;
 		refinementSession.beginSingle();
 		reloading = true;
 		reloadError = null;
 		try {
-			result = await runTouchRedraw({
+			const redrawn = await runTouchRedraw({
 				current: result,
 				canvasAspectId: refinementCanvasAspectId(),
 				parentNodeId,
@@ -3767,17 +3769,22 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				apiFetch,
 				apiError,
 				createRenderSeed: createSafeIntegerSeed,
+				isCurrentTarget: () => contextVersion === targetContextVersion,
 				currentResult: () => result!
 			});
+			if (!redrawn) return;
+			result = redrawn;
 			displayedHistoryItem = null;
 			history.clearSelection();
 			outputTab = 'canvas';
 			canvasViewport.fit();
 		} catch (e) {
-			reloadError = e instanceof Error ? e.message : String(e);
+			if (contextVersion === targetContextVersion) {
+				reloadError = e instanceof Error ? e.message : String(e);
+			}
 		} finally {
 			reloading = false;
-			refinementSession.finishSingle();
+			if (contextVersion === targetContextVersion) refinementSession.finishSingle();
 		}
 	}
 

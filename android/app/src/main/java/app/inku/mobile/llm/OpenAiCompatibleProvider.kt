@@ -16,7 +16,7 @@ class OpenAiCompatibleProvider(
 ) : ModelProvider {
     override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
-        val model = request.modelId.removePrefix("$providerId:").ifBlank { request.modelId }
+        val model = modelForRequest(providerId, request.modelId)
         val payload = JSONObject()
             .put("model", model)
             .put(
@@ -163,7 +163,10 @@ class OpenAiCompatibleProvider(
         }
     }
 
-    private companion object {
+    internal companion object {
+        internal fun modelForRequest(providerId: String, modelId: String): String =
+            modelId.removePrefix("$providerId:").ifBlank { modelId }
+
         private const val REQUEST_TIMEOUT_MS = 600_000
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384

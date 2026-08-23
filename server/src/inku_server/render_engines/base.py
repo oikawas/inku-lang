@@ -9,7 +9,7 @@ from ..schema import Score
 @dataclass(frozen=True)
 class RenderEngineResult:
     svg: str
-    metadata: dict[str, str]
+    metadata: dict[str, object]
 
 
 class RenderEngine(Protocol):

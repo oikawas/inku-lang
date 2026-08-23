@@ -21,9 +21,7 @@ from ..limits import (
     using_limits,
 )
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
-from ..render_engines import current_render_engine
-from ..render_engines.default.determinism import new_render_seed
-from ..render_engines.default.document import SVG_PROFILES
+from ..render_engines import SVG_PROFILES, current_render_engine, new_render_seed
 from ..schema import CanvasSpec, Score
 from .. import db as _db
 from .common import _build_number, _model_metadata

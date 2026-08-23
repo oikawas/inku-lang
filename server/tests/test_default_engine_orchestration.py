@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import inspect
 from pathlib import Path
+from typing import get_type_hints
 
 import inku_server.renderer as renderer
 from inku_server.render_engines import current_render_engine
@@ -178,7 +179,7 @@ def test_t5_facade_and_adapter_have_no_orchestration_binding() -> None:
     assert document.build_texture_metadata.__module__ == (
         "inku_server.render_engines.default.document"
     )
-    assert "engine.render_result" in inspect.getsource(renderer.render)
+    assert "_render_engines.current_render_engine" in inspect.getsource(renderer.render)
     assert not hasattr(adapter, "render_svg")
     assert not hasattr(adapter, "build_texture_metadata")
     assert not hasattr(adapter, "_bind_renderer")
@@ -186,6 +187,28 @@ def test_t5_facade_and_adapter_have_no_orchestration_binding() -> None:
     assert not hasattr(renderer, "_SURFACE_MARK_STYLE")
     assert not hasattr(renderer, "_MARK_SURFACE_OPS")
     assert engine._SURFACE_MARK_STYLE is not None
+
+
+def test_t7_host_contract_owns_profiles_and_seed() -> None:
+    host_contract = importlib.import_module("inku_server.render_engines")
+    profiles = importlib.import_module("inku_server.render_engines.profiles")
+    seeds = importlib.import_module("inku_server.render_engines.seeds")
+    determinism = importlib.import_module(
+        "inku_server.render_engines.default.determinism"
+    )
+
+    assert host_contract.SVG_PROFILES is profiles.SVG_PROFILES
+    assert document.SVG_PROFILES is profiles.SVG_PROFILES
+    assert document._normalize_svg_profile is profiles.normalize_svg_profile
+    assert host_contract.new_render_seed is seeds.new_render_seed
+    assert determinism.new_render_seed is seeds.new_render_seed
+    assert 0 <= host_contract.new_render_seed() <= 2**53 - 1
+
+
+def test_t8_render_metadata_type_accepts_json_compatible_values() -> None:
+    hints = get_type_hints(RenderEngineResult)
+
+    assert hints["metadata"] == dict[str, object]
 
 
 def test_t6_default_engine_modules_do_not_import_renderer() -> None:

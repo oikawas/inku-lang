@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin==1.13.3"]
+build-backend = "maturin"
+
+[project]
+name = "inku-render-python"
+version = "0.1.0"
+description = "Thin Python binding for the platform-independent inku render core"
+requires-python = ">=3.12"
+classifiers = ["Private :: Do Not Upload"]
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "inku_render._native"
+python-source = "python"

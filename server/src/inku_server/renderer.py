@@ -7,7 +7,7 @@ symbols belong to their modules under ``render_engines.default``.
 
 from __future__ import annotations
 
-from .render_engines.default import engine as _engine
+from . import render_engines as _render_engines
 from .schema import Score as _Score
 
 __all__ = ("render",)
@@ -26,7 +26,7 @@ def render(
 ) -> str:
     """Render a Score and return only the canonical engine's SVG."""
 
-    return _engine.render_result(
+    return _render_engines.current_render_engine().render(
         score,
         color_map=color_map,
         catalog_id=catalog_id,

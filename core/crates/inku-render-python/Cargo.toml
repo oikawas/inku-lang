@@ -1,0 +1,17 @@
+[package]
+name = "inku-render-python"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Thin Python binding for the inku render core"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+inku-render.workspace = true
+pyo3.workspace = true

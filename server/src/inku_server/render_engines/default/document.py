@@ -12,7 +12,9 @@ import svgwrite
 from ...plugins import CanvasSize
 from ...schema import CLOSED_SHAPES, CanvasGroundSpec, CanvasSpec, Instruction, Score
 
-SVG_PROFILES = frozenset({"display", "editable", "compat"})
+# Keep the legacy constant import path while consumers move to the neutral owner.
+from ..profiles import SVG_PROFILES as SVG_PROFILES
+from ..profiles import normalize_svg_profile as _normalize_svg_profile
 
 
 def _score_canvas_aspect(score: Score) -> str:
@@ -63,13 +65,6 @@ def build_texture_metadata(score: Score, *, svg_profile: str | None = None) -> d
     if surfaces:
         metadata["render_surface_textures"] = surfaces
     return metadata
-
-
-def _normalize_svg_profile(svg_profile: str | None) -> str:
-    profile = (svg_profile or "display").strip().lower()
-    if profile not in SVG_PROFILES:
-        raise ValueError(f"unsupported svg profile: {svg_profile}")
-    return profile
 
 
 def _safe_svg_id(value: str) -> str:

@@ -55,6 +55,7 @@ from .plugins.document_format import (
     _SAIJIKI_MARKERS,
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
+from .render_engines import SVG_PROFILES
 from .render_engines.default.marks import (
     AMPLITUDE_CLAMP_RATIO,
     AMPLITUDE_WIDTHS,
@@ -74,8 +75,6 @@ from .render_engines.default.mark_kernel import (
     SEGMENT_COUNT_MIN,
     SEGMENT_TARGET_RATIO,
 )
-from .render_engines.default.document import SVG_PROFILES
-
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 

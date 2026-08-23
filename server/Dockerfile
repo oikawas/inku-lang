@@ -1,3 +1,16 @@
+# This immutable builder contains Rust 1.95.0, maturin 1.13.3, and CPython 3.12.
+# Only its audited wheel crosses into the runtime image; Rust and Cargo do not.
+FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b0774376e3de103f9bed2578 AS native-builder
+
+WORKDIR /build
+COPY core/ /build/core/
+RUN maturin build \
+    --manifest-path /build/core/crates/inku-render-python/Cargo.toml \
+    --release \
+    --locked \
+    --compatibility manylinux2014 \
+    --out /wheelhouse
+
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,7 +30,11 @@ RUN apt-get update \
 WORKDIR /app
 COPY shared/ /app/shared/
 COPY server/ /app/server/
-RUN cd /app/server && uv sync --frozen --no-dev
+COPY --from=native-builder /wheelhouse/ /tmp/wheelhouse/
+RUN cd /app/server \
+    && uv sync --frozen --no-dev \
+    && uv pip install --python /app/server/.venv/bin/python --no-deps /tmp/wheelhouse/*.whl \
+    && rm -rf /tmp/wheelhouse
 
 # Copied after the dependency sync so re-numbering a build does not invalidate it.
 # api.py resolves the build number relative to the package: parents[3]/web/BUILD_NUMBER.

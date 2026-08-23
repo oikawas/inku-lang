@@ -1,0 +1,11 @@
+[package]
+name = "inku-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Platform-independent render core for inku"
+publish = false
+
+[lib]
+path = "src/lib.rs"

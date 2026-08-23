@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import secrets
 import struct
 
 from ...schema import Instruction, Variation
+
+# Keep the legacy import path while consumers move to the neutral owner.
+from ..seeds import new_render_seed as new_render_seed
 
 _VARIATION_SEED_FIELDS_ALL = frozenset(
     {"amplitude", "frequency", "quality", "dimensions"}
@@ -107,11 +109,6 @@ def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None)
         key += f":render:{performance_seed}".encode("utf-8")
     digest = hashlib.sha256(key).digest()
     return struct.unpack("<Q", digest[:8])[0]
-
-
-def new_render_seed() -> int:
-    """演奏ごとのマクロ揺らぎ seed。明示 seed 指定時は再現可能。"""
-    return secrets.randbits(53)
 
 
 def _hash_to_unit(i: int, seed: int) -> float:

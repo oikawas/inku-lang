@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import get_type_hints
 
 import inku_server.renderer as renderer
-from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.base import RenderEngineResult
+from inku_server.render_engines.default import DEFAULT_RENDER_ENGINE
 from inku_server.schema import Score
 from inku_server.render_engines.default import document
 
@@ -54,7 +54,7 @@ def _representative_score() -> Score:
     )
 
 
-def test_t1_engine_returns_svg_and_metadata_as_one_result() -> None:
+def test_t1_python_engine_returns_svg_and_metadata_as_one_result() -> None:
     engine = importlib.import_module("inku_server.render_engines.default.engine")
     score = _representative_score()
 
@@ -67,9 +67,8 @@ def test_t1_engine_returns_svg_and_metadata_as_one_result() -> None:
     assert result.metadata["texture_degraded"] is True
     assert result.metadata["render_canvas_ground"]["material"] == "paper"
     assert result.metadata["render_surface_textures"][0]["texture"] == "wash"
-    assert renderer.render(score, svg_profile="compat", render_seed=431) == result.svg
     assert (
-        current_render_engine().render(
+        DEFAULT_RENDER_ENGINE.render(
             score, svg_profile="compat", render_seed=431
         )
         == result
@@ -115,6 +114,7 @@ def test_t2_adapter_returns_the_canonical_result_directly(monkeypatch) -> None:
 
 
 def test_t3_three_profiles_keep_the_pre_move_bytes() -> None:
+    """The orchestration digest characterizes Python Engine 40 only."""
     score = Score.model_validate(
         {
             "instructions": [
@@ -135,7 +135,9 @@ def test_t3_three_profiles_keep_the_pre_move_bytes() -> None:
     )
 
     for profile, expected in PROFILE_DIGESTS.items():
-        svg = renderer.render(score, svg_profile=profile, render_seed=431)
+        svg = DEFAULT_RENDER_ENGINE.render(
+            score, svg_profile=profile, render_seed=431
+        ).svg
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 

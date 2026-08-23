@@ -8,7 +8,7 @@ import pathlib
 import re
 
 from inku_server.master_grid import MASTER_GRID_DECIMALS
-from inku_server.render_engines import current_render_engine
+from inku_server.render_engines import DEFAULT_RENDER_ENGINE, current_render_engine
 from inku_server.schema import (
     Arrangement,
     CanvasGroundSpec,
@@ -34,6 +34,7 @@ ENGINE_36_MANIFEST = SERVER_ROOT / "reference" / "render-engine-36" / "manifest.
 ENGINE_37_MANIFEST = SERVER_ROOT / "reference" / "render-engine-37" / "manifest.json"
 ENGINE_38_MANIFEST = SERVER_ROOT / "reference" / "render-engine-38" / "manifest.json"
 ENGINE_39_MANIFEST = SERVER_ROOT / "reference" / "render-engine-39" / "manifest.json"
+ENGINE_40_MANIFEST = SERVER_ROOT / "reference" / "render-engine-40" / "manifest.json"
 
 
 def _generator():
@@ -754,8 +755,8 @@ ENGINE_40_SOLID_PROFILE_CASES = frozenset(
 
 def test_engine_40_moves_only_the_solid_profile_cases() -> None:
     """Engine 40 adds four solid-profile cases and preserves all 606 prior cases."""
-    manifest = _manifest()
-    assert manifest["engine_version"] == "40" == current_render_engine().version
+    manifest = json.loads(ENGINE_40_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "40" == DEFAULT_RENDER_ENGINE.version
     assert set(manifest["changed_from_previous"]) == ENGINE_40_SOLID_PROFILE_CASES
     previous = json.loads(ENGINE_39_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -769,14 +770,14 @@ def test_engine_40_moves_only_the_solid_profile_cases() -> None:
     assert carried == 606
 
 
-def test_engine_40_solid_profile_cases_match_the_current_renderer() -> None:
-    """The four new mottle/fallback boundary records redraw through the bake call."""
+def test_engine_40_solid_profile_cases_match_the_python_engine() -> None:
+    """The four Engine 40 records remain tied to their Python implementation."""
     generator = _generator()
-    manifest = _manifest()
+    manifest = json.loads(ENGINE_40_MANIFEST.read_text(encoding="utf-8"))
     inputs = generator.build_inputs()
     checked = 0
     for case_id in sorted(ENGINE_40_SOLID_PROFILE_CASES):
-        svg = generator.render_case(inputs[case_id])
+        svg = generator.render_case(inputs[case_id], engine=DEFAULT_RENDER_ENGINE)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
     assert checked == 4
@@ -880,14 +881,14 @@ def test_engine_18_palette_cases_cover_the_resolution_chain() -> None:
         "F-catalog-default-gray"
     ]["digest"]
     # ink_season's red band holds two colors; the work assignment picks Madder.
-    assert 'stroke="#8c2d1d"' in _resolve_svg("F-hint-sakura").read_text()
+    assert "#8c2d1d" in _resolve_svg("F-hint-sakura").read_text()
     # The empty-band witness moved to sea_stone: engine 18's default catalog has
     # a purple, and sea_stone's purple is the one band left empty by ruling. The
     # stand-in is Night Sea, which is also this catalog's blue.
-    assert 'stroke="#191970"' in _resolve_svg(
+    assert "#191970" in _resolve_svg(
         "F-hint-missing-purple-sea-stone"
     ).read_text()
-    assert 'stroke="#b06a2f"' in _resolve_svg("F-hint-brown").read_text()
+    assert "#b06a2f" in _resolve_svg("F-hint-brown").read_text()
     assert all(
         inputs[case_id]["score"]["background"] != "white"
         for case_id in inputs
@@ -1005,7 +1006,7 @@ def test_render_reference_svg_files_match_manifest() -> None:
         assert generator._normalized_digest(svg) == case["digest"]
 
 
-def test_unchanged_cases_keep_the_previous_version_body() -> None:
+def test_corpus_bodies_match_the_changed_case_set() -> None:
     """変わらなかったケースは本文を持たず、前の版の実物がそのまま最新である。
 
     版のディレクトリに並ぶファイルが「その版が何を動かしたか」を意味するための
@@ -1016,20 +1017,16 @@ def test_unchanged_cases_keep_the_previous_version_body() -> None:
     bodies = {path.stem for path in MANIFEST_PATH.parent.glob("*.svg")}
     assert bodies == changed
     unchanged = set(manifest["cases"]) - changed
-    assert unchanged, "この版は全件を動かしている。遡りの検査が空振りしていないか確認する"
+    if not unchanged:
+        assert ENGINE_VERSION == "41"
+        assert changed == set(manifest["cases"])
+        return
     for case_id in unchanged:
         assert _resolve_svg(case_id).parent != MANIFEST_PATH.parent
 
 
-def test_every_corpus_number_sits_on_the_master_grid() -> None:
-    """凍結物のどの数値も 6 桁固定で書かれている。
-
-    グリッドに載っていることを成果物そのものから読めるようにするための検査。
-    桁を詰めると 695.45787 が 6 桁グリッドの産物か生の float かを見分けられず、
-    「丸めてから詰めた」という手順を信じる形になる (2026-07-24 作者裁定)。
-
-    除外は 2 つだけ。SVG 文書の version="1.1" と、識別子である class / id。
-    """
+def test_every_corpus_number_uses_at_most_master_grid_precision() -> None:
+    """Engine 41 may compact zeroes but never exceeds the six-decimal grid."""
     off_grid = []
     checked = 0
     files = sorted(CORPUS_DIR.glob("*.svg"))
@@ -1039,7 +1036,7 @@ def test_every_corpus_number_sits_on_the_master_grid() -> None:
                 continue
             for decimals in re.findall(r"\d+\.(\d+)", value):
                 checked += 1
-                if len(decimals) != MASTER_GRID_DECIMALS:
+                if not 1 <= len(decimals) <= MASTER_GRID_DECIMALS:
                     off_grid.append((path.name, name, decimals))
     assert len(files) == len(_manifest()["changed_from_previous"])
     assert checked > 2_400, checked

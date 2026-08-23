@@ -9,7 +9,11 @@ import inspect
 from pathlib import Path
 
 import inku_server.renderer as renderer
-from inku_server.render_engines import current_render_engine
+from inku_server.render_engines import (
+    DEFAULT_RENDER_ENGINE,
+    RUST_RENDER_ENGINE,
+    current_render_engine,
+)
 from inku_server.schema import Score
 
 
@@ -42,10 +46,13 @@ def _representative_score() -> Score:
 
 
 def test_t3_three_profiles_keep_the_pre_move_bytes() -> None:
+    """The historical byte contract belongs to Python Engine 40."""
     score = _representative_score()
 
     for profile, expected in PROFILE_DIGESTS.items():
-        svg = renderer.render(score, svg_profile=profile, render_seed=431)
+        svg = DEFAULT_RENDER_ENGINE.render(
+            score, svg_profile=profile, render_seed=431
+        ).svg
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
@@ -55,9 +62,10 @@ def test_t1_default_engine_import_path_is_a_package_with_the_same_adapter() -> N
 
     assert hasattr(default_engine, "__path__")
     assert default_engine.DefaultRenderEngine is adapter.DefaultRenderEngine
-    assert default_engine.DEFAULT_RENDER_ENGINE is current_render_engine()
+    assert default_engine.DEFAULT_RENDER_ENGINE is not current_render_engine()
+    assert current_render_engine() is RUST_RENDER_ENGINE
     assert current_render_engine().id == "default"
-    assert current_render_engine().version == "40"
+    assert current_render_engine().version == "41"
     assert list(inspect.signature(adapter.DefaultRenderEngine.render).parameters) == [
         "self",
         "score",

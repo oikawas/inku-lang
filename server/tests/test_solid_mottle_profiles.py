@@ -112,8 +112,8 @@ def test_t339_computer_keeps_its_raster_while_non_computer_drops_scanline_growth
     assert len(hand.encode("utf-8")) <= OLD_LARGE_SOLID_BYTES // 2
 
 
-def test_t340_profile_pass_through_docs_and_engine_history_match_engine_40():
-    """Web/CLI already pass profiles through; descriptions and histories name the new boundary."""
+def test_t340_engine_41_keeps_the_engine_40_profile_boundary():
+    """Web and CLI pass profiles through while Engine 41 preserves the boundary."""
     web_download = (ROOT / "web/src/lib/features/export/download.ts").read_text(encoding="utf-8")
     cli = (ROOT / "cli/src/inku_cli/cli.py").read_text(encoding="utf-8")
     spec_ja = (ROOT / "SPEC.ja.md").read_text(encoding="utf-8")
@@ -129,4 +129,4 @@ def test_t340_profile_pass_through_docs_and_engine_history_match_engine_40():
     assert "filter-free flat vector fallback" in spec_en
     assert "engine 40" in history_ja
     assert "engine 40" in history_en
-    assert current_render_engine().version == "40"
+    assert current_render_engine().version == "41"

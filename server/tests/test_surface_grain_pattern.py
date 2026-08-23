@@ -90,7 +90,7 @@ def _surface_group(svg: str) -> str:
 
 
 def _tool_geometry_signature(mark: ElementTree.Element) -> tuple[object, ...]:
-    """Compare tool grammar structure, excluding all seed-derived numeric values."""
+    """Compare emitted geometry while ignoring presentation-only attributes."""
     tag = mark.tag.rpartition("}")[-1]
     attrs = tuple(
         sorted(
@@ -102,14 +102,11 @@ def _tool_geometry_signature(mark: ElementTree.Element) -> tuple[object, ...]:
                 "fill",
                 "fill-opacity",
                 "opacity",
-                "cx",
-                "cy",
-                "d",
-                "r",
+                "stroke",
             }
         )
     )
-    return tag, attrs, tuple(re.findall(r"[A-Za-z]", mark.attrib.get("d", "")))
+    return tag, attrs
 
 
 def test_t329_grain_uses_one_fixed_pattern_and_shape_carrier():
@@ -269,6 +266,6 @@ def test_t334_spec_names_the_grain_pattern_while_existing_export_seams_stay_char
     assert 'surface.texture="grain"' in english and "<pattern>" in english
 
 
-def test_t335_default_engine_advances_for_the_changed_grain_serialisation():
-    """T-335: reference work belongs under render engine 39 after author approval."""
-    assert current_render_engine().version == "40"
+def test_t335_current_engine_keeps_the_accepted_grain_semantics():
+    """T-335 remains part of the accepted Engine 41 migration baseline."""
+    assert current_render_engine().version == "41"

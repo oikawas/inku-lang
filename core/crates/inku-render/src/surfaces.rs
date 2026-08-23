@@ -294,8 +294,10 @@ fn grain_pattern(
         .attr("id", pattern_id)
         .attr("patternUnits", "userSpaceOnUse")
         .attr("width", format_number(tile))
-        .attr("height", format_number(tile))
-        .attr("class", "surface-grain-pattern-v1");
+        .attr("height", format_number(tile));
+    if context.profile != crate::types::SvgProfile::Compat {
+        pattern.set_attr("class", "surface-grain-pattern-v1");
+    }
     for index in 0..count {
         let point = Point::new(
             hash01(index as i64, seed, "surface-grain-x") * tile,
@@ -668,6 +670,7 @@ mod tests {
             mark_index: 3,
             wild: false,
             use_filters: false,
+            profile: crate::types::SvgProfile::Editable,
             support: DEFAULT_SUPPORT,
         }
     }

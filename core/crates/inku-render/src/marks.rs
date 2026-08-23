@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::{instruction_seed, needs_contour_variation};
-use crate::fills::render_interior_fill;
+use crate::fills::{is_noncomputer_solid_fill, render_interior_fill};
 use crate::geometry::{
     ArcGeometry, arc_points, arc_points_with_variation, circle_points,
     closed_contour_with_variation, edge_contour_with_anchors, ellipse_perimeter, point_to_pixels,
@@ -19,7 +19,7 @@ use crate::support::Support;
 use crate::svg::{Element, format_number};
 use crate::types::{
     CanvasSize, CarveDepth, Instruction, LineStyle, Point, Primitive, Seed, SurfaceTexture,
-    Thinness, Weight,
+    SvgProfile, Thinness, Weight,
 };
 
 const MIN_STROKE_WIDTH: f64 = 0.5;
@@ -52,6 +52,7 @@ pub struct MarkContext<'a> {
     pub mark_index: usize,
     pub wild: bool,
     pub use_filters: bool,
+    pub profile: SvgProfile,
     pub support: Support,
 }
 
@@ -293,6 +294,24 @@ pub(crate) fn apply_style(mut element: Element, style: &MarkStyle, allow_fill: b
     element
 }
 
+fn mechanical_closed_mark(
+    instruction: &Instruction,
+    contour: &[Point],
+    geometry: Element,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Element {
+    if !is_noncomputer_solid_fill(instruction) {
+        return apply_style(geometry, style, true);
+    }
+    let mut group = Element::new("g");
+    if let Some(fill) = render_interior_fill(instruction, contour, style, context) {
+        group.push(fill);
+    }
+    group.push(apply_style(geometry, style, false));
+    group
+}
+
 fn missing(instruction: &Instruction, field: &'static str) -> MarkError {
     MarkError {
         primitive: instruction.primitive,
@@ -404,7 +423,7 @@ pub fn render_instruction(
                 Ok(rotate(group, instruction, context.canvas))
             } else {
                 Ok(rotate(
-                    apply_style(geometry, &style, true),
+                    mechanical_closed_mark(instruction, &contour, geometry, &style, context),
                     instruction,
                     context.canvas,
                 ))
@@ -584,7 +603,11 @@ pub fn render_instruction(
                 ));
                 Ok(rotate(group, instruction, context.canvas))
             } else {
-                Ok(rotate(geometry, instruction, context.canvas))
+                Ok(rotate(
+                    mechanical_closed_mark(instruction, &sampled, geometry, &style, context),
+                    instruction,
+                    context.canvas,
+                ))
             }
         }
     }
@@ -633,6 +656,10 @@ fn render_corner_shape(
         ));
         Ok(rotate(group, instruction, context.canvas))
     } else {
-        Ok(rotate(geometry, instruction, context.canvas))
+        Ok(rotate(
+            mechanical_closed_mark(instruction, &contour.points, geometry, style, context),
+            instruction,
+            context.canvas,
+        ))
     }
 }

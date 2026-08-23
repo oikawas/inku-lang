@@ -4,6 +4,7 @@ use std::fmt;
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
 use crate::determinism::hash01;
+use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
@@ -285,8 +286,16 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
                 mark_index,
                 wild: request.options.wild,
                 use_filters,
+                profile,
                 support,
             };
+            if profile != SvgProfile::Compat
+                && owns_surface(single.primitive)
+                && is_noncomputer_solid_fill(single)
+            {
+                let (filter_id, seed) = solid_mottle_filter_id(single, context);
+                material_definitions.push(solid_mottle_filter(&filter_id, seed));
+            }
             let base_mark = render_instruction(single, context)?;
             let mut mark = if let Some(surface) = render_surface(single, context) {
                 let mut combined = Element::new("g");

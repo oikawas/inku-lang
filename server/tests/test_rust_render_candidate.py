@@ -75,10 +75,12 @@ def test_candidate_adapter_uses_one_canonical_request(monkeypatch):
     assert request["options"]["canvas"]["width"] < 1000
 
 
-def test_candidate_import_does_not_change_the_current_engine():
-    from inku_server.render_engines import current_render_engine
+def test_current_engine_is_the_accepted_rust_engine():
+    from inku_server.render_engines import RUST_RENDER_ENGINE, current_render_engine
 
-    assert current_render_engine().version == "40"
+    assert current_render_engine() is RUST_RENDER_ENGINE
+    assert current_render_engine().id == "default"
+    assert current_render_engine().version == "41"
 
 
 def test_reference_case_uses_the_explicit_candidate_engine():

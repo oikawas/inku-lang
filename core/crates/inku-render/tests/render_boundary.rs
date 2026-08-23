@@ -436,3 +436,100 @@ fn display_grain_tile_is_reusable_and_not_filtered_per_dab() {
     assert!(!output.svg[pattern_start..pattern_end].contains("filter=\""));
     assert!(output.svg.contains("surface-grain-carrier-v1"));
 }
+
+#[test]
+fn solid_fill_profile_boundary_keeps_base_and_scopes_mottle() {
+    let make_request = |profile| RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.25,"weight":"pen","filled":true,"surface":{"texture":"solid"}}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: profile,
+            render_seed: Some(2718),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    for profile in [SvgProfile::Display, SvgProfile::Editable] {
+        let output = render(make_request(profile)).unwrap();
+        assert!(output.svg.contains("class=\"solid-base-fill-v1\""));
+        assert!(output.svg.contains("class=\"solid-mottle-overlay-v1\""));
+        assert!(output.svg.contains("baseFrequency=\"0.035000\""));
+        assert!(output.svg.contains("tableValues=\"0.310000 1\""));
+    }
+    let compat = render(make_request(SvgProfile::Compat)).unwrap();
+    assert!(compat.svg.contains("class=\"solid-base-fill-v1\""));
+    assert!(!compat.svg.contains("solid-mottle-overlay-v1"));
+    assert!(!compat.svg.contains("<filter"));
+}
+
+#[test]
+fn computer_solid_remains_a_periodic_fill_field() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.25,"weight":"computer","filled":true,"surface":{"texture":"solid"}}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(2718),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    assert!(output.svg.contains("fill-stroke-v1 strokes-"));
+    assert!(!output.svg.contains("solid-mottle-overlay-v1"));
+}
+
+#[test]
+fn tiny_hand_fill_is_one_dab_instead_of_scanlines() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.005,"weight":"pen","filled":true}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(12345),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    assert!(output.svg.contains("class=\"fill-dab-v1\""));
+    assert!(!output.svg.contains("fill-stroke-v1 strokes-"));
+}
+
+#[test]
+fn compat_grain_omits_the_nonportable_pattern_class() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"pen","filled":true,"surface":{"texture":"grain"}}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed: Some(73),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    assert!(output.svg.contains("<pattern"));
+    assert!(!output.svg.contains("class=\"surface-grain-pattern-v1\""));
+    assert!(!output.svg.contains("<filter"));
+}

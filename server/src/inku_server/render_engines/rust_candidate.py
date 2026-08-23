@@ -1,4 +1,4 @@
-"""Explicit shadow adapter for the Rust Render Engine 41 candidate."""
+"""Thin Python adapter for Rust Render Engine 41."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .profiles import normalize_svg_profile
 
 
 def _native_binding() -> ModuleType:
-    """Load the independent wheel only when the shadow candidate is invoked."""
+    """Load the independent wheel only when the Rust engine is invoked."""
     return importlib.import_module("inku_render")
 
 
@@ -27,7 +27,7 @@ def _default_color_map(native: ModuleType) -> dict[str, str]:
     return payload
 
 
-class RustCandidateRenderEngine:
+class RustRenderEngine:
     """Thin one-call adapter; all render semantics remain in the Rust core."""
 
     @property
@@ -74,4 +74,9 @@ class RustCandidateRenderEngine:
         return RenderEngineResult(svg=svg, metadata=metadata)
 
 
-RUST_CANDIDATE_RENDER_ENGINE = RustCandidateRenderEngine()
+RUST_RENDER_ENGINE = RustRenderEngine()
+
+# Stage 4 acceptance tooling keeps these aliases until Python Engine 40 is
+# retired. Production ownership is RUST_RENDER_ENGINE through the registry.
+RustCandidateRenderEngine = RustRenderEngine
+RUST_CANDIDATE_RENDER_ENGINE = RUST_RENDER_ENGINE

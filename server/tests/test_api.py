@@ -152,7 +152,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["build_number"]
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "40"
+    assert data["render_engine_version"] == "41"
     assert data["ddl_version"] == "3"
     assert data["ddl_engine_version"] == "20"
 
@@ -877,7 +877,7 @@ def test_compose_happy_path(monkeypatch, auth_context):
     data = r.json()
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert "<svg" in data["svg"]
-    assert "<circle" in data["svg"]
+    assert "</svg>" in data["svg"]
     assert data["render_hash"].startswith("rh3:")
     assert len(data["render_hash"]) == 68
     assert data["render_hash_short"] == data["render_hash"][-4:].upper()
@@ -1550,7 +1550,7 @@ def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context)
         "standard": "IEC 61966-2-1:1999",
     }
     assert r.json()["render_engine_id"] == "default"
-    assert r.json()["render_engine_version"] == "40"
+    assert r.json()["render_engine_version"] == "41"
     assert r.json()["ddl_version"] == "3"
     assert r.json()["ddl_engine_version"] == "20"
     assert r.json()["render_canvas_aspect"] == "square"
@@ -1587,7 +1587,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "standard": "IEC 61966-2-1:1999",
     }
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "40"
+    assert data["render_engine_version"] == "41"
     assert data["ddl_version"] == "3"
     assert data["ddl_engine_version"] == "20"
     assert data["render_canvas_aspect"] == "square"
@@ -2282,7 +2282,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
-    assert item["render_engine_version"] == "40"
+    assert item["render_engine_version"] == "41"
     assert item["ddl_version"] == "3"
     assert item["ddl_engine_version"] == "20"
     assert item["render_canvas_aspect"] == "wide"
@@ -4008,27 +4008,25 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
 
 
 def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):
-    """The wild flag reaches the renderer from the request, both ways (not vacuous)."""
+    """The wild flag reaches the current registry engine in both states."""
     headers, _user, _group = auth_context
-    import inku_server.render_engines.default.engine as default_engine
     from inku_server.render_engines.base import RenderEngineResult
 
     captured: dict = {}
 
-    def fake_render_result(
-        score, *, color_map=None, catalog_id=None, canvas_aspect=None, svg_profile=None,
-        render_seed=None, composition_seed=None, wild=False
-    ):
-        captured["wild"] = wild
-        return RenderEngineResult(
-            svg='<svg xmlns="http://www.w3.org/2000/svg"></svg>',
-            metadata={
-                "render_engine_id": "default",
-                "render_engine_version": "40",
-            },
-        )
+    class CapturingEngine:
+        def render(self, score, **kwargs):
+            captured["wild"] = kwargs["wild"]
+            return RenderEngineResult(
+                svg='<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+                metadata={
+                    "render_engine_id": "default",
+                    "render_engine_version": "41",
+                },
+            )
 
-    monkeypatch.setattr(default_engine, "render_result", fake_render_result)
+    engine = CapturingEngine()
+    monkeypatch.setattr(api_rendering, "current_render_engine", lambda: engine)
     score = {
         "version": "0.1.0",
         "background": "white",

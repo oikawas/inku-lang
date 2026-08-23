@@ -1,11 +1,30 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from inku_server.render_engines import RenderEngineResult
 from inku_server.render_engines import rust_candidate
 from inku_server.render_engines.rust_candidate import RustCandidateRenderEngine
 from inku_server.schema import Score
+
+
+SERVER_ROOT = Path(__file__).resolve().parents[1]
+GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
+
+
+def _reference_generator():
+    spec = importlib.util.spec_from_file_location(
+        "gen_render_reference_candidate", GENERATOR_PATH
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_candidate_adapter_uses_one_canonical_request(monkeypatch):
@@ -59,3 +78,69 @@ def test_candidate_import_does_not_change_the_current_engine():
     from inku_server.render_engines import current_render_engine
 
     assert current_render_engine().version == "40"
+
+
+def test_reference_case_uses_the_explicit_candidate_engine():
+    generator = _reference_generator()
+    render_input = generator.build_inputs()["A-pen-line"]
+    calls: list[tuple[Score, dict[str, object]]] = []
+
+    class CandidateEngine:
+        id = "candidate"
+        version = "41"
+
+        def render(self, score: Score, **options: object) -> RenderEngineResult:
+            calls.append((score, options))
+            return RenderEngineResult(svg="<svg data-engine='candidate'/>", metadata={})
+
+    svg = generator.render_case(render_input, engine=CandidateEngine())
+
+    assert svg == "<svg data-engine='candidate'/>"
+    assert len(calls) == 1
+    score, options = calls[0]
+    assert score.instructions[0].primitive == "line"
+    assert options["render_seed"] == render_input["render_seed"]
+    assert options["svg_profile"] == render_input["svg_profile"]
+
+
+def test_candidate_generation_reuses_manifest_logic_in_an_explicit_destination(
+    tmp_path: Path,
+    monkeypatch,
+):
+    generator = _reference_generator()
+    render_input = generator.build_inputs()["A-pen-line"]
+    calls: list[Score] = []
+
+    class CandidateEngine:
+        id = "candidate"
+        version = "41"
+
+        def render(self, score: Score, **_options: object) -> RenderEngineResult:
+            calls.append(score)
+            return RenderEngineResult(svg="<svg class='candidate'/>", metadata={})
+
+    monkeypatch.setattr(generator, "build_inputs", lambda: {"A-pen-line": render_input})
+    for check in (
+        "_assert_fade_cases_discriminate",
+        "_assert_fade_reaches_every_member",
+        "_assert_size_cases_discriminate",
+        "_assert_angle_cases_discriminate",
+    ):
+        monkeypatch.setattr(generator, check, lambda *_args, **_kwargs: None)
+
+    output_dir = tmp_path / "candidate-corpus"
+    generator.generate(engine=CandidateEngine(), output_dir=output_dir)
+
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+    assert manifest["engine_id"] == "candidate"
+    assert manifest["engine_version"] == "41"
+    assert set(manifest["cases"]) == {"A-pen-line"}
+    assert (output_dir / "A-pen-line.svg").read_text() == "<svg class='candidate'/>"
+    assert len(calls) == 1
+
+
+def test_explicit_candidate_generation_requires_an_explicit_destination():
+    generator = _reference_generator()
+
+    with pytest.raises(ValueError, match="explicit output directory"):
+        generator.generate(engine=SimpleNamespace(id="candidate", version="41"))

@@ -903,14 +903,7 @@ def test_engine_18_palette_cases_match_the_current_renderer() -> None:
     for case_id, render_input in inputs.items():
         if not case_id.startswith("F-"):
             continue
-        svg = generator.render(
-            Score.model_validate(render_input["score"]),
-            color_map=render_input["color_map"],
-            catalog_id=render_input["catalog_id"],
-            render_seed=render_input["render_seed"],
-            svg_profile=render_input["svg_profile"],
-            wild=render_input["wild"],
-        )
+        svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"]
 
 

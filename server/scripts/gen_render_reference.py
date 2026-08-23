@@ -20,16 +20,15 @@ import tempfile
 from typing import Any, get_args
 
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
-from inku_server.render_engines import current_render_engine
+from inku_server.render_engines import (
+    DEFAULT_RENDER_ENGINE,
+    RenderEngine,
+    current_render_engine,
+)
 from inku_server.render_engines.default import planning
-from inku_server.renderer import render
 from inku_server.schema import GroundMaterial, Instruction, Score
 
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
-ENGINE = current_render_engine()
-ENGINE_VERSION = ENGINE.version
-OUTPUT_DIR = REFERENCE_ROOT / f"render-engine-{ENGINE_VERSION}"
-MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
@@ -845,14 +844,14 @@ def _color_map_digest(inputs: dict[str, dict[str, Any]]) -> str:
     return hashlib.sha256(encoded).hexdigest()[:32]
 
 
-def _previous_manifest() -> dict[str, Any] | None:
+def _previous_manifest(engine_version: str) -> dict[str, Any] | None:
     """The frozen manifest of the highest engine version below the current one.
 
     Version directories are the record of how many times the layer changed, so
     "previous" is the largest integer under the current one that was actually
     frozen, not `current - 1`.
     """
-    current = int(ENGINE_VERSION)
+    current = int(engine_version)
     candidates: list[tuple[int, pathlib.Path]] = []
     for path in REFERENCE_ROOT.glob("render-engine-*/manifest.json"):
         suffix = path.parent.name.rsplit("-", 1)[-1]
@@ -868,7 +867,11 @@ def _source_commit() -> str:
                           check=True, capture_output=True, text=True).stdout.strip()
 
 
-def render_case(render_input: dict[str, Any]) -> str:
+def render_case(
+    render_input: dict[str, Any],
+    *,
+    engine: RenderEngine | None = None,
+) -> str:
     """Draw one case from its stated input, and only from that.
 
     Named so the tests that replay a case go through the same call the bake
@@ -876,12 +879,16 @@ def render_case(render_input: dict[str, Any]) -> str:
     one stops forwarding a key, which is how a corpus can hold an input field
     that never reaches the renderer.
     """
-    return render(Score.model_validate(render_input["score"]),
-                  color_map=render_input["color_map"],
-                  catalog_id=render_input["catalog_id"],
-                  render_seed=render_input["render_seed"],
-                  composition_seed=render_input.get("composition_seed"),
-                  svg_profile=render_input["svg_profile"], wild=render_input["wild"])
+    selected_engine = engine if engine is not None else current_render_engine()
+    return selected_engine.render(
+        Score.model_validate(render_input["score"]),
+        color_map=render_input["color_map"],
+        catalog_id=render_input["catalog_id"],
+        render_seed=render_input["render_seed"],
+        composition_seed=render_input.get("composition_seed"),
+        svg_profile=render_input["svg_profile"],
+        wild=render_input["wild"],
+    ).svg
 
 
 FADE_CASES = (
@@ -894,7 +901,11 @@ FADE_CASES = (
 )
 
 
-def _assert_fade_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+def _assert_fade_cases_discriminate(
+    inputs: dict[str, dict[str, Any]],
+    *,
+    engine: RenderEngine | None = None,
+) -> None:
     """Every fading case added here has to notice `fade` before it is written.
 
     A case that draws the same picture with and without the declaration records
@@ -905,7 +916,9 @@ def _assert_fade_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
         stated = inputs[case_id]
         withheld = copy.deepcopy(stated)
         withheld["score"]["instructions"][0]["arrangement"]["fade"] = "none"
-        if _normalized_digest(render_case(stated)) == _normalized_digest(render_case(withheld)):
+        if _normalized_digest(render_case(stated, engine=engine)) == _normalized_digest(
+            render_case(withheld, engine=engine)
+        ):
             raise AssertionError(f"{case_id}: the drawing does not read `fade`")
 
 
@@ -981,7 +994,11 @@ def _member_sizes_withheld() -> Iterator[None]:
         planning._apply_member_sizes = original
 
 
-def _assert_size_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+def _assert_size_cases_discriminate(
+    inputs: dict[str, dict[str, Any]],
+    *,
+    engine: RenderEngine | None = None,
+) -> None:
     """Every case added here has to notice the per-member size, two ways.
 
     Withholding the amplitude has to change the drawing, or the case records
@@ -998,9 +1015,9 @@ def _assert_size_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
         raise AssertionError(f"the added cases do not cover the four rules: {sorted(primitives)}")
     for case_id in SIZE_CASES:
         stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated))
+        drawn = _normalized_digest(render_case(stated, engine=engine))
         with _member_sizes_withheld():
-            withheld = _normalized_digest(render_case(stated))
+            withheld = _normalized_digest(render_case(stated, engine=engine))
         if drawn == withheld:
             raise AssertionError(f"{case_id}: the drawing does not read the member size")
 
@@ -1021,7 +1038,11 @@ def _member_rotations_withheld() -> Iterator[None]:
         planning._apply_member_rotations = original
 
 
-def _assert_angle_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+def _assert_angle_cases_discriminate(
+    inputs: dict[str, dict[str, Any]],
+    *,
+    engine: RenderEngine | None = None,
+) -> None:
     """The four added here have to notice the angle, in the two opposite ways.
 
     The turning pair has to change when the amplitude is withheld, and it has
@@ -1045,20 +1066,20 @@ def _assert_angle_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
         raise AssertionError(f"the added cases do not reach the missing shapes: {sorted(primitives)}")
     for case_id in ANGLE_CASES:
         stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated))
+        drawn = _normalized_digest(render_case(stated, engine=engine))
         with _member_rotations_withheld():
-            withheld = _normalized_digest(render_case(stated))
+            withheld = _normalized_digest(render_case(stated, engine=engine))
         if drawn == withheld:
             raise AssertionError(f"{case_id}: the drawing does not read the member angle")
     for case_id in STATED_ANGLE_CASES:
         stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated))
+        drawn = _normalized_digest(render_case(stated, engine=engine))
         with _member_rotations_withheld():
-            if _normalized_digest(render_case(stated)) != drawn:
+            if _normalized_digest(render_case(stated, engine=engine)) != drawn:
                 raise AssertionError(f"{case_id}: a group that states its angle was turned")
         dropped = copy.deepcopy(stated)
         dropped["score"]["instructions"][0]["rotation"] = None
-        if _normalized_digest(render_case(dropped)) == drawn:
+        if _normalized_digest(render_case(dropped, engine=engine)) == drawn:
             raise AssertionError(f"{case_id}: the drawing does not read `rotation`")
 
 
@@ -1082,7 +1103,7 @@ def _publish_output_directory(
     rendered: dict[str, str],
     changed: list[str],
     *,
-    output_dir: pathlib.Path = OUTPUT_DIR,
+    output_dir: pathlib.Path,
 ) -> None:
     """Stage a complete corpus, then publish it without modifying in place."""
     parent = output_dir.parent
@@ -1118,18 +1139,36 @@ def _publish_output_directory(
             shutil.rmtree(staging)
 
 
-def generate() -> None:
-    existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
+def generate(
+    *,
+    engine: RenderEngine | None = None,
+    output_dir: pathlib.Path | None = None,
+) -> None:
+    """Generate a corpus for the current engine or an explicit tooling candidate.
+
+    An explicit engine also requires an explicit destination. This keeps a
+    shadow run from publishing a tracked engine directory before acceptance.
+    """
+    if engine is not None and output_dir is None:
+        raise ValueError("an explicit render engine requires an explicit output directory")
+    selected_engine = engine if engine is not None else current_render_engine()
+    if output_dir is None:
+        output_dir = REFERENCE_ROOT / f"render-engine-{selected_engine.version}"
+    manifest_path = output_dir / "manifest.json"
+    existing = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
     inputs = build_inputs()
-    _assert_fade_cases_discriminate(inputs)
+    # These perturbation checks mutate the Python planner. They validate the
+    # shared input set with its canonical implementation; Stage 4 compares the
+    # injected candidate output separately without adding a second fixture set.
+    _assert_fade_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
     _assert_fade_reaches_every_member(inputs)
-    _assert_size_cases_discriminate(inputs)
-    _assert_angle_cases_discriminate(inputs)
+    _assert_size_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
+    _assert_angle_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
 
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}
     for case_id, render_input in sorted(inputs.items()):
-        svg = render_case(render_input)
+        svg = render_case(render_input, engine=selected_engine)
         rendered[case_id] = svg
         cases[case_id] = {
             "input": render_input,
@@ -1140,7 +1179,7 @@ def generate() -> None:
         }
 
     if existing is None:
-        previous = _previous_manifest()
+        previous = _previous_manifest(selected_engine.version)
         if previous is None:
             changed = sorted(cases)
         else:
@@ -1158,7 +1197,7 @@ def generate() -> None:
 
     manifest = {
         "corpus_format_version": CORPUS_FORMAT_VERSION, "layer": "render-engine",
-        "engine_id": ENGINE.id, "engine_version": ENGINE_VERSION,
+        "engine_id": selected_engine.id, "engine_version": selected_engine.version,
         "schema_version": SCHEMA_VERSION,
         "color_map_digest": _color_map_digest(inputs),
         **frozen, "cases": cases,
@@ -1175,7 +1214,12 @@ def generate() -> None:
     # Only the cases that moved get an SVG body. An unchanged case is already
     # frozen in the last version where it moved; copying it forward would make
     # the directory listing stop meaning "what this version changed".
-    _publish_output_directory(manifest, rendered, frozen["changed_from_previous"])
+    _publish_output_directory(
+        manifest,
+        rendered,
+        frozen["changed_from_previous"],
+        output_dir=output_dir,
+    )
 
 
 if __name__ == "__main__":

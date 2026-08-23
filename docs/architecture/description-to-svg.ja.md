@@ -28,7 +28,7 @@ flowchart TD
     AR{"auto_repair?"}
     COERCE["coerce（配達・統治・天井）"]
     MERGE["plugin転写instructionの合流"]
-    RENDER["Render Engine 演奏"]
+    RENDER["Render Engine 演奏\nadapter → engine → kernel / SVG emission"]
     HASH["dh1 / rh3 の計算"]
     SAVE{"save_history?"}
     ROW["履歴row + lineage node/edge\n（1 transaction）"]
@@ -130,7 +130,7 @@ LLMを呼ばない。焦点の書き換えだけを行い、新しい文を足�
 
 ## 演奏 — Render Engine
 
-確定したScoreと、`render_seed`・`wild`・色カタログの写像・`canvas`（Scoreの中）から、registryが選ぶ`render_engines/default/adapter.py`を介してcanonical `render_engines/default/engine.py`がSVGと演奏metadataを作る。`renderer.py`は既存のSVG-only呼出し向け互換facadeである。**同じScore・同じrender seed・同じ描画条件は同じ作品を再現する** — これが凍結corpusが守る契約である。過去のengineを選び直すAPIは無く、履歴のdisplay SVGは保存済みを返す。
+確定したScoreと、`render_seed`・`wild`・色カタログの写像・`canvas`（Scoreの中）から、registryが選ぶ `render_engines/default/adapter.py` を介してcanonical `render_engines/default/engine.py`が描画を統率する。幾何計算は `mark_kernel.py` がscalarと点列だけを返し、`marks.py` がそれを一方向に消費してSVGの属性とelementを組み立てる。SVGと演奏metadataはこの正規経路から一緒に返る。`renderer.py` は正規経路の所有moduleではなく、既存のSVG-only呼出しを `engine.render_result().svg` へ委譲する互換facadeである。詳細なmodule依存図は `server-components.ja.md` が持つ。**同じScore・同じrender seed・同じ描画条件は同じ作品を再現する** — これが凍結corpusが守る契約である。過去のengineを選び直すAPIは無く、履歴のdisplay SVGは保存済みを返す。
 
 ## 同一性と保存
 

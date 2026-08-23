@@ -11,7 +11,7 @@
 | Stage 1.5 | Core DDL → effective DDL | Deterministic focus rewrite; explicit variation moves one axis | `ddl_expander.py` |
 | Stage 2 | Effective DDL → JSON Score | LLM tool/schema; an empty or too-short answer retries once with a stated reason, and a timeout or empty retry ends in the deterministic fallback (recorded in `compose_fallback`) | `composer.py`; `render.py:_call_compose_detail` |
 | Coerce/validation | Score → performable Score | Only with `auto_repair`. Drops invalid relations, delivers requests, enforces ceilings, and retains one explicitly named abstract color. Branch firings land in `coerce_branch_counts` when tracing | `coerce/` |
-| Render Engine | Score + seeds + color catalog → SVG + metadata | Same Score, render seed, and conditions reproduce the same work | `render_engines/__init__.py`; `render_engines/default/adapter.py`; `render_engines/default/engine.py`; `renderer.py` (SVG-only compatibility facade) |
+| Render Engine | Score + seeds + color catalog → SVG + metadata | Same Score, render seed, and conditions reproduce the same work; pure geometry points one way into SVG emission | Registry `render_engines/__init__.py`; adapter `default/adapter.py`; orchestration `default/engine.py`; scalars and points `default/mark_kernel.py`; SVG emission `default/marks.py`; separate entrypoint `renderer.py` (SVG-only compatibility facade) |
 | History/lineage | Pipeline outputs → DB row/node/edge | One DB transaction; an edge needs an explicit parent and kind | `rendering.py`; `db.py` |
 
 The decision-level detail — under which condition each judgment fires, what happens, and what is recorded — lives in `description-to-svg.md`.
@@ -31,7 +31,7 @@ flowchart TD
     S2["Stage 2 score writing"]
     SCORE["JSON Score"]
     COERCE["Coerce / validation"]
-    RENDER["Render Engine"]
+    RENDER["Render Engine\nadapter → engine → kernel / SVG emission"]
     SVG["SVG + performance metadata"]
     HISTORY[("History DB + lineage")]
     FILES[("Optional work files")]
@@ -128,7 +128,7 @@ flowchart LR
 | Plugin immediately after Stage 1 | `_call_compose_detail`: `manager.expand` → `expand_intermediate_for_lang` → `compose` |
 | Later stages ignore plugin namespaces | Plugin documents close into core DDL/instructions; unknown references drop; metadata retains provenance only |
 | Drop-only preference | `_drop_invalid_relations` drops invalid relations; coerce also has request-delivery repairs and the deterministic single-named-color rule |
-| Reproducibility | Seed derivation in `render_engines/default/determinism.py` (compatibility-re-exported by `renderer.py`) and frozen corpora; any fresh seed used by a run is stored in metadata/DB |
+| Reproducibility | `render_engines/default/determinism.py` owns seed derivation, and frozen corpora pin rendering bytes. `renderer.py` exports only `render`; callers use seed helpers from their canonical owner. Any fresh seed used by a run is stored in metadata/DB |
 | No old-engine selector | `current_render_engine()` exposes one current engine; history display returns the stored SVG |
 | Saijiki source | `saijiki.py` supplies prompts, markers, relation literals, API display, and references |
 

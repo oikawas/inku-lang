@@ -28,7 +28,7 @@ flowchart TD
     AR{"auto_repair?"}
     COERCE["Coerce (delivery, governing, ceiling)"]
     MERGE["Merge transcribed plugin instructions"]
-    RENDER["Render Engine performance"]
+    RENDER["Render Engine performance\nadapter → engine → kernel / SVG emission"]
     HASH["Compute dh1 / rh3"]
     SAVE{"save_history?"}
     ROW["History row + lineage node/edge\n(one transaction)"]
@@ -130,7 +130,7 @@ There are about thirty branches, in four families.
 
 ## Performance — Render Engine
 
-From the settled Score plus `render_seed`, `wild`, the color-catalog mapping, and `canvas` (inside the Score), canonical `render_engines/default/engine.py` produces the SVG and performance metadata through the registry-selected `render_engines/default/adapter.py`. `renderer.py` is the compatibility facade for existing SVG-only callers. **The same Score, the same render seed, and the same conditions reproduce the same work** — the contract the frozen corpora guard. There is no API to choose a past engine; history display returns the stored SVG.
+From the settled Score plus `render_seed`, `wild`, the color-catalog mapping, and `canvas` (inside the Score), canonical `render_engines/default/engine.py` orchestrates rendering through the registry-selected `render_engines/default/adapter.py`. Geometry in `mark_kernel.py` returns only scalars and point collections; `marks.py` consumes it in one direction to construct SVG attributes and elements. The canonical path returns the SVG and performance metadata together. `renderer.py` does not own that path: it is a compatibility facade that delegates existing SVG-only callers to `engine.render_result().svg`. The detailed module dependency diagram lives in `server-components.md`. **The same Score, the same render seed, and the same conditions reproduce the same work** — the contract the frozen corpora guard. There is no API to choose a past engine; history display returns the stored SVG.
 
 ## Identity and persistence
 

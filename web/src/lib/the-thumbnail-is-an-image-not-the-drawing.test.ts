@@ -147,9 +147,10 @@ test('every other listing sender is accounted for', () => {
 	// writes nothing keeps receiving every drawing and nothing goes wrong loudly.
 	// A fifth sender appearing makes this fail and has to be decided about.
 	const page = readFileSync(fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)), 'utf-8');
+	const batch = readFileSync(fileURLToPath(new URL('./features/batch/state.svelte.ts', import.meta.url)), 'utf-8');
 	const browsing = readFileSync(fileURLToPath(new URL('./features/history/browsing-state.svelte.ts', import.meta.url)), 'utf-8');
 	const manager = readFileSync(fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url)), 'utf-8');
-	const getters = [page, browsing, manager].reduce(
+	const getters = [page, batch, browsing, manager].reduce(
 		(total, source) => total + [...source.matchAll(/apiFetch\(\s*(?:`|')\/api\/history\?/g)].length,
 		0
 	);
@@ -158,7 +159,7 @@ test('every other listing sender is accounted for', () => {
 	// The fourth: the sender that reads whether the last batch reached the end of
 	// its prompt, and which lines of it have a work. It wants two numbers off each
 	// work and never its drawing.
-	assert.match(page, /limit: String\(limit\),\s*include_svg: 'false',/, 'the batch resume sender must ask for no drawings');
+	assert.match(batch, /limit: String\(limit\),\s*include_svg: 'false',/, 'the batch resume sender must ask for no drawings');
 	// ── T-72 ──────────────────────────────────────────────────────────────────
 	// Stated as its own claim as well as in the roll-call above: no sender is
 	// left asking the listing for drawings. Only the URLs whose query is spelled

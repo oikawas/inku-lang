@@ -13,13 +13,14 @@ import { fileURLToPath } from 'node:url';
 
 const PANEL = readFileSync(fileURLToPath(new URL('./BatchPanel.svelte', import.meta.url)), 'utf8');
 const PAGE = readFileSync(fileURLToPath(new URL('../../routes/+page.svelte', import.meta.url)), 'utf8');
+const OWNER = readFileSync(fileURLToPath(new URL('../features/batch/state.svelte.ts', import.meta.url)), 'utf8');
 
 test('T-64  the resume button is withheld unless there is something to finish', () => {
 	assert.match(PANEL, /\{#if canResumeBatch\}/, 'the resume button no longer depends on the flag');
 	// Null the rest of the time -- an empty history and a run that reached its
 	// last line are the same answer here, and both withhold the button.
-	assert.match(PAGE, /canResumeBatch=\{batchResume !== null\}/, 'the flag is not the resume state');
-	assert.match(PAGE, /if \(!currentUser \|\| !prompt\) \{ batchResume = null; return; \}/,
+	assert.match(PAGE, /canResumeBatch=\{batch\.canResume\}/, 'the flag is not the canonical resume state');
+	assert.match(OWNER, /if \(!this\.deps\.signedIn\(\) \|\| !prompt\)/,
 		'a member with no stored batch is offered a resume');
 });
 
@@ -33,30 +34,30 @@ test('T-64  it sits to the left of the paint button', () => {
 });
 
 test('T-65  a resumed run paints the plan, not the box', () => {
-	assert.match(PAGE, /const paintLines = options\.resumeLines \?\? lines;/, 'the resume plan is not what gets painted');
+	assert.match(OWNER, /const paintLines = options\.resumeLines \?\? lines;/, 'the resume plan is not what gets painted');
 	// Every quantity the run reads has to come from the plan, or the progress
 	// readout counts one thing while the loop paints another.
-	assert.match(PAGE, /const batchLineTotal = paintLines\.length;/);
-	assert.match(PAGE, /for \(let i = 0; i < paintLines\.length; i\+\+\)/);
-	assert.match(PAGE, /await paintBatchLine\(paintLines\[i\]\)/);
+	assert.match(OWNER, /const lineTotal = paintLines\.length;/);
+	assert.match(OWNER, /for \(let index = 0; index < paintLines\.length; index \+= 1\)/);
+	assert.match(OWNER, /await paintBatchLine\(paintLines\[index\]\)/);
 });
 
 test('T-65  the numbers on the works come from the prompt, not from the plan', () => {
 	// `item.line` throughout, never the loop index: resuming at line 7 has to put
 	// #7 on the work, and a plan of what is left would otherwise restart at #1.
-	assert.match(PAGE, /historyInput: `#\$\{item\.line\} \$\{item\.input\}`/);
-	assert.match(PAGE, /displayLabel: `#\$\{item\.line\}`/);
-	assert.match(PAGE, /batchLineNumber: item\.line/);
+	assert.match(OWNER, /historyInput: `#\$\{item\.line\} \$\{item\.input\}`/);
+	assert.match(OWNER, /displayLabel: `#\$\{item\.line\}`/);
+	assert.match(OWNER, /batchLineNumber: item\.line/);
 	// And the box is refilled with the whole batch, which is what those numbers
 	// number.
-	assert.match(PAGE, /batchInput = resume\.prompt;/);
+	assert.match(OWNER, /this\.input = candidate\.prompt;/);
 });
 
 test('T-65  the answer is asked for again when a run ends', () => {
 	// A run that was stopped leaves lines to finish and a run that reached the
 	// end leaves none; without this the button outlives the run it belonged to.
-	assert.match(PAGE, /await refreshBatchResume\(\);/, 'the resume state is not refreshed after a run');
-	assert.match(PAGE, /if \(mode === 'batch'\) void untrack\(refreshBatchResume\)/, 'the batch tab does not ask on arrival');
+	assert.match(OWNER, /await this\.refreshResume\(\);/, 'the resume state is not refreshed after a run');
+	assert.match(PAGE, /if \(mode === 'batch'\) void untrack\(\(\) => batch\.refreshResume\(\)\)/, 'the batch tab does not ask on arrival');
 });
 
 test('T-66  resuming an auto run resumes under auto, not under what it resolved to', () => {

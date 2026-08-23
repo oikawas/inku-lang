@@ -2295,6 +2295,12 @@ internal fun historyStripModelLabel(modelId: String?): String? {
     return displayName?.compactLabel(14)
 }
 
+internal fun historyStripModelTooltipText(stage1Model: String?, stage2Model: String?): String? {
+    val stage1 = stage1Model?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    val stage2 = stage2Model?.trim()?.takeIf(String::isNotEmpty) ?: "—"
+    return "Stage 1: $stage1\nStage 2: $stage2"
+}
+
 internal data class HistoryStripStarControl(
     val symbol: String,
     val enabled: Boolean,
@@ -2307,6 +2313,7 @@ internal fun historyStripStarControl(starred: Boolean, stripEnabled: Boolean): H
     )
 
 /** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryThumbnailStrip(
     history: List<HistoryListItem>,
@@ -2359,15 +2366,29 @@ private fun HistoryThumbnailStrip(
                     )
                 }
                 modelLabel?.let {
-                    Text(
-                        text = it,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    val tooltipText = historyStripModelTooltipText(
+                        stage1Model = historyItem.stage1Model,
+                        stage2Model = historyItem.stage2Model,
+                    ) ?: return@let
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(tooltipText)
+                            }
+                        },
+                        state = rememberTooltipState(),
+                    ) {
+                        Text(
+                            text = it,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }

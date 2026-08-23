@@ -63,6 +63,7 @@ from inku_server.render_engines.default import planning
 from inku_server.schema import Instruction, Score, Variation
 from inku_server import stroke_engine as stroke_domain
 from inku_server.render_engines.default import determinism
+from inku_server.render_engines.default import dispatch
 from inku_server.render_engines.default import marks as mark_domain
 from inku_server.render_engines.default import palette
 from inku_server.render_engines.default import surfaces
@@ -1050,6 +1051,7 @@ def fill_and_arc_fixtures() -> None:
         )
         chosen, region_fill = mark_domain._interior_fill(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
+            surface_ops=dispatch._MARK_SURFACE_OPS,
             support=stroke_domain.DEFAULT_SUPPORT
         )
         dab_paths = path_d_list(dab)

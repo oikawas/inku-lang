@@ -293,6 +293,35 @@ interface InkuStrings {
     val close: String
     val sameAsTargetSuffix: String
     val renderTabArtwork: String
+    val generationInfoTitle: String
+    val generationInfoSketchSection: String
+    val generationInfoInterpretationSection: String
+    val generationInfoPerformanceSection: String
+    val generationInfoIdentitySection: String
+    val generationInfoRunSection: String
+    val generationInfoSketchGrain: String
+    val generationInfoSketchState: String
+    val generationInfoStage1Model: String
+    val generationInfoStage2Model: String
+    val generationInfoLanguageRequested: String
+    val generationInfoLanguageResolved: String
+    val generationInfoInterpretationSeed: String
+    val generationInfoVariationAmplitude: String
+    val generationInfoVariationSeed: String
+    val generationInfoCompositionSeed: String
+    val generationInfoRenderSeed: String
+    val generationInfoSeedText: String
+    val generationInfoRenderWild: String
+    val generationInfoColorCatalog: String
+    val generationInfoCanvasAspect: String
+    val generationInfoCanvasRatio: String
+    val generationInfoRenderHash: String
+    val generationInfoRenderEngineId: String
+    val generationInfoRenderEngineVersion: String
+    val generationInfoCreated: String
+    val generationInfoElapsed: String
+    val generationInfoOn: String
+    val generationInfoOff: String
     val recommendedStageSuffix: (Int) -> String
     val parentSuffix: (String, String) -> String
     val downloadOf: (String) -> String

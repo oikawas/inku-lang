@@ -8,6 +8,8 @@
 pub mod contact;
 pub mod determinism;
 pub mod geometry;
+pub mod stroke;
+pub mod support;
 pub mod types;
 
 /// Version of the Rust host boundary, independent from the Render Engine version.

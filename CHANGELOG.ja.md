@@ -7944,3 +7944,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **生成情報sheetの既存`色カタログ`行に、作品が保存したカタログ名と同じsnapshotのIDを`保存名 (catalog-id)`として表示する。** 名前欠落／blank、snapshot欠落、空map、壊れたmetadataでは従来のIDだけを保ち、名前とIDが同一なら重複させない。
 - **既存`workColorSnapshot(renderMetadataJson)`だけを再利用した。** 現在の`ColorCatalogs`やrename tableは参照せず、Webで除去済みの固定taglineを戻さないため`catalogSub`は表示しない。producer、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新catalog-name formatting helperの未実装参照だけでexit 1。実装中とbranch-tip finalの`GenerationInfoCatalogNameTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.57` — 履歴stripで保存済みの両モデルを確認する（2026-08-23・[I-359]）
+
+- **履歴stripの既存Stage 1短縮ラベルへ、保存済みStage 1／Stage 2 model IDを2行で示すtooltipを追加した。** provider prefixを含む完全IDを表示し、Stage 2欠落は`—`、Stage 1欠落では従来どおりラベル行とtargetを出さない。
+- **画面上の14文字短縮ラベルとstrip操作を保った。** サムネイル寸法、作品選択、Star、選択位置scroll、描画・推敲中の操作lockを変えず、既存`HistoryListItem`とMaterial tooltipだけを使った。新しいstate、model resolver、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新tooltip-text helperの未実装参照4件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainが枝分岐後に別のWeb変更で進んだため、重なり0・競合0を確認してmerge後に同testを1回実行しexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

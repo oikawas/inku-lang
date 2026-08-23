@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.56` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.57` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2626,3 +2626,9 @@ The UI uses only the existing `workColorSnapshot(renderMetadataJson)` and never 
 The existing `Color catalog` row in the Provenance sheet now shows a non-blank catalog name from a valid saved color snapshot together with the ID from that same snapshot as `saved name (catalog-id)`. It keeps the prior ID-only display when the name is missing or blank, the snapshot is absent, the map is empty, or the metadata is malformed, and it does not duplicate equal names and IDs.
 
 The UI uses only the existing `workColorSnapshot(renderMetadataJson)` and does not consult current `ColorCatalogs` or a rename table. It does not show `catalogSub`, preserving the Web decision that removed the fixed tagline. No producer, ViewModel state or action, repository or DAO query, Room schema or migration, persistence, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Inspecting both saved models from the history strip (android `2.1.4-android.57`, [I-359])
+
+Long-pressing or pointer-hovering the existing compact Stage 1 label in the ordinary Compose history strip now shows the work's saved Stage 1 and Stage 2 model IDs, including provider prefixes, in a two-line tooltip. A missing Stage 2 value is shown as `—`; a work with no Stage 1 value retains the prior behavior of having neither a label row nor a tooltip target.
+
+The visible fourteen-character Stage 1 label, thumbnail dimensions, work selection, Star control, selected-position scrolling, and interaction lock during drawing or refinement are preserved. The UI uses only the existing `HistoryListItem` and Material tooltip; no new state, model resolver, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.

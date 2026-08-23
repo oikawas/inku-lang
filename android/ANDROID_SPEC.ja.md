@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.56` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.57` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2124,3 +2124,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 生成情報sheetの既存`色カタログ`行は、有効な保存済みcolor snapshotに非blankのカタログ名があれば、保存名と同じsnapshotのIDを`保存名 (catalog-id)`として表示する。名前が無い／blank、snapshotが無い、空map、壊れたmetadataでは従来のIDだけを保ち、名前とIDが同一なら重複させない。
 
 既存`workColorSnapshot(renderMetadataJson)`だけを使い、現在の`ColorCatalogs`やrename tableは参照しない。Webで除去済みの固定taglineを戻さないため`catalogSub`は表示しない。producer、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 履歴stripで保存済みの両モデルを確認する（android `2.1.4-android.57`・[I-359]）
+
+通常Compose画面の履歴stripで、既存のStage 1短縮ラベルを長押しまたはpointer hoverすると、作品が保存したprovider prefix込みのStage 1／Stage 2 model IDを2行tooltipで確認できる。Stage 2欠落は`—`とし、Stage 1欠落では従来どおりラベル行とtooltip targetを出さない。
+
+画面上の14文字Stage 1短縮ラベル、サムネイル寸法、作品選択、Star、選択位置scroll、描画・推敲中の操作lockを保った。既存`HistoryListItem`とMaterial tooltipだけを使い、新しいstate、model resolver、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。

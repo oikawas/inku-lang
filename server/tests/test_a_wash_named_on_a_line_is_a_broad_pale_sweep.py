@@ -442,10 +442,10 @@ GENERAL_BRANCH_TOOLS = ("pencil", "crayon", "chalk", "brush_thick")
 def test_t177_the_corpus_traverses_the_texture_filter_branch() -> None:
     """T-177. Engine 37 baked 597 SVGs and not one carried a texture filter.
 
-    Two halves, because they fail for different reasons. The frozen half reads
-    the bytes this version recorded; the live half redraws the same cases, so
-    that a generator which stopped asking for `display` is seen here instead of
-    leaving the frozen record standing as its own witness.
+    Two halves fail for different reasons. The frozen manifest holds each digest
+    even when the corpus omits an unchanged raw SVG; the live half redraws the
+    same input. A generator that stops asking for `display` is therefore visible
+    instead of leaving the frozen record standing as its own witness.
 
     **`drypoint` appears, and that is the measurement, not a leak.** The
     contract expected it absent because `ins.weight != "drypoint"` guards the
@@ -454,26 +454,26 @@ def test_t177_the_corpus_traverses_the_texture_filter_branch() -> None:
     for the raised burr, which is what a drypoint is. So the claim it witnesses
     is exact: one reference, and the general branch fired for it zero times.
     """
-    frozen = {
-        case_id: (CORPUS_DIR / f"{case_id}.svg").read_text(encoding="utf-8")
-        for case_id in FILTER_MARKER_COUNTS
-    }
+    manifest = json.loads((CORPUS_DIR / "manifest.json").read_text(encoding="utf-8"))
+    inputs = GENERATOR.build_inputs()
+    live = {}
+    for case_id, expected in FILTER_MARKER_COUNTS.items():
+        frozen = manifest["cases"][case_id]
+        assert inputs[case_id] == frozen["input"]
+        svg = GENERATOR.render_case(inputs[case_id])
+        assert GENERATOR._normalized_digest(svg) == frozen["digest"]
+        live[case_id] = svg
+
+        references = TEXTURE_FILTER_REF.findall(svg)
+        assert len(references) == expected, (case_id, len(references))
+        assert set(references) == {
+            f"texture-{case_id.rsplit('-', 1)[1]}"
+        }, (case_id, sorted(set(references)))
+
     carrying = sum(
-        1 for svg in frozen.values() if TEXTURE_FILTER_REF.search(svg) is not None
+        1 for svg in live.values() if TEXTURE_FILTER_REF.search(svg) is not None
     )
     assert carrying > 0, "the corpus reaches no texture filter at all, as in engine 37"
-
-    inputs = GENERATOR.build_inputs()
-    for case_id, expected in FILTER_MARKER_COUNTS.items():
-        for label, svg in (
-            ("frozen", frozen[case_id]),
-            ("live", GENERATOR.render_case(inputs[case_id])),
-        ):
-            references = TEXTURE_FILTER_REF.findall(svg)
-            assert len(references) == expected, (case_id, label, len(references))
-            assert set(references) == {
-                f"texture-{case_id.rsplit('-', 1)[1]}"
-            }, (case_id, label, sorted(set(references)))
 
     for tool in GENERAL_BRANCH_TOOLS:
         assert FILTER_MARKER_COUNTS[f"C-filter-display-{tool}"] > 1, tool

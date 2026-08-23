@@ -545,8 +545,14 @@ def test_t9_the_limits_tab_carries_all_nine_rows_and_a_reset():
     panel = (WEB_ROOT / "src" / "lib" / "components" / "SettingsModal.svelte").read_text(
         encoding="utf-8"
     )
+    navigation = (
+        WEB_ROOT / "src" / "lib" / "features" / "settings" / "navigation-state.svelte.ts"
+    ).read_text(encoding="utf-8")
+    view = (
+        WEB_ROOT / "src" / "lib" / "features" / "settings" / "RenderLimitsSettings.svelte"
+    ).read_text(encoding="utf-8")
     assert "settingsTab === 'limits'" in panel
-    assert "'limits'" in panel.split("type SettingsTab =")[1].split(";")[0]
+    assert "'limits'" in navigation.split("export type SettingsTab =")[1].split(";")[0]
 
     labels = (WEB_ROOT / "src" / "lib" / "i18n" / "ja.ts").read_text(encoding="utf-8")
     block = labels.split("settingsRenderLimitLabels: {")[1].split("}")[0]
@@ -591,12 +597,12 @@ def test_t9_the_limits_tab_carries_all_nine_rows_and_a_reset():
             # being one of nine unrelated numbers.
             assert f"{name}:" in tips_block
 
-    assert "renderLimitGroupTooltip(groupName)" in panel
+    assert "renderLimitGroupTooltip(groupName)" in view
 
     # Deleting the reset control must turn this red: an adjustment device you
     # cannot put back is not usable.
-    assert "onUpdateRenderLimits(null)" in panel
-    assert "settingsRenderLimitsReset" in panel
+    assert "onUpdate(null)" in view
+    assert "settingsRenderLimitsReset" in view
 
 
 # --------------------------------------------------------------------------
@@ -632,7 +638,7 @@ def test_t10_i18n_keys_and_the_glossary_row():
     not ANDROID_ROOT.is_dir(), reason="android/ is not present (it is excluded from pentala)"
 )
 def test_t11_android_no_longer_carries_a_bare_240():
-    pipeline = (
+    counts = (
         ANDROID_ROOT
         / "app"
         / "src"
@@ -642,17 +648,15 @@ def test_t11_android_no_longer_carries_a_bare_240():
         / "inku"
         / "mobile"
         / "pipeline"
-        / "LocalFallbackPipeline.kt"
+        / "ServerScoreCounts.kt"
     )
-    source = pipeline.read_text(encoding="utf-8")
-    bare = [
-        line.strip()
-        for line in source.splitlines()
-        if re.search(r"\b240\b", line) and "const val" not in line
-    ]
-    assert bare == [], f"a bare 240 is left in the pipeline: {bare}"
-    assert "private const val LITERAL_COUNT_THRESHOLD = 240" in source
-    assert "originalCount >= LITERAL_COUNT_THRESHOLD" in source
+    repairs = counts.with_name("DdlEngineRepairs.kt")
+    count_source = counts.read_text(encoding="utf-8")
+    repair_source = repairs.read_text(encoding="utf-8")
+    assert "const val LITERAL_COUNT_THRESHOLD = 240" in count_source
+    assert "it >= LITERAL_COUNT_THRESHOLD" in count_source
+    assert "1 until ServerScoreCounts.LITERAL_COUNT_THRESHOLD" in repair_source
+    assert not re.search(r"1\s+until\s+240\b", repair_source)
 
 
 # --------------------------------------------------------------------------

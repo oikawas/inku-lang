@@ -211,13 +211,21 @@ print(json.dumps(payload, ensure_ascii=False))
 
 def _client_senders() -> dict[str, str]:
     """The two client trees that POST a drawn work to /api/history."""
-    web = REPO_ROOT / "web" / "src" / "routes" / "+page.svelte"
+    web_paths = (
+        REPO_ROOT / "web" / "src" / "lib" / "features" / "history" / "save.ts",
+        REPO_ROOT / "web" / "src" / "lib" / "features" / "demo" / "state.svelte.ts",
+        REPO_ROOT / "web" / "src" / "routes" / "+page.svelte",
+    )
     cli = REPO_ROOT / "cli" / "src" / "inku_cli" / "cli.py"
     # Named, and asserted rather than skipped: a census that cannot see its
     # subjects has to say so, not pass.
-    assert web.is_file(), f"the web sender is not where the census looks: {web}"
+    for web in web_paths:
+        assert web.is_file(), f"the web sender is not where the census looks: {web}"
     assert cli.is_file(), f"the cli sender is not where the census looks: {cli}"
-    return {"web": web.read_text(encoding="utf-8"), "cli": cli.read_text(encoding="utf-8")}
+    return {
+        "web": "\n".join(path.read_text(encoding="utf-8") for path in web_paths),
+        "cli": cli.read_text(encoding="utf-8"),
+    }
 
 
 def _web_save_bodies(text: str) -> list[str]:
@@ -256,7 +264,10 @@ def test_t234_every_sender_that_saves_a_drawn_work_stacks_the_key(auth_context):
     # Naming the key is not sending a value: bound to the work's own field
     # alone it is null for every freshly drawn work, so the key that is named
     # right there is dropped before the request leaves.
-    derivation = re.search(r"const composeFallback = [\s\S]{0,400}?;\n", sources["web"])
+    derivation = re.search(
+        r"composeFallbackFor: \(item\) =>[\s\S]{0,300}?,\n",
+        sources["web"],
+    )
     assert derivation, "the web save no longer derives what it sends"
     assert "compose_fallback_used" in derivation.group(0), (
         "the web derivation never reads the paint response, so a drawn work sends nothing"

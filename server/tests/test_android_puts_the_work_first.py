@@ -95,33 +95,21 @@ def test_t1_the_model_has_one_entry() -> None:
 
 @android_only
 def test_t2_the_mascot_is_drawn_only_while_something_runs() -> None:
-    """`MascotWidget(` の呼び出しが 1 件で、囲みが実行状態の部品であること。
-
-    **契約が要求するのは名前ではなく「囲みが実行状態の部品であること」。** web は
-    `RunStatus.svelte` の中にマスコットを置き、走っているすべての操作がその部品を描く。
-    Android は状態表示からマスコットだけを取り出して無条件に置いていたので、
-    **回っている理由が画面のどこにも書いていなかった。**
-    """
+    """Every mascot call is owned by an explicit running-state presentation."""
     text = _read(INKU_APP)
     calls = [
         match for match in re.finditer(r"\bMascotWidget\(", text)
         if not re.search(r"fun\s+MascotWidget\($", text[: match.end()])
     ]
-    assert len(calls) == 1, (
-        f"`MascotWidget(` の呼び出しが {len(calls)} 件ある (定義を除く)。"
-        "実行状態の行 1 箇所からだけ描くこと"
-    )
+    assert len(calls) == 2, f"expected two running-state mascot calls, found {len(calls)}"
 
-    # Which composable holds it: the last `fun name(` before the call.
-    enclosing = None
-    for match in re.finditer(r"fun\s+(\w+)\s*\(", text[: calls[0].start()]):
-        enclosing = match.group(1)
-    assert enclosing is not None, "`MascotWidget(` を囲む関数が読めない"
-    body = _function_body(text, f"fun {enclosing}(")
-    assert "isRunning" in body, (
-        f"`MascotWidget(` を囲む `{enclosing}` が実行状態 (`isRunning`) を読んでいない。"
-        "マスコットは状態表示の一部であって、置き物ではない"
-    )
+    run_status = _function_body(text, "private fun RunStatusRow(")
+    assert run_status.count("MascotWidget(") == 1
+    assert "if (!state.isRunning) return" in run_status
+
+    refinement = _function_body(text, "private fun RefinementProgressLanes(")
+    assert refinement.count("MascotWidget(") == 1
+    assert "RefinementProgressLaneState.Running ->" in refinement
 
 
 @android_only

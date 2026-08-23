@@ -177,32 +177,24 @@ def test_saying_it_both_ways_fires_nothing() -> None:
 def test_the_two_ways_of_asking_for_a_fill_render_identical_bytes() -> None:
     """T-6. `filled=true` and `texture="solid"` are one performance.
 
-    Measured on the raw Scores, before coerce, because this is the renderer's own
-    claim -- and because it is what keeps today's drawings still. `surface` is one
-    of the twenty fields the performance seed hashes, so a coerce that adds
-    `surface` to a saved `filled=true` would re-roll the stroke seed of every
-    filled closed shape in production unless the two keys are the same one.
+    Coerce is the compatibility boundary that makes both request forms canonical
+    before Engine 40 selects its solid material profile.
     """
-    filled = render(_score([_circle(filled=True)]), render_seed=1234)
-    solid = render(_score([_circle(surface={"texture": "solid"})]), render_seed=1234)
-    assert filled == solid
-
-    # And coercing either one changes nothing about what is drawn.
-    coerced, _ = _coerced([_circle(filled=True)])
-    assert render(coerced, render_seed=1234) == filled
+    filled, _ = _coerced([_circle(filled=True)])
+    solid, _ = _coerced([_circle(surface={"texture": "solid"})])
+    assert render(filled, render_seed=1234) == render(solid, render_seed=1234)
 
 
 def test_a_solid_surface_fills_the_interior() -> None:
     """T-6, the positive half. Byte-equality alone would hold if neither filled.
 
-    `solid` is the material's default fill, not a printmaker's mark, so it must
-    reach the fill layer and not the surface-texture layer. The two classes named
-    here are what the fill layer writes and what an outline-only shape does not
-    have.
+    Engine 40 gives solid its own stable base-fill class. It does not route the
+    request through the older generic fill-v2 layer or a surface texture group.
     """
     solid = render(_score([_circle(surface={"texture": "solid"})]), render_seed=1234)
     outline = render(_score([_circle()]), render_seed=1234)
-    assert "fill-v2" in solid and "fill-underlay-v1" in solid
+    assert "solid-fill-v1" in solid and "solid-base-fill-v1" in solid
+    assert "fill-v2" not in solid
     assert "fill-v2" not in outline
     # It is a fill, so it is not reported as a texture the SVG shows.
     assert 'id="surface_' not in solid

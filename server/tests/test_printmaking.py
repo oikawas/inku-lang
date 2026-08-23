@@ -4,7 +4,7 @@ import time
 import pytest
 from pydantic import ValidationError
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server.render_engines.default.marks import _stroke_sample_count
+from inku_server.render_engines.default.mark_kernel import _stroke_sample_count
 from inku_server.renderer import render
 from inku_server.schema import Score
 from inku_server.stroke_engine import GRAMMARS, synthesize_stroke

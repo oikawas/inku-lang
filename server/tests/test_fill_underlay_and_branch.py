@@ -60,6 +60,7 @@ from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS, synthesize_along
 from inku_server.render_engines.default import marks as mark_domain
+from inku_server.render_engines.default import mark_kernel as kernel_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 ENGINE_21_MANIFEST = SERVER_ROOT / "reference" / "render-engine-21" / "manifest.json"
@@ -96,8 +97,8 @@ def _svg(payload: dict, *, svg_profile: str | None = None) -> str:
 def _contour(payload: dict) -> list[tuple[float, float]]:
     """The polygon the renderer fills, built the way the renderer builds it."""
     r = payload["radius"] * CANVAS.unit
-    return mark_domain._circle_points(
-        500.0, 500.0, r, r, mark_domain._stroke_sample_count(2 * math.pi * r, CANVAS)
+    return kernel_domain._circle_points(
+        500.0, 500.0, r, r, kernel_domain._stroke_sample_count(2 * math.pi * r, CANVAS)
     )
 
 

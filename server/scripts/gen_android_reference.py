@@ -66,6 +66,7 @@ from inku_server.render_engines.default import determinism
 from inku_server.render_engines.default import marks as mark_domain
 from inku_server.render_engines.default import palette
 from inku_server.render_engines.default import surfaces
+from inku_server.render_engines.default import mark_kernel as kernel_domain
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
 
@@ -624,13 +625,13 @@ def variation_fixtures() -> None:
                 samples.append({
                     "t": t,
                     "segment": step,
-                    "open": mark_domain._sample_offset(t, variation, 12345, step, 10.0),
-                    "periodic": mark_domain._sample_offset_periodic(t, variation, 12345, step, 10.0),
+                    "open": kernel_domain._sample_offset(t, variation, 12345, step, 10.0),
+                    "periodic": kernel_domain._sample_offset_periodic(t, variation, 12345, step, 10.0),
                 })
             offsets.append({"quality": quality, "frequency": frequency, "seed": 12345, "amp": 10.0, "samples": samples})
 
     out_path("renderer_variation_primitives.json").write_text(json.dumps({
-        "frequency_cycles": mark_domain.FREQUENCY_CYCLES,
+        "frequency_cycles": kernel_domain.FREQUENCY_CYCLES,
         "wave_phase": [{"seed": s, "value": determinism._wave_phase(s)} for s in (111, 222, 12345)],
         "hash01": hash01,
         "hash_to_unit": hash_to_unit,
@@ -749,12 +750,12 @@ def proportional_fixtures() -> None:
             "BLUR_MIN_RATIO": mark_domain.BLUR_MIN_RATIO,
             "REPRESENTATIVE_MIN_RATIO": mark_domain.REPRESENTATIVE_MIN_RATIO,
             "AMPLITUDE_CLAMP_RATIO": mark_domain.AMPLITUDE_CLAMP_RATIO,
-            "SEGMENT_TARGET_RATIO": mark_domain.SEGMENT_TARGET_RATIO,
-            "SEGMENT_COUNT_MIN": mark_domain.SEGMENT_COUNT_MIN,
-            "SEGMENT_COUNT_MAX": mark_domain.SEGMENT_COUNT_MAX,
-            "STROKE_SAMPLE_TARGET_RATIO": mark_domain.STROKE_SAMPLE_TARGET_RATIO,
-            "STROKE_SAMPLE_MIN": mark_domain.STROKE_SAMPLE_MIN,
-            "STROKE_SAMPLE_MAX": mark_domain.STROKE_SAMPLE_MAX,
+            "SEGMENT_TARGET_RATIO": kernel_domain.SEGMENT_TARGET_RATIO,
+            "SEGMENT_COUNT_MIN": kernel_domain.SEGMENT_COUNT_MIN,
+            "SEGMENT_COUNT_MAX": kernel_domain.SEGMENT_COUNT_MAX,
+            "STROKE_SAMPLE_TARGET_RATIO": kernel_domain.STROKE_SAMPLE_TARGET_RATIO,
+            "STROKE_SAMPLE_MIN": kernel_domain.STROKE_SAMPLE_MIN,
+            "STROKE_SAMPLE_MAX": kernel_domain.STROKE_SAMPLE_MAX,
             "SPECK_ANCHOR_PERIMETER_RATIO": mark_domain.SPECK_ANCHOR_PERIMETER_RATIO,
             "SPECK_COUNT_MIN": mark_domain.SPECK_COUNT_MIN,
             "SPECK_COUNT_MAX_GAIN": mark_domain.SPECK_COUNT_MAX_GAIN,
@@ -799,9 +800,9 @@ def proportional_fixtures() -> None:
 
         for path_len in (10.0, 120.0, 1256.6, 5000.0, 40000.0):
             out["segment_count"].append({"aspect": aspect, "path_len_px": path_len,
-                                         "value": mark_domain._segment_count(path_len, canvas)})
+                                         "value": kernel_domain._segment_count(path_len, canvas)})
             out["stroke_sample_count"].append({"aspect": aspect, "length_px": path_len,
-                                               "value": mark_domain._stroke_sample_count(path_len, canvas)})
+                                               "value": kernel_domain._stroke_sample_count(path_len, canvas)})
             for base in (18, 28, 36):
                 out["speck_count"].append({"aspect": aspect, "base": base, "path_len_px": path_len,
                                            "value": mark_domain._speck_count(base, path_len, canvas)})
@@ -971,7 +972,7 @@ def fill_and_arc_fixtures() -> None:
     def contour_for(ins, canvas):
         if ins.primitive == "square":
             assert ins.position is not None and ins.size is not None
-            px, py = mark_domain._px(ins.position, canvas)
+            px, py = kernel_domain._px(ins.position, canvas)
             w = ins.size[0] * canvas.width
             h = ins.size[1] * canvas.height
             return [(px, py), (px + w, py), (px + w, py + h), (px, py + h)]
@@ -979,7 +980,7 @@ def fill_and_arc_fixtures() -> None:
         ccx = ins.center[0] * canvas.width
         ccy = ins.center[1] * canvas.height
         rr = ins.radius * canvas.unit
-        count = mark_domain._stroke_sample_count(2 * math.pi * rr, canvas)
+        count = kernel_domain._stroke_sample_count(2 * math.pi * rr, canvas)
         return [
             (ccx + rr * math.cos(2 * math.pi * i / count), ccy + rr * math.sin(2 * math.pi * i / count))
             for i in range(count)
@@ -1152,7 +1153,7 @@ def fill_and_arc_fixtures() -> None:
                 "span": round(span, 9),
                 "count": count,
                 "layer_angles": [round(a, 12) for a in angles],
-                "sample_count": max(2, mark_domain._stroke_sample_count(span, canvas)),
+                "sample_count": max(2, kernel_domain._stroke_sample_count(span, canvas)),
                 "line_width": round(max(0.45, canvas.unit * 0.0016), 9),
                 "lines": lines,
             })
@@ -1181,15 +1182,15 @@ def fill_and_arc_fixtures() -> None:
         varied = determinism._needs_contour_variation(ins.variation)
         if varied:
             assert ins.variation is not None
-            centerline = mark_domain._arc_points_with_variation(
+            centerline = kernel_domain._arc_points_with_variation(
                 cx, cy, r, ins.angle_start, ins.angle_end, ins.variation, seed,
                 mark_domain._amplitude_px(ins.variation, ins, canvas), canvas,
             )
         else:
             arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
-            centerline = mark_domain._arc_points(
+            centerline = kernel_domain._arc_points(
                 cx, cy, r, ins.angle_start, ins.angle_end,
-                mark_domain._stroke_sample_count(arc_len, canvas),
+                kernel_domain._stroke_sample_count(arc_len, canvas),
             )
         stroke = se.synthesize_along(centerline, mark_domain._stroke_width_px(ins.weight, canvas),
                                      ins.weight, seed, closed=False)

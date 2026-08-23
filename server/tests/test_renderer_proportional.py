@@ -19,8 +19,6 @@ from inku_server.render_engines.default.marks import (
     MATERIAL_INTENSITY_LEVEL,
     AMPLITUDE_WIDTHS,
     BLUR_RATIO,
-    SEGMENT_COUNT_MAX,
-    SEGMENT_COUNT_MIN,
     SPECK_COUNT_MIN,
     STYLE_TO_DASH,
     WEIGHT_TO_STROKE_WIDTH,
@@ -28,11 +26,15 @@ from inku_server.render_engines.default.marks import (
     _clamped_representative_px,
     _material_outline_profile,
     _performance_touch_filter,
-    _segment_count,
     _speck_count,
     _speck_profile,
     _stroke_width_px,
     _texture_filter_xml,
+)
+from inku_server.render_engines.default.mark_kernel import (
+    SEGMENT_COUNT_MAX,
+    SEGMENT_COUNT_MIN,
+    _segment_count,
 )
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score, Variation

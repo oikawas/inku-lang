@@ -10,6 +10,7 @@ from ...cloudform import generate_cloudform_contour, sample_closed_catmull_rom
 from ...plugins import CanvasSize, canvas_size_for_aspect
 from ...schema import Instruction
 from ...stroke_engine import Support
+from . import mark_kernel as _mark_kernel
 from . import marks as _marks
 from . import palette as _palette
 from . import surfaces as _surfaces
@@ -32,27 +33,27 @@ _add_material_rect_outline = _marks._add_material_rect_outline
 _amplitude_px = _marks._amplitude_px
 _apply_rotation = _marks._apply_rotation
 _arc_path_d = _marks._arc_path_d
-_arc_points_with_variation = _marks._arc_points_with_variation
+_arc_points_with_variation = _mark_kernel._arc_points_with_variation
 _body_attrs_for_contour_stroke = _marks._body_attrs_for_contour_stroke
-_circle_points = _marks._circle_points
-_closed_contour_with_variation = _marks._closed_contour_with_variation
-_closed_path_length = _marks._closed_path_length
+_circle_points = _mark_kernel._circle_points
+_closed_contour_with_variation = _mark_kernel._closed_contour_with_variation
+_closed_path_length = _mark_kernel._closed_path_length
 _copy_attrs = _marks._copy_attrs
-_edge_contour_with_anchors = _marks._edge_contour_with_anchors
-_ellipse_perimeter = _marks._ellipse_perimeter
+_edge_contour_with_anchors = _mark_kernel._edge_contour_with_anchors
+_ellipse_perimeter = _mark_kernel._ellipse_perimeter
 _instruction_support = _marks._instruction_support
 _interior_fill = _marks._interior_fill
-_points_center = _marks._points_center
-_polygon_points = _marks._polygon_points
-_px = _marks._px
+_points_center = _mark_kernel._points_center
+_polygon_points = _mark_kernel._polygon_points
+_px = _mark_kernel._px
 _render_arc_hand_stroke = _marks._render_arc_hand_stroke
 _render_contour_hand_stroke = _marks._render_contour_hand_stroke
 _render_corner_shape = _marks._render_corner_shape
 _render_hand_stroke = _marks._render_hand_stroke
-_segment_count = _marks._segment_count
-_size_px = _marks._size_px
+_segment_count = _mark_kernel._segment_count
+_size_px = _mark_kernel._size_px
 _stroke_attrs = _marks._stroke_attrs
-_stroke_sample_count = _marks._stroke_sample_count
+_stroke_sample_count = _mark_kernel._stroke_sample_count
 _uses_hand_stroke = _marks._uses_hand_stroke
 _uses_material_outline = _marks._uses_material_outline
 
@@ -121,9 +122,7 @@ def _render_instruction(
         if varied:
             assert ins.variation is not None
             contour = _closed_contour_with_variation(
-                _circle_points(
-                    cx, cy, r, r, _segment_count(2 * math.pi * r, canvas)
-                ),
+                _circle_points(cx, cy, r, r, _segment_count(2 * math.pi * r, canvas)),
                 (cx, cy),
                 ins.variation,
                 _seed_for_instruction(ins, render_seed),

@@ -6,10 +6,8 @@ from xml.etree import ElementTree
 from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines import current_render_engine
-from inku_server.render_engines.default.marks import (
-    _ellipse_perimeter,
-    _speck_count,
-)
+from inku_server.render_engines.default.mark_kernel import _ellipse_perimeter
+from inku_server.render_engines.default.marks import _speck_count
 from inku_server.render_engines.default.planning import (
     _clustered_pos,
     _expand_arrangement,

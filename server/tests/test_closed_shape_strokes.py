@@ -13,10 +13,8 @@ from xml.etree import ElementTree
 
 import pytest
 
-from inku_server.render_engines.default.marks import (
-    _edge_contour_with_anchors,
-    _stroke_width_px,
-)
+from inku_server.render_engines.default.mark_kernel import _edge_contour_with_anchors
+from inku_server.render_engines.default.marks import _stroke_width_px
 from inku_server.renderer import render
 from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.schema import Instruction, Score

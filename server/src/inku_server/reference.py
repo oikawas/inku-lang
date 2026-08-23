@@ -60,17 +60,19 @@ from .render_engines.default.marks import (
     AMPLITUDE_WIDTHS,
     BLUR_RATIO,
     CANVAS_PX,
-    FREQUENCY_CYCLES,
     REPRESENTATIVE_MIN_RATIO,
-    SEGMENT_COUNT_MAX,
     MIN_STROKE_WIDTH,
-    SEGMENT_COUNT_MIN,
-    SEGMENT_TARGET_RATIO,
     STYLE_TO_DASH,
     TEXTURE_FILTER_WEIGHTS,
     THINNESS_TO_WIDTH_SCALE,
     WEIGHT_STYLE,
     WEIGHT_TO_STROKE_WIDTH,
+)
+from .render_engines.default.mark_kernel import (
+    FREQUENCY_CYCLES,
+    SEGMENT_COUNT_MAX,
+    SEGMENT_COUNT_MIN,
+    SEGMENT_TARGET_RATIO,
 )
 from .render_engines.default.document import SVG_PROFILES
 

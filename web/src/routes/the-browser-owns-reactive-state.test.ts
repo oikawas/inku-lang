@@ -28,6 +28,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 
 	const instanceScoped = [
 		'elapsed.svelte.ts',
+		'features/batch/state.svelte.ts',
 		'features/canvas/refinement-session.svelte.ts',
 		'features/canvas/viewport-state.svelte.ts',
 		'features/history/browsing-state.svelte.ts',

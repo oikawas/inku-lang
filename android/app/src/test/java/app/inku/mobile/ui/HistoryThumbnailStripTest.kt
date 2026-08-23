@@ -6,6 +6,30 @@ import org.junit.Test
 class HistoryThumbnailStripTest {
 
     @Test
+    fun starControlShowsFilledStarForStarredWork() {
+        val control = historyStripStarControl(starred = true, stripEnabled = true)
+
+        assertEquals("★", control.symbol)
+        assertEquals(true, control.enabled)
+    }
+
+    @Test
+    fun starControlShowsEmptyStarForUnstarredWork() {
+        val control = historyStripStarControl(starred = false, stripEnabled = true)
+
+        assertEquals("☆", control.symbol)
+        assertEquals(true, control.enabled)
+    }
+
+    @Test
+    fun starControlIsDisabledWhileStripIsLocked() {
+        val control = historyStripStarControl(starred = true, stripEnabled = false)
+
+        assertEquals("★", control.symbol)
+        assertEquals(false, control.enabled)
+    }
+
+    @Test
     fun selectedIdMapsToItsExistingHistoryIndex() {
         val historyIds = listOf("latest", "middle", "oldest")
 

@@ -1704,6 +1704,7 @@ private fun CanvasHeroCard(
                     selectedId = item?.id,
                     enabled = !state.isRunning,
                     onSelect = viewModel::selectHistory,
+                    onToggleStar = viewModel::toggleStar,
                 )
             }
             // Under the canvas: on the left the ways of looking at the same work,
@@ -2286,6 +2287,17 @@ internal fun historyStripModelLabel(modelId: String?): String? {
     return displayName?.compactLabel(14)
 }
 
+internal data class HistoryStripStarControl(
+    val symbol: String,
+    val enabled: Boolean,
+)
+
+internal fun historyStripStarControl(starred: Boolean, stripEnabled: Boolean): HistoryStripStarControl =
+    HistoryStripStarControl(
+        symbol = if (starred) "★" else "☆",
+        enabled = stripEnabled,
+    )
+
 /** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
 @Composable
 private fun HistoryThumbnailStrip(
@@ -2293,6 +2305,7 @@ private fun HistoryThumbnailStrip(
     selectedId: String?,
     enabled: Boolean,
     onSelect: (HistoryListItem) -> Unit,
+    onToggleStar: (HistoryListItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val selectedIndex = remember(history, selectedId) {
@@ -2309,24 +2322,33 @@ private fun HistoryThumbnailStrip(
         items(history, key = { it.id }) { historyItem ->
             val selected = historyItem.id == selectedId
             val modelLabel = historyStripModelLabel(historyItem.stage1Model)
+            val starControl = historyStripStarControl(historyItem.starred, enabled)
             Column(
                 modifier = Modifier.width(Dimens.buttonHeightLarge),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
             ) {
-                Surface(
-                    modifier = Modifier
-                        .size(Dimens.buttonHeightLarge)
-                        .clickable(enabled = enabled) { onSelect(historyItem) }
-                        .border(
-                            Dimens.selectionRingWidth,
-                            if (selected) SelectionRing else Color.Transparent,
-                            RoundedCornerShape(0.dp),
-                        ),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(0.dp),
-                ) {
-                    HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
+                Box(modifier = Modifier.size(Dimens.buttonHeightLarge)) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable(enabled = enabled) { onSelect(historyItem) }
+                            .border(
+                                Dimens.selectionRingWidth,
+                                if (selected) SelectionRing else Color.Transparent,
+                                RoundedCornerShape(0.dp),
+                            ),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(0.dp),
+                    ) {
+                        HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
+                    }
+                    HistoryBadge(
+                        text = starControl.symbol,
+                        selected = historyItem.starred,
+                        onClick = if (starControl.enabled) ({ onToggleStar(historyItem) }) else null,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs),
+                    )
                 }
                 modelLabel?.let {
                     Text(

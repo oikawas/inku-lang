@@ -141,6 +141,8 @@ test('T-101: the two marks are the two flags a work carries', () => {
 	const call = PAGE.slice(PAGE.indexOf('<CanvasPanel'), PAGE.indexOf('/>', PAGE.indexOf('<CanvasPanel')));
 	assert.match(call, /onToggleStar=\{toggleHistoryStar\}/);
 	assert.match(call, /onToggleForRevision=\{toggleHistoryForRevision\}/);
+	assert.match(PAGE, /const toggleHistoryStar = historyMutations\.toggleStar/);
+	assert.match(PAGE, /const toggleHistoryForRevision = historyMutations\.toggleForRevision/);
 	// The canvas has to be able to read the flag it draws, or the mark would
 	// never come back on for a work that already carries it.
 	assert.match(PANEL, /for_revision\?: boolean;/);

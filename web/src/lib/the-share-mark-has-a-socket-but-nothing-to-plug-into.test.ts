@@ -33,6 +33,7 @@ const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'u
 
 const PANEL = read('./components/CanvasPanel.svelte');
 const PAGE = read('../routes/+page.svelte');
+const MUTATIONS = read('./features/history/mutations.ts');
 const JA = read('./i18n/ja.ts');
 const EN = read('./i18n/en.ts');
 const TYPES = read('./i18n/types.ts');
@@ -90,7 +91,8 @@ test('T-202: the page hands the canvas a way to save the mark, so it shows', () 
 	assert.match(PANEL, /onToggleForShare = null,/);
 	// The handler has to reach the endpoint that stores it. A handler that only
 	// moved local state would satisfy the line above and save nothing.
-	assert.match(PAGE, /`\/api\/history\/\$\{item\.id\}\/for-share`/);
+	assert.match(PAGE, /const toggleHistoryForShare = historyMutations\.toggleForShare/);
+	assert.match(MUTATIONS, /`\/api\/history\/\$\{item\.id\}\/for-share`/);
 });
 
 test('T-105: the socket names where the rest of the work is written down', () => {

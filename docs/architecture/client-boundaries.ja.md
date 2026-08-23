@@ -36,6 +36,7 @@ flowchart LR
     RUN["features/run/current-work.ts\n1回のPaint request・stream・保存直後projection"]
     LINEAGE_STATE["features/history/lineage-state.svelte.ts\nroute-instance lineage query + nearby作品"]
     HISTORY_STATE["features/history/browsing-state.svelte.ts\nroute-instanceのstrip query・paging・filter・refresh・manager連携"]
+    HISTORY_MUTATIONS["features/history/mutations.ts\nroute-instanceのmark・lifecycle mutation調停"]
     HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query・cache・実測page size"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server/model provider/user・group管理"]
     SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
@@ -58,6 +59,10 @@ flowchart LR
     RUN -->|"loadNearby capability"| LINEAGE_STATE
     PAGE -->|"owner生成 + current work/notice配線"| HISTORY_STATE
     HISTORY_STATE -->|"必ず1個だけ生成"| HISTORY_MANAGER
+    PAGE -->|"owner生成 + current canvas capability"| HISTORY_MUTATIONS
+    COMPONENTS -->|"名前付きmutation action"| HISTORY_MUTATIONS
+    HISTORY_MUTATIONS -->|"strip/trash/manager projection"| HISTORY_STATE
+    HISTORY_MUTATIONS -->|"mark projection + focused query refresh"| LINEAGE_STATE
     PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -74,6 +79,7 @@ flowchart LR
     LINEAGE_STATE -->|"lineage + neighbor query"| TRANSPORT
     LINEAGE_STATE -->|"graph/loading/error + nearby作品"| COMPONENTS
     HISTORY_STATE -->|"strip/trash query + external state probe"| TRANSPORT
+    HISTORY_MUTATIONS -->|"mark PATCH + lifecycle POST"| TRANSPORT
     HISTORY_STATE -->|"strip選択/paging/filter state"| COMPONENTS
     HISTORY_MANAGER -->|"manager state"| COMPONENTS
     TRANSPORT --> API
@@ -91,10 +97,11 @@ flowchart LR
 
 | 所有者 | 例 | 境界 |
 |---|---|---|
-| component/page memory | 描画中のresult、output tab、current work focus、replay/mutation state | reloadで消える。server正本ではない |
+| component/page memory | 描画中のresult、output tab、current work focus、replay state | reloadで消える。server正本ではない |
 | stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`は解決済みdefaultと名前付きcapabilityを受け取る。外側loop、route state、AbortControllerはpageに残る |
 | route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge、nearby作品 | routeごとに1個の`LineageQueryState`。Stage 5Aではcurrent focus選択とlineage actionはpageに残る |
 | route-instance history browsing owner | stripのitems/count/offset/選択、filter、paging/resize、stale-response identity、trash summary、external refresh、mark projection、manager連携 | routeごとに1個の`HistoryBrowsingState`が既存`HistoryManagerState`を必ず1個だけ生成する。managerのrequest/cache/page-size意味論は複製しない |
+| route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとpage-owned current canvasへ名前付きprojectionだけを渡す |
 | route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。focused viewへは`userAdministration`、`database`/`db_backup`、`render_limits`、または`output_save`/`render_concurrency`の必要sliceと名前付き操作だけを渡す |
 | focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
@@ -107,7 +114,9 @@ flowchart LR
 
 Stage 5Aではlineageとnearby作品のquery stateをroute-instanceの`LineageQueryState`へ置く。request identity、loading/error、graph置換、branch/overview merge、reset invalidation、同一historyのneighbor deduplicationをここが所有する。`runCurrentWork`には`loadNearby` methodを直接渡す。current focus選択とlineage actionはpageに残る。
 
-Stage 5Bではhistory browsingをroute-instanceの`HistoryBrowsingState`へ置く。strip/trash query、paging、選択同期、filter、resize時のoffset整列、stale-response identity、外部保存refresh、保存・run後の一覧refresh、mark projectionをここが所有する。既存`HistoryManagerState`を必ず1個だけ生成し、そのrequest suppression・cache・実測page-size規則を複製せずにseed/refreshする。pageはcurrent workとbrowser lifecycleのcapabilityを渡し、表示中の作品/result、mutation endpoint、replay、current focus選択、Canvas/refinement actionを後続Stage 5 unitまで保持する。
+Stage 5Bではhistory browsingをroute-instanceの`HistoryBrowsingState`へ置く。strip/trash query、paging、選択同期、filter、resize時のoffset整列、stale-response identity、外部保存refresh、保存・run後の一覧refresh、mark projectionをここが所有する。既存`HistoryManagerState`を必ず1個だけ生成し、そのrequest suppression・cache・実測page-size規則を複製せずにseed/refreshする。pageはcurrent workとbrowser lifecycleのcapabilityを渡す。
+
+Stage 5Cでは`HistoryMutations`がstar/revision/shareのoptimistic PATCHとrollback、trash/restore/permanent-deleteのbulk POSTとrefresh順を所有する。mutable stateは複製せず、`HistoryBrowsingState`と`LineageQueryState`へnamed projectionを送り、current canvasの再着席だけをpage capabilityへ返す。pageはlocalized confirmation、表示中の作品/result、replay、保存用`POST /api/history`、current focus選択、Canvas/refinement actionを後続Stage 5 unitまで保持する。
 
 設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
 

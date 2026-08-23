@@ -13,6 +13,7 @@ pub mod determinism;
 pub mod fills;
 pub mod geometry;
 pub mod ground;
+mod ground_patterns;
 pub mod group;
 pub mod layers;
 pub mod marks;

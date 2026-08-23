@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.49` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.50` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2082,3 +2082,9 @@ Androidはserver設定を搬送しないため、本段は端末内limitを受�
 通常Compose画面のキャンバス直下に、既存履歴のサムネイルを横stripで並べる。現在作品は選択枠で示し、タップは既存の履歴選択処理へ渡す。選択作品が変わるとstripもその位置へスクロールする。履歴0件、presentation/full-screen、controls非表示ではstripを出さず、描画・推敲中は選択操作を無効にする。
 
 Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した。履歴画面、検索、star filterは既存のAndroid UIを正本とし、ViewModel、repository、Room/query/schema、履歴の取得件数・順序、replay生成、永続化は変更していない。
+
+## 2026-08-23 履歴stripにモデル名を添える（android `2.1.4-android.50`・[I-350]）
+
+履歴stripの各サムネイル直下に、保存済みsummaryが既に持つStage 1モデル名を添える。provider接頭辞を外し、長い名前は既存の14文字compact規則で省略する。モデル名がnullまたは空の旧履歴ではラベル行自体を出さず、空きだけを残さない。
+
+選択枠、タップ、選択位置へのスクロール、描画・推敲中の操作lock、履歴順序はI-349のまま保つ。新しいproducerやsummary fieldは追加せず、ViewModel、repository、Room/query/schema、pipeline、render、永続化、server/web/sharedは変更していない。

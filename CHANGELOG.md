@@ -8731,3 +8731,9 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **A horizontal history-thumbnail strip now sits directly below the canvas on the ordinary Compose screen.** A selection ring marks the current work, taps use the existing selection path, and a selection change scrolls the strip to that position.
 - **The strip is absent with no history, in presentation/full-screen, or with controls hidden; interaction is disabled while drawing or refining.** The existing History screen, search, and starred filter are not duplicated. No ViewModel, repository, Room query or schema, history ordering, replay generation, or persistence changed.
 - **Verification:** the focused pre-production test exited 1 on the missing helper. The same two tests exited 0 during implementation and at the branch tip. Full JVM, instrumentation, devices, screenshots, reference generation, and pentala were out of scope.
+
+### Android `2.1.4-android.50` — the history strip names the model (2026-08-23, [I-350])
+
+- **Each history thumbnail now shows the Stage 1 model name already present in its summary.** The provider prefix is removed, long names use the existing fourteen-character compact rule, and old history with a null or blank value omits the label row entirely.
+- **The I-349 selection ring, taps, scrolling, interaction lock, and history order are preserved.** No new producer or summary field was added, and no ViewModel, repository, Room query or schema, pipeline, rendering, persistence, server, Web, or shared path changed.
+- **Verification:** the focused pre-production JVM test exited 1 only on the missing helper. The same targeted test exited 0 during implementation, at the branch tip, and in acceptance. Full JVM, instrumentation, devices, screenshots, reference generation, and pentala were out of scope.

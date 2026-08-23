@@ -7902,3 +7902,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常Compose画面のキャンバス直下に、履歴サムネイルの横stripを追加した。** 現在作品を選択枠で示し、タップは既存の選択処理へ渡し、選択変更時はその位置へ自動スクロールする。
 - **履歴0件、presentation/full-screen、controls非表示では出さず、描画・推敲中は操作を無効にする。** 既存の履歴画面、検索、star filterは複製していない。ViewModel、repository、Room/query/schema、履歴順、replay生成、永続化は変更していない。
 - **検証:** production edit前のfocused JVM testは未実装helperでexit 1。実装中とbranch-tip finalは同じ2 testsがexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.50` — 履歴stripにモデル名を添える（2026-08-23・[I-350]）
+
+- **各履歴サムネイルの直下に、既存summaryのStage 1モデル名を表示する。** provider接頭辞を外し、長い名前は既存の14文字compact規則で省略する。nullまたは空の旧履歴ではラベル行自体を出さない。
+- **I-349の選択枠、タップ、scroll、操作lock、履歴順序は保った。** 新しいproducerやsummary fieldは追加せず、ViewModel、repository、Room/query/schema、pipeline、render、永続化、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは未実装helperだけでexit 1。実装中、branch-tip final、受入側の同じtargeted testはexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

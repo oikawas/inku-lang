@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.49` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.50` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2584,3 +2584,9 @@ The display is derived only from the existing `refinementCount`, `refinementCand
 The ordinary Compose screen now places a horizontal strip of existing history thumbnails directly below the canvas. A selection ring marks the current work, taps use the existing history-selection path, and changing the selected work scrolls the strip to its position. The strip is absent with no history, in presentation/full-screen, or when controls are hidden; selection is disabled while drawing or refining.
 
 Only the thumbnail-selection route from Web's `HistoryStrip` is adapted. Android's existing History screen, search, and starred filter remain canonical. No ViewModel, repository, Room query or schema, history count or ordering, replay generation, or persistence changed.
+
+## 2026-08-23 Naming the model in the history strip (android `2.1.4-android.50`, [I-350])
+
+Each history-strip thumbnail now carries the Stage 1 model name already present in its saved summary. The provider prefix is removed and long names use the existing fourteen-character compact rule. Old history with a null or blank model omits the label row entirely instead of reserving empty space.
+
+The I-349 selection ring, tap behavior, scrolling to the selected work, interaction lock during drawing or refinement, and history order are unchanged. No new producer or summary field was added, and no ViewModel, repository, Room query or schema, pipeline, rendering, persistence, server, Web, or shared path changed.

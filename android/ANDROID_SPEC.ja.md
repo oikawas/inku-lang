@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.55` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.56` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2118,3 +2118,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 生成情報sheetの演奏sectionに`色の対応`を追加する。作品の`render_color_map`が保存した色語、色コード、そのコードのswatchを色語順で表示する。mapが無い、空、またはmetadataが壊れている作品では行自体を出さない。不正な色コードはneutral swatchへfallbackし、保存文字列はそのまま表示する。
 
 既存`workColorSnapshot(renderMetadataJson)`だけを使い、現在の色カタログから割当を再計算しない。producer、色コードの書換え／正規化、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、SVG解析、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 作品が保存した色カタログ名を表示する（android `2.1.4-android.56`・[I-358]）
+
+生成情報sheetの既存`色カタログ`行は、有効な保存済みcolor snapshotに非blankのカタログ名があれば、保存名と同じsnapshotのIDを`保存名 (catalog-id)`として表示する。名前が無い／blank、snapshotが無い、空map、壊れたmetadataでは従来のIDだけを保ち、名前とIDが同一なら重複させない。
+
+既存`workColorSnapshot(renderMetadataJson)`だけを使い、現在の`ColorCatalogs`やrename tableは参照しない。Webで除去済みの固定taglineを戻さないため`catalogSub`は表示しない。producer、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。

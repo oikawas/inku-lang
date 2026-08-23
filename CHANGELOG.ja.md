@@ -7938,3 +7938,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **生成情報sheetの演奏sectionに、保存済み`render_color_map`の色語・色コード・swatchを表示する。** 色語順で安定させ、map欠落／空／壊れたmetadataでは行を出さない。不正コードでもsheetを落とさずneutral swatchにし、保存文字列はそのまま残す。
 - **既存`workColorSnapshot(renderMetadataJson)`だけを再利用した。** 現在の色カタログから再計算せず、producer、色コードの書換え／正規化、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、SVG解析、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新color-map projection helper／typeの未実装参照だけでexit 1。実装中とbranch-tip finalの`GenerationInfoColorMapTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.56` — 作品が保存した色カタログ名を表示する（2026-08-23・[I-358]）
+
+- **生成情報sheetの既存`色カタログ`行に、作品が保存したカタログ名と同じsnapshotのIDを`保存名 (catalog-id)`として表示する。** 名前欠落／blank、snapshot欠落、空map、壊れたmetadataでは従来のIDだけを保ち、名前とIDが同一なら重複させない。
+- **既存`workColorSnapshot(renderMetadataJson)`だけを再利用した。** 現在の`ColorCatalogs`やrename tableは参照せず、Webで除去済みの固定taglineを戻さないため`catalogSub`は表示しない。producer、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新catalog-name formatting helperの未実装参照だけでexit 1。実装中とbranch-tip finalの`GenerationInfoCatalogNameTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

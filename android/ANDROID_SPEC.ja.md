@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.57` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.58` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2130,3 +2130,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 通常Compose画面の履歴stripで、既存のStage 1短縮ラベルを長押しまたはpointer hoverすると、作品が保存したprovider prefix込みのStage 1／Stage 2 model IDを2行tooltipで確認できる。Stage 2欠落は`—`とし、Stage 1欠落では従来どおりラベル行とtooltip targetを出さない。
 
 画面上の14文字Stage 1短縮ラベル、サムネイル寸法、作品選択、Star、選択位置scroll、描画・推敲中の操作lockを保った。既存`HistoryListItem`とMaterial tooltipだけを使い、新しいstate、model resolver、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 履歴stripのtooltipに保存日時と色カタログIDを表示する（android `2.1.4-android.58`・[I-360]）
+
+I-359のmodel tooltipへ、作品の保存日時と保存済み色カタログIDを追加する。日時は生成情報sheetと同じISO-8601 UTC文字列で、既存`作成日`／`Created`と`色カタログ`／`Color catalog`のlabelを使う。日時が0以下または変換不能、catalog IDがblankなら`—`を表示する。
+
+既存`HistoryListItem.createdAt`と`colorCatalogId`だけを読み、現在の色カタログ一覧から名前を取得しない。I-359の完全model ID、Stage 2欠落表示、Stage 1欠落時の非表示、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保ち、新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。

@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.57` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.58` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2632,3 +2632,9 @@ The UI uses only the existing `workColorSnapshot(renderMetadataJson)` and does n
 Long-pressing or pointer-hovering the existing compact Stage 1 label in the ordinary Compose history strip now shows the work's saved Stage 1 and Stage 2 model IDs, including provider prefixes, in a two-line tooltip. A missing Stage 2 value is shown as `—`; a work with no Stage 1 value retains the prior behavior of having neither a label row nor a tooltip target.
 
 The visible fourteen-character Stage 1 label, thumbnail dimensions, work selection, Star control, selected-position scrolling, and interaction lock during drawing or refinement are preserved. The UI uses only the existing `HistoryListItem` and Material tooltip; no new state, model resolver, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Showing saved time and color-catalog ID in the history-strip tooltip (android `2.1.4-android.58`, [I-360])
+
+I-359's model tooltip now also shows the work's saved time and saved color-catalog ID. The timestamp uses the same ISO-8601 UTC representation as the Provenance sheet and the existing `Created` and `Color catalog` labels. A non-positive or unconvertible timestamp or a blank catalog ID is shown as `—`.
+
+The UI reads only the existing `HistoryListItem.createdAt` and `colorCatalogId` and never looks up a name from the current color-catalog list. I-359's complete model IDs, missing-Stage-2 marker, no-Stage-1 omission, fourteen-character visible label, thumbnail dimensions, work selection, Star, scrolling, and interaction lock are preserved. No new state, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.

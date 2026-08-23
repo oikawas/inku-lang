@@ -7950,3 +7950,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **履歴stripの既存Stage 1短縮ラベルへ、保存済みStage 1／Stage 2 model IDを2行で示すtooltipを追加した。** provider prefixを含む完全IDを表示し、Stage 2欠落は`—`、Stage 1欠落では従来どおりラベル行とtargetを出さない。
 - **画面上の14文字短縮ラベルとstrip操作を保った。** サムネイル寸法、作品選択、Star、選択位置scroll、描画・推敲中の操作lockを変えず、既存`HistoryListItem`とMaterial tooltipだけを使った。新しいstate、model resolver、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新tooltip-text helperの未実装参照4件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainが枝分岐後に別のWeb変更で進んだため、重なり0・競合0を確認してmerge後に同testを1回実行しexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.58` — 履歴stripのtooltipに保存日時と色カタログIDを表示する（2026-08-23・[I-360]）
+
+- **I-359のmodel tooltipへ作品の保存日時と保存済み色カタログIDを追加した。** 日時は生成情報sheetと同じISO-8601 UTC表現で、既存の日英labelを再利用する。日時が0以下または変換不能、catalog IDがblankなら`—`とする。
+- **既存`HistoryListItem.createdAt`と`colorCatalogId`だけを読む。** 現在の色カタログ一覧から名前を引かず、I-359のmodel ID、欠落表示、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保った。新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testはtooltip formatterの追加予定4引数の未実装参照12件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

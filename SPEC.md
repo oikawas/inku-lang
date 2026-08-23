@@ -3017,7 +3017,7 @@ Important score concepts:
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
 - `rotation`: shape-level or group-level orientation
 - `color_hint`: optional hint used when resolving catalog colors, and the descriptive markers the renderer reads as the character of a drawing
-- `note`: optional machine-written processing annotation. It never reaches the drawing: it is outside the performance seed allowlist, and Stage 2 is instructed never to emit it. Coerce and the API record their diagnostics here so that a diagnostic can no longer be mistaken for a color description. It is declared second, because an optional field's fill rate rises toward the tail of the declaration order
+- `note`: optional machine-written processing annotation. It never reaches the drawing: it is outside the performance seed allowlist, and Stage 2 is instructed never to emit it. Coerce and the API record their diagnostics here so that a diagnostic can no longer be mistaken for a color description. **It is a chronological record of processing steps, not a summary of the final Score or drawing state.** A later step may supersede an earlier diagnostic while both remain recorded, so no single `note` clause is evidence of the current color, shape, or placement. It is declared second, because an optional field's fill rate rises toward the tail of the declaration order
 - `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
 - `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; a touching relation pins both endpoints
 

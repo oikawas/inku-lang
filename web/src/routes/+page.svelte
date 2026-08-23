@@ -20,6 +20,7 @@
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -417,15 +418,7 @@
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
 	let lineageDetached = $state(false);
-	let zoom         = $state(1);
-	let canvasFitZoom = $state(1);
-	let panX         = $state(0);
-	let panY         = $state(0);
-	let canvasDragging = $state(false);
-	let dragStartX   = 0;
-	let dragStartY   = 0;
-	let dragStartPanX = 0;
-	let dragStartPanY = 0;
+	const canvasViewport = new CanvasViewportState();
 	let promptStage1Expanded = $state(false);
 	let promptStage2Expanded = $state(false);
 	type ModelSelectionSnapshot = {
@@ -1145,7 +1138,7 @@
 			history.clearSelection();
 			outputTab = 'canvas';
 			exportMenuOpen = false;
-			fitCanvasZoom();
+			canvasViewport.fit();
 		}
 		await saveCanvasAspectPluginValue();
 	}
@@ -1170,7 +1163,7 @@
 		history.clearSelection();
 		outputTab = 'canvas';
 		exportMenuOpen = false;
-		fitCanvasZoom();
+		canvasViewport.fit();
 		await saveCanvasAspectPluginValue();
 	}
 
@@ -2303,7 +2296,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				demoSaveStatus = null;
 				const demoSourceDdl = r.source_ddl ?? r.ddl;
 				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; thinking = r.thinking; result = r; outputTab = 'canvas';
-				fitCanvasZoom();
+				canvasViewport.fit();
 				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
 				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
 				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
@@ -2507,7 +2500,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
 				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
-				fitCanvasZoom();
+				canvasViewport.fit();
 				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 					lineageDetached = false;
@@ -2810,7 +2803,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				};
 			}
 			outputTab = 'canvas';
-			fitCanvasZoom();
+			canvasViewport.fit();
 		} catch (e) {
 			if (!replayStopRequested && !abortController.signal.aborted) {
 				reloadError = e instanceof Error ? e.message : String(e);
@@ -2972,7 +2965,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		tokensOutStage2 = null;
 		displayedHistoryItem = null;
 		history.clearSelection();
-		resetZoom();
+		canvasViewport.fit();
 	}
 
 	function toggleHistorySelection(id: string) {
@@ -3484,7 +3477,7 @@ $effect(() => {
 		error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
 		if (preserveLineageTab && it.lineage_node_id) void lineageState.load(it.lineage_node_id, true);
-		fitCanvasZoom();
+		canvasViewport.fit();
 		// The listing carries thumbnails, not drawings, so the work being put on
 		// the canvas fetches its own. One request for the one work being looked
 		// at, rather than a page of them for the one that gets opened.
@@ -3497,7 +3490,7 @@ $effect(() => {
 		const svg = await ensureIterationSvg(it);
 		if (!svg || displayedHistoryItem?.id !== target || !result) return;
 		result = { ...result, svg };
-		fitCanvasZoom();
+		canvasViewport.fit();
 	}
 
 	function openNearbyHistory(id: string): void {
@@ -3790,7 +3783,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			displayedHistoryItem = null;
 			history.clearSelection();
 			outputTab = 'canvas';
-			fitCanvasZoom();
+			canvasViewport.fit();
 		} catch (e) {
 			reloadError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -3838,7 +3831,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			} else {
 				history.clearSelection();
 			}
-			fitCanvasZoom();
+			canvasViewport.fit();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -3887,7 +3880,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			} else {
 				history.clearSelection();
 			}
-			fitCanvasZoom();
+			canvasViewport.fit();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -4301,7 +4294,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		result = candidate.result;
 		displayedHistoryItem = null;
 		outputTab = "canvas";
-		fitCanvasZoom();
+		canvasViewport.fit();
 	}
 
 	async function saveSelectedVariationCandidates() {
@@ -4420,7 +4413,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		ddlGeneratedBaseline = batchLatestDdl;
 		thinking = batchLatestThinking;
 		outputTab = 'canvas';
-		fitCanvasZoom();
+		canvasViewport.fit();
 	}
 
 	function resumeBatchLatestFollow(): void {
@@ -4695,78 +4688,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		);
 	}
 
-	function setZoom(nextZoom: number) {
-		zoom = Math.max(0.25, Math.min(10, +nextZoom.toFixed(2)));
-		if (zoom <= 1) {
-			panX = 0;
-			panY = 0;
-		}
-	}
-
-	function resetZoom() {
-		fitCanvasZoom();
-	}
-
-	function fitCanvasZoom() {
-		zoom = 1;
-		panX = 0;
-		panY = 0;
-		canvasDragging = false;
-	}
-
-	function updateCanvasFitZoom(nextZoom: number) {
-		canvasFitZoom = Math.max(0.25, Math.min(10, +nextZoom.toFixed(2)));
-	}
-
-	function startCanvasDrag(event: PointerEvent) {
-		if (outputTab !== 'canvas' || zoom <= 1 || event.button !== 0) return;
-		canvasDragging = true;
-		dragStartX = event.clientX;
-		dragStartY = event.clientY;
-		dragStartPanX = panX;
-		dragStartPanY = panY;
-		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-		event.preventDefault();
-	}
-
-	function moveCanvasDrag(event: PointerEvent) {
-		if (!canvasDragging) return;
-		panX = dragStartPanX + event.clientX - dragStartX;
-		panY = dragStartPanY + event.clientY - dragStartY;
-	}
-
-	function endCanvasDrag(event: PointerEvent) {
-		if (!canvasDragging) return;
-		canvasDragging = false;
-		const target = event.currentTarget as HTMLElement;
-		if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
-	}
-
 	function handleCanvasKeydown(event: KeyboardEvent) {
-		if (outputTab !== 'canvas') return;
-		if (event.key === '+' || event.key === '=' || event.code === 'Equal' || event.code === 'NumpadAdd') {
-			setZoom(zoom + 0.25);
-			event.preventDefault();
-			return;
-		}
-		if (event.key === '-' || event.key === '_' || event.code === 'Minus' || event.code === 'NumpadSubtract') {
-			setZoom(zoom - 0.25);
-			event.preventDefault();
-			return;
-		}
-		if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
-			resetZoom();
-			event.preventDefault();
-			return;
-		}
-		if (zoom <= 1) return;
-		const step = event.shiftKey ? 120 : 40;
-		if (event.key === 'ArrowLeft') panX += step;
-		else if (event.key === 'ArrowRight') panX -= step;
-		else if (event.key === 'ArrowUp') panY += step;
-		else if (event.key === 'ArrowDown') panY -= step;
-		else return;
-		event.preventDefault();
+		canvasViewport.handleKeydown(event, outputTab === 'canvas');
 	}
 
 	const historyNavSpan = $derived(history.windowSize);
@@ -5189,12 +5112,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{navPos}
 				canvasAspectWidth={displayCanvasAspect.ratioW}
 				canvasAspectHeight={displayCanvasAspect.ratioH}
-				{zoom}
-				actualZoom={canvasFitZoom * zoom}
-				canPan={zoom > 1}
-				{panX}
-				{panY}
-				{canvasDragging}
+				viewport={canvasViewport}
 				{promptsData}
 				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
 				instructionText={currentInstructionText}
@@ -5219,12 +5137,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
 				onGotoLatest={gotoLatest}
-				onPointerDown={startCanvasDrag}
-				onPointerMove={moveCanvasDrag}
-				onPointerUp={endCanvasDrag}
-				onSetZoom={setZoom}
-				onResetZoom={resetZoom}
-				onFitZoomChange={updateCanvasFitZoom}
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}

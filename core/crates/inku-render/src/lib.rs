@@ -16,6 +16,7 @@ pub mod ground;
 mod ground_patterns;
 pub mod group;
 pub mod layers;
+mod mark_paths;
 pub mod marks;
 pub mod materials;
 pub mod palette;

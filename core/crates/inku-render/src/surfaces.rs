@@ -6,9 +6,8 @@ use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash_to_unit, hash01};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
-use crate::marks::{
-    MarkContext, contour_stroke_path, grid_step, mark_width, rotate, uses_hand_stroke,
-};
+use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
+use crate::marks::{MarkContext, mark_width};
 use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};

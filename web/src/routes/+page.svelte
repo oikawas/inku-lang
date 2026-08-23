@@ -27,6 +27,10 @@
 		type VariationAmplitude,
 		type VariationCandidate
 	} from '$lib/features/canvas/refinement-session.svelte';
+	import {
+		projectRefinementCandidate,
+		saveRefinementCandidates
+	} from '$lib/features/canvas/refinement-actions';
 	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -4215,13 +4219,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function showVariationCandidate(candidate: VariationCandidate) {
+		const projection = projectRefinementCandidate(candidate);
 		resetTargetScopedState({ preserveVariationCandidates: true });
 		history.clearSelection();
-		ddl = candidate.result.source_ddl ?? candidate.result.ddl;
-		expandedDdl = candidate.result.ddl;
+		ddl = projection.ddl;
+		expandedDdl = projection.expandedDdl;
 		ddlGeneratedBaseline = ddl;
-		thinking = candidate.result.thinking;
-		result = candidate.result;
+		thinking = projection.thinking;
+		result = projection.result;
 		displayedHistoryItem = null;
 		outputTab = "canvas";
 		canvasViewport.fit();
@@ -4236,29 +4241,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		}
 		refinementSession.beginSave();
 		try {
-			for (const candidate of selected) {
-				const saved = await pushHistory({
-					...candidate.result,
-					input: input.trim(),
-					ddl: candidate.result.ddl,
-					score: candidate.result.score,
-					svg: candidate.result.svg,
-					at: Date.now(),
-					elapsed_ms: candidate.result.elapsed_total_ms ?? 0,
-					stage1_model: candidate.result.stage1_model ?? null,
-					stage2_model: candidate.result.stage2_model ?? null,
-					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
-					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.effectiveId,
-				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
-				if (contextVersion !== targetContextVersion) return;
-				refinementSession.markSaved(candidate.id);
-				if (saved?.id && result === candidate.result) {
-					result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
+			await saveRefinementCandidates({
+				candidates: selected,
+				sourceText: () => input.trim(),
+				fallbackCatalogId: () => colorCatalogSettings.effectiveId
+			}, {
+				saveHistory: pushHistory,
+				isCurrentContext: () => contextVersion === targetContextVersion,
+				markSaved: (id) => refinementSession.markSaved(id),
+				isCurrentResult: (candidateResult) => result === candidateResult,
+				adoptSavedIdentity: (candidateResult, saved) => {
+					result = { ...candidateResult, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short, description_hash: saved.description_hash, lineage_node_id: saved.lineage_node_id };
 					displayedHistoryItem = saved;
 					void history.syncToItem(saved);
 				}
-			}
+			});
 		} finally {
 			if (contextVersion === targetContextVersion) refinementSession.finishSave();
 		}

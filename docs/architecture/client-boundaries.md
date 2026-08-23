@@ -40,6 +40,7 @@ flowchart LR
     HISTORY_WORK["features/history/{save,replay,current-work,lineage-actions}.ts\nsave, replay, current-work, and lineage-action coordination"]
     CANVAS_VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom, fit, pan, and pointer/keyboard interactions"]
     REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nroute-instance busy, cancellation, fan-out progress, and candidate selection"]
+    REFINE_ACTIONS["features/canvas/refinement-actions.ts\nstateless candidate persistence and Canvas projection"]
     HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query, cache, and measured page size"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instance Settings shell + Server / model-provider / user-group administration"]
     SETTINGS_MODAL["SettingsModal.svelte\nSettings shell view"]
@@ -75,6 +76,8 @@ flowchart LR
     COMPONENTS -->|"typed CanvasViewport"| CANVAS_VIEWPORT
     PAGE -->|"candidate generation, save, and Canvas application"| REFINE_SESSION
     COMPONENTS -->|"typed RefinementSession"| REFINE_SESSION
+    PAGE -->|"typed input + named capabilities"| REFINE_ACTIONS
+    REFINE_ACTIONS -->|"existing save operation"| HISTORY_WORK
     PAGE -->|"create factory + wire external dependencies"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -118,6 +121,7 @@ flowchart LR
 | Stateless history work operations | Save-oriented history payload, saved-work replay, history-to-current-work projection, and saved-child/promote/note coordination | `save.ts`, `replay.ts`, `current-work.ts`, and `lineage-actions.ts` receive only typed inputs and named capabilities; route UI, AbortControllers, and Canvas application stay with the page |
 | Route-instance Canvas viewport owner | Zoom, measured fit zoom, pan, pointer capture, and keyboard zoom/pan | One `CanvasViewportState` per route; `CanvasPanel` receives the typed owner, while the page wires only global-shortcut eligibility and `fit()` requests when work changes |
 | Route-instance refinement session owner | Single/grid/save busy state, elapsed/tokens, fan-out slots, AbortController, and candidate selection | One `RefinementSessionState` per route; only the active controller commits progress/errors/finish, and `CanvasPanel` sends cancel/toggle to the typed owner. Candidate requests, saves, and Canvas application stay with the page |
+| Stateless refinement candidate actions | Candidate-to-current-Canvas projection, sequential history saves for a selected snapshot, and stale/identity coordination | `refinement-actions.ts` receives typed candidates plus named save/context capabilities. It owns no route, session, history, or Canvas state; the page retains final assignment and view coordination |
 | Route-instance feature owner | Settings dialog visibility, tab and detail level; Server and model-provider administration; user/group lists, status, and operations | One `createSettingsController` per route; focused views receive only their required `userAdministration`, `database`/`db_backup`, `render_limits`, or `output_save`/`render_concurrency` slices and named operations |
 | Focused component memory | Unsaved API keys, account forms and passwords, and user/group selection | Kept only by the component that renders the input: account drafts in `UserAdministrationSettings.svelte`, API-key drafts in `SettingsModal.svelte` |
 | localStorage | UI language, Settings detail level, Wild, batch retry, result log, export and orientation settings | Browser-local |
@@ -139,6 +143,8 @@ Stage 5D assigns four stateless modules the save-oriented `POST /api/history` pa
 Stage 6A makes one route-instance `CanvasViewportState` own zoom, fit zoom, pan, drag origins, pointer capture, and keyboard mapping. `CanvasPanel` receives the typed owner instead of individual state and callback props, and passes ResizeObserver measurements plus wheel and pointer events to named operations. The page retains the global shortcut gate that excludes inputs and modals, plus composition calls that return the viewport to fit when the work or result changes. Refinement, variations, the current result, and Canvas markup do not move in this Stage.
 
 Stage 6B makes one route-instance `RefinementSessionState` own single/grid/save busy state, elapsed and token totals, fan-out waiting/running/done progress, cancellation identity, status, and candidate selection. A target reset aborts and invalidates the active controller, so late callbacks cannot write into a replacement session. `CanvasPanel` receives the typed owner instead of individual session props. Candidate endpoints and planning, history saves, Canvas application, fallback confirmation, target-context versioning, and single-redraw result mapping stay with the page.
+
+Stage 6C makes stateless `refinement-actions.ts` own candidate-to-current-Canvas field projection plus the payload and order for sequentially saving a selected snapshot. A page-owned context predicate stops stale work immediately after each save, and only the exact result still displayed receives the saved identity. The page retains the session lock and status, target version, history operation, current-state assignment, history sync, output tab, and viewport. Candidate-generation transport, planning, fan-out, and single-redraw result mapping stay with the page.
 
 The Settings shell, Server administration, model-provider administration, and user/group administration state machines are owned by the route-instance `features/settings/state.svelte.ts`. The page wires the signed-in actor, session/user-settings refresh, external per-tab loaders, drawing-time model-catalog loader, and render-concurrency setter into the factory. Login/logout, the canonical current actor, and drawing-time model selection stay on the page. `SettingsModal.svelte` receives one `SettingsController` as the Settings shell. The user/group tab passes only the narrow `userAdministration` submodel and required session props to `UserAdministrationSettings.svelte`; account-form/password drafts stay in that input view, while API-key drafts stay in the modal. The database/backup tab passes only `database`/`db_backup` to `DatabaseAdministrationSettings.svelte`, the render-limits tab only `render_limits` to `RenderLimitsSettings.svelte`, and the server-runtime tab only `output_save`/`render_concurrency` to `ServerRuntimeSettings.svelte`, each with required named operations. Status and operation ownership stays in the route-instance feature owner. The owner never copies a secret from an operation argument into state, confirmation, or error output.
 

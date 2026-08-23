@@ -14,6 +14,9 @@ class RoutingModelProvider(
 
     override suspend fun generate(request: ModelRequest): ModelResponse {
         val provider = resolveProvider(request.modelId)
+        if (!canGenerateWith(provider)) {
+            inkuError { it.errorProviderNotFoundForModel(request.modelId) }
+        }
         if (provider.providerId == "local-litert-lm") {
             return localProvider.generate(request)
         }
@@ -30,13 +33,8 @@ class RoutingModelProvider(
     }
 
     private suspend fun resolveProvider(modelId: String): ProviderSettingEntity {
-        val providers = database.providerSettingDao().listAll().filter { it.isEnabled }
-        providers.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it }
-        providers.firstOrNull { it.providerId == "local-litert-lm" && modelId.startsWith("local-litert-lm:") }?.let { return it }
-        providers.firstOrNull { provider ->
-            parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
-        }?.let { return it }
-        inkuError { it.errorProviderNotFoundForModel(modelId) }
+        return resolveProviderForRouting(database.providerSettingDao().listAll(), modelId)
+            ?: inkuError { it.errorProviderNotFoundForModel(modelId) }
     }
 
     private fun remoteProvider(provider: ProviderSettingEntity): OpenAiCompatibleProvider {
@@ -48,8 +46,21 @@ class RoutingModelProvider(
         return OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
     }
 
-    private fun parsePublishedModelIds(value: String): List<String> {
-        return runCatching {
+    internal companion object {
+        internal fun resolveProviderForRouting(
+            providers: List<ProviderSettingEntity>,
+            modelId: String,
+        ): ProviderSettingEntity? {
+            providers.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it }
+            val owners = providers.filter { provider ->
+                provider.isEnabled && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
+            }
+            return owners.singleOrNull() ?: providers.firstOrNull { it.isDefaultLocal }
+        }
+
+        internal fun canGenerateWith(provider: ProviderSettingEntity): Boolean = provider.isEnabled
+
+        private fun parsePublishedModelIds(value: String): List<String> = runCatching {
             val array = JSONArray(value)
             (0 until array.length()).mapNotNull { array.optString(it).takeIf { id -> id.isNotBlank() } }
         }.getOrElse {

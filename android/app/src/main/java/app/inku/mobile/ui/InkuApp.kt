@@ -1465,6 +1465,7 @@ private fun CanvasHeroCard(
     }
     var canvasMessage by remember { mutableStateOf<String?>(null) }
     var exportSheetOpen by remember { mutableStateOf(false) }
+    var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
     var instructionCaptionVisible by remember {
         mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
@@ -1728,6 +1729,7 @@ private fun CanvasHeroCard(
                         )
                     }
                     Spacer(Modifier.weight(1f))
+                    MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
                     MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
                 }
             }
@@ -1766,6 +1768,9 @@ private fun CanvasHeroCard(
                 }
             },
         )
+    }
+    if (!presentation && showControls && generationInfoOpen) item?.let {
+        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
     }
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
@@ -4475,6 +4480,7 @@ private fun selectedStage2ModelLabel(state: InkuUiState): String {
 @Composable
 private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val item = state.selectedHistory
+    var generationInfoOpen by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.radiusCard)),
         color = CanvasPanelSurface,
@@ -4495,6 +4501,14 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     )
                 }
                 Spacer(Modifier.weight(1f))
+                item?.let {
+                    Text(
+                        S.generationInfoTitle,
+                        modifier = Modifier.clickable { generationInfoOpen = true },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 item?.let { Text("F${it.renderHashShort}  ${it.canvasAspect}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary) }
             }
             Box(
@@ -4530,6 +4544,209 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
             }
         }
     }
+    if (generationInfoOpen) item?.let {
+        GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
+    }
+}
+
+internal enum class GenerationInfoSectionId {
+    Sketch,
+    Interpretation,
+    Performance,
+    Identity,
+    Run,
+}
+
+internal enum class GenerationInfoField {
+    SketchGrain,
+    SketchState,
+    Stage1Model,
+    Stage2Model,
+    LanguageRequested,
+    LanguageResolved,
+    InterpretationSeed,
+    VariationAmplitude,
+    VariationSeed,
+    CompositionSeed,
+    RenderSeed,
+    SeedText,
+    RenderWild,
+    ColorCatalog,
+    CanvasAspect,
+    CanvasRatio,
+    RenderHash,
+    RenderEngineId,
+    RenderEngineVersion,
+    Created,
+    Elapsed,
+}
+
+internal data class GenerationInfoRow(val field: GenerationInfoField, val value: String)
+
+internal data class GenerationInfoSection(
+    val id: GenerationInfoSectionId,
+    val rows: List<GenerationInfoRow>,
+)
+
+internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInfoSection> {
+    val metadata = runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }
+    fun value(value: Any?): String = value?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: "—"
+    fun metadataValue(key: String): String = if (metadata.has(key) && !metadata.isNull(key)) {
+        value(metadata.opt(key))
+    } else {
+        "—"
+    }
+    fun columnOrMetadata(column: String?, key: String): String =
+        column?.trim()?.takeIf { it.isNotEmpty() } ?: metadataValue(key)
+
+    val renderWild = item.renderWild?.toString() ?: run {
+        if (metadata.has("render_wild") && !metadata.isNull("render_wild")) {
+            when (val recorded = metadata.opt("render_wild")) {
+                is Boolean -> recorded.toString()
+                is String -> recorded.lowercase().takeIf { it == "true" || it == "false" } ?: "—"
+                else -> "—"
+            }
+        } else {
+            "—"
+        }
+    }
+    val created = if (item.createdAt > 0L) {
+        runCatching { java.time.Instant.ofEpochMilli(item.createdAt).toString() }.getOrDefault("—")
+    } else {
+        "—"
+    }
+
+    return listOf(
+        GenerationInfoSection(
+            GenerationInfoSectionId.Sketch,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.SketchGrain, value(item.sketchGrain)),
+                GenerationInfoRow(GenerationInfoField.SketchState, value(item.sketchState)),
+            ),
+        ),
+        GenerationInfoSection(
+            GenerationInfoSectionId.Interpretation,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.Stage1Model, value(item.stage1Model)),
+                GenerationInfoRow(GenerationInfoField.LanguageRequested, value(item.instructionLangRequested)),
+                GenerationInfoRow(GenerationInfoField.LanguageResolved, value(item.instructionLangResolved)),
+                GenerationInfoRow(GenerationInfoField.InterpretationSeed, value(item.interpretationSeed)),
+            ),
+        ),
+        GenerationInfoSection(
+            GenerationInfoSectionId.Performance,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.Stage2Model, value(item.stage2Model)),
+                GenerationInfoRow(GenerationInfoField.VariationAmplitude, value(item.variationAmplitude)),
+                GenerationInfoRow(GenerationInfoField.VariationSeed, value(item.variationSeed)),
+                GenerationInfoRow(GenerationInfoField.CompositionSeed, value(item.compositionSeed)),
+                GenerationInfoRow(GenerationInfoField.RenderSeed, columnOrMetadata(item.renderSeed, "render_seed")),
+                GenerationInfoRow(GenerationInfoField.SeedText, value(item.seedText)),
+                GenerationInfoRow(GenerationInfoField.RenderWild, renderWild),
+                GenerationInfoRow(GenerationInfoField.ColorCatalog, columnOrMetadata(item.colorCatalogId, "render_color_catalog_id")),
+                GenerationInfoRow(GenerationInfoField.CanvasAspect, columnOrMetadata(item.canvasAspect, "render_canvas_aspect")),
+                GenerationInfoRow(GenerationInfoField.CanvasRatio, metadataValue("render_canvas_aspect_ratio")),
+            ),
+        ),
+        GenerationInfoSection(
+            GenerationInfoSectionId.Identity,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.RenderHash, value(item.renderHash)),
+                GenerationInfoRow(GenerationInfoField.RenderEngineId, metadataValue("render_engine_id")),
+                GenerationInfoRow(GenerationInfoField.RenderEngineVersion, metadataValue("render_engine_version")),
+            ),
+        ),
+        GenerationInfoSection(
+            GenerationInfoSectionId.Run,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.Created, created),
+                GenerationInfoRow(GenerationInfoField.Elapsed, item.elapsedMs?.let { "$it ms" } ?: "—"),
+            ),
+        ),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Dimens.spaceL)
+                .padding(bottom = Dimens.spaceL),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        ) {
+            Text(S.generationInfoTitle, style = MaterialTheme.typography.titleMedium)
+            generationInfoSections(item).forEach { section ->
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    CompactLabel(generationInfoSectionLabel(section.id))
+                    section.rows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                        ) {
+                            Text(
+                                generationInfoFieldLabel(row.field),
+                                modifier = Modifier.weight(0.42f),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                generationInfoDisplayValue(row),
+                                modifier = Modifier.weight(0.58f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun generationInfoSectionLabel(section: GenerationInfoSectionId): String = when (section) {
+    GenerationInfoSectionId.Sketch -> S.generationInfoSketchSection
+    GenerationInfoSectionId.Interpretation -> S.generationInfoInterpretationSection
+    GenerationInfoSectionId.Performance -> S.generationInfoPerformanceSection
+    GenerationInfoSectionId.Identity -> S.generationInfoIdentitySection
+    GenerationInfoSectionId.Run -> S.generationInfoRunSection
+}
+
+@Composable
+private fun generationInfoFieldLabel(field: GenerationInfoField): String = when (field) {
+    GenerationInfoField.SketchGrain -> S.generationInfoSketchGrain
+    GenerationInfoField.SketchState -> S.generationInfoSketchState
+    GenerationInfoField.Stage1Model -> S.generationInfoStage1Model
+    GenerationInfoField.Stage2Model -> S.generationInfoStage2Model
+    GenerationInfoField.LanguageRequested -> S.generationInfoLanguageRequested
+    GenerationInfoField.LanguageResolved -> S.generationInfoLanguageResolved
+    GenerationInfoField.InterpretationSeed -> S.generationInfoInterpretationSeed
+    GenerationInfoField.VariationAmplitude -> S.generationInfoVariationAmplitude
+    GenerationInfoField.VariationSeed -> S.generationInfoVariationSeed
+    GenerationInfoField.CompositionSeed -> S.generationInfoCompositionSeed
+    GenerationInfoField.RenderSeed -> S.generationInfoRenderSeed
+    GenerationInfoField.SeedText -> S.generationInfoSeedText
+    GenerationInfoField.RenderWild -> S.generationInfoRenderWild
+    GenerationInfoField.ColorCatalog -> S.generationInfoColorCatalog
+    GenerationInfoField.CanvasAspect -> S.generationInfoCanvasAspect
+    GenerationInfoField.CanvasRatio -> S.generationInfoCanvasRatio
+    GenerationInfoField.RenderHash -> S.generationInfoRenderHash
+    GenerationInfoField.RenderEngineId -> S.generationInfoRenderEngineId
+    GenerationInfoField.RenderEngineVersion -> S.generationInfoRenderEngineVersion
+    GenerationInfoField.Created -> S.generationInfoCreated
+    GenerationInfoField.Elapsed -> S.generationInfoElapsed
+}
+
+@Composable
+private fun generationInfoDisplayValue(row: GenerationInfoRow): String = when {
+    row.field == GenerationInfoField.RenderWild && row.value == "true" -> S.generationInfoOn
+    row.field == GenerationInfoField.RenderWild && row.value == "false" -> S.generationInfoOff
+    row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> S.variationAmplitudeLabel(row.value)
+    else -> row.value
 }
 
 @Composable

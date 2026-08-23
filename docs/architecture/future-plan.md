@@ -6,7 +6,7 @@ The plan is a living document. As an item ships, its row moves from "ahead" to "
 
 ## Principles shared by every item
 
-1. **Not one byte of the drawing changes.** Most of the plan is observation, display, and documents; nothing touches the Renderer, the Score schema, or coerce's verdicts. The one exception (moving request delivery upstream) passes through its own ruling.
+1. **Not one byte of the drawing changes.** Most of the plan is observation, display, and documents. The portability preparation changes only ownership boundaries inside the Renderer, not the Score, seeds, or SVG. The only candidate behavior change (moving request delivery upstream) passes through its own ruling.
 2. **The rh3 materials are untouched.** No item moves a material of the edition identity (see the injection table in `ddl-processing-pipeline.md`).
 3. **A mirror is never a gate.** New records are observation only and change no branch, no count, no Score, and no canonical history.
 4. **No backfill writes new values.** What was never recorded is shown as unrecorded. "Unrecorded" and "not applicable" are never confused.
@@ -21,17 +21,20 @@ flowchart TD
         MARK["Fallback mark and the refine confirmation\ncompose_fallback column (ledger I-292)"]
         RITUAL["Thirty-piece ritual → folded into the existing bench\nlayer-attribution tags added to its procedure"]
         DOCS["Refinement re-entry diagram and injection table\nreflected into the pipeline document"]
+        PORT_BOUNDARY["Drawing portability boundary 1\nPython pure geometry separated from SVG emission"]
     end
     subgraph NEXT["Ahead"]
         MIRROR["The coerce mirror\n(investigation first)"]
         P41["Request-delivery repair investigation\n(with control generations)"]
         GOV["Score schema version governance\n(today: ungoverned, frozen in practice)"]
+        RUST_CORE["Shared Rust drawing core\n(designed and ruled under a separate contract)"]
     end
     HELD["Held: moving request delivery upstream\n(implementation only after the investigation is ruled)"]
 
     MARK -.->|"measured numbers set the premise"| MIRROR
     P41 -->|"three options compared → ruling"| HELD
     RITUAL -.->|"measured layer attribution"| P41
+    PORT_BOUNDARY -.->|"boundary informs a separate design"| RUST_CORE
 ```
 
 ## Done
@@ -40,6 +43,13 @@ flowchart TD
 - **The fallback mark** — Stage 2's deterministic fallback appeared only in one response and vanished the moment the work was saved. The `compose_fallback` column (a reason / `none` / unrecorded) now exists; a work whose words were not what composed it carries a mark, and continuing a refinement from one asks once for confirmation (ledger I-292). Nothing is backfilled — the mark exists only from the column onward.
 - **No second ledger for the ritual** — the proposal to "draw thirty fixed pieces under fixed conditions and note signability with a layer attribution" turned out to be **the same thing as the existing thirty-piece benchmark**, whose procedure carries three rounds' worth of judgment rules learned from failures; rebuilding it would lose them. Nothing new was built: the layer-attribution tags (`sketch / interpret / expand / score / coerce / render`) were added to the existing evaluation procedure.
 - **The document complement** — the refinement re-entry diagram and the injection-point × rh3 table went into `ddl-processing-pipeline.md`, and the full decision-level road into `description-to-svg.md` (this document set, both languages at once).
+- **Drawing portability boundary 1** — `renderer.py` was contracted to the SVG-only compatibility entrypoint, while `default/mark_kernel.py` now owns deterministic geometry that returns only scalars and point collections. `marks.py` consumes the kernel in one direction and constructs SVG. Engine 40 bytes, the Score, seeds, and the API did not change.
+
+## Considered under a separate contract — shared Rust drawing core
+
+The author's direction is to make the drawing core shareable in Rust for Android portability and a future iOS port. The current work stops at a Python portability boundary: no Rust crate, Scene IR or DTO, FFI, JNI, UniFFI, Swift binding, or Android/iOS integration exists yet.
+
+The next contract must rule together which value boundary moves out of `mark_kernel.py`, how Score input and drawing output are represented, Python/Rust differential tests, bindings per platform, failure fallback, performance, and binary size. The existing 610-case corpus remains the identity evidence, and server semantics are not bent around port convenience.
 
 ## Ahead 1 — the coerce mirror (investigation first)
 

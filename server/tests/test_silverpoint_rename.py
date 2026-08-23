@@ -17,7 +17,10 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from inku_server.renderer import WEIGHT_STYLE, WEIGHT_TO_STROKE_WIDTH
+from inku_server.render_engines.default.marks import (
+    WEIGHT_STYLE,
+    WEIGHT_TO_STROKE_WIDTH,
+)
 from inku_server.schema import Score, Weight
 from inku_server.stroke_engine import GRAMMARS
 

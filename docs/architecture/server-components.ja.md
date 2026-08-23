@@ -65,7 +65,9 @@ flowchart LR
     DEFAULT_INIT["render_engines/default/__init__.py"]
     ADAPTER["default/adapter.py\nDefaultRenderEngine"]
     ENGINE["default/engine.py\ncanonical render_result()"]
-    DOMAINS["default domain modules\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `marks.py` / `dispatch.py`"]
+    DOMAINS["default orchestration domains\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `dispatch.py`"]
+    MARKS["default/marks.py\nSVG mark emission"]
+    KERNEL["default/mark_kernel.py\npure deterministic geometry"]
     RENDERER["renderer.py\nSVG-only互換facade"]
     STROKE["stroke_engine.py\n共有stroke処理"]
     DB["db.py"]
@@ -85,14 +87,19 @@ flowchart LR
     DEFAULT_INIT --> ADAPTER
     ADAPTER --> ENGINE
     ENGINE --> DOMAINS
-    DOMAINS --> STROKE
+    DOMAINS --> MARKS
+    DOMAINS --> KERNEL
+    MARKS --> KERNEL
+    MARKS --> STROKE
+    KERNEL --> STROKE
     RENDERER -->|"render() → render_result().svg"| ENGINE
-    RENDERING -.->|"互換: SVG_PROFILES / new_render_seed"| RENDERER
     RENDERING --> DB
     RENDERING -->|"PNG rasterize"| ANALYSIS
 ```
 
-正規経路は `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()` である。`renderer.py` はSVGだけを返す既存呼出し向けの互換facadeであり、`renderer.render()` はcanonical resultの `.svg` へ委譲する。`api_core/rendering.py` には `SVG_PROFILES` / `new_render_seed` の互換参照が残るが、`render_engines/default/` から `renderer.py` への逆importは0件である。
+正規経路は `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()` である。`renderer.py` はSVGだけを返す既存呼出し向けの互換facadeであり、`renderer.render()` はcanonical resultの `.svg` へ委譲する。repository-owned executable codeがfacadeから使う名前は `render` だけで、`api_core/rendering.py` はprofileとseedを正規所有moduleから直接読む。
+
+`mark_kernel.py` はscalarと点列だけを返す決定的な幾何計算を所有し、SVG objectを作らない。`marks.py` はそのkernelを消費してSVGの属性とelementを組み立てる。この依存方向は将来の共有Rust coreを検討できる境界だが、現時点の実装はPythonだけである。
 
 ## Router分類
 

@@ -29,7 +29,7 @@ from typing import Any, get_args
 
 import pytest
 
-from inku_server import renderer, stroke_engine
+from inku_server import stroke_engine
 from inku_server.coerce import coerce_score
 from inku_server.renderer import render
 from inku_server.schema import CLOSED_SHAPES, MARK_SURFACE_WORDS, GroundMaterial, Score
@@ -42,6 +42,7 @@ from inku_server.stroke_engine import (
     support_for_ground,
     support_with_mark_word,
 )
+from inku_server.render_engines.default import marks as mark_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
@@ -322,8 +323,8 @@ def test_t7_a_closed_shape_is_not_worked_by_its_own_surface_word() -> None:
 
     for material in SHEETS:
         sheet = support_for_ground(material)
-        assert renderer._instruction_support(circle.instructions[0], sheet) == sheet, material
-        raised = renderer._instruction_support(line.instructions[0], sheet)
+        assert mark_domain._instruction_support(circle.instructions[0], sheet) == sheet, material
+        raised = mark_domain._instruction_support(line.instructions[0], sheet)
         assert raised != sheet, material
         assert raised.tooth == min(SUPPORT_CAP, sheet.tooth * MARK_SUPPORT_GAIN), material
 
@@ -367,8 +368,11 @@ def test_t9_every_synthesis_call_is_handed_the_sheet() -> None:
     goes missing is a call site nobody edited. Counted from the source: a call
     that got the default would draw on plain paper and say nothing about it.
     """
-    source = (SERVER_ROOT / "src" / "inku_server" / "renderer.py").read_text(
-        encoding="utf-8"
+    package = (
+        SERVER_ROOT / "src" / "inku_server" / "render_engines" / "default"
+    )
+    source = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(package.glob("*.py"))
     )
     call = re.compile(r"\bsynthesize_(?:stroke|along)\(")
     sites = 0

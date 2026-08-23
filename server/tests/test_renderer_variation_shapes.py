@@ -10,13 +10,13 @@ from xml.etree import ElementTree
 
 import pytest
 
-from inku_server.renderer import (
+from inku_server.render_engines.default.mark_kernel import (
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
     _segment_count,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Score, Variation
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect

@@ -33,7 +33,7 @@ import pytest
 
 from inku_server.coerce import coerce_score
 from inku_server.coerce.compose import _marks_only_ddl, _requested_colors_from_ddl
-from inku_server.renderer import _apply_color_cycle
+from inku_server.render_engines.default.planning import _apply_color_cycle
 from inku_server.schema import Instruction, Score
 
 

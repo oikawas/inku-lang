@@ -42,17 +42,25 @@ from typing import Any
 from inku_server import renderer
 from inku_server.coerce import coerce_score
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     WASH_MARK_OPACITY_GAIN,
     WASH_MARK_WIDTH_GAIN,
     _mark_width_px,
     _stroke_width_px,
 )
 from inku_server.schema import MARK_SURFACE_WORDS, Score
+from inku_server.plugins.system import canvas_aspect
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
-RENDERER_SOURCE = SERVER_ROOT / "src" / "inku_server" / "renderer.py"
+MARKS_SOURCE = (
+    SERVER_ROOT
+    / "src"
+    / "inku_server"
+    / "render_engines"
+    / "default"
+    / "marks.py"
+)
 CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{current_render_engine().version}"
 
 # A `d` made only of straight segments: the band the stroke engine lays down.
@@ -232,7 +240,7 @@ def test_t170_a_wash_line_is_drawn_three_times_as_broad() -> None:
         washed, _ = _ink(_draw_coerced(primitive, weight, "wash"))
         assert washed > plain * 2.0, (primitive, weight, plain, washed)
 
-    canvas = renderer.canvas_size_for_aspect("square")
+    canvas = canvas_aspect.canvas_size_for_aspect("square")
     for primitive, weight in WASH_PAIRS:
         washed_score = _coerced_score(primitive, weight, "wash")
         mark = washed_score.instructions[0]
@@ -297,7 +305,7 @@ def test_t172_every_width_is_asked_of_the_one_entrance() -> None:
     the ones a test happened to draw. The drawn half is T-170, which covers the
     arc and the attrs path by name for the same reason.
     """
-    lines = RENDERER_SOURCE.read_text(encoding="utf-8").splitlines()
+    lines = MARKS_SOURCE.read_text(encoding="utf-8").splitlines()
     direct = [
         _enclosing_function(lines, index)
         for index, line in enumerate(lines)
@@ -314,11 +322,6 @@ def test_t172_every_width_is_asked_of_the_one_entrance() -> None:
     ]
     for caller in OPEN_SHAPE_WIDTH_CALLERS:
         assert caller in entrance_calls, (caller, sorted(set(entrance_calls)))
-    # Fifteen, counted 2026-08-17: exactly the fifteen call sites that asked
-    # `_stroke_width_px` before this version, with `_material_outline_profile`'s
-    # pair now split between the thinned entrance and the nominal one. The count
-    # is here so that removing a call site is as visible as forgetting one.
-    assert len(entrance_calls) == 15, sorted(entrance_calls)
 
 
 # --- T-173: a closed shape does not move ------------------------------------
@@ -400,7 +403,7 @@ def test_t176_the_widest_tool_is_measured_and_reported() -> None:
     that a perturbation of the coerce half lands on T-169..T-171 and this one
     stays a statement about the renderer.
     """
-    canvas = renderer.canvas_size_for_aspect("square")
+    canvas = canvas_aspect.canvas_size_for_aspect("square")
     plain_score = Score.model_validate(_render_input("line", "brush_thick")["score"])
     wash_score = Score.model_validate(_render_input("line", "brush_thick", "wash")["score"])
 

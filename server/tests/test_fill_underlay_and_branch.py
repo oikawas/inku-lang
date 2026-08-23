@@ -39,11 +39,10 @@ import statistics
 import pytest
 from PIL import Image
 
-import inku_server.renderer as renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.render_engines.default import marks
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     FILL_COVERAGE_BRANCH,
     FILL_COVERAGE_TARGET,
     FILL_MIN_SCANLINES,
@@ -56,10 +55,12 @@ from inku_server.renderer import (
     _fill_scan_spacing,
     _line_spans,
     _stroke_width_px,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS, synthesize_along
+from inku_server.render_engines.default import marks as mark_domain
+from inku_server.render_engines.default import mark_kernel as kernel_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 ENGINE_21_MANIFEST = SERVER_ROOT / "reference" / "render-engine-21" / "manifest.json"
@@ -96,8 +97,8 @@ def _svg(payload: dict, *, svg_profile: str | None = None) -> str:
 def _contour(payload: dict) -> list[tuple[float, float]]:
     """The polygon the renderer fills, built the way the renderer builds it."""
     r = payload["radius"] * CANVAS.unit
-    return renderer._circle_points(
-        500.0, 500.0, r, r, renderer._stroke_sample_count(2 * math.pi * r, CANVAS)
+    return kernel_domain._circle_points(
+        500.0, 500.0, r, r, kernel_domain._stroke_sample_count(2 * math.pi * r, CANVAS)
     )
 
 
@@ -132,7 +133,7 @@ def _raster_lines(payload: dict, monkeypatch) -> list[tuple[tuple, tuple, float]
     about a degree and makes "exactly one direction" unmeasurable.
     """
     captured: list[tuple[tuple, tuple, float]] = []
-    original = renderer._raster_band
+    original = mark_domain._raster_band
 
     def recording(start, end, width):
         captured.append((tuple(start), tuple(end), width))
@@ -539,7 +540,7 @@ def test_t17_the_texture_branch_lays_the_ink_one_classic_scan_pass_laid(monkeypa
         xs = [point[0] for point in contour]
         ys = [point[1] for point in contour]
         short_side = min(max(xs) - min(xs), max(ys) - min(ys))
-        area = renderer._polygon_area(contour)
+        area = mark_domain._polygon_area(contour)
         one_pass = area / (pitch * max(pitch, area / short_side))
         marks = int(
             re.search(r'class="fill-texture-v1 marks-(\d+)"', _svg(payload)).group(1)
@@ -675,7 +676,7 @@ def test_t20_every_texture_mark_takes_its_own_tone():
         assert (high - low) / statistics.fmean(marks) >= 0.05, (tool, low, high)
         # どの痕も下地より薄くはならず、記述が求めた墨より濃くもならない。
         assert min(marks) >= under * 0.98, (tool, min(marks), under)
-        ink = under / renderer.FILL_UNDERLAY_OPACITY_RATIO
+        ink = under / mark_domain.FILL_UNDERLAY_OPACITY_RATIO
         assert max(marks) <= ink + 1e-9, (tool, max(marks), ink)
 
 
@@ -872,7 +873,7 @@ def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
     for tool in TEXTURE_TOOLS:
         payload = dict(CIRCLE, weight=tool, filled=True)
         contour = _contour(payload)
-        layers = renderer._field_tone_patches(
+        layers = mark_domain._field_tone_patches(
             contour, _seed_for_instruction(
                 Instruction.model_validate(payload), SEED
             ), 2 * payload["radius"] * CANVAS.unit,
@@ -889,7 +890,7 @@ def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
         # 位置に入る」と約束しているので、その約束のとおりに歩く。**中心の
         # 近さで寄せる案は使えない** — 別々の斑がたまたま 19px まで寄ることが
         # あり（silverpoint）、隣の斑と 1 つの族に潰れる。
-        rings = renderer.FILL_FIELD_TONE_RINGS
+        rings = mark_domain.FILL_FIELD_TONE_RINGS
         families = [
             [layers[base + r][p] for r in range(rings)]
             for base in range(0, len(layers), rings)
@@ -936,10 +937,10 @@ def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
     # 実装を緑で通す（実測: 加算では seed 7 で最初の交差が出る）。
     contour = _contour(TEXTURE_CASE)
     short_side = 2 * TEXTURE_CASE["radius"] * CANVAS.unit
-    rings = renderer.FILL_FIELD_TONE_RINGS
+    rings = mark_domain.FILL_FIELD_TONE_RINGS
     crossings = 0
     for seed in range(40):
-        layers = renderer._field_tone_patches(contour, seed, short_side)
+        layers = mark_domain._field_tone_patches(contour, seed, short_side)
         for base in range(0, len(layers), rings):
             for p in range(len(layers[base])):
                 family = [layers[base + r][p] for r in range(rings)]

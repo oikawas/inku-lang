@@ -116,33 +116,41 @@ def test_t3_mark_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_renderer_facade_uses_canonical_mark_owners() -> None:
-    marks = importlib.import_module("inku_server.render_engines.default.marks")
-
-    for name in (
-        "WEIGHT_TO_STROKE_WIDTH",
-        "WEIGHT_STYLE",
-        "TEXTURE_FILTER_WEIGHTS",
-        "FILL_COVERAGE_BRANCH",
-        "_mark_width_px",
-        "_texture_filter_xml",
+def test_t1_marks_uses_the_pure_mark_kernel() -> None:
+    kernel = importlib.import_module("inku_server.render_engines.default.mark_kernel")
+    owned = (
+        "_ellipse_perimeter",
+        "_segment_count",
         "_line_with_variation",
-        "_stroke_attrs",
-        "_material_outline_profile",
-        "_render_fill_strokes",
-        "_render_fill_texture",
-        "_interior_fill",
-        "_render_hand_stroke",
-        "_render_contour_hand_stroke",
-        "_render_arc_hand_stroke",
-        "_render_corner_shape",
-    ):
-        assert getattr(renderer, name) is getattr(marks, name)
-
-    assert renderer.render.__module__ == "inku_server.renderer"
-    assert renderer._render_instruction.__module__ == (
-        "inku_server.render_engines.default.dispatch"
+        "_contact_fragments",
+        "_circle_points",
+        "_offset_performed_path",
     )
+    for name in owned:
+        assert getattr(kernel, name).__module__ == kernel.__name__
+
+    marks_path = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "inku_server"
+        / "render_engines"
+        / "default"
+        / "marks.py"
+    )
+    tree = ast.parse(marks_path.read_text(encoding="utf-8"))
+    consumed = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "mark_kernel"
+        for alias in node.names
+    }
+    assert {
+        "_ellipse_perimeter",
+        "_line_with_variation",
+        "_contact_fragments",
+        "_circle_points",
+        "_offset_performed_path",
+    } <= consumed
 
 
 def test_t1_marks_has_a_small_frozen_surface_projection() -> None:
@@ -157,7 +165,8 @@ def test_t1_marks_has_a_small_frozen_surface_projection() -> None:
 
 
 def test_t1_marks_does_not_import_orchestration_domains() -> None:
-    path = Path(renderer.__file__).parent / "render_engines" / "default" / "marks.py"
+    package = Path(__file__).resolve().parents[1] / "src" / "inku_server"
+    path = package / "render_engines" / "default" / "marks.py"
     tree = ast.parse(path.read_text())
     imported = {
         alias.name
@@ -169,5 +178,35 @@ def test_t1_marks_does_not_import_orchestration_domains() -> None:
     assert not {"renderer", "surfaces", "layers"} & imported
 
 
-def test_t1_renderer_is_smaller_after_mark_extraction() -> None:
-    assert len(Path(renderer.__file__).read_text().splitlines()) < 4554
+def test_t1_mark_kernel_has_no_svg_or_orchestration_dependencies() -> None:
+    package = Path(__file__).resolve().parents[1] / "src" / "inku_server"
+    path = package / "render_engines" / "default" / "mark_kernel.py"
+    tree = ast.parse(path.read_text())
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    imported.update(
+        node.module or ""
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+    )
+    forbidden = {
+        "svgwrite",
+        "renderer",
+        "engine",
+        "adapter",
+        "dispatch",
+        "document",
+        "layers",
+        "surfaces",
+        "api_core",
+        "db",
+        "fastapi",
+    }
+
+    assert not {
+        name for name in imported if any(part in forbidden for part in name.split("."))
+    }

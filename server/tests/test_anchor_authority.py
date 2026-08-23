@@ -22,16 +22,16 @@ import importlib.util
 import json
 import pathlib
 
-from inku_server.renderer import (
+from inku_server.render_engines.default.planning import (
     FRAME_HI,
-    _uses_material_outline,
     FRAME_LO,
     _anchor,
     _expand_arrangement,
     _expand_arrangement_layout,
     _quantise_instructions,
-    render,
 )
+from inku_server.render_engines.default.marks import _uses_material_outline
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]

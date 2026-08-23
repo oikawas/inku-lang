@@ -19,7 +19,7 @@ from inku_server.color_catalogs import (
     get_color_catalog,
     render_color_map_for_catalog,
 )
-from inku_server.renderer import (
+from inku_server.render_engines.default.palette import (
     _OKLCH_CHROMA_FLOOR,
     _oklch_from_hex,
     _resolve_color,

@@ -12,6 +12,7 @@ import inku_server.renderer as renderer
 from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.base import RenderEngineResult
 from inku_server.schema import Score
+from inku_server.render_engines.default import document
 
 
 PROFILE_DIGESTS = {
@@ -174,7 +175,7 @@ def test_t5_facade_and_adapter_have_no_orchestration_binding() -> None:
         "wild",
     ]
     assert renderer.render.__module__ == "inku_server.renderer"
-    assert renderer.build_texture_metadata.__module__ == (
+    assert document.build_texture_metadata.__module__ == (
         "inku_server.render_engines.default.document"
     )
     assert "engine.render_result" in inspect.getsource(renderer.render)
@@ -188,7 +189,13 @@ def test_t5_facade_and_adapter_have_no_orchestration_binding() -> None:
 
 
 def test_t6_default_engine_modules_do_not_import_renderer() -> None:
-    package = Path(renderer.__file__).with_name("render_engines") / "default"
+    package = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "inku_server"
+        / "render_engines"
+        / "default"
+    )
 
     for source in sorted(package.glob("*.py")):
         tree = ast.parse(source.read_text(encoding="utf-8"))

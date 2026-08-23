@@ -23,19 +23,20 @@ import statistics
 
 import pytest
 
-import inku_server.renderer as renderer
 import inku_server.stroke_engine as stroke_engine
 from inku_server.render_engines.default import determinism
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import (
-    _line_spans,
+from inku_server.render_engines.default.marks import _line_spans
+from inku_server.render_engines.default.surfaces import (
     _point_in_polygon,
     _surface_contour,
     _surface_line_angle,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.schema import Instruction, Score
+from inku_server.render_engines.default import document
+from inku_server.render_engines.default import surfaces
 
 CANVAS = canvas_size_for_aspect(None)
 ENGINE_15_MANIFEST = (
@@ -869,8 +870,8 @@ def test_s8_wash_sweeps_are_as_wide_as_the_pitch(name: str) -> None:
     sweeps actually drawn fall inside that band**. Without the second, an
     implementation that declares the constants and never reads them passes.
     """
-    lo = renderer.SURFACE_WASH_WIDTH_BASE
-    hi = lo + renderer.SURFACE_WASH_WIDTH_SPAN
+    lo = surfaces.SURFACE_WASH_WIDTH_BASE
+    hi = lo + surfaces.SURFACE_WASH_WIDTH_SPAN
     assert lo >= 0.88, lo
     assert hi <= 1.48, hi
 
@@ -901,7 +902,7 @@ def test_s8_wash_stays_within_half_of_one_sweep(name: str) -> None:
     measured = _wash_measured(name)
     limit = (
         max(measured["pitches"])
-        * (renderer.SURFACE_WASH_WIDTH_BASE + renderer.SURFACE_WASH_WIDTH_SPAN)
+        * (surfaces.SURFACE_WASH_WIDTH_BASE + surfaces.SURFACE_WASH_WIDTH_SPAN)
         / 2
     )
     assert measured["excursion"] <= limit, (measured["excursion"], limit)
@@ -933,7 +934,7 @@ def test_s8_wash_keeps_the_pitch_the_layers_and_the_angles(name: str) -> None:
     """
     measured = _wash_measured(name)
     before = WASH_BRANCH_POINT[name]
-    assert len(measured["layers"]) == renderer.SURFACE_WASH_LAYERS
+    assert len(measured["layers"]) == surfaces.SURFACE_WASH_LAYERS
     assert len(measured["layers"]) == len(before["pitch"])
     for spread in measured["angle_spread_deg"]:
         assert spread <= 0.02, measured["angle_spread_deg"]
@@ -969,7 +970,7 @@ def test_s8_wash_draws_the_same_sweeps_in_every_profile(name: str) -> None:
     """
     shape = WASH_SHAPES[name]
     faces = {}
-    for profile in sorted(renderer.SVG_PROFILES):
+    for profile in sorted(document.SVG_PROFILES):
         sweeps = _wash_sweeps(_render(shape, "wash", profile=profile))
         faces[profile] = (
             [

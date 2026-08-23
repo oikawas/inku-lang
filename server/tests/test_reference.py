@@ -19,12 +19,12 @@ from inku_server.geometry_thresholds import (
 )
 from inku_server.plugins import CANVAS_ASPECTS, plugin_status_items
 from inku_server.plugins.document_format import _CORE_MARKERS, _REGIONS
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     AMPLITUDE_WIDTHS,
     BLUR_RATIO,
-    SVG_PROFILES,
     WEIGHT_TO_STROKE_WIDTH,
 )
+from inku_server.render_engines.default.document import SVG_PROFILES
 
 
 def _ref() -> dict:

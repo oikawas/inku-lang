@@ -36,11 +36,14 @@ import re
 
 import pytest
 
-from inku_server import renderer
 from inku_server.render_engines.default import planning
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
+from inku_server.plugins.system import canvas_aspect
+from inku_server.render_engines.default import determinism
+from inku_server.render_engines.default import dispatch
+from inku_server.render_engines.default import marks as mark_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 REFERENCE_ROOT = SERVER_ROOT / "reference"
@@ -167,7 +170,7 @@ def _hints(score: dict) -> list[str | None]:
     instruction = Instruction.model_validate(score["instructions"][0])
     return [
         item.color_hint
-        for item in renderer._expand_arrangement_layout(instruction, RENDER_SEED)
+        for item in planning._expand_arrangement_layout(instruction, RENDER_SEED)
     ]
 
 
@@ -184,8 +187,8 @@ def test_the_fade_differs_by_position_inside_the_group():
     assert len(set(ceilings)) > 1
 
     instruction = Instruction.model_validate(score["instructions"][0])
-    members = renderer._expand_arrangement_layout(instruction, RENDER_SEED)
-    anchors = [renderer._anchor(member) for member in members]
+    members = planning._expand_arrangement_layout(instruction, RENDER_SEED)
+    anchors = [planning._anchor(member) for member in members]
     cx = sum(x for x, _ in anchors) / len(anchors)
     cy = sum(y for _, y in anchors) / len(anchors)
     distances = [math.hypot(x - cx, y - cy) for x, y in anchors]
@@ -395,7 +398,7 @@ def test_the_hand_does_not_feel_the_level(monkeypatch):
     number would move every performance seed in the group and the coordinates
     below would move with it. Measured against the current corpus's own bytes.
     """
-    assert "color_hint" not in renderer._SEED_INSTRUCTION_FIELDS
+    assert "color_hint" not in determinism._SEED_INSTRUCTION_FIELDS
 
     # engine 28 で据え直した。これは以前 engine 23 の凍結バイトを物差しにし、
     # 後から載った層 (engine 25 の成員ごとの寸法) を無効化して比べていた。
@@ -447,16 +450,17 @@ def test_the_fill_keeps_its_ratio_to_the_stroke(fade, ratio, layout):
     running away from its own fill."""
     score = _score(fade=fade, filled=True, count=12, **layout)
     instruction = Instruction.model_validate(score["instructions"][0])
-    members = renderer._expand_arrangement_layout(instruction, RENDER_SEED)
-    canvas = renderer.canvas_size_for_aspect("square")
+    members = planning._expand_arrangement_layout(instruction, RENDER_SEED)
+    canvas = canvas_aspect.canvas_size_for_aspect("square")
 
     seen = set()
     for member in members:
-        attrs = renderer._stroke_attrs(
+        attrs = mark_domain._stroke_attrs(
             member,
             {"black": "#111111"},
             canvas,
             work_assignment={},
+            surface_ops=dispatch._MARK_SURFACE_OPS,
         )
         assert attrs["fill"] != "none"
         assert attrs["fill_opacity"] / attrs["stroke_opacity"] == pytest.approx(

@@ -85,7 +85,7 @@ baked_here_only = pytest.mark.skipif(
 
 
 VERSION_DIRECTORY = re.compile(r"^(render-engine|ddl-engine)-(\d+)$")
-# The primitives `renderer._anchor` answers with a stored coordinate. The rest
+# The primitives `planning._anchor` answers with a stored coordinate. The rest
 # derive theirs by a sum, which carries no quantum. See F-2 (ledger I-165).
 QUANTISED_ANCHOR_PRIMITIVES = frozenset(
     {"circle", "ellipse", "arc", "polygon", "cloudform"}

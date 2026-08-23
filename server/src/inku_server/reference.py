@@ -55,24 +55,26 @@ from .plugins.document_format import (
     _SAIJIKI_MARKERS,
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
-from .renderer import (
+from .render_engines.default.marks import (
     AMPLITUDE_CLAMP_RATIO,
     AMPLITUDE_WIDTHS,
     BLUR_RATIO,
     CANVAS_PX,
-    FREQUENCY_CYCLES,
     REPRESENTATIVE_MIN_RATIO,
-    SEGMENT_COUNT_MAX,
     MIN_STROKE_WIDTH,
-    SEGMENT_COUNT_MIN,
-    SEGMENT_TARGET_RATIO,
     STYLE_TO_DASH,
-    SVG_PROFILES,
     TEXTURE_FILTER_WEIGHTS,
     THINNESS_TO_WIDTH_SCALE,
     WEIGHT_STYLE,
     WEIGHT_TO_STROKE_WIDTH,
 )
+from .render_engines.default.mark_kernel import (
+    FREQUENCY_CYCLES,
+    SEGMENT_COUNT_MAX,
+    SEGMENT_COUNT_MIN,
+    SEGMENT_TARGET_RATIO,
+)
+from .render_engines.default.document import SVG_PROFILES
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 

@@ -37,12 +37,12 @@ import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines.default import planning
-from inku_server.renderer import (
+from inku_server.render_engines.default.planning import (
     _anchor,
     _expand_arrangement,
     _resolve_performance_score,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Score
 
 # The quantisation leaves the derived ratios agreeing to about 1e-9; the

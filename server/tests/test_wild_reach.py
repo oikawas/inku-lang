@@ -15,12 +15,12 @@ import re
 from xml.etree import ElementTree
 
 from inku_server.plugins import canvas_size_for_aspect
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     _material_outline_profile,
     _outline_wander_px,
     _stroke_width_px,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import synthesize_along
 

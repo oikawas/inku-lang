@@ -14,15 +14,15 @@ import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines.default.determinism import _seed_for_instruction
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     FILL_REACH_WIDTHS_MIN,
     FILL_REACH_WIDTHS_SPAN,
     _fill_scan_angle,
     _fill_scan_spacing,
     _scanline_segments,
     _stroke_width_px,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS
 

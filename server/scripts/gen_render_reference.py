@@ -19,7 +19,6 @@ import subprocess
 import tempfile
 from typing import Any, get_args
 
-from inku_server import renderer
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.default import planning
@@ -942,8 +941,8 @@ def _assert_fade_reaches_every_member(inputs: dict[str, dict[str, Any]]) -> None
         if placement_seed is None:
             placement_seed = performance_seed
         return [
-            renderer._fade_level_from_hint(item.color_hint)
-            for item in renderer._expand_arrangement(
+            planning._fade_level_from_hint(item.color_hint)
+            for item in planning._expand_arrangement(
                 instruction, placement_seed, performance_seed=performance_seed
             )
         ]

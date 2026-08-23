@@ -67,35 +67,16 @@ def test_t3_color_and_document_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_renderer_and_planning_use_the_canonical_palette_objects() -> None:
+def test_t1_planning_uses_the_canonical_palette_objects() -> None:
     palette = importlib.import_module("inku_server.render_engines.default.palette")
     planning = importlib.import_module("inku_server.render_engines.default.planning")
-    names = (
-        "COLOR_MAP",
-        "HUE_HINTS",
-        "_hex_to_rgb",
-        "_hue_from_hex",
-        "_oklch_from_hex",
-        "_work_color_choice",
-        "_work_color_assignment",
-        "_hint_hues",
-        "_resolve_color",
-        "_render_effect_hint",
-        "_norm_label",
-    )
-
-    for name in names:
-        assert getattr(renderer, name) is getattr(palette, name)
     assert planning._render_effect_hint is palette._render_effect_hint
     assert planning._norm_label is palette._norm_label
 
 
-def test_t2_renderer_reexports_the_canonical_document_objects() -> None:
+def test_t2_document_helpers_have_the_canonical_owner() -> None:
     document = importlib.import_module("inku_server.render_engines.default.document")
     names = (
-        "SVG_PROFILES",
-        "_score_canvas_aspect",
-        "_score_canvas_ground",
         "build_texture_metadata",
         "_normalize_svg_profile",
         "_safe_svg_id",
@@ -109,7 +90,7 @@ def test_t2_renderer_reexports_the_canonical_document_objects() -> None:
     )
 
     for name in names:
-        assert getattr(renderer, name) is getattr(document, name)
+        assert getattr(document, name).__module__ == document.__name__
 
 
 def _import_names(module_name: str) -> set[str]:
@@ -139,7 +120,13 @@ def test_t4_new_modules_have_one_way_dependencies_and_no_general_context() -> No
         assert not any(name == "renderer" or name.endswith(".renderer") for name in imports)
     assert not any(name == "planning" or name.endswith(".planning") for name in palette_imports)
 
-    default_package = Path(renderer.__file__).with_name("render_engines") / "default"
+    default_package = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "inku_server"
+        / "render_engines"
+        / "default"
+    )
     production = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(default_package.glob("*.py"))
     )

@@ -71,30 +71,18 @@ def test_t1_default_engine_import_path_is_a_package_with_the_same_adapter() -> N
     ]
 
 
-def test_t2_renderer_reexports_only_the_retained_determinism_objects() -> None:
-    determinism = importlib.import_module(
-        "inku_server.render_engines.default.determinism"
-    )
-    names = (
-        "_VARIATION_SEED_FIELDS_ALL",
-        "_WORK_COLOR_SEED_FIELDS",
-        "_SEED_INSTRUCTION_FIELDS",
-        "_SEED_ARRANGEMENT_FIELDS",
-        "_variation_seed_fields",
-        "new_render_seed",
-        "_hash01",
-    )
-
-    for name in names:
-        assert getattr(renderer, name) is getattr(determinism, name)
-
-    assert not hasattr(renderer, "_seed_for_instruction")
-    assert not hasattr(renderer, "_needs_contour_variation")
-    assert not hasattr(renderer, "_needs_blur")
+def test_t2_renderer_exposes_only_the_legacy_svg_entrypoint() -> None:
+    assert renderer.__all__ == ("render",)
 
 
 def test_t4_default_package_does_not_import_the_renderer_facade() -> None:
-    package = Path(renderer.__file__).with_name("render_engines") / "default"
+    package = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "inku_server"
+        / "render_engines"
+        / "default"
+    )
 
     for source in sorted(package.glob("*.py")):
         tree = ast.parse(source.read_text(encoding="utf-8"))
@@ -114,3 +102,45 @@ def test_t4_default_package_does_not_import_the_renderer_facade() -> None:
         assert not any(
             name == "renderer" or name.endswith(".renderer") for name in imported
         )
+
+
+def test_t5_repository_code_uses_no_renderer_domain_symbols() -> None:
+    server_root = Path(__file__).resolve().parents[1]
+    repository_root = server_root.parent
+    scan_roots = (server_root / "src", server_root / "scripts", server_root / "tests")
+    offenders: set[tuple[str, str]] = set()
+
+    for source in (path for root in scan_roots for path in root.rglob("*.py")):
+        if source == Path(__file__) or source.name == "renderer.py":
+            continue
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        renderer_aliases: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "inku_server.renderer":
+                        renderer_aliases.add(alias.asname or alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if module in {"inku_server.renderer", "renderer"}:
+                    offenders.update(
+                        (str(source.relative_to(repository_root)), alias.name)
+                        for alias in node.names
+                        if alias.name != "render"
+                    )
+                if module == "inku_server":
+                    renderer_aliases.update(
+                        alias.asname or alias.name
+                        for alias in node.names
+                        if alias.name == "renderer"
+                    )
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id in renderer_aliases
+                and node.attr != "render"
+            ):
+                offenders.add((str(source.relative_to(repository_root)), node.attr))
+
+    assert offenders == set()

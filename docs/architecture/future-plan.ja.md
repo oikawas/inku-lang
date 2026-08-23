@@ -6,7 +6,7 @@
 
 ## 全項目に共通の原則
 
-1. **描画を1バイトも変えない。** 計画の大半は観測・表示・文書であり、Renderer・Score schema・coerceの判定結果に触れない。唯一の例外（要求配達の移設）は独立の裁定を経る。
+1. **描画を1バイトも変えない。** 計画の大半は観測・表示・文書である。portabilityの前準備はRenderer内部の所有境界だけを変え、Score・seed・SVGを変えない。唯一の挙動変更候補（要求配達の移設）は独立の裁定を経る。
 2. **rh3の材料に触れない。** edition同一性の材料（`ddl-processing-pipeline.ja.md` の注入点の表）を動かす項目は計画に無い。
 3. **鏡はゲートにしない。** 新設する記録は観測専用で、生成の分岐・回数・Score・履歴の正本を変えない。
 4. **backfillで新しい値を書かない。** 記録なきものは記録なしと表示する。「記録なし」と「該当しない」を混同しない。
@@ -21,17 +21,20 @@ flowchart TD
         MARK["fallbackの印と推敲時の確認\ncompose_fallback列（台帳I-292）"]
         RITUAL["30題の儀式 → 既存ベンチへ統合\n層帰属タグを評価手順に追加"]
         DOCS["推敲の再入点図・注入点の表\npipeline文書へ反映"]
+        PORT_BOUNDARY["描画portability boundary 1\nPython pure geometryをSVG emissionから分離"]
     end
     subgraph NEXT["これから"]
         MIRROR["coerceの鏡\n（調査先行）"]
         P41["要求配達repairの調査\n（対照生成つき）"]
         GOV["Score schema版の統治\n（現状: 統治なし・実質凍結）"]
+        RUST_CORE["共有Rust描画core\n（別契約で設計・裁定）"]
     end
     HELD["保留: 要求配達の上流移設\n（実装は調査の裁定後）"]
 
     MARK -.->|"実数が前提"| MIRROR
     P41 -->|"三案比較 → 裁定"| HELD
     RITUAL -.->|"層帰属の実測"| P41
+    PORT_BOUNDARY -.->|"境界を入力に別途設計"| RUST_CORE
 ```
 
 ## 済んだもの
@@ -40,6 +43,13 @@ flowchart TD
 - **fallbackの印** — Stage 2の決定的fallbackは応答にしか出ず、保存すると消えていた。`compose_fallback` 列（落ちた理由 / `none` / 記録なしの3値）が加わり、言葉との対応が切れた作品は印を持ち、そこから推敲を続けるときは一度だけ確認を出す（台帳I-292）。過去の作品へはbackfillしない — 印が付くのは列の導入から先である。
 - **儀式の二重帳簿の回避** — 「30題を固定条件で描き、署名可否と層帰属を記入する」という提案は、**既存の30題ベンチマークと同じもの**だった。既存側には失敗から学んだ判定規則が3巡ぶん書き込まれており、作り直すとそれを失う。新設はせず、層帰属タグ（`sketch / interpret / expand / score / coerce / render`）を既存の評価手順へ追加した。
 - **文書の補完** — 推敲の再入点の図と、生成パラメータの注入点×rh3該否の表を `ddl-processing-pipeline.ja.md` へ、判定単位の全経路を `description-to-svg.ja.md` へ収めた（本書群・日英同時）。
+- **描画portability boundary 1** — `renderer.py` をSVG-only互換入口へ縮め、`default/mark_kernel.py` にscalarと点列だけを返す決定的な幾何計算を分離した。`marks.py` はkernelを一方向に消費してSVGを組み立てる。Engine 40のbyte出力、Score、seed、APIは変えていない。
+
+## 別契約で検討するもの — 共有Rust描画core
+
+作者方針は、Androidへの移植性と将来のiOS移植性のため、描画coreをRustで共有できる構造へ進むことである。今回できたのはPython内のportability boundaryまでで、Rust crate、Scene IR / DTO、FFI、JNI、UniFFI、Swift binding、Android/iOS統合はまだ存在しない。
+
+次の契約では、`mark_kernel.py` のどの値境界を共有coreへ移すか、Score入力と描画出力の表現、Python/Rust差分test、端末ごとのbinding、失敗時fallback、性能とbinary sizeをまとめて裁定する。既存の610件corpusを同一性の根拠にし、移植都合でserverの意味論を曲げない。
 
 ## これから 1 — coerceの鏡（調査先行）
 

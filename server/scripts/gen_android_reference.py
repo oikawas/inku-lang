@@ -61,6 +61,12 @@ from inku_server.layer_versions import DDL_ENGINE_VERSION
 from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.default import planning
 from inku_server.schema import Instruction, Score, Variation
+from inku_server import stroke_engine as stroke_domain
+from inku_server.render_engines.default import determinism
+from inku_server.render_engines.default import marks as mark_domain
+from inku_server.render_engines.default import palette
+from inku_server.render_engines.default import surfaces
+from inku_server.render_engines.default import mark_kernel as kernel_domain
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
 
@@ -401,7 +407,7 @@ def primitive_fixtures() -> None:
             "weight": w,
             "aspect": aspect,
             "canvas": [canvas_size_for_aspect(aspect).width, canvas_size_for_aspect(aspect).height],
-            "value": round(renderer._grid_step_px(w, canvas_size_for_aspect(aspect)), 12),
+            "value": round(mark_domain._grid_step_px(w, canvas_size_for_aspect(aspect)), 12),
         }
         for aspect in ("square", "wide", "pillar", "vertical")
         for w in ("computer", "pen", "rotring")
@@ -423,7 +429,7 @@ def primitive_fixtures() -> None:
         },
         "wild_gain": se.WILD_GAIN,
         "gesture_edge": se._GESTURE_EDGE,
-        "raster_bleed_opacity": renderer.RASTER_BLEED_OPACITY,
+        "raster_bleed_opacity": mark_domain.RASTER_BLEED_OPACITY,
         "machine": machine,
         "grid_point": grid,
         "grid_step_px": grid_step_px,
@@ -590,22 +596,22 @@ def variation_fixtures() -> None:
     from inku_server.schema import Variation
 
     hash01 = [
-        {"i": i, "seed": seed, "salt": salt, "value": renderer._hash01(i, seed, salt)}
+        {"i": i, "seed": seed, "salt": salt, "value": determinism._hash01(i, seed, salt)}
         for i, seed, salt in (
             (0, 12345, "wave-phase"), (0, 111, "wave-phase"), (0, 222, "wave-phase"),
             (3, 12345, "wave-phase"), (7, 999, "speck"), (0, 1, ""),
         )
     ]
     hash_to_unit = [
-        {"i": i, "seed": seed, "value": renderer._hash_to_unit(i, seed)}
+        {"i": i, "seed": seed, "value": determinism._hash_to_unit(i, seed)}
         for i, seed in ((0, 12345), (1, 12345), (3, 12345), (-1, 12345), (17, 999))
     ]
     value_noise = [
-        {"x": x, "seed": 12345, "value": renderer._value_noise_1d(x, 12345)}
+        {"x": x, "seed": 12345, "value": determinism._value_noise_1d(x, 12345)}
         for x in (0.0, 0.25, 1.5, 3.75, 12.0)
     ]
     periodic_noise = [
-        {"x": x, "seed": 12345, "period": 6, "value": renderer._periodic_value_noise_1d(x, 12345, 6)}
+        {"x": x, "seed": 12345, "period": 6, "value": determinism._periodic_value_noise_1d(x, 12345, 6)}
         for x in (0.0, 0.5, 2.5, 5.9, 6.0)
     ]
 
@@ -619,14 +625,14 @@ def variation_fixtures() -> None:
                 samples.append({
                     "t": t,
                     "segment": step,
-                    "open": renderer._sample_offset(t, variation, 12345, step, 10.0),
-                    "periodic": renderer._sample_offset_periodic(t, variation, 12345, step, 10.0),
+                    "open": kernel_domain._sample_offset(t, variation, 12345, step, 10.0),
+                    "periodic": kernel_domain._sample_offset_periodic(t, variation, 12345, step, 10.0),
                 })
             offsets.append({"quality": quality, "frequency": frequency, "seed": 12345, "amp": 10.0, "samples": samples})
 
     out_path("renderer_variation_primitives.json").write_text(json.dumps({
-        "frequency_cycles": renderer.FREQUENCY_CYCLES,
-        "wave_phase": [{"seed": s, "value": renderer._wave_phase(s)} for s in (111, 222, 12345)],
+        "frequency_cycles": kernel_domain.FREQUENCY_CYCLES,
+        "wave_phase": [{"seed": s, "value": determinism._wave_phase(s)} for s in (111, 222, 12345)],
         "hash01": hash01,
         "hash_to_unit": hash_to_unit,
         "value_noise_1d": value_noise,
@@ -672,12 +678,12 @@ def seed_range_fixtures() -> None:
             for label, index in (("energy-1", 0), ("event-arrival", 7), ("burr-side", 0))
         ],
         "renderer_hash01": [
-            {"i": i, "seed": seed, "salt": salt, "value": renderer._hash01(i, seed, salt)}
+            {"i": i, "seed": seed, "salt": salt, "value": determinism._hash01(i, seed, salt)}
             for seed in big
             for i, salt in ((0, "wave-phase"), (5, ""))
         ],
         "renderer_hash_to_unit": [
-            {"i": i, "seed": seed, "value": renderer._hash_to_unit(i, seed)}
+            {"i": i, "seed": seed, "value": determinism._hash_to_unit(i, seed)}
             for seed in big
             for i in (0, 3)
         ],
@@ -703,10 +709,10 @@ def seed_range_fixtures() -> None:
             "name": name,
             "instruction": payload,
             "performance_seed": performance_seed,
-            "seed": renderer._seed_for_instruction(ins, performance_seed),
+            "seed": determinism._seed_for_instruction(ins, performance_seed),
             "variation_seed_fields": (
-                sorted(renderer._variation_seed_fields(ins))
-                if renderer._variation_seed_fields(ins) is not None
+                sorted(determinism._variation_seed_fields(ins))
+                if determinism._variation_seed_fields(ins) is not None
                 else None
             ),
         })
@@ -739,34 +745,34 @@ def proportional_fixtures() -> None:
 
     out: dict = {
         "constants": {
-            "AMPLITUDE_WIDTHS": renderer.AMPLITUDE_WIDTHS,
-            "BLUR_RATIO": renderer.BLUR_RATIO,
-            "BLUR_MIN_RATIO": renderer.BLUR_MIN_RATIO,
-            "REPRESENTATIVE_MIN_RATIO": renderer.REPRESENTATIVE_MIN_RATIO,
-            "AMPLITUDE_CLAMP_RATIO": renderer.AMPLITUDE_CLAMP_RATIO,
-            "SEGMENT_TARGET_RATIO": renderer.SEGMENT_TARGET_RATIO,
-            "SEGMENT_COUNT_MIN": renderer.SEGMENT_COUNT_MIN,
-            "SEGMENT_COUNT_MAX": renderer.SEGMENT_COUNT_MAX,
-            "STROKE_SAMPLE_TARGET_RATIO": renderer.STROKE_SAMPLE_TARGET_RATIO,
-            "STROKE_SAMPLE_MIN": renderer.STROKE_SAMPLE_MIN,
-            "STROKE_SAMPLE_MAX": renderer.STROKE_SAMPLE_MAX,
-            "SPECK_ANCHOR_PERIMETER_RATIO": renderer.SPECK_ANCHOR_PERIMETER_RATIO,
-            "SPECK_COUNT_MIN": renderer.SPECK_COUNT_MIN,
-            "SPECK_COUNT_MAX_GAIN": renderer.SPECK_COUNT_MAX_GAIN,
-            "CANVAS_PX": renderer.CANVAS_PX,
-            "MATERIAL_INTENSITY_LEVEL": renderer.MATERIAL_INTENSITY_LEVEL,
-            "MATERIAL_INTENSITY_SELECTED": renderer.MATERIAL_INTENSITY[renderer.MATERIAL_INTENSITY_LEVEL],
-            "WEIGHT_TO_STROKE_WIDTH": renderer.WEIGHT_TO_STROKE_WIDTH,
+            "AMPLITUDE_WIDTHS": mark_domain.AMPLITUDE_WIDTHS,
+            "BLUR_RATIO": mark_domain.BLUR_RATIO,
+            "BLUR_MIN_RATIO": mark_domain.BLUR_MIN_RATIO,
+            "REPRESENTATIVE_MIN_RATIO": mark_domain.REPRESENTATIVE_MIN_RATIO,
+            "AMPLITUDE_CLAMP_RATIO": mark_domain.AMPLITUDE_CLAMP_RATIO,
+            "SEGMENT_TARGET_RATIO": kernel_domain.SEGMENT_TARGET_RATIO,
+            "SEGMENT_COUNT_MIN": kernel_domain.SEGMENT_COUNT_MIN,
+            "SEGMENT_COUNT_MAX": kernel_domain.SEGMENT_COUNT_MAX,
+            "STROKE_SAMPLE_TARGET_RATIO": kernel_domain.STROKE_SAMPLE_TARGET_RATIO,
+            "STROKE_SAMPLE_MIN": kernel_domain.STROKE_SAMPLE_MIN,
+            "STROKE_SAMPLE_MAX": kernel_domain.STROKE_SAMPLE_MAX,
+            "SPECK_ANCHOR_PERIMETER_RATIO": mark_domain.SPECK_ANCHOR_PERIMETER_RATIO,
+            "SPECK_COUNT_MIN": mark_domain.SPECK_COUNT_MIN,
+            "SPECK_COUNT_MAX_GAIN": mark_domain.SPECK_COUNT_MAX_GAIN,
+            "CANVAS_PX": mark_domain.CANVAS_PX,
+            "MATERIAL_INTENSITY_LEVEL": mark_domain.MATERIAL_INTENSITY_LEVEL,
+            "MATERIAL_INTENSITY_SELECTED": mark_domain.MATERIAL_INTENSITY[mark_domain.MATERIAL_INTENSITY_LEVEL],
+            "WEIGHT_TO_STROKE_WIDTH": mark_domain.WEIGHT_TO_STROKE_WIDTH,
             # engine 16 stage 3: the thickness axis. A multiplier on the tool's own
             # width, with a floor at the thinnest tool, so no amount of thinning
             # reorders the tools.
             "THINNESS_TO_WIDTH_SCALE": {
                 ("null" if k is None else k): v
-                for k, v in renderer.THINNESS_TO_WIDTH_SCALE.items()
+                for k, v in mark_domain.THINNESS_TO_WIDTH_SCALE.items()
             },
-            "MIN_STROKE_WIDTH": renderer.MIN_STROKE_WIDTH,
+            "MIN_STROKE_WIDTH": mark_domain.MIN_STROKE_WIDTH,
         },
-        "canvases": {a: {"width": c.width, "height": c.height, "unit": c.unit, "unit_scale": renderer._unit_scale(c)} for a, c in canvases.items()},
+        "canvases": {a: {"width": c.width, "height": c.height, "unit": c.unit, "unit_scale": mark_domain._unit_scale(c)} for a, c in canvases.items()},
         "representative_size_px": [],
         "amplitude_px": [],
         "blur_std_px": [],
@@ -782,41 +788,41 @@ def proportional_fixtures() -> None:
         for shape_name, ins in shapes.items():
             out["representative_size_px"].append({
                 "aspect": aspect, "shape": shape_name,
-                "raw": renderer._representative_size_px(ins, canvas),
-                "clamped": renderer._clamped_representative_px(ins, canvas),
+                "raw": mark_domain._representative_size_px(ins, canvas),
+                "clamped": mark_domain._clamped_representative_px(ins, canvas),
             })
             for amplitude in ("fine", "medium", "broad"):
                 variation = Variation(amplitude=amplitude, frequency="medium", quality="perlin", dimensions=["position_y"])
                 out["amplitude_px"].append({"aspect": aspect, "shape": shape_name, "amplitude": amplitude,
-                                            "value": renderer._amplitude_px(variation, ins, canvas)})
+                                            "value": mark_domain._amplitude_px(variation, ins, canvas)})
                 out["blur_std_px"].append({"aspect": aspect, "shape": shape_name, "amplitude": amplitude,
-                                           "value": renderer._blur_std_px(variation, ins, canvas)})
+                                           "value": mark_domain._blur_std_px(variation, ins, canvas)})
 
         for path_len in (10.0, 120.0, 1256.6, 5000.0, 40000.0):
             out["segment_count"].append({"aspect": aspect, "path_len_px": path_len,
-                                         "value": renderer._segment_count(path_len, canvas)})
+                                         "value": kernel_domain._segment_count(path_len, canvas)})
             out["stroke_sample_count"].append({"aspect": aspect, "length_px": path_len,
-                                               "value": renderer._stroke_sample_count(path_len, canvas)})
+                                               "value": kernel_domain._stroke_sample_count(path_len, canvas)})
             for base in (18, 28, 36):
                 out["speck_count"].append({"aspect": aspect, "base": base, "path_len_px": path_len,
-                                           "value": renderer._speck_count(base, path_len, canvas)})
+                                           "value": mark_domain._speck_count(base, path_len, canvas)})
 
-        for weight in sorted(renderer.WEIGHT_TO_STROKE_WIDTH):
+        for weight in sorted(mark_domain.WEIGHT_TO_STROKE_WIDTH):
             out["stroke_width_px"].append({"aspect": aspect, "weight": weight,
-                                           "value": renderer._stroke_width_px(weight, canvas)})
+                                           "value": mark_domain._stroke_width_px(weight, canvas)})
             # Every tool at every thinness, so a port that drops the floor shows up
             # as silverpoint going below 0.5 and as the tool order collapsing.
             for thinness in (None, "fine", "extra_fine"):
                 out["stroke_width_thinness_px"].append({
                     "aspect": aspect, "weight": weight, "thinness": thinness,
-                    "value": renderer._stroke_width_px(weight, canvas, thinness),
+                    "value": mark_domain._stroke_width_px(weight, canvas, thinness),
                 })
 
         # The material layer follows the thinned ink where its width is proportional
         # to it, and keeps its own distance: strength is not distance (engine 15).
         # The tool list comes from the specs themselves so a new tool cannot slip
         # past this fixture.
-        for weight in sorted(renderer._MATERIAL_OUTLINE_SPECS):
+        for weight in sorted(mark_domain._MATERIAL_OUTLINE_SPECS):
             for thinness in (None, "fine", "extra_fine"):
                 # The profile takes the instruction since render engine 38: the
                 # two widths it reads are asked of `_mark_width_px`, which is
@@ -827,7 +833,7 @@ def proportional_fixtures() -> None:
                     primitive="line", **{"from": (0.1, 0.5)}, to=(0.9, 0.5),
                     weight=weight, thinness=thinness,
                 )
-                layers = renderer._material_outline_profile(subject, canvas)
+                layers = mark_domain._material_outline_profile(subject, canvas)
                 out["material_outline_thinness"].append({
                     "aspect": aspect, "weight": weight, "thinness": thinness,
                     "layers": [
@@ -900,26 +906,26 @@ def fill_and_arc_fixtures() -> None:
     out: dict = {
         "note": "fill scanlines, hatch strokes and arc centerlines; seeds are unsigned 64-bit",
         "constants": {
-            "FILL_SPACING_WIDTH_GAIN": renderer.FILL_SPACING_WIDTH_GAIN,
-            "FILL_SPACING_UNIT_RATIO": renderer.FILL_SPACING_UNIT_RATIO,
-            "FILL_SPACING_JITTER": renderer.FILL_SPACING_JITTER,
-            "FILL_MIN_SCANLINES": renderer.FILL_MIN_SCANLINES,
-            "FILL_MIN_STROKE_WIDTHS": renderer.FILL_MIN_STROKE_WIDTHS,
-            "FILL_DAB_SAMPLES": renderer.FILL_DAB_SAMPLES,
-            "FILL_DAB_MIN_TRAVEL": renderer.FILL_DAB_MIN_TRAVEL,
+            "FILL_SPACING_WIDTH_GAIN": mark_domain.FILL_SPACING_WIDTH_GAIN,
+            "FILL_SPACING_UNIT_RATIO": mark_domain.FILL_SPACING_UNIT_RATIO,
+            "FILL_SPACING_JITTER": mark_domain.FILL_SPACING_JITTER,
+            "FILL_MIN_SCANLINES": mark_domain.FILL_MIN_SCANLINES,
+            "FILL_MIN_STROKE_WIDTHS": mark_domain.FILL_MIN_STROKE_WIDTHS,
+            "FILL_DAB_SAMPLES": mark_domain.FILL_DAB_SAMPLES,
+            "FILL_DAB_MIN_TRAVEL": mark_domain.FILL_DAB_MIN_TRAVEL,
         },
         "fill_scan_angle": [
-            {"seed": seed, "value": round(renderer._fill_scan_angle(seed), 12)}
+            {"seed": seed, "value": round(mark_domain._fill_scan_angle(seed), 12)}
             for seed in seeds
         ],
         "fill_scan_spacing": [
             {"aspect": aspect, "shape": name, "weight": ins.weight,
-             "value": round(renderer._fill_scan_spacing(ins, canvas), 9)}
+             "value": round(mark_domain._fill_scan_spacing(ins, canvas), 9)}
             for aspect, canvas in canvases.items()
             for name, ins in fill_shapes.items()
         ],
         "fill_stroke_seed": [
-            {"seed": seed, "index": index, "value": renderer._fill_stroke_seed(seed, index)}
+            {"seed": seed, "index": index, "value": mark_domain._fill_stroke_seed(seed, index)}
             for seed in seeds
             for index in (0, 1, 47, 4096)
         ],
@@ -927,8 +933,8 @@ def fill_and_arc_fixtures() -> None:
         # `filled` says, and `_interior_fill` degrades rotring to a region fill.
         "fills_interior": [
             {"shape": name, "filled": ins.filled, "has_surface": ins.surface is not None,
-             "value": renderer._fills_interior(ins),
-             "uses_hand_stroke": renderer._uses_hand_stroke(ins.weight)}
+             "value": surfaces._fills_interior(ins),
+             "uses_hand_stroke": mark_domain._uses_hand_stroke(ins.weight)}
             for name, ins in fill_shapes.items()
         ],
         "scanline_segments": [],
@@ -966,7 +972,7 @@ def fill_and_arc_fixtures() -> None:
     def contour_for(ins, canvas):
         if ins.primitive == "square":
             assert ins.position is not None and ins.size is not None
-            px, py = renderer._px(ins.position, canvas)
+            px, py = kernel_domain._px(ins.position, canvas)
             w = ins.size[0] * canvas.width
             h = ins.size[1] * canvas.height
             return [(px, py), (px + w, py), (px + w, py + h), (px, py + h)]
@@ -974,7 +980,7 @@ def fill_and_arc_fixtures() -> None:
         ccx = ins.center[0] * canvas.width
         ccy = ins.center[1] * canvas.height
         rr = ins.radius * canvas.unit
-        count = renderer._stroke_sample_count(2 * math.pi * rr, canvas)
+        count = kernel_domain._stroke_sample_count(2 * math.pi * rr, canvas)
         return [
             (ccx + rr * math.cos(2 * math.pi * i / count), ccy + rr * math.sin(2 * math.pi * i / count))
             for i in range(count)
@@ -982,12 +988,12 @@ def fill_and_arc_fixtures() -> None:
 
     for name, (ins, aspect) in fill_group_cases.items():
         canvas = canvases[aspect]
-        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+        seed = determinism._seed_for_instruction(ins, RENDER_SEED)
         contour = contour_for(ins, canvas)
         attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
-        group = renderer._render_fill_strokes(
+        group = mark_domain._render_fill_strokes(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
-            support=renderer.DEFAULT_SUPPORT
+            support=stroke_domain.DEFAULT_SUPPORT
         )
         paths = path_d_list(group)
         out["fill_stroke_group"].append({
@@ -996,9 +1002,9 @@ def fill_and_arc_fixtures() -> None:
             "weight": ins.weight,
             "seed": seed,
             "scan_contour": poly(contour),
-            "angle": round(renderer._fill_scan_angle(seed), 12),
-            "spacing": round(renderer._fill_scan_spacing(ins, canvas), 9),
-            "base_width": round(renderer._stroke_width_px(ins.weight, canvas), 9),
+            "angle": round(mark_domain._fill_scan_angle(seed), 12),
+            "spacing": round(mark_domain._fill_scan_spacing(ins, canvas), 9),
+            "base_width": round(mark_domain._stroke_width_px(ins.weight, canvas), 9),
             # None means the fill degraded to a region fill (`FILL_MIN_SCANLINES`).
             "class": None if group is None else group.attribs.get("class"),
             "stroke_count": len(paths),
@@ -1034,26 +1040,26 @@ def fill_and_arc_fixtures() -> None:
         canvas = canvases["square"]
         contour = contour_for(ins, canvas)
         attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
-        scan = renderer._render_fill_strokes(
+        scan = mark_domain._render_fill_strokes(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
-            support=renderer.DEFAULT_SUPPORT
+            support=stroke_domain.DEFAULT_SUPPORT
         )
-        dab = renderer._render_fill_dab(
+        dab = mark_domain._render_fill_dab(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
-            support=renderer.DEFAULT_SUPPORT
+            support=stroke_domain.DEFAULT_SUPPORT
         )
-        chosen, region_fill = renderer._interior_fill(
+        chosen, region_fill = mark_domain._interior_fill(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False,
-            support=renderer.DEFAULT_SUPPORT
+            support=stroke_domain.DEFAULT_SUPPORT
         )
         dab_paths = path_d_list(dab)
         out["fill_dab_group"].append({
             "case": name,
             "weight": ins.weight,
             "thinness": ins.thinness,
-            "seed": renderer._seed_for_instruction(ins, RENDER_SEED),
+            "seed": determinism._seed_for_instruction(ins, RENDER_SEED),
             "contour": poly(contour),
-            "base_width": round(renderer._stroke_width_px(ins.weight, canvas, ins.thinness), 9),
+            "base_width": round(mark_domain._stroke_width_px(ins.weight, canvas, ins.thinness), 9),
             # None here is what engine 15 called the degradation point.
             "scan_class": None if scan is None else scan.attribs.get("class"),
             "dab_class": None if dab is None else dab.attribs.get("class"),
@@ -1066,9 +1072,9 @@ def fill_and_arc_fixtures() -> None:
 
     for contour_name, contour in contours.items():
         for seed in seeds:
-            angle = renderer._fill_scan_angle(seed)
+            angle = mark_domain._fill_scan_angle(seed)
             for spacing in (18.0, 45.0):
-                segments = renderer._scanline_segments(contour, angle, spacing, seed)
+                segments = mark_domain._scanline_segments(contour, angle, spacing, seed)
                 out["scanline_segments"].append({
                     "contour": contour_name,
                     "contour_points": poly(contour),
@@ -1100,17 +1106,17 @@ def fill_and_arc_fixtures() -> None:
         for case_name, surface in hatch_cases.items():
             ins = Instruction(primitive="square", position=(0.25, 0.25), size=(0.5, 0.5),
                               weight="pen", surface=surface)
-            bbox = renderer._shape_bbox(ins, canvas)
+            bbox = surfaces._shape_bbox(ins, canvas)
             assert bbox is not None
             x, y, w, h = bbox
-            seed = renderer._seed_for_instruction(ins, RENDER_SEED)
-            angle = renderer._surface_line_angle(surface)
+            seed = determinism._seed_for_instruction(ins, RENDER_SEED)
+            angle = surfaces._surface_line_angle(surface)
             spacing = max(5.0, canvas.unit * (0.010 + (1.0 - surface.density) * 0.025))
             span = math.hypot(w, h) * 1.3
             count = min(80, max(3, int(span / spacing)))
             angles = [angle]
             if surface.texture == "crosshatch":
-                angles.append(angle + math.radians(60 + renderer._hash01(8, seed, "cross-angle") * 30))
+                angles.append(angle + math.radians(60 + determinism._hash01(8, seed, "cross-angle") * 30))
             lines = []
             for layer_index, layer_angle in enumerate(angles):
                 lux, luy = math.cos(layer_angle), math.sin(layer_angle)
@@ -1123,7 +1129,7 @@ def fill_and_arc_fixtures() -> None:
                     elif surface.spacing_gradient == "dense_to_coarse":
                         gradient = 0.65 + progress * 0.7
                     offset = (i * spacing * gradient
-                              + renderer._hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12)
+                              + determinism._hash_to_unit(i + layer_index * 401 + 500, seed) * spacing * 0.12)
                     ox, oy = lnx * offset, lny * offset
                     lines.append({
                         "layer": layer_index,
@@ -1135,7 +1141,7 @@ def fill_and_arc_fixtures() -> None:
                         "end": [round(x + w / 2 + ox + lux * span / 2, 6),
                                 round(y + h / 2 + oy + luy * span / 2, 6)],
                         "hatch_class": f"hatch-spacing-{spacing * gradient:.3f}",
-                        "stroke_seed": renderer._fill_stroke_seed(seed, i + layer_index * 4096),
+                        "stroke_seed": mark_domain._fill_stroke_seed(seed, i + layer_index * 4096),
                     })
             out["surface_hatch"].append({
                 "aspect": aspect,
@@ -1147,7 +1153,7 @@ def fill_and_arc_fixtures() -> None:
                 "span": round(span, 9),
                 "count": count,
                 "layer_angles": [round(a, 12) for a in angles],
-                "sample_count": max(2, renderer._stroke_sample_count(span, canvas)),
+                "sample_count": max(2, kernel_domain._stroke_sample_count(span, canvas)),
                 "line_width": round(max(0.45, canvas.unit * 0.0016), 9),
                 "lines": lines,
             })
@@ -1172,21 +1178,21 @@ def fill_and_arc_fixtures() -> None:
         cx = 0.5 * canvas.width
         cy = 0.5 * canvas.height
         r = 0.3 * canvas.unit
-        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
-        varied = renderer._needs_contour_variation(ins.variation)
+        seed = determinism._seed_for_instruction(ins, RENDER_SEED)
+        varied = determinism._needs_contour_variation(ins.variation)
         if varied:
             assert ins.variation is not None
-            centerline = renderer._arc_points_with_variation(
+            centerline = kernel_domain._arc_points_with_variation(
                 cx, cy, r, ins.angle_start, ins.angle_end, ins.variation, seed,
-                renderer._amplitude_px(ins.variation, ins, canvas), canvas,
+                mark_domain._amplitude_px(ins.variation, ins, canvas), canvas,
             )
         else:
             arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
-            centerline = renderer._arc_points(
+            centerline = kernel_domain._arc_points(
                 cx, cy, r, ins.angle_start, ins.angle_end,
-                renderer._stroke_sample_count(arc_len, canvas),
+                kernel_domain._stroke_sample_count(arc_len, canvas),
             )
-        stroke = se.synthesize_along(centerline, renderer._stroke_width_px(ins.weight, canvas),
+        stroke = se.synthesize_along(centerline, mark_domain._stroke_width_px(ins.weight, canvas),
                                      ins.weight, seed, closed=False)
         out["arc_centerline"].append({
             "case": name,
@@ -1198,7 +1204,7 @@ def fill_and_arc_fixtures() -> None:
             "arc_length_px": round(r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start)), 9),
             "centerline": poly(centerline),
             "intent_path_d": (None if varied
-                              else renderer._arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)),
+                              else mark_domain._arc_path_d(cx, cy, r, ins.angle_start, ins.angle_end)),
             "class": f"arc-stroke-v1 controls-{len(stroke.samples)} events-{stroke.event_count}",
             "path_d": se.contour_stroke_path(stroke),
         })
@@ -1331,7 +1337,7 @@ def cloudform_and_relation_fixtures() -> None:
         if name.startswith(("11_", "12_")):
             continue
         score = Score.model_validate(raw)
-        after = renderer._resolve_performance_score(score, RENDER_SEED)
+        after = planning._resolve_performance_score(score, RENDER_SEED)
         resolved.append({
             "case": name, "performance_seed": RENDER_SEED,
             "score_in": raw,
@@ -1343,7 +1349,7 @@ def cloudform_and_relation_fixtures() -> None:
         {"primitive": "circle", "center": [0.68, 0.5], "radius": 0.16, "weight": "pen",
          "relation": {"type": "touching", "contact": "both_ends"}},
     ]}
-    circle_after = renderer._resolve_performance_score(Score.model_validate(circle_raw), RENDER_SEED)
+    circle_after = planning._resolve_performance_score(Score.model_validate(circle_raw), RENDER_SEED)
     resolved.append({"case": "circle_touching_drops", "performance_seed": RENDER_SEED,
                      "score_in": circle_raw, "score_out": circle_after.model_dump(by_alias=True)})
 
@@ -1354,7 +1360,7 @@ def cloudform_and_relation_fixtures() -> None:
          "arrangement": {"layout": "grid", "count": 4, "rows": 2, "cols": 2},
          "relation": {"type": "touching", "contact": "both_ends"}},
     ]}
-    grid_after = renderer._resolve_performance_score(Score.model_validate(grid_raw), RENDER_SEED)
+    grid_after = planning._resolve_performance_score(Score.model_validate(grid_raw), RENDER_SEED)
     resolved.append({"case": "grid_drops_relation", "performance_seed": RENDER_SEED,
                      "score_in": grid_raw, "score_out": grid_after.model_dump(by_alias=True)})
     out["resolve_performance_score"] = resolved
@@ -1692,20 +1698,20 @@ def color_assignment_fixtures() -> None:
     for catalog_id in catalog_ids:
         cmap = render_color_map_for_catalog(catalog_id)
         achromatic: list[list] = []
-        chromatic: dict[str, list[str]] = {c: [] for c in renderer._CHROMATIC_COLORS}
+        chromatic: dict[str, list[str]] = {c: [] for c in palette._CHROMATIC_COLORS}
         seen: set[str] = set()
         for key, hex_value in cmap.items():
             if not key.startswith("palette:") or hex_value in seen:
                 continue
-            oklch = renderer._oklch_from_hex(hex_value)
+            oklch = palette._oklch_from_hex(hex_value)
             if oklch is None:
                 continue
             seen.add(hex_value)
             lightness, chroma, hue = oklch
-            if chroma < renderer._OKLCH_CHROMA_FLOOR:
+            if chroma < palette._OKLCH_CHROMA_FLOOR:
                 achromatic.append([round(lightness, 12), hex_value])
             else:
-                chromatic[renderer._chromatic_band(hue)].append(hex_value)
+                chromatic[palette._chromatic_band(hue)].append(hex_value)
         palette_bands[catalog_id] = {
             "achromatic": sorted(achromatic),
             "chromatic": {band: sorted(v) for band, v in chromatic.items()},
@@ -1715,7 +1721,7 @@ def color_assignment_fixtures() -> None:
     for catalog_id in catalog_ids:
         cmap = render_color_map_for_catalog(catalog_id)
         assignment[catalog_id] = {
-            str(seed): renderer._work_color_assignment(cmap, seed, catalog_id)
+            str(seed): palette._work_color_assignment(cmap, seed, catalog_id)
             for seed in COLOR_ASSIGNMENT_SEEDS
         }
 
@@ -1726,22 +1732,22 @@ def color_assignment_fixtures() -> None:
     seed_sensitive = sorted(
         f"{catalog_id}.{color}"
         for catalog_id in catalog_ids
-        for color in renderer._ACHROMATIC_COLORS + renderer._CHROMATIC_COLORS
+        for color in palette._ACHROMATIC_COLORS + palette._CHROMATIC_COLORS
         if assignment[catalog_id][first][color] != assignment[catalog_id][second][color]
     )
 
     hints = []
     for catalog_id, color, hint in HINT_CASES:
         cmap = render_color_map_for_catalog(catalog_id)
-        work = renderer._work_color_assignment(cmap, RENDER_SEED, catalog_id)
+        work = palette._work_color_assignment(cmap, RENDER_SEED, catalog_id)
         hints.append(
             {
                 "catalog_id": catalog_id,
                 "render_seed": RENDER_SEED,
                 "color": color,
                 "color_hint": hint,
-                "hues": sorted(renderer._hint_hues(hint)),
-                "expected": renderer._resolve_color(
+                "hues": sorted(palette._hint_hues(hint)),
+                "expected": palette._resolve_color(
                     color, hint or None, cmap, work_assignment=work
                 ),
             }
@@ -1752,15 +1758,15 @@ def color_assignment_fixtures() -> None:
         for hex_value in render_color_map_for_catalog(catalog_id).values():
             if hex_value in oklch:
                 continue
-            lightness, chroma, hue = renderer._oklch_from_hex(hex_value)
+            lightness, chroma, hue = palette._oklch_from_hex(hex_value)
             oklch[hex_value] = {
                 "lightness": round(lightness, 12),
                 "chroma": round(chroma, 12),
                 "hue": round(hue, 12),
             }
-    for hex_value in renderer.COLOR_MAP.values():
+    for hex_value in palette.COLOR_MAP.values():
         if hex_value not in oklch:
-            lightness, chroma, hue = renderer._oklch_from_hex(hex_value)
+            lightness, chroma, hue = palette._oklch_from_hex(hex_value)
             oklch[hex_value] = {
                 "lightness": round(lightness, 12),
                 "chroma": round(chroma, 12),
@@ -1775,14 +1781,14 @@ def color_assignment_fixtures() -> None:
             "wrong assignment."
         ),
         "constants": {
-            "default_color_map": dict(renderer.COLOR_MAP),
-            "achromatic_colors": list(renderer._ACHROMATIC_COLORS),
-            "chromatic_colors": list(renderer._CHROMATIC_COLORS),
-            "chromatic_bands": {k: list(v) for k, v in renderer._CHROMATIC_BANDS.items()},
-            "chromatic_band_centers": dict(renderer._CHROMATIC_BAND_CENTERS),
-            "oklch_chroma_floor": renderer._OKLCH_CHROMA_FLOOR,
-            "hint_hue_priority": list(renderer._HINT_HUE_PRIORITY),
-            "work_color_seed_fields": list(renderer._WORK_COLOR_SEED_FIELDS),
+            "default_color_map": dict(palette.COLOR_MAP),
+            "achromatic_colors": list(palette._ACHROMATIC_COLORS),
+            "chromatic_colors": list(palette._CHROMATIC_COLORS),
+            "chromatic_bands": {k: list(v) for k, v in palette._CHROMATIC_BANDS.items()},
+            "chromatic_band_centers": dict(palette._CHROMATIC_BAND_CENTERS),
+            "oklch_chroma_floor": palette._OKLCH_CHROMA_FLOOR,
+            "hint_hue_priority": list(palette._HINT_HUE_PRIORITY),
+            "work_color_seed_fields": list(determinism._WORK_COLOR_SEED_FIELDS),
             "default_catalog_id": DEFAULT_COLOR_CATALOG_ID,
         },
         "oklch": dict(sorted(oklch.items())),
@@ -2009,7 +2015,7 @@ def arrangement_fixtures() -> None:
     out: dict = {
         "note": "anchors of every expanded mark; compare exactly, no tolerance",
         "render_seed": RENDER_SEED,
-        "arrangement_quantum": renderer.ARRANGEMENT_QUANTUM,
+        "arrangement_quantum": planning.ARRANGEMENT_QUANTUM,
         "cases": [],
     }
     for case_id, raw in arrangement_cases().items():
@@ -2020,14 +2026,14 @@ def arrangement_fixtures() -> None:
         placement_seed = (
             composition_seed if composition_seed is not None else RENDER_SEED
         )
-        expanded = renderer._expand_arrangement(
+        expanded = planning._expand_arrangement(
             ins, placement_seed, None, performance_seed=RENDER_SEED
         )
         case: dict = {
             "case_id": case_id,
             "instruction": ins.model_dump(mode="json"),
             "count": len(expanded),
-            "anchors": [list(renderer._anchor(item)) for item in expanded],
+            "anchors": [list(planning._anchor(item)) for item in expanded],
         }
         if composition_seed is not None:
             case["composition_seed"] = composition_seed
@@ -2045,8 +2051,8 @@ def arrangement_fixtures() -> None:
 
     def anchors(placement_seed: int, performance_seed: int) -> list[list[float]]:
         return [
-            list(renderer._anchor(item))
-            for item in renderer._expand_arrangement(
+            list(planning._anchor(item))
+            for item in planning._expand_arrangement(
                 split_ins, placement_seed, None, performance_seed=performance_seed
             )
         ]
@@ -2236,8 +2242,8 @@ def _assert_fade_reaches_every_member(cases: dict[str, dict]) -> None:
     def levels(case_id: str) -> list[float | None]:
         ins = Instruction.model_validate(cases[case_id])
         return [
-            renderer._fade_level_from_hint(item.color_hint)
-            for item in renderer._expand_arrangement(
+            planning._fade_level_from_hint(item.color_hint)
+            for item in planning._expand_arrangement(
                 ins, RENDER_SEED, None, performance_seed=RENDER_SEED
             )
         ]

@@ -99,30 +99,6 @@ def test_t3_surface_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_t2_t4_renderer_reexports_the_canonical_surface_objects() -> None:
-    surfaces = importlib.import_module("inku_server.render_engines.default.surfaces")
-    names = (
-        "SURFACE_MARK_MAX",
-        "_surface_seed",
-        "_surface_grain_seed",
-        "_shape_bbox",
-        "_surface_contour",
-        "_point_in_polygon",
-        "_surface_color",
-        "_surface_line_angle",
-        "_surface_scatter",
-        "_surface_dab",
-        "_surface_sweep",
-        "_render_surface_vectors",
-        "_render_surface_texture",
-        "_has_surface_texture",
-        "_fills_interior",
-    )
-
-    for name in names:
-        assert getattr(renderer, name) is getattr(surfaces, name)
-
-
 def _import_names(module_name: str) -> set[str]:
     module = importlib.import_module(module_name)
     source = Path(module.__file__).read_text(encoding="utf-8")
@@ -141,7 +117,7 @@ def _import_names(module_name: str) -> set[str]:
     return names
 
 
-def test_t4_t5_surfaces_have_one_way_dependencies_and_shrink_the_facade() -> None:
+def test_t4_t5_surfaces_have_one_way_dependencies() -> None:
     engine = importlib.import_module("inku_server.render_engines.default.engine")
     surfaces = importlib.import_module("inku_server.render_engines.default.surfaces")
     imports = _import_names("inku_server.render_engines.default.surfaces")
@@ -160,6 +136,3 @@ def test_t4_t5_surfaces_have_one_way_dependencies_and_shrink_the_facade() -> Non
     )
     assert isinstance(engine._SURFACE_MARK_STYLE.weight_style, MappingProxyType)
     assert isinstance(engine._SURFACE_MARK_STYLE.texture_filter_weights, frozenset)
-
-    renderer_lines = Path(renderer.__file__).read_text(encoding="utf-8").splitlines()
-    assert len(renderer_lines) < 5368

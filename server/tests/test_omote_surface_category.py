@@ -28,7 +28,7 @@ from inku_server.api import app
 from inku_server.coerce import coerce_score
 from inku_server.interpreter import SYSTEM_PROMPT_PREFIX, SYSTEM_PROMPT_PREFIX_EN
 from inku_server.reference import build_reference
-from inku_server.renderer import build_texture_metadata
+from inku_server.render_engines.default.document import build_texture_metadata
 from inku_server.schema import Score
 
 client = TestClient(app)

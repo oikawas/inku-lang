@@ -6,7 +6,7 @@ import hashlib
 import math
 import re
 import struct
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import svgwrite
@@ -32,14 +32,31 @@ from .determinism import (
     _hash_to_unit,
     _needs_contour_variation,
     _needs_path_variation,
-    _periodic_value_noise_1d,
     _seed_for_instruction,
-    _value_noise_1d,
-    _wave_phase,
 )
 from .document import _safe_svg_id
 from .palette import _norm_label, _resolve_color
 from .planning import _FADE_FILL_RATIO, _anchor, _fade_level_from_hint
+from .mark_kernel import (
+    _arc_points,
+    _arc_points_with_variation,
+    _circle_points,
+    _closed_path_length,
+    _contact_fragments,
+    _dash_spec_stats,
+    _edge_contour_with_anchors,
+    _ellipse_perimeter,
+    _line_with_variation,
+    _offset_performed_path,
+    _offset_polyline,
+    _points_center,
+    _polyline_sample,
+    _px,
+    _rect_points,
+    _resample_points,
+    _size_px,
+    _stroke_sample_count,
+)
 
 
 @dataclass(frozen=True)
@@ -124,7 +141,6 @@ AMPLITUDE_WIDTHS: dict[str, float] = {"fine": 0.35, "medium": 0.6, "broad": 2.0}
 # 0.17 and 0.47; the cap is set where pencil and chalk already sit, so it moves
 # the two outliers and leaves the rest untouched (author's ruling, 2026-08-09).
 MATERIAL_OUTLINE_MAX_WIDTH_RATIO = 0.33
-FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 
 # 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
 BLUR_RATIO: dict[str, float] = {"fine": 0.009, "medium": 0.03, "broad": 0.07}
@@ -139,13 +155,6 @@ AMPLITUDE_CLAMP_RATIO = 0.40
 # line は代表寸法が線長のため、必要ならここだけで抑えられる。
 PRIMITIVE_AMP_GAIN: dict[str, float] = {}
 
-# 分割数は輪郭・線の長さに比例させ、セグメント長をほぼ一定に保つ。
-SEGMENT_TARGET_RATIO = 0.01  # 目標セグメント長 = canvas.unit の 1%
-SEGMENT_COUNT_MIN = 32
-SEGMENT_COUNT_MAX = 200
-STROKE_SAMPLE_TARGET_RATIO = 1.0 / 49.0  # 長さ = canvas.unit で現行の 49 本
-STROKE_SAMPLE_MIN = 17
-STROKE_SAMPLE_MAX = 129
 
 # 材質層の強度候補。相対化の起点 (m0) は v2.0.5 相当。
 # 採用段は MATERIAL_INTENSITY_LEVEL で選ぶ。
@@ -533,15 +542,6 @@ def _performance_touch_filter(render_seed: int, canvas: CanvasSize) -> tuple[str
     return filter_id, xml
 
 
-def _ellipse_perimeter(rx: float, ry: float) -> float:
-    """楕円の周長 (Ramanujan の第二近似)。"""
-    a, b = abs(rx), abs(ry)
-    if a + b <= 0:
-        return 0.0
-    h = ((a - b) / (a + b)) ** 2
-    return math.pi * (a + b) * (1 + 3 * h / (10 + math.sqrt(4 - 3 * h)))
-
-
 def _representative_size_px(ins: Instruction, canvas: CanvasSize) -> float:
     """揺らぎ振幅の基準となる図形の代表寸法 (px)。
 
@@ -594,243 +594,6 @@ def _blur_std_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> 
     return max(canvas.unit * BLUR_MIN_RATIO, BLUR_RATIO[variation.amplitude] * rep)
 
 
-def _segment_count(path_len_px: float, canvas: CanvasSize) -> int:
-    """輪郭・線の長さに比例した分割数 (セグメント長をほぼ一定に保つ)。"""
-    target = canvas.unit * SEGMENT_TARGET_RATIO
-    if target <= 0:
-        return SEGMENT_COUNT_MIN
-    return max(
-        SEGMENT_COUNT_MIN, min(SEGMENT_COUNT_MAX, int(round(path_len_px / target)))
-    )
-
-
-def _stroke_sample_count(length_px: float, canvas: CanvasSize) -> int:
-    """手描きストロークの分割数。長さ = canvas.unit で現行の 49 本。"""
-    target = canvas.unit * STROKE_SAMPLE_TARGET_RATIO
-    if target <= 0:
-        return STROKE_SAMPLE_MIN
-    return max(
-        STROKE_SAMPLE_MIN, min(STROKE_SAMPLE_MAX, int(round(length_px / target)))
-    )
-
-
-def _sample_offset(
-    t: float, variation: Variation, seed: int, segment: int, amp: float
-) -> float:
-    freq = FREQUENCY_CYCLES[variation.frequency]
-    q = variation.quality
-
-    if q == "wave":
-        return math.sin(t * 2 * math.pi * freq + _wave_phase(seed)) * amp
-    if q == "perlin":
-        return _value_noise_1d(t * freq, seed) * amp
-    if q == "pink":
-        # 簡易 pink: perlin 2 オクターブ合成
-        return (
-            _value_noise_1d(t * freq, seed) * amp
-            + _value_noise_1d(t * freq * 2, seed ^ 0x9E37) * amp * 0.5
-        ) / 1.5
-    if q == "white":
-        return _hash_to_unit(segment, seed) * amp
-    return 0.0
-
-
-def _line_with_variation(
-    start_px: tuple[float, float],
-    end_px: tuple[float, float],
-    variation: Variation,
-    seed: int,
-    amp: float,
-    canvas: CanvasSize,
-) -> list[tuple[float, float]]:
-    """直線の polyline に揺らぎを適用した頂点列を返す。
-
-    dimensions の指定:
-    - position_x のみ: x 軸方向に揺らす
-    - position_y のみ: y 軸方向に揺らす
-    - 両方 (または position_x+position_y+他): 線に垂直方向に揺らす
-    """
-    dx = end_px[0] - start_px[0]
-    dy = end_px[1] - start_px[1]
-    length = math.hypot(dx, dy)
-    if length < 1e-6:
-        return [start_px, end_px]
-
-    # 線の方向に垂直な単位ベクトル
-    perp_x = -dy / length
-    perp_y = dx / length
-
-    dims = set(variation.dimensions)
-    axis_x = "position_x" in dims
-    axis_y = "position_y" in dims
-
-    segments = _segment_count(length, canvas)
-    pts: list[tuple[float, float]] = [start_px]
-    for i in range(1, segments):
-        t = i / segments
-        x = start_px[0] + t * dx
-        y = start_px[1] + t * dy
-        off = _sample_offset(t, variation, seed, i, amp)
-
-        if axis_x and not axis_y:
-            x += off
-        elif axis_y and not axis_x:
-            y += off
-        else:
-            x += off * perp_x
-            y += off * perp_y
-
-        pts.append((x, y))
-    pts.append(end_px)
-    return pts
-
-
-def _sample_offset_periodic(
-    t: float, variation: Variation, seed: int, segment: int, amp: float
-) -> float:
-    """閉輪郭用の offset サンプル。t∈[0,1) を一周として周期連続にする。
-
-    wave は FREQUENCY_CYCLES が整数値のため自動的に閉じる。seed 由来の位相を
-    足しても周期は変わらないので閉合は保たれる。perlin は格子を周期化する。
-    white は頂点毎の独立雑音なので継ぎ目の概念を持たない。
-    """
-    freq = FREQUENCY_CYCLES[variation.frequency]
-    q = variation.quality
-    if q == "wave":
-        return math.sin(t * 2 * math.pi * freq + _wave_phase(seed)) * amp
-    if q == "perlin":
-        return _periodic_value_noise_1d(t * freq, seed, max(1, int(round(freq)))) * amp
-    if q == "white":
-        return _hash_to_unit(segment, seed) * amp
-    return 0.0
-
-
-def _offset_contour_point(
-    x: float,
-    y: float,
-    off: float,
-    center: tuple[float, float],
-    axis_x: bool,
-    axis_y: bool,
-) -> tuple[float, float]:
-    """dimensions の指定に応じて輪郭上の 1 点をずらす (line と対称の意味論)。
-
-    position_x のみ: x 軸方向 / position_y のみ: y 軸方向 /
-    両方または radius: 輪郭法線 (中心から外向き) 方向。
-    """
-    if axis_x and not axis_y:
-        return (x + off, y)
-    if axis_y and not axis_x:
-        return (x, y + off)
-    dx = x - center[0]
-    dy = y - center[1]
-    norm = math.hypot(dx, dy)
-    if norm <= 1e-6:
-        return (x, y)
-    return (x + off * dx / norm, y + off * dy / norm)
-
-
-def _closed_contour_with_variation(
-    points: list[tuple[float, float]],
-    center: tuple[float, float],
-    variation: Variation,
-    seed: int,
-    amp: float,
-) -> list[tuple[float, float]]:
-    """閉じた輪郭の頂点列に周期揺らぎを適用する (circle / ellipse 用)。"""
-    dims = set(variation.dimensions)
-    axis_x = "position_x" in dims
-    axis_y = "position_y" in dims
-    n = len(points)
-    result: list[tuple[float, float]] = []
-    for i, (x, y) in enumerate(points):
-        off = _sample_offset_periodic(i / n, variation, seed, i, amp)
-        result.append(_offset_contour_point(x, y, off, center, axis_x, axis_y))
-    return result
-
-
-def _edge_contour_with_anchors(
-    corners: list[tuple[float, float]],
-    variation: Variation | None,
-    seed: int,
-    amp: float,
-    canvas: CanvasSize,
-) -> tuple[list[tuple[float, float]], frozenset[int]]:
-    """辺ごとに分割した閉輪郭と、角に当たる頂点 index を返す。
-
-    variation を渡すと各辺に line と同じ揺らぎを適用し、分割数は _segment_count
-    (揺らぎ輪郭の解像度)。振幅は辺ごとの長さではなく図形の代表寸法から決めた
-    amp を共有する (横長の矩形で揺らぎが異方性を持たないようにするため)。
-    variation なしは手描きストロークの中心線用で、分割数は line と同じ
-    _stroke_sample_count に合わせる (筆の追従遅れの尺度を線と揃えるため)。
-    """
-    result: list[tuple[float, float]] = []
-    anchors: list[int] = []
-    n = len(corners)
-    for i in range(n):
-        start = corners[i]
-        end = corners[(i + 1) % n]
-        anchors.append(len(result))
-        if variation is None:
-            segments = _stroke_sample_count(
-                math.hypot(end[0] - start[0], end[1] - start[1]), canvas
-            )
-            edge = [
-                (
-                    start[0] + (end[0] - start[0]) * k / segments,
-                    start[1] + (end[1] - start[1]) * k / segments,
-                )
-                for k in range(segments + 1)
-            ]
-        else:
-            edge = _line_with_variation(
-                start, end, variation, seed + (i + 1) * 7919, amp, canvas
-            )
-        result.extend(edge[:-1])
-    return result, frozenset(anchors)
-
-
-def _edge_contour_with_variation(
-    corners: list[tuple[float, float]],
-    variation: Variation,
-    seed: int,
-    amp: float,
-    canvas: CanvasSize,
-) -> list[tuple[float, float]]:
-    """多角形の各辺に line と同じ揺らぎを適用し、角を固定した閉輪郭を返す。"""
-    return _edge_contour_with_anchors(corners, variation, seed, amp, canvas)[0]
-
-
-def _arc_points_with_variation(
-    cx: float,
-    cy: float,
-    r: float,
-    start_deg: float,
-    end_deg: float,
-    variation: Variation,
-    seed: int,
-    amp: float,
-    canvas: CanvasSize,
-) -> list[tuple[float, float]]:
-    """弧を分割し揺らぎを注入する。両端点は固定 (touching 接点契約の維持)。"""
-    arc_len = r * abs(math.radians(end_deg) - math.radians(start_deg))
-    base = _arc_points(
-        cx, cy, r, start_deg, end_deg, _segment_count(arc_len, canvas) + 1
-    )
-    dims = set(variation.dimensions)
-    axis_x = "position_x" in dims
-    axis_y = "position_y" in dims
-    last = len(base) - 1
-    result: list[tuple[float, float]] = [base[0]]
-    for i in range(1, last):
-        x, y = base[i]
-        off = _sample_offset(i / last, variation, seed, i, amp)
-        result.append(_offset_contour_point(x, y, off, (cx, cy), axis_x, axis_y))
-    result.append(base[last])
-    return result
-
-
-
 def _instruction_support(ins: Instruction, support: Support) -> Support:
     """Raise the sheet where the instruction itself said how the mark runs.
 
@@ -844,7 +607,6 @@ def _instruction_support(ins: Instruction, support: Support) -> Support:
     return support_with_mark_word(support, surface.texture)
 
 
-
 # The set moved to `schema.py` so coerce decides by the same one. The private
 # name stays because this module reads it in three places.
 _CLOSED_SHAPES = CLOSED_SHAPES
@@ -856,7 +618,6 @@ def _texture_filter_weights(score: Score) -> set[str]:
         if ins.weight in TEXTURE_FILTER_WEIGHTS:
             weights.add(ins.weight)
     return weights
-
 
 
 def _stroke_attrs(
@@ -885,7 +646,11 @@ def _stroke_attrs(
     }
     if "stroke_opacity" in weight_style:
         attrs["stroke_opacity"] = weight_style["stroke_opacity"]
-    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+    if (
+        use_filters
+        and ins.weight in TEXTURE_FILTER_WEIGHTS
+        and ins.weight != "drypoint"
+    ):
         attrs["filter"] = f"url(#texture-{ins.weight})"
     if any(
         token in hint
@@ -931,7 +696,8 @@ def _stroke_attrs(
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), ceiling)
         if do_fill:
             attrs["fill_opacity"] = (
-                0.30 if level is None
+                0.30
+                if level is None
                 else round(ceiling * _FADE_FILL_RATIO["directional"], 4)
             )
     elif "fade outward" in hint or "fade=outward" in hint:
@@ -940,7 +706,8 @@ def _stroke_attrs(
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), ceiling)
         if do_fill:
             attrs["fill_opacity"] = (
-                0.22 if level is None
+                0.22
+                if level is None
                 else round(ceiling * _FADE_FILL_RATIO["outward"], 4)
             )
     if any(token in hint for token in ("reflection", "反射", "映り")):
@@ -969,263 +736,6 @@ def _copy_attrs(attrs: dict) -> dict:
     return dict(attrs)
 
 
-def _line_direction(
-    start: tuple[float, float], end: tuple[float, float]
-) -> tuple[float, float]:
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
-    length = math.hypot(dx, dy)
-    if length < 1e-6:
-        return 1.0, 0.0
-    return dx / length, dy / length
-
-
-def _offset_polyline(
-    points: list[tuple[float, float]],
-    amount: float,
-    *,
-    wander: float = 0.0,
-    wander_period: float = 1.0,
-    seed: int = 0,
-) -> list[tuple[float, float]]:
-    """Offset an open polyline by `amount` along per-vertex normals.
-
-    The material outline layers used to be straight start->end lines. Once the
-    stroke centreline gained a gesture they had to follow that same curve, or the
-    straight remnants read as a faint line joining the endpoints.
-
-    `wander` adds a low-frequency drift to the offset along the arc length so the
-    strata are not perfectly parallel rails — one of the cues the eye reads as a
-    repeating pattern.
-    """
-    n = len(points)
-    if n < 2:
-        return list(points)
-    out: list[tuple[float, float]] = []
-    arc = 0.0
-    for i in range(n):
-        if i == 0:
-            tx, ty = points[1][0] - points[0][0], points[1][1] - points[0][1]
-        elif i == n - 1:
-            tx, ty = points[-1][0] - points[-2][0], points[-1][1] - points[-2][1]
-        else:
-            tx, ty = points[i + 1][0] - points[i - 1][0], points[i + 1][1] - points[i - 1][1]
-        length = math.hypot(tx, ty) or 1.0
-        nx, ny = -ty / length, tx / length
-        off = amount
-        if wander:
-            off += wander * (_value_noise_1d(arc / max(1e-6, wander_period), seed) * 2 - 1)
-        out.append((points[i][0] + nx * off, points[i][1] + ny * off))
-        if i < n - 1:
-            arc += math.hypot(
-                points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]
-            )
-    return out
-
-
-
-def _dash_spec_stats(dash: str | None) -> tuple[float, float]:
-    """The coverage and grain a tool's dash pattern implies.
-
-    The patterns in `_MATERIAL_OUTLINE_SPECS` carry a tool's character -- the pen
-    is nearly continuous, the pencil is mostly gap -- and that tuning is worth
-    keeping once the cadence is gone. Coverage is the share of the path the
-    pattern marked; grain is its natural wavelength, in unscaled units.
-    """
-    if not dash:
-        return 1.0, 0.0
-    values = [abs(float(v)) for v in dash.split(",") if v.strip()]
-    if not values or sum(values) <= 0:
-        return 1.0, 0.0
-    # An odd-length pattern swaps marks and gaps on every repeat, so read it twice.
-    if len(values) % 2:
-        values = values + values
-    marks, gaps = values[0::2], values[1::2]
-    coverage = sum(marks) / sum(values)
-    grain = sum(marks) / len(marks) + sum(gaps) / len(gaps)
-    return coverage, grain
-
-
-def _contact_field(t: float, seed: int) -> float:
-    """The paper's tooth at two scales, read along the path. Roughly 0..1."""
-    return 0.62 * _value_noise_1d(t, seed) + 0.38 * _value_noise_1d(
-        t * 2.7 + 13.1, seed + 977
-    )
-
-
-# Paper-contact decisions share the SVG's six-decimal length lattice. A libm
-# ULP is far below this precision, but before engine 29 it could add a sample,
-# move the sample-derived quantile, and replace a whole fragment.
-CONTACT_LENGTH_QUANTUM = 6
-
-
-def _quantise_contact_length(value: float) -> float:
-    return round(value, CONTACT_LENGTH_QUANTUM)
-
-
-def _resample_by_length(
-    points: list[tuple[float, float]], step: float, closed: bool
-) -> list[tuple[float, float]]:
-    """Walk a polyline and emit a point every `step` px of arc length.
-
-    `_resample_points` picks by index, which is even only when the source
-    vertices are. The contact field is read against distance on the paper, so it
-    needs a walk that is even in length.
-    """
-    step = _quantise_contact_length(step)
-    if step <= 0 or len(points) < 2:
-        return list(points)
-    path = points + [points[0]] if closed else points
-    out = [path[0]]
-    carry = 0.0
-    for (ax, ay), (bx, by) in zip(path, path[1:]):
-        seg = _quantise_contact_length(math.hypot(bx - ax, by - ay))
-        if seg <= 1e-9:
-            continue
-        travelled = step - carry
-        while travelled <= seg:
-            f = travelled / seg
-            out.append((ax + (bx - ax) * f, ay + (by - ay) * f))
-            travelled += step
-        carry = (carry + seg) % step
-    return out
-
-
-def _contact_fragments(
-    points: list[tuple[float, float]],
-    *,
-    coverage: float,
-    grain_px: float,
-    seed: int,
-    closed: bool,
-) -> list[tuple[list[tuple[float, float]], float]]:
-    """The pieces of an outline where the tool actually met the paper.
-
-    A dasharray repeats. However long the pattern, a long contour walks through
-    it several times and the eye finds the cadence -- and the material layer is
-    not a dotted line, it is where a tool dragged across a grain and kept losing
-    the paper. So presence is a smooth noise field read along the arc length, and
-    the outline exists where the field clears a threshold.
-
-    The threshold is the (1 - coverage) quantile of the field's own samples, not
-    a constant: that way each tool keeps the share of the path its dash pattern
-    used to mark, while nothing about the spacing repeats. Fragments come back
-    with a weight, so the thinly-touching ones are fainter than the ones the tool
-    bore down on.
-    """
-    if len(points) < 2:
-        return []
-    if grain_px <= 0 or coverage >= 0.999:
-        return [(list(points), 1.0)]
-
-    # Three samples per grain resolves a skip; the cap keeps a long contour from
-    # turning into thousands of SVG vertices.
-    total = _quantise_contact_length(
-        sum(
-            _quantise_contact_length(math.hypot(b[0] - a[0], b[1] - a[1]))
-            for a, b in zip(
-                points, points[1:] + points[:1] if closed else points[1:]
-            )
-        )
-    )
-    if total <= 1e-6:
-        return []
-    grain_px = _quantise_contact_length(grain_px)
-    step = _quantise_contact_length(max(grain_px / 3.0, total / 600.0, 0.8))
-    walk = _resample_by_length(points, step, closed)
-    if len(walk) < 3:
-        return [(list(points), 1.0)]
-
-    field = [_contact_field(i * step / grain_px, seed) for i in range(len(walk))]
-    ordered = sorted(field)
-    index = min(len(ordered) - 1, max(0, int((1.0 - coverage) * len(ordered))))
-    threshold = ordered[index]
-    span = max(1e-6, ordered[-1] - threshold)
-
-    runs: list[list[int]] = []
-    current: list[int] = []
-    for i, value in enumerate(field):
-        if value >= threshold:
-            current.append(i)
-        elif current:
-            runs.append(current)
-            current = []
-    if current:
-        runs.append(current)
-    # On a closed path the seam is not an end: a run that touches both ends is
-    # one fragment that happens to be written in two halves.
-    if closed and len(runs) > 1 and runs[0][0] == 0 and runs[-1][-1] == len(field) - 1:
-        runs[0] = runs[-1] + runs[0]
-        runs.pop()
-
-    def _crossing(outside: int, inside: int) -> tuple[float, float]:
-        """Where the field crosses the threshold between two samples.
-
-        Without this the ends of every fragment land on a sample, so every
-        length is a multiple of `step` and the lengths themselves become the
-        cadence -- the regularity comes back through the sampling instead of
-        through the pattern.
-        """
-        f_out, f_in = field[outside], field[inside]
-        if abs(f_in - f_out) < 1e-9:
-            return walk[inside]
-        f = min(1.0, max(0.0, (threshold - f_out) / (f_in - f_out)))
-        ax, ay = walk[outside]
-        bx, by = walk[inside]
-        return (ax + (bx - ax) * f, ay + (by - ay) * f)
-
-    fragments: list[tuple[list[tuple[float, float]], float]] = []
-    for run in runs:
-        piece = [walk[i] for i in run]
-        if run[0] - 1 >= 0:
-            piece.insert(0, _crossing(run[0] - 1, run[0]))
-        if run[-1] + 1 < len(field):
-            piece.append(_crossing(run[-1] + 1, run[-1]))
-        if len(piece) < 2:
-            continue
-        length = _quantise_contact_length(
-            sum(
-                _quantise_contact_length(math.hypot(b[0] - a[0], b[1] - a[1]))
-                for a, b in zip(piece, piece[1:])
-            )
-        )
-        if length < 0.6:
-            continue
-        margin = sum(field[i] - threshold for i in run) / len(run)
-        weight = min(1.0, 0.55 + 0.75 * (margin / span))
-        fragments.append((piece, weight))
-    return fragments
-
-
-def _polyline_sample(
-    points: list[tuple[float, float]], t: float
-) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Position and unit tangent at arc-length fraction `t` (0..1) of a polyline."""
-    if len(points) < 2:
-        p = points[0] if points else (0.0, 0.0)
-        return p, (1.0, 0.0)
-    segs = [
-        math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1])
-        for i in range(len(points) - 1)
-    ]
-    total = sum(segs)
-    if total < 1e-9:
-        return points[0], (1.0, 0.0)
-    target = t * total
-    acc = 0.0
-    for i, d in enumerate(segs):
-        if acc + d >= target or i == len(segs) - 1:
-            f = (target - acc) / d if d > 1e-9 else 0.0
-            x = points[i][0] + (points[i + 1][0] - points[i][0]) * f
-            y = points[i][1] + (points[i + 1][1] - points[i][1]) * f
-            length = d or 1.0
-            ux = (points[i + 1][0] - points[i][0]) / length
-            uy = (points[i + 1][1] - points[i][1]) / length
-            return (x, y), (ux, uy)
-        acc += d
-    return points[-1], (1.0, 0.0)
-
-
 def _add_powder_specks(
     dwg: svgwrite.Drawing,
     group,
@@ -1244,7 +754,9 @@ def _add_powder_specks(
     for idx in range(count):
         # Non-uniform spacing: jitter each speck within its slot so the powder
         # does not sit on an even grid.
-        t = min(1.0, max(0.0, (idx + 0.5 + (_hash01(idx, seed, "speck-t") - 0.5)) / count))
+        t = min(
+            1.0, max(0.0, (idx + 0.5 + (_hash01(idx, seed, "speck-t") - 0.5)) / count)
+        )
         (px, py), (ux, uy) = _polyline_sample(centerline, t)
         perp = _hash_to_unit(idx, seed) * spread
         ox, oy = -uy * perp, ux * perp
@@ -1292,66 +804,6 @@ def _add_specks_at_points(
                 opacity=opacity,
             )
         )
-
-
-def _circle_points(
-    cx: float, cy: float, rx: float, ry: float, count: int
-) -> list[tuple[float, float]]:
-    return [
-        (
-            cx + math.cos(i * 2 * math.pi / count) * rx,
-            cy + math.sin(i * 2 * math.pi / count) * ry,
-        )
-        for i in range(count)
-    ]
-
-
-def _rect_points(
-    x: float, y: float, w: float, h: float, count: int
-) -> list[tuple[float, float]]:
-    points: list[tuple[float, float]] = []
-    perimeter = max(1.0, 2 * (w + h))
-    for i in range(count):
-        d = ((i + 0.5) / count) * perimeter
-        if d <= w:
-            points.append((x + d, y))
-        elif d <= w + h:
-            points.append((x + w, y + d - w))
-        elif d <= 2 * w + h:
-            points.append((x + w - (d - w - h), y + h))
-        else:
-            points.append((x, y + h - (d - 2 * w - h)))
-    return points
-
-
-def _arc_points(
-    cx: float, cy: float, r: float, start_deg: float, end_deg: float, count: int
-) -> list[tuple[float, float]]:
-    if count <= 1:
-        count = 2
-    start = math.radians(start_deg)
-    end = math.radians(end_deg)
-    return [
-        (
-            cx + math.cos(start + (end - start) * i / (count - 1)) * r,
-            cy - math.sin(start + (end - start) * i / (count - 1)) * r,
-        )
-        for i in range(count)
-    ]
-
-
-def _polygon_points(
-    cx: float, cy: float, r: float, sides: int, rotation_deg: float = 0.0
-) -> list[tuple[float, float]]:
-    sides = min(max(int(sides), 5), 8)
-    start = math.radians(rotation_deg - 90)
-    return [
-        (
-            cx + math.cos(start + math.tau * i / sides) * r,
-            cy + math.sin(start + math.tau * i / sides) * r,
-        )
-        for i in range(sides)
-    ]
 
 
 def _outline_attrs(
@@ -1645,73 +1097,6 @@ def _add_material_arc_outline(
         )
 
 
-def _resample_points(
-    path: list[tuple[float, float]], count: int
-) -> list[tuple[float, float]]:
-    """path から count 点を等間隔 (index 基準) に取り出す。"""
-    if count <= 0 or not path:
-        return []
-    last = len(path)
-    return [path[min(last - 1, int(index * last / count))] for index in range(count)]
-
-
-def _offset_performed_path(
-    path: list[tuple[float, float]],
-    amount: float,
-    closed: bool,
-    center: tuple[float, float],
-    *,
-    wander: float = 0.0,
-    wander_period: float = 1.0,
-    seed: int = 0,
-) -> list[tuple[float, float]]:
-    """演奏後の中心線を法線方向へ amount だけずらす。正が外側。
-
-    法線の符号は輪郭の生成順で変わる (円は内向き、弧は外向き) ので、図形の中心に
-    対して一度だけ多数決で決める。幾何版の `r + offset` と向きを揃えるため。
-
-    `wander` adds a low-frequency drift to the offset along the arc length, the
-    same way `_offset_polyline` does it for the straight tools: strata that stay
-    exactly parallel read as engraved rails rather than as a tool's own edges.
-    """
-    normals = centerline_normals(path, closed)
-    votes = 0
-    for (x, y), (nx, ny) in zip(path, normals):
-        votes += 1 if nx * (x - center[0]) + ny * (y - center[1]) >= 0 else -1
-    sign = 1.0 if votes >= 0 else -1.0
-    out: list[tuple[float, float]] = []
-    arc = 0.0
-    for i, ((x, y), (nx, ny)) in enumerate(zip(path, normals)):
-        off = amount
-        if wander:
-            off += wander * (
-                _value_noise_1d(arc / max(1e-6, wander_period), seed) * 2 - 1
-            )
-        out.append((x + nx * off * sign, y + ny * off * sign))
-        if i + 1 < len(path):
-            arc += math.hypot(path[i + 1][0] - x, path[i + 1][1] - y)
-    return out
-
-
-def _closed_path_length(path: list[tuple[float, float]]) -> float:
-    """閉じた折れ線の周長 (px)。粒の個数を周長比例で決めるのに使う。"""
-    if len(path) < 2:
-        return 0.0
-    return sum(
-        math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(path, path[1:] + path[:1])
-    )
-
-
-def _points_center(path: list[tuple[float, float]]) -> tuple[float, float]:
-    """法線の向きを多数決で決めるための図形中心。厳密な重心である必要はない。"""
-    if not path:
-        return (0.0, 0.0)
-    return (
-        sum(x for x, _ in path) / len(path),
-        sum(y for _, y in path) / len(path),
-    )
-
-
 def _add_material_performed_outline(
     dwg: svgwrite.Drawing,
     group,
@@ -1860,7 +1245,6 @@ def _material_line_group(
     def _layer_offset(amount: float) -> float:
         return _outline_offset_px(amount * scale * offset_gain, canvas)
 
-
     def _emit_layer(
         amount: float, layer_attrs: dict, mark: float, gap: float, k: int
     ) -> None:
@@ -1990,20 +1374,6 @@ def _material_line_group(
     return _apply_rotation(group, ins, canvas)
 
 
-def _px(coord: tuple[float, float], canvas: CanvasSize) -> tuple[float, float]:
-    x, y = coord
-    return x * canvas.width, y * canvas.height
-
-
-def _size_px(size: Sequence[float], canvas: CanvasSize) -> tuple[float, float]:
-    """Both extents follow the short edge, so a mark keeps the proportion the
-    description gave it: a square stays square, and a 2:1 ellipse stays 2:1 on
-    any canvas. The aspect decides where a mark sits, not what shape it is --
-    placement still goes through _px, which keeps using width and height.
-    """
-    return size[0] * canvas.unit, size[1] * canvas.unit
-
-
 def _apply_rotation(element, ins: Instruction, canvas: CanvasSize):
     if ins.rotation is None or abs(ins.rotation) < 1e-9:
         return element
@@ -2029,9 +1399,7 @@ def _arc_path_d(
 
     large_arc, sweep = arc_svg_flags(start_deg, end_deg)
 
-    return (
-        f"M {fmt(x1)} {fmt(y1)} A {fmt(r)} {fmt(r)} 0 {large_arc} {sweep} {fmt(x2)} {fmt(y2)}"
-    )
+    return f"M {fmt(x1)} {fmt(y1)} A {fmt(r)} {fmt(r)} 0 {large_arc} {sweep} {fmt(x2)} {fmt(y2)}"
 
 
 def _render_hand_stroke(
@@ -2127,7 +1495,9 @@ def _render_hand_stroke(
         group.add(material)
     if ins.style != "solid":
         styled_attrs = _copy_attrs(attrs)
-        styled_attrs["stroke_width"] = max(0.45 * _unit_scale(canvas), base_width * 0.42)
+        styled_attrs["stroke_width"] = max(
+            0.45 * _unit_scale(canvas), base_width * 0.42
+        )
         styled_attrs.pop("filter", None)
         group.add(dwg.line(start=start, end=end, **styled_attrs))
 
@@ -2379,9 +1749,7 @@ def _fill_coverage(ins: Instruction, canvas: CanvasSize) -> float:
     A ratio of two lengths, so it does not move with the canvas: the same
     instruction reaches the same branch on every aspect.
     """
-    return _mark_width_px(ins, canvas) / _fill_scan_spacing(
-        ins, canvas
-    )
+    return _mark_width_px(ins, canvas) / _fill_scan_spacing(ins, canvas)
 
 
 def _fill_takes_scan_branch(ins: Instruction, canvas: CanvasSize) -> bool:
@@ -2418,7 +1786,9 @@ def _fill_angle_amplitude(hand: float) -> float:
     """
     if not hand:
         return 0.0
-    return math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(3.0)
+    return math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(
+        3.0
+    )
 
 
 def _fill_is_scannable(
@@ -2486,7 +1856,8 @@ def _field_tone_patches(
                 * _hash01(index, seed, "fill-field-tone-radius")
             )
             spans = [
-                span for span in _line_spans(
+                span
+                for span in _line_spans(
                     contour, (cx, cy), (math.cos(bearing), math.sin(bearing))
                 )
                 if span[0] <= 0.0 <= span[1]
@@ -2552,7 +1923,8 @@ def _wobbly_blob(
         theta = step * 2 * math.pi / FILL_FIELD_TONE_SEGMENTS
         rough = (
             _hash01(
-                (index * FILL_FIELD_TONE_SEGMENTS + step) * FILL_FIELD_TONE_RINGS + ring,
+                (index * FILL_FIELD_TONE_SEGMENTS + step) * FILL_FIELD_TONE_RINGS
+                + ring,
                 seed,
                 "fill-blob-edge",
             )
@@ -2591,7 +1963,8 @@ def _clamp_inside(
             return None
         ux, uy = dx / distance, dy / distance
         spans = [
-            span for span in _line_spans(contour, centre, (ux, uy))
+            span
+            for span in _line_spans(contour, centre, (ux, uy))
             if span[0] <= 0.0 <= span[1]
         ]
         if not spans:
@@ -2600,7 +1973,9 @@ def _clamp_inside(
         if limit <= 0:
             return None
         scale = min(1.0, limit / distance)
-        out.append((centre[0] + ux * distance * scale, centre[1] + uy * distance * scale))
+        out.append(
+            (centre[0] + ux * distance * scale, centre[1] + uy * distance * scale)
+        )
     return tuple(out)
 
 
@@ -2939,7 +2314,8 @@ def _render_fill_strokes(
             cos_d, sin_d = math.cos(delta), math.sin(delta)
             ux, uy = ux * cos_d - uy * sin_d, ux * sin_d + uy * cos_d
             spans = [
-                span for span in _line_spans(contour, (mx, my), (ux, uy))
+                span
+                for span in _line_spans(contour, (mx, my), (ux, uy))
                 if span[0] <= 0.0 <= span[1]
             ]
             if not spans:
@@ -2979,7 +2355,10 @@ def _render_fill_strokes(
         # display-only and the machine has to look the same in every profile.
         layers = (
             (
-                (base_width * FILL_RASTER_HALO_WIDTHS, mark_opacity - FILL_RASTER_HALO_STEP),
+                (
+                    base_width * FILL_RASTER_HALO_WIDTHS,
+                    mark_opacity - FILL_RASTER_HALO_STEP,
+                ),
                 (base_width * FILL_RASTER_CORE_WIDTHS, mark_opacity),
             )
             if raster
@@ -3119,7 +2498,9 @@ def _render_fill_texture(
         # the hand gives -- the same band the scan branch draws from. What makes
         # this branch a rubbed tone rather than a ruled one is where the marks
         # are put, which is a scatter, not which way they run.
-        angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
+        angle = (
+            base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
+        )
         half = span_limit
         dx, dy = math.cos(angle), math.sin(angle)
         # A mark is cut where the form ends, and then let past it -- or stopped
@@ -3128,13 +2509,16 @@ def _render_fill_texture(
         # one edge as tidy as the cut it replaced, and one that overshoots at
         # both ends is the spill that was already rejected once (F-1).
         spans = [
-            span for span in _line_spans(contour, (px, py), (dx, dy))
+            span
+            for span in _line_spans(contour, (px, py), (dx, dy))
             if span[0] <= 0.0 <= span[1]
         ]
         if not spans:
             continue
         inside_start, inside_end = spans[0]
-        r0 = reach if _hash01(index, seed, "fill-texture-reach-start") >= 0.5 else -reach
+        r0 = (
+            reach if _hash01(index, seed, "fill-texture-reach-start") >= 0.5 else -reach
+        )
         r1 = reach if _hash01(index, seed, "fill-texture-reach-end") >= 0.5 else -reach
         start = max(-half, inside_start - r0)
         end = min(half, inside_end + r1)
@@ -3262,7 +2646,11 @@ def _render_fill_dab(
         ),
         "stroke": "none",
     }
-    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+    if (
+        use_filters
+        and ins.weight in TEXTURE_FILTER_WEIGHTS
+        and ins.weight != "drypoint"
+    ):
         path_attrs["filter"] = f"url(#texture-{ins.weight})"
     group = dwg.g(class_="fill-dab-v1")
     group.add(dwg.path(**path_attrs))
@@ -3314,8 +2702,14 @@ def _interior_fill(
 
     if not _fill_is_scannable(ins, contour, canvas, render_seed):
         group = _render_fill_dab(
-            dwg, ins, contour, attrs, canvas, render_seed,
-            use_filters=use_filters, wild=wild,
+            dwg,
+            ins,
+            contour,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            wild=wild,
             support=support,
         )
         return (None, True) if group is None else (group, False)
@@ -3323,21 +2717,42 @@ def _interior_fill(
     scan_branch = _fill_takes_scan_branch(ins, canvas)
     if scan_branch:
         marks = _render_fill_strokes(
-            dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters,
-            wild=wild, support=support,
+            dwg,
+            ins,
+            contour,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            wild=wild,
+            support=support,
         )
     else:
         marks = _render_fill_texture(
-            dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters,
-            wild=wild, support=support, surface_ops=surface_ops,
+            dwg,
+            ins,
+            contour,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            wild=wild,
+            support=support,
+            surface_ops=surface_ops,
         )
     if marks is None:
         # Nothing survived the minimum-length filter. Fall through to the dab
         # rather than leaving a bare underlay: an area with no mark on it is the
         # flat fill this engine has been taking apart since 9.
         group = _render_fill_dab(
-            dwg, ins, contour, attrs, canvas, render_seed,
-            use_filters=use_filters, wild=wild,
+            dwg,
+            ins,
+            contour,
+            attrs,
+            canvas,
+            render_seed,
+            use_filters=use_filters,
+            wild=wild,
             support=support,
         )
         return (None, True) if group is None else (group, False)
@@ -3401,7 +2816,11 @@ def _render_contour_hand_stroke(
         "fill_rule": "evenodd",
         "stroke": "none",
     }
-    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+    if (
+        use_filters
+        and ins.weight in TEXTURE_FILTER_WEIGHTS
+        and ins.weight != "drypoint"
+    ):
         path_attrs["filter"] = f"url(#texture-{ins.weight})"
     group.add(dwg.path(**path_attrs))
 
@@ -3467,7 +2886,12 @@ def _render_arc_hand_stroke(
     else:
         arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
         centerline = _arc_points(
-            cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
+            cx,
+            cy,
+            r,
+            ins.angle_start,
+            ins.angle_end,
+            _stroke_sample_count(arc_len, canvas),
         )
     base_width = _mark_width_px(ins, canvas)
     stroke = synthesize_along(
@@ -3509,7 +2933,11 @@ def _render_arc_hand_stroke(
         "fill_opacity": opacity,
         "stroke": "none",
     }
-    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+    if (
+        use_filters
+        and ins.weight in TEXTURE_FILTER_WEIGHTS
+        and ins.weight != "drypoint"
+    ):
         path_attrs["filter"] = f"url(#texture-{ins.weight})"
     group.add(dwg.path(**path_attrs))
 
@@ -3651,4 +3079,3 @@ def _render_corner_shape(
             center=_points_center(points),
         )
     return _apply_rotation(group, ins, canvas)
-

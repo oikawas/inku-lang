@@ -6,11 +6,11 @@ from xml.etree import ElementTree
 
 import pytest
 
-import inku_server.renderer as renderer
 from inku_server.render_engines.default import determinism
 from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.renderer import render
 from inku_server.schema import Arrangement, Instruction, Score
+from inku_server.render_engines.default import planning
 
 
 EXPECTED_SEED_INSTRUCTION_FIELDS = {
@@ -354,7 +354,7 @@ def test_count_adds_one_mark_without_reshuffling_the_first_twelve():
         second_instruction, 431
     )
     laid_out = [
-        [renderer._anchor(item) for item in renderer._expand_arrangement_layout(ins, 431)]
+        [planning._anchor(item) for item in planning._expand_arrangement_layout(ins, 431)]
         for ins in (first_instruction, second_instruction)
     ]
     assert laid_out[0] == laid_out[1][:12]

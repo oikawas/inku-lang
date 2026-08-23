@@ -4,15 +4,15 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer boundary refreshed 2026-08-22; Web client boundary refreshed 2026-08-23 |
-| Source branch / implementation commit | `refactor/i346-stage10-five-surface-convergence` / `9366e7218a2c4426003179a4e13d2db250ed6b35` |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer boundary refreshed 2026-08-24; Web client boundary refreshed 2026-08-23 |
+| Source branch / implementation commit | `refactor/i366-render-portability-boundary-1` / `867f645a` |
 | Source uncommitted changes | None at the implementation snapshot; this document synchronizes that snapshot |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 973` |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 974` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `973` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `974` |
 | Render Engine | implementation `default / 40` |
 | DDL | `ddl_version=3`; `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.56`; implementation reports Render Engine `35` |
+| Android | `android/VERSION` = `2.1.4-android.63`; implementation reports Render Engine `35` |
 
 Environment-variable names may appear, but values, credentials, production DB contents, and deployment-specific identifiers were outside the investigation.
 
@@ -40,7 +40,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | PIPE-S15 | Stage 1.5 | Deterministic focus rewrite and explicit variation | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | Confirmed |
 | PIPE-S2 | Stage 2 | DDL to JSON Score through a schema tool | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | Confirmed |
 | PIPE-COERCE | Coerce/validation | Drop invalid values, deliver requests, enforce ceilings, and retain one explicitly named abstract color | `coerce/__init__.py`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | Confirmed |
-| PIPE-RENDER | Render Engine | JSON Score and seeds to SVG and performance metadata | `render_engines/__init__.py:current_render_engine`; `render_engines/default/adapter.py:DefaultRenderEngine`; `render_engines/default/engine.py:render_result`; `renderer.py:render` (SVG-only compatibility facade) | §12.14, §13.8 | Confirmed |
+| PIPE-RENDER | Render Engine | JSON Score and seeds to SVG and performance metadata, with a one-way pure-geometry-to-SVG boundary | `render_engines/default/mark_kernel.py` (scalars and points); `render_engines/default/marks.py` (SVG emission); `render_engines/default/engine.py:render_result`; `renderer.py:render` (SVG-only compatibility facade) | §12.14, §13.8 | Confirmed |
 | PIPE-HISTORY | History persistence | Store Server Paint outputs in the DB | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | Confirmed |
 | DATA-DH1 | `dh1` | Identity of a normalized description | `identity.py:description_hash` | Project Context | Confirmed |
 | DATA-RH3 | `rh3` | Edition identity from Score, render seed, Wild, engine, and color catalog | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context | Confirmed |

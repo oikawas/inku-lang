@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.48` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.49` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2076,3 +2076,9 @@ Androidはserver設定を搬送しないため、本段は端末内limitを受�
 4候補を推敲している間、候補ごとのlaneを1列に置き、生成済みをチェック、現在の1候補を選択中と反対のMascot、未着手を中点で示す。番号は1から4まで固定位置に残る。Androidの候補生成は逐次なので、同時に動くMascotは1体だけであり、Webの並列fan-outを移植した表示にはしない。1候補生成と非busy時にはlane列を出さない。
 
 表示は既存の`refinementCount`、`refinementCandidates.size`、`refinementBusy`だけから導出する。ViewModel、repository、pipeline、render、永続化、server/web/sharedは変更していない。
+
+## 2026-08-23 履歴をキャンバスのそばに置く（android `2.1.4-android.49`・[I-349]）
+
+通常Compose画面のキャンバス直下に、既存履歴のサムネイルを横stripで並べる。現在作品は選択枠で示し、タップは既存の履歴選択処理へ渡す。選択作品が変わるとstripもその位置へスクロールする。履歴0件、presentation/full-screen、controls非表示ではstripを出さず、描画・推敲中は選択操作を無効にする。
+
+Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した。履歴画面、検索、star filterは既存のAndroid UIを正本とし、ViewModel、repository、Room/query/schema、履歴の取得件数・順序、replay生成、永続化は変更していない。

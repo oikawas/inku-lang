@@ -7896,3 +7896,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **4候補の生成中、生成済みをチェック、現在の1候補を反対Mascot、未着手を中点で示す。** 1から4のlaneを固定位置に置き、逐次生成を並列fan-outのようには見せない。1候補と非busy時には表示しない。
 - **既存の候補数・生成済み候補・busy stateだけを読むUI変更である。** ViewModel、repository、pipeline、render、永続化、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは未実装symbolでexit 1。実装中とbranch-tip finalは同じ3 testsがexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.49` — 履歴をキャンバスのそばに置く（2026-08-23・[I-349]）
+
+- **通常Compose画面のキャンバス直下に、履歴サムネイルの横stripを追加した。** 現在作品を選択枠で示し、タップは既存の選択処理へ渡し、選択変更時はその位置へ自動スクロールする。
+- **履歴0件、presentation/full-screen、controls非表示では出さず、描画・推敲中は操作を無効にする。** 既存の履歴画面、検索、star filterは複製していない。ViewModel、repository、Room/query/schema、履歴順、replay生成、永続化は変更していない。
+- **検証:** production edit前のfocused JVM testは未実装helperでexit 1。実装中とbranch-tip finalは同じ2 testsがexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.48` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.49` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2578,3 +2578,9 @@ Android does not transport server settings, so this stage provides only the dete
 While four refinement candidates are being generated, one row keeps a lane for each candidate: completed candidates show a check, the current candidate shows the mascot opposite the selected one, and candidates not yet started show a middle dot. Numbers one through four stay in fixed positions. Android generates candidates sequentially, so only one mascot moves at a time; the row does not imply that Web's parallel fan-out was ported. The row is absent for a single candidate and whenever generation is not busy.
 
 The display is derived only from the existing `refinementCount`, `refinementCandidates.size`, and `refinementBusy` values. No ViewModel, repository, pipeline, rendering, persistence, server, Web, or shared path changed.
+
+## 2026-08-23 Keeping history beside the canvas (android `2.1.4-android.49`, [I-349])
+
+The ordinary Compose screen now places a horizontal strip of existing history thumbnails directly below the canvas. A selection ring marks the current work, taps use the existing history-selection path, and changing the selected work scrolls the strip to its position. The strip is absent with no history, in presentation/full-screen, or when controls are hidden; selection is disabled while drawing or refining.
+
+Only the thumbnail-selection route from Web's `HistoryStrip` is adapted. Android's existing History screen, search, and starred filter remain canonical. No ViewModel, repository, Room query or schema, history count or ordering, replay generation, or persistence changed.

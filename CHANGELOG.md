@@ -8725,3 +8725,9 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **During a four-candidate run, completed candidates show a check, the current candidate shows the opposite mascot, and candidates not yet started show a middle dot.** The numbered lanes stay in fixed positions and do not make sequential generation look like parallel fan-out. The row is absent for one candidate and while not busy.
 - **This UI change reads only the existing candidate count, completed candidates, and busy state.** No ViewModel, repository, pipeline, rendering, persistence, server, Web, or shared path changed.
 - **Verification:** the focused pre-production test exited 1 on the missing symbols. The same three tests exited 0 during implementation and at the branch tip. Full JVM, instrumentation, devices, screenshots, reference generation, and pentala were out of scope.
+
+### Android `2.1.4-android.49` — history stays beside the canvas (2026-08-23, [I-349])
+
+- **A horizontal history-thumbnail strip now sits directly below the canvas on the ordinary Compose screen.** A selection ring marks the current work, taps use the existing selection path, and a selection change scrolls the strip to that position.
+- **The strip is absent with no history, in presentation/full-screen, or with controls hidden; interaction is disabled while drawing or refining.** The existing History screen, search, and starred filter are not duplicated. No ViewModel, repository, Room query or schema, history ordering, replay generation, or persistence changed.
+- **Verification:** the focused pre-production test exited 1 on the missing helper. The same two tests exited 0 during implementation and at the branch tip. Full JVM, instrumentation, devices, screenshots, reference generation, and pentala were out of scope.

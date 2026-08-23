@@ -4600,6 +4600,20 @@ internal fun generationInfoColorMapEntries(renderMetadataJson: String): List<Gen
         ?.map { GenerationInfoColorMapEntry(word = it.key, code = it.value) }
         .orEmpty()
 
+internal fun generationInfoColorCatalogValue(
+    renderMetadataJson: String,
+    fallbackCatalogId: String,
+): String {
+    val snapshot = workColorSnapshot(renderMetadataJson) ?: return fallbackCatalogId
+    val catalogName = snapshot.catalogName?.trim()?.takeIf { it.isNotEmpty() }
+        ?: return snapshot.catalogId
+    return if (catalogName == snapshot.catalogId) {
+        snapshot.catalogId
+    } else {
+        "$catalogName (${snapshot.catalogId})"
+    }
+}
+
 internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInfoSection> {
     val metadata = runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }
     fun value(value: Any?): String = value?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: "—"
@@ -4655,7 +4669,13 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
                 GenerationInfoRow(GenerationInfoField.RenderSeed, columnOrMetadata(item.renderSeed, "render_seed")),
                 GenerationInfoRow(GenerationInfoField.SeedText, value(item.seedText)),
                 GenerationInfoRow(GenerationInfoField.RenderWild, renderWild),
-                GenerationInfoRow(GenerationInfoField.ColorCatalog, columnOrMetadata(item.colorCatalogId, "render_color_catalog_id")),
+                GenerationInfoRow(
+                    GenerationInfoField.ColorCatalog,
+                    generationInfoColorCatalogValue(
+                        item.renderMetadataJson,
+                        columnOrMetadata(item.colorCatalogId, "render_color_catalog_id"),
+                    ),
+                ),
                 GenerationInfoRow(GenerationInfoField.CanvasAspect, columnOrMetadata(item.canvasAspect, "render_canvas_aspect")),
                 GenerationInfoRow(GenerationInfoField.CanvasRatio, metadataValue("render_canvas_aspect_ratio")),
             ),

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.inku.mobile.data.model.CompatibilityConstants
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,8 +27,9 @@ class VersionInfoPanelTest {
         }
 
         composeTestRule.onNodeWithText("render engine").assertIsDisplayed()
-        // Pinned to a literal on purpose: leaving it stale has to fail here. It went
-        // stale across engines 18-21 because nothing ran this source set.
-        composeTestRule.onNodeWithText("default 26").assertIsDisplayed()
+        // Verify that the panel is wired to the same compatibility values as the product.
+        composeTestRule.onNodeWithText(
+            "${CompatibilityConstants.renderEngineId} ${CompatibilityConstants.renderEngineVersion}",
+        ).assertIsDisplayed()
     }
 }

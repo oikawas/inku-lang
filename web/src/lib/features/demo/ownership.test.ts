@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const page = readFileSync(new URL('../../../routes/+page.svelte', import.meta.url), 'utf8');
 const owner = readFileSync(new URL('./state.svelte.ts', import.meta.url), 'utf8');
+const work = readFileSync(new URL('../work/state.svelte.ts', import.meta.url), 'utf8');
 
 test('T-901: the route constructs one DemoState and no longer owns its state machine', () => {
 	assert.equal((page.match(/new DemoState(?:<[^>]+>)?\(/g) ?? []).length, 1);
@@ -25,7 +26,7 @@ test('T-905/T-907: DemoState uses narrow capabilities and identity, without tran
 	assert.doesNotMatch(owner, /HistoryBrowsingState|SettingsController|CanvasViewportState|Record<string, unknown>/);
 	assert.doesNotMatch(owner, /AbortController|AbortSignal/);
 	assert.match(owner, /private runIdentity = 0/);
-	assert.match(page, /paintInstruction: \(prompt, paintOptions\) => paintOne\(prompt, paintOptions\)/);
-	assert.match(page, /refreshAfterServerSave: \(\) => history\.refreshAfterServerSave\(\)/);
-	assert.match(page, /refreshAfterRun: \(\) => history\.refreshAfterRun\(\)/);
+	assert.match(work, /paintInstruction: \(prompt, paintOptions\) => paintOne\(prompt, paintOptions\)/);
+	assert.match(work, /refreshAfterServerSave: \(\) => deps\.history\(\)\.refreshAfterServerSave\(\)/);
+	assert.match(work, /refreshAfterRun: \(\) => deps\.history\(\)\.refreshAfterRun\(\)/);
 });

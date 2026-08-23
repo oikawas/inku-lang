@@ -24,3 +24,22 @@ test('T-1001/T-1006: Session writers no longer remain on the route', () => {
 	assert.match(session, /currentUser = \$state<UserItem \| null>/);
 	assert.doesNotMatch(page, /let currentUser(?:\s*:[^=]+)?\s*=\s*\$state/);
 });
+
+test('T-1001/T-1005: the route constructs the Work owner once', () => {
+	const page = read('../../routes/+page.svelte');
+	assert.match(page, /import \{ createWorkState \} from '\$lib\/features\/work\/state\.svelte';/);
+	assert.equal((page.match(/createWorkState\(/g) ?? []).length, 1);
+});
+
+test('T-1001/T-1004: submit, replay, and stop have one Work owner', () => {
+	const page = read('../../routes/+page.svelte');
+	const work = read('./work/state.svelte.ts');
+	for (const writer of ['submit', 'replay', 'stopDdlRender']) {
+		assert.match(work, new RegExp(`(?:async\\s+)?function\\s+${writer}\\(`), writer);
+		assert.doesNotMatch(page, new RegExp(`(?:async )?function ${writer}\\(`), writer);
+	}
+	for (const state of ['input', 'ddl', 'result', 'loading', 'displayedHistoryItem']) {
+		assert.match(work, new RegExp(`${state}\\s*=\\s*\\$state`), state);
+		assert.doesNotMatch(page, new RegExp(`let ${state}(?:\\s*:[^=]+)?\\s*=\\s*\\$state`), state);
+	}
+});

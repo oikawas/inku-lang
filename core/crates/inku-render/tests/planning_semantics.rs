@@ -62,3 +62,19 @@ fn unresolved_relation_is_dropped_with_structured_warning() {
         "between requires two priors"
     );
 }
+
+#[test]
+fn along_cloudform_uses_the_performed_contour() {
+    let prior = instruction(
+        r#"{"primitive":"cloudform","center":[0.5,0.5],"size":[0.5,0.3],
+        "weight":"pencil"}"#,
+    );
+    let current = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.03,
+        "relation":{"type":"along","gap":"narrow"}}"#,
+    );
+    let result = resolve_relation(&current, &[prior], 431, 1);
+    assert!(result.warning.is_none());
+    let center = result.instruction.center.unwrap();
+    assert!((center.x - 0.5).abs() > 0.1 || (center.y - 0.5).abs() > 0.05);
+}

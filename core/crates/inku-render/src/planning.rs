@@ -1,7 +1,8 @@
 //! Pure transformation of canonical instructions into performed instructions.
 
 use crate::arc::{arc_from_endpoints_and_sagitta, arc_point, minor_arc_delta};
-use crate::determinism::hash01;
+use crate::cloudform::{CloudformRequest, generate_cloudform_contour};
+use crate::determinism::{hash01, instruction_seed};
 use crate::placement::region_in_short_side_units;
 use crate::types::{
     CanvasSize, Instruction, Layout, Point, Primitive, RelationGap, RelationType, Seed,
@@ -188,6 +189,15 @@ fn bounds_for_points(points: &[Point]) -> Option<Bounds> {
 
 #[must_use]
 pub fn instruction_bounds(instruction: &Instruction) -> Option<Bounds> {
+    performed_instruction_bounds(instruction, None, 0)
+}
+
+#[must_use]
+pub fn performed_instruction_bounds(
+    instruction: &Instruction,
+    performance_seed: Option<Seed>,
+    instruction_index: usize,
+) -> Option<Bounds> {
     let rotation = instruction.rotation.unwrap_or(0.0);
     match instruction.primitive {
         Primitive::Line => {
@@ -239,7 +249,25 @@ pub fn instruction_bounds(instruction: &Instruction) -> Option<Bounds> {
                 .collect();
             bounds_for_points(&points)
         }
-        Primitive::Cloudform => None,
+        Primitive::Cloudform => {
+            let center = instruction.center?;
+            let size = instruction.size?;
+            let contour = generate_cloudform_contour(CloudformRequest {
+                center,
+                size,
+                performance_seed: Some(instruction_seed(instruction, performance_seed)),
+                instruction_index,
+                mark_index: 0,
+                variation: instruction.variation.as_ref(),
+                weight: instruction.weight,
+                point_count: 49,
+            });
+            let points: Vec<Point> = contour
+                .into_iter()
+                .map(|point| rotate_point(point, center, rotation))
+                .collect();
+            bounds_for_points(&points)
+        }
     }
 }
 
@@ -424,17 +452,19 @@ pub fn resolve_relation(
     if relation.kind != RelationType::Between && previous.is_empty() {
         return dropped(instruction, index, "no prior instruction");
     }
-    let Some(prior_bounds) = previous.last().and_then(instruction_bounds) else {
+    let Some(prior_bounds) = previous
+        .last()
+        .and_then(|prior| performed_instruction_bounds(prior, Some(seed), index.saturating_sub(1)))
+    else {
         return dropped(instruction, index, "prior has no performed bounds");
     };
     let prior_center = prior_bounds.center();
     let gap = relation_gap(seed, index, relation.gap);
     let target = match relation.kind {
         RelationType::Between => {
-            let Some(other_bounds) = previous
-                .get(previous.len() - 2)
-                .and_then(instruction_bounds)
-            else {
+            let Some(other_bounds) = previous.get(previous.len() - 2).and_then(|other| {
+                performed_instruction_bounds(other, Some(seed), index.saturating_sub(2))
+            }) else {
                 return dropped(instruction, index, "second prior has no performed bounds");
             };
             let jitter = 0.08 * (hash01(index as i64, seed, "between-jitter") - 0.5);
@@ -463,6 +493,34 @@ pub fn resolve_relation(
                 clamp_point(Point::new(
                     point.x + offset.x * side,
                     point.y + offset.y * side,
+                ))
+            } else if prior.primitive == Primitive::Cloudform {
+                let Some(center) = prior.center else {
+                    return dropped(instruction, index, "prior cloudform has no center");
+                };
+                let Some(size) = prior.size else {
+                    return dropped(instruction, index, "prior cloudform has no size");
+                };
+                let contour = generate_cloudform_contour(CloudformRequest {
+                    center,
+                    size,
+                    performance_seed: Some(instruction_seed(prior, Some(seed))),
+                    instruction_index: index.saturating_sub(1),
+                    mark_index: 0,
+                    variation: prior.variation.as_ref(),
+                    weight: prior.weight,
+                    point_count: 49,
+                });
+                let point_index = (hash01(index as i64, seed, "along-cloudform")
+                    * contour.len() as f64) as usize
+                    % contour.len();
+                let point =
+                    rotate_point(contour[point_index], center, prior.rotation.unwrap_or(0.0));
+                let delta = Point::new(point.x - prior_center.x, point.y - prior_center.y);
+                let distance = delta.x.hypot(delta.y).max(1.0e-9);
+                clamp_point(Point::new(
+                    point.x + delta.x / distance * gap,
+                    point.y + delta.y / distance * gap,
                 ))
             } else {
                 let angle = std::f64::consts::TAU * hash01(index as i64, seed, "along-angle");
@@ -493,7 +551,8 @@ pub fn resolve_relation(
             prior_center
         }
         RelationType::NotTouching => {
-            let own_radius = instruction_bounds(instruction).map_or(0.0, Bounds::radius);
+            let own_radius = performed_instruction_bounds(instruction, Some(seed), index)
+                .map_or(0.0, Bounds::radius);
             let distance = prior_bounds.radius() + own_radius + gap;
             let angle = std::f64::consts::TAU * hash01(index as i64, seed, "not-touching-angle");
             clamp_point(Point::new(

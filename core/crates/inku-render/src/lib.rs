@@ -6,10 +6,13 @@
 #![forbid(unsafe_code)]
 
 pub mod arc;
+pub mod arrangement;
+pub mod cloudform;
 pub mod contact;
 pub mod determinism;
 pub mod geometry;
 pub mod group;
+pub mod performance;
 pub mod placement;
 pub mod planning;
 pub mod stroke;

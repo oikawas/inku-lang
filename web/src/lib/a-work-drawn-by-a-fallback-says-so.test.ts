@@ -31,6 +31,7 @@ import { en } from './i18n/en.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PAGE = read('../routes/+page.svelte');
+const HISTORY_SAVE = read('./features/history/save.ts');
 const CANVAS = read('./components/CanvasPanel.svelte');
 const THUMBNAIL = read('./components/HistoryThumbnail.svelte');
 
@@ -55,14 +56,15 @@ test('T-232 the web sender stacks none when compose held', () => {
 	assert.equal(COMPOSE_FALLBACK_NONE, 'none');
 });
 
-test('T-232 both saves to /api/history carry the value', () => {
-	// Counted, not assumed: this page posts to the endpoint from two places --
-	// the general save and the demo save -- and a key added to one of them is
-	// the failure this counts. The bodies are single expressions, so each POST
-	// is read as the text between its url and its closing brace.
-	const posts = [...PAGE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
-	assert.equal(posts.length, 2, `expected 2 saves to /api/history, saw ${posts.length}`);
-	for (const [index, body] of posts.entries()) {
+test('T-232 both canonical saves to /api/history carry the value', () => {
+	// The general sender belongs to the history save module; the route retains
+	// only the demo sender. Count each canonical owner so another extraction does
+	// not turn this guard into a false failure about the page's internal shape.
+	const generalPosts = [...HISTORY_SAVE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
+	const demoPosts = [...PAGE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
+	assert.equal(generalPosts.length, 1, `expected the canonical general save, saw ${generalPosts.length}`);
+	assert.equal(demoPosts.length, 1, `expected the page-owned demo save, saw ${demoPosts.length}`);
+	for (const [index, body] of [...generalPosts, ...demoPosts].entries()) {
 		assert.ok(
 			body.includes('compose_fallback'),
 			`the save at index ${index} does not say what compose did`
@@ -70,12 +72,10 @@ test('T-232 both saves to /api/history carry the value', () => {
 	}
 
 	// Naming the key is not sending a value. The general save binds it to a
-	// derivation, and that derivation has to read the paint response: bound to
-	// the work's own field alone it is null for every freshly drawn work, and
-	// the key is then dropped by the very expression that names it -- a sender
-	// that looks wired and says nothing.
-	const derivation = PAGE.match(/const composeFallback = [\s\S]{0,400}?;\n/);
-	assert.ok(derivation, 'the general save no longer derives the value it sends');
+	// dependency, and the route wiring has to derive that value from the paint
+	// response when the stored field is absent.
+	const derivation = PAGE.match(/composeFallbackFor: \(item\) =>[\s\S]{0,300}?,\n/);
+	assert.ok(derivation, 'the general save no longer receives its canonical derivation');
 	assert.ok(
 		derivation[0].includes('compose_fallback_used'),
 		'the derivation never reads the paint response, so a drawn work sends nothing'
@@ -86,7 +86,7 @@ test('T-232 both saves to /api/history carry the value', () => {
 	);
 	// The demo save holds a response outright, so it derives from it directly.
 	assert.ok(
-		posts.some((body) => /compose_fallback: composeFallbackValue\(/.test(body)),
+		demoPosts.some((body) => /compose_fallback: composeFallbackValue\(/.test(body)),
 		'the demo save names the key without deriving its value'
 	);
 });

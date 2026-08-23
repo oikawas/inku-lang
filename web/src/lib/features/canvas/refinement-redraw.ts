@@ -19,6 +19,7 @@ export type TouchRedrawCapabilities = {
 	apiFetch: ApiFetch;
 	apiError(response: Response): Promise<Error>;
 	createRenderSeed(excluded: Set<number>): number;
+	isCurrentTarget(): boolean;
 	currentResult(): PaintResult;
 };
 
@@ -66,7 +67,7 @@ export type RefinementRedrawProjection = {
 export async function runTouchRedraw(
 	input: TouchRedrawInput,
 	capabilities: TouchRedrawCapabilities
-): Promise<PaintResult> {
+): Promise<PaintResult | null> {
 	const usedSeeds = new Set<number>();
 	if (Number.isFinite(input.current.render_seed ?? NaN)) {
 		usedSeeds.add(Number(input.current.render_seed));
@@ -88,8 +89,11 @@ export async function runTouchRedraw(
 	});
 	if (!response.ok) throw await capabilities.apiError(response);
 	const svg = await response.text();
-	// The route historically resolves the base again after the request. Keep that
-	// timing explicit here; changing stale-target behavior belongs to its own repair.
+	// A target change resets the route context. Check after the response body has
+	// finished too, or a move during that await could make the new work the base.
+	if (!capabilities.isCurrentTarget()) return null;
+	// For the same target, preserve the established completion-time result read so
+	// same-work updates made while rendering remain in the projection.
 	const current = capabilities.currentResult();
 	return {
 		...current,

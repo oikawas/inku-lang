@@ -31,6 +31,9 @@ test('T-331: page delegates single redraw actions but keeps route and view coord
 	const reading = pageFunction(page, 'varyInterpretation');
 	assert.doesNotMatch(touch, /apiFetch\(['"]\/api\/render-svg/);
 	assert.doesNotMatch(touch, /const usedSeeds = new Set/);
+	assert.match(touch, /const contextVersion = targetContextVersion/);
+	assert.match(touch, /isCurrentTarget: \(\) => contextVersion === targetContextVersion/);
+	assert.match(touch, /if \(!redrawn\) return/);
 	assert.doesNotMatch(layout + reading, /elapsedStage1Ms = r\.elapsed_stage1_ms/);
 
 	for (const wrapper of [touch, layout, reading]) {

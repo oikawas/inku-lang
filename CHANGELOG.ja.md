@@ -7962,3 +7962,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **I-360のmodel tooltipへ保存済み作品hashとキャンバスを追加した。** 短縮render hashは既存の`F` prefix表記と`作品の来歴ハッシュ`label、`canvasAspect`は既存の`キャンバス`labelを使い、blank値は`—`とする。
 - **既存`HistoryListItem.renderHashShort`と`canvasAspect`だけを読む。** full itemを追加loadせず、現在のcanvas optionから再計算しない。I-360のmodel ID、保存日時、色カタログID、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保った。新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testはtooltip formatterの追加予定4引数の未実装参照12件だけでexit 1。実装中とbranch-tip finalの`HistoryStripModelLabelTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.60` — VersionInfoPanel計装testのengine期待値を製品定数から組み立てる（2026-08-23・[I-318]）
+
+- **`VersionInfoPanelTest`の期待表示を`CompatibilityConstants.renderEngineId`と`renderEngineVersion`から組み立てる。** 古い`default 26` literalを外し、testの責務を現行番号の独立固定ではなく、VersionInfoPanelが製品互換定数へ結線されていることの確認に限定した。
+- **製品挙動は変えていない。** production Kotlin、表示文字列、Gradle dependency、runner、Espresso stub、保存形式、Room、pipeline、render、server/web/sharedは変更していない。I-064も未変更で残る。
+- **検証:** 最初の計装はscreen OFF・keyguard表示中の環境redでCompose hierarchy前に停止した。private I-362でread-only preflightを実装し、unlock後の有効なfail-firstは古いliteralだけで1/1 failure。実装後greenとbranch-tip finalは同じ1 testがexit 0。各runはAPK保持flagとDB退避を使い、history 2、lineage 2、schema 9、thumbnail 1,239件を保持した。全instrumentation、全JVM suite、screenshot、reference生成、pentalaは行っていない。

@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.59` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.60` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2644,3 +2644,9 @@ The UI reads only the existing `HistoryListItem.createdAt` and `colorCatalogId` 
 I-360's model tooltip now also shows the work's saved short render hash under the existing `Provenance hash` label with the established `F` prefix and its saved `canvasAspect` under the existing `Canvas` label. A blank value is shown as `—`.
 
 The UI reads only the existing `HistoryListItem.renderHashShort` and `canvasAspect`. It neither loads the full item nor recalculates from current canvas options. I-360's model IDs, saved time, color-catalog ID, no-Stage-1 omission, fourteen-character visible label, thumbnail dimensions, work selection, Star, scrolling, and interaction lock are preserved. No new state, repository or DAO query, Room schema or migration, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Wiring the VersionInfoPanel instrumentation test to product compatibility constants (android `2.1.4-android.60`, [I-318])
+
+`VersionInfoPanelTest` now builds its expected render-engine text from the same `CompatibilityConstants.renderEngineId` and `renderEngineVersion` used by the product instead of retaining the stale literal `default 26`. The test now checks that VersionInfoPanel is wired to the product compatibility values; it no longer independently freezes the current engine number.
+
+No production Kotlin, visible text, Gradle dependency, runner, Espresso stub, persistence format, Room, pipeline, rendering, server, Web, or shared path changed. The first instrumentation attempt failed before the Compose hierarchy because the device screen was off behind the keyguard, so private task I-362 added a read-only display preflight. After unlock, fail-first failed only on the old literal; the same one test passed after implementation and at the branch tip. Every run used the APK-retention flag and a database evacuation, preserving two history rows, two lineage rows, schema version 9, and 1,239 thumbnails. I-064 remains unchanged and open.

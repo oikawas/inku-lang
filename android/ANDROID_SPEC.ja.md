@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.59` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.60` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2142,3 +2142,9 @@ I-359のmodel tooltipへ、作品の保存日時と保存済み色カタログID
 I-360のmodel tooltipへ、作品が保存した短縮render hashを既存の`F` prefix表記で示す`作品の来歴ハッシュ`行と、保存済み`canvasAspect`を示す`キャンバス`行を追加する。既存の日英labelを再利用し、値がblankなら`—`を表示する。
 
 既存`HistoryListItem.renderHashShort`と`canvasAspect`だけを読み、full itemの追加loadや現在のcanvas optionからの再計算を行わない。I-360のmodel ID、保存日時、色カタログID、Stage 1欠落時の非表示、14文字短縮ラベル、サムネイル寸法、作品選択、Star、scroll、操作lockを保ち、新しいstate、repository/DAO/query、Room/schema/migration、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 VersionInfoPanel計装testを製品互換定数へ結線する（android `2.1.4-android.60`・[I-318]）
+
+`VersionInfoPanelTest`のrender engine期待表示は、古い`default 26` literalではなく、製品画面と同じ`CompatibilityConstants.renderEngineId`と`renderEngineVersion`から組み立てる。testの責務を「現行engine番号を別に固定する」ことから「VersionInfoPanelが製品互換定数へ結線されている」ことへ限定した。
+
+製品Kotlin、表示内容、Gradle dependency、runner、Espresso stub、保存形式、Room、pipeline、render、server/web/sharedは変更していない。最初の計装は画面OFF・keyguard表示中のためCompose hierarchy前で失敗したので、private I-362でread-only preflightを追加した。unlock後のfail-firstは古いliteralだけで1/1 failure、実装後とbranch-tip finalは同じ1 testがgreen。各runはAPK保持flagとDB退避を使い、history 2、lineage 2、schema 9、thumbnail 1,239件を保持した。I-064は未変更で残る。

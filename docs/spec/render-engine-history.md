@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **41** | pre-cutover migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
@@ -421,6 +422,22 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 41 — migration baseline for moving the render core to Rust (pre-cutover)
+
+**Engine 41 is not a drawing-quality release; it is the migration baseline that moves Engine 40's
+performance into the shared Rust core.** Python and Rust differ in SVG number spelling, their choice
+of path versus polyline, and how elements are grouped, so all 610 cases moved at the byte level.
+**No case stayed byte-identical, but the geometry, layers, materials, surfaces, grounds, colours,
+composition, and meaning of render metadata stayed fixed.** The candidate passed semantic checks
+over all 610 cases, visual review of 12 pairs, byte identity for a five-case Linux/macOS sample, and
+core compile checks for Android arm64 and iOS arm64. The author accepted its visual parity.
+
+At this freeze point, production `current_render_engine()` still selects Python Engine 40. A
+separate stage performs the Engine 41 production cutover and then proves that the normal generator
+recreates this frozen corpus byte-for-byte. **This version contains no intentional drawing
+improvement.** Improvements after the Engine 41 freeze belong to a separate contract and the next
+engine version.
 
 ## engine 40 — non-computer solid becomes a mottled base fill, not scan lines (v2.13.46)
 

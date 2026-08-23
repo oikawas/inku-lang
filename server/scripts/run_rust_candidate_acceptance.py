@@ -84,6 +84,12 @@ PLATFORM_CASES = (
     "D-canvas-pillar-path-wave",
     "G-cluster-edge",
 )
+CANDIDATE_FROZEN_AT = "2026-08-24"
+CANDIDATE_FREEZE_REASON = (
+    "Engine 41 is the accepted Rust portability migration baseline. It preserves "
+    "Engine 40 drawing semantics while moving the render implementation behind the "
+    "shared Rust core; no drawing improvement is part of this freeze."
+)
 
 
 class CandidateValidationError(RuntimeError):
@@ -429,6 +435,9 @@ def run(output_dir: Path, source_commit: str) -> dict[str, object]:
     reference.generate(
         engine=RUST_CANDIDATE_RENDER_ENGINE,
         output_dir=candidate_corpus,
+        frozen_at=CANDIDATE_FROZEN_AT,
+        source_commit=source_commit,
+        reason=CANDIDATE_FREEZE_REASON,
     )
 
     classifications: Counter[str] = Counter()

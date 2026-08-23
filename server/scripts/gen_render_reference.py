@@ -1143,6 +1143,9 @@ def generate(
     *,
     engine: RenderEngine | None = None,
     output_dir: pathlib.Path | None = None,
+    frozen_at: str | None = None,
+    source_commit: str | None = None,
+    reason: str | None = None,
 ) -> None:
     """Generate a corpus for the current engine or an explicit tooling candidate.
 
@@ -1151,6 +1154,11 @@ def generate(
     """
     if engine is not None and output_dir is None:
         raise ValueError("an explicit render engine requires an explicit output directory")
+    freeze_overrides = (frozen_at, source_commit, reason)
+    if engine is not None and any(value is None for value in freeze_overrides):
+        raise ValueError("an explicit render engine requires explicit freeze metadata")
+    if engine is None and any(value is not None for value in freeze_overrides):
+        raise ValueError("freeze metadata overrides require an explicit render engine")
     selected_engine = engine if engine is not None else current_render_engine()
     if output_dir is None:
         output_dir = REFERENCE_ROOT / f"render-engine-{selected_engine.version}"
@@ -1189,7 +1197,9 @@ def generate(
                 if case_id not in before or before[case_id]["digest"] != case["digest"]
             )
         frozen = {
-            "frozen_at": FROZEN_AT, "commit": _source_commit(), "reason": REASON,
+            "frozen_at": frozen_at if frozen_at is not None else FROZEN_AT,
+            "commit": source_commit if source_commit is not None else _source_commit(),
+            "reason": reason if reason is not None else REASON,
             "changed_from_previous": changed,
         }
     else:

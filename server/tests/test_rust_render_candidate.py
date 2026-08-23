@@ -15,6 +15,7 @@ from inku_server.schema import Score
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
+ENGINE_41_CORPUS_DIR = SERVER_ROOT / "reference" / "render-engine-41"
 
 
 def _reference_generator():
@@ -129,11 +130,20 @@ def test_candidate_generation_reuses_manifest_logic_in_an_explicit_destination(
         monkeypatch.setattr(generator, check, lambda *_args, **_kwargs: None)
 
     output_dir = tmp_path / "candidate-corpus"
-    generator.generate(engine=CandidateEngine(), output_dir=output_dir)
+    generator.generate(
+        engine=CandidateEngine(),
+        output_dir=output_dir,
+        frozen_at="2026-08-24",
+        source_commit="accepted-candidate",
+        reason="Accepted candidate freeze.",
+    )
 
     manifest = json.loads((output_dir / "manifest.json").read_text())
     assert manifest["engine_id"] == "candidate"
     assert manifest["engine_version"] == "41"
+    assert manifest["frozen_at"] == "2026-08-24"
+    assert manifest["commit"] == "accepted-candidate"
+    assert manifest["reason"] == "Accepted candidate freeze."
     assert set(manifest["cases"]) == {"A-pen-line"}
     assert (output_dir / "A-pen-line.svg").read_text() == "<svg class='candidate'/>"
     assert len(calls) == 1
@@ -144,3 +154,32 @@ def test_explicit_candidate_generation_requires_an_explicit_destination():
 
     with pytest.raises(ValueError, match="explicit output directory"):
         generator.generate(engine=SimpleNamespace(id="candidate", version="41"))
+
+
+def test_explicit_candidate_generation_requires_freeze_metadata(tmp_path: Path):
+    generator = _reference_generator()
+
+    with pytest.raises(ValueError, match="explicit freeze metadata"):
+        generator.generate(
+            engine=SimpleNamespace(id="candidate", version="41"),
+            output_dir=tmp_path / "candidate-corpus",
+        )
+
+
+def test_accepted_engine_41_candidate_corpus_is_internally_complete():
+    generator = _reference_generator()
+    manifest = json.loads((ENGINE_41_CORPUS_DIR / "manifest.json").read_text())
+
+    assert manifest["engine_id"] == "default"
+    assert manifest["engine_version"] == "41"
+    assert manifest["frozen_at"] == "2026-08-24"
+    assert manifest["commit"] == "68f89b11b087203504b99d81cc84e18879403f14"
+    cases = manifest["cases"]
+    changed = set(manifest["changed_from_previous"])
+    bodies = {path.stem for path in ENGINE_41_CORPUS_DIR.glob("*.svg")}
+    assert len(cases) == 610
+    assert changed == set(cases) == bodies
+    for case_id, case in cases.items():
+        svg = (ENGINE_41_CORPUS_DIR / f"{case_id}.svg").read_text()
+        assert len(svg.encode()) == case["bytes"], case_id
+        assert generator._normalized_digest(svg) == case["digest"], case_id

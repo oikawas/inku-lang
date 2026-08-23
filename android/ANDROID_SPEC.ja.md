@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.62` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.63` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2160,3 +2160,9 @@ I-360のmodel tooltipへ、作品が保存した短縮render hashを既存の`F`
 通常作品を持つ系譜cardに、描画要素の次、モデルの前へ既存`DDL編集`actionを追加する。actionはfocus外cardも対象にでき、保存済み`normalizedDdl`で既存editorを開く。編集後は既存`drawFromDdl`と`ddl_edit`保存経路を使い、成功時にLineage tabを保ったまま新しい子へfocusして系譜を再取得する。tombstoneにはactionを出さない。
 
 新しいeditor、producer、repository/DAO/query、Room/schema/migration、保存形式、i18n、LLM処理、pipeline、render、server/web/sharedは追加していない。focused実機testはcard action、editor初期値、`ddl_edit` edge、子focusを1本で通した。testが作るthumbnailはrepository close後に対象render hashだけを削除し、最終退避でhistory 2、lineage 2、schema 9、thumbnail 1,239件を保持した。
+
+## 2026-08-24 系譜カードで作品をその場でStar／解除する（android `2.1.4-android.63`・[I-365]）
+
+通常作品を持つ各系譜cardのthumbnail右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを置く。controlのtapはcardの作品選択とは別のtargetで、focus外cardをStar／解除しても選択中作品と系譜focusを変えない。tombstoneにはcontrolを出さない。
+
+既存`HistoryItemEntity.starred`、`toggleStar(HistoryItemEntity)`、Star保存、系譜再取得、`HistoryBadge`だけを使う。保存後に同じfocusでgraphを再取得して表示を更新し、既存card tap、thumbnail、世代・状態、描画要素／DDL／モデル／言語actionを保つ。新しいproducer、repository/DAO/query、Room/schema/migration、保存形式、i18n、pipeline、render、server/web/sharedは変更していない。

@@ -7980,3 +7980,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常作品を持つ系譜cardへ既存`DDL編集`actionを追加した。** 描画要素の次、モデルの前に置き、focus外cardを押しても対象作品の保存済み`normalizedDdl`で既存editorを開く。tombstoneには表示しない。
 - **編集後は既存`drawFromDdl`と`ddl_edit`保存を再利用する。** 成功後もLineage tabを保ち、保存した子をselected workとfocus nodeにして既存repositoryから系譜を再取得する。既存card tap、描画要素・モデル・言語action、新しい起点、通常Compose起点の遷移は維持した。新しいproducer、query、schema、engineは無い。
 - **検証:** production edit前はcard action 3件を期待して既存の`ddl_edit`派生label 1件しか無く、対象testだけがexit 1。画面外cardへのtest clickを画面内のfocus外cardへ直した後、focused実機testは実装中1/1、branch-tip final 1/1 green。各run前に画面/keyguard preflightとdata退避を行い、test生成thumbnailは対象hashだけをcleanupした。最終退避はhistory 2、lineage 2、schema 9、thumbnail 1,239件。全instrumentation、全JVM suite、screenshot、reference生成、実モデル、network、pentalaは対象外。
+
+### Android `2.1.4-android.63` — 系譜カードで作品をその場でStar／解除する（2026-08-24・[I-365]）
+
+- **通常作品を持つ系譜cardのthumbnail右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを追加した。** focus外cardのcontrolを押してもcard選択を発火させず、selected workと系譜focusを保つ。tombstoneには表示しない。
+- **既存Star保存後に同じfocusで系譜を再取得し、card表示をその場で更新する。** 既存`HistoryItemEntity.starred`、`toggleStar(HistoryItemEntity)`、`HistoryBadge`だけを使い、card tap、thumbnail、世代・状態、描画要素／DDL／モデル／言語actionを維持した。新しいproducer、query、schema、engineは無い。
+- **検証:** production edit前のfocused実機testはStar control 3件を期待して0件で1/1 failure。実装初回はDB保存・graph refresh・focus維持まで通り、画面文字assertの再composition待機だけをtest側へ追加した。その後の実装中とbranch-tip finalは各1/1 green。各run前の退避はhistory 2、lineage 2、schema 9、thumbnail 1,239件を保持した。全instrumentation、全JVM suite、screenshot、reference生成、pentalaは対象外。

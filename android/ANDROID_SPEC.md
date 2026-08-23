@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.62` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.63` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2662,3 +2662,9 @@ The change uses only the existing `HistoryListItem.starred`, toggle action, and 
 Every lineage card with a normal work now has the existing `DDL edit` action after Elements and before Model. The action can target a card other than the current focus and opens the existing editor with that work's saved `normalizedDdl`. Drawing the edit uses the existing `drawFromDdl` and `ddl_edit` save path, keeps the Lineage tab, then reloads the graph focused on the saved child. Tombstones have no action.
 
 No new editor, producer, repository or DAO query, Room schema or migration, persistence format, i18n, LLM processing, pipeline, rendering, server, Web, or shared path was added. One focused device test covers the card action, editor seed value, `ddl_edit` edge, and child refocus. The test removes only the thumbnail for the render hash it creates after closing the repository; the final evacuation preserved two history rows, two lineage rows, schema version 9, and 1,239 thumbnails.
+
+## 2026-08-24 Toggling a work Star in place from a lineage card (android `2.1.4-android.63`, [I-365])
+
+Every lineage card with a normal work now keeps a visible `★` or `☆` control at the upper right of its thumbnail. The control is a separate tap target from card selection, so starring or unstarring a non-focused card does not change the selected work or lineage focus. Tombstones have no control.
+
+The UI uses only the existing `HistoryItemEntity.starred`, `toggleStar(HistoryItemEntity)`, Star persistence, lineage reload, and `HistoryBadge`. Reloading the graph after persistence updates the same card under the same focus. Existing card taps, thumbnails, generation and state labels, and Elements, DDL, Model, and Language actions are preserved. No new producer, repository or DAO query, Room schema or migration, persistence format, i18n, pipeline, rendering, server, Web, or shared path changed.

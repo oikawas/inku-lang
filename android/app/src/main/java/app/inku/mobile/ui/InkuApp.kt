@@ -2344,6 +2344,8 @@ internal fun historyStripStarControl(starred: Boolean, stripEnabled: Boolean): H
         enabled = stripEnabled,
     )
 
+internal fun historyGridStarSymbol(starred: Boolean): String = if (starred) "★" else "☆"
+
 /** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -5164,9 +5166,12 @@ private fun HistoryGridTile(
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = Dimens.radiusCard)),
                     )
                 }
-                if (item.starred) {
-                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceM))
-                }
+                HistoryBadge(
+                    text = historyGridStarSymbol(item.starred),
+                    selected = item.starred,
+                    onClick = onToggleStar,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceM),
+                )
             }
             Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                 Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())

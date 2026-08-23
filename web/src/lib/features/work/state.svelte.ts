@@ -141,9 +141,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	let sketchState = $state<SketchState | null>(null);
 
 	/** The prose to send for this description, or null to let the layer write it.
-		 *  Used by the paths that re-run one stage over a description already on
-		 *  screen (model and language comparison): holding the prose fixed is what
-		 *  makes those a comparison of models rather than of two different texts. */
+	 *  Used by the paths that re-run one stage over a description already on
+	 *  screen (model and language comparison): holding the prose fixed is what
+	 *  makes those a comparison of models rather than of two different texts. */
 	function sketchTextFor(text: string): string | null {
 		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
 			? sketchText
@@ -151,8 +151,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	/** What every request that begins at Stage 2 sends. Those paths never run
-		 *  0.5 -- they carry the prose the work already has, so the four consumers
-		 *  below Stage 1 read what a paint would have given them. */
+	 *  0.5 -- they carry the prose the work already has, so the four consumers
+	 *  below Stage 1 read what a paint would have given them. */
 	function sketchPayloadFor(text: string): Record<string, string> {
 		const prose = sketchTextFor(text);
 		if (!prose) return {};
@@ -161,15 +161,15 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	/** Show the prose a run or a saved work was painted from, and select the
-		 *  grain it used so a redraw starts from the same place. A work with no
-		 *  prose (painted with the layer off, or made before it existed) turns the
-		 *  control off rather than silently painting it at the default grain.
-		 *
-		 *  The control still lands on 'off' for every work with no prose -- what the
-		 *  author is going to draw next is a separate question from what the work on
-		 *  screen was drawn through. The state is what keeps the two apart: it is
-		 *  carried whole, so the note can say "drawn without the layer" and "drawn
-		 *  before the layer was recorded" as the different things they are. */
+	 *  grain it used so a redraw starts from the same place. A work with no
+	 *  prose (painted with the layer off, or made before it existed) turns the
+	 *  control off rather than silently painting it at the default grain.
+	 *
+	 *  The control still lands on 'off' for every work with no prose -- what the
+	 *  author is going to draw next is a separate question from what the work on
+	 *  screen was drawn through. The state is what keeps the two apart: it is
+	 *  carried whole, so the note can say "drawn without the layer" and "drawn
+	 *  before the layer was recorded" as the different things they are. */
 	function adoptSketch(
 		text: string | null,
 		grain: unknown,
@@ -233,8 +233,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	);
 
 	/** The work a refinement started from the canvas would descend from.
-		 *  Built from the same two derivations the badges read, so the dialog and
-		 *  the mark can never disagree about whether the words were lost. */
+	 *  Built from the same two derivations the badges read, so the dialog and
+	 *  the mark can never disagree about whether the words were lost. */
 	function currentRefineParent(): FallbackRefineParent {
 		return {
 			id: displayedHistoryItem?.id ?? result?.history_id ?? null,
@@ -244,9 +244,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	/** Whether the next drawing from the input panel would hang under a parent.
-		 *  Detached, or with nothing on the canvas, it is a new work rather than a
-		 *  refinement, and nothing is being carried forward to ask about. Mirrors
-		 *  the parent expression submit() and replay() compute for themselves. */
+	 *  Detached, or with nothing on the canvas, it is a new work rather than a
+	 *  refinement, and nothing is being carried forward to ask about. Mirrors
+	 *  the parent expression submit() and replay() compute for themselves. */
 	function submitWouldRefine(): boolean {
 		const parentNodeId = pendingCanvasAspectDerivation?.parentNodeId
 			?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
@@ -254,8 +254,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	/** Ask before refining from a work drawn by a fallback, and wait for the
-		 *  answer. Resolves true when the refinement may go ahead -- which is
-		 *  immediately, and without a dialog, for every unmarked work. */
+	 *  answer. Resolves true when the refinement may go ahead -- which is
+	 *  immediately, and without a dialog, for every unmarked work. */
 	function confirmFallbackRefine(parent: FallbackRefineParent): Promise<boolean> {
 		if (!needsFallbackRefineConfirm(parent, fallbackRefineAsked)) return Promise.resolve(true);
 		return new Promise((resolve) => {
@@ -326,8 +326,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			{
 				uiLang: getLang(),
 				strings: t(),
-				// Resolve page settings before crossing the feature boundary. A
-				// caller's one-run override still wins inside the coordinator.
+				// Resolve injected route settings before entering the stateless run
+				// operation. A caller's one-run override still wins there.
 				stage1Model: qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
 				stage2Model: qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
 				includeThinking: deps.models.includeThinking(),
@@ -549,10 +549,10 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	/**
-		 * `resumeLines` finishes a batch that stopped part-way: the lines it names are
-		 * painted in place of the whole box, each keeping the number the prompt gave
-		 * it. Everything else about the run is unchanged.
-		 */
+	 * `resumeLines` finishes a batch that stopped part-way: the lines it names are
+	 * painted in place of the whole box, each keeping the number the prompt gave
+	 * it. Everything else about the run is unchanged.
+	 */
 	async function submit(options: { resumeLines?: NumberedLine[]; } = {}) {
 		if (!canSubmit || loading || refinementSession.gridBusy) return;
 		// Ask before resetTargetScopedState and before any intermediate save.

@@ -249,8 +249,8 @@ test('T-107: the page tells the canvas which of the two jobs the button has', ()
 	// The visibility of the work tools is what decides it, and it is read from
 	// the same derived value the hide classes are read from -- not a second
 	// copy of the rule that could drift from it.
-	assert.match(PAGE, /exportCardOnly=\{!uiVisibility\.work_tools\}/);
-	assert.match(PAGE, /class:ui-hide-work-tools=\{!uiVisibility\.work_tools\}/);
+	assert.match(PAGE, /exportCardOnly=\{!session\.uiVisibility\.work_tools\}/);
+	assert.match(PAGE, /class:ui-hide-work-tools=\{!session\.uiVisibility\.work_tools\}/);
 });
 
 test('T-107: with the work tools gone the button calls the card, not a menu', () => {

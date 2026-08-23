@@ -28,6 +28,7 @@ test('T-1001/T-1002: CanvasPanel delegates the current-artwork workspace once', 
 
 test('T-1002/T-1005: artwork view has a typed capability-local boundary and no owner state', () => {
 	const artwork = read('./CanvasArtworkWorkspace.svelte');
+	const types = read('./view-types.ts');
 
 	assert.match(artwork, /type Props = \{/);
 	assert.match(artwork, /viewport: CanvasViewport/);

@@ -123,7 +123,8 @@ test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () 
 	// Stage 1 could quietly go back to reading the raw description.
 	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 	const work = read('./features/work/state.svelte.ts');
-	const bodies = [page, work].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1));
+	const refinement = read('./features/canvas/refinement-coordinator.svelte.ts');
+	const bodies = [page, work, refinement].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1));
 	assert.ok(bodies.length >= 4, `expected the known /api/compose senders, found ${bodies.length}`);
 	for (const [i, body] of bodies.entries()) {
 		const head = body.slice(0, 900);

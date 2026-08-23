@@ -21,13 +21,14 @@ import { test } from 'node:test';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
+const coordinator = fs.readFileSync(path.join(here, '../lib/features/canvas/refinement-coordinator.svelte.ts'), 'utf8');
 const redraw = fs.readFileSync(path.join(here, '../lib/features/canvas/refinement-redraw.ts'), 'utf8');
 const replay = fs.readFileSync(path.join(here, '../lib/features/history/replay.ts'), 'utf8');
 
 function body(source: string, fnName: string): string {
 	const start = source.indexOf(`function ${fnName}(`);
 	assert.notEqual(start, -1, `${fnName} is gone; this gate names the wrong function`);
-	const markers = source === page ? ['\n\tasync function ', '\n\tfunction '] : ['\nexport '];
+	const markers = source === redraw || source === replay ? ['\nexport '] : ['\n\tasync function ', '\n\tfunction '];
 	const next = markers
 		.map((marker) => source.indexOf(marker, start + 1))
 		.filter((index) => index !== -1)
@@ -49,20 +50,20 @@ test('every redraw of a saved work names the work it is redrawing', () => {
 	// candidate still builds its request at the route transport boundary.
 	// The history replay now owns its request in the history module and receives
 	// only the page-built work reference and render preferences.
-	assert.match(body(page, 'varyPerformance'), /workReference:\s*workReferencePayload\(refinementWorkId\(\)\)/);
+	assert.match(body(coordinator, 'varyPerformance'), /workReference:\s*workReferencePayload\(refinementWorkId\(\)\)/);
 	assert.match(request(redraw, 'runTouchRedraw'), /\.\.\.input\.workReference/);
-	assert.match(request(page, 'renderWordTouchCandidate'), /workReferencePayload\(refinementWorkId\(\)\)/);
+	assert.match(request(coordinator, 'renderWordTouchCandidate'), /workReferencePayload\(refinementWorkId\(\)\)/);
 	const replayWiring = page.slice(page.indexOf('async function replayHistoryItem'), page.indexOf('function closeReplayComparison'));
-	assert.match(replayWiring, /workReferencePayload\(item\.id\)/);
+	assert.match(replayWiring, /refinement\.workReferencePayload\(item\.id\)/);
 	assert.match(replay, /\.\.\.defaults\.renderPayload\(item, catalogId\)/);
 });
 
 test('a redraw keeps sending the catalog id as the nameplate', () => {
 	// The colors stopped coming from it; the name did not. Dropping it here would
 	// leave the status line with nothing to show.
-	assert.match(body(page, 'varyPerformance'), /renderPayload:\s*renderSettingsPayload\('render-svg', colorCatalogOverride\(refinementCatalogId\(\)\)\)/);
+	assert.match(body(coordinator, 'varyPerformance'), /renderPayload:\s*renderSettingsPayload\('render-svg', colorCatalogOverride\(refinementCatalogId\(\)\)\)/);
 	assert.match(request(redraw, 'runTouchRedraw'), /\.\.\.input\.renderPayload/);
-	assert.match(request(page, 'renderWordTouchCandidate'), /colorCatalogOverride\(refinementCatalogId\(\)\)/);
+	assert.match(request(coordinator, 'renderWordTouchCandidate'), /colorCatalogOverride\(refinementCatalogId\(\)\)/);
 });
 
 test('asking for another catalog does not name a work', () => {
@@ -70,10 +71,10 @@ test('asking for another catalog does not name a work', () => {
 	// work was NOT drawn in, so a work reference here would pin it to the old ones
 	// and every candidate would come back identical.
 	assert.doesNotMatch(
-		request(page, 'renderColorCatalogCandidate'),
+		request(coordinator, 'renderColorCatalogCandidate'),
 		/work_id|workReferencePayload/,
 		'renderColorCatalogCandidate must not send a work reference'
 	);
 	// Not vacuous: it really is a redraw of the same Score through the same endpoint.
-	assert.match(request(page, 'renderColorCatalogCandidate'), /score:\s*result\.score/);
+	assert.match(request(coordinator, 'renderColorCatalogCandidate'), /score:\s*work\.result\.score/);
 });

@@ -99,7 +99,7 @@ test('T-39  the prose is not repeated here; the describe panel holds it', () => 
 	assert.doesNotMatch(INFO, /sketch_text/);
 	assert.doesNotMatch(INFO, /detail-sketch-text/);
 	// It is still on screen, in the panel that owns it.
-	assert.match(read('../routes/+page.svelte'), /class="sketch-body">\{sketchDraft\}/);
+	assert.match(read('../routes/+page.svelte'), /class="sketch-body">\{work\.sketchDraft\}/);
 });
 
 test('T-39  and the section is withheld when there is no work at all', () => {

@@ -231,15 +231,16 @@ test('T-260: an HTTP failure uses the page-provided error wording', async () => 
 	);
 });
 
-test('T-263/T-264: the coordinator stays stateless and the page keeps outer-run ownership', () => {
+test('T-263/T-264: the operation stays stateless and Work keeps outer-run ownership', () => {
 	const owner = readFileSync(new URL('./current-work.ts', import.meta.url), 'utf8');
 	const page = readFileSync(new URL('../../../routes/+page.svelte', import.meta.url), 'utf8');
+	const work = readFileSync(new URL('../work/state.svelte.ts', import.meta.url), 'utf8');
 
 	assert.equal((owner.match(/\/api\/paint\/stream/g) ?? []).length, 1);
 	assert.doesNotMatch(page, /\/api\/paint\/stream/);
 	assert.doesNotMatch(owner, /\$state|new AbortController|currentUser|lineageDetached/);
-	assert.match(page, /new AbortController/);
-	assert.match(page, /return runCurrentWork\(/);
+	assert.match(work, /new AbortController/);
+	assert.match(work, /return runCurrentWork\(/);
 	assert.match(owner, /type CurrentWorkCapabilities = \{/);
 	assert.match(owner, /setActiveRunTokens:/);
 	assert.match(owner, /loadNearbyHistory:/);

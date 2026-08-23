@@ -86,7 +86,7 @@ test('T-26: the motif is the same shape at every aspect', () => {
 });
 
 test('T-26: no shape in the motif is written against the frame', () => {
-	const panel = read('./components/CanvasPanel.svelte');
+	const panel = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 	const start = panel.indexOf('<g opacity="0.72"');
 	assert.ok(start > 0, 'the motif group is missing');
 	const motif = panel.slice(start, panel.indexOf('</g>', start));
@@ -107,7 +107,7 @@ test('T-26: no shape in the motif is written against the frame', () => {
 // --- the motif itself (author's choice, 2026-08-17): mountain, water, moon ---
 
 test('T-168  the motif is three strokes, and the moon is a circle', () => {
-	const panel = read('./components/CanvasPanel.svelte');
+	const panel = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 	const start = panel.indexOf('<g opacity="0.72"');
 	const motif = panel.slice(start, panel.indexOf('</g>', start));
 

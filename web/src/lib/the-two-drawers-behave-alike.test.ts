@@ -15,6 +15,7 @@ import { test } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const SAIJIKI = read('./components/SaijikiDrawer.svelte');
 const PANEL = read('./components/CanvasPanel.svelte');
+const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 const INFO = read('./features/canvas/CanvasGenerationInfo.svelte');
 
 // ------------------------------------------------------------------- T-44
@@ -36,8 +37,8 @@ test('T-44  the button that opens it is not "outside"', () => {
 	// never be closed from the button it was opened with.
 	assert.match(SAIJIKI, /target\.closest\?\.\('\[data-saijiki-toggle\]'\)/);
 	// Both halves of that contract, so neither side can be renamed alone.
-	assert.match(PANEL, /data-saijiki-toggle/);
-	const button = PANEL.slice(PANEL.indexOf('data-saijiki-toggle'));
+	assert.match(ARTWORK, /data-saijiki-toggle/);
+	const button = ARTWORK.slice(ARTWORK.indexOf('data-saijiki-toggle'));
 	assert.match(button.slice(0, 200), /onclick=\{onToggleSaijiki\}/);
 });
 

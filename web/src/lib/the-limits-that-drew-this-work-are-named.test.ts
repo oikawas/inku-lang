@@ -17,6 +17,7 @@ import { limitNoteName, limitNotesToShow } from './limitNotes.ts';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '..', 'routes', '+page.svelte'), 'utf8');
+const work = fs.readFileSync(path.join(here, 'features', 'work', 'state.svelte.ts'), 'utf8');
 
 test('T-107  the notes a finished drawing carries are the ones shown', () => {
 	assert.deepEqual(
@@ -62,9 +63,9 @@ test('T-107  the page shows them, from the one read point every draw path sets',
 	// The section has to be wired to `result`, the state whatever drew last
 	// assigns -- a surface fed from the paint route alone would stay blank for
 	// a redraw, which is the path this contract exists for.
-	assert.match(page, /const limitNotesShown = \$derived\(limitNotesToShow\(result\)\);/);
-	assert.match(page, /\{#if limitNotesShown\.length > 0 && inputMode === 'single'\}/);
-	assert.match(page, /\{#each limitNotesShown as note\}/);
+	assert.match(work, /get limitNotesShown\(\) \{ return limitNotesToShow\(result\); \}/);
+	assert.match(page, /\{#if work\.limitNotesShown\.length > 0 && work\.inputMode === 'single'\}/);
+	assert.match(page, /\{#each work\.limitNotesShown as note\}/);
 	assert.match(page, /\{t\(\)\.renderLimitNotesTitle\}/);
 });
 

@@ -29,6 +29,7 @@ import { test } from 'node:test';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
+const coordinator = fs.readFileSync(path.join(here, '../lib/features/canvas/refinement-coordinator.svelte.ts'), 'utf8');
 const redraw = fs.readFileSync(path.join(here, '../lib/features/canvas/refinement-redraw.ts'), 'utf8');
 
 /** The effective placement seed, as the server resolves it. */
@@ -38,7 +39,7 @@ const placementSeed = (compositionSeed: number | null, renderSeed: number | null
 function body(source: string, fnName: string): string {
 	const start = source.indexOf(`function ${fnName}(`);
 	assert.notEqual(start, -1, `${fnName} is gone; this gate names the wrong function`);
-	const markers = source === page ? ['\n\tasync function ', '\n\tfunction '] : ['\nexport '];
+	const markers = source === redraw ? ['\nexport '] : ['\n\tasync function ', '\n\tfunction '];
 	const next = markers
 		.map((marker) => source.indexOf(marker, start + 1))
 		.filter((index) => index !== -1)
@@ -66,26 +67,26 @@ function kept(sourceText: string, fnName: string): string {
 test('both touch refinements send the placement seed the picture was drawn with', () => {
 	// The single redraw action draws a fresh render_seed; the candidate derives one
 	// from words. Both are touch refinements and must hold the composition.
-	for (const [source, fn] of [[redraw, 'runTouchRedraw'], [page, 'renderWordTouchCandidate']] as const) {
+	for (const [source, fn] of [[redraw, 'runTouchRedraw'], [coordinator, 'renderWordTouchCandidate']] as const) {
 		assert.match(
 			request(source, fn),
-			/composition_seed:\s*(?:placementSeed|result\.composition_seed \?\? result\.render_seed)/,
+			/composition_seed:\s*(?:placementSeed|work\.result\.composition_seed \?\? work\.result\.render_seed)/,
 			`${fn} must send the effective placement seed`
 		);
 	}
-	assert.match(body(page, 'varyPerformance'), /runTouchRedraw\(\{/);
-	assert.match(body(page, 'varyPerformance'), /current:\s*result/);
+	assert.match(body(coordinator, 'varyPerformance'), /runTouchRedraw\(\{/);
+	assert.match(body(coordinator, 'varyPerformance'), /current:\s*work\.result/);
 });
 
 test('the fallback is written with ??, so a seed of zero is not dropped', () => {
 	// `||` would send render_seed for a work whose composition_seed is 0 — the one
 	// user who asked for seed 0 is the one who would not get their composition back.
-	for (const [sourceText, fn] of [[redraw, 'runTouchRedraw'], [page, 'renderWordTouchCandidate']] as const) {
+	for (const [sourceText, fn] of [[redraw, 'runTouchRedraw'], [coordinator, 'renderWordTouchCandidate']] as const) {
 		const source = body(sourceText, fn);
 		assert.doesNotMatch(source, /composition_seed\s*\|\|/, `${fn} must not fall back with ||`);
 		assert.match(
 			source,
-			/(?:result|input\.current)\.composition_seed \?\? (?:result|input\.current)\.render_seed/,
+			/(?:work\.result|input\.current)\.composition_seed \?\? (?:work\.result|input\.current)\.render_seed/,
 			`${fn} must resolve the placement seed the way the server does`
 		);
 	}

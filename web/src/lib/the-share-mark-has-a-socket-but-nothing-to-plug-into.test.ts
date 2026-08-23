@@ -32,6 +32,9 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'utf8');
 
 const PANEL = read('./components/CanvasPanel.svelte');
+const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
+const VIEW_TYPES = read('./features/canvas/view-types.ts');
+const HISTORY_STATE = read('./historyManagerState.svelte.ts');
 const PAGE = read('../routes/+page.svelte');
 const MUTATIONS = read('./features/history/mutations.ts');
 const JA = read('./i18n/ja.ts');
@@ -70,11 +73,12 @@ test('T-104: the decision is made in one place, from the field itself', () => {
 // ------------------------------------------- T-105 (nothing is offered yet)
 
 test('T-105: the mark is behind both the flag and a handler', () => {
-	assert.match(PANEL, /\{#if shareTarget\.supported && onToggleForShare\}/);
-	assert.match(PANEL, /const shareTarget = \$derived\(shareTargetOf\(statusHistoryItem\)\);/);
+	assert.match(ARTWORK, /\{#if shareTarget\.supported && onToggleForShare\}/);
+	assert.match(ARTWORK, /const shareTarget = \$derived\(shareTargetOf\(statusHistoryItem\)\);/);
 	// The canvas must be able to read the field, or `supported` is false even
 	// after the server starts sending it.
-	assert.match(PANEL, /for_share\?: boolean;/);
+	assert.match(VIEW_TYPES, /CanvasStatusHistoryItem = Partial<HistoryItem>/);
+	assert.match(HISTORY_STATE, /for_share\?: boolean;/);
 });
 
 test('T-202: the page hands the canvas a way to save the mark, so it shows', () => {
@@ -100,7 +104,7 @@ test('T-105: the socket names where the rest of the work is written down', () =>
 	// this conversation.
 	const source = read('./shareTarget.ts');
 	assert.match(source, /I-191/);
-	assert.match(PANEL, /I-191/);
+	assert.match(PANEL + ARTWORK, /I-191/);
 });
 
 // ------------------------------------------ T-106 (ready for the follow-up)

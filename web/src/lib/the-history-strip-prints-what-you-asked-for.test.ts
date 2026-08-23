@@ -96,6 +96,6 @@ test('T-163  the file size is read from the server, not counted from what arrive
 	assert.match(STRIP, /const bytes = item\.svg_bytes \?\? 0;/);
 	assert.ok(!STRIP.includes('measureSvgWeight'), 'the strip must not measure what it was sent');
 	// And the listing really does withhold the picture, which is why.
-	const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf-8');
-	assert.match(PAGE, /include_svg: 'false'/);
+	const HISTORY_OWNER = readFileSync(new URL('./features/history/browsing-state.svelte.ts', import.meta.url), 'utf-8');
+	assert.match(HISTORY_OWNER, /include_svg: 'false'/);
 });

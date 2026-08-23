@@ -1,6 +1,6 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// T-4 of 契約 tasks/description-is-the-origin.md.
+// T-4 of contract tasks/description-is-the-origin.md.
 //
 // There is no component renderer here, so the derivations cannot be evaluated
 // as Svelte runes.  Two halves are needed and neither alone is a gate: the
@@ -17,6 +17,7 @@ import { pipelineDescription } from '../lib/description-labels.ts';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
+const batchOwner = fs.readFileSync(path.join(here, '../lib/features/batch/state.svelte.ts'), 'utf8');
 
 /** The single-mode gate, as the page writes it. */
 const canSubmitSingle = (input: string) => !!pipelineDescription(input).trim();
@@ -52,8 +53,8 @@ test('the page gates on the cut text, not on the raw text', () => {
 	assert.match(body, /pipelineDescription\(input\)\.trim\(\)/);
 	assert.doesNotMatch(body, /!!input\.trim\(\)/);
 
-	const counter = page.slice(page.indexOf('const batchNonEmpty'));
-	assert.match(counter.slice(0, counter.indexOf('\n')), /pipelineDescription\(l\)\.trim\(\)/);
+	assert.match(page, /paintable: \(text\) => !!pipelineDescription\(text\)\.trim\(\)/);
+	assert.match(batchOwner, /numberedBatchLines\(this\.input, this\.deps\.paintable\)\.length/);
 
 	// The rule is imported, never re-typed: the server owns it and the editor's
 	// meter already reads the same copy.
@@ -63,8 +64,8 @@ test('the page gates on the cut text, not on the raw text', () => {
 test('the batch run paints the same lines the counter counted', () => {
 	// A counter and a runner that disagree would show "2 lines" and send 3, one
 	// of which the server now refuses with a 400.
-	const runner = page.slice(page.indexOf('const lines = batchLines'));
-	assert.match(runner.slice(0, runner.indexOf(';')), /pipelineDescription\(item\.input\)\.trim\(\)/);
+	assert.match(batchOwner, /const lines = numberedBatchLines\(this\.input, this\.deps\.paintable\)/);
+	assert.match(page, /paintable: \(text\) => !!pipelineDescription\(text\)\.trim\(\)/);
 });
 
 test('the server tells the page which refusal this is', () => {

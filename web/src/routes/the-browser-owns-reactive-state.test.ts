@@ -31,6 +31,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'features/batch/state.svelte.ts',
 		'features/canvas/refinement-session.svelte.ts',
 		'features/canvas/viewport-state.svelte.ts',
+		'features/demo/state.svelte.ts',
 		'features/history/browsing-state.svelte.ts',
 		'features/history/lineage-state.svelte.ts',
 		'features/settings/state.svelte.ts',

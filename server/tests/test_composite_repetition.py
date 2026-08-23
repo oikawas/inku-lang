@@ -15,6 +15,8 @@ from inku_server.plugins.document_format import (
     validate_plugin_document,
 )
 from inku_server.schema import Score
+from inku_server.plugins.system import canvas_aspect
+from inku_server.render_engines.default import planning
 
 
 def _pair_plugin(count: int = 3) -> str:
@@ -124,19 +126,19 @@ def test_t2_pair_member_is_two_instructions_with_one_composite_arrangement() -> 
 
 def test_t3_composite_expands_before_each_local_touching_relation() -> None:
     score = _composite_score()
-    resolved = renderer._resolve_performance_score(
+    resolved = planning._resolve_performance_score(
         score,
         performance_seed=17,
         composition_seed=23,
-        canvas=renderer.canvas_size_for_aspect("square"),
+        canvas=canvas_aspect.canvas_size_for_aspect("square"),
     )
 
     assert len(resolved.instructions) == 6
     for index in range(0, 6, 2):
-        first = renderer._canvas_endpoint_geometry(
+        first = planning._canvas_endpoint_geometry(
             resolved.instructions[index], 17, index
         )
-        second = renderer._canvas_endpoint_geometry(
+        second = planning._canvas_endpoint_geometry(
             resolved.instructions[index + 1], 17, index + 1
         )
         assert first is not None and second is not None

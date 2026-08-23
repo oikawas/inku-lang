@@ -41,7 +41,6 @@ import statistics
 
 import pytest
 
-from inku_server import renderer
 from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.default import planning
 from inku_server.renderer import render
@@ -85,7 +84,7 @@ STATED_CASES = ("G-angle-stated-zero-edge", "G-angle-stated-30-edge")
 # Same bound and same reason as engine 25's: an anchor rebuilt from `position`
 # and `size`, or from a line's two ends, is recovered through two coordinates
 # `_quantise_instructions` rounds independently.
-ANCHOR_TOLERANCE = 2 * 10 ** -renderer.ARRANGEMENT_QUANTUM
+ANCHOR_TOLERANCE = 2 * 10 ** -planning.ARRANGEMENT_QUANTUM
 
 # The five shapes the rule turns, in the order production ranks them: `arc` 377
 # groups, `ellipse` 373, `square` 215, `triangle` 98, `cloudform` 64. `line` and
@@ -156,7 +155,7 @@ def _instruction(
 
 def _expand(instruction: Instruction, *, placement=None, performance=RENDER_SEED):
     """The product call, with both seeds stated."""
-    return renderer._expand_arrangement(
+    return planning._expand_arrangement(
         instruction,
         RENDER_SEED if placement is None else placement,
         None,
@@ -225,7 +224,7 @@ def _members_through_render(monkeypatch, instruction: Instruction, **kwargs):
 
 def _anchors(items: list[Instruction]) -> list[float]:
     """Every member's anchor, flattened: `pytest.approx` compares numbers."""
-    return [value for item in items for value in renderer._anchor(item)]
+    return [value for item in items for value in planning._anchor(item)]
 
 
 def _extents(items: list[Instruction]) -> list[float]:
@@ -410,8 +409,8 @@ def test_the_composition_seed_does_not_reach_the_angle(monkeypatch):
     assert [item.rotation for item in here] == [
         item.rotation for item in other_placement
     ]
-    assert [renderer._anchor(item) for item in here] != [
-        renderer._anchor(item) for item in other_placement
+    assert [planning._anchor(item) for item in here] != [
+        planning._anchor(item) for item in other_placement
     ]
     # The performance seed moves the angle.
     assert [item.rotation for item in here] != [

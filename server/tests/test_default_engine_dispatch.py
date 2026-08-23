@@ -15,6 +15,9 @@ import svgwrite
 import inku_server.renderer as renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.schema import Instruction, Score
+from inku_server.render_engines.default import dispatch
+from inku_server.render_engines.default import layers
+from inku_server.render_engines.default import palette
 
 
 PROFILE_DIGESTS = {
@@ -130,16 +133,16 @@ def test_t3_unknown_primitive_keeps_the_explicit_fallback() -> None:
         NotImplementedError,
         match=r"^primitive 'unknown' not yet supported$",
     ):
-        renderer._render_instruction(
+        dispatch._render_instruction(
             drawing,
             instruction,
             canvas=canvas,
-            support=renderer._score_support(Score(instructions=[])),
+            support=layers._score_support(Score(instructions=[])),
         )
 
 
 def test_t3_dispatch_signature_keeps_the_renderer_contract() -> None:
-    parameters = inspect.signature(renderer._render_instruction).parameters
+    parameters = inspect.signature(dispatch._render_instruction).parameters
 
     assert list(parameters) == [
         "dwg",
@@ -155,17 +158,16 @@ def test_t3_dispatch_signature_keeps_the_renderer_contract() -> None:
         "mark_idx",
         "wild",
     ]
-    assert parameters["cmap"].default is renderer.COLOR_MAP
+    assert parameters["cmap"].default is palette.COLOR_MAP
     assert parameters["canvas"].default is None
     assert parameters["work_assignment"].kind is inspect.Parameter.KEYWORD_ONLY
     assert parameters["support"].default is inspect.Parameter.empty
 
 
-def test_t1_renderer_facade_uses_the_canonical_dispatch() -> None:
+def test_t1_dispatch_function_has_the_canonical_owner() -> None:
     dispatch = importlib.import_module("inku_server.render_engines.default.dispatch")
 
-    assert renderer._render_instruction is dispatch._render_instruction
-    assert renderer._render_instruction.__module__ == (
+    assert dispatch._render_instruction.__module__ == (
         "inku_server.render_engines.default.dispatch"
     )
     assert renderer.render.__module__ == "inku_server.renderer"
@@ -215,35 +217,3 @@ def test_t5_dispatch_keeps_the_two_field_frozen_surface_projection() -> None:
         "scatter",
     ]
     assert type(projection).__dataclass_params__.frozen is True
-
-
-def test_t6_renderer_is_smaller_after_dispatch_extraction() -> None:
-    assert len(Path(renderer.__file__).read_text().splitlines()) < 1144
-
-
-def test_renderer_does_not_reexport_determinism_private_helpers() -> None:
-    assert not hasattr(renderer, "_seed_for_instruction")
-    assert not hasattr(renderer, "_needs_contour_variation")
-
-
-def test_tests_do_not_read_determinism_helpers_through_renderer() -> None:
-    tests_root = Path(__file__).parent
-    names = {"_seed_for_instruction", "_needs_contour_variation"}
-    offenders: set[tuple[str, str]] = set()
-
-    for path in tests_root.glob("test_*.py"):
-        tree = ast.parse(path.read_text())
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == "inku_server.renderer":
-                offenders.update(
-                    (path.name, alias.name) for alias in node.names if alias.name in names
-                )
-            if (
-                isinstance(node, ast.Attribute)
-                and isinstance(node.value, ast.Name)
-                and node.value.id == "renderer"
-                and node.attr in names
-            ):
-                offenders.add((path.name, node.attr))
-
-    assert offenders == set()

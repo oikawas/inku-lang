@@ -8,13 +8,13 @@ import pytest
 
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines.default.determinism import _seed_for_instruction
-from inku_server.renderer import (
+from inku_server.render_engines.default.palette import (
     COLOR_MAP,
     _hint_hues,
     _resolve_color,
     _work_color_assignment,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
 

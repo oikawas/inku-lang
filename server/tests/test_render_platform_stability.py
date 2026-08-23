@@ -25,9 +25,9 @@ import math
 import pathlib
 import sys
 
-from inku_server import renderer
 from inku_server.render_engines.default import marks
 from inku_server.render_engines.default import planning
+from inku_server.render_engines.default import marks as mark_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
@@ -213,11 +213,11 @@ def test_exposure_gate_is_derived_from_rendered_output() -> None:
 
 def test_one_ulp_of_arc_length_does_not_change_fragment_shape(monkeypatch) -> None:
     points = [(0.0, 0.0), (2.0, 0.0)]
-    before = renderer._contact_fragments(
+    before = mark_domain._contact_fragments(
         points, coverage=0.2, grain_px=3.0, seed=0, closed=False
     )
     monkeypatch.setattr(marks, "math", _PreviousUlpHypotMath())
-    after = renderer._contact_fragments(
+    after = mark_domain._contact_fragments(
         points, coverage=0.2, grain_px=3.0, seed=0, closed=False
     )
     assert [len(piece) for piece, _ in before] == [

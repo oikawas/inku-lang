@@ -35,7 +35,8 @@ from inku_analysis.texture_fold import (
     fold_texture_runs,
     should_fold,
 )
-from inku_server.renderer import TEXTURE_FILTER_WEIGHTS, render
+from inku_server.render_engines.default.marks import TEXTURE_FILTER_WEIGHTS
+from inku_server.renderer import render
 from inku_server.schema import Score
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

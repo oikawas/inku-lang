@@ -18,10 +18,8 @@ from inku_server.composer import (
     _enforce_relation_literal_gate,
     _literal_relation_types,
 )
-from inku_server.renderer import (
-    _resolve_performance_score,
-    render,
-)
+from inku_server.render_engines.default.planning import _resolve_performance_score
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score, migrate_score_payload
 from inku_server.stroke_engine import synthesize_stroke
 

@@ -25,13 +25,13 @@ import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server import renderer
-from inku_server.renderer import (
+from inku_server.render_engines.default.planning import (
     _anchor,
     _expand_arrangement,
     _region_in_short_side_units,
     _resolve_performance_score,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Score
 
 # Quantisation leaves the derived ratios agreeing to about 1e-8; the anisotropy

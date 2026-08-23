@@ -6,15 +6,17 @@ from xml.etree import ElementTree
 from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     _ellipse_perimeter,
     _speck_count,
+)
+from inku_server.render_engines.default.planning import (
     _clustered_pos,
     _expand_arrangement,
     _resolve_performance_score,
-    new_render_seed,
-    render,
 )
+from inku_server.render_engines.default.determinism import new_render_seed
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.svg_compat import PORTABLE_SVG_POLICY, validate_compat_svg
 

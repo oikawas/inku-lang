@@ -10,13 +10,13 @@ from inku_server import composer, saijiki
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.language_support.en import COERCE_MARKERS as EN_COERCE_MARKERS
 from inku_server.language_support.ja import COERCE_MARKERS as JA_COERCE_MARKERS
-from inku_server.renderer import (
+from inku_server.render_engines.default.palette import (
     COLOR_MAP,
     _hue_from_hex,
     _resolve_color,
     _work_color_assignment,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Color, Instruction, Score
 
 

@@ -13,7 +13,8 @@ from xml.etree import ElementTree
 import pytest
 
 from inku_server.render_engines import current_render_engine
-from inku_server.renderer import SURFACE_MARK_MAX, render
+from inku_server.render_engines.default.surfaces import SURFACE_MARK_MAX
+from inku_server.renderer import render
 from inku_server.schema import Score
 from inku_server.svg_compat import validate_compat_svg
 

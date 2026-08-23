@@ -13,7 +13,7 @@ import pytest
 from inku_server.master_grid import fmt
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines.default import marks
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     AMPLITUDE_CLAMP_RATIO,
     MATERIAL_INTENSITY,
     MATERIAL_INTENSITY_LEVEL,
@@ -33,8 +33,8 @@ from inku_server.renderer import (
     _speck_profile,
     _stroke_width_px,
     _texture_filter_xml,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score, Variation
 
 SQUARE = canvas_size_for_aspect(None)

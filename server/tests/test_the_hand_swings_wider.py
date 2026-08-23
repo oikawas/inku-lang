@@ -36,11 +36,11 @@ import re
 
 import pytest
 
-from inku_server import renderer
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.stroke_engine import GRAMMARS
+from inku_server.render_engines.default import planning
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 REFERENCE_ROOT = SERVER_ROOT / "reference"
@@ -77,7 +77,7 @@ CONTRACT_FRAME_HI = 0.98
 # An anchor rebuilt from two fields lands within one step of the nine-decimal
 # grid `_quantise_instructions` rounds on, rather than on the same float. The
 # same bound `test_each_member_gets_its_own_size.py` measures and states.
-ANCHOR_TOLERANCE = 2 * 10**-renderer.ARRANGEMENT_QUANTUM
+ANCHOR_TOLERANCE = 2 * 10**-planning.ARRANGEMENT_QUANTUM
 
 # The shapes the two rules reach. `circle` is excluded from both lists on
 # purpose -- an angle cannot be seen on one, so the angle rule leaves it alone
@@ -134,7 +134,7 @@ def _instruction(primitive: str, *, count: int, weight: str = "pen") -> Instruct
 
 
 def _expand(instruction: Instruction) -> list[Instruction]:
-    return renderer._expand_arrangement(
+    return planning._expand_arrangement(
         instruction, RENDER_SEED, None, performance_seed=RENDER_SEED
     )
 
@@ -191,10 +191,10 @@ def _placed(instruction: Instruction, render_input: dict) -> list[tuple[float, f
     """Where the corpus's own call puts the members' anchors."""
     seed = render_input["render_seed"]
     placement = render_input.get("composition_seed", seed)
-    members = renderer._expand_arrangement(
+    members = planning._expand_arrangement(
         instruction, placement, None, performance_seed=seed
     )
-    return [renderer._anchor(item) for item in members]
+    return [planning._anchor(item) for item in members]
 
 
 # T-2 --------------------------------------------------------------------
@@ -285,7 +285,7 @@ def test_the_wider_swing_does_not_move_the_frame(monkeypatch):
     extents = {
         case_id: [
             _extent(item)
-            for item in renderer._expand_arrangement(
+            for item in planning._expand_arrangement(
                 instruction,
                 render_input.get("composition_seed", render_input["render_seed"]),
                 None,
@@ -315,7 +315,7 @@ def test_the_wider_swing_does_not_move_the_frame(monkeypatch):
         ), case_id
         was = [
             _extent(item)
-            for item in renderer._expand_arrangement(
+            for item in planning._expand_arrangement(
                 instruction,
                 render_input.get("composition_seed", render_input["render_seed"]),
                 None,

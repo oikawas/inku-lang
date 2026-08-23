@@ -22,7 +22,9 @@ from typing import get_args
 import pytest
 
 from inku_server import saijiki
-from inku_server.renderer import GROUND_BYTE_BUDGET, SVG_PROFILES, render
+from inku_server.render_engines.default.layers import GROUND_BYTE_BUDGET
+from inku_server.render_engines.default.document import SVG_PROFILES
+from inku_server.renderer import render
 from inku_server.schema import GroundMaterial, Score
 
 # The supports that draw something. `plain` is the absence of a ground, so it is

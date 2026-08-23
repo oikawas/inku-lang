@@ -166,7 +166,7 @@ def test_the_drafting_pen_never_reaches_the_stroke_synthesizer() -> None:
     表の 0 は記述であって機構ではない。ここが変わったら、機械の極が本当に
     守られているかを測り直すこと。
     """
-    from inku_server.renderer import _uses_hand_stroke
+    from inku_server.render_engines.default.marks import _uses_hand_stroke
 
     assert _uses_hand_stroke("rotring") is False
     assert _uses_hand_stroke("computer") is True

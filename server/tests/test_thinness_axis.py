@@ -19,13 +19,13 @@ from inku_server.coerce import coerce_score
 from inku_server.composer import _score_tool_schema
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.render_engines.default.determinism import _seed_for_instruction
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     MIN_STROKE_WIDTH,
     THINNESS_TO_WIDTH_SCALE,
     WEIGHT_TO_STROKE_WIDTH,
     _stroke_width_px,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
 CANVAS = canvas_size_for_aspect(None)
@@ -256,7 +256,7 @@ def test_material_outline_follows_the_thinned_ink(weight: str) -> None:
     `WEIGHT_TO_STROKE_WIDTH` に据え置くと、墨だけが細って材質が取り残される。
     比例項を持つのは太筆とクレヨンの 2 道具である。
     """
-    from inku_server.renderer import _material_outline_profile
+    from inku_server.render_engines.default.marks import _material_outline_profile
 
     default = _material_outline_profile(_plain_mark(weight), CANVAS)
     thinned = _material_outline_profile(_plain_mark(weight, "extra_fine"), CANVAS)
@@ -271,7 +271,7 @@ def test_material_outline_absolute_widths_do_not_move(weight: str) -> None:
     材質は道具そのものの粗さで、線を細く引いても紙の目や粉の粒は細らない。
     距離も同じ理由で動かさない — engine 15 の「強さは距離ではない」のまま。
     """
-    from inku_server.renderer import _material_outline_profile
+    from inku_server.render_engines.default.marks import _material_outline_profile
 
     assert _material_outline_profile(_plain_mark(weight), CANVAS) == _material_outline_profile(
         _plain_mark(weight, "extra_fine"), CANVAS

@@ -35,7 +35,6 @@ import statistics
 
 import pytest
 
-from inku_server import renderer
 from inku_server.render_engines import current_render_engine
 from inku_server.render_engines.default import planning
 from inku_server.renderer import render
@@ -70,7 +69,7 @@ UNCHANGED_CASES = 504
 # what the SVG prints. What the two rules here would move if they were wrong is
 # half the growth of the shape -- about 1e-2 -- seven orders of magnitude above
 # this bound.
-ANCHOR_TOLERANCE = 2 * 10 ** -renderer.ARRANGEMENT_QUANTUM
+ANCHOR_TOLERANCE = 2 * 10 ** -planning.ARRANGEMENT_QUANTUM
 
 
 def _manifest(version: str) -> dict:
@@ -108,7 +107,7 @@ def _instruction(
 
 def _expand(instruction: Instruction, *, placement=None, performance=RENDER_SEED):
     """The product call, with both seeds stated."""
-    return renderer._expand_arrangement(
+    return planning._expand_arrangement(
         instruction,
         RENDER_SEED if placement is None else placement,
         None,
@@ -162,7 +161,7 @@ def _draw(instruction: Instruction, **kwargs) -> str:
 
 def _anchors(items: list[Instruction]) -> list[float]:
     """Every member's anchor, flattened: `pytest.approx` compares numbers."""
-    return [value for item in items for value in renderer._anchor(item)]
+    return [value for item in items for value in planning._anchor(item)]
 
 
 def _extent(item: Instruction) -> float:
@@ -339,8 +338,8 @@ def test_the_composition_seed_does_not_reach_the_size(monkeypatch):
 
     assert [item.radius for item in here] == [item.radius for item in there]
     # The premise: these two placements really are different placements.
-    assert [renderer._anchor(item) for item in here] != [
-        renderer._anchor(item) for item in there
+    assert [planning._anchor(item) for item in here] != [
+        planning._anchor(item) for item in there
     ]
 
 
@@ -392,8 +391,8 @@ def test_stage_a_fade_levels_do_not_move(fade, changes, monkeypatch):
     """
     instruction = _instruction(fade=fade, **changes)
     levels = [
-        renderer._fade_level_from_hint(item.color_hint)
-        for item in renderer._expand_arrangement_layout(
+        planning._fade_level_from_hint(item.color_hint)
+        for item in planning._expand_arrangement_layout(
             instruction, RENDER_SEED, None, performance_seed=RENDER_SEED
         )
     ]
@@ -401,8 +400,8 @@ def test_stage_a_fade_levels_do_not_move(fade, changes, monkeypatch):
 
     _withhold_sizes(monkeypatch)
     assert levels == [
-        renderer._fade_level_from_hint(item.color_hint)
-        for item in renderer._expand_arrangement_layout(
+        planning._fade_level_from_hint(item.color_hint)
+        for item in planning._expand_arrangement_layout(
             instruction, RENDER_SEED, None, performance_seed=RENDER_SEED
         )
     ]
@@ -467,14 +466,14 @@ def test_the_corpus_walks_every_size_rule(monkeypatch):
 
     seed = generator.DEFAULT_RENDER_SEED
     engine_25 = {
-        case_id: renderer._expand_arrangement(
+        case_id: planning._expand_arrangement(
             instruction, seed, None, performance_seed=seed
         )
         for case_id, instruction in shaped.items()
     }
     _withhold_sizes(monkeypatch)
     for case_id, instruction in shaped.items():
-        engine_24 = renderer._expand_arrangement(
+        engine_24 = planning._expand_arrangement(
             instruction, seed, None, performance_seed=seed
         )
         assert _anchors(engine_25[case_id]) == pytest.approx(

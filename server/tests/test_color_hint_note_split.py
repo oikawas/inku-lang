@@ -12,7 +12,10 @@ import pytest
 from inku_server import composer
 from inku_server.coerce import coerce_score
 from inku_server.render_engines.default.determinism import _seed_for_instruction
-from inku_server.renderer import COLOR_MAP, _resolve_color
+from inku_server.render_engines.default.palette import (
+    COLOR_MAP,
+    _resolve_color,
+)
 from inku_server.schema import Instruction, Score
 
 

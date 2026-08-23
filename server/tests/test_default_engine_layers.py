@@ -69,23 +69,6 @@ def test_t3_ground_and_presence_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_t2_t4_renderer_reexports_the_canonical_layer_objects() -> None:
-    layers = importlib.import_module("inku_server.render_engines.default.layers")
-    names = (
-        "GROUND_BYTE_BUDGET",
-        "_score_support",
-        "_texture_seed",
-        "_render_canvas_ground",
-        "_score_visual_load",
-        "_presence_center_px",
-        "_presence_seed",
-        "_render_presence_layer",
-    )
-
-    for name in names:
-        assert getattr(renderer, name) is getattr(layers, name)
-
-
 def _import_names(module_name: str) -> set[str]:
     module = importlib.import_module(module_name)
     source = Path(module.__file__).read_text(encoding="utf-8")
@@ -104,7 +87,7 @@ def _import_names(module_name: str) -> set[str]:
     return names
 
 
-def test_t4_t5_layers_have_one_way_dependencies_and_shrink_the_facade() -> None:
+def test_t4_t5_layers_have_one_way_dependencies() -> None:
     imports = _import_names("inku_server.render_engines.default.layers")
     forbidden = ("renderer", "surfaces", "marks")
     assert not any(
@@ -112,6 +95,3 @@ def test_t4_t5_layers_have_one_way_dependencies_and_shrink_the_facade() -> None:
         for name in imports
         for item in forbidden
     )
-
-    renderer_lines = Path(renderer.__file__).read_text(encoding="utf-8").splitlines()
-    assert len(renderer_lines) < 6284

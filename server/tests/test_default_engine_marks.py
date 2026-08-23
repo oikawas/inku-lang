@@ -116,35 +116,6 @@ def test_t3_mark_profiles_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == expected
 
 
-def test_t1_renderer_facade_uses_canonical_mark_owners() -> None:
-    marks = importlib.import_module("inku_server.render_engines.default.marks")
-
-    for name in (
-        "WEIGHT_TO_STROKE_WIDTH",
-        "WEIGHT_STYLE",
-        "TEXTURE_FILTER_WEIGHTS",
-        "FILL_COVERAGE_BRANCH",
-        "_mark_width_px",
-        "_texture_filter_xml",
-        "_line_with_variation",
-        "_stroke_attrs",
-        "_material_outline_profile",
-        "_render_fill_strokes",
-        "_render_fill_texture",
-        "_interior_fill",
-        "_render_hand_stroke",
-        "_render_contour_hand_stroke",
-        "_render_arc_hand_stroke",
-        "_render_corner_shape",
-    ):
-        assert getattr(renderer, name) is getattr(marks, name)
-
-    assert renderer.render.__module__ == "inku_server.renderer"
-    assert renderer._render_instruction.__module__ == (
-        "inku_server.render_engines.default.dispatch"
-    )
-
-
 def test_t1_marks_has_a_small_frozen_surface_projection() -> None:
     marks = importlib.import_module("inku_server.render_engines.default.marks")
 
@@ -157,7 +128,8 @@ def test_t1_marks_has_a_small_frozen_surface_projection() -> None:
 
 
 def test_t1_marks_does_not_import_orchestration_domains() -> None:
-    path = Path(renderer.__file__).parent / "render_engines" / "default" / "marks.py"
+    package = Path(__file__).resolve().parents[1] / "src" / "inku_server"
+    path = package / "render_engines" / "default" / "marks.py"
     tree = ast.parse(path.read_text())
     imported = {
         alias.name
@@ -167,7 +139,3 @@ def test_t1_marks_does_not_import_orchestration_domains() -> None:
     }
 
     assert not {"renderer", "surfaces", "layers"} & imported
-
-
-def test_t1_renderer_is_smaller_after_mark_extraction() -> None:
-    assert len(Path(renderer.__file__).read_text().splitlines()) < 4554

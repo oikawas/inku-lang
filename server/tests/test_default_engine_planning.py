@@ -80,29 +80,6 @@ def test_t2_representative_planning_cases_keep_the_pre_move_bytes() -> None:
         assert hashlib.sha256(svg.encode()).hexdigest() == REPRESENTATIVE_DIGESTS[name]
 
 
-def test_t1_renderer_reexports_the_canonical_planning_objects() -> None:
-    planning = importlib.import_module("inku_server.render_engines.default.planning")
-    names = (
-        "FRAME_LO",
-        "FRAME_HI",
-        "_PATH_WAVE_AMPLITUDE",
-        "_PATH_JITTER",
-        "_PATH_SPREAD",
-        "_FADE_FILL_RATIO",
-        "ARRANGEMENT_QUANTUM",
-        "_anchor",
-        "_resolve_performance_score",
-        "_expand_arrangement_layout",
-        "_expand_arrangement",
-        "_apply_member_sizes",
-        "_apply_member_rotations",
-        "_quantise_instructions",
-    )
-
-    for name in names:
-        assert getattr(renderer, name) is getattr(planning, name)
-
-
 def test_t3_reference_generators_patch_the_canonical_planning_module() -> None:
     server_root = Path(__file__).resolve().parents[1]
     render_source = (server_root / "scripts/gen_render_reference.py").read_text()

@@ -34,7 +34,7 @@ import sys
 
 import pytest
 
-from inku_server import renderer
+from inku_server.render_engines.default import planning
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -77,7 +77,7 @@ baked_here_only = pytest.mark.skipif(
 
 
 VERSION_DIRECTORY = re.compile(r"^(render-engine|ddl-engine)-(\d+)$")
-# The primitives `renderer._anchor` answers with a stored coordinate. The rest
+# The primitives `planning._anchor` answers with a stored coordinate. The rest
 # derive theirs by a sum, which carries no quantum. See F-2 (ledger I-165).
 QUANTISED_ANCHOR_PRIMITIVES = frozenset(
     {"circle", "ellipse", "arc", "polygon", "cloudform"}
@@ -160,7 +160,7 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
     2026-08-09.
     """
     fixture = json.loads(_fixture_path("renderer_arrangement.json").read_text())
-    assert fixture["arrangement_quantum"] == renderer.ARRANGEMENT_QUANTUM
+    assert fixture["arrangement_quantum"] == planning.ARRANGEMENT_QUANTUM
 
     stored = [
         case
@@ -177,8 +177,8 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
         for anchor in case["anchors"]
         for value in anchor
     )
-    assert decimals <= renderer.ARRANGEMENT_QUANTUM
-    assert decimals == renderer.ARRANGEMENT_QUANTUM
+    assert decimals <= planning.ARRANGEMENT_QUANTUM
+    assert decimals == planning.ARRANGEMENT_QUANTUM
 
 
 @android_only

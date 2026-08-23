@@ -21,13 +21,13 @@ from xml.etree import ElementTree
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server.renderer import (
+from inku_server.render_engines.default.marks import (
     MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
     _MATERIAL_OUTLINE_SPECS,
     _material_outline_profile,
     _stroke_width_px,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
 RENDER_SEED = 12345
@@ -240,7 +240,7 @@ def _rendered_offsets(weight: str) -> list[float]:
     強度レベルの gain と下限が掛かる。engine 14 まではそれが 2.8 倍と 3.5px で、
     表を読むだけの検査は絵と無関係な数を固定していた。
     """
-    from inku_server.renderer import _material_outline_profile
+    from inku_server.render_engines.default.marks import _material_outline_profile
 
     return [entry[0] for entry in _material_outline_profile(_plain_mark(weight), CANVAS)]
 
@@ -260,7 +260,7 @@ def test_pen_strata_run_just_outside_the_band_edge() -> None:
     痕跡が墨から 3.5px 離れ、閉輪郭で二重の輪に見えた (作者目視 2026-07-27 で
     差し戻し)。
     """
-    from inku_server.renderer import _stroke_width_px
+    from inku_server.render_engines.default.marks import _stroke_width_px
 
     half_width = _stroke_width_px("pen", CANVAS) / 2
     for offset in _rendered_offsets("pen"):
@@ -286,7 +286,7 @@ def test_every_stratum_rides_the_ink_it_belongs_to() -> None:
 
 def test_the_offset_distance_is_not_a_strength_lever() -> None:
     """距離の倍率と下限は 1.0 / 0.0。強さは濃さ側だけが持つ。"""
-    from inku_server.renderer import _material_gain
+    from inku_server.render_engines.default.marks import _material_gain
 
     assert _material_gain("outline_offset") == 1.0
     assert _material_gain("outline_offset_floor_ratio") == 0.0
@@ -296,7 +296,7 @@ def test_the_offset_distance_is_not_a_strength_lever() -> None:
 
 def test_bare_tools_get_no_specks() -> None:
     """粒は柔らかく崩れる画材 (chalk / crayon / pencil) の印。硬い道具には与えない。"""
-    from inku_server.renderer import _SPECK_SPECS
+    from inku_server.render_engines.default.marks import _SPECK_SPECS
 
     assert set(_SPECK_SPECS) == {"pencil", "crayon", "chalk"}
 

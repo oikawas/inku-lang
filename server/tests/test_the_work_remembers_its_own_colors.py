@@ -44,7 +44,7 @@ from inku_server.color_catalogs import (
     current_color_catalog_id,
     render_color_map_for_catalog,
 )
-from inku_server.renderer import _work_color_assignment
+from inku_server.render_engines.default.palette import _work_color_assignment
 
 client = TestClient(app)
 

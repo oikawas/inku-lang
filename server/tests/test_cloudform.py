@@ -20,11 +20,11 @@ from inku_server.interpreter import (
     SYSTEM_PROMPT_PREFIX_EN,
 )
 from inku_server import db
-from inku_server.renderer import (
+from inku_server.render_engines.default.planning import (
     _bbox_for_instruction,
     _resolve_performance_score,
-    render,
 )
+from inku_server.renderer import render
 from inku_server.schema import Score, migrate_score_payload
 
 

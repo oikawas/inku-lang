@@ -13,6 +13,7 @@ const read = (path: string): string => {
 test('T-312/T-313: page and panel share one typed refinement session owner', () => {
 	const owner = read('./refinement-session.svelte.ts');
 	const actions = read('./refinement-actions.ts');
+	const view = read('./CanvasRefinementWorkspace.svelte');
 	const page = read('../../../routes/+page.svelte');
 	const panel = read('../../components/CanvasPanel.svelte');
 
@@ -36,6 +37,9 @@ test('T-312/T-313: page and panel share one typed refinement session owner', () 
 	assert.doesNotMatch(page.slice(saveStart, downloadStart), /pushHistory\(\{/);
 
 	assert.match(panel, /refinementSession:\s*RefinementSession/);
+	assert.match(panel, /<CanvasRefinementWorkspace[\s\S]*\{refinementSession\}/);
+	assert.match(view, /refinementSession:\s*RefinementSession/);
+	assert.doesNotMatch(view, /\$state\(/);
 	assert.doesNotMatch(panel, /type VariationCandidate\s*=/);
 	assert.doesNotMatch(panel, /variationGridBusy:/);
 	assert.doesNotMatch(panel, /onAbortVariationCandidates:/);

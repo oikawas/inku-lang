@@ -22,7 +22,11 @@ const PRESENTATION = readFileSync(
 	fileURLToPath(new URL('./features/canvas/CanvasPresentationOverlay.svelte', import.meta.url)),
 	'utf-8'
 );
-const DRAWING_VIEWS = [PANEL, PRESENTATION];
+const REFINEMENT = readFileSync(
+	fileURLToPath(new URL('./features/canvas/CanvasRefinementWorkspace.svelte', import.meta.url)),
+	'utf-8'
+);
+const DRAWING_VIEWS = [PANEL, PRESENTATION, REFINEMENT];
 
 // ── T-73 ────────────────────────────────────────────────────────────────────
 test('T-73  the canvas puts no drawing markup in the page', () => {

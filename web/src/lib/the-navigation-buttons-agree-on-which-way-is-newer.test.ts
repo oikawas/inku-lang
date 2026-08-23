@@ -54,6 +54,7 @@ const TYPES = read('lib/i18n/types.ts');
 const PAGE = read('routes/+page.svelte');
 const BROWSING = read('lib/features/history/browsing-state.svelte.ts');
 const CANVAS = read('lib/components/CanvasPanel.svelte');
+const PRESENTATION = read('lib/features/canvas/CanvasPresentationOverlay.svelte');
 const STRIP = read('lib/components/HistoryStrip.svelte');
 const MODAL = read('lib/components/HistoryManager.svelte');
 
@@ -138,7 +139,7 @@ test('T-2  every canvas nav tooltip names the direction its own button moves', (
 	// Read as pairs: a Tooltip's text key and the first onclick after it, which
 	// is the button that tooltip belongs to. Four of them, in both the ordinary
 	// canvas and the presentation overlay.
-	const pairs = [...CANVAS.matchAll(/text=\{t\(\)\.(tooltipCanvasNav\w+)\}[\s\S]*?onclick=\{(onGoto\w+)\}/g)]
+	const pairs = [CANVAS, PRESENTATION].flatMap((source) => [...source.matchAll(/text=\{t\(\)\.(tooltipCanvasNav\w+)\}[\s\S]*?onclick=\{(onGoto\w+)\}/g)])
 		.map((m) => [m[1], m[2]] as const);
 	const directional = pairs.filter(([key]) => key !== 'tooltipCanvasNavLatest');
 	assert.equal(directional.length, 4, `expected four directional nav buttons, read ${JSON.stringify(directional)}`);
@@ -152,7 +153,7 @@ test('T-2  every canvas nav tooltip names the direction its own button moves', (
 
 // ── T-3 ─────────────────────────────────────────────────────────────────────
 test('T-3  in presentation mode the screen reader is told what the tooltip says', () => {
-	const controls = CANVAS.slice(CANVAS.indexOf('class="presentation-controls"'));
+	const controls = PRESENTATION.slice(PRESENTATION.indexOf('class="presentation-controls"'));
 	const chunks = controls.split('<Tooltip').filter((c) => /onclick=\{onGoto(Next|Prev)\}/.test(c));
 	assert.equal(chunks.length, 2, 'expected the two directional buttons of the overlay');
 	for (const chunk of chunks) {
@@ -360,7 +361,8 @@ test('T-15  every test that existed before this contract still runs and still pa
 	const pass = Number(out.match(/^# pass (\d+)$/m)?.[1]);
 	const fail = Number(out.match(/^# fail (\d+)$/m)?.[1]);
 	assert.ok(Number.isFinite(pass) && Number.isFinite(fail), `could not read the child's tally:\n${out.slice(-2000)}`);
-	assert.equal(fail, 0, `${fail} of the tests that were here before this contract now fail`);
+	const failedNames = [...out.matchAll(/^not ok \d+ - (.+)$/gm)].map((match) => match[1]);
+	assert.equal(fail, 0, `${fail} of the tests that were here before this contract now fail: ${failedNames.join('; ')}`);
 	assert.ok(pass >= BASELINE, `${pass} passing, ${BASELINE} before this contract`);
 });
 
@@ -567,7 +569,9 @@ test('T-26  the demo lock reaches the canvas, and every nav button on it', () =>
 	const element = elementOf(PAGE, 'CanvasPanel');
 	assert.match(element, /interactionLocked=\{demoRunning\}/);
 
-	const nav = buttonsIn(CANVAS).filter((b) => /onclick=\{onGoto(Next|Prev|Latest)\}/.test(b));
+	const nav = [CANVAS, PRESENTATION]
+		.flatMap((source) => buttonsIn(source))
+		.filter((button) => /onclick=\{onGoto(Next|Prev|Latest)\}/.test(button));
 	assert.equal(nav.length, 6, `expected six nav buttons on the canvas, found ${nav.length}`);
 	for (const button of nav) {
 		const disabled = button.match(/disabled=\{([^}]*)\}/)?.[1];

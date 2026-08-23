@@ -44,6 +44,7 @@ flowchart LR
     REFINE_REDRAW["features/canvas/refinement-redraw.ts\nstateless single-redraw seeds, requests, and result projection"]
     REFINE_ACTIONS["features/canvas/refinement-actions.ts\nstateless candidate persistence and Canvas projection"]
     CANVAS_INFO["features/canvas/CanvasGenerationInfo.svelte\ngeneration-information focused view"]
+    CANVAS_PRESENTATION["features/canvas/CanvasPresentationOverlay.svelte\npresentation focused view"]
     HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query, cache, and measured page size"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instance Settings shell + Server / model-provider / user-group administration"]
     SETTINGS_MODAL["SettingsModal.svelte\nSettings shell view"]
@@ -84,6 +85,7 @@ flowchart LR
     PAGE -->|"typed input + named capabilities"| REFINE_ACTIONS
     REFINE_ACTIONS -->|"existing save operation"| HISTORY_WORK
     COMPONENTS -->|"typed display props from CanvasPanel"| CANVAS_INFO
+    COMPONENTS -->|"typed display props and callbacks from CanvasPanel"| CANVAS_PRESENTATION
     PAGE -->|"create factory + wire external dependencies"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -131,6 +133,7 @@ flowchart LR
 | Stateless single-redraw actions | Touch/layout/reading seed selection, touch request/result construction, Paint invocation options, and current-result field projection | `refinement-redraw.ts` receives resolved inputs and named transport, seed, and Paint capabilities. The page retains fallback confirmation, lineage-parent materialization, session/loading/error, history reseating, reading diff, output tab, and viewport application |
 | Stateless refinement candidate actions | Candidate-to-current-Canvas projection, sequential history saves for a selected snapshot, and stale/identity coordination | `refinement-actions.ts` receives typed candidates plus named save/context capabilities. It owns no route, session, history, or Canvas state; the page retains final assignment and view coordination |
 | Canvas generation-information focused view | Details, prompts, and score tabs; recorded-work presentation; and drawer-local scroll elements | `CanvasGenerationInfo.svelte` renders typed display props. `CanvasPanel` owns open/close, outside/Escape handling, per-tab scroll memory, and the shared SVG measurement |
+| Canvas presentation focused view | Fullscreen artwork, caption, and navigation, star, caption, and close controls | `CanvasPresentationOverlay.svelte` renders a minimal work mark plus typed display props and callbacks. `CanvasPanel` owns open state, the toolbar, Escape, the current work, and mutations |
 | Route-instance feature owner | Settings dialog visibility, tab and detail level; Server and model-provider administration; user/group lists, status, and operations | One `createSettingsController` per route; focused views receive only their required `userAdministration`, `database`/`db_backup`, `render_limits`, or `output_save`/`render_concurrency` slices and named operations |
 | Focused component memory | Unsaved API keys, account forms and passwords, and user/group selection | Kept only by the component that renders the input: account drafts in `UserAdministrationSettings.svelte`, API-key drafts in `SettingsModal.svelte` |
 | localStorage | UI language, Settings detail level, Wild, batch retry, result log, export and orientation settings | Browser-local |
@@ -160,6 +163,8 @@ Stage 6D makes stateless `refinement-fanout.ts` own the five candidate-kind plan
 Stage 6E makes stateless `refinement-redraw.ts` own touch/layout/reading single-redraw seed selection, the touch `render-svg` request and derived result identity, layout/reading Paint options, and the shared current-result projection. The page passes resolved work/catalog/render inputs and named transport, seed, and Paint capabilities. It retains preconditions, fallback confirmation, visible lineage-parent materialization, single-session and loading/error state, history reseating, interpretation diff, final Svelte assignments, output tab, timer, and viewport coordination. Candidate-grid request transport does not move in this Stage.
 
 Stage 7A makes `CanvasGenerationInfo.svelte` own the generation-information drawer's details, prompts, and score presentation, recorded-work display projections, and drawer-local styles. `CanvasPanel` retains open/close, outside/Escape handling, the active tab, per-tab scroll memory, and the shared SVG measurement for the displayed work, and passes only typed props and named callbacks. The extracted view owns no route or session state, HTTP, or current-work mutation.
+
+Stage 7B makes `CanvasPresentationOverlay.svelte` own the fullscreen artwork, caption, control markup, and presentation-only styles. `CanvasPanel` retains open/close, the toolbar, Escape priority, the current work, and navigation, star, and caption mutations, and passes only a minimal mark projection plus named callbacks. The extracted view owns no mutable owner, route state, or HTTP.
 
 The Settings shell, Server administration, model-provider administration, and user/group administration state machines are owned by the route-instance `features/settings/state.svelte.ts`. The page wires the signed-in actor, session/user-settings refresh, external per-tab loaders, drawing-time model-catalog loader, and render-concurrency setter into the factory. Login/logout, the canonical current actor, and drawing-time model selection stay on the page. `SettingsModal.svelte` receives one `SettingsController` as the Settings shell. The user/group tab passes only the narrow `userAdministration` submodel and required session props to `UserAdministrationSettings.svelte`; account-form/password drafts stay in that input view, while API-key drafts stay in the modal. The database/backup tab passes only `database`/`db_backup` to `DatabaseAdministrationSettings.svelte`, the render-limits tab only `render_limits` to `RenderLimitsSettings.svelte`, and the server-runtime tab only `output_save`/`render_concurrency` to `ServerRuntimeSettings.svelte`, each with required named operations. Status and operation ownership stays in the route-instance feature owner. The owner never copies a secret from an operation argument into state, confirmation, or error output.
 

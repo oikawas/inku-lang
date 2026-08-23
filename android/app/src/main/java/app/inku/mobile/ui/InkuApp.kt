@@ -1776,13 +1776,15 @@ private fun CanvasHeroCard(
         canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
     }
     if (!presentation && showControls) item?.let {
-        when (state.renderTab) {
-            RenderTab.Artwork -> Unit
-            RenderTab.Prompt -> RenderTextView(
-                renderPromptText(it, state.litertStage1PromptOptimization),
+        renderTabCopyText(
+            state.renderTab,
+            promptText = renderPromptText(it, state.litertStage1PromptOptimization),
+            jsonText = renderJsonText(it),
+        )?.let { text ->
+            CopyableRenderTextView(
+                text,
                 Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight),
             )
-            RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight))
         }
     }
 }
@@ -4506,10 +4508,16 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 if (item == null) {
                     Text("No render yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    when (state.renderTab) {
-                        RenderTab.Artwork -> ArtworkPreview(item, modifier = Modifier.fillMaxSize())
-                        RenderTab.Prompt -> RenderTextView(renderPromptText(item, state.litertStage1PromptOptimization), Modifier.fillMaxSize())
-                        RenderTab.Json -> RenderTextView(renderJsonText(item), Modifier.fillMaxSize())
+                    if (state.renderTab == RenderTab.Artwork) {
+                        ArtworkPreview(item, modifier = Modifier.fillMaxSize())
+                    } else {
+                        renderTabCopyText(
+                            state.renderTab,
+                            promptText = renderPromptText(item, state.litertStage1PromptOptimization),
+                            jsonText = renderJsonText(item),
+                        )?.let { text ->
+                            CopyableRenderTextView(text, Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
@@ -4521,6 +4529,28 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboardManager.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            MiniPill(
+                text = "Copy",
+                onClick = { clipboard.setText(AnnotatedString(text)) },
+            )
+        }
+        RenderTextView(text, Modifier.fillMaxWidth().weight(1f))
+    }
+}
+
+internal fun renderTabCopyText(renderTab: RenderTab, promptText: String, jsonText: String): String? {
+    return when (renderTab) {
+        RenderTab.Artwork -> null
+        RenderTab.Prompt -> promptText
+        RenderTab.Json -> jsonText
     }
 }
 

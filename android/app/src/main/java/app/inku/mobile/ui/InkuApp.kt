@@ -2450,6 +2450,15 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             )
         }
 
+        RefinementProgressLanes(
+            lanes = refinementProgressLanes(
+                candidateCount = state.refinementCount,
+                completedCount = state.refinementCandidates.size,
+                busy = state.refinementBusy,
+            ),
+            selectedMascotKind = state.mascotKind,
+        )
+
         // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
         if (state.refinementCanAbort) {
             ChipButton(S.stop, modifier = Modifier.testTag(REFINE_STOP_TAG), onClick = viewModel::abortRefinementCandidates)
@@ -2476,6 +2485,93 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                     )
                 }
                 repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+internal enum class RefinementProgressLaneState {
+    Done,
+    Running,
+    Waiting,
+}
+
+/**
+ * The generator is sequential: completed candidates precede one running turn,
+ * and every later turn is waiting. A single candidate needs no lane row.
+ */
+internal fun refinementProgressLanes(
+    candidateCount: Int,
+    completedCount: Int,
+    busy: Boolean,
+): List<RefinementProgressLaneState> {
+    if (!busy || candidateCount <= 1) return emptyList()
+    val completed = completedCount.coerceIn(0, candidateCount)
+    return List(candidateCount) { index ->
+        when {
+            index < completed -> RefinementProgressLaneState.Done
+            index == completed -> RefinementProgressLaneState.Running
+            else -> RefinementProgressLaneState.Waiting
+        }
+    }
+}
+
+/** Shows sequential refinement turns without implying web-style fan-out. */
+@Composable
+private fun RefinementProgressLanes(
+    lanes: List<RefinementProgressLaneState>,
+    selectedMascotKind: String,
+) {
+    if (lanes.isEmpty()) return
+    val runningMascotKind = if (selectedMascotKind == "incu") "yuragi" else "incu"
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    ) {
+        lanes.forEachIndexed { index, lane ->
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("refinement_progress_lane_${index + 1}_${lane.name.lowercase()}"),
+                shape = RoundedCornerShape(Dimens.radiusCard),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(
+                    modifier = Modifier.padding(Dimens.spaceXs),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    when (lane) {
+                        RefinementProgressLaneState.Done -> Box(
+                            modifier = Modifier.size(Dimens.buttonHeightSmall),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "✓",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                        RefinementProgressLaneState.Running ->
+                            MascotWidget(mascotKind = runningMascotKind)
+                        RefinementProgressLaneState.Waiting -> Box(
+                            modifier = Modifier.size(Dimens.buttonHeightSmall),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

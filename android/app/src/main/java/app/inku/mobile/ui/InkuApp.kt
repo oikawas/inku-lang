@@ -2500,6 +2500,7 @@ internal const val LINEAGE_NODE_TAG = "lineage_node"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
 internal const val REFINE_ENTRY_TAG = "refine_entry"
+internal const val DDL_ENTRY_TAG = "ddl_entry"
 internal const val REFINE_CANDIDATE_TAG = "refine_candidate"
 internal const val REFINE_SAVE_TAG = "refine_save"
 internal const val REFINE_STOP_TAG = "refine_stop"
@@ -2991,6 +2992,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
                         derivationKind = kindOf[node.id],
                         onSelect = { viewModel.selectLineageNode(node) },
                         onRefine = { item, subview -> viewModel.openRefinement(item, subview) },
+                        onEditDdl = viewModel::openLineageDdlEditor,
                     )
                 }
             }
@@ -3005,6 +3007,7 @@ private fun LineageNodeCard(
     derivationKind: String?,
     onSelect: () -> Unit,
     onRefine: (HistoryItemEntity, RefinementSubview) -> Unit,
+    onEditDdl: (HistoryItemEntity) -> Unit,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
@@ -3054,14 +3057,14 @@ private fun LineageNodeCard(
                 )
                 // 「作品を編集する」 in SPEC :618 lists seven items in one order --
                 // 描画要素・記述・DDL・モデル・言語・AI に自律推敲させる・ゴミ箱.
-                // Three of them are here, in that order; 記述 and DDL sit
-                // between them in the SPEC and belong to another contract, so
-                // モデル and 言語 follow 描画要素 directly. Each opens the matching
-                // sub-view of the same 推敲 screen rather than a screen of its own
-                // (SPEC :688). A tombstone has no work to refine, which is why
-                // this hangs off `history`.
+                // Four are here in that order. 記述 remains another contract, so
+                // DDL follows 描画要素 directly; モデル and 言語 still open the
+                // matching sub-view of the same 推敲 screen rather than a screen
+                // of their own (SPEC :688). A tombstone has no work to edit,
+                // which is why this hangs off `history`.
                 if (history != null) {
                     ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
+                    ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
                     ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
                     ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
                 }

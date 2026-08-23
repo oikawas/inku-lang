@@ -822,6 +822,12 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(ddlEditorOpen = true, message = null)
     }
 
+    fun openLineageDdlEditor(item: HistoryItemEntity) {
+        applyHistorySelection(item, AppTab.Lineage)
+        localState.value = localState.value.copy(ddlEditorOpen = true, message = null)
+        refreshLineage()
+    }
+
     fun closeDdlEditor() {
         localState.value = localState.value.copy(ddlEditorOpen = false)
     }
@@ -1204,6 +1210,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun drawFromDdl() {
         val current = state.value
+        val returnToLineage = current.tab == AppTab.Lineage
         if (current.refinementBusy) {
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
@@ -1235,6 +1242,7 @@ class InkuViewModel @JvmOverloads constructor(
                     isDrawing = false,
                     message = "Composed ${item.renderHashShort}",
                 )
+                if (returnToLineage) refreshLineage()
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
                 val message = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().statusComposeFailed)

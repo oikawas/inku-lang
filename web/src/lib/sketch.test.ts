@@ -185,10 +185,12 @@ test('T-6: both places that put a work on screen carry its state, and the panel 
 	assert.match(generationInfo, /normalizeSketchState\(statusHistoryItem\?\.sketch_state \?\? result\?\.sketch_state\)/);
 });
 
-test('T-6/T-2: the one sender that saves a drawing carries the state too', () => {
+test('T-6/T-2: every sender that saves a drawing carries the state too', () => {
 	const page = read('../routes/+page.svelte');
-	const bodies = page.split(/apiFetch\(\s*['"]\/api\/history['"]/).slice(1);
-	assert.ok(bodies.length >= 1, 'the /api/history sender is missing');
+	const demo = read('./features/demo/state.svelte.ts');
+	const historySave = read('./features/history/save.ts');
+	const bodies = [demo, historySave].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/history['"]/).slice(1));
+	assert.equal(bodies.length, 2, 'a canonical /api/history sender is missing');
 	for (const [i, body] of bodies.entries()) {
 		assert.match(body.slice(0, 4000), /sketch_state/, `/api/history sender ${i + 1} drops the state`);
 	}

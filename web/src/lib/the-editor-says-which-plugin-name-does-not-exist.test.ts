@@ -160,7 +160,7 @@ test('T-7: the four callers pass no index, and the editor passes one', () => {
 	assert.match(viewer, /highlightDDL\(expandedDdl \?\? ''\)/);
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /highlightDDL\(batch\.activeDdl\)/);
-	assert.match(page, /highlightDDL\(demoGeneratedDdl\)/);
+	assert.match(page, /highlightDDL\(demo\.generatedDdl\)/);
 	const dialog = read('components/DdlEditorDialog.svelte');
 	assert.match(dialog, /highlightDDL\(value, [^)]*, pluginNameIndex\)/);
 });

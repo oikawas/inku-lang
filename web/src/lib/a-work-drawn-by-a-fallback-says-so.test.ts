@@ -1,6 +1,6 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// 作曲フォールバックの記録 acceptance, web side --
+// Composition fallback recording acceptance, web side --
 // contract a-work-drawn-by-a-fallback-says-so.md.
 //
 // T-232 (the web sender), T-235 (the mark reads both layers), T-236 (the
@@ -32,6 +32,7 @@ import { en } from './i18n/en.ts';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PAGE = read('../routes/+page.svelte');
 const HISTORY_SAVE = read('./features/history/save.ts');
+const DEMO_STATE = read('./features/demo/state.svelte.ts');
 const CANVAS = read('./components/CanvasPanel.svelte');
 const THUMBNAIL = read('./components/HistoryThumbnail.svelte');
 
@@ -57,13 +58,12 @@ test('T-232 the web sender stacks none when compose held', () => {
 });
 
 test('T-232 both canonical saves to /api/history carry the value', () => {
-	// The general sender belongs to the history save module; the route retains
-	// only the demo sender. Count each canonical owner so another extraction does
-	// not turn this guard into a false failure about the page's internal shape.
+	// The two senders belong to their feature owners. Count each canonical owner
+	// so another extraction does not make this guard depend on page internals.
 	const generalPosts = [...HISTORY_SAVE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
-	const demoPosts = [...PAGE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
+	const demoPosts = [...DEMO_STATE.matchAll(/apiFetch\('\/api\/history',[\s\S]{0,6000}?\n\t*\}\);/g)].map((m) => m[0]);
 	assert.equal(generalPosts.length, 1, `expected the canonical general save, saw ${generalPosts.length}`);
-	assert.equal(demoPosts.length, 1, `expected the page-owned demo save, saw ${demoPosts.length}`);
+	assert.equal(demoPosts.length, 1, `expected the canonical Demo save, saw ${demoPosts.length}`);
 	for (const [index, body] of [...generalPosts, ...demoPosts].entries()) {
 		assert.ok(
 			body.includes('compose_fallback'),
@@ -84,7 +84,7 @@ test('T-232 both canonical saves to /api/history carry the value', () => {
 		derivation[0].includes('composeFallbackValue('),
 		'the derivation does not use the shared sender rule'
 	);
-	// The demo save holds a response outright, so it derives from it directly.
+	// The Demo owner holds a response outright, so it derives from it directly.
 	assert.ok(
 		demoPosts.some((body) => /compose_fallback: composeFallbackValue\(/.test(body)),
 		'the demo save names the key without deriving its value'

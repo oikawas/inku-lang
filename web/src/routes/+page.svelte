@@ -75,7 +75,6 @@
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
-	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { createApiFetch } from '$lib/transport/api-fetch';
 	import {
@@ -100,6 +99,7 @@
 	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { BatchState } from '$lib/features/batch/state.svelte';
+	import { DemoState } from '$lib/features/demo/state.svelte';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
@@ -230,27 +230,6 @@
 	let stageLabel = $state('');
 	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
 	let error        = $state<string | null>(null);
-	let demoSettings = $state<DemoSettings>({ ...DEFAULT_DEMO_SETTINGS });
-	let demoGeneratedPrompt = $state('');
-	let demoGeneratedDdl = $state<string | null>(null);
-	let demoError = $state<string | null>(null);
-	let demoTimedOut = $state(false);
-	let demoSaveStatus = $state<string | null>(null);
-	let demoSavingCurrent = $state(false);
-	let demoCurrentSaved = $state(false);
-	let demoWaitingSeconds = $state<number | null>(null);
-	let demoCurrentStartedAt: number | null = null;
-	let demoCurrentLiveMs = $state<number | null>(null);
-	let demoCurrentElapsedMs = $state<number | null>(null);
-	let demoCurrentTokensIn = $state<number | null>(null);
-	let demoCurrentTokensOut = $state<number | null>(null);
-	let demoTotalElapsedMs = $state(0);
-	let demoTotalTokensIn = $state(0);
-	let demoTotalTokensOut = $state(0);
-	let demoRenderCount = $state(0);
-	let demoSettingsLoaded = $state(false);
-	let demoRunId = 0;
-
 	// ── Replay ──────────────────────────────────────────────
 	let reloading   = $state(false);
 	let reloadError = $state<string | null>(null);
@@ -699,6 +678,13 @@
 		setFailureReport: batchFailureReportStore.set,
 		describeApiError,
 	});
+	const demo = new DemoState({
+		apiFetch,
+		signedIn: () => currentUser !== null,
+		instructionLang: () => instructionLang,
+		uiLang: getLang,
+		describeApiError,
+	});
 	const lineageState = new LineageQueryState(apiFetch);
 	const settings = createSettingsController({
 		apiFetch,
@@ -812,18 +798,6 @@
 		return availableVisionModelCatalog.find((group) => group.id === provider)?.models ?? [];
 	}
 
-	function reconcileDemoPromptModel() {
-		if (!availableModelsLoaded || !demoSettingsLoaded) return;
-		const configured = availableModelCatalog.some(
-			(group) => group.id === demoSettings.prompt_provider && group.models.some((model) => model.id === demoSettings.prompt_model)
-		);
-		if (configured) return;
-		const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
-		const fallbackModel = fallbackGroup?.models[0]?.id;
-		if (!fallbackGroup || !fallbackModel) return;
-		void saveDemoSettings({ ...demoSettings, prompt_provider: fallbackGroup.id, prompt_model: fallbackModel });
-	}
-
 	function applyUserModelSettings(user: UserItem | null) {
 		const settings = user?.model_settings;
 		if (!settings) return;
@@ -932,21 +906,6 @@
 		}
 	}
 
-	function normalizeDemoSettings(settings: DemoSettings): DemoSettings {
-		// Values stored before prompt_provider existed carry the provider inside
-		// prompt_model; the server splits them, and so does this.
-		const prompt = splitModelRef(settings.prompt_model || DEFAULT_MODEL);
-		return {
-			save_db: !!settings.save_db,
-			save_files: !!settings.save_files,
-			prompt_provider: prompt.provider ?? settings.prompt_provider ?? DEFAULT_PROVIDER,
-			prompt_model: prompt.model,
-			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
-			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
-			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
-		};
-	}
-
 	async function loadPluginStorage() {
 		if (!currentUser) {
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
@@ -1027,25 +986,6 @@
 		await saveCanvasAspectPluginValue();
 	}
 
-	async function loadDemoSettings() {
-		if (!currentUser) {
-			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
-			demoSettingsLoaded = false;
-			return;
-		}
-		try {
-			const r = await apiFetch('/api/auth/me/demo-settings', { cache: 'no-store' });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
-			demoSettingsLoaded = true;
-			reconcileDemoPromptModel();
-		} catch (e) {
-			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
-			demoSettingsLoaded = false;
-			console.warn('failed to load demo settings', e);
-		}
-	}
-
 	async function loadExportTemplates() {
 		if (!currentUser) {
 			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
@@ -1106,23 +1046,6 @@
 
 	function removeExportTemplate(id: string) {
 		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
-	}
-
-	async function saveDemoSettings(settings: DemoSettings) {
-		const next = normalizeDemoSettings(settings);
-		demoSettings = next;
-		if (!currentUser || !demoSettingsLoaded) return;
-		try {
-			const r = await apiFetch('/api/auth/me/demo-settings', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(next)
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
-		} catch (e) {
-			console.warn('failed to save demo settings', e);
-		}
 	}
 
 	async function updateUiTheme(nextDarkMode: boolean) {
@@ -1413,7 +1336,7 @@
 			if (!okugakiModelAvailable) {
 				okugakiModel = qualifiedModelId(visionProvider, visionModel);
 			}
-			reconcileDemoPromptModel();
+			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
 		}
@@ -1516,7 +1439,8 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
@@ -1524,8 +1448,7 @@
 			currentUser = null;
 			applyUserTheme(null);
 			batch.clearPromptHistory();
-			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
-			demoSettingsLoaded = false;
+			demo.resetForSignedOut();
 			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 			exportTemplateStatus = null;
 			canvasAspectEnabled = true;
@@ -1562,7 +1485,8 @@
 			// logged in and now gets a 401, so without reading them again the
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), demo.loadSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -1582,8 +1506,7 @@
 		uiModeSaveError = false;
 		applyUserTheme(null);
 		batch.clearPromptHistory();
-		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
-		demoSettingsLoaded = false;
+		demo.resetForSignedOut();
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
 		canvasAspectEnabled = true;
@@ -1754,8 +1677,7 @@
 		sketchModeLabel(sketchModeOf(batch.sketchGrain), getLang() === 'ja')
 	);
 	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
-	const demoRunning = $derived(activeRunMode === 'demo' && loading);
-	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
+	const demoRunning = $derived(demo.running);
 	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
 	// The gate reads what the drawing reads.  The meter already cut the text
 	// (InputPanel), so a description greyed out end to end must not be sendable:
@@ -1765,7 +1687,7 @@
 	);
 	const currentInstructionText = $derived.by(() => {
 		if (displayedHistoryItem?.input) return displayedHistoryItem.input;
-		if (inputMode === 'demo' || activeRunMode === 'demo') return demoGeneratedPrompt;
+		if (inputMode === 'demo' || activeRunMode === 'demo') return demo.generatedPrompt;
 		if (inputMode === 'batch' || activeRunMode === 'batch') return batch.latestPrompt;
 		return input;
 	});
@@ -1867,9 +1789,7 @@
 		_timerHandle = setInterval(() => {
 			const now = Date.now();
 			liveMs = now - _timerStart;
-			if (demoCurrentStartedAt !== null) {
-				demoCurrentLiveMs = now - demoCurrentStartedAt;
-			}
+			demo.updateLiveTime(now);
 		}, 100);
 	}
 	function stopTimer() {
@@ -2054,146 +1974,56 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		return data;
 	}
 
-
-	function sleep(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
-		const model = qualifiedModelId(settings.prompt_provider, settings.prompt_model);
-		const r = await apiFetch('/api/demo/instruction', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				seed_phrase: settings.seed_phrase,
-				model,
-				instruction_lang: instructionLang,
-				ui_lang: getLang(),
-			})
-		});
-		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown };
-			throw new Error(describeApiError(d.detail, r.status));
-		}
-		const data = await r.json() as { instruction: string };
-		return data.instruction;
-	}
-
-	async function runDemoLoop(runId: number, timeoutAt: number) {
-		while (demoRunId === runId && loading && Date.now() < timeoutAt) {
-			const startedAt = Date.now();
-			demoCurrentStartedAt = startedAt;
-			demoCurrentLiveMs = 0;
-			demoCurrentElapsedMs = null;
-			demoCurrentTokensIn = null;
-			demoCurrentTokensOut = null;
-			demoWaitingSeconds = null;
-			try {
-				const settings = normalizeDemoSettings(demoSettings);
-				await saveDemoSettings(settings);
-				demoGeneratedPrompt = await generateDemoInstruction(settings);
-				if (demoRunId !== runId || !loading) break;
-				// The demo draws with whatever the catalog modal has selected, including
-				// "from the description": it used to carry a mode of its own.
-				const demoCatalogId = colorCatalogSettings.selected;
-				const r = await paintOne(demoGeneratedPrompt, {
-					saveHistory: settings.save_db,
-					saveArtifacts: settings.save_files,
-					countGeneration: false,
-					historyInput: `[demo] ${demoGeneratedPrompt}`,
-					sourceText: demoGeneratedPrompt,
-					displayLabel: '[demo]',
-					renderOverrides: {
-						...colorCatalogOverride(demoCatalogId),
-						...wildOverride(false)
-					},
-				});
-				if (demoRunId !== runId || !loading) break;
-				demoGeneratedDdl = r.ddl;
-				demoCurrentSaved = !!r.history_id;
-				demoSaveStatus = null;
-				const demoSourceDdl = r.source_ddl ?? r.ddl;
-				ddl = demoSourceDdl; expandedDdl = r.ddl; ddlGeneratedBaseline = demoSourceDdl; thinking = r.thinking; result = r; outputTab = 'canvas';
-				canvasViewport.fit();
-				elapsedStage1Ms = r.elapsed_stage1_ms; elapsedStage2Ms = r.elapsed_stage2_ms; elapsedTotalMs = r.elapsed_total_ms;
-				tokensInStage1 = r.tokens_in_stage1; tokensOutStage1 = r.tokens_out_stage1;
-				tokensInStage2 = r.tokens_in_stage2; tokensOutStage2 = r.tokens_out_stage2;
-				const currentTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0);
-				const currentTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0);
-				demoCurrentElapsedMs = r.elapsed_total_ms;
-				demoCurrentLiveMs = r.elapsed_total_ms;
-				demoCurrentStartedAt = null;
-				demoCurrentTokensIn = currentTokensIn;
-				demoCurrentTokensOut = currentTokensOut;
-				demoTotalElapsedMs += r.elapsed_total_ms;
-				demoTotalTokensIn += currentTokensIn;
-				demoTotalTokensOut += currentTokensOut;
-				demoRenderCount += 1;
-				if (settings.save_db) await history.refreshAfterServerSave();
-				if (Date.now() >= timeoutAt) break;
-				const intervalRemainingMs = settings.interval_seconds * 1000 - (Date.now() - startedAt);
-				const timeoutRemainingMs = timeoutAt - Date.now();
-				const remainingMs = Math.max(0, Math.min(intervalRemainingMs, timeoutRemainingMs));
-				const waitingForNextRender = intervalRemainingMs <= timeoutRemainingMs;
-				for (let left = Math.ceil(remainingMs / 1000); left > 0 && demoRunId === runId && loading; left--) {
-					demoWaitingSeconds = waitingForNextRender ? left : null;
-					await sleep(Math.min(1000, remainingMs));
-				}
-			} catch (e) {
-				demoCurrentStartedAt = null;
-				demoError = e instanceof Error ? e.message : String(e);
-				const retryDelayMs = Math.min(1000, Math.max(0, timeoutAt - Date.now()));
-				if (retryDelayMs > 0) await sleep(retryDelayMs);
-			}
-		}
-		if (demoRunId === runId) {
-			await history.refreshAfterRun();
-			demoTimedOut = Date.now() >= timeoutAt;
-			demoCurrentStartedAt = null;
-			stopTimer();
-			loading = false;
-			activeRunMode = null;
-			stageLabel = '';
-			demoWaitingSeconds = null;
-		}
-	}
-
 	async function startDemo() {
 		if (loading || refinementSession.gridBusy) return;
 		clearInput();
-		demoError = null;
-		demoTimedOut = false;
-		demoSaveStatus = null;
-		demoCurrentSaved = false;
 		error = null;
-		demoGeneratedDdl = null;
-		demoCurrentStartedAt = null;
-		demoCurrentLiveMs = null;
-		demoCurrentElapsedMs = null;
-		demoCurrentTokensIn = null;
-		demoCurrentTokensOut = null;
-		demoTotalElapsedMs = 0;
-		demoTotalTokensIn = 0;
-		demoTotalTokensOut = 0;
-		demoRenderCount = 0;
 		displayedHistoryItem = null;
 		activeRunMode = 'demo';
 		loading = true;
-		demoRunId += 1;
 		startTimer();
-		const timeoutAt = Date.now() + normalizeDemoSettings(demoSettings).timeout_seconds * 1000;
-		await runDemoLoop(demoRunId, timeoutAt);
+		await demo.start({
+			canvasAspectId: effectiveCanvasAspectId,
+			// Demo follows the catalog modal, including "from the description";
+			// it has no separate catalog or wild-mode setting of its own.
+			renderOverrides: () => ({
+				...colorCatalogOverride(colorCatalogSettings.selected),
+				...wildOverride(false),
+			}),
+			paintInstruction: (prompt, paintOptions) => paintOne(prompt, paintOptions),
+			onLatestResult: (painted) => {
+				const sourceDdl = painted.source_ddl ?? painted.ddl;
+				ddl = sourceDdl;
+				expandedDdl = painted.ddl;
+				ddlGeneratedBaseline = sourceDdl;
+				thinking = painted.thinking;
+				result = painted;
+				outputTab = 'canvas';
+				canvasViewport.fit();
+				elapsedStage1Ms = painted.elapsed_stage1_ms;
+				elapsedStage2Ms = painted.elapsed_stage2_ms;
+				elapsedTotalMs = painted.elapsed_total_ms;
+				tokensInStage1 = painted.tokens_in_stage1;
+				tokensOutStage1 = painted.tokens_out_stage1;
+				tokensInStage2 = painted.tokens_in_stage2;
+				tokensOutStage2 = painted.tokens_out_stage2;
+			},
+			onRunFinished: () => {
+				stopTimer();
+				loading = false;
+				activeRunMode = null;
+				stageLabel = '';
+			},
+			refreshAfterServerSave: () => history.refreshAfterServerSave(),
+			refreshAfterRun: () => history.refreshAfterRun(),
+		});
 	}
 
 	function stopDemo() {
-		demoRunId += 1;
-		void history.refreshAfterRun();
-		demoTimedOut = false;
-		demoCurrentStartedAt = null;
+		demo.stop();
 		loading = false;
 		activeRunMode = null;
 		stageLabel = '';
-		demoWaitingSeconds = null;
 		stopTimer();
 	}
 
@@ -2600,60 +2430,20 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	}
 
 	async function saveCurrentDemoToHistory(): Promise<void> {
-		if (!result || !demoGeneratedPrompt || !demoGeneratedDdl || demoSavingCurrent || demoCurrentSaved) return;
-		demoSavingCurrent = true;
-		demoSaveStatus = null;
-		try {
-			const r = await apiFetch('/api/history', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					input: `[demo] ${demoGeneratedPrompt}`,
-					source_text: demoGeneratedPrompt,
-					display_label: '[demo]',
-					ddl: demoGeneratedDdl,
-					score: result.score,
-					at: Date.now(),
-					elapsed_ms: result.elapsed_total_ms ?? 0,
-					stage1_model: result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
-					stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
-					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: result.render_color_catalog_id ?? (colorCatalogSettings.effectiveId !== 'default' ? colorCatalogSettings.effectiveId : null),
-					save_artifacts: demoSettings.save_files,
-					canvas_aspect: effectiveCanvasAspectId(),
-					instruction_lang_requested: result.instruction_lang_requested ?? instructionLang,
-					instruction_lang_resolved: result.instruction_lang_resolved ?? null,
-					ui_lang: result.ui_lang ?? getLang(),
-					// The second sender to this endpoint. It was dropping the prose
-					// as well as the state, so a demo work drawn through the layer
-					// was saved as though it had never been near it.
-					sketch_text: result.sketch_text ?? null,
-					sketch_grain: result.sketch_grain ?? null,
-					...(result.sketch_state ? { sketch_state: result.sketch_state } : {}),
-					// It saves a work it holds the paint response for, so it can
-					// always say what compose did -- and has to, or the row reads as
-					// one drawn before the column existed.
-					compose_fallback: composeFallbackValue(result),
-				})
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const saved = await r.json() as Iteration;
-			if (result) {
-				result = { ...result, history_id: saved.id, history_at: saved.at, render_hash: saved.render_hash, render_hash_short: saved.render_hash_short };
-			}
-			demoCurrentSaved = true;
-			demoSaveStatus = t().demoSavedCurrent;
-			await history.fetchOffset(0);
-			history.setCursor(0);
-		} catch (e) {
-			demoError = e instanceof Error ? e.message : String(e);
-		} finally {
-			demoSavingCurrent = false;
-		}
+		await demo.saveCurrent({
+			stage1Model: qualifiedModelId(stage1Provider, stage1Model),
+			stage2Model: qualifiedModelId(stage2Provider, stage2Model),
+			effectiveCatalogId: colorCatalogSettings.effectiveId,
+			canvasAspectId: effectiveCanvasAspectId(),
+			instructionLang,
+			uiLang: getLang(),
+			savedStatus: t().demoSavedCurrent,
+			onSaved: (saved) => { result = saved; },
+			refreshHistory: async () => {
+				await history.fetchOffset(0);
+				history.setCursor(0);
+			},
+		});
 	}
 
 	function clearInput() {
@@ -2661,13 +2451,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') batch.clearInput();
-		if (inputMode === 'demo') {
-			demoGeneratedPrompt = '';
-			demoGeneratedDdl = null;
-			demoError = null;
-			demoSaveStatus = null;
-			demoCurrentSaved = false;
-		}
+		if (inputMode === 'demo') demo.clearInput();
 		ddl = inputMode === 'single' ? '' : null;
 		expandedDdl = null;
 		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
@@ -4281,8 +4065,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const batchActiveDdlHighlighted = $derived(batch.activeDdl !== null
 		? highlightDDL(batch.activeDdl)
 		: escapeHtml(t().batchActiveDdlPending));
-	const demoGeneratedDdlHighlighted = $derived(demoGeneratedDdl !== null
-		? highlightDDL(demoGeneratedDdl)
+	const demoGeneratedDdlHighlighted = $derived(demo.generatedDdl !== null
+		? highlightDDL(demo.generatedDdl)
 		: '');
 
 	function escapeHtml(value: string) {
@@ -4472,25 +4256,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchPromptHistory={batch.promptHistory}
 						canResumeBatch={batch.canResume}
 						onResumeBatch={() => void resumeInterruptedBatch()}
-						bind:demoSettings
+						bind:demoSettings={demo.settings}
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}
-						{demoTimedOut}
-						{demoWaitingSeconds}
-						{demoCurrentLiveMs}
-						{demoCurrentElapsedMs}
-						{demoCurrentTokensIn}
-						{demoCurrentTokensOut}
-						{demoTotalElapsedMs}
-						{demoTotalTokensIn}
-						{demoTotalTokensOut}
-						{demoRenderCount}
-						{demoGeneratedPrompt}
+						demoTimedOut={demo.timedOut}
+						demoWaitingSeconds={demo.waitingSeconds}
+						demoCurrentLiveMs={demo.currentLiveMs}
+						demoCurrentElapsedMs={demo.currentElapsedMs}
+						demoCurrentTokensIn={demo.currentTokensIn}
+						demoCurrentTokensOut={demo.currentTokensOut}
+						demoTotalElapsedMs={demo.totalElapsedMs}
+						demoTotalTokensIn={demo.totalTokensIn}
+						demoTotalTokensOut={demo.totalTokensOut}
+						demoRenderCount={demo.renderCount}
+						demoGeneratedPrompt={demo.generatedPrompt}
 						{demoGeneratedDdlHighlighted}
-						{demoCanSaveCurrent}
-						{demoSavingCurrent}
-						{demoSaveStatus}
-						{demoError}
+						demoCanSaveCurrent={demo.canSaveCurrent}
+						demoSavingCurrent={demo.savingCurrent}
+						demoSaveStatus={demo.saveStatus}
+						demoError={demo.error}
 						lockNonDemo={demoRunning}
 						{canSubmit}
 						generationDisabled={refinementSession.gridBusy || reloading}
@@ -4513,7 +4297,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
 						onRememberBatchPrompt={(prompt) => batch.rememberPrompt(prompt)}
-						onDemoSettingsChange={saveDemoSettings}
+						onDemoSettingsChange={(next) => demo.saveSettings(next)}
 						onSaveCurrentDemo={saveCurrentDemoToHistory}
 						onStartDemo={startDemo}
 						onStopDemo={stopDemo}
@@ -4731,7 +4515,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvasAspectHeight={displayCanvasAspect.ratioH}
 				viewport={canvasViewport}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batch.input : demoGeneratedPrompt)}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batch.input : demo.generatedPrompt)}
 				instructionText={currentInstructionText}
 				{ddl}
 				{copiedPrompt}

@@ -6,7 +6,7 @@
   "schema_version": "0.1.0",
   "color_map_digest": "fef0aadd35c9417422fc66218d01488b",
   "frozen_at": "2026-08-24",
-  "commit": "68f89b11b087203504b99d81cc84e18879403f14",
+  "commit": "56fae469e94c6a9f8d31de26ca9207fde7155831",
   "reason": "Engine 41 is the accepted Rust portability migration baseline. It preserves Engine 40 drawing semantics while moving the render implementation behind the shared Rust core; no drawing improvement is part of this freeze.",
   "changed_from_previous": [
     "A-brush_thick-arc",
@@ -13146,22 +13146,23 @@
         "svg_profile": "display",
         "wild": false
       },
-      "digest": "184c851b56b12f9aca8b7d8729c7c5ad",
-      "bytes": 3728,
+      "digest": "e696f5cfcdf10bf8ee19891d2bd7a461",
+      "bytes": 28766,
       "counts": {
-        "path": 2,
+        "path": 40,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
         "ellipse": 0,
         "line": 0,
         "rect": 1,
-        "g": 4
+        "g": 5
       },
       "classes": [
         "contour-stroke-v1 controls-88 events-0",
-        "solid-base-fill-v1",
-        "solid-fill-v1"
+        "fill-stroke-v1 strokes-38",
+        "fill-underlay-v1",
+        "fill-v2"
       ]
     },
     "C-display-surface-solid-pen": {
@@ -13232,10 +13233,10 @@
         "svg_profile": "display",
         "wild": false
       },
-      "digest": "cfc4038b32259063ec197d97b7e36fc8",
-      "bytes": 5942,
+      "digest": "e69dea0ef38dea36be7bac32711a2e05",
+      "bytes": 7506,
       "counts": {
-        "path": 2,
+        "path": 3,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
@@ -13247,7 +13248,8 @@
       "classes": [
         "contour-stroke-v1 controls-88 events-0",
         "solid-base-fill-v1",
-        "solid-fill-v1"
+        "solid-fill-v1",
+        "solid-mottle-overlay-v1"
       ]
     },
     "C-display-surface-wash-pen": {
@@ -13686,10 +13688,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "c10589d537db1b8527b63335bd3dacf1",
-      "bytes": 227395,
+      "digest": "4667501c83326c8ff6b2fe7238945182",
+      "bytes": 46257,
       "counts": {
-        "path": 221,
+        "path": 42,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
@@ -13700,7 +13702,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
-        "fill-stroke-v1 strokes-219",
+        "fill-stroke-v1 strokes-40",
         "fill-underlay-v1",
         "fill-v2"
       ]
@@ -18356,10 +18358,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "7fd0e5d9c5a56ccb497d35094b1b8f4a",
-      "bytes": 5907,
+      "digest": "42427001b8f4f555bca3c13e228531bb",
+      "bytes": 7477,
       "counts": {
-        "path": 2,
+        "path": 3,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
@@ -18371,7 +18373,8 @@
       "classes": [
         "contour-stroke-v1 controls-88 events-0",
         "solid-base-fill-v1",
-        "solid-fill-v1"
+        "solid-fill-v1",
+        "solid-mottle-overlay-v1"
       ]
     },
     "C-surface-stipple-pen": {
@@ -19361,23 +19364,21 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "3d10a0938aa1d1414f408c751ea5d91d",
-      "bytes": 5564,
+      "digest": "f5bb55b63419ef6df7a10fc8767f0c44",
+      "bytes": 1857,
       "counts": {
-        "path": 6,
+        "path": 2,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
         "ellipse": 0,
         "line": 0,
         "rect": 1,
-        "g": 9
+        "g": 8
       },
       "classes": [
         "contour-stroke-v1 controls-17 events-0",
-        "fill-stroke-v1 strokes-4",
-        "fill-underlay-v1",
-        "fill-v2"
+        "fill-dab-v1"
       ]
     },
     "C-tinyfill-circle-rotring": {
@@ -19507,8 +19508,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "9401cea370777d8938d2152969cad8e9",
-      "bytes": 4908,
+      "digest": "81bef9afcb140dd46a6f35a690105321",
+      "bytes": 4296,
       "counts": {
         "path": 2,
         "polyline": 0,
@@ -19517,12 +19518,11 @@
         "ellipse": 0,
         "line": 0,
         "rect": 1,
-        "g": 9
+        "g": 8
       },
       "classes": [
         "contour-stroke-v1 controls-68 events-2",
-        "fill-stroke-v1 strokes-1",
-        "fill-v2"
+        "fill-dab-v1"
       ]
     },
     "C-wash-arc-pencil": {
@@ -24297,23 +24297,21 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "1097bbfdff7dff94847d9ee59d6ca469",
-      "bytes": 5189,
+      "digest": "14bceae95b717b7aa0c52c4f32f36cf2",
+      "bytes": 1861,
       "counts": {
-        "path": 6,
+        "path": 2,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
         "ellipse": 0,
         "line": 0,
         "rect": 1,
-        "g": 9
+        "g": 8
       },
       "classes": [
         "contour-stroke-v1 controls-17 events-0",
-        "fill-stroke-v1 strokes-4",
-        "fill-underlay-v1",
-        "fill-v2"
+        "fill-dab-v1"
       ]
     },
     "D-style-dash_dot": {

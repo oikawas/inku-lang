@@ -338,8 +338,10 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 **Engine 41は描画品質を変える版ではなく、Engine 40の演奏を共有Rust coreへ移すための移行基準である。**
 PythonとRustではSVGの数値表記、pathとpolylineの選択、要素のまとめ方が異なるため、610件すべてが
 byte上は動いた。**byte-identicalな不変ケースは0件だが、不変にした対象は図形、層、材質、面、地、色、
-構図とrender metadataの意味である。** 610件の意味検査、12組の目視比較、LinuxとmacOSの代表5件の
+構図とrender metadataの意味である。** 610件の意味検査、16組の目視比較、LinuxとmacOSの代表5件の
 byte一致、Android arm64とiOS arm64のcore compile checkを通し、作者が見た目の同等性を受け入れた。
+本番切替前のfocused gateで見つかったsolid mottle、computer raster、微小fill dab、compat grain属性の
+移植漏れは再凍結前に修復した。これはEngine 40の既存意味の回復であり、描画改善ではない。
 
 この凍結時点では本番の`current_render_engine()`は引き続きPython Engine 40を指す。Engine 41への
 本番切替は別のStageで行い、切替後の通常generatorがこの凍結コーパスをbyte-identicalに再生成することを

@@ -974,7 +974,6 @@ def test_render_reference_discriminator_cases() -> None:
         )
     }
     assert len({case["digest"] for case in thin.values()}) == 5
-    assert thin["fine-silverpoint"]["bytes"] == thin["extra_fine-silverpoint"]["bytes"]
 
 
 def _resolve_svg(case_id: str) -> pathlib.Path:

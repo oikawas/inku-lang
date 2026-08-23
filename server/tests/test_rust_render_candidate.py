@@ -175,7 +175,7 @@ def test_accepted_engine_41_candidate_corpus_is_internally_complete():
     assert manifest["engine_id"] == "default"
     assert manifest["engine_version"] == "41"
     assert manifest["frozen_at"] == "2026-08-24"
-    assert manifest["commit"] == "68f89b11b087203504b99d81cc84e18879403f14"
+    assert manifest["commit"] == "56fae469e94c6a9f8d31de26ca9207fde7155831"
     cases = manifest["cases"]
     changed = set(manifest["changed_from_previous"])
     bodies = {path.stem for path in ENGINE_41_CORPUS_DIR.glob("*.svg")}

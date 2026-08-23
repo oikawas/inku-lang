@@ -430,8 +430,11 @@ performance into the shared Rust core.** Python and Rust differ in SVG number sp
 of path versus polyline, and how elements are grouped, so all 610 cases moved at the byte level.
 **No case stayed byte-identical, but the geometry, layers, materials, surfaces, grounds, colours,
 composition, and meaning of render metadata stayed fixed.** The candidate passed semantic checks
-over all 610 cases, visual review of 12 pairs, byte identity for a five-case Linux/macOS sample, and
+over all 610 cases, visual review of 16 pairs, byte identity for a five-case Linux/macOS sample, and
 core compile checks for Android arm64 and iOS arm64. The author accepted its visual parity.
+Before production cutover, focused gates found and repaired missed Engine 40 semantics for solid
+mottle, computer raster fills, tiny-fill dabs, and compat grain attributes. This restored the
+existing boundary; it was not a drawing improvement.
 
 At this freeze point, production `current_render_engine()` still selects Python Engine 40. A
 separate stage performs the Engine 41 production cutover and then proves that the normal generator

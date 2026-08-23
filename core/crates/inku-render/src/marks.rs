@@ -663,3 +663,24 @@ fn render_corner_shape(
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn silverpoint_thinness_stops_at_the_shared_minimum_width() {
+        let instruction = |thinness| {
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"line","weight":"silverpoint","thinness":"{thinness}"}}"#
+            ))
+            .unwrap()
+        };
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let fine = mark_width(&instruction("fine"), canvas);
+        let extra_fine = mark_width(&instruction("extra_fine"), canvas);
+
+        assert_eq!(fine, MIN_STROKE_WIDTH);
+        assert_eq!(extra_fine, MIN_STROKE_WIDTH);
+    }
+}

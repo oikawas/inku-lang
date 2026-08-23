@@ -584,3 +584,36 @@ pub struct RenderOptions {
     pub composition_seed: Option<Seed>,
     pub wild: bool,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RenderRequest {
+    pub score: Score,
+    pub options: RenderOptions,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SurfaceTextureMetadata {
+    pub instruction_index: usize,
+    pub texture: SurfaceTexture,
+    pub density: f64,
+    pub opacity: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RenderMetadata {
+    pub render_engine_id: String,
+    pub render_engine_version: String,
+    pub render_texture_version: String,
+    pub render_texture_profile: SvgProfile,
+    pub texture_degraded: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub render_canvas_ground: Option<CanvasGroundSpec>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub render_surface_textures: Vec<SurfaceTextureMetadata>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RenderOutput {
+    pub svg: String,
+    pub metadata: RenderMetadata,
+}

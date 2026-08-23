@@ -76,21 +76,21 @@ def test_t1_planning_uses_the_canonical_palette_objects() -> None:
 
 def test_t2_document_helpers_have_the_canonical_owner() -> None:
     document = importlib.import_module("inku_server.render_engines.default.document")
-    names = (
-        "build_texture_metadata",
-        "_normalize_svg_profile",
-        "_safe_svg_id",
-        "_instruction_svg_id",
-        "_mark_svg_id",
-        "_inject_svg_document_metadata",
-        "_new_svg_drawing",
-        "_build_root_groups",
-        "_attach_root_groups",
-        "_inject_extra_defs",
-    )
+    expected_owners = {
+        "build_texture_metadata": document.__name__,
+        "_normalize_svg_profile": "inku_server.render_engines.profiles",
+        "_safe_svg_id": document.__name__,
+        "_instruction_svg_id": document.__name__,
+        "_mark_svg_id": document.__name__,
+        "_inject_svg_document_metadata": document.__name__,
+        "_new_svg_drawing": document.__name__,
+        "_build_root_groups": document.__name__,
+        "_attach_root_groups": document.__name__,
+        "_inject_extra_defs": document.__name__,
+    }
 
-    for name in names:
-        assert getattr(document, name).__module__ == document.__name__
+    for name, owner in expected_owners.items():
+        assert getattr(document, name).__module__ == owner
 
 
 def _import_names(module_name: str) -> set[str]:

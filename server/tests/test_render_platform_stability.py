@@ -171,7 +171,12 @@ def _stability_case_ids() -> tuple[str, ...]:
 
 @functools.lru_cache(maxsize=1)
 def _frozen_stability_digests() -> dict[str, str]:
-    manifest = json.loads(_generator().MANIFEST_PATH.read_text(encoding="utf-8"))
+    generator = _generator()
+    manifest = json.loads(
+        (generator.REFERENCE_ROOT / "render-engine-40" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     return {
         case_id: manifest["cases"][case_id]["digest"]
         for case_id in _stability_case_ids()

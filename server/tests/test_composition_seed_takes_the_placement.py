@@ -419,12 +419,12 @@ def test_the_added_cases_can_tell_the_two_seeds_apart(monkeypatch):
 
         # And the value is what makes the difference: drop it and the case
         # collapses onto its twin.
-        without = generator.render(
+        without = generator.DEFAULT_RENDER_ENGINE.render(
             Score.model_validate(case["score"]),
             color_map=case["color_map"],
             catalog_id=case["catalog_id"],
             render_seed=case["render_seed"],
             svg_profile=case["svg_profile"],
             wild=case["wild"],
-        )
+        ).svg
         assert generator._normalized_digest(without) == manifest["cases"][twin_id]["digest"], case_id

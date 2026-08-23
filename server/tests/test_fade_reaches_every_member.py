@@ -535,10 +535,11 @@ def test_the_bake_runs_every_discriminating_guard_it_defines():
     """
     generator = _load_generator()
     body = inspect.getsource(generator.generate)
-    for name in (
-        "_assert_fade_cases_discriminate",
-        "_assert_fade_reaches_every_member",
-        "_assert_size_cases_discriminate",
-        "_assert_angle_cases_discriminate",
-    ):
-        assert f"{name}(inputs)" in body, name
+    expected_calls = {
+        "_assert_fade_cases_discriminate": "_assert_fade_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)",
+        "_assert_fade_reaches_every_member": "_assert_fade_reaches_every_member(inputs)",
+        "_assert_size_cases_discriminate": "_assert_size_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)",
+        "_assert_angle_cases_discriminate": "_assert_angle_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)",
+    }
+    for name, call in expected_calls.items():
+        assert call in body, name

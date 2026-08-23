@@ -7926,3 +7926,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常Compose画面と既存Canvas panelのPrompt／JSONタブに`Copy` controlを追加した。** Promptは表示中のStage 1／Stage 2入力とsystem prompt全文、JSONは表示中のrender情報全文をclipboardへ渡す。表示とcopyは同じ計算済み文字列を使い、Artworkまたは作品未選択ではcontrolを出さない。
 - **既存`LocalClipboardManager`と表示helperだけを結線した。** tab切替、本文、hash copy、export、canvas messageを保ち、新しいViewModel state/action、producer、生成規則、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`RenderTabCopyTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.54` — 保存済みの生成情報を読む（2026-08-23・[I-356]）
+
+- **通常Compose画面と既存Canvas panelに、選択中作品の読み取り専用`生成情報`sheetを追加した。** 保存済みの写生、Stage 1／2モデルと言語、各seedと変奏、色カタログ、キャンバス、render hash／engine、作成日時、処理時間を5節に整理し、null／blankまたは壊れたmetadataは`—`で扱う。
+- **既存`HistoryItemEntity`と`renderMetadataJson`だけを読む。** Androidにproducerが無い世代、派生、コメント、batch、tokensは足さず、ViewModel state/action、repository/DAO/query、Room/schema/migration、永続化、lineage取得、token収集、SVG解析、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新projection helper／typesの未実装symbolだけでexit 1。実装中とbranch-tip finalはexit 0。mainが枝分岐後に別のWeb変更で進んだため、重なり0・競合0を確認してmerge後に`GenerationInfoSheetTest`を1回実行しexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

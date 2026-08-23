@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.53` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.54` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2608,3 +2608,9 @@ The UI uses only the existing `HistoryListItem.starred` state and `toggleStar(Hi
 The Prompt and JSON tabs on the ordinary Compose screen and the existing Canvas panel now have a `Copy` control. Prompt copies the complete Stage 1 and Stage 2 input and system-prompt text shown on screen; JSON copies the complete rendered-information text shown on screen. Display and clipboard share the same computed string, and no control appears for the `Artwork` tab or with no selected work.
 
 The UI uses only the existing `LocalClipboardManager` and `renderPromptText` or `renderJsonText`. Tab switching, body text, hash copying, export, and canvas messages are preserved. No new ViewModel state or action, producer, generation rule, repository or DAO query, Room schema or migration, persistence, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Reading saved provenance (android `2.1.4-android.54`, [I-356])
+
+The ordinary Compose screen and the existing Canvas panel can now open a read-only `Provenance` sheet for the selected work. Saved sketch state, Stage 1 and Stage 2 models and languages, seeds and variation, color catalog, canvas, render hash and engine, creation time, and elapsed time are arranged under Sketch from life, Interpretation, Performance, Identity, and Run. Null, blank, or malformed render metadata is shown as `—` without crashing the sheet.
+
+The sheet reads only the existing `HistoryItemEntity` and `renderMetadataJson`. Generation, derivation, comments, batch data, and tokens have no current Android producer and were not added. No ViewModel state or action, repository or DAO query, Room schema or migration, persistence, lineage fetch, token collection, SVG analysis, pipeline, rendering, server, Web, or shared path changed.

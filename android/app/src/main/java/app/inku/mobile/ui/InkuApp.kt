@@ -1,5 +1,6 @@
 package app.inku.mobile.ui
 
+import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -4583,10 +4584,21 @@ internal enum class GenerationInfoField {
 
 internal data class GenerationInfoRow(val field: GenerationInfoField, val value: String)
 
+internal data class GenerationInfoColorMapEntry(val word: String, val code: String)
+
 internal data class GenerationInfoSection(
     val id: GenerationInfoSectionId,
     val rows: List<GenerationInfoRow>,
+    val colorMapEntries: List<GenerationInfoColorMapEntry> = emptyList(),
 )
+
+internal fun generationInfoColorMapEntries(renderMetadataJson: String): List<GenerationInfoColorMapEntry> =
+    workColorSnapshot(renderMetadataJson)
+        ?.colorMap
+        ?.entries
+        ?.sortedBy { it.key }
+        ?.map { GenerationInfoColorMapEntry(word = it.key, code = it.value) }
+        .orEmpty()
 
 internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInfoSection> {
     val metadata = runCatching { JSONObject(item.renderMetadataJson) }.getOrElse { JSONObject() }
@@ -4647,6 +4659,7 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
                 GenerationInfoRow(GenerationInfoField.CanvasAspect, columnOrMetadata(item.canvasAspect, "render_canvas_aspect")),
                 GenerationInfoRow(GenerationInfoField.CanvasRatio, metadataValue("render_canvas_aspect_ratio")),
             ),
+            generationInfoColorMapEntries(item.renderMetadataJson),
         ),
         GenerationInfoSection(
             GenerationInfoSectionId.Identity,
@@ -4701,9 +4714,59 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
                             )
                         }
                     }
+                    if (section.colorMapEntries.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                        ) {
+                            Text(
+                                S.generationInfoColorMap,
+                                modifier = Modifier.weight(0.42f),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Column(
+                                modifier = Modifier.weight(0.58f),
+                                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                            ) {
+                                section.colorMapEntries.forEach { entry ->
+                                    GenerationInfoColorMapEntryRow(entry)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GenerationInfoColorMapEntryRow(entry: GenerationInfoColorMapEntry) {
+    val swatchColor = runCatching { parseColor(entry.code) }
+        .getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(Dimens.spaceL)
+                .background(swatchColor, RoundedCornerShape(Dimens.radiusCard))
+                .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.radiusCard)),
+        )
+        Text(
+            entry.word,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            entry.code,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -397,6 +397,7 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoSeedText = "Seed text"
     override val generationInfoRenderWild = "Wild"
     override val generationInfoColorCatalog = "Color catalog"
+    override val generationInfoColorMap = "Color map"
     override val generationInfoCanvasAspect = "Canvas"
     override val generationInfoCanvasRatio = "Canvas ratio"
     override val generationInfoRenderHash = "Provenance hash"

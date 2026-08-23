@@ -367,6 +367,7 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoSeedText = "種テキスト"
     override val generationInfoRenderWild = "暴れる"
     override val generationInfoColorCatalog = "色カタログ"
+    override val generationInfoColorMap = "色の対応"
     override val generationInfoCanvasAspect = "キャンバス"
     override val generationInfoCanvasRatio = "キャンバスの比率"
     override val generationInfoRenderHash = "作品の来歴ハッシュ"

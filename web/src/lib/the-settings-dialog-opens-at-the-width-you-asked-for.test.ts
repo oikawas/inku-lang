@@ -34,7 +34,7 @@ import {
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const MODAL = read('./components/SettingsModal.svelte');
 const PAGE = read('../routes/+page.svelte');
-const SETTINGS = read('./features/settings/state.svelte.ts');
+const SETTINGS = read('./features/settings/navigation-state.svelte.ts');
 
 /**
  * The four, written out here rather than read from the module under test.

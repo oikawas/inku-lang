@@ -9,6 +9,10 @@ import { test } from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const OWNER = read('./state.svelte.ts');
+const SERVER_OWNER = read('./server-administration.svelte.ts');
+const MODEL_OWNER = read('./model-administration.svelte.ts');
+const USER_OWNER = read('./user-administration.svelte.ts');
+const ALL_OWNERS = OWNER + SERVER_OWNER + MODEL_OWNER + USER_OWNER;
 const PAGE = read('../../../routes/+page.svelte');
 const MODAL = read('../../components/SettingsModal.svelte');
 
@@ -59,7 +63,7 @@ test('the page no longer owns moved Settings operations or endpoints', () => {
 		'/api/settings/limits'
 	]) {
 		assert.doesNotMatch(PAGE, new RegExp(endpoint.replaceAll('/', '\\/')));
-		assert.match(OWNER, new RegExp(endpoint.replaceAll('/', '\\/')));
+		assert.match(SERVER_OWNER, new RegExp(endpoint.replaceAll('/', '\\/')));
 	}
 });
 
@@ -82,8 +86,8 @@ test('SettingsModal receives one typed Stage 2A boundary and no generic transpor
 
 test('user edit secrets do not enter the Settings owner', () => {
 	for (const field of ['loginPassword', 'newUserPassword', 'editUserPassword']) {
-		assert.doesNotMatch(OWNER, new RegExp(field), field);
+		assert.doesNotMatch(ALL_OWNERS, new RegExp(field), field);
 	}
-	assert.doesNotMatch(OWNER, /newProviderApiKey/);
+	assert.doesNotMatch(ALL_OWNERS, /newProviderApiKey/);
 	assert.match(MODAL, /let newProviderApiKey = \$state\(''\)/);
 });

@@ -11,6 +11,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const VIEW_URL = new URL('./UserAdministrationSettings.svelte', import.meta.url);
 const VIEW = existsSync(VIEW_URL) ? read('./UserAdministrationSettings.svelte') : '';
 const OWNER = read('./state.svelte.ts');
+const USER_OWNER = read('./user-administration.svelte.ts');
 const MODAL = read('../../components/SettingsModal.svelte');
 const PAGE = read('../../../routes/+page.svelte');
 const USER_BRANCH = MODAL.slice(
@@ -31,7 +32,7 @@ test('Stage 3A gives the cohesive account view one feature-local component', () 
 });
 
 test('the focused view receives only the account submodel and session capabilities', () => {
-	assert.match(OWNER, /export type SettingsUserAdministration\s*=\s*\{/);
+	assert.match(USER_OWNER, /export type SettingsUserAdministration\s*=\s*\{/);
 	assert.match(PUBLIC_CONTROLLER, /\buserAdministration,/);
 	assert.doesNotMatch(PUBLIC_CONTROLLER, /get users\(|get groups\(|loadUserAdministration,|addUser,|updateUser,|removeUser,/);
 	assert.match(VIEW, /administration: SettingsUserAdministration;/);

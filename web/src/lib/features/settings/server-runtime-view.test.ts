@@ -9,7 +9,7 @@ import { test } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const VIEW_URL = new URL('./ServerRuntimeSettings.svelte', import.meta.url);
 const VIEW = existsSync(VIEW_URL) ? read('./ServerRuntimeSettings.svelte') : '';
-const OWNER = read('./state.svelte.ts');
+const OWNER = read('./server-administration.svelte.ts');
 const MODAL = read('../../components/SettingsModal.svelte');
 const SERVER_BRANCH = MODAL.slice(
 	MODAL.indexOf("{:else if settingsTab === 'server_misc'}"),

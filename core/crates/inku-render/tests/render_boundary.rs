@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use inku_render::render::build_render_metadata;
+use inku_render::render::{build_render_metadata, render};
 use inku_render::svg::{Document, Element, format_number};
 use inku_render::types::{CanvasSize, RenderOptions, RenderRequest, Score, SvgProfile};
 
@@ -58,4 +58,67 @@ fn svg_tree_escapes_values_and_serializes_once() {
     assert!(svg.contains("&lt;safe&gt;"));
     assert_eq!(svg.matches("<svg").count(), 1);
     assert_eq!(format_number(-0.0), "0");
+}
+
+#[test]
+fn candidate_renders_every_primitive_through_one_request() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[
+              {"primitive":"line","from":[0.1,0.1],"to":[0.9,0.1],"weight":"pencil"},
+              {"primitive":"circle","center":[0.2,0.3],"radius":0.06,"weight":"rotring"},
+              {"primitive":"ellipse","center":[0.5,0.3],"size":[0.2,0.1],"weight":"pen"},
+              {"primitive":"square","position":[0.7,0.2],"size":[0.12,0.12],"weight":"rotring"},
+              {"primitive":"triangle","position":[0.1,0.55],"size":[0.15,0.15],"weight":"pen"},
+              {"primitive":"polygon","center":[0.4,0.65],"radius":0.08,"sides":6,"weight":"rotring"},
+              {"primitive":"arc","center":[0.65,0.65],"radius":0.1,"angle_start":20,"angle_end":150,"weight":"pen"},
+              {"primitive":"cloudform","center":[0.85,0.7],"size":[0.18,0.12],"weight":"rotring"}
+            ]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed: Some(431),
+            composition_seed: Some(17),
+            wild: false,
+        },
+    };
+    let first = render(request.clone()).unwrap();
+    let second = render(request).unwrap();
+    assert_eq!(first, second);
+    assert_eq!(first.metadata.render_engine_version, "41");
+    assert!(first.svg.starts_with("<svg"));
+    assert!(first.svg.ends_with("</svg>"));
+    assert!(first.svg.contains("stroke-engine-v1"));
+    assert!(first.svg.contains("contour-stroke-v1"));
+    assert!(first.svg.contains("cloudform contour-v1"));
+    assert!(!first.svg.contains("NaN"));
+    assert!(!first.svg.contains("<filter"));
+    assert!(!first.svg.contains("<clipPath"));
+}
+
+#[test]
+fn render_request_has_a_stable_json_wire_shape() {
+    let request = RenderRequest {
+        score: score(r#"{"instructions":[]}"#),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 500.0),
+            canvas_aspect_id: "landscape".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: None,
+            composition_seed: Some(-7),
+            wild: false,
+        },
+    };
+    let wire = serde_json::to_string(&request).unwrap();
+    let decoded: RenderRequest = serde_json::from_str(&wire).unwrap();
+    assert_eq!(decoded, request);
+    let output = render(decoded).unwrap();
+    assert!(output.svg.contains("id=\"inku_artboard\""));
+    assert!(output.svg.contains("id=\"inku_metadata\""));
 }

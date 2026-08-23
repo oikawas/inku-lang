@@ -196,6 +196,40 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
         .collect()
 }
 
+/// Densely sample the closed Catmull-Rom curve used by the SVG cloudform path.
+#[must_use]
+pub fn sample_closed_catmull_rom(points: &[Point], samples_per_segment: usize) -> Vec<Point> {
+    let count = points.len();
+    if count < 3 {
+        return points.to_vec();
+    }
+    let samples_per_segment = samples_per_segment.max(2);
+    let mut sampled = Vec::with_capacity(count * samples_per_segment);
+    for index in 0..count {
+        let p0 = points[(index + count - 1) % count];
+        let p1 = points[index];
+        let p2 = points[(index + 1) % count];
+        let p3 = points[(index + 2) % count];
+        let c1 = Point::new(p1.x + (p2.x - p0.x) / 6.0, p1.y + (p2.y - p0.y) / 6.0);
+        let c2 = Point::new(p2.x - (p3.x - p1.x) / 6.0, p2.y - (p3.y - p1.y) / 6.0);
+        for step in 0..samples_per_segment {
+            let t = step as f64 / samples_per_segment as f64;
+            let inverse = 1.0 - t;
+            sampled.push(Point::new(
+                inverse.powi(3) * p1.x
+                    + 3.0 * inverse.powi(2) * t * c1.x
+                    + 3.0 * inverse * t.powi(2) * c2.x
+                    + t.powi(3) * p2.x,
+                inverse.powi(3) * p1.y
+                    + 3.0 * inverse.powi(2) * t * c1.y
+                    + 3.0 * inverse * t.powi(2) * c2.y
+                    + t.powi(3) * p2.y,
+            ));
+        }
+    }
+    sampled
+}
+
 #[must_use]
 pub fn polygon_self_intersects(points: &[Point]) -> bool {
     let orientation =

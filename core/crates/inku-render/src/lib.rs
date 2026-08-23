@@ -12,6 +12,7 @@ pub mod contact;
 pub mod determinism;
 pub mod geometry;
 pub mod group;
+pub mod marks;
 pub mod palette;
 pub mod performance;
 pub mod placement;

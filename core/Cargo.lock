@@ -82,6 +82,7 @@ version = "0.1.0"
 dependencies = [
  "inku-render",
  "pyo3",
+ "serde_json",
 ]
 
 [[package]]

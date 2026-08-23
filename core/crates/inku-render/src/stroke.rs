@@ -361,6 +361,27 @@ fn banks_for_centerline(
     (left, right)
 }
 
+/// Build the variable-width polygon around a caller-supplied centerline.
+#[must_use]
+pub fn outline_for_centerline(points: &[Point], widths: &[f64], cuts: &[bool]) -> Vec<Point> {
+    if points.len() < 2 {
+        return points.to_vec();
+    }
+    let (left, right) = banks_for_centerline(points, widths, false);
+    if !cuts.iter().any(|cut| *cut) {
+        return left.into_iter().chain(right.into_iter().rev()).collect();
+    }
+    let mut outline = Vec::new();
+    for run in ink_runs(&cuts[..cuts.len().min(left.len())], 2) {
+        if !outline.is_empty() {
+            outline.push(Point::new(f64::NAN, f64::NAN));
+        }
+        outline.extend(run.iter().map(|index| left[*index]));
+        outline.extend(run.iter().rev().map(|index| right[*index]));
+    }
+    outline
+}
+
 fn correct_closed_seam(samples: &mut [StrokeSample], intended: &[Point], parameters: &[f64]) {
     let span = parameters[parameters.len() - 1];
     if span <= 1.0e-9 {

@@ -66,11 +66,13 @@ enum VariationSeedFields {
     All,
 }
 
-fn needs_blur(variation: &Variation) -> bool {
+#[must_use]
+pub fn needs_blur(variation: &Variation) -> bool {
     variation.quality == Quality::Pink
 }
 
-fn needs_path_variation(variation: &Variation) -> bool {
+#[must_use]
+pub fn needs_path_variation(variation: &Variation) -> bool {
     !matches!(variation.quality, Quality::None | Quality::Pink)
         && variation
             .dimensions
@@ -78,7 +80,8 @@ fn needs_path_variation(variation: &Variation) -> bool {
             .any(|dimension| matches!(dimension, Dimension::PositionX | Dimension::PositionY))
 }
 
-fn needs_contour_variation(variation: &Variation) -> bool {
+#[must_use]
+pub fn needs_contour_variation(variation: &Variation) -> bool {
     !matches!(variation.quality, Quality::None | Quality::Pink)
         && variation.dimensions.iter().any(|dimension| {
             matches!(

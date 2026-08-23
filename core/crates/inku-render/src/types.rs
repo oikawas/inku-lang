@@ -46,7 +46,7 @@ impl From<Point> for [f64; 2] {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CanvasSize {
     pub width: f64,
     pub height: f64,
@@ -573,7 +573,7 @@ pub struct Score {
     pub instructions: Vec<Instruction>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderOptions {
     pub resolved_color_map: BTreeMap<String, String>,
     pub catalog_id: Option<String>,
@@ -585,7 +585,7 @@ pub struct RenderOptions {
     pub wild: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderRequest {
     pub score: Score,
     pub options: RenderOptions,
@@ -612,7 +612,7 @@ pub struct RenderMetadata {
     pub render_surface_textures: Vec<SurfaceTextureMetadata>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderOutput {
     pub svg: String,
     pub metadata: RenderMetadata,

@@ -6,28 +6,26 @@
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
-	import OutputTabsContent from './OutputTabsContent.svelte';
+	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import VariationLanes from './VariationLanes.svelte';
-	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { measureSvgWeight } from '$lib/svgWeight';
-	import { formatByteSize, groupDigits } from '$lib/formatNumber';
+	import { formatByteSize } from '$lib/formatNumber';
 	import { shareTargetOf } from '$lib/shareTarget';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
-	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
+	import type { DerivationKind } from '$lib/derivation';
 	import type { ModelOption } from '$lib/models';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	import Tooltip from './Tooltip.svelte';
-	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
-	import { colorMapEntries, colorWordLabel, type ColorMap } from '$lib/colors';
+	import type { ColorMap } from '$lib/colors';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type {
 		RefinementSession,
@@ -526,90 +524,15 @@
 	// Three readings for the drawer, one condition for the badge. Only Stage 2
 	// can tell 'no' from 'unrecorded', so only its row shows three.
 	const composeFallbackRecord = $derived(composeFallbackState(composeFallbackRaw));
-	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
-	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
-	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
-	// The stored form is `<scheme>:<digest>`. The scheme is named in the row's
-	// label and the digest stands alone in the cell, so the value shown is the
-	// value copied. See lib/hashIdentity.ts.
-	const storedDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
-	const storedRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
-	const detailDescriptionHash = $derived(hashDigest(storedDescriptionHash));
-	const detailRenderHash = $derived(hashDigest(storedRenderHash));
-	const detailDescriptionHashLabel = $derived(hashRowLabel('description hash', storedDescriptionHash));
-	const detailRenderHashLabel = $derived(hashRowLabel('render hash', storedRenderHash));
-	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
-	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
-	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
-	const detailBuild = $derived(statusHistoryItem?.render_build_number ?? result?.render_build_number ?? '');
-	const detailDerivationMetadata = $derived(statusHistoryItem?.derivation_metadata ?? result?.derivation_metadata ?? {});
-	const detailResolvedLang = $derived(statusHistoryItem?.instruction_lang_resolved ?? result?.instruction_lang_resolved ?? '');
-	const detailStage1Lang = $derived(typeof detailDerivationMetadata.stage1_language === 'string' ? detailDerivationMetadata.stage1_language : detailResolvedLang);
-	const detailStage2Lang = $derived(typeof detailDerivationMetadata.stage2_language === 'string' ? detailDerivationMetadata.stage2_language : detailResolvedLang);
-	const displayLanguageName = (lang: string) => lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : lang === 'en' ? 'English' : lang || '-';
-	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
-	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
-	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
-	// How heavy the performance is, in three quantities that do not stand in for
-	// one another: bytes, objects, points. Counted by the same function the trend
-	// report uses (see $lib/svgWeight), so the number here and the number there
-	// are the same quantity. HistoryItem carries no `svg`, so this reads `result`
-	// rather than the `statusHistoryItem ?? result` shape the other rows use.
 	// The third mark's socket. `supported` is false everywhere today, so the
 	// button below renders nothing -- see $lib/shareTarget and ledger I-191.
 	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
+	// Bytes, objects, and points do not stand in for one another. Measure all
+	// three once for both the canvas strip and the generation-information view,
+	// using the same definition as the trend report (see $lib/svgWeight).
+	// HistoryItem carries no SVG, so this reads the current result directly.
 	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
 	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
-	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
-	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
-	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
-	const detailSeedText = $derived(statusHistoryItem?.seed_text ?? result?.seed_text ?? '');
-	// Wild: null predates the column and is different from Off.
-	const detailWild = $derived(statusHistoryItem?.render_wild ?? result?.render_wild ?? null);
-	const detailVariationAmplitude = $derived(statusHistoryItem?.variation_amplitude ?? result?.variation_amplitude ?? '');
-	const detailVariationSeed = $derived(statusHistoryItem?.variation_seed ?? result?.variation_seed ?? null);
-	// Sketch from life (Stage 0.5). Two things about the work: what the layer did (fine /
-	// coarse / fallback / off / not_applicable) and the grain. The prose the
-	// layer wrote is deliberately not here -- the describe panel already holds
-	// it, at the length it deserves. A row with no state at all is a work drawn
-	// before the column existed, which is NOT 'off', so the absence gets a
-	// sentence of its own rather than being rounded to a choice never made.
-	const detailSketchState = $derived(
-		normalizeSketchState(statusHistoryItem?.sketch_state ?? result?.sketch_state)
-	);
-	const detailSketchGrain = $derived(
-		detailSketchState === 'fine' || detailSketchState === 'coarse'
-			? detailSketchState
-			: normalizeSketchGrain(statusHistoryItem?.sketch_grain ?? result?.sketch_grain)
-	);
-	// Empty for a plain fine / coarse run: there the grain row says everything.
-	const detailSketchNote = $derived(sketchStateNote(detailSketchState, isJapanese));
-	// Nothing to report when no work is on screen -- an empty canvas has not
-	// been drawn before the column existed; it has not been drawn at all.
-	const hasSketchDetails = $derived(!!(statusHistoryItem ?? result));
-	// The colours this work was actually drawn in. The catalog names the table;
-	// this is the row of it the work kept, and an empty list is a work with no
-	// map recorded rather than a work drawn at nine defaults.
-	const detailColorMap = $derived(
-		colorMapEntries(statusHistoryItem?.render_color_map ?? result?.render_color_map)
-	);
-	const detailCanvasRatio = $derived(statusHistoryItem?.render_canvas_aspect_ratio ?? result?.render_canvas_aspect_ratio ?? null);
-	const detailStage1PromptDigest = $derived(statusHistoryItem?.stage1_prompt_digest ?? result?.stage1_prompt_digest ?? '');
-	const detailStage1PromptBaseDigest = $derived(statusHistoryItem?.stage1_prompt_base_digest ?? result?.stage1_prompt_base_digest ?? '');
-	const detailStage2PromptDigest = $derived(statusHistoryItem?.stage2_prompt_digest ?? result?.stage2_prompt_digest ?? '');
-	const detailDerivationKind = $derived(statusHistoryItem?.derivation_kind ?? result?.derivation_kind ?? null);
-	const detailBatchRunId = $derived(statusHistoryItem?.batch_run_id ?? '');
-	const detailBatchLine = $derived(statusHistoryItem?.batch_line_number ?? null);
-	const detailNote = $derived((statusHistoryItem?.note ?? '').trim());
-	const variationAmplitudeLabel = (amplitude: string) =>
-		amplitude === 'small' ? t().variationSmall
-		: amplitude === 'medium' ? t().variationMedium
-		: amplitude === 'large' ? t().variationLarge
-		: amplitude;
-	// Hide the provenance group when the work has no lineage, derivation, batch, or note.
-	const hasOriginDetails = $derived(
-		statusGeneration != null || detailDerivationKind != null || !!detailBatchRunId || !!detailNote
-	);
 </script>
 
 <svelte:window
@@ -1368,159 +1291,45 @@
 		</div>
 	</div>
 
-	<aside
-		bind:this={generationInfoEl}
-		class="generation-info"
-		class:open={generationInfoOpen}
-		aria-hidden={!generationInfoOpen}
-		aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}
-	>
-			<header class="generation-info-head">
-				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
-				<button type="button" class="generation-info-close" onclick={closeGenerationInfo} aria-label="Close">&times;</button>
-			</header>
-			<div class="generation-info-tabs" role="tablist">
-				<button type="button" role="tab" aria-selected={generationInfoTab === 'details'} class:active={generationInfoTab === 'details'} onclick={() => (generationInfoTab = 'details')}>{isJapanese ? '\u8a73\u7d30' : 'Details'}</button>
-				<button type="button" role="tab" aria-selected={generationInfoTab === 'prompts'} class:active={generationInfoTab === 'prompts'} onclick={() => (generationInfoTab = 'prompts')}>{t().tabPrompts}</button>
-				<button type="button" role="tab" aria-selected={generationInfoTab === 'score'} class:active={generationInfoTab === 'score'} onclick={() => (generationInfoTab = 'score')}>{t().tabScore}</button>
-			</div>
-			<div class="generation-info-content">
-				{#if generationInfoTab === 'details'}
-					{#snippet term(label: string, hint: string)}
-						<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
-					{/snippet}
-					<div class="generation-details" bind:this={detailsScrollEl}>
-						{#if hasSketchDetails}
-							<section class="detail-group">
-								<h4>{t().sketchLabel}</h4>
-								<dl>
-									{#if detailSketchGrain}
-										{@render term(t().sketchGrainLabel, t().provenanceHintSketchGrain)}<dd>{sketchModeLabel(detailSketchGrain, isJapanese)}</dd>
-									{/if}
-									{#if detailSketchNote}
-										{@render term(t().provenanceLabelSketchRecord, t().provenanceHintSketchRecord)}<dd>{detailSketchNote}</dd>
-									{/if}
-								</dl>
-							</section>
-						{/if}
-						<section class="detail-group">
-							<h4>{t().provenanceSectionInterpretation}</h4>
-							<dl>
-								{@render term(`Stage 1 (${isJapanese ? '解釈' : 'Interpretation'})`, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
-								{@render term(`Stage 1 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
-								{@render term(t().provenanceLabelLangRequested, t().provenanceHintLangRequested)}<dd>{detailRequestedLang ? displayLanguageName(detailRequestedLang) : '-'}</dd>
-								{@render term(isJapanese ? '解釈 seed' : 'Interpretation seed', t().provenanceHintInterpretationSeed)}<dd>{detailInterpretationSeed ?? '-'}</dd>
-								{#if interpretFallbackReason}
-									{@render term(t().provenanceLabelInterpretFallback, t().provenanceHintInterpretFallback)}<dd>{interpretFallbackReason}</dd>
-								{/if}
-								<!-- Always shown, and in three states: 'no record' is a fact
-								     about the work, and hiding it would leave every work drawn
-								     before the column looking like one whose compose held. -->
-								{@render term(t().provenanceLabelComposeFallback, t().provenanceHintComposeFallback)}<dd>{t().composeFallbackRecord(composeFallbackRecord)}{composeFallbackDrawnReason ? ` (${composeFallbackDrawnReason})` : ''}</dd>
-							</dl>
-						</section>
-						<section class="detail-group">
-							<h4>{t().provenanceSectionPerformance}</h4>
-							<dl>
-								{@render term(`Stage 2 (${isJapanese ? '描画' : 'Performance'})`, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
-								{@render term(`Stage 2 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
-								{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus || '-'}</dd>
-								{#if detailVariationAmplitude}
-									{@render term(t().provenanceLabelVariation, t().provenanceHintVariation)}<dd>{variationAmplitudeLabel(detailVariationAmplitude)}</dd>
-								{/if}
-								{#if detailVariationSeed != null}
-									{@render term(t().provenanceLabelVariationSeed, t().provenanceHintVariationSeed)}<dd>{detailVariationSeed}</dd>
-								{/if}
-								{@render term(isJapanese ? '配置 seed' : 'Composition seed', t().provenanceHintCompositionSeed)}<dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
-								{@render term('render seed', t().provenanceHintRenderSeed)}<dd>{detailRenderSeed ?? '-'}</dd>
-								{@render term(t().provenanceLabelSeedText, t().provenanceHintSeedText)}<dd>{detailSeedText || '-'}</dd>
-								{@render term(t().provenanceLabelWild, t().provenanceHintWild)}<dd>{detailWild == null ? t().historyVersionNotRecorded : detailWild ? t().provenanceWildOn : t().provenanceWildOff}</dd>
-								<!-- Works drawn before the staffage axis was folded away carry the
-								     level they were drawn at. Nothing new records one, so this only
-								     ever shows for a past work, and only to a developer. -->
-								{#if developerMode && statusTenkei}
-									<dt><span>{isJapanese ? '添景' : 'Staffage'}</span></dt><dd>{statusTenkei}</dd>
-								{/if}
-								{@render term(isJapanese ? '色カタログ' : 'Color catalog', t().provenanceHintCatalog)}<dd>{statusCatalogName}</dd>
-								{#if detailColorMap.length > 0}
-									{@render term(t().provenanceLabelColorMap, t().provenanceHintColorMap)}<dd class="detail-color-map">
-										{#each detailColorMap as entry (entry.key)}
-											<span class="color-map-entry" title={entry.code}>
-												<span class="color-map-chip" style="background: {entry.code}"></span>{colorWordLabel(entry.key, isJapanese)}
-											</span>
-										{/each}
-									</dd>
-								{/if}
-								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
-								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
-								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatByteSize(detailSvgBytes)}</dd>
-								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.objects) : '-'}</dd>
-								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight ? groupDigits(detailSvgWeight.points) : '-'}</dd>
-							</dl>
-						</section>
-						<section class="detail-group">
-							<h4>{t().provenanceSectionIdentity}</h4>
-							<dl>
-								{@render term(detailRenderHashLabel, t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
-								{@render term(detailDescriptionHashLabel, t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
-								{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
-								{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
-								{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
-								{@render term(t().provenanceLabelStage1PromptDigest, t().provenanceHintStage1PromptDigest)}<dd><code>{detailStage1PromptDigest || t().historyVersionNotRecorded}</code></dd>
-								{@render term(t().provenanceLabelStage1PromptBaseDigest, t().provenanceHintStage1PromptBaseDigest)}<dd><code>{detailStage1PromptBaseDigest || t().historyVersionNotRecorded}</code></dd>
-								{@render term(t().provenanceLabelStage2PromptDigest, t().provenanceHintStage2PromptDigest)}<dd><code>{detailStage2PromptDigest || t().historyVersionNotRecorded}</code></dd>
-								{@render term('Build', t().provenanceHintBuild)}<dd>{detailBuild || '-'}</dd>
-							</dl>
-						</section>
-						{#if hasOriginDetails}
-							<section class="detail-group">
-								<h4>{t().provenanceSectionOrigin}</h4>
-								<dl>
-									{#if statusGeneration != null}
-										{@render term(t().provenanceLabelGeneration, t().provenanceHintGeneration)}<dd>{statusGeneration}</dd>
-									{/if}
-									{@render term(t().provenanceLabelDerivation, t().provenanceHintDerivation)}<dd>{derivationKindLabel(detailDerivationKind, isJapanese)}</dd>
-									{#if detailBatchRunId}
-										{@render term(t().provenanceLabelBatchRun, t().provenanceHintBatchRun)}<dd><code>{detailBatchRunId}</code></dd>
-									{/if}
-									{#if detailBatchLine != null}
-										{@render term(t().provenanceLabelBatchLine, t().provenanceHintBatchLine)}<dd>{detailBatchLine}</dd>
-									{/if}
-									{#if detailNote}
-										{@render term(t().provenanceLabelComment, t().provenanceHintComment)}<dd class="detail-note">{detailNote}</dd>
-									{/if}
-								</dl>
-							</section>
-						{/if}
-						<section class="detail-group">
-							<h4>{t().provenanceSectionRun}</h4>
-							<dl>
-								{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
-								{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
-								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn == null ? '-' : groupDigits(detailTokensIn)} / {detailTokensOut == null ? '-' : groupDigits(detailTokensOut)}</dd>
-								{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
-							</dl>
-						</section>
-					</div>
-				{:else}
-					<OutputTabsContent
-						bind:scrollEl={tabsScrollEl}
-						outputTab={generationInfoTab}
-						{promptsData}
-						{stage1PromptText}
-						{ddl}
-						bind:promptStage1Expanded
-						bind:promptStage2Expanded
-						{copiedPrompt}
-						{scoreJsonText}
-						{scoreJsonLines}
-						{scoreJsonHighlighted}
-						{scoreJsonSeparatorLine}
-						{onCopyPromptText}
-					/>
-				{/if}
-			</div>
-	</aside>
+	<CanvasGenerationInfo
+		open={generationInfoOpen}
+		bind:tab={generationInfoTab}
+		bind:drawerEl={generationInfoEl}
+		bind:detailsScrollEl
+		bind:tabsScrollEl
+		{result}
+		{statusHistoryItem}
+		{isJapanese}
+		{developerMode}
+		{statusTenkei}
+		{statusGeneration}
+		{statusStage1Model}
+		{statusStage2Model}
+		{statusCatalogName}
+		{statusCanvasName}
+		{currentRenderedAt}
+		{interpretFallbackReason}
+		{composeFallbackRecord}
+		{composeFallbackDrawnReason}
+		detailSvgWeight={detailSvgWeight}
+		detailSvgBytes={detailSvgBytes}
+		{statusHashLabel}
+		{statusHashCopied}
+		{promptsData}
+		{stage1PromptText}
+		{ddl}
+		bind:promptStage1Expanded
+		bind:promptStage2Expanded
+		{copiedPrompt}
+		{scoreJsonText}
+		{scoreJsonLines}
+		{scoreJsonHighlighted}
+		{scoreJsonSeparatorLine}
+		onClose={closeGenerationInfo}
+		{onCopyStatusHash}
+		{onCopyPromptText}
+	/>
+
 
 </div>
 
@@ -1678,7 +1487,6 @@
 		}
 		.render-meta-item { flex: 0 1 auto; }
 		.render-meta-item strong { max-width: 180px; }
-		.generation-info { top: 68px; }
 	}
 	.canvas-area {
 		flex: 1;
@@ -2371,106 +2179,6 @@
 		user-select: none;
 	}
 	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
-	/* Opens and shuts the way the saijiki drawer does: uncovered from the right
-	   edge over the same 0.25s and the same curve, with the content standing
-	   still while it is revealed.
-
-	   The saijiki gets that by animating the width of a wrapper around an inner
-	   box of a fixed 460px. This panel's width is responsive -- min(760px, 100%
-	   - 72px) -- so there is no fixed number to give an inner box, and an inner
-	   box in percent resolves against the wrapper that is mid-animation, which
-	   drew the panel a gap narrower than it should be. Clipping does the same
-	   reveal on the box itself: same duration, same curve, no second box, and
-	   the content never reflows. */
-	.generation-info {
-		position: absolute;
-		z-index: 90;
-		top: 41px;
-		right: 0;
-		bottom: 49px;
-		box-sizing: border-box;
-		width: min(760px, calc(100% - 72px));
-		display: flex;
-		flex-direction: column;
-		background: var(--bg);
-		border-left: 1px solid var(--border2);
-		box-shadow: -14px 0 34px rgba(0, 0, 0, .18);
-		clip-path: inset(0 0 0 100%);
-		pointer-events: none;
-		transition: clip-path 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-	.generation-info.open {
-		clip-path: inset(0 0 0 0);
-		pointer-events: all;
-	}
-	.generation-info-head {
-		height: 44px;
-		flex: 0 0 auto;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0 12px 0 16px;
-		border-bottom: 1px solid var(--border);
-	}
-	.generation-info-head strong { font-size: 13px; font-weight: 600; }
-	.generation-info-close {
-		width: 30px;
-		height: 30px;
-		border: 0;
-		border-radius: 6px;
-		background: transparent;
-		color: var(--fg2);
-		font-size: 20px;
-		cursor: pointer;
-	}
-	.generation-info-close:hover { background: var(--bg2); color: var(--fg); }
-	.generation-info-tabs {
-		flex: 0 0 auto;
-		display: flex;
-		padding: 0 12px;
-		border-bottom: 1px solid var(--border);
-	}
-	.generation-info-tabs button {
-		padding: 9px 14px 8px;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		background: transparent;
-		color: var(--fg2);
-		font: inherit;
-		font-size: 12px;
-		cursor: pointer;
-	}
-	.generation-info-tabs button.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 600; }
-	.generation-info-content { min-height: 0; flex: 1; display: flex; padding: 10px; overflow: hidden; }
-	.generation-details { width: 100%; overflow: auto; padding: 8px 10px; }
-	.detail-group + .detail-group { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-	.detail-group h4 {
-		margin: 0 0 8px;
-		color: var(--fg2);
-		font-size: 11px;
-		font-weight: 600;
-		letter-spacing: .04em;
-	}
-	.generation-details dl { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 12px; }
-	.generation-details dt { min-width: 0; color: var(--fg3); }
-	.generation-details dt :global(.tooltip-wrap) { max-width: 100%; }
-	.detail-note { white-space: pre-wrap; }
-	/* The nine colour words as they were drawn. A chip and its word travel
-	   together so the row reads as pairs rather than as a run of swatches. */
-	.detail-color-map { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-	.color-map-entry { display: inline-flex; align-items: center; gap: 4px; }
-	.color-map-chip {
-		width: 11px;
-		height: 11px;
-		border-radius: 2px;
-		border: 1px solid var(--border2);
-		flex-shrink: 0;
-	}
-	.generation-details dd { min-width: 0; margin: 0; color: var(--fg); overflow-wrap: anywhere; }
-	.generation-details code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
-	.detail-copy-row code { min-width: 0; flex: 1; }
-	.detail-copy-row button { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: 5px; padding: 3px 7px; background: var(--panel); color: var(--fg2); font: inherit; font-size: 10px; cursor: pointer; }
 	.download-icon {
 		width: 14px;
 		height: 14px;

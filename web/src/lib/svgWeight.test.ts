@@ -24,6 +24,7 @@ import { measureSvgWeight } from './svgWeight.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PANEL = read('./components/CanvasPanel.svelte');
+const INFO = read('./features/canvas/CanvasGenerationInfo.svelte');
 
 // The known drawing of T-71. It is small enough to read, and it holds one of
 // every branch the count has: all five excluded tags, a `<defs>` with a drawn
@@ -124,11 +125,11 @@ test('T-69  and all three cells fall back to a dash, never to a zero', () => {
 	// in $lib/formatNumber (the canvas strip says the same number); the two
 	// other cells check the derivation itself, since a formatter that groups
 	// digits always returns a string and can no longer carry the dash.
-	assert.match(PANEL, /formatByteSize\(detailSvgBytes\)/);
+	assert.match(INFO, /formatByteSize\(detailSvgBytes\)/);
 	assert.match(read('./formatNumber.ts'), /if \(bytes == null\) return '-';/);
 	for (const field of ['objects', 'points']) {
 		assert.match(
-			PANEL,
+			INFO,
 			new RegExp(`\\{detailSvgWeight \\? groupDigits\\(detailSvgWeight\\.${field}\\) : '-'\\}`),
 			`the ${field} cell does not fall back to a dash`
 		);
@@ -152,15 +153,15 @@ test('T-70  the two new hint keys stand in all three i18n faces', () => {
 		assert.match(ja, new RegExp(`\\n\\t${key}: '`), `ja.ts has no ${key}`);
 		assert.match(en, new RegExp(`\\n\\t${key}: '`), `en.ts has no ${key}`);
 		assert.match(types, new RegExp(`\\n\\t${key}: string;`), `types.ts has no ${key}`);
-		assert.match(PANEL, new RegExp(`t\\(\\)\\.${key}`), `the drawer never uses ${key}`);
+		assert.match(INFO, new RegExp(`t\\(\\)\\.${key}`), `the drawer never uses ${key}`);
 	}
 });
 
 test('T-70  and the two labels are the words the glossary settles on', () => {
 	// Japanese is the source; the English side is the row in the correspondence
 	// table, which lives in docs/i18n/glossary.md since 2026-08-17.
-	assert.match(PANEL, /isJapanese \? 'SVG オブジェクト数' : 'SVG objects'/);
-	assert.match(PANEL, /isJapanese \? 'SVG 点数' : 'SVG points'/);
+	assert.match(INFO, /isJapanese \? 'SVG オブジェクト数' : 'SVG objects'/);
+	assert.match(INFO, /isJapanese \? 'SVG 点数' : 'SVG points'/);
 	const glossary = read('../../../docs/i18n/glossary.md');
 	assert.match(glossary, /SVG オブジェクト数/, 'the glossary does not settle the pair');
 	assert.match(glossary, /\*\*SVG objects\*\*/);

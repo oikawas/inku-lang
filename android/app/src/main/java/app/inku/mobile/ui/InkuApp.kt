@@ -2276,6 +2276,16 @@ private fun DemoSettingRow(
 internal fun selectedHistoryStripIndex(historyIds: List<String>, selectedId: String?): Int =
     selectedId?.let(historyIds::indexOf) ?: -1
 
+internal fun historyStripModelLabel(modelId: String?): String? {
+    val displayName = modelId
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?.substringAfterLast(":")
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+    return displayName?.compactLabel(14)
+}
+
 /** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
 @Composable
 private fun HistoryThumbnailStrip(
@@ -2298,19 +2308,37 @@ private fun HistoryThumbnailStrip(
     ) {
         items(history, key = { it.id }) { historyItem ->
             val selected = historyItem.id == selectedId
-            Surface(
-                modifier = Modifier
-                    .size(Dimens.buttonHeightLarge)
-                    .clickable(enabled = enabled) { onSelect(historyItem) }
-                    .border(
-                        Dimens.selectionRingWidth,
-                        if (selected) SelectionRing else Color.Transparent,
-                        RoundedCornerShape(0.dp),
-                    ),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(0.dp),
+            val modelLabel = historyStripModelLabel(historyItem.stage1Model)
+            Column(
+                modifier = Modifier.width(Dimens.buttonHeightLarge),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
             ) {
-                HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
+                Surface(
+                    modifier = Modifier
+                        .size(Dimens.buttonHeightLarge)
+                        .clickable(enabled = enabled) { onSelect(historyItem) }
+                        .border(
+                            Dimens.selectionRingWidth,
+                            if (selected) SelectionRing else Color.Transparent,
+                            RoundedCornerShape(0.dp),
+                        ),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(0.dp),
+                ) {
+                    HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
+                }
+                modelLabel?.let {
+                    Text(
+                        text = it,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

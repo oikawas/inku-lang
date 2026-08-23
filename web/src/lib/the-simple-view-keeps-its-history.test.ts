@@ -22,8 +22,8 @@ const PAGE = fileURLToPath(new URL('../routes/+page.svelte', import.meta.url));
 const HISTORY_MANAGER = fileURLToPath(
 	new URL('./components/HistoryManager.svelte', import.meta.url)
 );
-const CANVAS_PANEL = fileURLToPath(
-	new URL('./components/CanvasPanel.svelte', import.meta.url)
+const CANVAS_ARTWORK = fileURLToPath(
+	new URL('./features/canvas/CanvasArtworkWorkspace.svelte', import.meta.url)
 );
 const MANAGER_STATE = fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url));
 
@@ -172,9 +172,9 @@ test('T-7: the canvas card door is inside the export menu, with the other two', 
 	// The author then ruled: in a simple UI the export button stays and calls
 	// the card alone. So the menu holds all three only where the work tools are
 	// shown; T-107 owns the other state. No rule hides .canvas-export any more.
-	const source = read(CANVAS_PANEL);
+	const source = read(CANVAS_ARTWORK);
 	const menu = elementBody(source, 'div', /<div class="export-menu"/);
-	assert.match(menu, /downloadCardFromCanvas\(\)/, 'the card left the export menu');
+	assert.match(menu, /onDownloadCard\(\)/, 'the card left the export menu');
 	assert.match(menu, /onDownloadSVG\('display'\)/, 'SVG left the export menu');
 	assert.match(menu, /onDownloadPNG\(/, 'PNG left the export menu');
 	// One button opens all three, and no UI mode takes the button away.

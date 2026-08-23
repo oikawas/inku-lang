@@ -18,15 +18,19 @@ const PANEL = readFileSync(
 	fileURLToPath(new URL('./components/CanvasPanel.svelte', import.meta.url)),
 	'utf-8'
 );
+const ARTWORK = readFileSync(
+	fileURLToPath(new URL('./features/canvas/CanvasArtworkWorkspace.svelte', import.meta.url)),
+	'utf-8'
+);
 const PRESENTATION = readFileSync(
 	fileURLToPath(new URL('./features/canvas/CanvasPresentationOverlay.svelte', import.meta.url)),
 	'utf-8'
 );
-const REFINEMENT = readFileSync(
-	fileURLToPath(new URL('./features/canvas/CanvasRefinementWorkspace.svelte', import.meta.url)),
+const REFINEMENT_ADJUST = readFileSync(
+	fileURLToPath(new URL('./features/canvas/RefinementAdjustView.svelte', import.meta.url)),
 	'utf-8'
 );
-const DRAWING_VIEWS = [PANEL, PRESENTATION, REFINEMENT];
+const DRAWING_VIEWS = [ARTWORK, PRESENTATION, REFINEMENT_ADJUST];
 
 // ── T-73 ────────────────────────────────────────────────────────────────────
 test('T-73  the canvas puts no drawing markup in the page', () => {

@@ -27,6 +27,8 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'utf8');
 
 const PANEL = read('./components/CanvasPanel.svelte');
+const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
+const HISTORY_STATE = read('./historyManagerState.svelte.ts');
 const LINEAGE = read('./components/LineagePanel.svelte');
 const PAGE = read('../routes/+page.svelte');
 
@@ -39,14 +41,14 @@ const PAGE = read('../routes/+page.svelte');
  * region that really does contain it.
  */
 function cornerRow(side: 'left' | 'right'): string {
-	const start = PANEL.indexOf(`<div class="canvas-corner-controls canvas-corner-${side}"`);
+	const start = ARTWORK.indexOf(`<div class="canvas-corner-controls canvas-corner-${side}"`);
 	assert.ok(start > 0, `the ${side} corner row is gone`);
 	let depth = 0;
-	for (let i = start; i < PANEL.length; i += 1) {
-		if (PANEL.startsWith('<div', i)) depth += 1;
-		else if (PANEL.startsWith('</div>', i)) {
+	for (let i = start; i < ARTWORK.length; i += 1) {
+		if (ARTWORK.startsWith('<div', i)) depth += 1;
+		else if (ARTWORK.startsWith('</div>', i)) {
 			depth -= 1;
-			if (depth === 0) return PANEL.slice(start, i);
+			if (depth === 0) return ARTWORK.slice(start, i);
 		}
 	}
 	throw new Error(`the ${side} corner row never closes`);
@@ -67,18 +69,18 @@ test('T-99: SVG, PNG and the card leave through one button', () => {
 	// One button, one menu. Two of the three used to carry a menu of their own
 	// and the third was a button that acted at once, which is why the row read
 	// as three unrelated things.
-	assert.equal((PANEL.match(/class="canvas-icon-btn canvas-export-btn"/g) ?? []).length, 1);
-	assert.equal((PANEL.match(/<div class="export-menu"/g) ?? []).length, 1);
+	assert.equal((ARTWORK.match(/class="canvas-icon-btn canvas-export-btn"/g) ?? []).length, 1);
+	assert.equal((ARTWORK.match(/<div class="export-menu"/g) ?? []).length, 1);
 	// And the separate doors are gone, by their own names.
-	assert.doesNotMatch(PANEL, /class="png-wrap"/);
-	assert.doesNotMatch(PANEL, /svgMenuOpen/);
-	assert.doesNotMatch(PANEL, /pngMenuOpen/);
+	assert.doesNotMatch(ARTWORK, /class="png-wrap"/);
+	assert.doesNotMatch(ARTWORK, /svgMenuOpen/);
+	assert.doesNotMatch(ARTWORK, /pngMenuOpen/);
 	assert.doesNotMatch(PAGE, /pngMenuOpen|pngWrapEl/);
 });
 
 test('T-99: the menu keeps the order the three buttons stood in', () => {
-	const menu = PANEL.slice(PANEL.indexOf('<div class="export-menu"'));
-	const [svg, png, card] = positionsOf(menu, ['onDownloadSVG', 'onDownloadPNG', 'downloadCardFromCanvas']);
+	const menu = ARTWORK.slice(ARTWORK.indexOf('<div class="export-menu"'));
+	const [svg, png, card] = positionsOf(menu, ['onDownloadSVG', 'onDownloadPNG', 'onDownloadCard']);
 	assert.ok(svg < png && png < card, 'the three ways out were reordered by the merge');
 });
 
@@ -86,19 +88,19 @@ test('T-99: the menu closes on a press outside itself, not outside the row', () 
 	// The wrap the page measures against has to be the menu's own box. Bound to
 	// the corner row instead, a press on any other button in that row would
 	// count as inside and leave the menu standing open.
-	assert.match(PANEL, /<div class="canvas-export" bind:this=\{exportWrapEl\}>/);
-	assert.doesNotMatch(PANEL, /canvas-corner-right" bind:this=\{exportWrapEl\}/);
+	assert.match(ARTWORK, /<div class="canvas-export" bind:this=\{exportWrapEl\}>/);
+	assert.doesNotMatch(ARTWORK, /canvas-corner-right" bind:this=\{exportWrapEl\}/);
 	assert.match(PAGE, /if \(exportMenuOpen && exportWrapEl && !exportWrapEl\.contains\(e\.target as Node\)\) exportMenuOpen = false;/);
 });
 
 // -------------------------------------------------- T-100 (the bar is gone)
 
 test('T-100: the bar under the canvas no longer exists', () => {
-	assert.doesNotMatch(PANEL, /class="status-bar"/);
-	assert.doesNotMatch(PANEL, /class="status-spacer"/);
+	assert.doesNotMatch(ARTWORK, /class="status-bar"/);
+	assert.doesNotMatch(ARTWORK, /class="status-spacer"/);
 	// Its two label-shaped button styles went with it.
-	assert.doesNotMatch(PANEL, /\.generation-info-button \{/);
-	assert.doesNotMatch(PANEL, /\.status-hash-btn \{/);
+	assert.doesNotMatch(ARTWORK, /\.generation-info-button \{/);
+	assert.doesNotMatch(ARTWORK, /\.status-hash-btn \{/);
 });
 
 test('T-100: the marks stand at the left, after the caption toggle', () => {
@@ -145,7 +147,7 @@ test('T-101: the two marks are the two flags a work carries', () => {
 	assert.match(PAGE, /const toggleHistoryForRevision = historyMutations\.toggleForRevision/);
 	// The canvas has to be able to read the flag it draws, or the mark would
 	// never come back on for a work that already carries it.
-	assert.match(PANEL, /for_revision\?: boolean;/);
+	assert.match(HISTORY_STATE, /for_revision\?: boolean;/);
 	assert.match(left, /class:marked=\{!!statusHistoryItem\?\.for_revision\}/);
 	assert.match(left, /class:marked=\{!!statusHistoryItem\?\.starred\}/);
 });
@@ -252,13 +254,13 @@ test('T-107: the page tells the canvas which of the two jobs the button has', ()
 });
 
 test('T-107: with the work tools gone the button calls the card, not a menu', () => {
-	assert.match(PANEL, /if \(exportCardOnly\) downloadCardFromCanvas\(\);/);
-	assert.match(PANEL, /else exportMenuOpen = !exportMenuOpen;/);
+	assert.match(ARTWORK, /if \(exportCardOnly\) onDownloadCard\(\);/);
+	assert.match(ARTWORK, /else exportMenuOpen = !exportMenuOpen;/);
 	// A menu of one is still a menu. The panel must not be able to open it in
 	// that state, whatever the bound flag happens to hold.
-	assert.match(PANEL, /\{#if exportMenuOpen && !exportCardOnly\}/);
+	assert.match(ARTWORK, /\{#if exportMenuOpen && !exportCardOnly\}/);
 	// And it must not announce a menu it will not open.
-	assert.match(PANEL, /aria-haspopup=\{exportCardOnly \? undefined : 'menu'\}/);
+	assert.match(ARTWORK, /aria-haspopup=\{exportCardOnly \? undefined : 'menu'\}/);
 });
 
 test('T-107: in that state the button is disabled exactly when the card is', () => {
@@ -266,10 +268,10 @@ test('T-107: in that state the button is disabled exactly when the card is', () 
 	// A door that leads only there must refuse in the same two cases -- with
 	// `!result` alone it would be pressable and then do nothing.
 	assert.match(
-		PANEL,
+		ARTWORK,
 		/disabled=\{exportCardOnly \? \(!currentHistoryId \|\| cardExportBusy\) : !result\}/
 	);
-	assert.match(PANEL, /disabled=\{!currentHistoryId \|\| cardExportBusy\}/);
+	assert.match(ARTWORK, /disabled=\{!currentHistoryId \|\| cardExportBusy\}/);
 	// It says what it does, too: the card's own label, not "export".
-	assert.match(PANEL, /aria-label=\{exportCardOnly \? t\(\)\.historyCardExport : t\(\)\.exportLabel\}/);
+	assert.match(ARTWORK, /aria-label=\{exportCardOnly \? t\(\)\.historyCardExport : t\(\)\.exportLabel\}/);
 });

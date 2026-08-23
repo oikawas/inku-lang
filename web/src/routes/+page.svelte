@@ -99,16 +99,9 @@
 	import { loadPersistedSettings } from '$lib/features/persisted-settings';
 	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
+	import { BatchState } from '$lib/features/batch/state.svelte';
+	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
-	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
-	import {
-		batchStoppedPartWay,
-		conditionsOfWork,
-		latestBatchWork,
-		linesToResume,
-		numberedBatchLines,
-		type NumberedLine
-	} from '$lib/features/batch/resume';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -116,10 +109,7 @@
 	import { createExportActions } from '$lib/features/export/download';
 	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
-	import {
-		batchFailureReportStore,
-		type BatchFailure
-	} from '$lib/features/batch/failure-report.svelte';
+	import { batchFailureReportStore } from '$lib/features/batch/failure-report.svelte';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
@@ -166,13 +156,8 @@
 		if (Number.isNaN(stamp.getTime())) return null;
 		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
 	});
-	// Matches _BATCH_PROMPT_HISTORY_LIMIT in server/src/inku_server/db.py: the
-	// server cuts the list on both the read and the write, so the shorter of the
-	// two numbers is what the picker ever shows.
-	const BATCH_PROMPT_HISTORY_LIMIT = 50;
-	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
-
 	type Iteration = HistoryItem;
+	type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null };
 
 	type PluginEntry = {
 		qualified_name: string;
@@ -229,7 +214,6 @@
 	let inputMode   = $state<'single' | 'batch' | 'demo'>('single');
 	let input       = $state(DEFAULT_INPUT);
 	let touchSeedText = $state('');
-	let batchInput  = $state('');
 	const instructionLang: InstructionLang = 'auto';
 	let stage1UserPrompt = $state('');
 	type CopyKind = 'stage1' | 'stage2' | 'score';
@@ -244,39 +228,6 @@
 	let replayAbortController: AbortController | null = null;
 	let replayStopRequested = false;
 	let stageLabel = $state('');
-	let batchCurrent = $state(0);
-	let batchTotal   = $state(0);
-	// 0 while the batch is on its original pass, n while it is on retry round n.
-	let batchRetryRound = $state(0);
-	let batchSuccess = $state(0);
-	let batchFailures = $state<BatchFailure[]>([]);
-	let batchPromptHistory = $state<string[]>([]);
-	// Set when the newest batch work says its run stopped before the end of the
-	// prompt it came from -- what the resume button offers to finish. Null the
-	// rest of the time, which is what withholds the button.
-	let batchResume = $state<{ prompt: string; lines: NumberedLine[]; runId: string | null; work: Iteration } | null>(null);
-	let batchActiveLine = $state<number | null>(null);
-	let batchActiveDdl = $state<string | null>(null);
-	// Which line the observer block is showing. Not batchActiveLine: that one is
-	// taken when a line starts, while the instructions, the tokens and the prose
-	// only exist once it comes back. Naming the block with the line being painted
-	// put the previous line's work under the next line's number.
-	let batchObservedLine = $state<number | null>(null);
-	// Sketching (Stage 0.5) for the batch, kept apart from the single-mode prose: that
-	// one is an editable draft bound to one description, and a batch must not
-	// overwrite what the author is editing there. Written when a line returns,
-	// the same moment batchActiveDdl is, so the two always describe one work.
-	let batchSketchText = $state<string | null>(null);
-	let batchSketchGrain = $state<unknown>(null);
-	let batchActiveTokensIn = $state<number | null>(null);
-	let batchActiveTokensOut = $state<number | null>(null);
-	let batchTokensInTotal = $state(0);
-	let batchTokensOutTotal = $state(0);
-	let batchLatestResult = $state<PaintResult | null>(null);
-	let batchLatestDdl = $state<string | null>(null);
-	let batchLatestThinking = $state<string | null>(null);
-	let batchLatestPrompt = $state('');
-	let batchAutoFollowLatest = $state(false);
 	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
 	let error        = $state<string | null>(null);
 	let demoSettings = $state<DemoSettings>({ ...DEFAULT_DEMO_SETTINGS });
@@ -741,6 +692,13 @@
 	}
 
 	const apiFetch = createApiFetch();
+	const batch = new BatchState<BatchPaintResult, Iteration>({
+		apiFetch,
+		signedIn: () => currentUser !== null,
+		paintable: (text) => !!pipelineDescription(text).trim(),
+		setFailureReport: batchFailureReportStore.set,
+		describeApiError,
+	});
 	const lineageState = new LineageQueryState(apiFetch);
 	const settings = createSettingsController({
 		apiFetch,
@@ -937,99 +895,8 @@
 		}
 	}
 
-	function normalizeBatchPromptHistory(items: string[]): string[] {
-		const normalized: string[] = [];
-		const seen = new Set<string>();
-		for (const item of items) {
-			const prompt = item.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-			if (!prompt || seen.has(prompt) || prompt.length > BATCH_PROMPT_HISTORY_MAX_TEXT) continue;
-			normalized.push(prompt);
-			seen.add(prompt);
-			if (normalized.length >= BATCH_PROMPT_HISTORY_LIMIT) break;
-		}
-		return normalized;
-	}
-
-	async function loadBatchPromptHistory() {
-		if (!currentUser) {
-			batchPromptHistory = [];
-			return;
-		}
-		try {
-			const r = await apiFetch('/api/auth/me/batch-prompt-history', { cache: 'no-store' });
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { items?: unknown };
-			batchPromptHistory = Array.isArray(data.items)
-				? normalizeBatchPromptHistory(data.items.filter((item): item is string => typeof item === 'string'))
-				: [];
-		} catch (e) {
-			batchPromptHistory = [];
-			console.warn('failed to load batch prompt history', e);
-		}
-	}
-
-	// ── Resuming a batch that stopped part-way ──────────────
-	// A page of works without their drawings is a few hundred kilobytes, so the
-	// two questions are asked at different depths. Whether to offer the button
-	// needs only the newest work carrying a batch number, and is asked every time
-	// the batch tab is shown; which lines are missing needs the whole run, and is
-	// asked once, after the button is pressed.
-	const BATCH_RESUME_PROBE_LIMIT = 20;
-	const BATCH_RESUME_SCAN_PAGE = 100;
-	const BATCH_RESUME_SCAN_MAX = 500;
-
-	async function fetchWorksPage(offset: number, limit: number): Promise<Iteration[]> {
-		const params = new URLSearchParams({
-			offset: String(offset),
-			limit: String(limit),
-			include_svg: 'false',
-		});
-		const r = await apiFetch(`/api/history?${params.toString()}`, { cache: 'no-store' });
-		if (!r.ok) throw new Error(`HTTP ${r.status}`);
-		const data = await r.json() as { items?: Iteration[] };
-		return Array.isArray(data.items) ? data.items : [];
-	}
-
-	/** Whether the newest stored batch has lines the last run never reached. */
-	async function refreshBatchResume() {
-		const prompt = batchPromptHistory[0] ?? '';
-		if (!currentUser || !prompt) { batchResume = null; return; }
-		const lines = numberedBatchLines(prompt, (text) => !!pipelineDescription(text).trim());
-		if (lines.length === 0) { batchResume = null; return; }
-		try {
-			const work = latestBatchWork(await fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT));
-			batchResume = work && batchStoppedPartWay(lines, work)
-				? { prompt, lines, runId: work.batch_run_id ?? null, work }
-				: null;
-		} catch (e) {
-			batchResume = null;
-			console.warn('failed to check whether the last batch reached its end', e);
-		}
-	}
-
-	/** Every work of one batch run, paged back until the run has been walked past. */
-	async function collectBatchRunWorks(runId: string | null, need: number): Promise<Iteration[]> {
-		const collected: Iteration[] = [];
-		for (let offset = 0; offset < BATCH_RESUME_SCAN_MAX; offset += BATCH_RESUME_SCAN_PAGE) {
-			const page = await fetchWorksPage(offset, BATCH_RESUME_SCAN_PAGE);
-			if (page.length === 0) break;
-			const mine = page.filter((item) =>
-				typeof item.batch_line_number === 'number'
-				&& (runId === null || (item.batch_run_id ?? null) === runId));
-			collected.push(...mine);
-			// The run's works sit together, so a page without one means the listing
-			// has walked past it -- but only once one has been seen. Works made
-			// after the run sit above it, and a page of those is not the end.
-			if (mine.length === 0 && collected.length > 0) break;
-			if (collected.length >= need) break;
-			if (page.length < BATCH_RESUME_SCAN_PAGE) break;
-		}
-		return collected;
-	}
-
 	/** Put back the conditions the last work of the stopped run was drawn under. */
-	function applyBatchRunConditions(work: Iteration) {
-		const conditions = conditionsOfWork(work);
+	function applyBatchRunConditions(conditions: BatchRunConditions) {
 		if (conditions.stage1Model) {
 			const ref = splitModelRef(conditions.stage1Model, availableModelCatalog);
 			if (ref.provider) stage1Provider = ref.provider;
@@ -1054,25 +921,15 @@
 	}
 
 	async function resumeInterruptedBatch() {
-		const resume = batchResume;
-		if (!resume || loading || refinementSession.gridBusy) return;
-		let works: Iteration[];
 		try {
-			works = await collectBatchRunWorks(resume.runId, resume.lines.length);
+			await batch.resumeInterrupted({
+				blocked: () => loading || refinementSession.gridBusy,
+				applyConditions: applyBatchRunConditions,
+				run: (lines) => submit({ resumeLines: lines }),
+			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
-			return;
 		}
-		const remaining = linesToResume(resume.lines, works, resume.runId);
-		// Nothing missing after all: the listing knows more than the probe did.
-		if (remaining.length === 0) { batchResume = null; return; }
-		applyBatchRunConditions(resume.work);
-		// The box is refilled with the whole batch, not with what is left of it:
-		// the resumed lines keep the numbers the prompt gave them, and the numbers
-		// are what the works are named by.
-		batchInput = resume.prompt;
-		batchResume = null;
-		await submit({ resumeLines: remaining });
 	}
 
 	function normalizeDemoSettings(settings: DemoSettings): DemoSettings {
@@ -1265,34 +1122,6 @@
 			demoSettings = normalizeDemoSettings(await r.json() as DemoSettings);
 		} catch (e) {
 			console.warn('failed to save demo settings', e);
-		}
-	}
-
-	async function rememberBatchPrompt(prompt: string) {
-		if (!currentUser) return;
-		const previous = batchPromptHistory;
-		const next = normalizeBatchPromptHistory([prompt, ...batchPromptHistory]);
-		if (next.length === previous.length && next.every((item, i) => item === previous[i])) return;
-		batchPromptHistory = next;
-		try {
-			const r = await apiFetch('/api/auth/me/batch-prompt-history', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ items: next })
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const data = await r.json() as { items?: unknown };
-			if (Array.isArray(data.items)) {
-				batchPromptHistory = normalizeBatchPromptHistory(
-					data.items.filter((item): item is string => typeof item === 'string')
-				);
-			}
-		} catch (e) {
-			batchPromptHistory = previous;
-			console.warn('failed to update batch prompt history', e);
 		}
 	}
 
@@ -1687,14 +1516,14 @@
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
 			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
 			currentUser = null;
 			applyUserTheme(null);
-			batchPromptHistory = [];
+			batch.clearPromptHistory();
 			demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 			demoSettingsLoaded = false;
 			exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
@@ -1733,7 +1562,7 @@
 			// logged in and now gets a 401, so without reading them again the
 			// catalog would stay on FALLBACK_CATALOG and the Prompt tab would stay
 			// empty until the page was reloaded.
-			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
+			await Promise.all([loadAvailableModels(), settings.userAdministration.load(), settings.loadStatus(), batch.loadPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig(), loadColorCatalogs(), fetchPrompts()]);
 			await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
@@ -1752,7 +1581,7 @@
 		currentUser = null;
 		uiModeSaveError = false;
 		applyUserTheme(null);
-		batchPromptHistory = [];
+		batch.clearPromptHistory();
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
 		demoSettingsLoaded = false;
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
@@ -1920,19 +1749,9 @@
 	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
 	// ── Batch derived ────────────────────────────────────────
-	const batchLines    = $derived(batchInput.split('\n'));
-	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
-	// Counted the way the server reads them: a line that is only its numbering
-	// and a bracketed note has nothing to draw, and would come back a 400.
-	const batchNonEmpty = $derived(batchLines.filter((l) => pipelineDescription(l).trim()).length);
-	const batchRunning = $derived(activeRunMode === 'batch' && loading);
-	// The line being painted, shown in place of the input box while the run holds
-	// that box read-only anyway. The whole line is kept, numbering and all.
-	const batchRunningLineText = $derived(
-		batchActiveLine === null ? '' : (batchLines[batchActiveLine - 1] ?? '').trim()
-	);
+	const batchRunning = $derived(batch.running);
 	const batchSketchGrainLabel = $derived(
-		sketchModeLabel(sketchModeOf(batchSketchGrain), getLang() === 'ja')
+		sketchModeLabel(sketchModeOf(batch.sketchGrain), getLang() === 'ja')
 	);
 	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
@@ -1942,12 +1761,12 @@
 	// (InputPanel), so a description greyed out end to end must not be sendable:
 	// the same rule, moved to the door instead of a second rule written here.
 	const canSubmit     = $derived(
-		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
+		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batch.nonEmpty > 0 : false
 	);
 	const currentInstructionText = $derived.by(() => {
 		if (displayedHistoryItem?.input) return displayedHistoryItem.input;
 		if (inputMode === 'demo' || activeRunMode === 'demo') return demoGeneratedPrompt;
-		if (inputMode === 'batch' || activeRunMode === 'batch') return batchLatestPrompt;
+		if (inputMode === 'batch' || activeRunMode === 'batch') return batch.latestPrompt;
 		return input;
 	});
 
@@ -2401,8 +2220,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 	 */
 	async function submit(options: { resumeLines?: NumberedLine[] } = {}) {
 		if (!canSubmit || loading || refinementSession.gridBusy) return;
-		// Before resetTargetScopedState and before the intermediate save below:
-		// the question is asked while nothing has been written yet.
+		// Ask before resetTargetScopedState and before any intermediate save.
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
 		try {
@@ -2411,11 +2229,17 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			error = cause instanceof Error ? cause.message : String(cause);
 			return;
 		}
-		const submittedMode = inputMode;
+
+		if (inputMode === 'batch') {
+			await submitBatch(options);
+			return;
+		}
+		if (inputMode !== 'single') return;
+
 		const abortController = new AbortController();
 		submitAbortController = abortController;
 		submitStopRequested = false;
-		const canvasAspectDerivation = submittedMode === 'single' ? pendingCanvasAspectDerivation : null;
+		const canvasAspectDerivation = pendingCanvasAspectDerivation;
 		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
 		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
 		const submitTextChanged = input.trim() !== submitSource.trim();
@@ -2442,215 +2266,119 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		const submitDerivationMetadata = canvasAspectDerivation
 			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
 			: {};
+
 		loading = true; error = null;
-		activeRunMode = submittedMode;
+		activeRunMode = 'single';
 		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
 		history.clearSelection();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null;
-		batchSketchText = null; batchSketchGrain = null;
-		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
-		if (submittedMode === 'batch') {
-			batchLatestResult = null;
-			batchLatestDdl = null;
-			batchLatestThinking = null;
-			batchLatestPrompt = '';
-			batchAutoFollowLatest = true;
-		}
 		startTimer();
 
 		try {
-			if (submittedMode === 'single') {
-				stageLabel = t().stageDdlGenerating;
-				const r = await paintOne(input, {
-					sourceText: input,
-					canvasAspectId: effectiveCanvasAspectId(),
-					lineageParentNodeId: submitParentNodeId,
-					sketchText: submitSketchText,
-					derivationKind: submitDerivationKind,
-					derivationMetadata: submitDerivationMetadata,
-					signal: abortController.signal,
-					onStage1: (stage1) => {
-						elapsedStage1Ms = stage1.elapsed_ms;
-						tokensInStage1 = stage1.tokens_in;
-						tokensOutStage1 = stage1.tokens_out;
-						ddl = stage1.ddl;
-						expandedDdl = null;
-						ddlGeneratedBaseline = stage1.ddl;
-						thinking = stage1.thinking;
-						stageLabel = t().stageImageGenerating;
-						reloading = true;
-					}
-				});
-				if (submitStopRequested) return;
-				reloading = false;
-				elapsedStage1Ms = r.elapsed_stage1_ms;
-				elapsedStage2Ms = r.elapsed_stage2_ms;
-				elapsedTotalMs = r.elapsed_total_ms;
-				tokensInStage1 = r.tokens_in_stage1;
-				tokensOutStage1 = r.tokens_out_stage1;
-				tokensInStage2 = r.tokens_in_stage2;
-				tokensOutStage2 = r.tokens_out_stage2;
-				ddl = r.source_ddl ?? r.ddl;
-				expandedDdl = r.ddl;
-				ddlGeneratedBaseline = ddl;
-				thinking = r.thinking;
-				result = r; outputTab = 'canvas';
-				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
-				canvasViewport.fit();
-				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
-					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
-					lineageDetached = false;
-					await history.fetchOffset(0, { anchorId: r.history_id });
-					displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
+			stageLabel = t().stageDdlGenerating;
+			const r = await paintOne(input, {
+				sourceText: input,
+				canvasAspectId: effectiveCanvasAspectId(),
+				lineageParentNodeId: submitParentNodeId,
+				sketchText: submitSketchText,
+				derivationKind: submitDerivationKind,
+				derivationMetadata: submitDerivationMetadata,
+				signal: abortController.signal,
+				onStage1: (stage1) => {
+					elapsedStage1Ms = stage1.elapsed_ms;
+					tokensInStage1 = stage1.tokens_in;
+					tokensOutStage1 = stage1.tokens_out;
+					ddl = stage1.ddl;
+					expandedDdl = null;
+					ddlGeneratedBaseline = stage1.ddl;
+					thinking = stage1.thinking;
+					stageLabel = t().stageImageGenerating;
+					reloading = true;
 				}
-			} else {
-				batchTotal = 0; batchSuccess = 0; batchFailures = []; batchFailureReportStore.set(null);
-				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
-				const batchCanvasAspectId = effectiveCanvasAspectId();
-				const batchCatalogId = colorCatalogSettings.selected;
-				const batchRunId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
-				// The whole line is sent -- the server keeps the author's numbering
-				// for the record and cuts it for the pipeline -- but a line with
-				// nothing left after the cut is not a line to paint.
-				const lines = batchLines
-					.map((line, index) => ({ line: index + 1, input: line.trim() }))
-					.filter((item) => pipelineDescription(item.input).trim());
-				// Resuming paints the lines the stopped run never reached, each keeping
-				// the number the prompt gave it; an ordinary run paints the whole box.
-				const paintLines = options.resumeLines ?? lines;
-				// The report's `total` is how many lines the batch had. batchTotal drives
-				// the progress readouts and is re-pointed at each retry round, so the
-				// report keeps its own copy.
-				const batchLineTotal = paintLines.length;
-				batchTotal = batchLineTotal; outputTab = 'canvas';
-				let batchInterrupted = false;
-
-				/** true = painted, string = the failure message, null = the run was interrupted. */
-				const paintBatchLine = async (item: { line: number; input: string }): Promise<true | string | null> => {
-					batchActiveLine = item.line;
-					try {
-						const r = await paintOne(item.input, {
-							historyInput: `#${item.line} ${item.input}`,
-							sourceText: item.input,
-							displayLabel: `#${item.line}`,
-							batchLineNumber: item.line,
-							batchRunId,
-							canvasAspectId: batchCanvasAspectId,
-							renderOverrides: colorCatalogOverride(batchCatalogId),
-							signal: abortController.signal,
-						});
-						if (submitStopRequested) return null;
-						// The observer's four quantities are written together, so the
-						// block always describes one work.
-						batchObservedLine = item.line;
-						batchActiveDdl = r.ddl;
-						batchSketchText = r.sketch_text ?? null;
-						batchSketchGrain = r.sketch_grain ?? null;
-						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
-						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
-						batchTokensInTotal += batchActiveTokensIn ?? 0;
-						batchTokensOutTotal += batchActiveTokensOut ?? 0;
-						thinking = r.thinking;
-						batchLatestResult = r;
-						batchLatestDdl = r.ddl;
-						batchLatestThinking = r.thinking;
-						batchLatestPrompt = `#${item.line} ${item.input}`;
-						if (inputMode === 'batch' && batchAutoFollowLatest) {
-							displayLatestBatchRender();
-						}
-						await history.refreshAfterServerSave();
-						batchSuccess += 1;
-						return true;
-					} catch (e) {
-						if (submitStopRequested || abortController.signal.aborted) return null;
-						return e instanceof Error ? e.message : String(e);
-					}
-				};
-
-				const publishFailureReport = () => {
-					batchFailureReportStore.set(
-						batchFailures.length > 0
-							? { success: batchSuccess, total: batchLineTotal, failures: batchFailures }
-							: null,
-					);
-				};
-
-				for (let i = 0; i < paintLines.length; i++) {
-					if (submitStopRequested) { batchInterrupted = true; break; }
-					batchCurrent = i + 1;
-					const outcome = await paintBatchLine(paintLines[i]);
-					if (outcome === null) { batchInterrupted = true; break; }
-					if (outcome !== true) {
-						batchFailures = [
-							...batchFailures,
-							{ line: paintLines[i].line, input: paintLines[i].input, message: outcome },
-						];
-					}
-					publishFailureReport();
-				}
-
-				// Retry the lines that failed, if the author asked for retries. An
-				// interrupted batch is never retried: the lines that never ran are not
-				// failures, and the author stopped the run on purpose.
-				let completedRetryRounds = 0;
-				for (;;) {
-					const round = planRetryRound(
-						batchFailures,
-						completedRetryRounds,
-						batchSettings.maxRetries,
-						batchInterrupted || submitStopRequested || abortController.signal.aborted,
-					);
-					if (!round) break;
-					batchRetryRound = round.round;
-					batchTotal = round.items.length;
-					for (let i = 0; i < round.items.length; i++) {
-						if (submitStopRequested) { batchInterrupted = true; break; }
-						batchCurrent = i + 1;
-						const item = round.items[i];
-						const outcome = await paintBatchLine(item);
-						if (outcome === null) { batchInterrupted = true; break; }
-						if (outcome === true) {
-							batchFailures = dropFailedLine(batchFailures, item.line);
-						} else {
-							batchFailures = batchFailures.map((failure) =>
-								failure.line === item.line ? { ...failure, message: outcome } : failure,
-							);
-						}
-						publishFailureReport();
-					}
-					if (batchInterrupted) break;
-					completedRetryRounds += 1;
-				}
-				batchRetryRound = 0;
-				batchTotal = batchLineTotal;
-
-				elapsedTotalMs = Date.now() - _timerStart;
-				await history.refreshAfterRun();
-				publishFailureReport();
-				// A run that was stopped leaves lines to finish; one that reached the
-				// end leaves none. Either way the answer is now different.
-				await refreshBatchResume();
+			});
+			if (submitStopRequested) return;
+			reloading = false;
+			elapsedStage1Ms = r.elapsed_stage1_ms;
+			elapsedStage2Ms = r.elapsed_stage2_ms;
+			elapsedTotalMs = r.elapsed_total_ms;
+			tokensInStage1 = r.tokens_in_stage1;
+			tokensOutStage1 = r.tokens_out_stage1;
+			tokensInStage2 = r.tokens_in_stage2;
+			tokensOutStage2 = r.tokens_out_stage2;
+			ddl = r.source_ddl ?? r.ddl;
+			expandedDdl = r.ddl;
+			ddlGeneratedBaseline = ddl;
+			thinking = r.thinking;
+			result = r; outputTab = 'canvas';
+			adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
+			canvasViewport.fit();
+			if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
+				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
+				lineageDetached = false;
+				await history.fetchOffset(0, { anchorId: r.history_id });
+				displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 			}
-		} catch (e) {
+		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
-				error = e instanceof Error ? e.message : String(e); result = null;
+				error = cause instanceof Error ? cause.message : String(cause);
+				result = null;
 			}
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = '';
+		}
+	}
+
+	async function submitBatch(options: { resumeLines?: NumberedLine[] }): Promise<void> {
+		const batchCanvasAspectId = effectiveCanvasAspectId();
+		const batchCatalogId = colorCatalogSettings.selected;
+		loading = true; error = null;
+		activeRunMode = 'batch';
+		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
+		displayedHistoryItem = null;
+		history.clearSelection();
+		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
+		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
+		outputTab = 'canvas';
+		startTimer();
+
+		try {
+			await batch.run({
+				resumeLines: options.resumeLines,
+				canvasAspectId: batchCanvasAspectId,
+				renderOverrides: colorCatalogOverride(batchCatalogId),
+				maxRetries: batchSettings.maxRetries,
+				paintLine: (text, paintOptions) => paintOne(text, paintOptions),
+				onLatestResult: (painted) => {
+					thinking = painted.thinking;
+					if (inputMode === 'batch' && batch.autoFollowLatest) displayLatestBatchRender();
+				},
+				onPaintComplete: () => { elapsedTotalMs = Date.now() - _timerStart; },
+				refreshAfterServerSave: () => history.refreshAfterServerSave(),
+				refreshAfterRun: () => history.refreshAfterRun(),
+			});
+		} catch (cause) {
+			if (!batch.interrupted) {
+				error = cause instanceof Error ? cause.message : String(cause);
+				result = null;
+			}
+		} finally {
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = '';
 		}
 	}
 
 	function stopBatch() {
-		if (activeRunMode !== 'single' && activeRunMode !== 'batch') return;
+		if (activeRunMode === 'batch') {
+			batch.stop();
+			return;
+		}
+		if (activeRunMode !== 'single') return;
 		submitStopRequested = true;
 		submitAbortController?.abort();
 	}
-
 	function stopReplay() {
 		if (!reloading) return;
 		replayStopRequested = true;
@@ -2932,7 +2660,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		resetTargetScopedState();
 		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
-		if (inputMode === 'batch') batchInput = '';
+		if (inputMode === 'batch') batch.clearInput();
 		if (inputMode === 'demo') {
 			demoGeneratedPrompt = '';
 			demoGeneratedDdl = null;
@@ -2948,12 +2676,6 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		stage1UserPrompt = '';
 		error = null;
 		reloadError = null;
-		batchFailures = [];
-		batchFailureReportStore.set(null);
-		batchActiveLine = null;
-		batchActiveDdl = null;
-		batchObservedLine = null;
-		batchLatestPrompt = '';
 		outputTab = 'canvas';
 		elapsedStage1Ms = 0;
 		elapsedStage2Ms = 0;
@@ -4302,18 +4024,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function displayLatestBatchRender(): void {
-		if (!batchLatestResult) return;
-		result = batchLatestResult;
-		ddl = batchLatestDdl;
-		ddlGeneratedBaseline = batchLatestDdl;
-		thinking = batchLatestThinking;
+		if (!batch.latestResult) return;
+		result = batch.latestResult;
+		ddl = batch.latestDdl;
+		ddlGeneratedBaseline = batch.latestDdl;
+		thinking = batch.latestThinking;
 		outputTab = 'canvas';
 		canvasViewport.fit();
 	}
 
 	function resumeBatchLatestFollow(): void {
 		resetTargetScopedState();
-		batchAutoFollowLatest = true;
+		batch.startFollowingLatest();
 		displayedHistoryItem = null;
 		history.clearSelection();
 		displayLatestBatchRender();
@@ -4556,8 +4278,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const index = scoreJsonLines.findIndex((line) => line.startsWith('  "score"'));
 		return index >= 0 ? index : null;
 	});
-	const batchActiveDdlHighlighted = $derived(batchActiveDdl !== null
-		? highlightDDL(batchActiveDdl)
+	const batchActiveDdlHighlighted = $derived(batch.activeDdl !== null
+		? highlightDDL(batch.activeDdl)
 		: escapeHtml(t().batchActiveDdlPending));
 	const demoGeneratedDdlHighlighted = $derived(demoGeneratedDdl !== null
 		? highlightDDL(demoGeneratedDdl)
@@ -4653,14 +4375,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const wasMode = previousInputMode;
 		if (mode === wasMode) return;
 		previousInputMode = mode;
-		if (mode === 'batch' && (activeRunMode === 'batch' || batchLatestResult)) {
+		if (mode === 'batch' && (activeRunMode === 'batch' || batch.latestResult)) {
 			untrack(resumeBatchLatestFollow);
 		} else if (wasMode === 'batch') {
-			batchAutoFollowLatest = false;
+			batch.stopFollowingLatest();
 		}
 		// Asked on arrival rather than kept up to date: works are saved from other
 		// windows too, and the answer is only ever read here.
-		if (mode === 'batch') void untrack(refreshBatchResume);
+		if (mode === 'batch') void untrack(() => batch.refreshResume());
 	});
 </script>
 
@@ -4725,30 +4447,30 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onSelectSketchMode={(mode) => (sketchMode = mode)}
 						bind:inputMode
 						bind:input
-						bind:batchInput
-						{lineNumbersText}
-						{batchNonEmpty}
+						bind:batchInput={batch.input}
+						lineNumbersText={batch.lineNumbersText}
+						batchNonEmpty={batch.nonEmpty}
 						{batchRunning}
 						{singleRunning}
 						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
-						{batchActiveLine}
-						{batchObservedLine}
-						{batchRunningLineText}
-						{batchSketchText}
+						batchActiveLine={batch.activeLine}
+						batchObservedLine={batch.observedLine}
+						batchRunningLineText={batch.runningLineText}
+						batchSketchText={batch.sketchText}
 						{batchSketchGrainLabel}
 						{batchActiveDdlHighlighted}
-						{batchTotal}
-						{batchCurrent}
-						{batchRetryRound}
-						{batchActiveTokensIn}
-						{batchActiveTokensOut}
-						{batchTokensInTotal}
-						{batchTokensOutTotal}
+						batchTotal={batch.total}
+						batchCurrent={batch.current}
+						batchRetryRound={batch.retryRound}
+						batchActiveTokensIn={batch.activeTokensIn}
+						batchActiveTokensOut={batch.activeTokensOut}
+						batchTokensInTotal={batch.tokensInTotal}
+						batchTokensOutTotal={batch.tokensOutTotal}
 						{liveMs}
 						batchFailureReport={batchFailureReportStore.report}
-						{batchPromptHistory}
-						canResumeBatch={batchResume !== null}
+						batchPromptHistory={batch.promptHistory}
+						canResumeBatch={batch.canResume}
 						onResumeBatch={() => void resumeInterruptedBatch()}
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
@@ -4790,7 +4512,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onOpenModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={clearInput}
-						onRememberBatchPrompt={rememberBatchPrompt}
+						onRememberBatchPrompt={(prompt) => batch.rememberPrompt(prompt)}
 						onDemoSettingsChange={saveDemoSettings}
 						onSaveCurrentDemo={saveCurrentDemoToHistory}
 						onStartDemo={startDemo}
@@ -5009,7 +4731,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvasAspectHeight={displayCanvasAspect.ratioH}
 				viewport={canvasViewport}
 				{promptsData}
-				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batchInput : demoGeneratedPrompt)}
+				stage1PromptText={stage1UserPrompt || (inputMode === 'single' ? input : inputMode === 'batch' ? batch.input : demoGeneratedPrompt)}
 				instructionText={currentInstructionText}
 				{ddl}
 				{copiedPrompt}

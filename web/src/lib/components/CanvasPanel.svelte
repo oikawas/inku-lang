@@ -29,6 +29,12 @@
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { colorMapEntries, colorWordLabel, type ColorMap } from '$lib/colors';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
+	import type {
+		RefinementSession,
+		RefineKind,
+		VariationAmplitude,
+		VariationCandidate
+	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
@@ -37,9 +43,6 @@
 	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; compose_fallback_used?: boolean; compose_retry_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean; for_revision?: boolean; for_share?: boolean; note?: string | null; interpret_fallback?: string | null; compose_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
-	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
-	type VariationAmplitude = 'small' | 'medium' | 'large';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
@@ -132,30 +135,15 @@
 		onVaryInterpretation: () => void | Promise<void>;
 		instructionCaptionVisible: boolean;
 		onInstructionCaptionVisibleChange: (visible: boolean) => void | Promise<void>;
-		variationBusy: boolean;
-		variationCandidates: VariationCandidate[];
-		variationGridBusy: boolean;
+		refinementSession: RefinementSession;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
-		variationElapsedMs: number;
-		variationTokensIn: number | null;
-		variationTokensOut: number | null;
 		/** The whole feature, so a new field costs no line here. */
 		modelInspection: ModelInspection;
-		variationGridCanAbort: boolean;
-		variationGridIncludesReading: boolean;
-		variationGridTaskLabel: string;
-		variationGridDone: number;
-		variationGridTotal: number;
-		variationGridSlots: Array<'waiting' | 'running' | 'done'>;
-		variationGridSlotLabels: string[];
-		variationGridStatus: string | null;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
-		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
-		onToggleVariationCandidate: (id: string) => void;
 		activeComparisonItem: { svg: string } | null;
 		lineageGraph: LineageGraph | null;
 		lineageLoading: boolean;
@@ -265,29 +253,14 @@
 		onVaryInterpretation,
 		instructionCaptionVisible = $bindable(true),
 		onInstructionCaptionVisibleChange,
-		variationBusy = false,
-		variationCandidates = [],
-		variationGridBusy = false,
+		refinementSession,
 		runTokensIn = null,
 		runTokensOut = null,
-		variationElapsedMs = 0,
-		variationTokensIn = null,
-		variationTokensOut = null,
 		modelInspection,
-		variationGridCanAbort = false,
-		variationGridIncludesReading = false,
-		variationGridTaskLabel = '',
-		variationGridDone = 0,
-		variationGridTotal = 0,
-		variationGridSlots = [],
-		variationGridSlotLabels = [],
-		variationGridStatus = null,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
-		onAbortVariationCandidates,
 		onSaveSelectedVariationCandidates,
 		onShowVariationCandidate,
-		onToggleVariationCandidate,
 		activeComparisonItem,
 		lineageGraph = null,
 		lineageLoading = false,
@@ -1049,7 +1022,7 @@
 									</div>
 									<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
 										<label class="model-choice" class:checked={refineKind === 'layout'}>
-											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => setRefineKind('layout')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="layout" checked={refineKind === 'layout'} onchange={() => setRefineKind('layout')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryComposition}</strong>
@@ -1059,7 +1032,7 @@
 										</label>
 										{#if !statusDdlOrigin}
 											<label class="model-choice" class:checked={refineKind === 'reading'}>
-												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => setRefineKind('reading')} disabled={variationBusy || variationGridBusy} />
+												<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => setRefineKind('reading')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 												<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
 													<span class="refine-choice-label">
 														<strong>{t().canvasVaryInterpretation}</strong>
@@ -1069,7 +1042,7 @@
 											</label>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'color'}>
-											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => setRefineKind('color')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => setRefineKind('color')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryColor}</strong>
@@ -1078,7 +1051,7 @@
 											</Tooltip>
 										</label>
 										<label class="model-choice" class:checked={refineKind === 'variation'}>
-											<input type="radio" name="refine-kind" value="variation" checked={refineKind === 'variation'} onchange={() => setRefineKind('variation')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="variation" checked={refineKind === 'variation'} onchange={() => setRefineKind('variation')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipVariation}>
 												<span class="refine-choice-label">
 													<strong>{t().variationRadioLabel}</strong>
@@ -1091,7 +1064,7 @@
 												<div class="model-choice-grid variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>
 													{#each [['small', t().variationSmall, t().variationTooltipSmall, 'bottom-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'bottom'], ['large', t().variationLarge, t().variationTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
 														<label class="model-choice" class:checked={variationAmplitude === level}>
-															<input type="radio" name="variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} disabled={variationBusy || variationGridBusy} />
+															<input type="radio" name="variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} disabled={refinementSession.busy || refinementSession.gridBusy} />
 															<Tooltip placement={place as 'bottom' | 'bottom-left' | 'bottom-right'} text={hint}>
 																<span class="refine-choice-label">
 																	<strong>{label}</strong>
@@ -1104,7 +1077,7 @@
 											</div>
 										{/if}
 										<label class="model-choice" class:checked={refineKind === 'touch'}>
-											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => setRefineKind('touch')} disabled={variationBusy || variationGridBusy} />
+											<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => setRefineKind('touch')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 											<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
 												<span class="refine-choice-label">
 													<strong>{t().canvasVaryPerformance}</strong>
@@ -1115,7 +1088,7 @@
 									</div>
 									{#if refineKind === 'touch'}
 										<label class="touch-seed-field">
-											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
+											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={refinementSession.busy || refinementSession.gridBusy} />
 											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.'}</small>
 										</label>
 									{/if}
@@ -1126,7 +1099,7 @@
 											<div class="refine-action-wrap">
 												<PaintButton
 												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
-												disabled={!result || variationBusy || variationGridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
+												disabled={!result || refinementSession.busy || refinementSession.gridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
 												>
 													{t().refineSingleButton}
 												</PaintButton>
@@ -1136,7 +1109,7 @@
 											<div class="refine-action-wrap">
 												<PaintButton
 												onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
-												disabled={!result || variationBusy || variationGridBusy || refineKind === 'touch'}
+												disabled={!result || refinementSession.busy || refinementSession.gridBusy || refineKind === 'touch'}
 												>
 													{t().variationGridDefault}
 												</PaintButton>
@@ -1164,22 +1137,22 @@
 										</div>
 										<div class="refine-settings-row"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
 
-									{#if variationBusy || variationGridBusy}
+									{#if refinementSession.busy || refinementSession.gridBusy}
 										<RunStatus
-											label={t().refineGeneratingTask(variationGridTaskLabel)}
-											progressDone={variationGridDone}
-											progressTotal={variationGridTotal}
+											label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
+											progressDone={refinementSession.gridDone}
+											progressTotal={refinementSession.gridTotal}
 											stage1Model={statusStage1Model}
 											stage2Model={statusStage2Model}
-											elapsedMs={variationElapsedMs}
-											tokensIn={variationTokensIn}
-											tokensOut={variationTokensOut}
-											onStop={variationGridBusy && variationGridCanAbort ? onAbortVariationCandidates : null}
+											elapsedMs={refinementSession.elapsedMs}
+											tokensIn={refinementSession.tokensIn}
+											tokensOut={refinementSession.tokensOut}
+											onStop={refinementSession.gridBusy && refinementSession.gridCanAbort ? () => refinementSession.abort() : null}
 										/>
 										<!-- The candidates are drawn side by side, so the waiting
 										     is shown side by side too. -->
-										{#if variationGridBusy}
-											<VariationLanes states={variationGridSlots} labels={variationGridSlotLabels} />
+										{#if refinementSession.gridBusy}
+											<VariationLanes states={refinementSession.gridSlots} labels={refinementSession.gridSlotLabels} />
 										{/if}
 									{/if}
 									</div>
@@ -1188,16 +1161,16 @@
 						</div>
 						<div class="refine-workspace">
 							<section class="refine-action-section refine-candidates-section">
-								{#if variationCandidates.length > 0}
+								{#if refinementSession.candidates.length > 0}
 									<div class="refine-actions refine-save-actions">
 										<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-											<button class="refine-save-btn" onclick={onSaveSelectedVariationCandidates} disabled={variationBusy || variationGridBusy || variationCandidates.every((candidate) => !candidate.selected)}>
+											<button class="refine-save-btn" onclick={onSaveSelectedVariationCandidates} disabled={refinementSession.busy || refinementSession.gridBusy || refinementSession.candidates.every((candidate) => !candidate.selected)}>
 												{t().variationGridSaveSelected}
 											</button>
 										</Tooltip>
 									</div>
-									<div class="variation-grid" style="--variation-cols: {variationCandidates.length > 1 ? 2 : 1};">
-										{#each variationCandidates as candidate (candidate.id)}
+									<div class="variation-grid" style="--variation-cols: {refinementSession.candidates.length > 1 ? 2 : 1};">
+										{#each refinementSession.candidates as candidate (candidate.id)}
 											<div class="variation-card-wrap">
 												<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
 													<span class="variation-card-art">{@html candidate.result.svg}</span>
@@ -1213,16 +1186,16 @@
 														{/if}
 													</span>
 												</button>
-											{#if variationGridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
+											{#if refinementSession.gridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
 												<button
 													class="variation-select"
 													class:selected={candidate.selected}
 													class:saved={candidate.saved}
-													disabled={candidate.saved}
-													title={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
-													aria-label={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
-													onclick={() => onToggleVariationCandidate(candidate.id)}
-													type="button"
+												disabled={candidate.saved}
+												title={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+												aria-label={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
+												onclick={() => refinementSession.toggleCandidate(candidate.id)}
+												type="button"
 												>{candidate.saved ? "✔" : candidate.selected ? "✓" : "+"}</button>
 											</div>
 										{/each}
@@ -1233,7 +1206,7 @@
 									</div>
 								{/if}
 							</section>
-							{#if variationGridStatus}<div class="variation-grid-status">{variationGridStatus}</div>{/if}
+							{#if refinementSession.status}<div class="variation-grid-status">{refinementSession.status}</div>{/if}
 						</div>
 					</div>
 				</div>
@@ -1255,7 +1228,7 @@
 									onStop={modelInspection.abort}
 								/>
 							{:else}
-								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={modelInspection.run} disabled={!result || variationGridBusy || modelInspection.selectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
+								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={modelInspection.run} disabled={!result || refinementSession.gridBusy || modelInspection.selectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
 							{/if}
 						</div>
 					</div>
@@ -1333,7 +1306,7 @@
 										onStop={modelInspection.abortLanguage}
 									/>
 								{:else}
-									<PaintButton onclick={modelInspection.runLanguage} disabled={!result || variationGridBusy || modelInspection.languageSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
+									<PaintButton onclick={modelInspection.runLanguage} disabled={!result || refinementSession.gridBusy || modelInspection.languageSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
 								{/if}
 							</div>
 						</div>

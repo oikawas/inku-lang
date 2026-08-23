@@ -5,6 +5,11 @@
 
 #![forbid(unsafe_code)]
 
+pub mod contact;
+pub mod determinism;
+pub mod geometry;
+pub mod types;
+
 /// Version of the Rust host boundary, independent from the Render Engine version.
 pub const CORE_API_VERSION: &str = "0.1.0";
 

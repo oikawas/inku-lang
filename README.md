@@ -274,7 +274,7 @@ This is a choice, not an omission.
 
 A saved work is **a print**. The SVG itself persists, so the piece as it was can always be seen. The engine is **the block**, and only its carved-forward state exists. Redrawing pulls a fresh print from the current engine, and that is a new edition. Both are never warehoused at once.
 
-The block cannot be restored, but the prints can be kept. Each time a generation rises, the actual output from a fixed set of inputs is frozen (`server/reference/`, currently 350 cases). **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
+The block cannot be restored, but the prints can be kept. Each time a generation rises, the actual output from a fixed set of inputs is frozen (`server/reference/`, currently 610 cases). **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
 
 ---
 
@@ -294,7 +294,7 @@ The block cannot be restored, but the prints can be kept. Each time a generation
 
 - **Web version** — operational (Python FastAPI + SvelteKit; runs locally or on a server)
 - **CLI** — implemented as an independent `cli/` project; drives the API for login, drawing, batch generation, and benchmark output
-- **Android app** — `2.1.2-android.1`; its drawing implements the same render engine 15 as the server, in Kotlin
+- **Android app** — `2.1.4-android.51`; its Kotlin drawing implements render engine 35 and follows the server's render engine 40 afterward
 
 The author maintains the **Japanese** and **English** versions of inku. Other language implementations are welcomed from the community as open-source contributions. The internal JSON Score layer is language-neutral (English keys), so only the surface description layer needs translation.
 

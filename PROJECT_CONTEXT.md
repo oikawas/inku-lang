@@ -112,7 +112,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 38 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 40 | `server/src/inku_server/render_engines/default/engine.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.51` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
@@ -127,7 +127,7 @@ holds the mapping to Japanese terms.
 - 11 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 2 thinness values — `fine` / `extra_fine` (an axis independent of the tool)
 - 9 colors — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
-- 9 surface textures, 5 surface directions, 6 ground materials
+- 9 surface textures, 5 surface directions, 7 ground materials
 
 The saijiki table is a single source: the Stage 1 prompt vocabulary block, plugin closure markers,
 relation phrases, the web Saijiki display, and reference §1 are all derived from it.
@@ -195,7 +195,7 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Render Engine 38** — the SVG performance.
+- **Render Engine 40** — the SVG performance.
 **A sheet called by name changes how the brush runs**: each of the seven grounds carries its own
 absorbency and tooth, and those values reach the stroke synthesizer, so the same description leaves
 a different mark on washi than on canvas. `面: 粒` and `面: にじみ` on a line or an arc are read as
@@ -376,7 +376,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-38` (606 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
+`render-engine-40` (610 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

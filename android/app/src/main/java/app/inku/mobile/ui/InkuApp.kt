@@ -63,6 +63,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -1695,6 +1698,14 @@ private fun CanvasHeroCard(
                     }
                 }
             }
+            if (!presentation && showControls && historyItems.isNotEmpty()) {
+                HistoryThumbnailStrip(
+                    history = historyItems,
+                    selectedId = item?.id,
+                    enabled = !state.isRunning,
+                    onSelect = viewModel::selectHistory,
+                )
+            }
             // Under the canvas: on the left the ways of looking at the same work,
             // on the right the one way out of the app. Getting a file used to be
             // two dropdown menus in this row and a third place in the settings.
@@ -2259,6 +2270,49 @@ private fun DemoSettingRow(
                 .height(Dimens.hairline)
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
         )
+    }
+}
+
+internal fun selectedHistoryStripIndex(historyIds: List<String>, selectedId: String?): Int =
+    selectedId?.let(historyIds::indexOf) ?: -1
+
+/** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
+@Composable
+private fun HistoryThumbnailStrip(
+    history: List<HistoryListItem>,
+    selectedId: String?,
+    enabled: Boolean,
+    onSelect: (HistoryListItem) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val selectedIndex = remember(history, selectedId) {
+        selectedHistoryStripIndex(history.map { it.id }, selectedId)
+    }
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
+    }
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().testTag("history_thumbnail_strip"),
+        state = listState,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    ) {
+        items(history, key = { it.id }) { historyItem ->
+            val selected = historyItem.id == selectedId
+            Surface(
+                modifier = Modifier
+                    .size(Dimens.buttonHeightLarge)
+                    .clickable(enabled = enabled) { onSelect(historyItem) }
+                    .border(
+                        Dimens.selectionRingWidth,
+                        if (selected) SelectionRing else Color.Transparent,
+                        RoundedCornerShape(0.dp),
+                    ),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(0.dp),
+            ) {
+                HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
+            }
+        }
     }
 }
 
@@ -6198,4 +6252,3 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
 }
 
 private data class Tuple5<A, B, C, D, E>(val a: A, val b: B, val c: C, val d: D, val e: E)
-

@@ -153,7 +153,7 @@ cd server && UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server   # API (SQLite 
 cd web && npm install && npm run dev                              # → http://localhost:5173
 ```
 
-At least one LLM provider is needed for Stage 1 and Stage 2 (`INKU_LLM_BACKEND` plus an API key, or the model settings page in the web UI). **You can also start without an API key at all** — choose a local [Ollama](https://ollama.com) as the provider; the steps and the recommended models are in [SETUP.md](SETUP.md). There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters).
+At least one LLM provider is needed for Stage 1 and Stage 2 (`INKU_LLM_BACKEND` plus that provider's authentication and connection settings, or the model settings page in the web UI). A local [Ollama](https://ollama.com) can also be selected as a separately installed and operated provider after its models, connection, and stage assignments are configured. [SETUP.md](SETUP.md) gives the procedure and the measured Stage 1 / Stage 2 pair. Vision is available when a compatible model is configured separately and is not part of the standard local-model setup. There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters).
 
 Once you are logged in, write a short description. After generating, consult the Saijiki, read the ink-shaded interpretation feedback to see how your words were read, and refine the description if you like.
 

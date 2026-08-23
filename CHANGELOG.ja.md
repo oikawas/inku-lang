@@ -997,17 +997,17 @@ info モーダルのバージョン・ビルド日時を先頭へ（**日時は 
 
 ---
 
-### v2.9.6 — API キーを持たずに始められるようになった（Build 765、2026-07-29）
+### v2.9.6 — ローカル Ollama provider 経路を追加した（Build 765、2026-07-29）
 
-**手元の Ollama を provider に選ぶだけで、API キーを 1 つも用意せずに inku を動かせる。** 実測に基づく推奨は **Stage 1 `qwen3.5:4b-q4_K_M` + Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`**（合計 9.4GB・被覆 71%）で、旧・承認済みの `qwen3.5:4b` + `gemma4:e4b`（13.0GB・64%）から乗り換えた。
+**訂正（2026-08-24・I-027）:** この版で実装したのは、別途導入・起動・モデル取得・接続・段への割り当てを行うローカル Ollama 経路であり、inku 全体を API キーや認証設定なしで利用できるという保証ではない。実測に基づく推奨は **Stage 1 `qwen3.5:4b-q4_K_M` + Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`**（合計 9.4GB・被覆 71%）で、旧・承認済みの `qwen3.5:4b` + `gemma4:e4b`（13.0GB・64%）から乗り換えた。Vision は対応モデルを別途設定すれば同じ OpenAI 互換経路を使えるが、この版も現在の検証済みローカルカタログも標準 Vision モデルを保証していない。
 
-- **`SETUP.ja.md` / `SETUP.md` に「API キーなしで動かす（ローカル Ollama）」を新設した**（Web UI と CLI の間）。環境変数表へ `OLLAMA_BASE_URL` / `OLLAMA_CONTEXT_LENGTH` を追加。`deploy/compose.yaml` は `api` へ `OLLAMA_BASE_URL` を渡し、`extra_hosts` で `host.docker.internal` を gateway へ写す（**コンテナから見た「手元」はホストではないため**）
+- **`SETUP.ja.md` / `SETUP.md` にローカル Ollama の設定手順を新設した**（Web UI と CLI の間）。環境変数表へ `OLLAMA_BASE_URL` / `OLLAMA_CONTEXT_LENGTH` を追加。`deploy/compose.yaml` は `api` へ `OLLAMA_BASE_URL` を渡し、`extra_hosts` で `host.docker.internal` を gateway へ写す（**コンテナから見た「手元」はホストではないため**）
 - **Ollama のモデル一覧を、実際に計測した 10 本へ差し替えた**（`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0）。**タグに量子化まで書く** — 素タグは上流で中身が差し替わるので、計測と結びつかなくなる
 - **Stage 2 はローカル Ollama へ tool ではなくスキーマで訊く**（`response_format`）。**tool 定義はプロンプトに乗り、Score スキーマが大きすぎて Ollama がプロンプトの 75% を捨てていた**
 - **思考を止める**（`reasoning_effort="none"`）。**Ollama は指定が無いと自分で思考を始め、その思考は答えと同じ予算を食う**ので、予算を超えた分だけ何も返らなくなっていた。止めると同じ作業が 8 倍速く、被覆は変わらない
 - **速度はリリース表示から外し、デベロッパーモード限定にした**（2026-07-27 裁定の実装形。`speed_developer_only`）。**GPU の無い 1 台で測った数字は、他人の環境への約束にならない**
 - **保存済みカタログの再取り込みを nvidia 限定から全 builtin provider へ広げた** — 保存された一覧は設置環境自身のもので、どのモデルが在るかはそちらが決める。ただし**計測が変わったカタログより長生きしてはならない**ので、版が上がったときは builtin のメタデータを同じ id へ貼り直す
-- **README 日英に 1 文足した** — 「少なくとも 1 つの LLM provider が要る」の直後に、API キー無しの道が SETUP にあることを書いた。**この行は API キーが必須だと読める書き方のままだった**
+- **README 日英に 1 文足した** — 「少なくとも 1 つの LLM provider が要る」の直後に、ローカル Ollama の設定手順が SETUP にあることを書いた（上記 I-027 の訂正で、製品全体の無認証利用を意味しない表現へ改めた）
 
 **受け入れで直したもの（実装セッションの報告に無い）。** 分岐点が Build 730 で、その後 main の `e653f52`（Build 731）が `PROVIDER_GROUPS` の id を修飾なしへ揃えていたため、**片方のブランチだけでは 1 つも赤くならない食い違いが 3 つ出た**。
 

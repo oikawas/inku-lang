@@ -126,7 +126,7 @@ cd server && UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server   # API（既定
 cd web && npm install && npm run dev                              # → http://localhost:5173
 ```
 
-少なくとも Stage 1 / Stage 2 用の LLM provider が要ります（`INKU_LLM_BACKEND` と API キー、または Web UI のモデル設定画面）。**API キーを持たずに始めることもできます** — 手元の [Ollama](https://ollama.com) を provider に選ぶ道で、手順と推奨のモデルは [SETUP.ja.md](SETUP.ja.md) にあります。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
+少なくとも Stage 1 / Stage 2 用の LLM provider が要ります（`INKU_LLM_BACKEND` と各 provider の認証・接続設定、または Web UI のモデル設定画面）。手元の [Ollama](https://ollama.com) も、別途導入・起動・モデル取得・接続・段への割り当てを行う provider として選べます。手順と実測した Stage 1 / Stage 2 の組み合わせは [SETUP.ja.md](SETUP.ja.md) にあります。Vision は対応モデルを別途設定した場合に利用でき、標準のローカルモデル構成には含みません。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
 
 ログインしたら短い記述を書きます。生成後は歳時記を参照し、解釈フィードバックの墨の濃淡で「どう読まれたか」を確かめ、必要なら記述を推敲します。
 

@@ -2142,6 +2142,7 @@ class InkuViewModel @JvmOverloads constructor(
             if (localState.value.selectedHistory?.id == item.id) {
                 localState.value = localState.value.copy(selectedHistory = item.copy(starred = nextStarred))
             }
+            if (localState.value.tab == AppTab.Lineage) refreshLineage()
         }
     }
 

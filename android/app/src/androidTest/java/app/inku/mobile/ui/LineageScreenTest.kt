@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModel
@@ -22,6 +23,7 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.LineageNodeEntity
+import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
@@ -156,6 +158,13 @@ class LineageScreenTest {
     private fun savedRows(): List<HistoryItemEntity> =
         runBlocking { database.historyDao().listActive(20, 0).first() }
 
+    private fun graphItem(id: String): HistoryItemEntity? =
+        vm().state.value.lineageGraph?.nodes
+            ?.filterIsInstance<LineageGraphNode.Work>()
+            ?.firstOrNull { it.history?.item?.id == id }
+            ?.history
+            ?.item
+
     /** Rows come back newest first (`created_at DESC`). */
     private fun awaitNewestAfter(previous: Int): HistoryItemEntity {
         try {
@@ -255,6 +264,22 @@ class LineageScreenTest {
             throw AssertionError(
                 "timed out waiting for $count cards on screen; showing $shown, " +
                     "state holds ${vm().state.value.lineageGraph?.nodes?.size} nodes",
+                timeout,
+            )
+        }
+    }
+
+    private fun awaitStarSymbols(starred: Int, unstarred: Int) {
+        try {
+            composeTestRule.waitUntil(TIMEOUT_MS) {
+                composeTestRule.onAllNodesWithText("★").fetchSemanticsNodes().size == starred &&
+                    composeTestRule.onAllNodesWithText("☆").fetchSemanticsNodes().size == unstarred
+            }
+        } catch (timeout: Throwable) {
+            val shownStarred = composeTestRule.onAllNodesWithText("★").fetchSemanticsNodes().size
+            val shownUnstarred = composeTestRule.onAllNodesWithText("☆").fetchSemanticsNodes().size
+            throw AssertionError(
+                "timed out waiting for Star symbols $starred/$unstarred; showing $shownStarred/$shownUnstarred",
                 timeout,
             )
         }
@@ -408,6 +433,33 @@ class LineageScreenTest {
                     graph.nodes.any { node -> node.id == root.lineageNodeId }
             } == true
         }
+    }
+
+    // --- T-9: Star belongs to the card action, not card selection ---
+
+    @Test
+    fun t9_starActionUpdatesTheCardWithoutChangingFocus() {
+        val (root, _, grand) = seedThreeGenerations()
+        showLineage()
+        openLineageOn(grand, cards = 3)
+
+        composeTestRule.onAllNodesWithTag(LINEAGE_STAR_TAG).assertCountEquals(3)
+        awaitStarSymbols(starred = 0, unstarred = 3)
+
+        // The root is the first visible card and is not the focused grandchild.
+        composeTestRule.onAllNodesWithTag(LINEAGE_STAR_TAG)[0].performClick()
+        awaitState("the root card to refresh as starred") { graphItem(root.id)?.starred == true }
+
+        assertEquals("the Star action must not select its card", grand.id, vm().state.value.selectedHistory?.id)
+        assertTrue("the Star state must be saved", savedRows().first { it.id == root.id }.starred)
+        awaitStarSymbols(starred = 1, unstarred = 2)
+
+        composeTestRule.onAllNodesWithTag(LINEAGE_STAR_TAG)[0].performClick()
+        awaitState("the root card to refresh as unstarred") { graphItem(root.id)?.starred == false }
+
+        assertEquals("unstar must not select its card either", grand.id, vm().state.value.selectedHistory?.id)
+        assertFalse("the cleared Star state must be saved", savedRows().first { it.id == root.id }.starred)
+        awaitStarSymbols(starred = 0, unstarred = 3)
     }
 
     private companion object {

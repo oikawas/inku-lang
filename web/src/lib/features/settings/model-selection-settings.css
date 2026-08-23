@@ -1,0 +1,39 @@
+	.settings-feature-root .settings-tabs.model-selection-tabs button { flex: 1 1 0; text-align: center; }
+	.settings-feature-root .model-selection-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+	.settings-feature-root .model-selection-summary span {
+		display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px;
+		border: 1px solid var(--border); border-radius: var(--r); background: var(--panel);
+		color: var(--fg2); font-size: 11px; overflow-wrap: anywhere;
+	}
+	.settings-feature-root .model-selection-summary strong { color: var(--fg3); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+	.settings-feature-root .model-selection-hint { margin: 0; color: var(--fg3); font-size: 11px; line-height: 1.5; }
+	.settings-feature-root .generation-model-groups { display: flex; flex-direction: column; gap: 12px; }
+	.settings-feature-root .generation-model-provider h3 { margin: 0 0 6px; color: var(--fg3); font-size: 10px; font-weight: 500; letter-spacing: .06em; }
+	.settings-feature-root .generation-model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }
+	.settings-feature-root .generation-model-grid button {
+		display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
+		padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r);
+		background: var(--panel); color: var(--fg2); cursor: pointer; text-align: left; font-family: inherit;
+	}
+	.settings-feature-root .generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
+	.settings-feature-root .generation-model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
+	/* Strike through retired models only; a paid-plan model has not disappeared. */
+	.settings-feature-root .generation-model-grid button.eol strong { text-decoration: line-through; }
+	.settings-feature-root .eol-mark { color: var(--danger); font-weight: 600; }
+	.settings-feature-root .generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
+	.settings-feature-root .generation-model-grid strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+	.settings-feature-root .generation-model-grid span { color: var(--fg3); font-size: 10px; }
+	.settings-feature-root .model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+	.settings-feature-root .model-metadata-hover { position: relative; }
+	.settings-feature-root .model-metadata-hover:hover .model-hover-card,
+	.settings-feature-root .model-metadata-hover:focus-visible .model-hover-card,
+	.settings-feature-root .model-metadata-hover:focus-within .model-hover-card { display: block; }
+	.settings-feature-root .catalog-modal-foot {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		padding: 10px 18px 14px;
+		border-top: 1px solid var(--border);
+		background: var(--panel2);
+		flex-shrink: 0;
+	}

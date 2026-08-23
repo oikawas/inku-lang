@@ -11,6 +11,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const VIEW_URL = new URL('./DatabaseAdministrationSettings.svelte', import.meta.url);
 const VIEW = existsSync(VIEW_URL) ? read('./DatabaseAdministrationSettings.svelte') : '';
 const OWNER = read('./server-administration.svelte.ts');
+const SHARED_STYLES = read('./settings-modal.css');
 const MODAL = read('../../components/SettingsModal.svelte');
 const DB_BRANCH = MODAL.slice(
 	MODAL.indexOf("{:else if settingsTab === 'db'}"),
@@ -49,7 +50,7 @@ test('database-specific styles move while shared grid support remains available'
 		assert.doesNotMatch(MODAL, new RegExp(selector.replace('.', '\\.') + '\\s*\\{'), selector);
 	}
 	assert.match(VIEW, /\.db-backup-grid\s*\{/);
-	assert.match(MODAL, /\.db-backup-grid\s*\{/);
+	assert.match(SHARED_STYLES, /\.db-backup-grid\s*\{/);
 	assert.equal((VIEW.match(/:global\(/g) ?? []).length, 1);
 	assert.match(VIEW, /\.db-backup-time-fields :global\(\.number-stepper\)/);
 });

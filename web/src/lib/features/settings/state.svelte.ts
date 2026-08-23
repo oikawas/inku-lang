@@ -57,6 +57,7 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 };
 
 export type SettingsController = SettingsNavigation & ServerAdministration & ModelAdministration & {
+	readonly modelAdministration: ModelAdministration;
 	readonly userAdministration: SettingsUserAdministration;
 };
 
@@ -116,6 +117,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		get modelFetchResults() { return modelAdministration.modelFetchResults; },
 		get modelSettingsLoading() { return modelAdministration.modelSettingsLoading; },
 		get modelCatalog(): ProviderGroup[] { return modelAdministration.modelCatalog; },
+		modelAdministration,
 		userAdministration,
 		restoreDetail: navigation.restoreDetail,
 		setDetail: (detail: SettingsDetailLevel) => navigation.setDetail(detail),

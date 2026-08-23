@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import { normalizeUiMode } from '../uiMode.ts';
 
 const RAIL = readFileSync(new URL('./AppRail.svelte', import.meta.url), 'utf8');
-const SETTINGS = readFileSync(new URL('./SettingsModal.svelte', import.meta.url), 'utf8');
+const SETTINGS = readFileSync(new URL('../features/settings/AppearanceSettings.svelte', import.meta.url), 'utf8');
 const MANUAL_JA_URL = new URL('../../../../manual/ja/image-creation.md', import.meta.url);
 const MANUAL_EN_URL = new URL('../../../../manual/en/image-creation.md', import.meta.url);
 const MANUAL_JA = existsSync(MANUAL_JA_URL) ? readFileSync(MANUAL_JA_URL, 'utf8') : null;

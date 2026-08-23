@@ -15,6 +15,7 @@ const USER_OWNER = read('./user-administration.svelte.ts');
 const ALL_OWNERS = OWNER + SERVER_OWNER + MODEL_OWNER + USER_OWNER;
 const PAGE = read('../../../routes/+page.svelte');
 const MODAL = read('../../components/SettingsModal.svelte');
+const MODEL_VIEW = read('./ModelAdministrationSettings.svelte');
 
 const MOVED_PAGE_WRITERS = [
 	'settingsOpen',
@@ -89,5 +90,5 @@ test('user edit secrets do not enter the Settings owner', () => {
 		assert.doesNotMatch(ALL_OWNERS, new RegExp(field), field);
 	}
 	assert.doesNotMatch(ALL_OWNERS, /newProviderApiKey/);
-	assert.match(MODAL, /let newProviderApiKey = \$state\(''\)/);
+	assert.match(MODEL_VIEW, /let newProviderApiKey = \$state\(''\)/);
 });

@@ -12,6 +12,7 @@ const OWNER = read('./state.svelte.ts');
 const MODEL_OWNER = read('./model-administration.svelte.ts');
 const PAGE = read('../../../routes/+page.svelte');
 const MODAL = read('../../components/SettingsModal.svelte');
+const MODEL_VIEW = read('./ModelAdministrationSettings.svelte');
 const PROPS = MODAL.slice(MODAL.indexOf('type Props'), MODAL.indexOf('}: Props = $props()'));
 
 test('Stage 2B moves every model-provider administration writer into the Settings owner', () => {
@@ -59,9 +60,9 @@ test('model administration types and Modal boundary are canonical on SettingsCon
 	]) {
 		assert.doesNotMatch(PROPS, new RegExp(prop), prop);
 	}
-	assert.match(MODAL, /const modelSettings = \$derived\(settings\.modelSettings\)/);
-	assert.match(MODAL, /settings\.updateModelProvider/);
-	assert.match(MODAL, /settings\.saveModelProvider/);
+	assert.match(MODEL_VIEW, /const modelSettings = \$derived\(administration\.modelSettings\)/);
+	assert.match(MODEL_VIEW, /administration\.updateModelProvider/);
+	assert.match(MODEL_VIEW, /administration\.saveModelProvider/);
 });
 
 test('drawing-time selection and input-level secret drafts stay at their narrow owners', () => {
@@ -72,7 +73,7 @@ test('drawing-time selection and input-level secret drafts stay at their narrow 
 	assert.match(PAGE, /async function loadAvailableModels\(/);
 	assert.match(PAGE, /\/api\/models/);
 	assert.doesNotMatch(MODEL_OWNER, /\/api\/models/);
-	assert.match(MODAL, /let newProviderApiKey = \$state\(''\)/);
+	assert.match(MODEL_VIEW, /let newProviderApiKey = \$state\(''\)/);
 	assert.doesNotMatch(MODEL_OWNER, /newProviderApiKey/);
 });
 

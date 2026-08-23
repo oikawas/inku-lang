@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::{PerformanceRequest, resolve_performance};
@@ -267,6 +268,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
             content.push(instruction_group);
         }
     }
+    let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
     let mut document = Document::new(request.options.canvas);
     if structured {
         let (title, description) = document_metadata(profile);
@@ -291,10 +293,17 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         background_layer.push(background_rect(&request, &background));
         artboard.push(background_layer);
         artboard.push(content);
-        artboard.push(Element::new("g").attr("id", "layer_20_presence"));
+        let mut presence_content = Element::new("g").attr("id", "layer_20_presence");
+        if let Some(presence) = presence {
+            presence_content.push(presence);
+        }
+        artboard.push(presence_content);
         document.push(artboard);
     } else {
         document.push(background_rect(&request, &background));
+        if let Some(presence) = presence {
+            content.push(presence);
+        }
         document.push(content);
     }
     let svg = document.serialize();

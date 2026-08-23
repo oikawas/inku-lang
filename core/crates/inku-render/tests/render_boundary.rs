@@ -122,3 +122,30 @@ fn render_request_has_a_stable_json_wire_shape() {
     assert!(output.svg.contains("id=\"inku_artboard\""));
     assert!(output.svg.contains("id=\"inku_metadata\""));
 }
+
+#[test]
+fn abstract_presence_is_emitted_in_its_owned_layer() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"presence":{"kind":"group_like","intensity":"high",
+            "symmetry":"radial","gaze_pressure":"medium","contour_density":"medium"},
+            "instructions":[]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(431),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    let presence_layer = output.svg.find("id=\"layer_20_presence\"").unwrap();
+    let presence = output.svg.find("id=\"presence_layer\"").unwrap();
+    assert!(presence > presence_layer);
+    assert!(output.svg[presence..].contains("<circle"));
+    assert!(!output.svg.contains("NaN"));
+}

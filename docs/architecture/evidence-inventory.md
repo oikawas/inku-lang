@@ -4,12 +4,12 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer boundary refreshed 2026-08-24; Web client boundary refreshed 2026-08-23 |
-| Source branch / implementation commit | `refactor/i366-render-portability-boundary-1` / `867f645a` |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer and Web client boundaries refreshed 2026-08-24 |
+| Source branch / implementation commit | `main` / `1c835d0b` |
 | Source uncommitted changes | None at the implementation snapshot; this document synchronizes that snapshot |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 974` |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 975` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `974` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `975` |
 | Render Engine | implementation `default / 40` |
 | DDL | `ddl_version=3`; `ddl_engine_version=20` |
 | Android | `android/VERSION` = `2.1.4-android.63`; implementation reports Render Engine `35` |
@@ -48,7 +48,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | DATA-LINEAGE | Lineage nodes and edges | Connect only an explicit parent and derivation kind | `LineageNodeRow`; `LineageEdgeRow`; `db.py:add_item`; `test_lineage_acceptance.py` | §21; Project Context | Confirmed |
 | DATA-SAIJIKI | Saijiki | Vocabulary source for prompts, markers, relation literals, display, and references | `saijiki.py`; `test_saijiki_golden.py` | Project Context | Confirmed |
 | DATA-FALLBACK | Fallback records | Store each layer's fallback as a column (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`, Sketch from life = `sketch_state`), keeping "unrecorded" (works older than the column) apart from "not a fallback" | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context | Confirmed |
-| WEB-FEATURES | Web feature modules | Route-instance Session, Work, Refinement, Settings slices, history/lineage/viewport owners; stateless Paint/refinement operations; focused Canvas and Settings views | `web/src/lib/features/<name>/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte` | Project Context | Confirmed |
+| WEB-FEATURES | Web feature modules | Session, Work, Refinement, Settings, history/lineage, and viewport owners extracted from the route shell; stateless operations; focused Canvas and Settings views | `web/src/routes/+page.svelte`; `web/src/lib/features/{session,work,run,history,canvas,settings}/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte`; ownership tests | Project Context | Confirmed |
 | WEB-REGISTRY | Three settings registries | Collect local storage, user settings, and render payload fields | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context | Confirmed |
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |

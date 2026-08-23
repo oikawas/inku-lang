@@ -5,7 +5,7 @@ Web and the CLI use the Server HTTP API. Android is not a thin client over that 
 ```mermaid
 flowchart LR
     SYS_USER["Author"]
-    SYS_WEB["Web / SvelteKit"]
+    SYS_WEB["Web / SvelteKit\nroute shell + feature owners"]
     SYS_CLI["inku-cli"]
     SYS_ANDROID["Separate Android implementation"]
     SYS_API["inku Server / FastAPI"]
@@ -26,11 +26,13 @@ flowchart LR
     SYS_ANDROID -->|"history, settings, lineage"| ANDROID_DB
 ```
 
+Within Web, `+page.svelte` retains route lifecycle and owner wiring while route-instance owners hold Session, Work, Refinement, Settings, history/lineage, and viewport state. Stateless operations perform one Paint or refinement action; focused views own Canvas and Settings presentation. The canonical owner diagram lives in `client-boundaries.md`.
+
 ## External and trust boundaries
 
 | Boundary | Contract | Evidence |
 |---|---|---|
-| Browser → Web | UI state, localStorage, IndexedDB, and File System Access stay in the browser | `+page.svelte`; `features/export/save-target.ts` |
+| Browser → Web | Route-instance feature owners hold UI state; localStorage, IndexedDB, and File System Access stay in the browser | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/canvas/refinement-coordinator.svelte.ts`; `features/export/save-target.ts` |
 | Web → API | Vite proxy in development; SvelteKit hook proxy in the packaged service | `vite.config.ts`; `web/src/hooks.server.ts` |
 | CLI → API | HTTP through `urllib`; no Server package import | `cli/src/inku_cli/cli.py` |
 | API → provider | Resolve provider/model, then use Anthropic, Gemini, or OpenAI-compatible connections | `model_settings.py`; `interpreter.py`; `composer.py` |

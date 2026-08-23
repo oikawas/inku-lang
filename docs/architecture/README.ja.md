@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `88506e0e10ffa38fdeeac3f74dfe1c5f07b3e37c`、app `v2.13.47 / Build 946` である。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。対象は公開commit `1c835d0ba27c65ea45ede7f8035040963986ac56`、app `v2.13.47 / Build 975` である。
 
 ## 推奨閲覧順
 
@@ -10,7 +10,7 @@
 4. `ddl-processing-pipeline.ja.md` — DDL処理
 5. `description-to-svg.ja.md` — 記述からSVGまでの判定の道筋（pipelineの深掘り）
 6. `server-components.ja.md` — Server内部
-7. `client-boundaries.ja.md` — Web/CLI/Android
+7. `client-boundaries.ja.md` — Web内部のcanonical owner図とWeb/CLI/Android境界
 8. `data-history-lineage.ja.md` — DB、同一性、系譜
 9. `operations-security.ja.md` — 運用・安全境界
 10. `change-impact-map.ja.md` — 変更時の波及

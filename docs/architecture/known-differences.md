@@ -37,6 +37,8 @@
 
 Session, current-work submit/replay/stop, refinement orchestration and target identity, Settings administration slices, and the largest Canvas/Settings views now have route-instance or focused owners. The page retains route lifecycle, modal/view state, component wiring, history/lineage cross-owner actions, and short presentation projections. It remains a composition seam, but it is no longer the canonical writer for the three high-change workflows.
 
+Its remaining line count alone does not demonstrate an ownership violation. Another split is warranted only when one change reason crosses multiple owners, mutable state is duplicated, or an asynchronous failure boundary moves back into the page.
+
 ### C-02 `server/src/inku_server/db.py`
 
 One module holds schema, migration, auth, settings, backup, history, lineage, and search. Transactions are explicit, but responsibility is concentrated.

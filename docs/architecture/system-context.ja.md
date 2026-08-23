@@ -5,7 +5,7 @@ WebとCLIはserverのHTTP APIを利用する。Androidは同じserverを薄いcl
 ```mermaid
 flowchart LR
     SYS_USER["利用者"]
-    SYS_WEB["Web / SvelteKit"]
+    SYS_WEB["Web / SvelteKit\nroute shell + feature owners"]
     SYS_CLI["inku-cli"]
     SYS_ANDROID["Android別実装"]
     SYS_API["inku server / FastAPI"]
@@ -26,11 +26,13 @@ flowchart LR
     SYS_ANDROID -->|"履歴・設定・系譜"| ANDROID_DB
 ```
 
+Web内部では `+page.svelte` がroute lifecycleとowner配線だけを担い、Session・Work・Refinement・Settings・history/lineage・viewportをroute-instance ownerへ分離する。1回のPaintやrefinement処理はstateless operation、CanvasとSettingsの表示はfocused viewが所有する。詳細なcanonical owner図は `client-boundaries.ja.md` が持つ。
+
 ## 外部境界と信頼境界
 
 | 境界 | 契約 | 根拠 |
 |---|---|---|
-| Browser → Web | UI状態、localStorage、IndexedDB/File System Accessはbrowser側 | `+page.svelte`; `features/export/save-target.ts` |
+| Browser → Web | UI状態はroute-instance feature owner、localStorage・IndexedDB・File System Accessはbrowser側 | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/canvas/refinement-coordinator.svelte.ts`; `features/export/save-target.ts` |
 | Web → API | developmentはVite proxy、配布時はSvelteKit hook proxy | `vite.config.ts`; `web/src/hooks.server.ts` |
 | CLI → API | `urllib`によるHTTPのみ。Server内部packageをimportしない | `cli/src/inku_cli/cli.py` |
 | API → provider | provider/modelを解決後、Anthropic/Gemini/OpenAI互換へ接続 | `model_settings.py`; `interpreter.py`; `composer.py` |

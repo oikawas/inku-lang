@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The baseline is public commit `88506e0e10ffa38fdeeac3f74dfe1c5f07b3e37c`, app `v2.13.47 / Build 946`.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The baseline is public commit `1c835d0ba27c65ea45ede7f8035040963986ac56`, app `v2.13.47 / Build 975`.
 
 ## Reading order
 
@@ -10,7 +10,7 @@ This documentation maps the DDL design stages to the current implementation and 
 4. `ddl-processing-pipeline.md` — DDL processing
 5. `description-to-svg.md` — From a description to an SVG, decision by decision (the pipeline deep dive)
 6. `server-components.md` — Server internals
-7. `client-boundaries.md` — Web, CLI, and Android
+7. `client-boundaries.md` — Canonical Web owners and the Web, CLI, and Android boundaries
 8. `data-history-lineage.md` — DB, identity, and lineage
 9. `operations-security.md` — Operations and security boundaries
 10. `change-impact-map.md` — Change propagation

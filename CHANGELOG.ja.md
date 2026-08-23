@@ -7908,3 +7908,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **各履歴サムネイルの直下に、既存summaryのStage 1モデル名を表示する。** provider接頭辞を外し、長い名前は既存の14文字compact規則で省略する。nullまたは空の旧履歴ではラベル行自体を出さない。
 - **I-349の選択枠、タップ、scroll、操作lock、履歴順序は保った。** 新しいproducerやsummary fieldは追加せず、ViewModel、repository、Room/query/schema、pipeline、render、永続化、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは未実装helperだけでexit 1。実装中、branch-tip final、受入側の同じtargeted testはexit 0。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.51` — モデルroutingから順序依存の推測を除く（2026-08-23・[I-351]）
+
+- **provider選択を明示prefix、enabled providerによる完全一致の単独所有、default-localの3段規則へ揃えた。** 所有者が0件または複数なら一覧の先頭を選ばずdefault-localへ進むため、Roomの並び順で答えが変わらない。
+- **disabled providerは所有者へ数えず、明示指定されたdisabled providerは別providerへredirectせず実行前に停止する。** 未知prefixらしき語とモデルID内部のcolonを保持し、OpenAI互換requestは自providerの先頭prefixだけを外す。Stage別設定、`ModelRequest`、provider catalog、Room/schema/migration、pipeline、render、永続化、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新resolver/helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`RoutingModelProviderTest`はexit 0。全JVM suite、計装、実機、network、実モデル、Room migration、reference生成、pentalaは対象外。

@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.50` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.51` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2088,3 +2088,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 履歴stripの各サムネイル直下に、保存済みsummaryが既に持つStage 1モデル名を添える。provider接頭辞を外し、長い名前は既存の14文字compact規則で省略する。モデル名がnullまたは空の旧履歴ではラベル行自体を出さず、空きだけを残さない。
 
 選択枠、タップ、選択位置へのスクロール、描画・推敲中の操作lock、履歴順序はI-349のまま保つ。新しいproducerやsummary fieldは追加せず、ViewModel、repository、Room/query/schema、pipeline、render、永続化、server/web/sharedは変更していない。
+
+## 2026-08-23 モデルroutingから順序依存の推測を除く（android `2.1.4-android.51`・[I-351]）
+
+モデルのproviderは、設定済みproviderの明示prefix、enabled providerによる完全一致の単独所有、default-localの順で解決する。同じモデルを複数providerが公開する場合と所有者がない場合は一覧の先頭を選ばずdefault-localへ進む。disabled providerは単独所有へ数えず、明示prefixでdisabled providerを指定した場合は別providerへredirectせず実行前に停止する。
+
+未知のprefixらしき語やモデルID内部のcolonはそのまま保持する。OpenAI互換requestでは自providerの先頭prefixだけを外す。Stage別provider設定、`ModelRequest`、provider catalog、Room/schema/migration、pipeline、render、永続化、server/web/sharedは変更していない。

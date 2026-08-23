@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.50` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.51` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2590,3 +2590,9 @@ Only the thumbnail-selection route from Web's `HistoryStrip` is adapted. Android
 Each history-strip thumbnail now carries the Stage 1 model name already present in its saved summary. The provider prefix is removed and long names use the existing fourteen-character compact rule. Old history with a null or blank model omits the label row entirely instead of reserving empty space.
 
 The I-349 selection ring, tap behavior, scrolling to the selected work, interaction lock during drawing or refinement, and history order are unchanged. No new producer or summary field was added, and no ViewModel, repository, Room query or schema, pipeline, rendering, persistence, server, Web, or shared path changed.
+
+## 2026-08-23 Removing order-dependent guesses from model routing (android `2.1.4-android.51`, [I-351])
+
+A model provider is now resolved in three steps: an explicit prefix naming a configured provider, exact ownership by exactly one enabled provider, then the default-local provider. If multiple providers publish the same model, or none owns it, routing no longer chooses the first list entry and proceeds to default-local. Disabled providers do not count as owners; an explicit prefix naming a disabled provider keeps that identity and stops before execution instead of redirecting elsewhere.
+
+Prefix-like unknown words and colons inside model IDs remain unchanged. OpenAI-compatible requests remove only their own leading provider prefix. No per-stage provider setting, `ModelRequest`, provider catalog, Room schema or migration, pipeline, rendering, persistence, server, Web, or shared path changed.

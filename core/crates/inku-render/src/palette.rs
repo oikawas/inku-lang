@@ -42,6 +42,30 @@ pub fn default_color(color: Color) -> &'static str {
     }
 }
 
+/// Return the neutral nine-color map for hosts that did not supply a catalog snapshot.
+#[must_use]
+pub fn default_color_map() -> BTreeMap<String, String> {
+    [
+        Color::White,
+        Color::Black,
+        Color::Blue,
+        Color::Red,
+        Color::Green,
+        Color::Gray,
+        Color::Yellow,
+        Color::Orange,
+        Color::Purple,
+    ]
+    .into_iter()
+    .map(|color| {
+        (
+            color_name(color).to_owned(),
+            default_color(color).to_owned(),
+        )
+    })
+    .collect()
+}
+
 fn default_named_color(name: &str) -> &'static str {
     match name {
         "white" => "#ffffff",

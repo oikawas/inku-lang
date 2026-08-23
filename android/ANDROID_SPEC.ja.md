@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-23。
 
-**追随状況**: Android は `2.1.4-android.52` / **render engine version `35`** /
+**追随状況**: Android は `2.1.4-android.53` / **render engine version `35`** /
 **DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
 DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
 **render engine `40`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
@@ -2100,3 +2100,9 @@ Web `HistoryStrip`のサムネイル選択導線だけをAndroidへ適応した�
 通常Compose画面の履歴stripで、各サムネイル右上の`★`／`☆`から作品をStar／解除できる。Star controlはサムネイルの作品選択とは別のtap targetで、Starを押してもキャンバスの選択作品を切り替えない。描画・推敲中は既存lockに従って両操作を無効にする。
 
 既存の`HistoryListItem.starred`と`toggleStar(HistoryListItem)`だけを使う。I-349の選択枠、tap、scroll、表示条件とI-350のモデル名表示を保ち、新しいstate producer、ViewModel action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
+
+## 2026-08-23 表示中のPrompt／JSONをコピーする（android `2.1.4-android.53`・[I-355]）
+
+通常Compose画面と既存Canvas panelのPrompt／JSONタブに`Copy` controlを置く。Promptでは画面に出しているStage 1／Stage 2入力とsystem prompt全文、JSONでは画面に出しているrender情報全文をそのままclipboardへ渡す。表示とcopyは同じ計算済み文字列を共有し、Artworkまたは作品未選択ではcontrolを出さない。
+
+既存`LocalClipboardManager`と`renderPromptText`／`renderJsonText`だけを使う。tab切替、本文、hash copy、export、canvas messageを保ち、新しいViewModel state/action、producer、生成規則、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。

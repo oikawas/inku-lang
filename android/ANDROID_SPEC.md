@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-23.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.52` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.53` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
 web/server implementation is at v2.13.47 with **render engine `40`** and
@@ -2602,3 +2602,9 @@ Prefix-like unknown words and colons inside model IDs remain unchanged. OpenAI-c
 Each thumbnail in the ordinary Compose history strip now has a `★` or `☆` control at its upper-right corner for starring or unstarring the work in place. The Star control is a separate tap target from selecting the thumbnail, so starring does not replace the work shown on the canvas. The existing drawing and refinement lock disables both actions.
 
 The UI uses only the existing `HistoryListItem.starred` state and `toggleStar(HistoryListItem)` action. I-349's selection ring, tap, scrolling, and visibility rules and I-350's model label are preserved. No new state producer, ViewModel action, repository or DAO query, Room schema or migration, persistence, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-23 Copying the visible Prompt or JSON (android `2.1.4-android.53`, [I-355])
+
+The Prompt and JSON tabs on the ordinary Compose screen and the existing Canvas panel now have a `Copy` control. Prompt copies the complete Stage 1 and Stage 2 input and system-prompt text shown on screen; JSON copies the complete rendered-information text shown on screen. Display and clipboard share the same computed string, and no control appears for the `Artwork` tab or with no selected work.
+
+The UI uses only the existing `LocalClipboardManager` and `renderPromptText` or `renderJsonText`. Tab switching, body text, hash copying, export, and canvas messages are preserved. No new ViewModel state or action, producer, generation rule, repository or DAO query, Room schema or migration, persistence, pipeline, rendering, server, Web, or shared path changed.

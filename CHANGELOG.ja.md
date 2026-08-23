@@ -7920,3 +7920,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **各履歴サムネイル右上に`★`／`☆`のStar controlを追加した。** サムネイル選択とは別のtap targetで、Star操作だけではキャンバスの選択作品を切り替えない。描画・推敲中は既存lockに従って両操作を無効にする。
 - **既存`HistoryListItem.starred`と`toggleStar(HistoryListItem)`だけを結線した。** I-349の選択枠、tap、scroll、表示条件とI-350のモデル名表示を保ち、新しいproducer、ViewModel action、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
 - **検証:** production edit前のfocused JVM testは新helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`HistoryThumbnailStripTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。
+
+### Android `2.1.4-android.53` — 表示中のPrompt／JSONをコピーする（2026-08-23・[I-355]）
+
+- **通常Compose画面と既存Canvas panelのPrompt／JSONタブに`Copy` controlを追加した。** Promptは表示中のStage 1／Stage 2入力とsystem prompt全文、JSONは表示中のrender情報全文をclipboardへ渡す。表示とcopyは同じ計算済み文字列を使い、Artworkまたは作品未選択ではcontrolを出さない。
+- **既存`LocalClipboardManager`と表示helperだけを結線した。** tab切替、本文、hash copy、export、canvas messageを保ち、新しいViewModel state/action、producer、生成規則、repository/DAO/query、Room/schema/migration、永続化、pipeline、render、server/web/sharedは変更していない。
+- **検証:** production edit前のfocused JVM testは新helperの未実装symbolだけでexit 1。実装中、branch-tip final、受入側の`RenderTabCopyTest`はexit 0。mainは枝分岐後に動いておらず競合0のため、Fast規約どおりmerge後の同testは再実行していない。全JVM suite、計装、実機、screenshot、reference生成、pentalaは対象外。

@@ -93,4 +93,54 @@ class HistoryStripModelLabelTest {
             ),
         )
     }
+
+    @Test
+    fun tooltipAddsTheSavedRenderHashAndCanvasAspect() {
+        assertEquals(
+            "Stage 1: openai:gpt-image-1\n" +
+                "Stage 2: gemini:imagen-3\n" +
+                "Provenance hash: Fabcd1234\n" +
+                "Canvas: landscape",
+            historyStripModelTooltipText(
+                stage1Model = "openai:gpt-image-1",
+                stage2Model = "gemini:imagen-3",
+                renderHashShort = " abcd1234 ",
+                canvasAspect = " landscape ",
+                renderHashLabel = "Provenance hash",
+                canvasLabel = "Canvas",
+            ),
+        )
+    }
+
+    @Test
+    fun missingRenderHashAndCanvasUseTheExistingAbsentMarker() {
+        assertEquals(
+            "Stage 1: openai:gpt-image-1\n" +
+                "Stage 2: —\n" +
+                "作品の来歴ハッシュ: —\n" +
+                "キャンバス: —",
+            historyStripModelTooltipText(
+                stage1Model = "openai:gpt-image-1",
+                stage2Model = null,
+                renderHashShort = "   ",
+                canvasAspect = " ",
+                renderHashLabel = "作品の来歴ハッシュ",
+                canvasLabel = "キャンバス",
+            ),
+        )
+    }
+
+    @Test
+    fun missingStage1StillOmitsTheTooltipWhenHashAndCanvasExist() {
+        assertNull(
+            historyStripModelTooltipText(
+                stage1Model = null,
+                stage2Model = "gemini:imagen-3",
+                renderHashShort = "abcd1234",
+                canvasAspect = "landscape",
+                renderHashLabel = "Provenance hash",
+                canvasLabel = "Canvas",
+            ),
+        )
+    }
 }

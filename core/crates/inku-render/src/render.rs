@@ -8,6 +8,7 @@ use crate::marks::{MarkContext, MarkError, render_instruction};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::{PerformanceRequest, resolve_performance};
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
+use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
     Canvas, CanvasGroundSpec, Color, Instruction, InstructionMode, Primitive, RenderMetadata,
@@ -228,6 +229,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         .or(request.options.render_seed);
     let structured = profile != SvgProfile::Display;
     let mut content = Element::new("g").attr("id", "layer_10_content");
+    let mut surface_definitions = Vec::new();
     for (instruction_index, instruction) in ordered {
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
@@ -244,19 +246,26 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
             instruction_group.set_attr("id", instruction_id(instruction, instruction_index));
         }
         for (mark_index, single) in expanded.iter().enumerate() {
-            let mut mark = render_instruction(
-                single,
-                MarkContext {
-                    canvas: request.options.canvas,
-                    color_map: &request.options.resolved_color_map,
-                    work_assignment: &assignment,
-                    render_seed: request.options.render_seed,
-                    instruction_index,
-                    mark_index,
-                    wild: request.options.wild,
-                    support,
-                },
-            )?;
+            let context = MarkContext {
+                canvas: request.options.canvas,
+                color_map: &request.options.resolved_color_map,
+                work_assignment: &assignment,
+                render_seed: request.options.render_seed,
+                instruction_index,
+                mark_index,
+                wild: request.options.wild,
+                support,
+            };
+            let base_mark = render_instruction(single, context)?;
+            let mut mark = if let Some(surface) = render_surface(single, context) {
+                let mut combined = Element::new("g");
+                combined.push(base_mark);
+                combined.push(surface.group);
+                surface_definitions.extend(surface.definitions);
+                combined
+            } else {
+                base_mark
+            };
             if structured {
                 mark.set_attr("id", mark_id(single, instruction_index, mark_index));
                 instruction_group.push(mark);
@@ -270,6 +279,9 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
     }
     let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
     let mut document = Document::new(request.options.canvas);
+    for definition in surface_definitions {
+        document.push_definition(definition);
+    }
     if structured {
         let (title, description) = document_metadata(profile);
         let mut title_node = Element::new("title");

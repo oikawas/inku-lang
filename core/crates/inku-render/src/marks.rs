@@ -66,7 +66,7 @@ struct MarkStyle {
     dash: Option<String>,
 }
 
-fn weight_width(weight: Weight) -> f64 {
+pub(crate) fn weight_width(weight: Weight) -> f64 {
     match weight {
         Weight::Silverpoint => 0.5,
         Weight::Pencil => 1.5,
@@ -108,7 +108,7 @@ fn is_wash_mark(instruction: &Instruction) -> bool {
             .is_some_and(|surface| surface.texture == SurfaceTexture::Wash)
 }
 
-fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
+pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let width = (weight_width(instruction.weight) * thinness_scale(instruction.thinness))
         .max(MIN_STROKE_WIDTH)
         * canvas.unit()
@@ -300,7 +300,11 @@ fn missing(instruction: &Instruction, field: &'static str) -> MarkError {
     }
 }
 
-fn rotate(mut element: Element, instruction: &Instruction, canvas: CanvasSize) -> Element {
+pub(crate) fn rotate(
+    mut element: Element,
+    instruction: &Instruction,
+    canvas: CanvasSize,
+) -> Element {
     let Some(rotation) = instruction
         .rotation
         .filter(|rotation| rotation.abs() >= 1.0e-9)
@@ -365,7 +369,7 @@ fn polygon_path(points: &[Point]) -> String {
     }
 }
 
-fn contour_stroke_path(stroke: &ContourStrokeResult) -> String {
+pub(crate) fn contour_stroke_path(stroke: &ContourStrokeResult) -> String {
     if stroke.closed {
         return format!(
             "{} {}",
@@ -408,7 +412,7 @@ fn points_attribute(points: &[Point]) -> String {
         .join(" ")
 }
 
-fn uses_hand_stroke(weight: Weight) -> bool {
+pub(crate) fn uses_hand_stroke(weight: Weight) -> bool {
     weight != Weight::Rotring
 }
 
@@ -421,7 +425,7 @@ fn instruction_support(instruction: &Instruction, support: Support) -> Support {
     })
 }
 
-fn grid_step(weight: Weight, canvas: CanvasSize) -> f64 {
+pub(crate) fn grid_step(weight: Weight, canvas: CanvasSize) -> f64 {
     let quantize = crate::stroke::grammar(weight).quantize;
     if quantize > 0.0 {
         canvas.unit() * quantize

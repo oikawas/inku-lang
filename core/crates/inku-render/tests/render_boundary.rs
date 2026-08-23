@@ -149,3 +149,56 @@ fn abstract_presence_is_emitted_in_its_owned_layer() {
     assert!(output.svg[presence..].contains("<circle"));
     assert!(!output.svg.contains("NaN"));
 }
+
+#[test]
+fn candidate_renders_every_surface_without_profile_only_geometry() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[
+              {"primitive":"circle","center":[0.15,0.18],"radius":0.08,"weight":"pencil","surface":{"texture":"stipple","density":0.4}},
+              {"primitive":"ellipse","center":[0.40,0.18],"size":[0.16,0.11],"weight":"rotring","surface":{"texture":"paper_grain"}},
+              {"primitive":"square","position":[0.60,0.10],"size":[0.16,0.16],"weight":"pen","surface":{"texture":"wash"}},
+              {"primitive":"triangle","position":[0.08,0.40],"size":[0.18,0.16],"weight":"rotring","surface":{"texture":"hatch","direction":"vertical"}},
+              {"primitive":"polygon","center":[0.40,0.49],"radius":0.10,"sides":6,"weight":"pencil","surface":{"texture":"crosshatch","spacing_gradient":"coarse_to_dense"}},
+              {"primitive":"cloudform","center":[0.68,0.49],"size":[0.18,0.14],"weight":"pen","surface":{"texture":"aquatint","tone_steps":4}},
+              {"primitive":"circle","center":[0.20,0.76],"radius":0.09,"weight":"pen","surface":{"texture":"bleed","bleed":0.5}},
+              {"primitive":"square","position":[0.42,0.68],"size":[0.17,0.17],"weight":"pencil","surface":{"texture":"grain"}}
+            ]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed: Some(431),
+            composition_seed: Some(17),
+            wild: false,
+        },
+    };
+    let first = render(request.clone()).unwrap();
+    let second = render(request).unwrap();
+    assert_eq!(first, second);
+    for texture in [
+        "stipple",
+        "paper_grain",
+        "wash",
+        "hatch",
+        "crosshatch",
+        "aquatint",
+        "bleed",
+        "grain",
+    ] {
+        assert!(
+            first.svg.contains(&format!("_{texture}\"")),
+            "missing surface {texture}"
+        );
+    }
+    assert!(first.svg.contains("<pattern"));
+    assert!(first.svg.contains("surface-grain-carrier-v1"));
+    assert_eq!(first.metadata.render_surface_textures.len(), 8);
+    assert!(!first.svg.contains("<filter"));
+    assert!(!first.svg.contains("<clipPath"));
+    assert!(!first.svg.contains("NaN"));
+    assert!(!first.svg.contains("inf"));
+}

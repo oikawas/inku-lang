@@ -115,6 +115,18 @@ impl Document {
         self.root.push(child);
     }
 
+    /// Add one reusable SVG definition without exposing document-tree internals.
+    pub fn push_definition(&mut self, definition: Element) {
+        match self.root.children.first_mut() {
+            Some(Node::Element(defs)) if defs.name == "defs" => defs.push(definition),
+            _ => {
+                let mut defs = Element::new("defs");
+                defs.push(definition);
+                self.root.children.insert(0, defs.into());
+            }
+        }
+    }
+
     #[must_use]
     pub fn serialize(&self) -> String {
         let mut output = String::with_capacity(4096);

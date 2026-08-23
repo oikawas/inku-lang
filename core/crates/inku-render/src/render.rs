@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
 use crate::palette::{default_color, work_color_assignment};
@@ -213,7 +214,8 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         composition_seed: request.options.composition_seed,
         canvas: Some(request.options.canvas),
     });
-    let support = canvas_ground(&performance.score).map_or(DEFAULT_SUPPORT, |ground| {
+    let ground = canvas_ground(&performance.score);
+    let support = ground.as_ref().map_or(DEFAULT_SUPPORT, |ground| {
         support_for_ground(ground.material)
     });
     let mut ordered = performance
@@ -278,7 +280,20 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         }
     }
     let presence = render_presence_layer(&performance.score, request.options.canvas, &assignment);
+    let ground = ground.as_ref().and_then(|ground| {
+        render_ground(
+            ground,
+            request.options.canvas,
+            &background,
+            request.options.render_seed,
+        )
+    });
     let mut document = Document::new(request.options.canvas);
+    if let Some(ground) = &ground {
+        for definition in &ground.definitions {
+            document.push_definition(definition.clone());
+        }
+    }
     for definition in surface_definitions {
         document.push_definition(definition);
     }
@@ -304,6 +319,9 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         let mut background_layer = Element::new("g").attr("id", "layer_00_background");
         background_layer.push(background_rect(&request, &background));
         artboard.push(background_layer);
+        if let Some(ground) = ground.as_ref() {
+            artboard.push(ground.group.clone());
+        }
         artboard.push(content);
         let mut presence_content = Element::new("g").attr("id", "layer_20_presence");
         if let Some(presence) = presence {
@@ -313,6 +331,9 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         document.push(artboard);
     } else {
         document.push(background_rect(&request, &background));
+        if let Some(ground) = ground {
+            document.push(ground.group);
+        }
         if let Some(presence) = presence {
             content.push(presence);
         }

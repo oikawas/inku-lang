@@ -202,3 +202,64 @@ fn candidate_renders_every_surface_without_profile_only_geometry() {
     assert!(!first.svg.contains("NaN"));
     assert!(!first.svg.contains("inf"));
 }
+
+#[test]
+fn candidate_preserves_every_ground_between_background_and_content() {
+    for material in [
+        "paper",
+        "washi",
+        "ink_wash",
+        "charcoal_ground",
+        "canvas",
+        "drawing_paper",
+        "mezzotint",
+    ] {
+        for profile in [
+            SvgProfile::Display,
+            SvgProfile::Editable,
+            SvgProfile::Compat,
+        ] {
+            let request = RenderRequest {
+                score: score(&format!(
+                    r#"{{"canvas":{{"aspect":"square","ground":{{"material":"{material}","tone":"warm","grain":"medium"}}}},"instructions":[]}}"#
+                )),
+                options: RenderOptions {
+                    resolved_color_map: BTreeMap::new(),
+                    catalog_id: None,
+                    canvas: CanvasSize::new(1000.0, 1000.0),
+                    canvas_aspect_id: "square".to_owned(),
+                    svg_profile: profile,
+                    render_seed: Some(431),
+                    composition_seed: None,
+                    wild: false,
+                },
+            };
+            let output = render(request).unwrap();
+            let background = output.svg.find("id=\"background\"").unwrap();
+            let ground = output.svg.find("id=\"layer_01_canvas_ground\"").unwrap();
+            let content = output.svg.find("id=\"layer_10_content\"").unwrap();
+            assert!(
+                background < ground && ground < content,
+                "ground order: {material}"
+            );
+            assert!(
+                output.svg.contains("<pattern"),
+                "ground pattern: {material}"
+            );
+            assert!(!output.svg.contains("<filter"));
+            assert!(!output.svg.contains("<clipPath"));
+            assert_eq!(
+                serde_json::to_string(
+                    &output
+                        .metadata
+                        .render_canvas_ground
+                        .as_ref()
+                        .unwrap()
+                        .material
+                )
+                .unwrap(),
+                format!("\"{material}\"")
+            );
+        }
+    }
+}

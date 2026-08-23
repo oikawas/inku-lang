@@ -9,6 +9,64 @@ fn score(json: &str) -> Score {
 }
 
 #[test]
+fn canonical_python_score_accepts_explicit_null_fields() {
+    let input = score(
+        r#"{"version":"0.1.0","canvas":{"aspect":"square","ground":null},
+        "background":"white","presence":null,"instructions":[{
+        "primitive":"arc","note":null,"from":null,"to":null,
+        "center":[0.5,0.5],"radius":0.27,"sides":null,"position":null,
+        "size":null,"angle_start":15.0,"angle_end":285.0,"rotation":null,
+        "filled":false,"style":"solid","weight":"brush_thick",
+        "mode":"additive","carve_depth":null,"color":"black",
+        "color_hint":null,"variation":null,"arrangement":null,"at":null,
+        "relation":null,"thinness":null,"surface":null}]}"#,
+    );
+
+    assert_eq!(input.instructions.len(), 1);
+}
+
+#[test]
+fn canonical_python_render_request_accepts_the_reference_shape() {
+    let request: RenderRequest = serde_json::from_str(
+        r##"{"score":{"version":"0.1.0","canvas":{"aspect":"square","ground":null},
+        "background":"white","presence":null,"instructions":[{
+        "primitive":"arc","note":null,"from":null,"to":null,
+        "center":[0.5,0.5],"radius":0.27,"sides":null,"position":null,
+        "size":null,"angle_start":15.0,"angle_end":285.0,"rotation":null,
+        "filled":false,"style":"solid","weight":"brush_thick",
+        "mode":"additive","carve_depth":null,"color":"black",
+        "color_hint":null,"variation":null,"arrangement":null,"at":null,
+        "relation":null,"thinness":null,"surface":null}]},"options":{
+        "resolved_color_map":{"white":"#ffffff","black":"#111111",
+        "blue":"#2c3e91","red":"#a2342a","green":"#2f6b3a",
+        "gray":"#888888"},"catalog_id":null,"canvas":{"width":1000.0,
+        "height":1000.0},"canvas_aspect_id":"square",
+        "svg_profile":"editable","render_seed":12345,
+        "composition_seed":null,"wild":false}}"##,
+    )
+    .unwrap();
+
+    assert_eq!(request.score.instructions.len(), 1);
+}
+
+#[test]
+fn canonical_python_canvas_ground_accepts_the_full_explicit_shape() {
+    let ground: inku_render::types::CanvasGroundSpec = serde_json::from_str(
+        r#"{"material":"canvas","tone":"off_white","grain":"medium",
+        "density":0.45,"opacity":0.16,"seed":13579}"#,
+    )
+    .unwrap();
+    let input = score(
+        r#"{"canvas":{"aspect":"square","ground":{"material":"canvas",
+        "tone":"off_white","grain":"medium","density":0.45,
+        "opacity":0.16,"seed":13579}},"instructions":[]}"#,
+    );
+
+    assert_eq!(ground.density, 0.45);
+    assert!(matches!(input.canvas, inku_render::types::Canvas::Spec(_)));
+}
+
+#[test]
 fn render_boundary_is_one_owned_request_and_output_shape() {
     let request = RenderRequest {
         score: score(r#"{"instructions":[]}"#),

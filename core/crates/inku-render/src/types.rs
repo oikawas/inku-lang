@@ -5,7 +5,9 @@
 //! schema and deliberately contain no Python or server-registry concepts.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
+use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Serialize};
 
 /// Integer seed domain accepted at the canonical JSON boundary.
@@ -407,11 +409,54 @@ fn default_canvas_aspect() -> String {
     "square".to_owned()
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Canvas {
     Id(String),
     Spec(CanvasSpec),
+}
+
+impl<'de> Deserialize<'de> for Canvas {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CanvasVisitor;
+
+        impl<'de> Visitor<'de> for CanvasVisitor {
+            type Value = Canvas;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a canvas aspect string or canvas specification")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Canvas::Id(value.to_owned()))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Canvas::Id(value))
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                // Serde's derived untagged enum buffers the map before choosing
+                // a variant. That buffer cannot carry the i128 seed domain, so
+                // a valid ground seed made the whole Canvas look invalid.
+                CanvasSpec::deserialize(MapAccessDeserializer::new(map)).map(Canvas::Spec)
+            }
+        }
+
+        deserializer.deserialize_any(CanvasVisitor)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

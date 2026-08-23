@@ -28,6 +28,7 @@
 	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { colorMapEntries, colorWordLabel, type ColorMap } from '$lib/colors';
+	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
@@ -64,12 +65,7 @@
 		navPos: number;
 		canvasAspectWidth: number;
 		canvasAspectHeight: number;
-		zoom: number;
-		actualZoom: number;
-		canPan: boolean;
-		panX: number;
-		panY: number;
-		canvasDragging: boolean;
+		viewport: CanvasViewport;
 		promptsData: PromptsData | null;
 		stage1PromptText: string;
 		instructionText: string;
@@ -111,12 +107,6 @@
 		onGotoNext: () => void | Promise<void>;
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
-		onPointerDown: (event: PointerEvent) => void;
-		onPointerMove: (event: PointerEvent) => void;
-		onPointerUp: (event: PointerEvent) => void;
-		onSetZoom: (zoom: number) => void;
-		onResetZoom: () => void;
-		onFitZoomChange: (zoom: number) => void;
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
@@ -223,12 +213,7 @@
 		navPos,
 		canvasAspectWidth = 1,
 		canvasAspectHeight = 1,
-		zoom,
-		actualZoom,
-		canPan,
-		panX,
-		panY,
-		canvasDragging,
+		viewport,
 		promptsData,
 		stage1PromptText,
 		instructionText,
@@ -264,12 +249,6 @@
 		onGotoNext,
 		onGotoPrev,
 		onGotoLatest,
-		onPointerDown,
-		onPointerMove,
-		onPointerUp,
-		onSetZoom,
-		onResetZoom,
-		onFitZoomChange,
 		onCopyPromptText,
 		onCopyStatusHash,
 		onToggleStar,
@@ -509,7 +488,7 @@
 		const availableWidth = Math.max(120, rect.width - 120);
 		const availableHeight = Math.max(120, rect.height - 96);
 		const nextZoom = Math.max(0.25, Math.min(10, Math.min(availableWidth / canvasBaseWidth, availableHeight / canvasBaseHeight)));
-		onFitZoomChange(+nextZoom.toFixed(2));
+		viewport.updateFitZoom(+nextZoom.toFixed(2));
 	}
 
 	onMount(() => {
@@ -521,7 +500,7 @@
 			if (outputTab !== 'canvas' || !result) return;
 			event.preventDefault();
 			const step = event.deltaY < 0 ? 0.15 : -0.15;
-			onSetZoom(zoom + step);
+			viewport.setZoom(viewport.zoom + step);
 		};
 		wheelTarget?.addEventListener('wheel', onWheel, { passive: false });
 		return () => {
@@ -740,19 +719,19 @@
 		<div
 			bind:this={canvasContentEl}
 			class="canvas-content"
-			class:can-pan={outputTab === 'canvas' && canPan}
-			class:dragging={canvasDragging}
+			class:can-pan={outputTab === 'canvas' && viewport.canPan}
+			class:dragging={viewport.dragging}
 			class:side-nav-safe={outputTab !== 'canvas'}
-			onpointerdown={onPointerDown}
-			onpointermove={onPointerMove}
-			onpointerup={onPointerUp}
-			onpointercancel={onPointerUp}
+			onpointerdown={(event) => viewport.startDrag(event, outputTab === 'canvas')}
+			onpointermove={(event) => viewport.moveDrag(event)}
+			onpointerup={(event) => viewport.endDrag(event)}
+			onpointercancel={(event) => viewport.endDrag(event)}
 		>
 			{#if outputTab === 'canvas'}
-				<div class="canvas-pan" style="transform: translate3d({panX}px, {panY}px, 0);">
+				<div class="canvas-pan" style="transform: translate3d({viewport.panX}px, {viewport.panY}px, 0);">
 					<div
 						class="canvas-box"
-						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px; transform: scale({actualZoom}); transform-origin: center center; transition: transform 0.15s;"
+						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px; transform: scale({viewport.actualZoom}); transform-origin: center center; transition: transform 0.15s;"
 					>
 						{#if result}
 							{#if artworkUrl}
@@ -1392,14 +1371,14 @@
 		{#if outputTab === 'canvas'}
 			<div class="zoom-controls">
 				<Tooltip text={t().tooltipCanvasZoomOut}>
-					<button onclick={() => onSetZoom(zoom - 0.25)}>−</button>
+					<button onclick={() => viewport.setZoom(viewport.zoom - 0.25)}>−</button>
 				</Tooltip>
-				<span class="zoom-pct">{Math.round(zoom * 100)}%</span>
+				<span class="zoom-pct">{Math.round(viewport.zoom * 100)}%</span>
 				<Tooltip text={t().tooltipCanvasZoomIn}>
-					<button onclick={() => onSetZoom(zoom + 0.25)}>＋</button>
+					<button onclick={() => viewport.setZoom(viewport.zoom + 0.25)}>＋</button>
 				</Tooltip>
 				<Tooltip text={t().tooltipCanvasZoomReset}>
-					<button class="zoom-reset" onclick={onResetZoom}>⊙</button>
+					<button class="zoom-reset" onclick={() => viewport.fit()}>⊙</button>
 				</Tooltip>
 			</div>
 		{/if}

@@ -24,7 +24,7 @@ import copy
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server import renderer
+from inku_server.render_engines.default import planning
 from inku_server.render_engines.default.planning import (
     _anchor,
     _expand_arrangement,
@@ -68,7 +68,7 @@ def _placed_px(
 ) -> list[tuple[float, float]]:
     """Where the marks of one instruction land, in pixels, on `aspect`.
 
-    The two calls are the ones `render()` makes (renderer.py, the resolve and
+    The two calls are the ones `render()` makes (planning, the resolve and
     the expansion), in that order and with those arguments, so a gate here runs
     on the same path a drawing does rather than on a copy of it.
     """
@@ -288,7 +288,7 @@ def test_square_canvas_svg_is_byte_identical_without_the_rule(
 
     with_rule = draw()
     monkeypatch.setattr(
-        renderer,
+        planning,
         "_region_in_short_side_units",
         lambda region, canvas: tuple(region),
     )

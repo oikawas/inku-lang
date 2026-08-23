@@ -10,7 +10,7 @@
 | Plugin document | Core writing-down immediately after Stage 1 | `plugins/document_format.py`, render router | Plugin format/v2 tests | DDL `A-plugin-*` cases | CRUD/auth and reference dump |
 | Stage 1.5 | No semantic overwrite; focus; explicit variation | `ddl_expander.py`, language support | Expander, variation, staffage-fold tests | DDL Engine corpus | `check_frozen_corpora.py` |
 | Coerce | Drop/repair, request delivery, ceilings, one named abstract color | `coerce/normalize.py`, `compose.py`, `__init__.py` | Coerce, limit, relation, and named-color tests | DDL Engine corpus | `check_frozen_corpora.py` |
-| Renderer/strokes | Same Score+seed; forward-only engine | `render_engines/default/` package, `renderer.py` compatibility facade, `stroke_engine.py` | Renderer contracts and platform stability | 610 Render Engine cases | Version bump; rebuild twice; Linux CI |
+| Renderer/strokes | Same Score+seed; forward-only engine; pure-kernel dependency direction | `default/mark_kernel.py` (scalars and points), `default/marks.py` (SVG emission), `renderer.py` compatibility facade, `stroke_engine.py` | Facade consumer census, kernel dependency gate, renderer contracts, platform stability | 610 Render Engine cases | Version bump; rebuild twice; Linux CI |
 | Identity/history | `dh1`, `rh3`, legacy `rh2`, DB canonical data | `identity.py`, `db.py`, rendering/history router | Hash, integrity, lineage acceptance | Android parity fixtures | Migration and stored-row compatibility |
 | API route/model | 96 routes, three public paths, response shape | `api.py`, `api_core/*` | Route auth, module split, API baseline | None | Web/CLI/Android sender census |
 | Web settings feature | Three registries and local/user/payload boundaries | `web/src/lib/features/*`, `+page.svelte` | Registry unit tests and route-source contracts | None | `npm run check`, unit and relevant lint |
@@ -48,6 +48,8 @@ On ordinary pushes and pull requests, current workflows run the server suite (ru
 ## Special rule for deterministic layers
 
 `coerce/`, `ddl_expander.py`, `render_engines/default/`, `renderer.py`, `stroke_engine.py`, `schema.py`, `saijiki.py`, and `language_support/` are deterministic layers whose changes require rebuilding the corresponding frozen corpus. Reference tests that only compare stored files do not replace running the rebuild.
+
+For `mark_kernel.py`, the no-SVG dependency gate and ownership tests do not by themselves prove drawing identity. Run the direct tests and rebuild the Render Engine corpus so the one-way dependency from `marks.py` into the kernel and byte identity are checked together.
 
 ## Evidence map
 

@@ -4,15 +4,15 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer境界更新 2026-08-22、Web client境界更新 2026-08-23 |
-| source branch / 実装commit | `refactor/i346-stage10-five-surface-convergence` / `9366e7218a2c4426003179a4e13d2db250ed6b35` |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer境界更新 2026-08-24、Web client境界更新 2026-08-23 |
+| source branch / 実装commit | `refactor/i366-render-portability-boundary-1` / `867f645a` |
 | source未コミット変更 | 実装snapshot時はなし。本書がそのsnapshotへ同期する |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 973` |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 974` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `973` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `974` |
 | Render Engine | 実装 `default` / `40` |
 | DDL | `ddl_version=3` / `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.56`、実装が名乗る Render Engine `35` |
+| Android | `android/VERSION` = `2.1.4-android.63`、実装が名乗る Render Engine `35` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -40,7 +40,7 @@
 | PIPE-S15 | Stage 1.5 | 決定的な焦点書換えと明示変奏 | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | 確認済み | 公開可 |
 | PIPE-S2 | Stage 2 | DDLからJSON Score、schema tool利用 | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | 確認済み | 公開可 |
 | PIPE-COERCE | coerce/validation | 不正値drop、要求配達、天井、描画可能性確保 | `coerce/__init__.py:coerce_score`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | 確認済み | 公開可 |
-| PIPE-RENDER | Render Engine | ScoreとseedからSVGと描画metadata | `render_engines/__init__.py:current_render_engine`; `render_engines/default/adapter.py:DefaultRenderEngine`; `render_engines/default/engine.py:render_result`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
+| PIPE-RENDER | Render Engine | ScoreとseedからSVGと描画metadata。pure geometryからSVG emissionへの一方向境界 | `render_engines/default/mark_kernel.py`（scalar・点列）; `render_engines/default/marks.py`（SVG emission）; `render_engines/default/engine.py:render_result`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
 | PIPE-HISTORY | 履歴保存 | `/api/paint`のserver生成物をDBへ保存 | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | 確認済み | 公開可 |
 | DATA-DH1 | `dh1` | 正規化した記述の同一性 | `identity.py:description_hash` | Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-RH3 | `rh3` | Score、render seed、wild、engine、色カタログによるedition同一性 | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context「設計契約」 | 確認済み | 公開可 |

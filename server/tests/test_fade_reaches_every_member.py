@@ -42,6 +42,7 @@ from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 from inku_server.plugins.system import canvas_aspect
 from inku_server.render_engines.default import determinism
+from inku_server.render_engines.default import dispatch
 from inku_server.render_engines.default import marks as mark_domain
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -459,6 +460,7 @@ def test_the_fill_keeps_its_ratio_to_the_stroke(fade, ratio, layout):
             {"black": "#111111"},
             canvas,
             work_assignment={},
+            surface_ops=dispatch._MARK_SURFACE_OPS,
         )
         assert attrs["fill"] != "none"
         assert attrs["fill_opacity"] / attrs["stroke_opacity"] == pytest.approx(

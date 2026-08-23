@@ -45,6 +45,7 @@ flowchart LR
     REFINE_ACTIONS["features/canvas/refinement-actions.ts\nstatelessなcandidate保存・Canvas projection"]
     CANVAS_INFO["features/canvas/CanvasGenerationInfo.svelte\ngeneration info focused view"]
     CANVAS_PRESENTATION["features/canvas/CanvasPresentationOverlay.svelte\npresentation focused view"]
+    CANVAS_REFINEMENT["features/canvas/CanvasRefinementWorkspace.svelte\nrefinement workspace focused view"]
     HISTORY_MANAGER["historyManagerState.svelte.ts\nmanager query・cache・実測page size"]
     SETTINGS["features/settings/state.svelte.ts\nroute-instanceの設定shell + server/model provider/user・group管理"]
     SETTINGS_MODAL["SettingsModal.svelte\n設定shell view"]
@@ -86,6 +87,7 @@ flowchart LR
     REFINE_ACTIONS -->|"既存save operation"| HISTORY_WORK
     COMPONENTS -->|"CanvasPanelからtyped display props"| CANVAS_INFO
     COMPONENTS -->|"CanvasPanelからtyped display props + callbacks"| CANVAS_PRESENTATION
+    COMPONENTS -->|"CanvasPanelからtyped owner + display props + callbacks"| CANVAS_REFINEMENT
     PAGE -->|"factory作成 + 外部依存の配線"| SETTINGS
     PAGE --> SETTINGS_MODAL
     SETTINGS_MODAL -->|"SettingsController"| SETTINGS
@@ -134,6 +136,7 @@ flowchart LR
 | stateless refinement candidate actions | candidate→current Canvas projection、選択snapshotの逐次history保存、stale/identity調停 | `refinement-actions.ts`がtyped candidateとnamed save/context capabilityを受ける。route/session/history/Canvas stateを所有せず、pageが最終代入とview coordinationを保持する |
 | Canvas generation-information focused view | 詳細・prompt・score tab、作品由来情報の表示、drawer固有のscroll element | `CanvasGenerationInfo.svelte`がtyped display propsを受けて描画する。開閉、outside/Escape、tab別scroll memory、共有SVG計測は`CanvasPanel`が所有する |
 | Canvas presentation focused view | fullscreen作品画像、caption、navigation・star・caption・close control | `CanvasPresentationOverlay.svelte`がminimal work markとtyped display props/callbacksを受けて描画する。open state、toolbar、Escape、current workとmutationは`CanvasPanel`が所有する |
+| Canvas refinement workspace focused view | adjust、candidate、model比較、language比較の表示とworkspace固有style | `CanvasRefinementWorkspace.svelte`が既存のtyped refinement-session/model-inspection owner、解決済みprops、named callbackを受けて描画する。output/view/open選択、永続化、Escape/close、current作品画像URL、operationは`CanvasPanel`が所有する |
 | route-instance feature owner | 設定dialogの開閉・tab・詳細度、server管理、model provider管理、user/groupの一覧・status・操作 | `createSettingsController`をrouteごとに1回生成する。focused viewへは`userAdministration`、`database`/`db_backup`、`render_limits`、または`output_save`/`render_concurrency`の必要sliceと名前付き操作だけを渡す |
 | focused component memory | 入力中のAPI key、account form/password、user/group選択 | 入力を描くcomponentだけが保持する。account draftは`UserAdministrationSettings.svelte`、API key draftは`SettingsModal.svelte`に留まる |
 | localStorage | UI language、設定dialog詳細度、wild、batch retry、result log、export設定、表示向き | browser-local |
@@ -165,6 +168,8 @@ Stage 6Eではstatelessな`refinement-redraw.ts`がtouch/layout/readingのsingle
 Stage 7Aでは`CanvasGenerationInfo.svelte`が生成情報drawerの詳細・prompt・score表示、作品由来の表示用projection、drawer固有styleを所有する。`CanvasPanel`は開閉、outside/Escape、active tab、tab別scroll memory、表示中作品からの共有SVG計測を保持し、typed propsとnamed callbackだけを渡す。抽出したviewはroute/session state、HTTP、current-work変更を所有しない。
 
 Stage 7Bでは`CanvasPresentationOverlay.svelte`がfullscreen作品画像、caption、control markup、presentation専用styleを所有する。`CanvasPanel`はopen/close、toolbar、Escape priority、current work、navigation/star/caption mutationを保持し、minimal mark projectionとnamed callbackだけを渡す。抽出したviewはmutable owner、route state、HTTPを持たない。
+
+Stage 7Cでは`CanvasRefinementWorkspace.svelte`がbackdrop、shell、adjust/candidate表示、model/language比較表示、refinement専用styleを所有する。`CanvasPanel`はoutput/view/open state、refinement kindの永続化とDDL-origin補正、amplitude/touch word ownership、Escape/close、current作品画像URL、全operationを保持する。focused viewは既存のtyped refinement-session/model-inspection owner、解決済みdisplay props、named callbackを受け取り、mutable ownerやtransportを追加しない。
 
 設定shell、server管理、model provider管理、user/group管理のstate machineはroute-instanceの `features/settings/state.svelte.ts` が所有する。pageはfactoryへ認証利用者、session/user設定refresh、各tabの外部loader、描画用model catalog loader、render同時実行数のsetterを配線する。login/logoutとcurrent actorの正本、および描画時model選択はpageに残る。`SettingsModal.svelte` は設定shellとして1個の `SettingsController` を受け取る。user/group tabは`UserAdministrationSettings.svelte`へ狭い`userAdministration` submodelと必要なsession propsだけを渡し、account form/password draftは入力view内、API key draftはModal内に留める。database/backup tabは`DatabaseAdministrationSettings.svelte`へ`database`/`db_backup` slice、render limits tabは`RenderLimitsSettings.svelte`へ`render_limits` slice、server runtime tabは`ServerRuntimeSettings.svelte`へ`output_save`/`render_concurrency` sliceと、それぞれ必要な名前付き操作だけを渡す。いずれのstatusと操作のownerもroute-instance feature ownerに留める。ownerは秘密値をoperation引数からstate、確認dialog、errorへ複製しない。
 

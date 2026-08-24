@@ -1,0 +1,34 @@
+{
+  "nodes": [
+    {
+      "id": "node-minimal",
+      "history_id": "history-minimal",
+      "state": "active",
+      "description_hash": "dh1:portable-parent",
+      "render_hash": "rh3:portable-fixture",
+      "at": 1787580000000,
+      "deleted_at": null,
+      "root_node_id": null
+    },
+    {
+      "id": "node-child",
+      "history_id": null,
+      "state": "lineage_only",
+      "description_hash": "dh1:portable-child",
+      "render_hash": null,
+      "at": 1787580003000,
+      "deleted_at": null,
+      "root_node_id": "node-minimal"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-minimal-child",
+      "parent_node_id": "node-minimal",
+      "child_node_id": "node-child",
+      "derivation_kind": "replay",
+      "metadata_json": "{}",
+      "at": 1787580003000
+    }
+  ]
+}

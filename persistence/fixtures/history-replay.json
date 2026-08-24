@@ -1,0 +1,26 @@
+[
+  {
+    "id": "history-legacy-null",
+    "at": 1787580001000,
+    "input": "Legacy work",
+    "score": "{}",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
+    "compose_fallback": null,
+    "sketch_state": null,
+    "starred": 0,
+    "trashed": 0,
+    "history_visibility": "normal"
+  },
+  {
+    "id": "history-recorded-none",
+    "at": 1787580002000,
+    "input": "Recorded work",
+    "score": "{}",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
+    "compose_fallback": "none",
+    "sketch_state": "off",
+    "starred": 0,
+    "trashed": 0,
+    "history_visibility": "normal"
+  }
+]

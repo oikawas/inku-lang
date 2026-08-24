@@ -22,19 +22,21 @@ flowchart TD
         RITUAL["30題の儀式 → 既存ベンチへ統合\n層帰属タグを評価手順に追加"]
         DOCS["推敲の再入点図・注入点の表\npipeline文書へ反映"]
         PORT_BOUNDARY["描画portability boundary 1\nPython pure geometryをSVG emissionから分離"]
+        RUST_CORE["描画portability boundary 2\nServerを共有Rust Engine 41へ移行"]
     end
     subgraph NEXT["これから"]
         MIRROR["coerceの鏡\n（調査先行）"]
         P41["要求配達repairの調査\n（対照生成つき）"]
         GOV["Score schema版の統治\n（現状: 統治なし・実質凍結）"]
-        RUST_CORE["共有Rust描画core\n（別契約で設計・裁定）"]
+        ANDROID_RUST["Androidで共有Rust coreを採用\n（次のportability boundary）"]
     end
     HELD["保留: 要求配達の上流移設\n（実装は調査の裁定後）"]
 
     MARK -.->|"実数が前提"| MIRROR
     P41 -->|"三案比較 → 裁定"| HELD
     RITUAL -.->|"層帰属の実測"| P41
-    PORT_BOUNDARY -.->|"境界を入力に別途設計"| RUST_CORE
+    PORT_BOUNDARY --> RUST_CORE
+    RUST_CORE -.->|"portable coreは準備済み"| ANDROID_RUST
 ```
 
 ## 済んだもの
@@ -44,12 +46,13 @@ flowchart TD
 - **儀式の二重帳簿の回避** — 「30題を固定条件で描き、署名可否と層帰属を記入する」という提案は、**既存の30題ベンチマークと同じもの**だった。既存側には失敗から学んだ判定規則が3巡ぶん書き込まれており、作り直すとそれを失う。新設はせず、層帰属タグ（`sketch / interpret / expand / score / coerce / render`）を既存の評価手順へ追加した。
 - **文書の補完** — 推敲の再入点の図と、生成パラメータの注入点×rh3該否の表を `ddl-processing-pipeline.ja.md` へ、判定単位の全経路を `description-to-svg.ja.md` へ収めた（本書群・日英同時）。
 - **描画portability boundary 1** — `renderer.py` をSVG-only互換入口へ縮め、`default/mark_kernel.py` にscalarと点列だけを返す決定的な幾何計算を分離した。`marks.py` はkernelを一方向に消費してSVGを組み立てる。Engine 40のbyte出力、Score、seed、APIは変えていない。
+- **描画portability boundary 2** — Engine 41でplanning、geometry、mark、surface、layer、SVG serialize、決定的seed派生、演奏metadataをplatform-independentなRust crate `inku-render` へ移した。Serverは粗い1 requestの`inku-render-python`境界から呼び、runtime fallbackを持たない。受入済みEngine 41 corpusが現行byteを固定し、Python Engine 40実装はretireした。
 
-## 別契約で検討するもの — 共有Rust描画core
+## 別契約で完了したもの — 共有Rust描画core
 
-作者方針は、Androidへの移植性と将来のiOS移植性のため、描画coreをRustで共有できる構造へ進むことである。今回できたのはPython内のportability boundaryまでで、Rust crate、Scene IR / DTO、FFI、JNI、UniFFI、Swift binding、Android/iOS統合はまだ存在しない。
+Serverはplatform-independentなRust crate `inku-render` で演奏する。独立した薄い`inku-render-python` wheelが正規JSON request/responseを1回で渡し、Server packageは`uv_build`を維持する。Rust coreはPython、DB、filesystem、network、host platformへ依存せず、利用者を先回りしたgeneric Scene IRも追加していない。
 
-次の契約では、`mark_kernel.py` のどの値境界を共有coreへ移すか、Score入力と描画出力の表現、Python/Rust差分test、端末ごとのbinding、失敗時fallback、性能とbinary sizeをまとめて裁定する。既存の610件corpusを同一性の根拠にし、移植都合でserverの意味論を曲げない。
+Androidは引き続き既存Kotlin rendererで演奏しており、JNI、UniFFI、Swift binding、Android/iOS application integrationはまだ無い。次のportability boundaryはAndroid採用で、iOSは将来の利用者である。後続契約はEngine 41のrequest/output semanticsを守り、移植都合でServerの意味論を曲げずに性能とbinary sizeを測る。
 
 ## これから 1 — coerceの鏡（調査先行）
 

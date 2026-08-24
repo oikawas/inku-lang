@@ -62,14 +62,13 @@ flowchart LR
     COERCE["coerce/"]
     RENDERING["api_core/rendering.py"]
     REGISTRY["render_engines/__init__.py\ncurrent_render_engine()"]
+    HOST["render_engines/host.py / profiles.py / seeds.py\nhost-owned request preparation"]
     DEFAULT_INIT["render_engines/default/__init__.py"]
-    ADAPTER["default/adapter.py\nDefaultRenderEngine"]
-    ENGINE["default/engine.py\ncanonical render_result()"]
-    DOMAINS["default orchestration domains\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `dispatch.py`"]
-    MARKS["default/marks.py\nSVG mark emission"]
-    KERNEL["default/mark_kernel.py\npure deterministic geometry"]
+    ADAPTER["default/adapter.py\nthin one-call native adapter"]
+    BINDING["inku-render-python\nCPython wheel boundary"]
+    CORE["inku-render Rust core\nplanning / geometry / marks / SVG / metadata"]
+    REFERENCE["reference.py\nimplementation reference"]
     RENDERER["renderer.py\nSVG-only compatibility facade"]
-    STROKE["stroke_engine.py\nshared stroke processing"]
     DB["db.py"]
     ANALYSIS["shared/inku_analysis"]
 
@@ -83,23 +82,21 @@ flowchart LR
     COERCE --> SCHEMA
     RENDER_ROUTER --> RENDERING
     RENDERING --> REGISTRY
+    RENDERING --> HOST
     REGISTRY --> DEFAULT_INIT
     DEFAULT_INIT --> ADAPTER
-    ADAPTER --> ENGINE
-    ENGINE --> DOMAINS
-    DOMAINS --> MARKS
-    DOMAINS --> KERNEL
-    MARKS --> KERNEL
-    MARKS --> STROKE
-    KERNEL --> STROKE
-    RENDERER -->|"render() → render_result().svg"| ENGINE
+    ADAPTER --> HOST
+    ADAPTER --> BINDING
+    BINDING --> CORE
+    REFERENCE --> BINDING
+    RENDERER -->|"render() → current engine .svg"| REGISTRY
     RENDERING --> DB
     RENDERING -->|"PNG rasterization"| ANALYSIS
 ```
 
-The canonical path is `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()`. `renderer.py` is the compatibility facade for existing SVG-only callers; `renderer.render()` delegates to the canonical result's `.svg`. Repository-owned executable code uses only `render` from the facade, while `api_core/rendering.py` reads profiles and seeds directly from their canonical owners.
+The canonical path is `api_core/rendering.py → render_engines` registry → `default/adapter.py` → the independent `inku-render-python` wheel → the platform-independent `inku-render` core. The adapter resolves host-owned canvas/profile data, serializes one canonical request, and receives SVG plus metadata in one call. `renderer.py` remains the SVG-only compatibility facade and delegates through the same registry.
 
-`mark_kernel.py` owns deterministic geometry that returns only scalars and point collections and creates no SVG object. `marks.py` consumes that kernel to construct SVG attributes and elements. This dependency direction is a boundary at which a future shared Rust core can be evaluated; the current implementation remains Python-only.
+Stage 6 removed the Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules. `default/` now contains only its package export and the thin Rust adapter. `/api/reference` obtains renderer-owned tables from the native core instead of importing a second Python implementation. Android still uses its historical Kotlin renderer; adopting this Rust core there is the next portability boundary.
 
 ## Router groups
 

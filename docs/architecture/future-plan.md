@@ -22,19 +22,21 @@ flowchart TD
         RITUAL["Thirty-piece ritual → folded into the existing bench\nlayer-attribution tags added to its procedure"]
         DOCS["Refinement re-entry diagram and injection table\nreflected into the pipeline document"]
         PORT_BOUNDARY["Drawing portability boundary 1\nPython pure geometry separated from SVG emission"]
+        RUST_CORE["Drawing portability boundary 2\nServer moved to shared Rust Engine 41"]
     end
     subgraph NEXT["Ahead"]
         MIRROR["The coerce mirror\n(investigation first)"]
         P41["Request-delivery repair investigation\n(with control generations)"]
         GOV["Score schema version governance\n(today: ungoverned, frozen in practice)"]
-        RUST_CORE["Shared Rust drawing core\n(designed and ruled under a separate contract)"]
+        ANDROID_RUST["Android adoption of the shared Rust core\n(next portability boundary)"]
     end
     HELD["Held: moving request delivery upstream\n(implementation only after the investigation is ruled)"]
 
     MARK -.->|"measured numbers set the premise"| MIRROR
     P41 -->|"three options compared → ruling"| HELD
     RITUAL -.->|"measured layer attribution"| P41
-    PORT_BOUNDARY -.->|"boundary informs a separate design"| RUST_CORE
+    PORT_BOUNDARY --> RUST_CORE
+    RUST_CORE -.->|"portable core is ready"| ANDROID_RUST
 ```
 
 ## Done
@@ -44,12 +46,13 @@ flowchart TD
 - **No second ledger for the ritual** — the proposal to "draw thirty fixed pieces under fixed conditions and note signability with a layer attribution" turned out to be **the same thing as the existing thirty-piece benchmark**, whose procedure carries three rounds' worth of judgment rules learned from failures; rebuilding it would lose them. Nothing new was built: the layer-attribution tags (`sketch / interpret / expand / score / coerce / render`) were added to the existing evaluation procedure.
 - **The document complement** — the refinement re-entry diagram and the injection-point × rh3 table went into `ddl-processing-pipeline.md`, and the full decision-level road into `description-to-svg.md` (this document set, both languages at once).
 - **Drawing portability boundary 1** — `renderer.py` was contracted to the SVG-only compatibility entrypoint, while `default/mark_kernel.py` now owns deterministic geometry that returns only scalars and point collections. `marks.py` consumes the kernel in one direction and constructs SVG. Engine 40 bytes, the Score, seeds, and the API did not change.
+- **Drawing portability boundary 2** — Engine 41 moved planning, geometry, marks, surfaces, layers, SVG serialization, deterministic seed derivation, and performance metadata into the platform-independent `inku-render` Rust crate. The Server calls it through one coarse `inku-render-python` request, with no runtime fallback. The accepted Engine 41 corpus pins the current bytes; the Python Engine 40 implementation has been retired.
 
-## Considered under a separate contract — shared Rust drawing core
+## Completed under a separate contract — shared Rust drawing core
 
-The author's direction is to make the drawing core shareable in Rust for Android portability and a future iOS port. The current work stops at a Python portability boundary: no Rust crate, Scene IR or DTO, FFI, JNI, UniFFI, Swift binding, or Android/iOS integration exists yet.
+The Server now performs through the platform-independent `inku-render` Rust crate. A thin independent `inku-render-python` wheel carries one canonical JSON request and response across the Python boundary; the Server package keeps its `uv_build` backend. The Rust core has no Python, database, filesystem, network, or host-platform dependency, and no generic Scene IR was added ahead of a consumer need.
 
-The next contract must rule together which value boundary moves out of `mark_kernel.py`, how Score input and drawing output are represented, Python/Rust differential tests, bindings per platform, failure fallback, performance, and binary size. The existing 610-case corpus remains the identity evidence, and server semantics are not bent around port convenience.
+Android still performs through its existing Kotlin renderer, and no JNI, UniFFI, Swift binding, or Android/iOS application integration exists yet. Android adoption is the next portability boundary; iOS remains a future consumer. Those contracts must preserve the Engine 41 request/output semantics and measure performance and binary size without bending Server semantics around port convenience.
 
 ## Ahead 1 — the coerce mirror (investigation first)
 

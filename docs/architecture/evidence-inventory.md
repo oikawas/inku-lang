@@ -4,13 +4,13 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer and Web client boundaries refreshed 2026-08-24 |
-| Source branch / implementation commit | `main` / `1c835d0b` |
-| Source uncommitted changes | None at the implementation snapshot; this document synchronizes that snapshot |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer and Web client boundaries refreshed 2026-08-24; Engine 41 retirement boundary refreshed 2026-08-24 |
+| Source branch / implementation commit | `refactor/i368-retire-python-renderer` / Stage 6 branch tip (based on `2ea9f683c44d`) |
+| Source uncommitted changes | None at the Stage 6 implementation snapshot; merge is pending |
 | Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 975` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `975` |
-| Render Engine | implementation `default / 40` |
+| Render Engine | implementation `default / 41`; shared Rust core with a thin Python adapter |
 | DDL | `ddl_version=3`; `ddl_engine_version=20` |
 | Android | `android/VERSION` = `2.1.4-android.63`; implementation reports Render Engine `35` |
 
@@ -40,7 +40,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | PIPE-S15 | Stage 1.5 | Deterministic focus rewrite and explicit variation | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | Confirmed |
 | PIPE-S2 | Stage 2 | DDL to JSON Score through a schema tool | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | Confirmed |
 | PIPE-COERCE | Coerce/validation | Drop invalid values, deliver requests, enforce ceilings, and retain one explicitly named abstract color | `coerce/__init__.py`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | Confirmed |
-| PIPE-RENDER | Render Engine | JSON Score and seeds to SVG and performance metadata, with a one-way pure-geometry-to-SVG boundary | `render_engines/default/mark_kernel.py` (scalars and points); `render_engines/default/marks.py` (SVG emission); `render_engines/default/engine.py:render_result`; `renderer.py:render` (SVG-only compatibility facade) | §12.14, §13.8 | Confirmed |
+| PIPE-RENDER | Render Engine | JSON Score, seeds, and resolved host options to SVG and performance metadata through one coarse native boundary | `render_engines/default/adapter.py`; `inku-render-python`; `core/crates/inku-render`; `renderer.py:render` (SVG-only compatibility facade) | §12.14, §13.8 | Confirmed |
 | PIPE-HISTORY | History persistence | Store Server Paint outputs in the DB | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | Confirmed |
 | DATA-DH1 | `dh1` | Identity of a normalized description | `identity.py:description_hash` | Project Context | Confirmed |
 | DATA-RH3 | `rh3` | Edition identity from Score, render seed, Wild, engine, and color catalog | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context | Confirmed |
@@ -53,7 +53,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |
 | TEST-SERVER | Server checks | pytest, API surface, authorization, and route ownership | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context | Confirmed |
-| TEST-CORPUS | Frozen corpora | Rebuild and compare 610 Render Engine 40 cases and 49 DDL Engine 20 cases | `server/reference/render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | Confirmed |
+| TEST-CORPUS | Frozen corpora | Rebuild and compare 610 current Render Engine 41 cases and 49 DDL Engine 20 cases; retain the 610 Engine 40 cases as historical evidence only | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | Confirmed |
 | TEST-ANDROID | Android reference | Pin Server-version fixtures with manifests | `android/app/src/test/resources/server_reference/`; `test_android_reference_fixtures_are_current.py` | Android specification | Confirmed |
 | TEST-WEBCLI | Web/CLI checks | Svelte checks/unit/lint and CLI pytest | `web/package.json`; Web tests; `cli/tests/test_cli.py` | Project Context | Confirmed |
 | CI-GATES | Current CI | Server/CLI lint+pytest, Web check+unit+lint:i18n, document checks, corpus and Android design preview rebuild, and release-tag container build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `release.yml` | §11, §22 | Confirmed |

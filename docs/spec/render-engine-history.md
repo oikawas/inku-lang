@@ -58,7 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
-| **41** | pre-cutover migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
+| **41** | Rust migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
@@ -115,7 +115,7 @@ layers can carry a version, and this table draws that line.
 | **Stage 2 composition** | `composer.py` | **no** | 19 | none (`stage2_prompt_digest` records provenance only) |
 | **coerce / validation** | `coerce_score` | **yes** | 0 | `ddl_engine_version` |
 | JSON Score | `schema.py` | — | — | `version` (`"0.1.0"`, the schema version) |
-| **Renderer performance** | `renderer.py` / `stroke_engine.py` | **yes** (given a seed) | 0 | `render_engine_version` |
+| **Renderer performance** | `inku-render` through `default/adapter.py`; `renderer.py` is the SVG-only facade | **yes** (given seeds) | 0 | `render_engine_version` |
 | Output (SVG) | the saved work | — | — | `rh3` (work edition) |
 
 **The deterministic layers are not adjacent.** Stage 2's LLM sits between Stage 1.5
@@ -423,7 +423,7 @@ distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
 
-## engine 41 — migration baseline for moving the render core to Rust (pre-cutover)
+## engine 41 — migration baseline for moving the render core to Rust
 
 **Engine 41 is not a drawing-quality release; it is the migration baseline that moves Engine 40's
 performance into the shared Rust core.** Python and Rust differ in SVG number spelling, their choice
@@ -436,11 +436,13 @@ Before production cutover, focused gates found and repaired missed Engine 40 sem
 mottle, computer raster fills, tiny-fill dabs, and compat grain attributes. This restored the
 existing boundary; it was not a drawing improvement.
 
-At this freeze point, production `current_render_engine()` still selects Python Engine 40. A
-separate stage performs the Engine 41 production cutover and then proves that the normal generator
-recreates this frozen corpus byte-for-byte. **This version contains no intentional drawing
-improvement.** Improvements after the Engine 41 freeze belong to a separate contract and the next
-engine version.
+Production `current_render_engine()` now selects the thin adapter for Rust Engine 41, and the normal
+generator recreates the accepted Engine 41 corpus byte-for-byte. The Server installs an independently
+built and audited CPython native wheel; there is no runtime fallback to Engine 40. After cutover, the
+Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules were
+retired in a separate stage. Engine 40 remains in Git history and its frozen corpus remains historical
+evidence. **This version contains no intentional drawing improvement.** Improvements after the
+Engine 41 freeze belong to a separate contract and the next engine version.
 
 ## engine 40 — non-computer solid becomes a mottled base fill, not scan lines (v2.13.46)
 

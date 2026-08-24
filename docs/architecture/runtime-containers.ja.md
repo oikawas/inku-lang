@@ -9,6 +9,7 @@ flowchart TB
     BROWSER["Browser"]
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
+    NATIVE_RENDER["inku-render-python wheel\n共有Rust Engine 41 core"]
     STAGE_POOL["Stage executor / bounded queue"]
     SAVE_POOL["Artifact executor / bounded queue"]
     BACKUP_TASK["lifespan backup scheduler"]
@@ -20,6 +21,7 @@ flowchart TB
 
     BROWSER -->|"HTTP"| WEB_PROC
     WEB_PROC -->|"/api proxy"| API_PROC
+    API_PROC -->|"render request 1回"| NATIVE_RENDER
     API_PROC -->|"Stage 0.5/1/2 job"| STAGE_POOL
     STAGE_POOL -->|"provider call"| PROVIDERS
     API_PROC -->|"transaction"| DB
@@ -36,12 +38,14 @@ flowchart TB
 flowchart LR
     CLIENT["Client"]
     WEB_IMG["web service / Node image"]
-    API_IMG["api service / Python image"]
+    API_IMG["api service / Python image\nCPython native render wheel"]
+    WHEEL_BUILDER["一時的なpinned Rust / maturin builder"]
     DATA_VOL[("persistent data volume")]
     PROVIDER["LLM provider"]
 
     CLIENT -->|"HTTP"| WEB_IMG
     WEB_IMG -->|"internal API URL"| API_IMG
+    WHEEL_BUILDER -.->|"監査済みwheel artifact"| API_IMG
     API_IMG -->|"DB・outputs・backups・logs"| DATA_VOL
     API_IMG -->|"model request"| PROVIDER
 ```
@@ -51,7 +55,8 @@ flowchart LR
 | 観点 | 開発時 | Compose配布時 | 根拠 |
 |---|---|---|---|
 | Web | Vite/SvelteKit process、`/api`をbackendへproxy | adapter-node buildをNodeで実行 | `vite.config.ts`; `web/Dockerfile` |
-| API | `inku-server` / uvicorn | Python imageの`inku-server` | `server/pyproject.toml`; `server/Dockerfile` |
+| API | `inku-server` / uvicornとlocal buildしたnative render wheel | build済みCPython native wheelを持つPython imageの`inku-server` | `server/pyproject.toml`; `server/Dockerfile`; `core/crates/inku-render-python` |
+| native render artifact | pinned RustとmaturinがServer package backend外でwheelをbuild | 一時builderがwheelをbuild・監査し、runtime imageには受入済みwheelだけを入れてtoolchainを残さない | `rust-toolchain.toml`; `core/crates/inku-render-python/pyproject.toml`; `server/Dockerfile` |
 | DB | `INKU_DB_URL`、既定SQLite。PostgreSQL指定もコード上可能 | volume上のSQLiteを明示 | `db.py`; `server/Dockerfile` |
 | 永続化 | 環境ごとのDB・出力先 | 1 persistent volume配下 | Dockerfileと`compose.yaml` |
 | 配備 | 環境固有のため本書の対象外 | release tagでimage build/publish | `.github/workflows/release.yml` |
@@ -61,6 +66,7 @@ flowchart LR
 | 図要素 | Evidence ID | 実装 |
 |---|---|---|
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
+| native render境界 | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Stage/save pool | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
 | Backup/log | `SYS-BACKUP`, `SYS-LOG` | `api.py:_lifespan`, `db.py`, `logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

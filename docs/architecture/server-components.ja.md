@@ -62,14 +62,13 @@ flowchart LR
     COERCE["coerce/"]
     RENDERING["api_core/rendering.py"]
     REGISTRY["render_engines/__init__.py\ncurrent_render_engine()"]
+    HOST["render_engines/host.py / profiles.py / seeds.py\nhost所有のrequest準備"]
     DEFAULT_INIT["render_engines/default/__init__.py"]
-    ADAPTER["default/adapter.py\nDefaultRenderEngine"]
-    ENGINE["default/engine.py\ncanonical render_result()"]
-    DOMAINS["default orchestration domains\n`determinism.py` / `planning.py` / `palette.py` / `document.py`\n`layers.py` / `surfaces.py` / `dispatch.py`"]
-    MARKS["default/marks.py\nSVG mark emission"]
-    KERNEL["default/mark_kernel.py\npure deterministic geometry"]
+    ADAPTER["default/adapter.py\n薄い1-call native adapter"]
+    BINDING["inku-render-python\nCPython wheel境界"]
+    CORE["inku-render Rust core\nplanning / geometry / marks / SVG / metadata"]
+    REFERENCE["reference.py\n実装reference"]
     RENDERER["renderer.py\nSVG-only互換facade"]
-    STROKE["stroke_engine.py\n共有stroke処理"]
     DB["db.py"]
     ANALYSIS["shared/inku_analysis"]
 
@@ -83,23 +82,21 @@ flowchart LR
     COERCE --> SCHEMA
     RENDER_ROUTER --> RENDERING
     RENDERING --> REGISTRY
+    RENDERING --> HOST
     REGISTRY --> DEFAULT_INIT
     DEFAULT_INIT --> ADAPTER
-    ADAPTER --> ENGINE
-    ENGINE --> DOMAINS
-    DOMAINS --> MARKS
-    DOMAINS --> KERNEL
-    MARKS --> KERNEL
-    MARKS --> STROKE
-    KERNEL --> STROKE
-    RENDERER -->|"render() → render_result().svg"| ENGINE
+    ADAPTER --> HOST
+    ADAPTER --> BINDING
+    BINDING --> CORE
+    REFERENCE --> BINDING
+    RENDERER -->|"render() → current engine .svg"| REGISTRY
     RENDERING --> DB
     RENDERING -->|"PNG rasterize"| ANALYSIS
 ```
 
-正規経路は `api_core/rendering.py → render_engines` registry → `default` adapter → canonical `engine.render_result()` である。`renderer.py` はSVGだけを返す既存呼出し向けの互換facadeであり、`renderer.render()` はcanonical resultの `.svg` へ委譲する。repository-owned executable codeがfacadeから使う名前は `render` だけで、`api_core/rendering.py` はprofileとseedを正規所有moduleから直接読む。
+正規経路は `api_core/rendering.py → render_engines` registry → `default/adapter.py` → 独立した `inku-render-python` wheel → platform-independentな `inku-render` core である。adapterはhost所有のcanvas/profileを解決し、正規requestを1回serializeして、SVGとmetadataを1回のcallで受け取る。`renderer.py` はSVG-only互換facadeとして残り、同じregistryへ委譲する。
 
-`mark_kernel.py` はscalarと点列だけを返す決定的な幾何計算を所有し、SVG objectを作らない。`marks.py` はそのkernelを消費してSVGの属性とelementを組み立てる。この依存方向は将来の共有Rust coreを検討できる境界だが、現時点の実装はPythonだけである。
+Stage 6でPython Engine 40の統率、planning、mark、surface、layer、SVG emission、stroke moduleを削除した。`default/` に残るのはpackage exportと薄いRust adapterだけである。`/api/reference` も第二のPython実装をimportせず、renderer所有の表をnative coreから読む。Androidはまだ履歴上のKotlin rendererを使っており、このRust coreの採用は次のportability boundaryである。
 
 ## Router分類
 

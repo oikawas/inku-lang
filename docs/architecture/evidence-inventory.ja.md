@@ -4,13 +4,13 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer・Web client境界更新 2026-08-24 |
-| source branch / 実装commit | `main` / `1c835d0b` |
-| source未コミット変更 | 実装snapshot時はなし。本書がそのsnapshotへ同期する |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer・Web client境界更新 2026-08-24、Engine 41 retirement境界更新 2026-08-24 |
+| source branch / 実装commit | `refactor/i368-retire-python-renderer` / Stage 6 branch tip（`2ea9f683c44d`起点） |
+| source未コミット変更 | Stage 6実装snapshotではなし。merge待ち |
 | Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 975` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `975` |
-| Render Engine | 実装 `default` / `40` |
+| Render Engine | 実装 `default` / `41`、共有Rust coreと薄いPython adapter |
 | DDL | `ddl_version=3` / `ddl_engine_version=20` |
 | Android | `android/VERSION` = `2.1.4-android.63`、実装が名乗る Render Engine `35` |
 
@@ -40,7 +40,7 @@
 | PIPE-S15 | Stage 1.5 | 決定的な焦点書換えと明示変奏 | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | 確認済み | 公開可 |
 | PIPE-S2 | Stage 2 | DDLからJSON Score、schema tool利用 | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | 確認済み | 公開可 |
 | PIPE-COERCE | coerce/validation | 不正値drop、要求配達、天井、描画可能性確保 | `coerce/__init__.py:coerce_score`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | 確認済み | 公開可 |
-| PIPE-RENDER | Render Engine | ScoreとseedからSVGと描画metadata。pure geometryからSVG emissionへの一方向境界 | `render_engines/default/mark_kernel.py`（scalar・点列）; `render_engines/default/marks.py`（SVG emission）; `render_engines/default/engine.py:render_result`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
+| PIPE-RENDER | Render Engine | Score、seed、解決済みhost optionから、粗いnative 1-call境界を通してSVGと描画metadataを作る | `render_engines/default/adapter.py`; `inku-render-python`; `core/crates/inku-render`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
 | PIPE-HISTORY | 履歴保存 | `/api/paint`のserver生成物をDBへ保存 | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | 確認済み | 公開可 |
 | DATA-DH1 | `dh1` | 正規化した記述の同一性 | `identity.py:description_hash` | Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-RH3 | `rh3` | Score、render seed、wild、engine、色カタログによるedition同一性 | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context「設計契約」 | 確認済み | 公開可 |
@@ -53,7 +53,7 @@
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |
 | TEST-SERVER | Server検査 | pytest、API surface、認可、route所在 | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context「検査面」 | 確認済み | 公開可 |
-| TEST-CORPUS | 凍結コーパス | render 40の610件、DDL 20の49件を再生成照合 | `server/reference/render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
+| TEST-CORPUS | 凍結コーパス | 現行Render Engine 41の610件とDDL 20の49件を再生成照合し、Engine 40の610件は履歴根拠としてのみ保持 | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
 | TEST-ANDROID | Android参照 | server版ごとのfixtureをmanifest固定 | `android/app/src/test/resources/server_reference/`; `server/tests/test_android_reference_fixtures_are_current.py` | Android仕様メモ | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
 | CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、docs検査、corpus・Android design preview再生成、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `release.yml` | §11, §22 | 確認済み | 公開可 |

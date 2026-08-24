@@ -49,7 +49,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 
 | 版 | 製品版数 | Build | 凍結日 | ケース | 動いた | 不変 |
 |---|---|---|---|---|---|---|
-| **41** | 本番切替前の移行基準 | — | 2026-08-24 | 610 | **610** | **0** |
+| **41** | Rust移行基準 | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
 | **38** | v2.13.35 | 922 | 2026-08-17 | 606 | **9** | **597** |
@@ -105,7 +105,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 | **Stage 2 構成** | `composer.py` | **いいえ** | 19 箇所 | 版を持たない（`stage2_prompt_digest` で来歴のみ） |
 | **coerce / validation** | `coerce/` の `coerce_score`（`normalize` = Score だけを見る補修 / `compose` = `ddl` を読んで構図を書く） | **はい** | 0 | `ddl_engine_version` |
 | JSON Score | `schema.py` | — | — | `version`（`"0.1.0"`。Schema Version） |
-| **Renderer 演奏** | `renderer.py` / `stroke_engine.py` | **はい**（seed 固定時） | 0 | `render_engine_version` |
+| **Renderer 演奏** | `default/adapter.py`経由の`inku-render`。`renderer.py`はSVG-only facade | **はい**（seed固定時） | 0 | `render_engine_version` |
 | 出力（SVG） | 保存済み作品 | — | — | `rh3`（作品エディション） |
 
 **決定的な層は隣り合っていない。** Stage 1.5（DDL→DDL）と coerce（Score→Score）のあいだに
@@ -333,7 +333,7 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
 
-## engine 41 — 描画中核をRustへ移すための移行基準（本番切替前）
+## engine 41 — 描画中核をRustへ移すための移行基準
 
 **Engine 41は描画品質を変える版ではなく、Engine 40の演奏を共有Rust coreへ移すための移行基準である。**
 PythonとRustではSVGの数値表記、pathとpolylineの選択、要素のまとめ方が異なるため、610件すべてが
@@ -343,9 +343,11 @@ byte一致、Android arm64とiOS arm64のcore compile checkを通し、作者が
 本番切替前のfocused gateで見つかったsolid mottle、computer raster、微小fill dab、compat grain属性の
 移植漏れは再凍結前に修復した。これはEngine 40の既存意味の回復であり、描画改善ではない。
 
-この凍結時点では本番の`current_render_engine()`は引き続きPython Engine 40を指す。Engine 41への
-本番切替は別のStageで行い、切替後の通常generatorがこの凍結コーパスをbyte-identicalに再生成することを
-確認する。**この版には描画改善を含めない。** 改善はEngine 41の凍結後に別契約・次のengine版で扱う。
+本番の`current_render_engine()`は現在、Rust Engine 41の薄いadapterを選び、通常generatorが受入済み
+Engine 41 corpusをbyte-identicalに再生成する。Serverは独立build・監査したCPython native wheelを導入し、
+Engine 40へのruntime fallbackを持たない。本番切替後の別Stageで、Python Engine 40の統率、planning、mark、
+surface、layer、SVG emission、stroke moduleをretireした。Engine 40はGit historyに残り、凍結corpusは履歴根拠として
+残る。**この版には描画改善を含めない。** 改善はEngine 41の凍結後に別契約・次のengine版で扱う。
 
 ## engine 40 — non-computer の solid は走査線でなくむらを持つ base fill になる（v2.13.46）
 

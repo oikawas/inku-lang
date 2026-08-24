@@ -10,7 +10,7 @@
 | Plugin document | Core writing-down immediately after Stage 1 | `plugins/document_format.py`, render router | Plugin format/v2 tests | DDL `A-plugin-*` cases | CRUD/auth and reference dump |
 | Stage 1.5 | No semantic overwrite; focus; explicit variation | `ddl_expander.py`, language support | Expander, variation, staffage-fold tests | DDL Engine corpus | `check_frozen_corpora.py` |
 | Coerce | Drop/repair, request delivery, ceilings, one named abstract color | `coerce/normalize.py`, `compose.py`, `__init__.py` | Coerce, limit, relation, and named-color tests | DDL Engine corpus | `check_frozen_corpora.py` |
-| Renderer/strokes | Same Score+seed; forward-only engine; pure-kernel dependency direction | `default/mark_kernel.py` (scalars and points), `default/marks.py` (SVG emission), `renderer.py` compatibility facade, `stroke_engine.py` | Facade consumer census, kernel dependency gate, renderer contracts, platform stability | 610 Render Engine cases | Version bump; rebuild twice; Linux CI |
+| Render core/strokes | Same Score+seeds+resolved options; forward-only engine; one coarse native boundary | `core/crates/inku-render`; `inku-render-python`; `default/adapter.py`; `renderer.py` compatibility facade | Rust workspace tests, adapter/facade contracts, reference API, same-version platform sample | 610 current Engine 41 cases; Engine 40 retained as history | Version ruling; rebuild twice for output changes; pinned wheel and Linux CI |
 | Identity/history | `dh1`, `rh3`, legacy `rh2`, DB canonical data | `identity.py`, `db.py`, rendering/history router | Hash, integrity, lineage acceptance | Android parity fixtures | Migration and stored-row compatibility |
 | API route/model | 96 routes, three public paths, response shape | `api.py`, `api_core/*` | Route auth, module split, API baseline | None | Web/CLI/Android sender census |
 | Web route/workflow | One owner per route, no stale result applied to the current work, stateless Paint operation | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/run/current-work.ts`; `features/canvas/refinement-coordinator.svelte.ts` | Route-composition, current-work, and refinement ownership tests | None | Targeted unit tests, `npm run check`, and `npm run build` |
@@ -49,9 +49,9 @@ On ordinary pushes and pull requests, current workflows run the server suite (ru
 
 ## Special rule for deterministic layers
 
-`coerce/`, `ddl_expander.py`, `render_engines/default/`, `renderer.py`, `stroke_engine.py`, `schema.py`, `saijiki.py`, and `language_support/` are deterministic layers whose changes require rebuilding the corresponding frozen corpus. Reference tests that only compare stored files do not replace running the rebuild.
+`coerce/`, `ddl_expander.py`, `core/crates/inku-render/`, the native request boundary, `render_engines/default/`, `renderer.py`, `schema.py`, `saijiki.py`, and `language_support/` are deterministic layers. A change that can affect Render Engine output requires rebuilding the current frozen corpus; reference tests that only compare stored files do not replace the rebuild. A host-only change proven not to alter the native request or output uses proportionate direct checks and a bounded same-version byte sample.
 
-For `mark_kernel.py`, the no-SVG dependency gate and ownership tests do not by themselves prove drawing identity. Run the direct tests and rebuild the Render Engine corpus so the one-way dependency from `marks.py` into the kernel and byte identity are checked together.
+Rust unit and ownership tests do not by themselves prove drawing identity. Run the direct tests and rebuild the Render Engine corpus for output-affecting core changes so portable algorithm behavior and serialized byte identity are checked together. Native-binding changes also require a pinned wheel build, import and engine-identity checks, and the relevant Linux runtime gate.
 
 ## Evidence map
 

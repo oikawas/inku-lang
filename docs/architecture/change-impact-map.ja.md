@@ -10,7 +10,7 @@
 | plugin文書 | Stage 1直後のcore writing-down | `plugins/document_format.py`, router | plugin format/v2 tests | DDL corpus `A-plugin-*` | plugin CRUD/auth、reference dump |
 | Stage 1.5 | 意味非上書き、焦点、明示変奏 | `ddl_expander.py`, language support | expander、variation、staffage fold tests | DDL engine corpus | `check_frozen_corpora.py` |
 | coerce | drop/repair、要求配達、hard ceiling、単一の名指し抽象色 | `coerce/normalize.py`, `coerce/compose.py`, `coerce/__init__.py` | composer/coerce/limits/relation tests | DDL engine corpus | `check_frozen_corpora.py` |
-| renderer/stroke | 同一Score+seed、engine前進、pure kernel依存方向 | `default/mark_kernel.py`（scalar・点列）、`default/marks.py`（SVG emission）、`renderer.py`互換facade、`stroke_engine.py` | facade consumer census、kernel依存gate、renderer各契約、platform stability | Render Engine corpus 610件 | version bump、再生成2回、Linux CI |
+| render core/stroke | 同一Score+seed+解決済みoption、engine前進、粗いnative 1-call境界 | `core/crates/inku-render`; `inku-render-python`; `default/adapter.py`; `renderer.py`互換facade | Rust workspace test、adapter/facade契約、reference API、same-version platform sample | 現行Engine 41の610件、Engine 40は履歴保持 | version裁定、出力変更時2回再生成、pinned wheelとLinux CI |
 | identity/history | `dh1`, `rh3`, legacy `rh2`, DB正本 | `identity.py`, `db.py`, rendering/history router | hash、integrity、lineage acceptance | Android parity fixtures | migrationと既存row互換 |
 | API route/model | 96 route、公開3、response shape | `api.py`, `api_core/*` | route auth、module split、API surface baseline | なし | Web/CLI/Android sender census |
 | Web route/workflow | ownerはrouteごとに1個、stale resultを現作品へ適用しない、stateless Paint operation | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/run/current-work.ts`; `features/canvas/refinement-coordinator.svelte.ts` | route composition、current-work、refinement ownership test | なし | targeted unit、`npm run check`、`npm run build` |
@@ -49,9 +49,9 @@ flowchart LR
 
 ## 決定的層の特別規則
 
-`coerce/`、`ddl_expander.py`、`render_engines/default/`、`renderer.py`、`stroke_engine.py`、`schema.py`、`saijiki.py`、`language_support/` は決定的層であり、変更時に対応する凍結corpusの再生成が必要である。pytestのreference testは凍結fileとmanifestを読むだけの部分があり、generator再実行の代用にならない。
+`coerce/`、`ddl_expander.py`、`core/crates/inku-render/`、native request境界、`render_engines/default/`、`renderer.py`、`schema.py`、`saijiki.py`、`language_support/` は決定的層である。Render Engine出力へ影響しうる変更では現行凍結corpusを再生成する。pytestのreference testは凍結fileとmanifestを読むだけの部分があり、generator再実行の代用にならない。native request/outputを変えないと証明したhost-only変更は、比例した直接検査とbounded same-version byte sampleを使う。
 
-`mark_kernel.py` の変更は、SVG objectを持ち込まない依存gateと所有権testだけでは描画同一性を証明しない。直接testに加えてRender Engine corpusを再生成し、`marks.py` からkernelへの一方向依存とbyte identityを同時に確認する。
+Rustのunit/ownership testだけでは描画同一性を証明しない。出力へ影響するcore変更では直接testに加えてRender Engine corpusを再生成し、portable algorithmとserialize後のbyte identityを同時に確認する。native binding変更ではさらに、pinned wheel build、import、engine identity、該当Linux runtime gateを行う。
 
 ## 根拠対応
 

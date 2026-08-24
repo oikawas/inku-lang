@@ -28,7 +28,7 @@ flowchart TD
     AR{"auto_repair?"}
     COERCE["coerce（配達・統治・天井）"]
     MERGE["plugin転写instructionの合流"]
-    RENDER["Render Engine 演奏\nadapter → engine → kernel / SVG emission"]
+    RENDER["Render Engine 演奏\nPython adapter → native wheel → Rust core"]
     HASH["dh1 / rh3 の計算"]
     SAVE{"save_history?"}
     ROW["履歴row + lineage node/edge\n（1 transaction）"]
@@ -130,7 +130,7 @@ LLMを呼ばない。焦点の書き換えだけを行い、新しい文を足�
 
 ## 演奏 — Render Engine
 
-確定したScoreと、`render_seed`・`wild`・色カタログの写像・`canvas`（Scoreの中）から、registryが選ぶ `render_engines/default/adapter.py` を介してcanonical `render_engines/default/engine.py`が描画を統率する。幾何計算は `mark_kernel.py` がscalarと点列だけを返し、`marks.py` がそれを一方向に消費してSVGの属性とelementを組み立てる。SVGと演奏metadataはこの正規経路から一緒に返る。`renderer.py` は正規経路の所有moduleではなく、既存のSVG-only呼出しを `engine.render_result().svg` へ委譲する互換facadeである。詳細なmodule依存図は `server-components.ja.md` が持つ。**同じScore・同じrender seed・同じ描画条件は同じ作品を再現する** — これが凍結corpusが守る契約である。過去のengineを選び直すAPIは無く、履歴のdisplay SVGは保存済みを返す。
+確定したScoreと、`render_seed`・`composition_seed`・`wild`・解決済みcolor map・profile・canvasから、registryが選ぶ `render_engines/default/adapter.py` が1個の正規JSON requestを作る。独立した `inku-render-python` wheelはそのrequestをplatform-independentな `inku-render` coreへ渡し、Rust側がplanning、geometry、mark/surface/layer構築、SVG serialize、演奏metadataを所有する。Python/Rust間を細かく往復せず、adapterはSVGとmetadataを一緒に返す。`renderer.py` はSVG-only互換facadeで、同じregistryへ委譲する。詳細なmodule依存図は `server-components.ja.md` が持つ。**同じScore・seed・描画条件は同じ作品を再現する** — Engine 41 corpusがこの契約を守る。runtime fallbackや過去engine selectorは無く、履歴のdisplay SVGは保存済みを返す。
 
 ## 同一性と保存
 

@@ -28,7 +28,7 @@ from inku_server.api import app
 from inku_server.coerce import coerce_score
 from inku_server.interpreter import SYSTEM_PROMPT_PREFIX, SYSTEM_PROMPT_PREFIX_EN
 from inku_server.reference import build_reference
-from inku_server.render_engines.default.document import build_texture_metadata
+from inku_server.render_engines import current_render_engine
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -422,7 +422,7 @@ def test_texture_metadata_omits_a_surface_on_a_line() -> None:
             ],
         }
     )
-    metadata = build_texture_metadata(score, svg_profile="display")
+    metadata = current_render_engine().render(score, svg_profile="display").metadata
     reported = metadata["render_surface_textures"]
     assert [entry["texture"] for entry in reported] == ["hatch"]
     assert [entry["instruction_index"] for entry in reported] == [1]
@@ -430,6 +430,6 @@ def test_texture_metadata_omits_a_surface_on_a_line() -> None:
     # And with nothing drawable left, the key is absent rather than empty --
     # which is also what `texture_degraded` reads to decide.
     only_a_line = score.model_copy(update={"instructions": score.instructions[:1]})
-    bare = build_texture_metadata(only_a_line, svg_profile="compat")
+    bare = current_render_engine().render(only_a_line, svg_profile="compat").metadata
     assert "render_surface_textures" not in bare
     assert bare["texture_degraded"] is False

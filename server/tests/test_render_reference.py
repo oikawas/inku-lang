@@ -8,7 +8,7 @@ import pathlib
 import re
 
 from inku_server.master_grid import MASTER_GRID_DECIMALS
-from inku_server.render_engines import DEFAULT_RENDER_ENGINE, current_render_engine
+from inku_server.render_engines import current_render_engine
 from inku_server.schema import (
     Arrangement,
     CanvasGroundSpec,
@@ -22,8 +22,8 @@ GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 ENGINE_VERSION = current_render_engine().version
 CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{ENGINE_VERSION}"
 MANIFEST_PATH = CORPUS_DIR / "manifest.json"
-# 帰属の主張は版に紐づく。「そのとき何が動いたか」を後の版の manifest で読むと、
-# 主張の対象が黙って入れ替わる。
+# Attribution claims belong to a version. Reading them from a later manifest
+# silently changes what the claim describes.
 ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
 ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.json"
 ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.json"
@@ -109,7 +109,7 @@ def test_render_reference_case_counts() -> None:
     # sheet under `brush_thick` (drunk) and `chalk` (refused), two put a mark
     # word on a line, and one is the combination where the ceiling binds.
     # Engine 38 added nine to C, in two groups that must stay countable apart.
-    # Four put 薄墨 on an open shape: the two drawing paths a line has
+    # Four put wash on an open shape: the two drawing paths a line has
     # (`brush_thin` performs a band, `rotring` is an SVG `<line>` written from
     # `_stroke_attrs`), an arc, which is a third function again, and a closed
     # control. Not one of the 597 cases above carried a wash on an open shape,
@@ -165,16 +165,14 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
 
 
 def test_render_reference_keeps_the_display_profile_covered() -> None:
-    """本番既定の `display` を通るケースが消えないように数で留める。
+    """Keep a counted set of cases on the production-default `display` profile.
 
-    engine 15 までコーパスは 100% `editable` で、作者が見ている経路 (フィルタ・
-    clip) を 1 件も実行していなかった。
-
-    engine 38 で 5 件足した。**`display` を通ることと、フィルタが書かれることは
-    別である** —— 最初の 4 件は 4 件とも `pen` で、`pen` は `TEXTURE_SPECS` に無い。
-    焼かれた 597 件のうち `filter="url(#texture-` を持つものは 0 本だった
-    (2026-08-17 実測・[I-289])。**この一覧は「profile が display である」しか
-    測っていない**ので、フィルタが実際に書かれたことは T-177 が別に測る。
+    Through Engine 15 the corpus was entirely `editable`, so none of the filter
+    or clip paths seen by the author ran. Engine 38 added five cases. Reaching
+    `display` is distinct from writing a filter: the first four cases use `pen`,
+    which is absent from `TEXTURE_SPECS`. Of 597 frozen SVGs, none contained
+    `filter="url(#texture-` in the 2026-08-17 I-289 measurement. This list measures
+    only the profile; T-177 separately proves that filters are emitted.
     """
     cases = _generator().build_inputs()
     display = sorted(
@@ -198,7 +196,7 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
 def test_engine_18_moves_only_the_catalog_dependent_cases() -> None:
     """The unchanged side states that six-key legacy rendering did not move.
 
-    engine 18 についての主張なので、engine 18 の manifest を読む。
+    This is an Engine 18 claim, so it reads the Engine 18 manifest.
     """
     manifest = json.loads(ENGINE_18_MANIFEST.read_text(encoding="utf-8"))
     changed = set(manifest["changed_from_previous"])
@@ -220,14 +218,12 @@ def test_engine_18_moves_only_the_catalog_dependent_cases() -> None:
 
 
 def test_engine_19_moves_the_tools_the_sheet_meets_and_no_others() -> None:
-    """engine 19 が動かした 227 件の帰属。
+    """Attribute the 227 cases moved by Engine 19.
 
-    地の抵抗は道具の性質なので、動いた / 動かないの境目は道具にある。
-    機械 (rotring / computer) が 1 件でも入っていたら、抵抗が道具でなく
-    全体にかかる効果になっている。
-
-    engine 19 についての主張なので、engine 19 の manifest を読む。現行版を
-    読むと、engine 20 で「動いた 32 件」へ主張の対象が黙って入れ替わる。
+    Ground resistance is a tool property, so the moved/unchanged boundary follows
+    tools. If any machine-only case moved, resistance became a whole-work effect.
+    This is an Engine 19 claim and reads that manifest; reading the current one
+    would silently replace it with Engine 20's set of 32 moved cases.
     """
     manifest = json.loads(ENGINE_19_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "19"
@@ -250,9 +246,9 @@ def test_engine_19_moves_the_tools_the_sheet_meets_and_no_others() -> None:
     assert machines_only, "機械だけのケースが無ければ、下の主張は恒真である"
     assert not (changed & machines_only)
 
-    # 対照。到着は疎なので、動かない手の道具のケースもある (brush 全体では
-    # 72/86)。1 件残らず動く群を対照に置く — 細筆だけの 16 件と crayon だけの
-    # 30 件。ここが 1 件でも欠けたら、機械が動かないことは何も言っていない。
+    # Arrival is sparse, so some hand-tool cases remain unchanged (72 of 86 brush
+    # cases move). Use complete control groups: all 16 brush_thin-only cases and
+    # all 30 crayon-only cases. A missing member would make the machine claim weak.
     for group, expected in (({"brush_thin"}, 16), ({"crayon"}, 30)):
         only = {
             case_id
@@ -276,16 +272,15 @@ ENGINE_32_NEW_CASES = {
 
 
 def test_engine_32_moves_only_its_own_new_cluster_and_path_cases() -> None:
-    """engine 32 が動かしたのは、自分が足した 13 件だけである。
+    """Engine 32 moved only the thirteen cases it added.
 
-    engine 32 は正方形では恒等なので、既存 569 件は 1 件も動かないのが正しい。
-    ⚠ したがって「差分が空でないこと」は主張の材料にならない —— 新規 ID は
-    すべて changed に数えられる (生成器の `case_id not in before`)。動く 9 件と
-    対照 4 件を manifest から見分けることはできず、判別力は摂動でしか示せない。
-    ここで測るのは「動いたのが新規 13 件と一致すること」だけ。
+    Engine 32 is an identity on square canvases, so all 569 existing cases should
+    remain byte-identical. A non-empty diff proves nothing because every new ID is
+    counted as changed (`case_id not in before`). The manifest cannot distinguish
+    nine moving cases from four controls; perturbation supplies that power. This
+    check only proves that the moved set equals the thirteen new cases.
 
-    ⚠ engine 32 の manifest を読む。現在版の manifest を読むと、engine 33 を
-    焼いた日に主張の対象が黙って engine 33 の差分へ入れ替わる。
+    It reads the Engine 32 manifest so Engine 33 cannot silently replace the claim.
     """
     manifest = json.loads(ENGINE_32_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "32"
@@ -294,14 +289,13 @@ def test_engine_32_moves_only_its_own_new_cluster_and_path_cases() -> None:
 
 
 def test_engine_33_moves_only_its_own_composite_cases() -> None:
-    """engine 33 が動かしたのは、自分が足した 4 件だけである。
+    """Engine 33 moved only the four composite cases it added.
 
-    語彙が増えた版なので、既存 582 件はバイト一致するのが正しい —— `group_size`
-    は 1 のとき直列化から外れるので、前の版の入力は 1 件も形が変わらない。
-    ⚠ 新規 ID はすべて changed に数えられるため、判別力は摂動でしか示せない。
+    This version added vocabulary, so the existing 582 cases must stay identical.
+    `group_size=1` is omitted from serialization, leaving every prior input intact.
+    New IDs always count as changed, so perturbation supplies discrimination.
 
-    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
-    いる実装ではなく別の実装の記録になる。
+    Version agreement is checked here so the manifest records the running engine.
     """
     manifest = json.loads(ENGINE_33_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "33"
@@ -322,8 +316,8 @@ def test_engine_33_moves_only_its_own_composite_cases() -> None:
     assert carried == 582
 
 
-# 地の 13 件。うち 2 件は新規 ID で、11 件は素材を持つ既存 case である。
-# `C-ground-plain` はここに入らない —— 地を頼まないことは地ではない。
+# Thirteen ground cases: two new IDs and eleven existing cases with material.
+# `C-ground-plain` is excluded because asking for no ground is not a ground.
 ENGINE_34_GROUND_CASES = {
     "C-ground-canvas",
     "C-ground-charcoal_ground",
@@ -342,19 +336,17 @@ ENGINE_34_GROUND_CASES = {
 
 
 def test_engine_34_moves_only_the_ground_cases() -> None:
-    """engine 34 が動かしたのは、地を持つ 13 件だけである。
+    """Engine 34 moved only the thirteen cases that carry a ground.
 
-    地の機構を profile ごとの作り分けから `<pattern>` へ入れ替えた版なので、
-    **地を持たない 575 件はバイト一致するのが正しい**。1 件でも動いていたら、
-    地の層以外へ手が伸びている。
+    It replaced profile-specific ground construction with `<pattern>`, so the 575
+    cases without a ground must remain byte-identical. Any movement there reaches
+    outside the ground layer.
 
-    ⚠ `C-ground-plain` が **changed に入っていないこと**が、この版の主張の片方で
-    ある —— 素材が `plain` の Score には地の層そのものが出ない。新規 ID は
-    すべて changed に数えられるので、判別力を持つのは残りの 11 件と、
-    動かなかった 575 件のほうである。
+    `C-ground-plain` must not be changed because a `plain` Score emits no ground
+    layer. New IDs always count as changed, leaving the other eleven cases and the
+    575 unchanged cases as the discriminating evidence.
 
-    ⚠ engine 35 が出たので、物差しは現行 manifest から engine 34 の凍結 manifest へ
-    移した（engine 33 の検査と同じ形）。版の一致は engine 35 の検査が見る。
+    The yardstick is Engine 34's frozen manifest; Engine 35 checks version agreement.
     """
     manifest = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "34"
@@ -371,11 +363,10 @@ def test_engine_34_moves_only_the_ground_cases() -> None:
     assert carried == 575
 
 
-# 平行線・交差線を持つ 9 件。**case 名ではなく
-# `input.score.instructions[].surface.texture` で数えた** —— 名前で数えると
-# `C-ground-ink_wash` `C-ground-washi` `C-groundseed-auto-washi` が `wash` に
-# 混ざり、薄墨の 6 件が 8 件に見える。9 件とも `square` で、9 件とも
-# `spacing_gradient` は `none` である (2026-08-15 実測)。
+# Nine hatch/crosshatch cases, counted by
+# `input.score.instructions[].surface.texture`, not by case name. Name matching
+# mixes three ground cases into wash and makes six wash cases look like eight.
+# All nine use `square` and `spacing_gradient=none` (measured 2026-08-15).
 ENGINE_35_HATCH_CASES = {
     "C-display-surface-hatch-pen",
     "C-surface-hatch-pen",
@@ -436,15 +427,15 @@ def test_engine_35_moves_only_the_hatch_cases() -> None:
 
 
 def test_engine_35_hatch_cases_match_the_current_renderer() -> None:
-    """動いた 9 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+    """Redraw the nine moved cases with the live renderer, not frozen records.
 
-    **⚠ 上の検査は manifest どうしの比較で、1 バイトも描き直さない。** 実測で
-    確かめた —— ハッチの描画を壊す摂動 7 本 (P-1〜P-7) を当てても、上の検査は
-    1 本も赤くならなかった。**あれは焼き直される記録であって、renderer の検査では
-    ない。** ここが「この版の 9 件は、いまの木が描くものと同じである」を測る。
+    The preceding checks compare manifests and render no byte. Seven hatch-breaking
+    perturbations (P-1 through P-7) left all of them green: they inspect a record
+    that can be rebaked, not the renderer. This check proves that the nine cases
+    still match the current engine.
 
-    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
-    やめた日にこの検査だけが古い呼び方で緑になる。
+    Rendering goes through the generator's own call so its argument contract cannot
+    change while this test remains green on a copied old invocation.
     """
     generator = _generator()
     manifest = _manifest()
@@ -582,8 +573,8 @@ def test_engine_37_moves_only_the_sheet_cases() -> None:
     Everything outside the ground is right to be byte-identical: a work that
     names no ground keeps `DEFAULT_SUPPORT`, and `paper` restates it.
 
-    ⚠ engine 37 の manifest を読む。engine 38 を焼いた日に、現在版の manifest を
-    読むこの検査は主張の対象が黙って engine 38 の差分へ入れ替わっていた。
+    This reads the Engine 37 manifest. Reading the current manifest silently
+    replaced the claim with the Engine 38 diff when that version was frozen.
     """
     manifest = json.loads(ENGINE_37_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "37"
@@ -627,7 +618,7 @@ def test_engine_37_sheet_cases_match_the_current_renderer() -> None:
 
 ENGINE_38_WASH_CASES = frozenset(
     {
-        # New: 薄墨 on the three drawing paths an open shape has.
+        # New: wash on the three drawing paths an open shape has.
         "C-wash-line-brush_thin",
         "C-wash-line-rotring",
         "C-wash-arc-pencil",
@@ -650,15 +641,15 @@ def test_engine_38_moves_only_its_own_new_cases() -> None:
     """Engine 38 moved the nine it added and not one case that was here.
 
     **Byte-identity of the other 597 is the claim, not a gap.** The version
-    widens and pales a mark whose 面 says 薄墨, and 薄墨 sat on an open shape in
+    widens and pales a mark whose surface says wash, and wash sat on an open shape in
     exactly zero of the cases frozen before it -- the three open-shape surfaces
-    in the corpus are engine 37's 粒 and にじみ, which this version decides by
+    in the corpus are Engine 37's grain and bleed, which this version decides by
     word and leaves alone. So a diff of anything but the nine would be this
     version reaching a mark nobody described that way.
 
-    ⚠ 新規 ID はすべて `changed_from_previous` に数えられる (生成器の
-    `case_id not in before`)。ここで測るのは「動いたのが新規 9 件と一致すること」
-    だけで、その 9 件が何を描いているかの判別力は摂動が持つ。
+    Every new ID counts in `changed_from_previous` through the generator's
+    `case_id not in before` rule. This check only proves that the moved set equals
+    the nine new cases; perturbation proves what those cases actually exercise.
     """
     manifest = json.loads(ENGINE_38_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "38"
@@ -683,7 +674,7 @@ def test_engine_38_new_cases_match_the_current_renderer() -> None:
 
     **⚠ The test above compares manifest against manifest and redraws not one
     byte**, the same way engines 35, 36 and 37 found out. This is the only
-    place that traverses 薄墨 on an open shape at all: of the other live
+    place that traverses wash on an open shape at all: of the other live
     redraws in this file, group G, group F and engine 32 hold no surface on an
     open shape, and engines 35, 36 and 37 hold no wash on one.
 
@@ -756,7 +747,7 @@ ENGINE_40_SOLID_PROFILE_CASES = frozenset(
 def test_engine_40_moves_only_the_solid_profile_cases() -> None:
     """Engine 40 adds four solid-profile cases and preserves all 606 prior cases."""
     manifest = json.loads(ENGINE_40_MANIFEST.read_text(encoding="utf-8"))
-    assert manifest["engine_version"] == "40" == DEFAULT_RENDER_ENGINE.version
+    assert manifest["engine_version"] == "40"
     assert set(manifest["changed_from_previous"]) == ENGINE_40_SOLID_PROFILE_CASES
     previous = json.loads(ENGINE_39_MANIFEST.read_text(encoding="utf-8"))["cases"]
     carried = 0
@@ -768,19 +759,6 @@ def test_engine_40_moves_only_the_solid_profile_cases() -> None:
         assert case["digest"] == previous[case_id]["digest"], case_id
         carried += 1
     assert carried == 606
-
-
-def test_engine_40_solid_profile_cases_match_the_python_engine() -> None:
-    """The four Engine 40 records remain tied to their Python implementation."""
-    generator = _generator()
-    manifest = json.loads(ENGINE_40_MANIFEST.read_text(encoding="utf-8"))
-    inputs = generator.build_inputs()
-    checked = 0
-    for case_id in sorted(ENGINE_40_SOLID_PROFILE_CASES):
-        svg = generator.render_case(inputs[case_id], engine=DEFAULT_RENDER_ENGINE)
-        assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
-        checked += 1
-    assert checked == 4
 
 
 def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> None:
@@ -801,12 +779,11 @@ def test_engine_37_records_a_sheet_the_paper_and_the_canvas_do_not_share() -> No
 
 
 def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:
-    """動いた 9 件でも、間隔は 1 つも動いていない。
+    """None of the nine moved cases changed hatch spacing.
 
-    作者の裁定 3 は「図形の中に収めたとき、線の引き方は規則的なまま残す」で
-    ある。**間隔の値は `hatch-spacing-*` として class に出るので、裁定は
-    コーパスからも読める** —— digest が動いたことと、間隔が動いたことは別の
-    量である。`C-surface-hatch-pen` は起点 `189fedc7` でも 21.250 だった。
+    Author ruling 3 keeps line-making regular when clipped inside a shape. Spacing
+    is exposed as a `hatch-spacing-*` class, so the corpus can verify it separately
+    from digest movement. `C-surface-hatch-pen` was already 21.250 at `189fedc7`.
     """
     manifest = _manifest()
     previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
@@ -830,15 +807,14 @@ def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:
 
 
 def test_engine_32_cases_match_the_current_renderer() -> None:
-    """新しい 13 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+    """Redraw the thirteen new cases with the live renderer, not frozen records.
 
-    このファイルの他の検査は凍結 SVG と凍結 manifest を比べるので、`_path_pos`
-    や `_clustered_pos` を壊しても全部緑のままになる。群 G を生描きする検査が
-    同じ理由で置かれているが、G は全件 square なので engine 32 の規則を 1 つも
-    通らない。非正方形を通る生描きはここにしかない。
+    Other checks compare frozen SVGs with manifests and stay green if `_path_pos`
+    or `_clustered_pos` breaks. The live group-G check also uses only square cases
+    and reaches none of Engine 32's rules. This is the sole live non-square route.
 
-    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
-    やめた日にこの検査だけが古い呼び方で緑になる。
+    Rendering goes through the generator's own call so its argument contract cannot
+    change while this test remains green on a copied old invocation.
     """
     generator = _generator()
     manifest = _manifest()
@@ -943,29 +919,29 @@ def test_render_reference_discriminator_cases() -> None:
         assert high["input"]["render_seed"] > 2**63
         assert high["digest"] != ordinary["digest"]
 
-    # engine 16 段 2。engine 15 では「走査線で埋めていない」としか言えなかったが
-    # (縮退先が領域 fill だったので class が出なかった)、いまは打点であることまで
-    # 言える。境界の上側は走査のままであることと対にして留める。
+    # Engine 16 stage 2 made the tiny case explicitly a dab; Engine 15 could only
+    # show that it was not scan-filled because the area-fill fallback had no class.
+    # Keep this paired with the scan behavior above the boundary.
     tiny = cases["D-size-tiny-filled-circle"]
     assert not any("fill-stroke-v1" in name for name in tiny["classes"])
     assert "fill-dab-v1" in tiny["classes"]
     boundary = cases["C-tinyfill-boundary-pen"]
-    # engine 22: pen は被覆 0.167 でテクスチャ枝へ移った。境界が見ているのは
-    # 「打点ではない = 面として塗られている」ことなので、枝はどちらでもよい。
+    # Engine 22 moved pen at coverage 0.167 to the texture branch. This boundary
+    # checks only that it is area-filled rather than dabbed, so either branch is valid.
     assert any(
         name.startswith(("fill-stroke-v1", "fill-texture-v1"))
         for name in boundary["classes"]
     )
     assert "fill-dab-v1" not in boundary["classes"]
-    # 機械の極は大きさに依らず領域 fill のまま (class を 1 つも出さない)。
+    # The machine extreme remains an area fill at every size and emits no class.
     assert cases["C-tinyfill-circle-rotring"]["classes"] == []
 
-    # engine 16 段 1。本番既定の display が筆致を通ること。
+    # Engine 16 stage 1: the production-default display profile reaches brushwork.
     display = cases["C-display-surface-wash-pen"]
     assert any("surface-stroke-v1" in name.split() for name in display["classes"])
 
-    # engine 16 段 3。太さは絵を変えるが、銀筆は下限にいるので幅が変わらない
-    # (それでも演奏 seed には入っているので手は変わる = C-7 の帰結)。
+    # Engine 16 stage 3: thinness changes the drawing, but silverpoint is already
+    # at the width floor. It still enters the performance seed, so the hand changes.
     thin = {
         key: cases[f"C-thinness-{key}"]
         for key in (
@@ -977,10 +953,10 @@ def test_render_reference_discriminator_cases() -> None:
 
 
 def _resolve_svg(case_id: str) -> pathlib.Path:
-    """ケースの実物を、最後にそれが動いた版まで遡って探す。
+    """Find a case body by walking back to the last version that moved it.
 
-    動かなかったケースの SVG は現在の版のディレクトリには無い。前の版のものが
-    そのまま最新であり、それを辿れることがこの構造の要点である (SPEC §15.7)。
+    An unchanged case has no SVG in the current version directory; the prior body
+    remains current. Being able to follow that chain is the point of SPEC §15.7.
     """
     reference_root = MANIFEST_PATH.parent.parent
     versions = sorted(
@@ -1006,10 +982,10 @@ def test_render_reference_svg_files_match_manifest() -> None:
 
 
 def test_corpus_bodies_match_the_changed_case_set() -> None:
-    """変わらなかったケースは本文を持たず、前の版の実物がそのまま最新である。
+    """Unchanged cases have no body; the prior version's body remains current.
 
-    版のディレクトリに並ぶファイルが「その版が何を動かしたか」を意味するための
-    条件。全件を書き写すと、この一覧が意味を失う。
+    This makes files in a version directory mean exactly what that version moved.
+    Copying every case into every version would erase that meaning.
     """
     manifest = _manifest()
     changed = set(manifest["changed_from_previous"])

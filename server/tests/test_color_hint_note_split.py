@@ -11,11 +11,7 @@ import pytest
 
 from inku_server import composer
 from inku_server.coerce import coerce_score
-from inku_server.render_engines.default.determinism import _seed_for_instruction
-from inku_server.render_engines.default.palette import (
-    COLOR_MAP,
-    _resolve_color,
-)
+from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
 
@@ -191,9 +187,10 @@ def test_word_boundary_stops_restored_from_selecting_red_without_moving_the_seed
         }
     )
 
-    assert _resolve_color(before.color, before.color_hint, COLOR_MAP) == COLOR_MAP["gray"]
-    assert _resolve_color(after.color, after.color_hint, COLOR_MAP) == COLOR_MAP["gray"]
-    assert _seed_for_instruction(before, 4242) == _seed_for_instruction(after, 4242)
+    before_svg = render(Score(instructions=[before]), render_seed=4242)
+    after_svg = render(Score(instructions=[after]), render_seed=4242)
+    assert before_svg == after_svg
+    assert "#a2342a" not in after_svg
 
 
 def test_the_57_write_sites_remain_split_by_role() -> None:

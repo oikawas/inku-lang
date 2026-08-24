@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 import pytest
 from pydantic import ValidationError
 
@@ -15,8 +13,6 @@ from inku_server.plugins.document_format import (
     validate_plugin_document,
 )
 from inku_server.schema import Score
-from inku_server.plugins.system import canvas_aspect
-from inku_server.render_engines.default import planning
 
 
 def _pair_plugin(count: int = 3) -> str:
@@ -122,36 +118,6 @@ def test_t2_pair_member_is_two_instructions_with_one_composite_arrangement() -> 
     assert arrangement["count"] == 3
     assert arrangement["group_size"] == 2
     assert result.score_instructions[1]["relation"] == {"type": "touching"}
-
-
-def test_t3_composite_expands_before_each_local_touching_relation() -> None:
-    score = _composite_score()
-    resolved = planning._resolve_performance_score(
-        score,
-        performance_seed=17,
-        composition_seed=23,
-        canvas=canvas_aspect.canvas_size_for_aspect("square"),
-    )
-
-    assert len(resolved.instructions) == 6
-    for index in range(0, 6, 2):
-        first = planning._canvas_endpoint_geometry(
-            resolved.instructions[index], 17, index
-        )
-        second = planning._canvas_endpoint_geometry(
-            resolved.instructions[index + 1], 17, index + 1
-        )
-        assert first is not None and second is not None
-        assert second[0] == pytest.approx(first[0])
-        assert second[1] == pytest.approx(first[1])
-
-    svg = renderer.render(
-        score,
-        render_seed=17,
-        composition_seed=23,
-        svg_profile="editable",
-    )
-    assert len(re.findall(r'id="mark_\d{3}_000_arc"', svg)) == 6
 
 
 def test_t4_whole_work_budget_counts_every_member_of_a_composite() -> None:

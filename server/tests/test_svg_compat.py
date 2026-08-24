@@ -38,12 +38,7 @@ def test_t324_rejects_every_outside_structure(fragment: str):
         validate_compat_svg(svg)
 
 
-def test_t328_renderer_checks_the_compat_document_before_return(monkeypatch):
-    from inku_server.render_engines.default import engine
-
-    checked: list[str] = []
-    monkeypatch.setattr(engine, "validate_compat_svg", checked.append)
-
+def test_t328_current_renderer_returns_a_valid_compat_document():
     svg = renderer.render(
         Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}]}
@@ -52,4 +47,4 @@ def test_t328_renderer_checks_the_compat_document_before_return(monkeypatch):
         render_seed=123,
     )
 
-    assert checked == [svg]
+    validate_compat_svg(svg)

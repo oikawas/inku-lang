@@ -7,13 +7,10 @@ import org.json.JSONObject
 /**
  * Resolves a reference fixture to the corpus directory that governs it.
  *
- * `gen_android_reference.py` bakes these files from whatever engine the server
- * tree holds. While they sat in one flat directory, raising the server engine
- * rewrote the port's expectations in place, and the port went red the moment the
- * engine branch merged -- twice now, for two days each time. The server solved
- * this for its own frozen corpora years of commits ago: each version keeps its
- * own directory, the generator only writes the current one, and older ones are
- * held by a manifest rather than rebaked.
+ * These files are historical artifacts held by a manifest. While they sat in
+ * one flat directory, raising the Server engine rewrote the port's expectations
+ * in place. Each Android engine version now keeps its own directory, and a newer
+ * Server engine must not rebake it.
  *
  * The port therefore asks for a fixture by bare name and reads the directory for
  * the version it implements. Raising the server engine adds a directory; it does

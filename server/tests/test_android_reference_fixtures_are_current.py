@@ -1,36 +1,17 @@
-"""The Android reference fixtures must match their declared owners (F-1..F-4).
+"""The historical Android fixtures must match their declared owners.
 
-The corpus is filed by the Android engine version that consumes it. Flat files
-and any declared version that still matches the server generator are rebaked by
-F-1. A deliberately lagging renderer directory cannot be reproduced by a newer
-server tree, so F-4 holds it by manifest instead. Rebaking an older directory is
-exactly the failure this layout exists to prevent: it rewrites expectations the
-port still holds, and turned 7 of 159 JVM tests red when engine 22 merged.
-
-`gen_android_reference.py` is run by hand, and nothing watched its output. On
-2026-08-04 five of the 53 files had been stale since `4eef595c` (the commit that
-moved `thinness` in front of `surface`): that commit regenerated
-`score_schema_contract.json` and left `06_surface_hatch.svg`,
-`21_hatch_computer.svg`, `renderer_cloudform_and_relations.json`,
-`renderer_seed_range.json` and `svg_index.json` behind. The port kept matching
-the old expectations, so the divergence it hid -- the Kotlin copy of the dump
-order inside `surfaceSeed` still ended `surface, thinness` -- stayed green for
-two days.
-
-`test_thinness_declaration_position.py` P-7 already watched the two order tables
-in `score_schema_contract.json`, which is exactly the file that commit did
-regenerate. Watching one file is not watching the corpus: F-1 rebakes the whole
-current version of it.
+Stage 6 retires the Engine 40 generator with the Python renderer. The Android
+engine continues to consume its declared historical corpus until shared Rust
+integration replaces that path, so manifests remain the byte authority and a
+newer Server must not silently rebake these files.
 """
 
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import pathlib
 import re
-import sys
 
 import pytest
 
@@ -42,7 +23,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 # or renamed fixture is a failure rather than a skip.
 ANDROID_TREE = ROOT / "android"
 FIXTURES = ANDROID_TREE / "app/src/test/resources/server_reference"
-GENERATOR = ROOT / "server/scripts/gen_android_reference.py"
 ANDROID_COMPATIBILITY = (
     ANDROID_TREE
     / "app/src/main/java/app/inku/mobile/data/model/CompatibilityConstants.kt"
@@ -58,48 +38,12 @@ android_only = pytest.mark.skipif(
     not ANDROID_TREE.is_dir(), reason="android/ is absent (pentala)"
 )
 
-# F-1 rebakes and compares bytes, so it can only be asked on the platform the
-# fixture was baked on. `renderer_variation_primitives.json` stores raw doubles
-# -- wave phases and hash01 values that reach sin/cos -- and macOS libm and glibc
-# disagree there by one ULP: six values, the last digit, e.g.
-# -1.7282983464997077 on darwin against -1.7282983464997073 on glibc 2.41
-# (measured 2026-08-17 in the pentala test container). The port compares those
-# fields with a 1e-9 tolerance, so the difference reaches nothing it asserts;
-# only a byte comparison sees it.
-#
-# The release runs linux (the GHCR images), so linux is where the fixture is
-# baked and where this record is kept. On darwin the rebake is not a fair
-# comparison and this test says so instead of failing. The cost is stated
-# plainly: a fixture staled on a Mac is caught by the container run, not by the
-# Mac. See `no-git-sync/scripts/testbox.sh --corpora`.
-FROZEN_BAKE_PLATFORM = "linux"
-
-baked_here_only = pytest.mark.skipif(
-    sys.platform != FROZEN_BAKE_PLATFORM,
-    reason=(
-        f"the fixture is baked on {FROZEN_BAKE_PLATFORM} (the platform the release"
-        f" runs on) and this is {sys.platform}; rebake and check it with"
-        " no-git-sync/scripts/testbox.sh --sync --corpora"
-    ),
-)
-
-
 VERSION_DIRECTORY = re.compile(r"^(render-engine|ddl-engine)-(\d+)$")
 # The primitives `planning._anchor` answers with a stored coordinate. The rest
 # derive theirs by a sum, which carries no quantum. See F-2 (ledger I-165).
 QUANTISED_ANCHOR_PRIMITIVES = frozenset(
     {"circle", "ellipse", "arc", "polygon", "cloudform"}
 )
-
-
-def _load_generator(out_dir: pathlib.Path):
-    """Import the generator as a module and point its output at `out_dir`."""
-    spec = importlib.util.spec_from_file_location("gen_android_reference", GENERATOR)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.OUT = out_dir
-    return module
 
 
 def _kotlin_string_constant(path: pathlib.Path, name: str) -> str:
@@ -134,51 +78,6 @@ def _android_arrangement_quantum() -> int:
 def _fixture_path(name: str) -> pathlib.Path:
     """Resolve a renderer fixture through Android's declared compatibility version."""
     return _android_render_engine_dir() / name
-
-
-def _files_under(root: pathlib.Path, subdirectories: set[str]) -> set[str]:
-    """Paths the generator writes: the flat fixtures plus the given directories."""
-    return {
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if path.is_file()
-        and (path.parent == root or path.parent.name in subdirectories)
-    }
-
-
-@android_only
-@baked_here_only
-def test_every_android_fixture_matches_a_fresh_bake(tmp_path) -> None:
-    """F-1 currency: rebaking matching declared versions reproduces every byte.
-
-    This is a record, not a property -- it says the files on disk are what the
-    current tree produces. That is the failure it exists for: a change moves the
-    drawing, the fixtures are not rebaked, and the port stays green against an
-    expectation the server no longer holds.
-
-    It reaches flat files and only version directories where Android's declaration
-    equals the generator's current version. Lagging directories are held by F-4,
-    because this tree cannot bake them at all.
-    """
-    module = _load_generator(tmp_path)
-    module.main()
-
-    declared = {_android_render_engine_dir().name, _android_ddl_engine_dir().name}
-    generated = {module.render_engine_dir().name, module.ddl_engine_dir().name}
-    current = declared & generated
-    baked = _files_under(tmp_path, current)
-    committed = _files_under(FIXTURES, current)
-    assert baked == committed
-
-    stale = sorted(
-        name
-        for name in sorted(committed)
-        if (tmp_path / name).read_bytes() != (FIXTURES / name).read_bytes()
-    )
-    assert stale == [], (
-        f"stale: {stale}"
-        " -- rebake with: uv run python scripts/gen_android_reference.py"
-    )
 
 
 @android_only

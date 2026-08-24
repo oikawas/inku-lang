@@ -7,7 +7,10 @@ imported, it would diverge from the implementation and these tests would fail.
 
 from __future__ import annotations
 
+import json
 from typing import get_args
+
+import inku_render
 
 from inku_server import reference, schema
 from inku_server.color_catalogs import COLOR_CATALOGS, COLOR_KEYS, color_catalogs
@@ -19,16 +22,15 @@ from inku_server.geometry_thresholds import (
 )
 from inku_server.plugins import CANVAS_ASPECTS, plugin_status_items
 from inku_server.plugins.document_format import _CORE_MARKERS, _REGIONS
-from inku_server.render_engines.default.marks import (
-    AMPLITUDE_WIDTHS,
-    BLUR_RATIO,
-    WEIGHT_TO_STROKE_WIDTH,
-)
-from inku_server.render_engines.default.document import SVG_PROFILES
+from inku_server.render_engines import SVG_PROFILES
 
 
 def _ref() -> dict:
     return reference.build_reference()
+
+
+def _renderer_ref() -> dict:
+    return json.loads(inku_render.renderer_reference_json())
 
 
 def test_sections_are_stable() -> None:
@@ -109,7 +111,7 @@ def test_relation_literals_match_composer() -> None:
 
 
 def test_reference_does_not_tell_the_reader_gray_backgrounds_are_refused() -> None:
-    """Stage 4 of 契約 background-color-openness had no gate of its own.
+    """Stage 4 of the background-color-openness contract had no gate of its own.
 
     Reverting the reference wording turned nothing red during acceptance, so the
     dump could drift back to describing a restriction the pipeline no longer has.
@@ -168,9 +170,7 @@ def test_color_resolution_hex_matches_catalogs() -> None:
 
 def test_weight_properties_stroke_width_matches_renderer() -> None:
     weights = _ref()["weight_properties"]["weights"]
-    assert {w["weight"]: w["stroke_width"] for w in weights} == dict(
-        WEIGHT_TO_STROKE_WIDTH
-    )
+    assert _ref()["weight_properties"] == _renderer_ref()["weight_properties"]
     assert [w["weight"] for w in weights] == list(get_args(schema.Weight))
 
 
@@ -179,15 +179,20 @@ def test_performance_tables_match_sources() -> None:
     assert [a["id"] for a in performance["canvas_aspects"]] == [
         aspect.id for aspect in CANVAS_ASPECTS
     ]
-    assert performance["amplitude_widths"] == dict(AMPLITUDE_WIDTHS)
-    assert performance["blur_ratio"] == dict(BLUR_RATIO)
+    for key, value in _renderer_ref()["performance"].items():
+        assert performance[key] == value
+    assert performance["blur_ratio"] == {
+        "fine": 0.009,
+        "medium": 0.03,
+        "broad": 0.07,
+    }
     assert performance["svg_profiles"] == sorted(SVG_PROFILES)
 
 
 def test_seed_summary_names_the_canonical_determinism_owner() -> None:
     summary = _ref()["performance"]["seed_summary"]
-    assert "default.determinism._seed_for_instruction" in summary
-    assert "renderer._seed_for_instruction" not in summary
+    assert "Rust renderer" in summary
+    assert "default.determinism" not in summary
 
 
 def test_verification_thresholds_match_geometry_module() -> None:

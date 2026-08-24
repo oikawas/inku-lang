@@ -17,9 +17,8 @@ import org.junit.Test
  * `src/test/resources/sketch/` and are read below. Measuring the port against
  * itself would only prove it agrees with itself.
  *
- * They are deliberately NOT baked by `gen_android_reference.py`: that generator
- * also bakes SVG references off the renderer, and putting a prompt in its way
- * would tie this to the drawing-quality work.
+ * They are deliberately outside the historical Server renderer corpus because
+ * putting prompts there would tie this test to drawing-quality work.
  */
 class SketchTest {
 

@@ -12,11 +12,10 @@ today's definition, AND the same edit still reaches a drawing that named no
 work. Either half alone is passed by an implementation that stopped resolving
 colors altogether.
 
-The perturbation those two apply moves `palette` as well as `map`. Measured
-2026-08-09: rewriting `map` alone does not reach the picture at all --
-`_work_color_assignment` builds the drawn colors out of the `palette:` entries
-and falls back to `map` only for a band with no candidate -- so a gate that
-edited `map` would stay green for a build that ignored the snapshot entirely.
+The perturbation those two apply moves `palette` as well as `map`. The Rust
+core builds drawn colors from the `palette:` entries and falls back to `map`
+only for a band with no candidate, so changing only `map` would not exercise
+the snapshot path.
 """
 
 from __future__ import annotations
@@ -44,7 +43,6 @@ from inku_server.color_catalogs import (
     current_color_catalog_id,
     render_color_map_for_catalog,
 )
-from inku_server.render_engines.default.palette import _work_color_assignment
 
 client = TestClient(app)
 
@@ -189,7 +187,7 @@ def _render_svg(headers: dict, **body) -> tuple[int, str, dict]:
     return response.status_code, response.text, dict(response.headers)
 
 
-# 段 1: the server reads the work's colors -----------------------------------
+# Stage 1: the server reads the work's colors --------------------------------
 
 
 def test_a_work_keeps_its_colors_when_todays_definition_is_repainted(actor):
@@ -377,11 +375,6 @@ def test_the_work_supplies_the_catalog_id_that_seeds_its_own_colors(actor):
     ).json()
 
     assert body["render_color_catalog_id"] == RENAMED_OLD_ID
-    # Not vacuous: at this seed the two ids really do assign different colors,
-    # so carrying the requested one through would have shown.
-    assert _work_color_assignment(
-        snapshot, SEED_WHERE_THE_IDS_DISAGREE, RENAMED_OLD_ID
-    ) != _work_color_assignment(snapshot, SEED_WHERE_THE_IDS_DISAGREE, DRAWN_WITH)
 
 
 def test_the_editable_redraw_of_a_saved_work_uses_the_works_own_colors(actor):
@@ -401,7 +394,7 @@ def test_the_editable_redraw_of_a_saved_work_uses_the_works_own_colors(actor):
     assert RECORDED_BLACK in before
 
 
-# 段 1: authorization ---------------------------------------------------------
+# Stage 1: authorization ------------------------------------------------------
 
 
 def test_another_users_work_is_not_readable_through_the_colors(actor):
@@ -477,7 +470,7 @@ def _dependency_names(dependant, seen=None) -> set[str]:
     return names
 
 
-# 段 3: the rename migration --------------------------------------------------
+# Stage 3: the rename migration ----------------------------------------------
 
 
 def test_the_rename_table_names_every_pair_that_was_renamed():
@@ -547,19 +540,6 @@ def test_the_migration_does_not_touch_the_id_a_work_was_drawn_with(tmp_path):
     rows = _migrated(tmp_path, [("w-1", RENAMED_OLD_ID, RENAMED_OLD_ID, SNAPSHOT_JSON)])
 
     assert rows[0][2] == RENAMED_OLD_ID
-
-
-def test_rewriting_the_drawn_with_id_would_repaint_the_work():
-    """Why the test above exists, stated as a measurement rather than a comment."""
-    snapshot = RECORDED_COLORS
-    differing = sum(
-        1
-        for seed in range(200)
-        if _work_color_assignment(snapshot, seed, RENAMED_OLD_ID)
-        != _work_color_assignment(snapshot, seed, DRAWN_WITH)
-    )
-
-    assert differing > 0
 
 
 def test_the_migration_is_idempotent(tmp_path):
@@ -643,7 +623,7 @@ print(json.dumps(row))
     assert json.loads(snapshot) == {"black": "#111111"}
 
 
-# 段 5: the nameplate ---------------------------------------------------------
+# Stage 5: the nameplate ------------------------------------------------------
 
 
 def test_the_catalog_list_serves_the_rename_table(actor):

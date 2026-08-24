@@ -33,7 +33,6 @@ import pytest
 
 from inku_server.coerce import coerce_score
 from inku_server.coerce.compose import _marks_only_ddl, _requested_colors_from_ddl
-from inku_server.render_engines.default.planning import _apply_color_cycle
 from inku_server.schema import Instruction, Score
 
 
@@ -220,16 +219,6 @@ def test_t6_a_black_mark_on_a_black_background_clause_is_still_one_color() -> No
 
 
 # T-9: control. The cycle itself is not touched by this change.
-
-
-def test_t9_apply_color_cycle_still_hands_each_member_the_next_color() -> None:
-    members = [_grouped("black", None) for _ in range(6)]
-    cycle = ["red", "blue", "green"]
-
-    applied = _apply_color_cycle(members, cycle)
-
-    assert [ins.color for ins in applied] == [cycle[i % len(cycle)] for i in range(6)]
-    assert len({ins.color for ins in applied}) == 3
 
 
 # T-10: the rule holds on the INKU_COERCE_DISABLE exit too.

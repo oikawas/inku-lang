@@ -1,20 +1,22 @@
-"""`thinness` の宣言位置を固定する (I-036 / I-037 / I-038)。
+"""Pin the declaration position of `thinness` (I-036 / I-037 / I-038).
 
-宣言順は Stage 2 の tool schema に並びごと渡り、**任意フィールドは後ろにあるほど埋まる**。
-`thinness` は `weight` の直後 (位置 14) では 3〜18% しか搬送されない。
+Stage 2 preserves tool-schema declaration order, and optional fields are filled
+more often when they appear later. `thinness` reached only 3-18% when placed
+immediately after `weight` at position 14.
 
-だが**末尾は 1 席しかない**。`thinness` がその席を取った版 (v2.9.5) では `surface` が
-末尾を失い、搬送が 92% → 42% へ落ちて **Stage 2 の出力そのものが半分に縮んだ**
-(2026-08-02 に 168 本で実測)。よって `thinness` は `surface` の**直前**に置き、
-**末尾は `surface` のために空けておく**。
+There is only one final slot. In v2.9.5, `thinness` took it from `surface`, whose
+delivery fell from 92% to 42%, cutting Stage 2 output roughly in half across 168
+measured runs on 2026-08-02. Therefore `thinness` stays immediately before
+`surface`, leaving the final slot to `surface`.
 
-位置は絵を動かす。凍結コーパスも `check_frozen_corpora.py` も Stage 2 を通らないので、
-この性質を捕まえるゲートは他に無い。`thinness` を末尾へ戻したら P-1 が、`weight` の隣へ
-戻したら P-2 が、`sort_keys` を戻したら P-4 が赤くなること。
+Position changes the drawing. Neither the frozen corpus nor
+`check_frozen_corpora.py` runs Stage 2, so these checks are the only gate for this
+property. P-1 fails if `thinness` moves last, P-2 fails if it returns beside
+`weight`, and P-4 fails if `sort_keys` returns.
 
-宣言順の現物は 3 つある (server / Kotlin の複製 / Android の fixture)。突き合わせの辺も
-3 本で、Kotlin ↔ fixture は Android 単体テストが見ているが、server から出る 2 本は
-どこも見ていなかった。P-6 と P-7 がその 2 本を埋める。
+Declaration order has three copies: Server, Kotlin, and the Android fixture.
+Android unit tests cover Kotlin against the fixture; P-6 and P-7 cover the two
+edges originating at the Server.
 """
 
 from __future__ import annotations
@@ -27,7 +29,6 @@ from typing import Iterator
 import pytest
 
 from inku_server import composer
-from inku_server.render_engines.default.determinism import _seed_for_instruction
 from inku_server.schema import Instruction, Score
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -51,7 +52,7 @@ ANDROID_FIXTURE = (
     ANDROID_TREE / "app/src/test/resources/server_reference/score_schema_contract.json"
 )
 
-# engine 16 段 3 で入った本体。位置を移す本契約では 1 文字も動かない。
+# Engine 16 stage 3 introduced this body; the ordering contract changes no byte of it.
 THINNESS_SCHEMA = {
     "anyOf": [
         {"enum": ["fine", "extra_fine"], "type": "string"},
@@ -73,11 +74,12 @@ def _instruction_properties() -> dict[str, object]:
 
 @contextmanager
 def thinness_at(index: int) -> Iterator[None]:
-    """`thinness` を index へ動かし、抜けるときに元の並びへ戻す。
+    """Move `thinness` to an index and restore the original order on exit.
 
-    `Instruction.model_fields` だけを触っても `_score_tool_schema()` には届かない。
-    `Score` 側も rebuild しないと、`Instruction.model_json_schema()` には出るのに
-    tool schema には出ないという食い違いが起きる (I-036 の食い違いの原因)。
+    Changing only `Instruction.model_fields` does not reach `_score_tool_schema()`.
+    `Score` must also be rebuilt, or the field appears in
+    `Instruction.model_json_schema()` but not in the tool schema, the mismatch
+    that caused I-036.
     """
     original = dict(Instruction.model_fields)
     fields = dict(original)
@@ -101,12 +103,12 @@ def thinness_at(index: int) -> Iterator[None]:
 
 
 def test_surface_is_declared_last() -> None:
-    """P-1 末尾: `Instruction` の最後の宣言は `surface` である。
+    """P-1 final slot: `surface` is the last `Instruction` declaration.
 
-    末尾は 1 席しかない。ここを他のフィールドへ譲ると `surface` の搬送が 92% → 42% へ
-    落ち、Stage 2 の出力が半分に縮む。**今後どのフィールドを足しても、末尾へ置いたら
-    この検査が赤くなる** — 次に任意フィールドを足す者が同じ退行を黙って通さないため、
-    「`thinness` が直前」(P-2) とは別に立てている。
+    There is only one final slot. Giving it to another field cuts `surface`
+    delivery from 92% to 42% and halves Stage 2 output. This check fails whenever
+    a future field is appended, independently of P-2, so the regression cannot
+    pass silently.
     """
     properties = _instruction_properties()
     assert len(properties) == 25
@@ -115,21 +117,21 @@ def test_surface_is_declared_last() -> None:
 
 
 def test_thinness_is_declared_immediately_before_surface() -> None:
-    """P-2 位置: 任意フィールドは後ろにあるほど埋まる。`surface` の直前から動かさない。"""
+    """P-2 position: keep `thinness` immediately before the final `surface`."""
     properties = list(_instruction_properties())
     assert properties[-2:] == ["thinness", "surface"]
     assert list(Instruction.model_fields)[-2:] == ["thinness", "surface"]
 
 
 def test_thinness_schema_body_is_unchanged() -> None:
-    """P-3 内容: 移したのは位置だけで、型・既定値・description は engine 16 のまま。"""
+    """P-3 body: type, default, and description remain those of Engine 16."""
     assert _instruction_properties()["thinness"] == THINNESS_SCHEMA
 
 
 def test_stage2_digest_sees_declaration_order() -> None:
-    """P-4 指紋: 絵を動かす並べ替えが `stage2_prompt_digest` に残ること。
+    """P-4 fingerprint: declaration reordering changes `stage2_prompt_digest`.
 
-    `sort_keys=True` は並びを潰すので、この検査は指紋が並び順に開いていることを要求する。
+    `sort_keys=True` destroys order, so this requires the digest to preserve it.
     """
     def sorted_tool_json() -> str:
         return json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
@@ -142,31 +144,9 @@ def test_stage2_digest_sees_declaration_order() -> None:
         after_weight = composer._stage2_prompt_digest(system_prompt)
         sorted_after_weight = sorted_tool_json()
     assert at_last != after_weight
-    # 動いたのは並びだけ。鍵を並べ替えて潰すと同一になる ＝ 旧 digest が盲目だった理由。
+    # Only order moved. Sorting keys makes both forms equal, which explains the old blind digest.
     assert sorted_at_last == sorted_after_weight
     assert composer._stage2_prompt_digest(system_prompt) == at_last
-
-
-def test_seed_for_instruction_ignores_declaration_order() -> None:
-    """P-5 恒等: 演奏 seed は明示タプルで組み直すので並び順を見ない。
-
-    §3.1 の「決定的な層は 1 バイトも動かない」の前提。ここが赤いなら凍結コーパスが
-    緑であることの説明が崩れている。
-    """
-    instruction = Instruction.model_validate(
-        {
-            "primitive": "line",
-            "from": [0.2, 0.3],
-            "to": [0.8, 0.7],
-            "weight": "brush_thin",
-            "thinness": "fine",
-        }
-    )
-    at_last = _seed_for_instruction(instruction, performance_seed=1234)
-    with thinness_at(14):
-        moved = Instruction.model_validate(instruction.model_dump(by_alias=True))
-        after_weight = _seed_for_instruction(moved, performance_seed=1234)
-    assert at_last == after_weight
 
 
 def _kotlin_instruction_order() -> list[str]:
@@ -179,11 +159,11 @@ def _kotlin_instruction_order() -> list[str]:
 
 @android_only
 def test_android_schema_copy_keeps_the_server_declaration_order() -> None:
-    """P-6 辺 server ↔ Kotlin: 複製が宣言順ごと server と一致すること。
+    """P-6 Server-to-Kotlin edge: the copy preserves Server declaration order.
 
-    port の schema は意図的に部分集合 ([I-008]) なので、等号ではなく **server の順序の
-    部分列** であることを見る。server だけ直して複製を落とすと、Android の
-    ローカル LLM 経路だけが縮んだまま残る。この辺を見る検査は他に無かった。
+    The port schema is intentionally a subset (I-008), so it must be an ordered
+    subsequence rather than equal. If only the Server is repaired, Android's local
+    LLM path otherwise remains truncated. No other check covered this edge.
     """
     server_order = list(_instruction_properties())
     kotlin_order = _kotlin_instruction_order()
@@ -194,12 +174,12 @@ def test_android_schema_copy_keeps_the_server_declaration_order() -> None:
 
 @android_only
 def test_android_fixture_tables_keep_the_server_declaration_order() -> None:
-    """P-7 辺 server ↔ fixture: 焼き直し忘れを捕まえる。
+    """Keep both historical Android order tables aligned with the Server schema.
 
-    `ServerScoreVocabularyTest` は Kotlin ↔ fixture を見るが、fixture を作る
-    `gen_android_reference.py` を回す検査は CI にも `server/tests/` にも無い。宣言順を
-    動かして fixture を焼き直さないと、Android 側だけが旧い並びで固定される。
-    **2 つの表を両方見る** — 片方だけだと、生成器を回さず手で片方を直した場合が素通りする。
+    The Android corpus is now immutable and manifest-owned, so Stage 6 does not
+    rebake it. Both stored order tables still describe the compatibility input
+    and must agree with the Server declaration until shared schema generation
+    replaces them.
     """
     fixture = json.loads(ANDROID_FIXTURE.read_text(encoding="utf-8"))
     server_order = list(_instruction_properties())

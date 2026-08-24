@@ -11,55 +11,6 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 _TEST_DB_PATH: Path | None = None
 _TEST_THUMBS_PATH: Path | None = None
 
-# These modules characterize Python Engine 40 through its private helpers, SVG
-# element choices, or historical byte snapshots. Stage 5 keeps that historical
-# suite explicit while the product registry moves to Rust Engine 41. Stage 6
-# classifies each test and retains only public semantics at the Rust boundary.
-_ENGINE_40_CHARACTERIZATION_FILES = frozenset(
-    {
-        "test_a_named_sheet_changes_how_the_mark_runs.py",
-        "test_a_wash_named_on_a_line_is_a_broad_pale_sweep.py",
-        "test_anchor_authority.py",
-        "test_android_reference_fixtures_are_current.py",
-        "test_arc_strokes.py",
-        "test_closed_shape_strokes.py",
-        "test_cloudform.py",
-        "test_cloudform_stroke.py",
-        "test_composition_seed_takes_the_placement.py",
-        "test_computer_touch.py",
-        "test_default_engine_dispatch.py",
-        "test_default_engine_layers.py",
-        "test_default_engine_marks.py",
-        "test_default_engine_palette_document.py",
-        "test_default_engine_planning.py",
-        "test_default_engine_surfaces.py",
-        "test_each_member_finds_its_own_angle.py",
-        "test_each_member_gets_its_own_size.py",
-        "test_fade_reaches_every_member.py",
-        "test_fill_dab.py",
-        "test_fill_strokes.py",
-        "test_fill_underlay_and_branch.py",
-        "test_ground_resistance.py",
-        "test_ground_seed.py",
-        "test_material_outline_reach.py",
-        "test_one_lattice.py",
-        "test_palette_color_assignment.py",
-        "test_perform_region_relation.py",
-        "test_printmaking.py",
-        "test_render_platform_stability.py",
-        "test_renderer.py",
-        "test_renderer_proportional.py",
-        "test_renderer_variation_shapes.py",
-        "test_renderer_wave_phase.py",
-        "test_surface_stroke.py",
-        "test_svg_compat.py",
-        "test_the_ground_is_a_support_you_can_name.py",
-        "test_the_texture_hangs_on_the_run.py",
-        "test_touching.py",
-        "test_wild_reach.py",
-    }
-)
-
 if os.getenv("INKU_TEST_USE_CONFIGURED_DB") != "1":
     _TEST_DB_PATH = Path(tempfile.gettempdir()) / f"inku-test-{os.getpid()}.db"
     try:
@@ -98,40 +49,6 @@ def pytest_sessionfinish(session, exitstatus):
             path.unlink()
         except FileNotFoundError:
             pass
-
-
-@pytest.fixture(autouse=True)
-def engine_40_characterization_route(request, monkeypatch):
-    """Keep historical renderer tests attached to their canonical engine."""
-    if request.path.name not in _ENGINE_40_CHARACTERIZATION_FILES:
-        return
-
-    from inku_server import render_engines
-    from inku_server.render_engines.default import DEFAULT_RENDER_ENGINE
-
-    monkeypatch.setattr(
-        render_engines, "current_render_engine", lambda: DEFAULT_RENDER_ENGINE
-    )
-    if hasattr(request.module, "current_render_engine"):
-        monkeypatch.setattr(
-            request.module,
-            "current_render_engine",
-            lambda: DEFAULT_RENDER_ENGINE,
-        )
-    generator = getattr(request.module, "GENERATOR", None)
-    if generator is not None and hasattr(generator, "current_render_engine"):
-        monkeypatch.setattr(
-            generator,
-            "current_render_engine",
-            lambda: DEFAULT_RENDER_ENGINE,
-        )
-    corpus_dir = getattr(request.module, "CORPUS_DIR", None)
-    if isinstance(corpus_dir, Path) and corpus_dir.name == "render-engine-41":
-        monkeypatch.setattr(
-            request.module,
-            "CORPUS_DIR",
-            corpus_dir.with_name("render-engine-40"),
-        )
 
 
 @pytest.fixture

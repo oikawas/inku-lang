@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from inku_server.render_engines import RenderEngineResult
-from inku_server.render_engines import rust_candidate
-from inku_server.render_engines.rust_candidate import RustCandidateRenderEngine
+from inku_server.render_engines import RenderEngineResult, current_render_engine
+from inku_server.render_engines.default import adapter
+from inku_server.render_engines.default.adapter import DefaultRenderEngine
 from inku_server.schema import Score
 
 
@@ -20,7 +21,7 @@ ENGINE_41_CORPUS_DIR = SERVER_ROOT / "reference" / "render-engine-41"
 
 def _reference_generator():
     spec = importlib.util.spec_from_file_location(
-        "gen_render_reference_candidate", GENERATOR_PATH
+        "gen_render_reference_explicit", GENERATOR_PATH
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -28,7 +29,7 @@ def _reference_generator():
     return module
 
 
-def test_candidate_adapter_uses_one_canonical_request(monkeypatch):
+def test_default_adapter_uses_one_canonical_request(monkeypatch):
     calls: list[dict] = []
 
     def render(request_json: str) -> tuple[str, str]:
@@ -44,8 +45,8 @@ def test_candidate_adapter_uses_one_canonical_request(monkeypatch):
         render_engine_version=lambda: "41",
         render=render,
     )
-    monkeypatch.setattr(rust_candidate, "_native_binding", lambda: native)
-    engine = RustCandidateRenderEngine()
+    monkeypatch.setattr(adapter, "_native_binding", lambda: native)
+    engine = DefaultRenderEngine()
     score = Score.model_validate(
         {
             "canvas": {"aspect": "a4"},
@@ -75,30 +76,48 @@ def test_candidate_adapter_uses_one_canonical_request(monkeypatch):
     assert request["options"]["canvas"]["width"] < 1000
 
 
-def test_current_engine_is_the_accepted_rust_engine():
-    from inku_server.render_engines import RUST_RENDER_ENGINE, current_render_engine
-
-    assert current_render_engine() is RUST_RENDER_ENGINE
+def test_current_engine_is_the_default_rust_adapter():
+    assert current_render_engine() is adapter.DEFAULT_RENDER_ENGINE
     assert current_render_engine().id == "default"
     assert current_render_engine().version == "41"
 
 
-def test_reference_case_uses_the_explicit_candidate_engine():
+def test_default_package_exports_the_thin_adapter_contract():
+    default_engine = __import__(
+        "inku_server.render_engines.default", fromlist=["DEFAULT_RENDER_ENGINE"]
+    )
+
+    assert default_engine.DefaultRenderEngine is DefaultRenderEngine
+    assert default_engine.DEFAULT_RENDER_ENGINE is current_render_engine()
+    assert list(inspect.signature(DefaultRenderEngine.render).parameters) == [
+        "self",
+        "score",
+        "color_map",
+        "catalog_id",
+        "canvas_aspect",
+        "svg_profile",
+        "render_seed",
+        "composition_seed",
+        "wild",
+    ]
+
+
+def test_reference_case_uses_the_explicit_engine():
     generator = _reference_generator()
     render_input = generator.build_inputs()["A-pen-line"]
     calls: list[tuple[Score, dict[str, object]]] = []
 
-    class CandidateEngine:
-        id = "candidate"
+    class ExplicitEngine:
+        id = "explicit"
         version = "41"
 
         def render(self, score: Score, **options: object) -> RenderEngineResult:
             calls.append((score, options))
-            return RenderEngineResult(svg="<svg data-engine='candidate'/>", metadata={})
+            return RenderEngineResult(svg="<svg data-engine='explicit'/>", metadata={})
 
-    svg = generator.render_case(render_input, engine=CandidateEngine())
+    svg = generator.render_case(render_input, engine=ExplicitEngine())
 
-    assert svg == "<svg data-engine='candidate'/>"
+    assert svg == "<svg data-engine='explicit'/>"
     assert len(calls) == 1
     score, options = calls[0]
     assert score.instructions[0].primitive == "line"
@@ -106,7 +125,7 @@ def test_reference_case_uses_the_explicit_candidate_engine():
     assert options["svg_profile"] == render_input["svg_profile"]
 
 
-def test_candidate_generation_reuses_manifest_logic_in_an_explicit_destination(
+def test_explicit_generation_reuses_manifest_logic_in_an_explicit_destination(
     tmp_path: Path,
     monkeypatch,
 ):
@@ -114,51 +133,43 @@ def test_candidate_generation_reuses_manifest_logic_in_an_explicit_destination(
     render_input = generator.build_inputs()["A-pen-line"]
     calls: list[Score] = []
 
-    class CandidateEngine:
-        id = "candidate"
+    class ExplicitEngine:
+        id = "explicit"
         version = "41"
 
         def render(self, score: Score, **_options: object) -> RenderEngineResult:
             calls.append(score)
-            return RenderEngineResult(svg="<svg class='candidate'/>", metadata={})
+            return RenderEngineResult(svg="<svg class='explicit'/>", metadata={})
 
     monkeypatch.setattr(generator, "build_inputs", lambda: {"A-pen-line": render_input})
-    for check in (
-        "_assert_fade_cases_discriminate",
-        "_assert_fade_reaches_every_member",
-        "_assert_size_cases_discriminate",
-        "_assert_angle_cases_discriminate",
-    ):
-        monkeypatch.setattr(generator, check, lambda *_args, **_kwargs: None)
-
-    output_dir = tmp_path / "candidate-corpus"
+    output_dir = tmp_path / "explicit-corpus"
     generator.generate(
-        engine=CandidateEngine(),
+        engine=ExplicitEngine(),
         output_dir=output_dir,
         frozen_at="2026-08-24",
-        source_commit="accepted-candidate",
-        reason="Accepted candidate freeze.",
+        source_commit="explicit-engine",
+        reason="Explicit engine freeze.",
     )
 
     manifest = json.loads((output_dir / "manifest.json").read_text())
-    assert manifest["engine_id"] == "candidate"
+    assert manifest["engine_id"] == "explicit"
     assert manifest["engine_version"] == "41"
     assert manifest["frozen_at"] == "2026-08-24"
-    assert manifest["commit"] == "accepted-candidate"
-    assert manifest["reason"] == "Accepted candidate freeze."
+    assert manifest["commit"] == "explicit-engine"
+    assert manifest["reason"] == "Explicit engine freeze."
     assert set(manifest["cases"]) == {"A-pen-line"}
-    assert (output_dir / "A-pen-line.svg").read_text() == "<svg class='candidate'/>"
+    assert (output_dir / "A-pen-line.svg").read_text() == "<svg class='explicit'/>"
     assert len(calls) == 1
 
 
-def test_explicit_candidate_generation_requires_an_explicit_destination():
+def test_explicit_generation_requires_an_explicit_destination():
     generator = _reference_generator()
 
     with pytest.raises(ValueError, match="explicit output directory"):
         generator.generate(engine=SimpleNamespace(id="candidate", version="41"))
 
 
-def test_explicit_candidate_generation_requires_freeze_metadata(tmp_path: Path):
+def test_explicit_generation_requires_freeze_metadata(tmp_path: Path):
     generator = _reference_generator()
 
     with pytest.raises(ValueError, match="explicit freeze metadata"):
@@ -168,7 +179,7 @@ def test_explicit_candidate_generation_requires_freeze_metadata(tmp_path: Path):
         )
 
 
-def test_accepted_engine_41_candidate_corpus_is_internally_complete():
+def test_accepted_engine_41_corpus_is_internally_complete():
     generator = _reference_generator()
     manifest = json.loads((ENGINE_41_CORPUS_DIR / "manifest.json").read_text())
 

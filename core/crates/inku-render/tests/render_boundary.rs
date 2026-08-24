@@ -119,7 +119,7 @@ fn svg_tree_escapes_values_and_serializes_once() {
 }
 
 #[test]
-fn candidate_renders_every_primitive_through_one_request() {
+fn engine_renders_every_primitive_through_one_request() {
     let request = RenderRequest {
         score: score(
             r#"{"instructions":[
@@ -209,7 +209,7 @@ fn abstract_presence_is_emitted_in_its_owned_layer() {
 }
 
 #[test]
-fn candidate_renders_every_surface_without_profile_only_geometry() {
+fn engine_renders_every_surface_without_profile_only_geometry() {
     let request = RenderRequest {
         score: score(
             r#"{"instructions":[
@@ -262,7 +262,7 @@ fn candidate_renders_every_surface_without_profile_only_geometry() {
 }
 
 #[test]
-fn candidate_preserves_every_ground_between_background_and_content() {
+fn engine_preserves_every_ground_between_background_and_content() {
     for material in [
         "paper",
         "washi",

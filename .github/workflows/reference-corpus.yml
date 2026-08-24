@@ -22,7 +22,11 @@ jobs:
           enable-cache: true
       - name: Regenerate current render corpus
         working-directory: server
-        run: uv run python scripts/gen_render_reference.py
+        # The Server keeps the independently deployed native wheel out of its
+        # dependency graph, so this gate injects the local binding only here.
+        run: >
+          uv run --with ../core/crates/inku-render-python
+          python scripts/gen_render_reference.py
       - name: Require byte-identical frozen output
         run: |
           git diff --exit-code -- server/reference/

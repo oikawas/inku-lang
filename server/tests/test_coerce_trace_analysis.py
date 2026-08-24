@@ -62,6 +62,47 @@ def test_t321_cli_is_read_only_and_groups_catalog_versions(tmp_path):
     assert data["groups"][digest]["current_code_replay_eligible"] is False
 
 
+def test_t321_cli_reads_pre_catalog_stage0_without_mutating_it(tmp_path):
+    db_path = tmp_path / "pre-catalog.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE history (
+            id TEXT PRIMARY KEY,
+            score_pre_coerce TEXT,
+            coerce_trace_version INTEGER,
+            coerce_catalog_digest TEXT,
+            coerce_trace TEXT
+        );
+        INSERT INTO history VALUES (
+            'legacy', '{}', 1, 'unresolved',
+            '{"complete":true,"marker_events":[],"branch_events":[]}'
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+    before = hashlib.sha256(db_path.read_bytes()).hexdigest()
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--db", str(db_path), "--json"],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    after = hashlib.sha256(db_path.read_bytes()).hexdigest()
+
+    assert before == after
+    assert json.loads(result.stdout) == {
+        "groups": {},
+        "global_coverage": {
+            "total": 1,
+            "observed": 1,
+            "complete": 1,
+            "incomplete": 0,
+            "unobserved": 0,
+        },
+    }
+
+
 def test_t322_cli_preserves_overlap_and_marks_co_matched_ambiguous(tmp_path):
     db_path = tmp_path / "trace.db"
     digest = _make_db(db_path)

@@ -6,23 +6,24 @@ import logging
 import os
 import re
 import secrets
-import shutil
-import sqlite3
 import uuid
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
 from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, func, inspect, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
 from .identity import description_hash
 from .limits import normalize_limits
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
+from .persistence.backup import create_sqlite_snapshot
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
+from .persistence.migrations import MigrationExecutionError, ensure_current_schema, install_history_fts
 
 _SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 
@@ -51,16 +52,16 @@ LINEAGE_DERIVATION_KINDS = {
     "renga_reply",
     "external_seed_change",
     "canvas_aspect_change",
-    "variation",  # v2.0 変奏 (Stage 1.5 の展開をまとめて振る)。v2.8.0 で hensou から改名
-    # 写生 (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
+    "variation",  # Stage 1.5 variation, renamed from hensou in v2.8.0.
+    # Sketching (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
     # which includes switching the layer on or off (the grain is fine, coarse
     # or absent). The web client has sent this since v2.9.37; until v2.11.3 the
     # server did not know the name and the whole save was lost ([I-137]).
     "sketch_grain_change",
 }
 
-# v2.8.0 の改名表。**保存済みの行はこの表で書き換える**（`_migrate_columns`）。
-# 新旧の対応は `no-git-sync/opus5/name_convantion/` にも記録がある。
+# v2.8.0 rename table. `_migrate_columns` rewrites persisted rows through this
+# exact mapping; the private naming record preserves the historical rationale.
 _LINEAGE_KIND_RENAMES = (
     ("hensou", "variation"),
     ("touch_variation", "touch_change"),
@@ -667,27 +668,76 @@ _LINEAGE_NODE_INDEX_MIGRATIONS = (
 
 
 def init_db() -> None:
+    global _HISTORY_FTS_ENABLED
+
     db_path = sqlite_database_path(
         PERSISTENCE_CONFIG.canonical_url,
         setting=CANONICAL_DB_ENV,
     )
     if db_path is not None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(engine)
-    _migrate_columns()
-    _ensure_default_user_group()
-    _ensure_permission_groups()
-    _ensure_bootstrap_admin()
-    # After the bootstrap admin, so the account it may have just created is
-    # migrated in the same pass; before anything that resolves an administrator,
-    # because that now asks the permission groups.
-    _migrate_roles_to_permission_groups()
-    _assign_unowned_history_to_admin()
-    _backfill_history_identity_and_lineage()
+    try:
+        outcome = ensure_current_schema(
+            engine=engine,
+            database_path=db_path,
+            create_schema=lambda connection: Base.metadata.create_all(bind=connection),
+            seed_fresh=_seed_fresh_database,
+            apply_legacy=_apply_legacy_baseline,
+        )
+    except MigrationExecutionError as exc:
+        _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
+        raise
+    _HISTORY_FTS_ENABLED = outcome.fts_enabled
 
 
-def _migrate_columns() -> None:
-    with engine.begin() as conn:
+def _migration_session(connection) -> Session:
+    return Session(bind=connection, autocommit=False, autoflush=False)
+
+
+@contextmanager
+def _session_scope(session: Session | None):
+    """Reuse the migration session or own a normal short-lived session."""
+    if session is not None:
+        yield session, False
+        return
+    with SessionLocal() as owned_session:
+        yield owned_session, True
+
+
+def _finish_session(session: Session, owns_session: bool) -> None:
+    if owns_session:
+        session.commit()
+    else:
+        session.flush()
+
+
+def _seed_fresh_database(connection) -> None:
+    """Seed only rows required by a new, already-current database."""
+    with _migration_session(connection) as session:
+        _ensure_default_user_group(session)
+        _ensure_permission_groups(session)
+        _ensure_bootstrap_admin(session)
+        session.flush()
+
+
+def _apply_legacy_baseline(connection) -> None:
+    """Run the reviewed legacy transforms inside the coordinator transaction."""
+    _migrate_columns(connection, include_fts=False)
+    with _migration_session(connection) as session:
+        _ensure_default_user_group(session)
+        _ensure_permission_groups(session)
+        _ensure_bootstrap_admin(session)
+        # The bootstrap account must exist before the legacy role mirror is
+        # converted and before orphaned works resolve their canonical owner.
+        _migrate_roles_to_permission_groups(session)
+        _assign_unowned_history_to_admin(session)
+        _backfill_history_identity_and_lineage(session)
+        session.flush()
+
+
+def _migrate_columns(connection=None, *, include_fts: bool = True) -> None:
+    manager = engine.begin() if connection is None else nullcontext(connection)
+    with manager as conn:
         try:
             CoerceTraceCatalogRow.__table__.create(bind=conn, checkfirst=True)
         except Exception as exc:  # noqa: BLE001
@@ -698,9 +748,9 @@ def _migrate_columns() -> None:
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("failed to inspect history table columns for migration") from exc
 
-        # v2.8.0: 変奏の語を辞書へ揃えた。`vary_seed` は変奏ではなく Stage 1.5 の
-        # **構図** seed なので `composition_seed` へ移す。列を足すだけだと既存の値が
-        # 孤児になるので、**足す前に中身を移す**。
+        # v2.8.0: `vary_seed` is the Stage 1.5 composition seed, not the
+        # variation seed. Rename the column before additions so persisted values
+        # move with it instead of becoming orphaned.
         if (
             "vary_seed" in existing_history_columns
             and "composition_seed" not in existing_history_columns
@@ -722,11 +772,12 @@ def _migrate_columns() -> None:
                 raise RuntimeError(f"failed to migrate history.{column}") from exc
 
         if adding_expanded_ddl:
-            # v1.98: history.ddl の意味を「入力側」に定義し直したため、既存行が持つ
-            # テキスト (Stage 2 に渡った展開後 DDL) を expanded_ddl へ移し、入力側は
-            # NULL = 記録なしとする。Stage 1 出力は保存されたことがないので復元できない。
-            # DDL から直接作られた少数の作品では原文が expanded_ddl 側に入るが、
-            # 作者裁定 (2026-07-20) によりその誤差は許容する。
+            # v1.98 redefined history.ddl as input-side DDL. Existing text is the
+            # expanded DDL that reached Stage 2, so move it and leave input-side
+            # DDL NULL because the original Stage 1 output was never persisted.
+            # A few direct-DDL works move their source text as expanded DDL; the
+            # author explicitly accepted that historical approximation on
+            # 2026-07-20.
             try:
                 conn.execute(text("UPDATE history SET expanded_ddl = ddl, ddl = NULL WHERE ddl IS NOT NULL"))
             except Exception as exc:  # noqa: BLE001
@@ -759,9 +810,10 @@ def _migrate_columns() -> None:
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to migrate user_accounts.{column}") from exc
 
-        # v2.8.0: 保存済みの derivation kind を辞書の語へ移す。
-        # **`variation` は変奏だけの語である** — 変奏でない 4 種が名乗っていたのを外し、
-        # 本物の変奏 (`hensou`) をローマ字から戻した。**行は消さずに書き換える。**
+        # v2.8.0 moves persisted derivation kinds to the canonical vocabulary.
+        # `variation` belongs only to the actual variation operation: four other
+        # operations lose that suffix and `hensou` becomes `variation`. Rows are
+        # rewritten in place and never removed.
         if inspector.has_table("lineage_edges"):
             for before, after in _LINEAGE_KIND_RENAMES:
                 try:
@@ -785,7 +837,8 @@ def _migrate_columns() -> None:
                     raise RuntimeError(f"failed to create migration index {index_name}") from exc
         _backfill_render_hashes(conn)
         _migrate_renamed_catalog_nameplates(conn)
-        _migrate_history_search(conn)
+        if include_fts:
+            _migrate_history_search(conn)
 
 
 def _migrate_renamed_catalog_nameplates(conn) -> None:
@@ -815,52 +868,16 @@ def _migrate_renamed_catalog_nameplates(conn) -> None:
 def _migrate_history_search(conn) -> None:
     global _HISTORY_FTS_ENABLED
 
-    _HISTORY_FTS_ENABLED = False
-    if engine.dialect.name != "sqlite":
+    required_columns = {"input", "ddl", "stage1_model", "stage2_model", "catalog_id"}
+    history_columns = {column["name"] for column in inspect(conn).get_columns("history")}
+    if not required_columns <= history_columns:
+        # Focused transform fixtures can predate columns that the historical
+        # init_db baseline always had. They exercise the column transform only;
+        # creating an unusable external-content FTS table would leave a partial
+        # installation for the next startup to reject.
+        _HISTORY_FTS_ENABLED = False
         return
-
-    table_sql = (
-        "CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5("
-        "input, ddl, stage1_model, stage2_model, catalog_id, "
-        "content='history', content_rowid='rowid', tokenize='trigram'"
-        ")"
-    )
-    try:
-        conn.execute(text(table_sql))
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("SQLite FTS5 trigram history search is unavailable; falling back to LIKE search: %s", exc)
-        return
-
-    trigger_sql = (
-        """
-        CREATE TRIGGER IF NOT EXISTS history_fts_ai AFTER INSERT ON history BEGIN
-            INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id)
-            VALUES (new.rowid, new.input, new.ddl, new.stage1_model, new.stage2_model, new.catalog_id);
-        END
-        """,
-        """
-        CREATE TRIGGER IF NOT EXISTS history_fts_ad AFTER DELETE ON history BEGIN
-            INSERT INTO history_fts(history_fts, rowid, input, ddl, stage1_model, stage2_model, catalog_id)
-            VALUES ('delete', old.rowid, old.input, old.ddl, old.stage1_model, old.stage2_model, old.catalog_id);
-        END
-        """,
-        """
-        CREATE TRIGGER IF NOT EXISTS history_fts_au AFTER UPDATE OF input, ddl, stage1_model, stage2_model, catalog_id ON history BEGIN
-            INSERT INTO history_fts(history_fts, rowid, input, ddl, stage1_model, stage2_model, catalog_id)
-            VALUES ('delete', old.rowid, old.input, old.ddl, old.stage1_model, old.stage2_model, old.catalog_id);
-            INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id)
-            VALUES (new.rowid, new.input, new.ddl, new.stage1_model, new.stage2_model, new.catalog_id);
-        END
-        """,
-    )
-    try:
-        for ddl in trigger_sql:
-            conn.execute(text(ddl))
-        conn.execute(text("INSERT INTO history_fts(history_fts) VALUES ('rebuild')"))
-    except Exception as exc:  # noqa: BLE001
-        _logger.warning("SQLite FTS5 history search setup failed; falling back to LIKE search: %s", exc)
-        return
-    _HISTORY_FTS_ENABLED = True
+    _HISTORY_FTS_ENABLED = install_history_fts(conn, rebuild=True)
 
 
 def _now_ms() -> int:
@@ -896,9 +913,9 @@ def _legacy_render_hash_for_item(item: dict) -> str:
         "version": "rh2",
         "score": item.get("score") or {},
         "render_seed": _canonical_seed(item.get("render_seed")),
-        # **鍵名は `vary_seed` のまま凍結する。** これは名前ではなく hash の材料であり、
-        # 文字を変えると保存済み作品の rh2 が全部作り直しになる。値は新しい列から取る。
-        # (v2.8.0 の改名で実際に全件動いたのを検査が捕まえた)
+        # Freeze the key as `vary_seed`: it is hash material, not a field label.
+        # Renaming it would change every persisted rh2. The value still comes
+        # from the renamed column; a v2.8.0 check caught this exact drift.
         "vary_seed": _canonical_seed(item.get("composition_seed")),
         "render_build_number": item.get("render_build_number"),
         "render_engine_id": item.get("render_engine_id"),
@@ -1041,13 +1058,13 @@ def verify_password(password: str, stored_hash: str) -> bool:
 _DUMMY_PASSWORD_HASH = _hash_password("inku-nonexistent-account-timing-guard")
 
 
-def _ensure_default_user_group() -> None:
-    with SessionLocal() as session:
-        exists = session.query(UserGroupRow).first()
+def _ensure_default_user_group(session: Session | None = None) -> None:
+    with _session_scope(session) as (active_session, owns_session):
+        exists = active_session.query(UserGroupRow).first()
         if exists:
             return
-        session.add(UserGroupRow(id=str(uuid.uuid4()), name="default", at=_now_ms()))
-        session.commit()
+        active_session.add(UserGroupRow(id=str(uuid.uuid4()), name="default", at=_now_ms()))
+        _finish_session(active_session, owns_session)
 
 
 def has_permission_group(actor: dict, name: str) -> bool:
@@ -1355,21 +1372,21 @@ def _holds_no_elevated_group(session):
     return ~UserAccountRow.id.in_(elevated)
 
 
-def _ensure_permission_groups() -> None:
+def _ensure_permission_groups(session: Session | None = None) -> None:
     """Seed the three fixed permission groups. Idempotent."""
-    with SessionLocal() as session:
-        existing = {row.name for row in session.query(PermissionGroupRow).all()}
+    with _session_scope(session) as (active_session, owns_session):
+        existing = {row.name for row in active_session.query(PermissionGroupRow).all()}
         added = False
         for name in PERMISSION_GROUPS:
             if name in existing:
                 continue
-            session.add(PermissionGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms()))
+            active_session.add(PermissionGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms()))
             added = True
         if added:
-            session.commit()
+            _finish_session(active_session, owns_session)
 
 
-def _migrate_roles_to_permission_groups() -> None:
+def _migrate_roles_to_permission_groups(session: Session | None = None) -> None:
     """Give every pre-existing account the one group its legacy role names.
 
     The mapping is one-to-one on purpose: an admin becomes `admins` and nothing
@@ -1381,20 +1398,20 @@ def _migrate_roles_to_permission_groups() -> None:
     permission group is left alone, so a second run adds nothing and an account
     later given `admins` + `leaders` is not knocked back down to one.
     """
-    with SessionLocal() as session:
-        by_name = _permission_group_ids(session)
+    with _session_scope(session) as (active_session, owns_session):
+        by_name = _permission_group_ids(active_session)
         if not by_name:
             return
         assigned = {
             user_id
-            for (user_id,) in session.query(UserPermissionGroupRow.user_id).distinct().all()
+            for (user_id,) in active_session.query(UserPermissionGroupRow.user_id).distinct().all()
         }
         added = False
-        for row in session.query(UserAccountRow).all():
+        for row in active_session.query(UserAccountRow).all():
             if row.id in assigned:
                 continue
             name = _LEGACY_ROLE_TO_PERMISSION_GROUP.get(row.role, "users")
-            session.add(
+            active_session.add(
                 UserPermissionGroupRow(
                     id=str(uuid.uuid4()),
                     user_id=row.id,
@@ -1404,7 +1421,7 @@ def _migrate_roles_to_permission_groups() -> None:
             )
             added = True
         if added:
-            session.commit()
+            _finish_session(active_session, owns_session)
 
 
 def _bootstrap_admin_password() -> str | None:
@@ -1424,11 +1441,11 @@ def _bootstrap_admin_password() -> str | None:
     return None
 
 
-def _ensure_bootstrap_admin() -> None:
-    with SessionLocal() as session:
-        if session.query(UserAccountRow).first():
+def _ensure_bootstrap_admin(session: Session | None = None) -> None:
+    with _session_scope(session) as (active_session, owns_session):
+        if active_session.query(UserAccountRow).first():
             return
-        group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
+        group = active_session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
         password = _bootstrap_admin_password()
         if password is None:
             return
@@ -1441,15 +1458,15 @@ def _ensure_bootstrap_admin() -> None:
             group_id=group.id if group else None,
             at=_now_ms(),
         )
-        session.add(row)
-        session.commit()
-        _set_permission_groups(session, row, ["admins"])
-        session.commit()
+        active_session.add(row)
+        active_session.flush()
+        _set_permission_groups(active_session, row, ["admins"])
+        _finish_session(active_session, owns_session)
 
 
-def _backfill_history_identity_and_lineage() -> None:
-    with SessionLocal() as session:
-        rows = session.query(HistoryRow).filter(
+def _backfill_history_identity_and_lineage(session: Session | None = None) -> None:
+    with _session_scope(session) as (active_session, owns_session):
+        rows = active_session.query(HistoryRow).filter(
             or_(
                 HistoryRow.source_text.is_(None),
                 HistoryRow.description_hash.is_(None),
@@ -1471,9 +1488,9 @@ def _backfill_history_identity_and_lineage() -> None:
                 changed = True
             node = None
             if row.lineage_node_id:
-                node = session.get(LineageNodeRow, row.lineage_node_id)
+                node = active_session.get(LineageNodeRow, row.lineage_node_id)
             if node is None:
-                node = session.query(LineageNodeRow).filter(LineageNodeRow.history_id == row.id).first()
+                node = active_session.query(LineageNodeRow).filter(LineageNodeRow.history_id == row.id).first()
             if node is None and row.user_id:
                 node = LineageNodeRow(
                     id=str(uuid.uuid4()),
@@ -1485,14 +1502,17 @@ def _backfill_history_identity_and_lineage() -> None:
                     at=row.at,
                     root_node_id=None,
                 )
-                session.add(node)
+                active_session.add(node)
                 changed = True
             if node is not None and row.lineage_node_id != node.id:
                 row.lineage_node_id = node.id
                 changed = True
-        session.flush()
-        nodes = session.query(LineageNodeRow).all()
-        parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in session.query(LineageEdgeRow).all()}
+        active_session.flush()
+        nodes = active_session.query(LineageNodeRow).all()
+        parent_by_child = {
+            edge.child_node_id: edge.parent_node_id
+            for edge in active_session.query(LineageEdgeRow).all()
+        }
         node_by_id = {node.id: node for node in nodes}
 
         def resolve_root(node_id: str) -> str:
@@ -1512,7 +1532,7 @@ def _backfill_history_identity_and_lineage() -> None:
                 node.root_node_id = expected_root
                 changed = True
         if changed:
-            session.commit()
+            _finish_session(active_session, owns_session)
 
 
 def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
@@ -1970,12 +1990,12 @@ def _oldest_admin_id(session) -> str | None:
     return admin.id if admin else None
 
 
-def _history_owner_user_id() -> str | None:
-    with SessionLocal() as session:
-        admin_id = _oldest_admin_id(session)
+def _history_owner_user_id(session: Session | None = None) -> str | None:
+    with _session_scope(session) as (active_session, _owns_session):
+        admin_id = _oldest_admin_id(active_session)
         if admin_id:
             return admin_id
-        user = session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
+        user = active_session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
         return user.id if user else None
 
 
@@ -2463,14 +2483,7 @@ def _copy_sqlite_database(destination: Path) -> None:
     source = _sqlite_db_path()
     if not source or not source.exists():
         raise ValueError("SQLite DB file is not available")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with sqlite3.connect(source) as src, sqlite3.connect(destination) as dst:
-            src.backup(dst)
-    except sqlite3.Error:
-        if destination.exists():
-            destination.unlink(missing_ok=True)
-        shutil.copy2(source, destination)
+    create_sqlite_snapshot(source, destination)
 
 
 def _prune_auto_backups(max_generations: int) -> None:
@@ -2590,16 +2603,16 @@ def db_backup_status() -> dict:
     }
 
 
-def _assign_unowned_history_to_admin() -> None:
-    owner_id = _history_owner_user_id()
-    if not owner_id:
-        return
-    with SessionLocal() as session:
-        session.query(HistoryRow).filter(HistoryRow.user_id.is_(None)).update(
+def _assign_unowned_history_to_admin(session: Session | None = None) -> None:
+    with _session_scope(session) as (active_session, owns_session):
+        owner_id = _history_owner_user_id(active_session)
+        if not owner_id:
+            return
+        active_session.query(HistoryRow).filter(HistoryRow.user_id.is_(None)).update(
             {HistoryRow.user_id: owner_id},
             synchronize_session=False,
         )
-        session.commit()
+        _finish_session(active_session, owns_session)
 
 
 def _row_to_dict(row: HistoryRow) -> dict:

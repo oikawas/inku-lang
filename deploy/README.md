@@ -87,9 +87,21 @@ volume resets the server to a fresh install, including the accounts.
 
 ```bash
 docker compose exec api ls /data          # inspect / 中身を見る
+docker compose stop api                   # stop SQLite writers / DB 書込みを止める
 docker run --rm -v inku_inku-data:/data -v "$PWD:/backup" \
   busybox tar czf /backup/inku-data.tar.gz -C /data .   # back up / 退避する
+docker compose start api                  # resume / 再開する
 ```
+
+Do not archive the volume while the API is running. SQLite may have committed
+pages in its WAL, and a file-by-file archive is not one atomic database
+snapshot. For a no-downtime database-only copy, run the manual backup from the
+Server settings screen; it uses SQLite's Backup API and verifies the result.
+
+API の稼働中に volume を archive しないでください。SQLite の確定済みページが
+WAL に残っている場合、ファイルを順番に読む archive は DB 全体の同一時点snapshotに
+なりません。停止時間なしで DB だけを退避する場合は、Server 設定画面の手動backupを
+実行してください。SQLite Backup API で作成し、結果も検査します。
 
 ## Pinning a version / 版を固定する
 

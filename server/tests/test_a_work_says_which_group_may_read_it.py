@@ -126,8 +126,8 @@ import json
 from sqlalchemy import inspect, text
 from inku_server import db
 db.init_db()
-# Twice: the migration has to be idempotent, and a second ALTER on an existing
-# column is exactly the failure a first run would hide.
+# Twice: the first accepted legacy start records the registry; the second start
+# must validate that registry without replaying ALTER or other legacy repairs.
 db.init_db()
 with db.SessionLocal() as session:
     rows = session.execute(text(

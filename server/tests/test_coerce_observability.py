@@ -48,6 +48,7 @@ def test_t316_legacy_migration_keeps_observation_unrecorded_and_private(tmp_path
     columns = {column["name"] for column in inspect(legacy).get_columns("history")}
     assert set(INTERNAL_HISTORY_COLUMNS) <= columns
     assert inspect(legacy).has_table("coerce_trace_catalogs")
+    assert not inspect(legacy).has_table("history_fts")
     with legacy.connect() as conn:
         old = conn.execute(text("SELECT score_pre_coerce, coerce_trace_version, coerce_catalog_digest, coerce_trace FROM history WHERE id = 'old'")).one()
     assert old == (None, None, None, None)

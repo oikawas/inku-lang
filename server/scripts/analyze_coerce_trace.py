@@ -59,6 +59,14 @@ def _catalog_groups(
     digest_selector: str | None,
     trace_version_selector: int | None,
 ) -> dict[str, tuple[int, dict[str, Any]]]:
+    required_columns = {"digest", "trace_version", "snapshot_json"}
+    if not required_columns <= _table_columns(conn, "coerce_trace_catalogs"):
+        # Read-only preflight is intentionally useful before startup migration.
+        # Some accepted Stage 0 databases already have the observation columns
+        # on history but not the catalog table that gives their digests meaning.
+        # Treat that state as having no analyzable groups; never create or repair
+        # schema from an inspection tool.
+        return {}
     groups: dict[str, tuple[int, dict[str, Any]]] = {}
     for digest, trace_version, snapshot_raw in conn.execute(
         "SELECT digest, trace_version, snapshot_json FROM coerce_trace_catalogs"

@@ -543,7 +543,7 @@ def test_the_migration_does_not_touch_the_id_a_work_was_drawn_with(tmp_path):
 
 
 def test_the_migration_is_idempotent(tmp_path):
-    """It runs on every start. A second pass must find nothing left to move."""
+    """The transform is safe if an accepted legacy migration retries it."""
     from inku_server.db import _migrate_renamed_catalog_nameplates
 
     db_path = tmp_path / "idempotent.db"
@@ -561,11 +561,11 @@ def test_the_migration_is_idempotent(tmp_path):
 
 
 def test_starting_the_server_migrates_a_row_that_was_already_there(tmp_path):
-    """The function has to be reachable from `init_db`, not merely correct.
+    """The catalog transform is reachable from the pre-registry startup path.
 
-    Run in a subprocess: `init_db` binds a module-global engine, and the row is
-    written between the two calls so that the second one meets a row an older
-    build left behind.
+    A registry-bearing current database must never replay legacy repairs. The
+    fixture therefore removes only the registry after building a complete
+    pre-registry shape, then starts the Server once through the legacy gate.
     """
     db_path = tmp_path / "startup.db"
     code = """
@@ -593,8 +593,10 @@ db.add_item({
     "render_color_map": {"black": "#111111"},
 })
 
-# The row is now in place the way an older build left it, and this second start
-# is the one whose migration has to meet it.
+# Model the last build before the registry existed. The schema and persisted row
+# remain intact; only the new coordinator metadata is absent.
+with db.engine.begin() as connection:
+    connection.exec_driver_sql("DROP TABLE schema_migrations")
 db.init_db()
 
 connection = sqlite3.connect(os.environ["INKU_DB_PATH"])

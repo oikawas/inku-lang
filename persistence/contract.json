@@ -1,0 +1,203 @@
+{
+  "contract_version": 1,
+  "name": "inku-portable-persistence",
+  "physical_schema_identity_required": false,
+  "semantic_rules": [
+    {"id": "PERSIST-HISTORY-ID-001", "rule": "History primary-key collisions are rejected, never replaced."},
+    {"id": "PERSIST-RENDER-HASH-001", "rule": "Render hash is non-unique; the same drawing may be saved as more than one work."},
+    {"id": "PERSIST-SOURCE-TEXT-001", "rule": "A missing source_text falls back to input without rewriting the stored null."},
+    {"id": "PERSIST-SKETCH-NULL-001", "rule": "A null sketch state means the work predates the field and is distinct from off."},
+    {"id": "PERSIST-COMPOSE-FALLBACK-001", "rule": "A null compose fallback predates recording and is distinct from the recorded value none."},
+    {"id": "PERSIST-RH3-001", "rule": "The persistence adapter does not calculate or rewrite rh3."},
+    {"id": "PERSIST-DH1-001", "rule": "The persistence adapter does not calculate or rewrite dh1."},
+    {"id": "PERSIST-LINEAGE-ATOMIC-001", "rule": "History, its lineage node, and an optional edge are one atomic write."},
+    {"id": "PERSIST-CANONICAL-SVG-001", "rule": "Stored SVG is canonical artwork and is never re-rendered by persistence migration."},
+    {"id": "PERSIST-DERIVED-THUMB-001", "rule": "Thumbnail data is derived and may be rebuilt from canonical SVG."},
+    {"id": "PERSIST-PHYSICAL-MAPPING-001", "rule": "Host adapters map physical storage to logical fields; physical names need not match."},
+    {"id": "PERSIST-LEGACY-FINGERPRINT-001", "rule": "Unknown Server schema fingerprints fail closed before migration."}
+  ],
+  "constraint_keys": [
+    "history.id.primary_key",
+    "history.render_hash.non_unique",
+    "history.lineage_node_id.unique",
+    "lineage_nodes.history_id.unique",
+    "lineage_edges.child_node_id.unique",
+    "lineage_edges.no_self_edge",
+    "history_lineage.atomic_write"
+  ],
+  "records": {
+    "history": {
+      "fields": [
+        {"name": "id", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "at", "affinity": "INTEGER", "nullable": false, "classification": "required_common", "encoding": "unix_epoch_milliseconds"},
+        {"name": "input", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "source_text", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "ddl", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "expanded_ddl", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "score", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "canonical_json_object"},
+        {"name": "svg", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "utf8_svg"},
+        {"name": "elapsed_ms", "affinity": "INTEGER", "nullable": true, "classification": "required_common", "encoding": "integer_milliseconds"},
+        {"name": "stage1_model", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "stage2_model", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "catalog_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_engine_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_engine_version", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_color_catalog_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_color_catalog_name", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "render_color_catalog_sub", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "render_color_profile", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "canonical_json_object"},
+        {"name": "render_color_map", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "canonical_json_object"},
+        {"name": "render_canvas_aspect", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_canvas_aspect_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_canvas_aspect_ratio", "affinity": "REAL", "nullable": true, "classification": "required_common", "encoding": "finite_number"},
+        {"name": "render_seed", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "unsigned_decimal_text"},
+        {"name": "render_wild", "affinity": "INTEGER", "nullable": true, "classification": "required_common", "encoding": "boolean_0_1"},
+        {"name": "composition_seed", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "unsigned_decimal_text"},
+        {"name": "interpretation_seed", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "variation_amplitude", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "variation_seed", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "unsigned_decimal_text"},
+        {"name": "seed_text", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "instruction_lang_requested", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "instruction_lang_resolved", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "interpret_fallback", "affinity": "TEXT", "nullable": true, "classification": "optional_common", "encoding": "text"},
+        {"name": "compose_fallback", "affinity": "TEXT", "nullable": true, "classification": "optional_common", "encoding": "text"},
+        {"name": "sketch_text", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "sketch_grain", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "sketch_state", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "render_limits", "affinity": "TEXT", "nullable": true, "classification": "optional_common", "encoding": "canonical_json_object"},
+        {"name": "render_hash", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "rh3_or_legacy_text"},
+        {"name": "description_hash", "affinity": "TEXT", "nullable": true, "classification": "optional_common", "encoding": "dh1_or_legacy_text"},
+        {"name": "starred", "affinity": "INTEGER", "nullable": false, "classification": "required_common", "encoding": "boolean_0_1"},
+        {"name": "trashed", "affinity": "INTEGER", "nullable": false, "classification": "required_common", "encoding": "boolean_0_1"},
+        {"name": "history_visibility", "affinity": "TEXT", "nullable": false, "classification": "optional_common", "encoding": "text"},
+        {"name": "lineage_node_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"}
+      ],
+      "constraints": {
+        "primary_key": ["id"],
+        "unique": [["lineage_node_id"]],
+        "non_unique": [["render_hash"]]
+      }
+    },
+    "lineage_nodes": {
+      "fields": [
+        {"name": "id", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "history_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"},
+        {"name": "state", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "description_hash", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "dh1_or_legacy_text"},
+        {"name": "render_hash", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "rh3_or_legacy_text"},
+        {"name": "at", "affinity": "INTEGER", "nullable": false, "classification": "required_common", "encoding": "unix_epoch_milliseconds"},
+        {"name": "deleted_at", "affinity": "INTEGER", "nullable": true, "classification": "required_common", "encoding": "unix_epoch_milliseconds"},
+        {"name": "root_node_id", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "text"}
+      ],
+      "constraints": {"primary_key": ["id"], "unique": [["history_id"]]}
+    },
+    "lineage_edges": {
+      "fields": [
+        {"name": "id", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "parent_node_id", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "child_node_id", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "derivation_kind", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "text"},
+        {"name": "metadata_json", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "canonical_json_object"},
+        {"name": "at", "affinity": "INTEGER", "nullable": false, "classification": "required_common", "encoding": "unix_epoch_milliseconds"}
+      ],
+      "constraints": {
+        "primary_key": ["id"],
+        "unique": [["child_node_id"]],
+        "checks": ["parent_node_id <> child_node_id"]
+      }
+    }
+  },
+  "hosts": {
+    "server": {
+      "source": "server/src/inku_server/db.py",
+      "records": {
+        "history": {
+          "model": "HistoryRow",
+          "table": "history",
+          "fields": {
+            "id": {"column": "id"}, "at": {"column": "at"}, "input": {"column": "input"},
+            "source_text": {"column": "source_text"}, "ddl": {"column": "ddl"}, "expanded_ddl": {"column": "expanded_ddl"},
+            "score": {"column": "score"}, "svg": {"column": "svg"}, "elapsed_ms": {"column": "elapsed_ms"},
+            "stage1_model": {"column": "stage1_model"}, "stage2_model": {"column": "stage2_model"}, "catalog_id": {"column": "catalog_id"},
+            "render_engine_id": {"column": "render_engine_id"}, "render_engine_version": {"column": "render_engine_version"},
+            "render_color_catalog_id": {"column": "render_color_catalog_id"}, "render_color_catalog_name": {"column": "render_color_catalog_name"},
+            "render_color_catalog_sub": {"column": "render_color_catalog_sub"}, "render_color_profile": {"column": "render_color_profile"},
+            "render_color_map": {"column": "render_color_map"}, "render_canvas_aspect": {"column": "render_canvas_aspect"},
+            "render_canvas_aspect_id": {"column": "render_canvas_aspect_id"}, "render_canvas_aspect_ratio": {"column": "render_canvas_aspect_ratio"},
+            "render_seed": {"column": "render_seed"}, "render_wild": {"column": "render_wild", "adapter_encoding": "text_boolean_1_0"},
+            "composition_seed": {"column": "composition_seed"}, "interpretation_seed": {"column": "interpretation_seed"},
+            "variation_amplitude": {"column": "variation_amplitude"}, "variation_seed": {"column": "variation_seed"}, "seed_text": {"column": "seed_text"},
+            "instruction_lang_requested": {"column": "instruction_lang_requested"}, "instruction_lang_resolved": {"column": "instruction_lang_resolved"},
+            "interpret_fallback": {"column": "interpret_fallback"}, "compose_fallback": {"column": "compose_fallback"},
+            "sketch_text": {"column": "sketch_text"}, "sketch_grain": {"column": "sketch_grain"}, "sketch_state": {"column": "sketch_state"},
+            "render_limits": {"column": "render_limits"}, "render_hash": {"column": "render_hash"}, "description_hash": {"column": "description_hash"},
+            "starred": {"column": "starred"}, "trashed": {"column": "trashed"}, "history_visibility": {"column": "history_visibility"},
+            "lineage_node_id": {"column": "lineage_node_id"}
+          }
+        },
+        "lineage_nodes": {"model": "LineageNodeRow", "table": "lineage_nodes", "fields": {"id": {"column": "id"}, "history_id": {"column": "history_id"}, "state": {"column": "state"}, "description_hash": {"column": "description_hash"}, "render_hash": {"column": "render_hash"}, "at": {"column": "at"}, "deleted_at": {"column": "deleted_at"}, "root_node_id": {"column": "root_node_id"}}},
+        "lineage_edges": {"model": "LineageEdgeRow", "table": "lineage_edges", "fields": {"id": {"column": "id"}, "parent_node_id": {"column": "parent_node_id"}, "child_node_id": {"column": "child_node_id"}, "derivation_kind": {"column": "derivation_kind"}, "metadata_json": {"column": "metadata_json"}, "at": {"column": "at"}}}
+      },
+      "host_only_history_extensions": ["user_id", "output_path", "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest", "tokens_in", "tokens_out", "catalog_mode", "ddl_version", "ddl_engine_version", "render_build_number", "render_color_catalog", "ui_lang", "tenkei", "focus", "for_revision", "for_share", "share_group_id", "note", "display_label", "batch_line_number", "batch_run_id", "idempotency_key", "score_pre_coerce", "coerce_trace_version", "coerce_catalog_digest", "coerce_trace"],
+      "constraint_coverage": {
+        "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "HistoryRow.id"},
+        "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "HistoryRow.render_hash"},
+        "history.lineage_node_id.unique": {"status": "enforced", "mechanism": "database", "authority": "HistoryRow.lineage_node_id"},
+        "lineage_nodes.history_id.unique": {"status": "enforced", "mechanism": "database", "authority": "LineageNodeRow.history_id"},
+        "lineage_edges.child_node_id.unique": {"status": "enforced", "mechanism": "database", "authority": "uq_lineage_primary_parent"},
+        "lineage_edges.no_self_edge": {"status": "enforced", "mechanism": "database", "authority": "ck_lineage_no_self_edge"},
+        "history_lineage.atomic_write": {"status": "enforced", "mechanism": "application_transaction", "authority": "db.add_item"}
+      }
+    },
+    "android": {
+      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/9.json",
+      "records": {
+        "history": {
+          "table": "history_items",
+          "fields": {
+            "id": {"column": "id"}, "at": {"column": "created_at"}, "input": {"column": "original_input"},
+            "source_text": {"column": "source_text"}, "ddl": {"column": "normalized_ddl"}, "expanded_ddl": {"column": "expanded_ddl"},
+            "score": {"column": "score_json"}, "svg": {"column": "display_svg"}, "elapsed_ms": {"column": "elapsed_ms"},
+            "stage1_model": {"column": "stage1_model"}, "stage2_model": {"column": "stage2_model"}, "catalog_id": {"column": "color_catalog_id"},
+            "render_engine_id": {"column": "render_metadata_json", "json_path": "$.render_engine_id", "adapter_encoding": "json_text"},
+            "render_engine_version": {"column": "render_metadata_json", "json_path": "$.render_engine_version", "adapter_encoding": "json_text"},
+            "render_color_catalog_id": {"column": "render_metadata_json", "json_path": "$.render_color_catalog_id", "adapter_encoding": "json_text"},
+            "render_color_catalog_name": {"column": "render_metadata_json", "json_path": "$.render_color_catalog_name", "adapter_encoding": "json_text"},
+            "render_color_catalog_sub": {"column": "render_metadata_json", "json_path": "$.render_color_catalog_sub", "adapter_encoding": "json_text"},
+            "render_color_profile": {"column": "render_metadata_json", "json_path": "$.render_color_profile", "adapter_encoding": "json_object"},
+            "render_color_map": {"column": "render_metadata_json", "json_path": "$.render_color_map", "adapter_encoding": "json_object"},
+            "render_canvas_aspect": {"column": "canvas_aspect"},
+            "render_canvas_aspect_id": {"column": "render_metadata_json", "json_path": "$.render_canvas_aspect_id", "adapter_encoding": "json_text"},
+            "render_canvas_aspect_ratio": {"column": "render_metadata_json", "json_path": "$.render_canvas_aspect_ratio", "adapter_encoding": "json_number"},
+            "render_seed": {"column": "render_seed", "integrity_echo": "$.render_seed"}, "render_wild": {"column": "render_wild", "integrity_echo": "$.render_wild"},
+            "composition_seed": {"column": "composition_seed", "integrity_echo": "$.composition_seed"}, "interpretation_seed": {"column": "interpretation_seed"},
+            "variation_amplitude": {"column": "variation_amplitude"}, "variation_seed": {"column": "variation_seed"}, "seed_text": {"column": "seed_text"},
+            "instruction_lang_requested": {"column": "instruction_lang_requested"}, "instruction_lang_resolved": {"column": "instruction_lang_resolved"},
+            "sketch_text": {"column": "sketch_text"}, "sketch_grain": {"column": "sketch_grain"}, "sketch_state": {"column": "sketch_state"},
+            "render_hash": {"column": "render_hash"}, "description_hash": {"related_record": "lineage_nodes", "column": "description_hash", "join": "lineage_node_id=id"},
+            "starred": {"column": "starred"}, "trashed": {"column": "trashed"}, "history_visibility": {"constant": "normal"},
+            "lineage_node_id": {"column": "lineage_node_id"}
+          }
+        },
+        "lineage_nodes": {"table": "lineage_nodes", "fields": {"id": {"column": "id"}, "history_id": {"column": "history_id"}, "state": {"column": "state"}, "description_hash": {"column": "description_hash"}, "render_hash": {"column": "render_hash"}, "at": {"column": "at"}, "deleted_at": {"column": "deleted_at"}, "root_node_id": {"column": "root_node_id"}}},
+        "lineage_edges": {"table": "lineage_edges", "fields": {"id": {"column": "id"}, "parent_node_id": {"column": "parent_node_id"}, "child_node_id": {"column": "child_node_id"}, "derivation_kind": {"column": "derivation_kind"}, "metadata_json": {"column": "metadata_json"}, "at": {"column": "at"}}}
+      },
+      "host_only_history_extensions": ["updated_at", "render_metadata_json", "render_hash_short", "token_metadata_json", "thumbnail_path", "thumbnail_width", "thumbnail_height"],
+      "constraint_coverage": {
+        "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "HistoryItemEntity.id"},
+        "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "index_history_items_render_hash"},
+        "history.lineage_node_id.unique": {"status": "gap", "mechanism": "none", "authority": "Room v9", "target_stage": "Android reset"},
+        "lineage_nodes.history_id.unique": {"status": "gap", "mechanism": "none", "authority": "Room v9", "target_stage": "Android reset"},
+        "lineage_edges.child_node_id.unique": {"status": "enforced", "mechanism": "database", "authority": "uq_lineage_primary_parent"},
+        "lineage_edges.no_self_edge": {"status": "gap", "mechanism": "none", "authority": "Room v9 and LineagePlanner", "target_stage": "Android reset"},
+        "history_lineage.atomic_write": {"status": "enforced", "mechanism": "application_transaction", "authority": "InkuRepository.saveResult"}
+      }
+    }
+  },
+  "legacy_server_fingerprint": {
+    "algorithm": "sha256-canonical-sqlite-master-v1",
+    "object_types": ["table", "index", "trigger", "view"],
+    "exclude_name_prefixes": ["sqlite_", "history_fts"],
+    "normalization": "lower object type, preserve names, collapse SQL whitespace, sort by type/name/table, canonical JSON UTF-8"
+  }
+}

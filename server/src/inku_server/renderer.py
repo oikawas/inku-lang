@@ -1,8 +1,8 @@
-"""Legacy SVG-only compatibility entrypoint.
+"""SVG-only compatibility entrypoint.
 
 The canonical engine returns SVG and render metadata together. Existing callers
-that need only SVG may continue to use :func:`render`; domain implementation
-symbols belong to their modules under ``render_engines.default``.
+that need only SVG may continue to use :func:`render`; implementation details
+remain behind the render-engine boundary.
 """
 
 from __future__ import annotations

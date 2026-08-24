@@ -74,11 +74,9 @@ class DefaultSvgRenderer(
         // The server takes the seed as an argument
         // (`renderer.render(..., render_seed=...)`) and its `Score` has no such
         // field at all, so reading one off the Score is this client's own. It
-        // stays because it is how the frozen reference corpus hands the seed
-        // over: `gen_android_reference.py` writes `render_seed` into the Score
-        // of every baked case, and that generator belongs to the server. Moving
-        // the fixtures onto the argument is a change to the generator, not to
-        // this file.
+        // stays because the frozen historical corpus carries `render_seed` in
+        // each Score. Moving those fixtures onto the argument belongs to the
+        // future shared-renderer integration, not this compatibility reader.
         val renderSeed = request.renderSeed
             ?: if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
         val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + colorMap
@@ -1468,7 +1466,7 @@ class DefaultSvgRenderer(
         val rotation = ins.optDouble("rotation", 0.0)
         if (kotlin.math.abs(rotation) < 1e-9 || element.isBlank()) return element
         val center = rotationCenter(ins, width, height, primitive)
-        // Commas, and the master grid's six decimals: what svgwrite writes on
+        // Commas, and the master grid's six decimals: what the historical Server serializer writes on
         // the server. Spaces are valid SVG and read the same, but the corpus is
         // compared as text.
         return """<g transform="rotate(${fmt(rotation)},${fmt(center.first)},${fmt(center.second)})">$element</g>"""

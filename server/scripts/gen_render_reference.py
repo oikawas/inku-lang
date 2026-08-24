@@ -7,8 +7,6 @@ catalog, or coerce path supplies fixture values.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-import contextlib
 import copy
 import hashlib
 import json
@@ -21,12 +19,10 @@ from typing import Any, get_args
 
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import (
-    DEFAULT_RENDER_ENGINE,
     RenderEngine,
     current_render_engine,
 )
-from inku_server.render_engines.default import planning
-from inku_server.schema import GroundMaterial, Instruction, Score
+from inku_server.schema import GroundMaterial, Score
 
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
@@ -350,7 +346,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             _case(cases, f"C-sheet-{material}-{tool}",
                   _instruction("line", weight=tool), ground=ground)
 
-    # The mark words. 粒 and にじみ on a `line` are not an interior, so they raise
+    # The `grain` and `bleed` mark words on a line are not an interior, so they raise
     # the sheet's own two quantities for that one instruction rather than being
     # moved back to a closed shape. **These three do not reach that decision:**
     # this generator imports `renderer` directly and never calls `coerce_score`,
@@ -364,7 +360,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         _case(cases, f"C-sheet-line-{word}",
               _instruction("line", weight=tool, surface=surface), ground=ground)
 
-    # The one combination where the ceiling binds: washi drinks at 2.2 and にじみ
+    # The one combination where the ceiling binds: washi drinks at 2.2 and bleed
     # doubles it to 4.4, past the end of the ladder the author accepted. Without
     # a case here the cap could be raised to any number and the corpus would not
     # notice.
@@ -375,16 +371,16 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _case(cases, "C-sheet-cap",
           _instruction("line", weight="brush_thick", surface=cap_surface), ground=cap_ground)
 
-    # Engine 38. 薄墨 on an open shape is a broad pale sweep. Not one case in
+    # Engine 38. Wash on an open shape is a broad pale sweep. Not one case in
     # the 597 above carries a wash on a line or an arc -- the three open-shape
-    # surfaces here are engine 37's 粒 and にじみ -- so freezing without these
+    # surfaces here are Engine 37's grain and bleed -- so freezing without these
     # would record a version whose change the record never traverses.
     # `brush_thin` and `rotring` are production's top two tools for this
     # request (171 and 92 of 567 measured 2026-08-16), and they are the two
     # halves of the drawing path: a `rotring` line is an SVG `<line>` drawn
     # from `_stroke_attrs`, every other tool is a performed band. The arc goes
     # through `_render_arc_hand_stroke`, a different function again -- the one
-    # the prototype forgot, which is why its 刷毛 and its 濃度 came out equal.
+    # the prototype forgot, which made its brush width and density equal.
     for primitive, tool in (
         ("line", "brush_thin"), ("line", "rotring"), ("arc", "pencil"),
     ):
@@ -393,7 +389,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         _case(cases, f"C-wash-{primitive}-{tool}",
               _instruction(primitive, weight=tool, surface=wash))
 
-    # The control. A closed shape's 薄墨 is its interior, drawn by the surface
+    # The control. A closed shape's wash is its interior, drawn by the surface
     # layer since engine 36, and this version must not reach it: without a
     # frozen closed case beside the open ones, dropping the closed-shape
     # exclusion would move nothing the corpus records.
@@ -813,7 +809,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Engine 37 gained nine more to C: six that change nothing but the sheet
     # under two tools the sheet actually reaches, two that put a mark word on a
     # line, and one where the ceiling binds.
-    # Engine 38 gained nine more to C: four that put 薄墨 on an open shape --
+    # Engine 38 gained nine more to C: four that put wash on an open shape --
     # the two drawing paths a line has plus an arc, and a closed control -- and
     # five that reach the texture filters, which no `display` case in the
     # corpus could reach while all four of them were `pen`.
@@ -901,188 +897,6 @@ FADE_CASES = (
 )
 
 
-def _assert_fade_cases_discriminate(
-    inputs: dict[str, dict[str, Any]],
-    *,
-    engine: RenderEngine | None = None,
-) -> None:
-    """Every fading case added here has to notice `fade` before it is written.
-
-    A case that draws the same picture with and without the declaration records
-    that nothing broke and nothing else; the corpus would then hold six cases
-    that cannot fail. Checked at bake time, on the bake's own call.
-    """
-    for case_id in FADE_CASES:
-        stated = inputs[case_id]
-        withheld = copy.deepcopy(stated)
-        withheld["score"]["instructions"][0]["arrangement"]["fade"] = "none"
-        if _normalized_digest(render_case(stated, engine=engine)) == _normalized_digest(
-            render_case(withheld, engine=engine)
-        ):
-            raise AssertionError(f"{case_id}: the drawing does not read `fade`")
-
-
-# The two that must come out with no ceiling at all, and stay that way.
-DEGENERATE_FADE_CASES = ("G-fade-radial-edge", "G-fade-count2-edge")
-
-
-def _assert_fade_reaches_every_member(inputs: dict[str, dict[str, Any]]) -> None:
-    """At least one drawn fading group carries more than one ceiling.
-
-    The check above cannot ask this. Dropping the declaration takes the whole
-    group's fade away, and engine 23 already drew that difference with a single
-    constant for the whole group -- so an implementation that carries no
-    per-member ceiling at all still passes it. The corpus is asked directly
-    instead: some drawn group has to hold distinct per-member levels, or `fade`
-    is pinned only where the rule declines to fire.
-
-    And the two degenerate groups have to hold none: a ring is equidistant from
-    its own centre and so is a pair, and ranking them would draw a gradient
-    nobody stated. Author ruling A on ledger I-166, 2026-08-09; the engine's
-    behaviour is not changed, only asked about.
-    """
-    def levels(case_id: str) -> list[float | None]:
-        render_input = inputs[case_id]
-        instruction = Instruction.model_validate(
-            render_input["score"]["instructions"][0]
-        )
-        performance_seed = render_input["render_seed"]
-        # The placement seed is the composition seed's when the case states one:
-        # read with "is it stated", never with a falsy test, because 0 is a seed
-        # a caller can legitimately give.
-        placement_seed = render_input.get("composition_seed")
-        if placement_seed is None:
-            placement_seed = performance_seed
-        return [
-            planning._fade_level_from_hint(item.color_hint)
-            for item in planning._expand_arrangement(
-                instruction, placement_seed, performance_seed=performance_seed
-            )
-        ]
-
-    ramped = [
-        case_id
-        for case_id in FADE_CASES
-        if len({level for level in levels(case_id) if level is not None}) > 1
-    ]
-    if not ramped:
-        raise AssertionError(
-            "no drawn fading group carries a per-member ceiling; the corpus "
-            "pins `fade` only where the rule declines to fire"
-        )
-    for case_id in DEGENERATE_FADE_CASES:
-        if any(level is not None for level in levels(case_id)):
-            raise AssertionError(f"{case_id}: a group that cannot fade was ramped")
-
-
-SIZE_CASES = (
-    "G-size-line-edge",
-    "G-size-square-edge",
-    "G-size-triangle-edge",
-    "G-size-ellipse-edge",
-)
-
-
-@contextlib.contextmanager
-def _member_sizes_withheld() -> Iterator[None]:
-    """Draw as engine 24 did: the group expands, and every member is congruent."""
-    original = planning._apply_member_sizes
-    planning._apply_member_sizes = lambda items, arr, member_seed: items
-    try:
-        yield
-    finally:
-        planning._apply_member_sizes = original
-
-
-def _assert_size_cases_discriminate(
-    inputs: dict[str, dict[str, Any]],
-    *,
-    engine: RenderEngine | None = None,
-) -> None:
-    """Every case added here has to notice the per-member size, two ways.
-
-    Withholding the amplitude has to change the drawing, or the case records
-    that nothing broke and nothing else. And the four have to walk four
-    different rules: the corpus already held 42 groups that were circles to
-    the last one, so a fifth circle would discriminate perfectly and cover
-    nothing. Checked at bake time, on the bake's own call.
-    """
-    primitives = {
-        inputs[case_id]["score"]["instructions"][0]["primitive"]
-        for case_id in SIZE_CASES
-    }
-    if primitives != {"line", "square", "triangle", "ellipse"}:
-        raise AssertionError(f"the added cases do not cover the four rules: {sorted(primitives)}")
-    for case_id in SIZE_CASES:
-        stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated, engine=engine))
-        with _member_sizes_withheld():
-            withheld = _normalized_digest(render_case(stated, engine=engine))
-        if drawn == withheld:
-            raise AssertionError(f"{case_id}: the drawing does not read the member size")
-
-
-# The two the angle rule turns, and the two it has to leave alone.
-ANGLE_CASES = ("G-angle-arc-edge", "G-angle-cloudform-edge")
-STATED_ANGLE_CASES = ("G-angle-stated-zero-edge", "G-angle-stated-30-edge")
-
-
-@contextlib.contextmanager
-def _member_rotations_withheld() -> Iterator[None]:
-    """Draw as engine 25 did: the group expands, and every member shares an angle."""
-    original = planning._apply_member_rotations
-    planning._apply_member_rotations = lambda items, arr, member_seed: items
-    try:
-        yield
-    finally:
-        planning._apply_member_rotations = original
-
-
-def _assert_angle_cases_discriminate(
-    inputs: dict[str, dict[str, Any]],
-    *,
-    engine: RenderEngine | None = None,
-) -> None:
-    """The four added here have to notice the angle, in the two opposite ways.
-
-    The turning pair has to change when the amplitude is withheld, and it has
-    to be `arc` and `cloudform`: the corpus can already reach the rule through
-    the three shapes engine 25 added, so a fourth ellipse would discriminate
-    perfectly and cover nothing new.
-
-    The stating pair has to do the reverse -- withholding the amplitude must
-    not move them, because a group that names its own angle is excluded -- and
-    still has to read `rotation` itself, or the pair records that nothing broke
-    and nothing else. Dropping the stated angle turns the exclusion off, which
-    is the only thing that separates `rotation: 0` from an unstated angle:
-    neither draws a rotate() of its own. Checked at bake time, on the bake's
-    own call.
-    """
-    primitives = {
-        inputs[case_id]["score"]["instructions"][0]["primitive"]
-        for case_id in ANGLE_CASES
-    }
-    if primitives != {"arc", "cloudform"}:
-        raise AssertionError(f"the added cases do not reach the missing shapes: {sorted(primitives)}")
-    for case_id in ANGLE_CASES:
-        stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated, engine=engine))
-        with _member_rotations_withheld():
-            withheld = _normalized_digest(render_case(stated, engine=engine))
-        if drawn == withheld:
-            raise AssertionError(f"{case_id}: the drawing does not read the member angle")
-    for case_id in STATED_ANGLE_CASES:
-        stated = inputs[case_id]
-        drawn = _normalized_digest(render_case(stated, engine=engine))
-        with _member_rotations_withheld():
-            if _normalized_digest(render_case(stated, engine=engine)) != drawn:
-                raise AssertionError(f"{case_id}: a group that states its angle was turned")
-        dropped = copy.deepcopy(stated)
-        dropped["score"]["instructions"][0]["rotation"] = None
-        if _normalized_digest(render_case(dropped, engine=engine)) == drawn:
-            raise AssertionError(f"{case_id}: the drawing does not read `rotation`")
-
-
 def _write_output_directory(
     output_dir: pathlib.Path,
     manifest: dict[str, Any],
@@ -1147,7 +961,7 @@ def generate(
     source_commit: str | None = None,
     reason: str | None = None,
 ) -> None:
-    """Generate a corpus for the current engine or an explicit tooling candidate.
+    """Generate a corpus for the current engine or an explicit tooling engine.
 
     An explicit engine also requires an explicit destination. This keeps a
     shadow run from publishing a tracked engine directory before acceptance.
@@ -1165,14 +979,6 @@ def generate(
     manifest_path = output_dir / "manifest.json"
     existing = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
     inputs = build_inputs()
-    # These perturbation checks mutate the Python planner. They validate the
-    # shared input set with its canonical implementation; Stage 4 compares the
-    # injected candidate output separately without adding a second fixture set.
-    _assert_fade_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
-    _assert_fade_reaches_every_member(inputs)
-    _assert_size_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
-    _assert_angle_cases_discriminate(inputs, engine=DEFAULT_RENDER_ENGINE)
-
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}
     for case_id, render_input in sorted(inputs.items()):

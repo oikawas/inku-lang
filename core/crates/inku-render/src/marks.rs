@@ -22,7 +22,7 @@ use crate::types::{
     SvgProfile, Thinness, Weight,
 };
 
-const MIN_STROKE_WIDTH: f64 = 0.5;
+pub(crate) const MIN_STROKE_WIDTH: f64 = 0.5;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MarkError {
@@ -81,7 +81,7 @@ pub(crate) fn weight_width(weight: Weight) -> f64 {
     }
 }
 
-fn thinness_scale(thinness: Option<Thinness>) -> f64 {
+pub(crate) fn thinness_scale(thinness: Option<Thinness>) -> f64 {
     match thinness {
         None => 1.0,
         Some(Thinness::Fine) => 0.6,
@@ -117,7 +117,7 @@ pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     width * if is_wash_mark(instruction) { 3.0 } else { 1.0 }
 }
 
-fn weight_opacity(weight: Weight) -> f64 {
+pub(crate) fn weight_opacity(weight: Weight) -> f64 {
     match weight {
         Weight::Silverpoint => 0.72,
         Weight::Pencil => 0.66,
@@ -132,7 +132,7 @@ fn weight_opacity(weight: Weight) -> f64 {
     }
 }
 
-fn weight_linecap(weight: Weight) -> &'static str {
+pub(crate) fn weight_linecap(weight: Weight) -> &'static str {
     match weight {
         Weight::Silverpoint => "butt",
         Weight::Rotring => "square",
@@ -140,7 +140,7 @@ fn weight_linecap(weight: Weight) -> &'static str {
     }
 }
 
-fn style_dash(style: LineStyle, weight: Weight, scale: f64) -> Option<String> {
+pub(crate) fn style_dash(style: LineStyle, weight: Weight, scale: f64) -> Option<String> {
     let values: Option<&[f64]> = match style {
         LineStyle::Dashed => Some(&[12.0, 8.0]),
         LineStyle::Dotted => Some(&[2.0, 6.0]),

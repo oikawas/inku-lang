@@ -12,7 +12,7 @@ pub const STROKE_SAMPLE_TARGET_RATIO: f64 = 1.0 / 49.0;
 pub const STROKE_SAMPLE_MIN: usize = 17;
 pub const STROKE_SAMPLE_MAX: usize = 129;
 
-fn frequency_cycles(frequency: Frequency) -> f64 {
+pub(crate) fn frequency_cycles(frequency: Frequency) -> f64 {
     match frequency {
         Frequency::Slow => 2.0,
         Frequency::Medium => 6.0,

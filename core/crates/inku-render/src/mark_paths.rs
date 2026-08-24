@@ -153,11 +153,7 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let Some(variation) = instruction.variation.as_ref() else {
         return 0.0;
     };
-    let widths = match variation.amplitude {
-        Amplitude::Fine => 0.35,
-        Amplitude::Medium => 0.6,
-        Amplitude::Broad => 2.0,
-    };
+    let widths = amplitude_width(variation.amplitude);
     let representative =
         match instruction.primitive {
             Primitive::Circle | Primitive::Polygon | Primitive::Arc => {
@@ -186,6 +182,14 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
         }
         .max(canvas.unit() * 0.02);
     (widths * mark_width(instruction, canvas)).min(0.40 * representative)
+}
+
+pub(crate) const fn amplitude_width(amplitude: Amplitude) -> f64 {
+    match amplitude {
+        Amplitude::Fine => 0.35,
+        Amplitude::Medium => 0.6,
+        Amplitude::Broad => 2.0,
+    }
 }
 
 pub(crate) fn hand_line(

@@ -1,16 +1,42 @@
+"""Thin Python adapter for the canonical Rust render engine."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+import importlib
+import json
+from types import ModuleType
 
 from ...schema import Score
 from ..base import RenderEngineResult
-from . import engine
+from ..host import canonical_score_payload, resolved_canvas
+from ..profiles import normalize_svg_profile
 
 
-@dataclass(frozen=True)
+def _native_binding() -> ModuleType:
+    """Load the independent native wheel only when rendering is requested."""
+    return importlib.import_module("inku_render")
+
+
+def _default_color_map(native: ModuleType) -> dict[str, str]:
+    payload = json.loads(native.default_color_map_json())
+    if not isinstance(payload, dict) or not all(
+        isinstance(key, str) and isinstance(value, str)
+        for key, value in payload.items()
+    ):
+        raise RuntimeError("Rust default color map is not a string map")
+    return payload
+
+
 class DefaultRenderEngine:
-    id: str = engine.ENGINE_ID
-    version: str = engine.ENGINE_VERSION
+    """Translate one host request into one coarse native render call."""
+
+    @property
+    def id(self) -> str:
+        return str(_native_binding().render_engine_id())
+
+    @property
+    def version(self) -> str:
+        return str(_native_binding().render_engine_version())
 
     def render(
         self,
@@ -24,16 +50,28 @@ class DefaultRenderEngine:
         composition_seed: int | None = None,
         wild: bool = False,
     ) -> RenderEngineResult:
-        return engine.render_result(
-            score,
-            color_map=color_map,
-            catalog_id=catalog_id,
-            canvas_aspect=canvas_aspect,
-            svg_profile=svg_profile,
-            render_seed=render_seed,
-            composition_seed=composition_seed,
-            wild=wild,
+        native = _native_binding()
+        aspect, canvas = resolved_canvas(score, canvas_aspect)
+        request = {
+            "score": canonical_score_payload(score),
+            "options": {
+                "resolved_color_map": dict(color_map or _default_color_map(native)),
+                "catalog_id": catalog_id,
+                "canvas": {"width": canvas.width, "height": canvas.height},
+                "canvas_aspect_id": aspect,
+                "svg_profile": normalize_svg_profile(svg_profile),
+                "render_seed": render_seed,
+                "composition_seed": composition_seed,
+                "wild": wild,
+            },
+        }
+        svg, metadata_json = native.render(
+            json.dumps(request, ensure_ascii=False, separators=(",", ":"))
         )
+        metadata = json.loads(metadata_json)
+        if not isinstance(svg, str) or not isinstance(metadata, dict):
+            raise RuntimeError("Rust render binding returned an invalid output boundary")
+        return RenderEngineResult(svg=svg, metadata=metadata)
 
 
 DEFAULT_RENDER_ENGINE = DefaultRenderEngine()

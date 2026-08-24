@@ -10,27 +10,17 @@ from __future__ import annotations
 from .base import RenderEngine, RenderEngineResult
 from .default import DEFAULT_RENDER_ENGINE
 from .profiles import SVG_PROFILES, normalize_svg_profile
-from .rust_candidate import (
-    RUST_CANDIDATE_RENDER_ENGINE,
-    RUST_RENDER_ENGINE,
-    RustCandidateRenderEngine,
-    RustRenderEngine,
-)
 from .seeds import new_render_seed
 
 
 def current_render_engine() -> RenderEngine:
-    return RUST_RENDER_ENGINE
+    return DEFAULT_RENDER_ENGINE
 
 
 __all__ = [
     "DEFAULT_RENDER_ENGINE",
     "RenderEngine",
     "RenderEngineResult",
-    "RUST_CANDIDATE_RENDER_ENGINE",
-    "RUST_RENDER_ENGINE",
-    "RustCandidateRenderEngine",
-    "RustRenderEngine",
     "SVG_PROFILES",
     "current_render_engine",
     "new_render_seed",

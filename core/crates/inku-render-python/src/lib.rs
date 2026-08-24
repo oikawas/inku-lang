@@ -25,6 +25,13 @@ fn default_color_map_json() -> PyResult<String> {
     })
 }
 
+#[pyfunction]
+fn renderer_reference_json() -> PyResult<String> {
+    serde_json::to_string(&inku_render::reference::renderer_reference()).map_err(|error| {
+        PyValueError::new_err(format!("renderer reference serialization failed: {error}"))
+    })
+}
+
 /// Render one canonical coarse request and return SVG plus JSON metadata.
 #[pyfunction]
 fn render(request_json: &str) -> PyResult<(String, String)> {
@@ -44,6 +51,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_engine_id, module)?)?;
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;
     module.add_function(wrap_pyfunction!(default_color_map_json, module)?)?;
+    module.add_function(wrap_pyfunction!(renderer_reference_json, module)?)?;
     module.add_function(wrap_pyfunction!(render, module)?)?;
     Ok(())
 }

@@ -18,8 +18,11 @@ Sections (stable JSON keys):
 
 from __future__ import annotations
 
+import importlib
+import json
 import subprocess
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, get_args
 
@@ -56,26 +59,17 @@ from .plugins.document_format import (
 )
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 from .render_engines import SVG_PROFILES
-from .render_engines.default.marks import (
-    AMPLITUDE_CLAMP_RATIO,
-    AMPLITUDE_WIDTHS,
-    BLUR_RATIO,
-    CANVAS_PX,
-    REPRESENTATIVE_MIN_RATIO,
-    MIN_STROKE_WIDTH,
-    STYLE_TO_DASH,
-    TEXTURE_FILTER_WEIGHTS,
-    THINNESS_TO_WIDTH_SCALE,
-    WEIGHT_STYLE,
-    WEIGHT_TO_STROKE_WIDTH,
-)
-from .render_engines.default.mark_kernel import (
-    FREQUENCY_CYCLES,
-    SEGMENT_COUNT_MAX,
-    SEGMENT_COUNT_MIN,
-    SEGMENT_TARGET_RATIO,
-)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+@lru_cache(maxsize=1)
+def _renderer_reference() -> dict[str, Any]:
+    """Read renderer-owned reference values from the canonical native core."""
+    native = importlib.import_module("inku_render")
+    payload = json.loads(native.renderer_reference_json())
+    if not isinstance(payload, dict):
+        raise RuntimeError("Rust renderer reference is not a JSON object")
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -198,9 +192,8 @@ def _plugin_words() -> list[dict[str, Any]]:
 
 
 def _saijiki() -> dict[str, Any]:
-    # v1.92: saijiki テーブル (saijiki.py) を直接参照する。プロンプトのブロックは
-    # 同じテーブルから生成されるため、_parse_saijiki_block による抽出結果と常に
-    # 一致する (test_reference が両経路の同値を検査する)。
+    # Since v1.92 this reads the saijiki table directly. Prompt blocks come from
+    # the same table, and test_reference verifies that both paths stay equivalent.
     return {
         "core_categories_ja": {
             name: list(words) for name, words in saijiki_reference_categories("ja")
@@ -375,35 +368,14 @@ def _color_resolution() -> dict[str, Any]:
 # §6 weight_properties                                                         #
 # --------------------------------------------------------------------------- #
 def _weight_properties() -> dict[str, Any]:
-    weights: list[dict[str, Any]] = []
-    for weight in get_args(schema.Weight):
-        style = WEIGHT_STYLE.get(weight, {})
-        weights.append(
-            {
-                "weight": weight,
-                "stroke_width": WEIGHT_TO_STROKE_WIDTH[weight],
-                "stroke_opacity": style.get("stroke_opacity"),
-                "stroke_dasharray": style.get("stroke_dasharray"),
-                "stroke_linecap": style.get("stroke_linecap"),
-                "texture_filter": weight in TEXTURE_FILTER_WEIGHTS,
-            }
-        )
-    return {
-        "weights": weights,
-        "line_style_dash": {style: STYLE_TO_DASH[style] for style in get_args(schema.LineStyle)},
-        "texture_filter_weights": sorted(TEXTURE_FILTER_WEIGHTS),
-        "thinness_width_scale": {
-            str(key): value for key, value in THINNESS_TO_WIDTH_SCALE.items()
-        },
-        "min_stroke_width": MIN_STROKE_WIDTH,
-        "canvas_px": CANVAS_PX,
-    }
+    return _renderer_reference()["weight_properties"]
 
 
 # --------------------------------------------------------------------------- #
 # §7 performance                                                               #
 # --------------------------------------------------------------------------- #
 def _performance() -> dict[str, Any]:
+    renderer = _renderer_reference()["performance"]
     return {
         "canvas_aspects": [
             {
@@ -419,20 +391,12 @@ def _performance() -> dict[str, Any]:
         "default_canvas_aspect_id": DEFAULT_CANVAS_ASPECT_ID,
         "canvas_base_px": CANVAS_BASE_PX,
         "svg_profiles": sorted(SVG_PROFILES),
-        "amplitude_widths": dict(AMPLITUDE_WIDTHS),
-        "amplitude_clamp_ratio": AMPLITUDE_CLAMP_RATIO,
-        "representative_min_ratio": REPRESENTATIVE_MIN_RATIO,
-        "frequency_cycles": dict(FREQUENCY_CYCLES),
-        "blur_ratio": dict(BLUR_RATIO),
-        "segment_target_ratio": SEGMENT_TARGET_RATIO,
-        "segment_count_range": [SEGMENT_COUNT_MIN, SEGMENT_COUNT_MAX],
+        **renderer,
         "default_anchor_region": list(_REGIONS["中域"]),
         "seed_summary": (
             "The JSON Score is deterministic; wobble and scatter are performed by "
-            "the renderer from a performance seed (per-instruction, derived in "
-            "default.determinism._seed_for_instruction). composition_seed re-salts "
-            "intermediate "
-            "expansion (expand_intermediate_ddl) to produce a sibling reading "
+            "the Rust renderer from a performance seed. composition_seed re-salts "
+            "arrangement expansion to produce a sibling reading "
             "without changing the score's meaning."
         ),
     }

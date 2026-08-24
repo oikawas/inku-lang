@@ -171,9 +171,9 @@ npm run check
 npm run build
 ```
 
-## Running Without an API Key (local Ollama)
+## Using a local Ollama provider
 
-inku can use [Ollama](https://ollama.com) as a provider. **No API key is needed, and the description never leaves the machine.**
+inku can connect to [Ollama](https://ollama.com) through its local OpenAI-compatible endpoint. This is a separately managed setup: the operator installs and runs Ollama, pulls the models, configures the endpoint, and assigns each stage. **It is not a claim that the whole of inku can be used without API keys or authentication settings.** Only the Stage 1 / Stage 2 pair below has been measured. Vision can use the same compatibility path when Ollama serves a model that accepts image input, but the current verified local catalog contains no Vision model and the standard setup does not guarantee one.
 
 ### 1. Widen the context length
 

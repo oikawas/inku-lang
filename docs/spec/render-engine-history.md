@@ -217,7 +217,7 @@ outputs, frozen, produced from fixed inputs.** A version number carries only one
   identity fields (`corpus_format_version`, `engine_version`, `schema_version`,
   `color_map_digest`) move, **a dependency was left unfixed**.
 
-There are two instances as of v2.4.7.
+There are two instances as of v2.6.0.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|

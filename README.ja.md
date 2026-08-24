@@ -126,7 +126,7 @@ cd server && UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server   # API（既定
 cd web && npm install && npm run dev                              # → http://localhost:5173
 ```
 
-少なくとも Stage 1 / Stage 2 用の LLM provider が要ります（`INKU_LLM_BACKEND` と API キー、または Web UI のモデル設定画面）。**API キーを持たずに始めることもできます** — 手元の [Ollama](https://ollama.com) を provider に選ぶ道で、手順と推奨のモデルは [SETUP.ja.md](SETUP.ja.md) にあります。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
+少なくとも Stage 1 / Stage 2 用の LLM provider が要ります（`INKU_LLM_BACKEND` と各 provider の認証・接続設定、または Web UI のモデル設定画面）。手元の [Ollama](https://ollama.com) も、別途導入・起動・モデル取得・接続・段への割り当てを行う provider として選べます。手順と実測した Stage 1 / Stage 2 の組み合わせは [SETUP.ja.md](SETUP.ja.md) にあります。Vision は対応モデルを別途設定した場合に利用でき、標準のローカルモデル構成には含みません。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
 
 ログインしたら短い記述を書きます。生成後は歳時記を参照し、解釈フィードバックの墨の濃淡で「どう読まれたか」を確かめ、必要なら記述を推敲します。
 
@@ -247,7 +247,7 @@ inku の描画エンジンには、**過去の版が存在しません**。現�
 
 保存した作品は**刷り**です。SVG そのものが残るので、当時の姿はいつでも見られます。エンジンは**版木**で、彫り進めた先しか存在しません。再描画すれば最新のエンジンで刷られ、それは新しいエディションになります。両方を倉庫に取っておくことはしません。
 
-版木は戻せませんが、刷りは残せます。世代が上がるたびに、決まった入力から得た出力の実物を凍結しています（`server/reference/`、現在 350 ケース）。**どの版が何をどう変えたかは [render engine の版史](docs/spec/render-engine-history.ja.md) にあります。**
+版木は戻せませんが、刷りは残せます。世代が上がるたびに、決まった入力から得た出力の実物を凍結しています（`server/reference/`、現在 610 ケース）。**どの版が何をどう変えたかは [render engine の版史](docs/spec/render-engine-history.ja.md) にあります。**
 
 ---
 
@@ -268,7 +268,7 @@ inku の描画エンジンには、**過去の版が存在しません**。現�
 
 - **Web版** — 稼働中（Python FastAPI + SvelteKit、ローカルまたはサーバーで動作）
 - **CLI** — `cli/` 以下に独立プロジェクトとして実装。API 経由でログイン、描画、バッチ生成、ベンチ評価を実行
-- **Android アプリ** — `2.1.2-android.1`。描画は server と同じ render engine 15 を Kotlin で実装
+- **Android アプリ** — `2.1.4-android.51`。Kotlin の描画は render engine 35 を実装し、server の render engine 40 へ後から追随する
 
 **日本語版**と**英語版**の inku は作者が維持します。他言語の実装は、OSS として各言語話者の貢献を歓迎します。内部の JSON Score 層は言語非依存（英語キーで統一）で、翻訳が必要なのは記述の表層部分のみです。
 

@@ -127,7 +127,7 @@ holds the mapping to Japanese terms.
 - 11 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 2 thinness values — `fine` / `extra_fine` (an axis independent of the tool)
 - 9 colors — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
-- 9 surface textures, 5 surface directions, 6 ground materials
+- 9 surface textures, 5 surface directions, 7 ground materials
 
 The saijiki table is a single source: the Stage 1 prompt vocabulary block, plugin closure markers,
 relation phrases, the web Saijiki display, and reference §1 are all derived from it.
@@ -336,8 +336,11 @@ The default scope gives `admins` everything, `leaders` their own organisation an
 works, and a per-work ACL and the group-aimed flag the work carries itself add to it.
 **The paths written in raw SQL run through the same predicate** — when full-text search is left out,
 it shows up not as "too much is visible" but as "it goes missing when you search".
-- The LLM layer reaches both Anthropic and OpenAI-compatible local or cloud backends, and the product
-can be started without a single API key.
+- The LLM layer reaches Anthropic and OpenAI-compatible local or cloud providers. A local Ollama is a
+separately installed and operated provider whose models, connection, and stage assignments must be
+configured; it is not a guarantee that the whole product works without API keys or authentication
+settings. Vision can use the same compatibility path when a separately configured model accepts image
+input, but the verified local catalog has no standard Vision model.
 Model reference resolution follows three rules — explicit qualification, sole ownership, then the
 stage default — and never guesses.
 

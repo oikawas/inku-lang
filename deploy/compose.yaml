@@ -28,8 +28,9 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      # Local Ollama, which needs no key. Its default endpoint is localhost, and
-      # inside this container localhost is the container -- so reaching an Ollama
+      # Optional local Ollama endpoint. Ollama, its models, and the stage/vision
+      # assignments are managed separately; this setting only points inku at it.
+      # Inside this container localhost is the container, so reaching an Ollama
       # on the host means naming the host. See `extra_hosts` below.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
     # `host.docker.internal` resolves on its own under Docker Desktop but not on

@@ -172,9 +172,9 @@ npm run check
 npm run build
 ```
 
-## APIキーなしで動かす（ローカル Ollama）
+## ローカル Ollama を provider として使う
 
-inku は [Ollama](https://ollama.com) をプロバイダーとして選べる。**APIキーは要らず、記述は機体の外へ出ない。**
+inku は [Ollama](https://ollama.com) へ OpenAI 互換のローカル endpoint として接続できる。これは、Ollama の導入・起動、モデル取得、接続先、段ごとの割り当てを利用者が別途管理する構成であり、**inku 全体を API キーや認証設定なしで利用できるという意味ではない。** 以下で実測済みなのは Stage 1 / Stage 2 の組み合わせだけである。Vision も Ollama が画像入力を扱える対応モデルなら同じ互換経路を使えるが、現在の検証済みローカルカタログには Vision モデルを収録しておらず、標準構成として保証しない。
 
 ### 1. コンテキスト長を広げる
 

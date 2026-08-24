@@ -49,6 +49,13 @@ LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
 # widening it to every extension drags in generated paths (`cli/out2/...`) that
 # are absent by design.
 PROSE_DOC = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ja\.)?md)`")
+VERSION_MARK = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+|Builds?[ \t]+[0-9]+")
+
+# Root changelog entries are already paired by their ### headings. Their prose
+# translates Build ranges idiomatically: Japanese may say ``Build 777 / 778``
+# where English says ``777, 778`` under the same entry. I-326 confirmed that a
+# repeated ``Build`` token is not evidence that the underlying record is absent.
+VERSION_PARITY_EXEMPT = frozenset({"CHANGELOG.ja.md"})
 
 # (japanese, english, mode, reason the two may differ | None)
 #
@@ -371,6 +378,52 @@ def check_parity() -> list[str]:
     return problems
 
 
+def version_marks(text: str) -> set[str]:
+    """Version and Build marks, normalized across English singular/plural prose."""
+    return {
+        re.sub(r"^Builds", "Build", match)
+        for match in VERSION_MARK.findall(text)
+    }
+
+
+def version_mark_differences(
+    ja_text: str, en_text: str
+) -> tuple[set[str], set[str]]:
+    """Return marks present only in Japanese and only in English."""
+    ja_marks = version_marks(ja_text)
+    en_marks = version_marks(en_text)
+    return ja_marks - en_marks, en_marks - ja_marks
+
+
+def check_version_parity() -> list[str]:
+    """Check that paired documents carry the same explicit version records."""
+    problems = []
+    compared = 0
+    for ja_name, en_name, _, _ in PAIRS:
+        if ja_name in VERSION_PARITY_EXEMPT:
+            continue
+        ja, en = REPO_ROOT / ja_name, REPO_ROOT / en_name
+        if not ja.exists() or not en.exists():
+            # ``check_parity`` owns whole-file absence and its declared exceptions.
+            continue
+        compared += 1
+        ja_only, en_only = version_mark_differences(
+            ja.read_text(encoding="utf-8"), en.read_text(encoding="utf-8")
+        )
+        if ja_only or en_only:
+            problems.append(
+                f"{ja_name} and {en_name} do not carry the same version marks:\n"
+                f"    Japanese only: {_summarise_marks(ja_only)}\n"
+                f"    English only: {_summarise_marks(en_only)}"
+            )
+    print(f"  version-mark pairs compared: {compared}")
+    return problems
+
+
+def _summarise_marks(marks: set[str]) -> str:
+    return ", ".join(sorted(marks)) if marks else "<none>"
+
+
 def _summarise(shape: list[int]) -> str:
     counts = {level: shape.count(level) for level in sorted(set(shape))}
     return " ".join(f"h{level}={n}" for level, n in counts.items())
@@ -522,6 +575,8 @@ def _inside_tracked_dir(resolved: str, tracked: set[str]) -> bool:
 def main() -> int:
     print("checking that the two language versions have the same shape")
     parity = check_parity()
+    print("checking that the two language versions carry the same version marks")
+    version_parity = check_version_parity()
     tracked = _tracked()
     print("checking that published documents link to published paths")
     links = check_links(tracked)
@@ -530,7 +585,7 @@ def main() -> int:
     print("checking that the English follows the glossary")
     terminology = check_terminology()
 
-    problems = parity + links + prose + terminology
+    problems = parity + version_parity + links + prose + terminology
     if not problems:
         print("documents are consistent.")
         return 0

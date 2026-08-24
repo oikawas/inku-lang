@@ -113,7 +113,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - 道具 11 — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 細さ 2 — `fine` / `extra_fine`（道具から独立した太さの軸）
 - 色 9 — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
-- 面の質感 9・面の向き 5・地の素材 6
+- 面の質感 9・面の向き 5・地の素材 7
 
 saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙ブロック・プラグインの閉包マーカー・relation の固定句・web の歳時記表示・reference §1 をそこから導出する。
 語彙の変更はテーブルと golden test を経由する。
@@ -266,7 +266,7 @@ router 既定より強いガード（`plugins` の管理者限定 7 本）を課
 どちらも述語 1 本を通る。既定の見える範囲は `admins` が全部・`leaders` が自分の組織・`users` が自分の作品で、
 そこへ作品ごとの ACL と、作品が自分で言うグループ宛の旗が足す。**生の SQL で書かれた経路も同じ述語を通す** ——
 全文検索が漏れると、現れ方は「見えすぎる」ではなく「検索したときだけ見えない」になる。
-- LLM は Anthropic とローカル／クラウドの OpenAI 互換の両系統へ繋がり、API キーを 1 つも用意せずに始められる。
+- LLM は Anthropic とローカル／クラウドの OpenAI 互換の各 provider へ繋がる。ローカル Ollama は別途導入・起動・モデル取得・接続・段への割り当てを行う構成で、製品全体を API キーや認証設定なしで利用できるという保証ではない。Vision は画像入力に対応するモデルを別途設定した場合に同じ互換経路を使えるが、検証済みローカルカタログには標準 Vision モデルを持たない。
 モデル参照の解決は明示修飾 → 一意所有 → 段の既定の 3 段規則で、推測をしない。
 
 ### cli

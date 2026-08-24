@@ -7986,3 +7986,10 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常作品を持つ系譜cardのthumbnail右上へ、保存済みStar状態を`★`／`☆`で常時示すcontrolを追加した。** focus外cardのcontrolを押してもcard選択を発火させず、selected workと系譜focusを保つ。tombstoneには表示しない。
 - **既存Star保存後に同じfocusで系譜を再取得し、card表示をその場で更新する。** 既存`HistoryItemEntity.starred`、`toggleStar(HistoryItemEntity)`、`HistoryBadge`だけを使い、card tap、thumbnail、世代・状態、描画要素／DDL／モデル／言語actionを維持した。新しいproducer、query、schema、engineは無い。
 - **検証:** production edit前のfocused実機testはStar control 3件を期待して0件で1/1 failure。実装初回はDB保存・graph refresh・focus維持まで通り、画面文字assertの再composition待機だけをtest側へ追加した。その後の実装中とbranch-tip finalは各1/1 green。各run前の退避はhistory 2、lineage 2、schema 9、thumbnail 1,239件を保持した。全instrumentation、全JVM suite、screenshot、reference生成、pentalaは対象外。
+
+### v2.13.47 — Webと描画中核の責務を分け、Engine 41を共有Rust coreへ移す（Build 976、2026-08-24）
+
+- **歳時記の色プレビューを9色へ揃えた。** 黄・橙・紫も、既存の6色と同じように語彙から色見本を確認できる。
+- **Webの大きな画面モジュールを、変更理由ごとのownerへ分けた。** `+page.svelte`はroute lifecycleと画面構成・owner配線を担うshellとなり、Session・単一作品・Batch・Demo・履歴／系譜・Canvas viewport・推敲・Settingsはrouteごとのstate owner、1回のPaintや推敲処理はstateless operation、CanvasとSettingsの表示はfocused viewが持つ。作品を切り替えた後に戻る古い非同期結果は、runまたはtarget identityが一致しなければ現在画面へ適用しない。
+- **Render Engine 41で、Engine 40の演奏をplatform-independentな共有Rust coreへ移した。** Rustがplanning・geometry・mark・surface・layer・SVG・描画metadataを持ち、Pythonは検証済みScoreと解決済みoptionを1個のrequestとして薄いadapterから1回だけ渡す。旧Python描画実装とruntime fallbackは退役した。これは描画品質を意図的に変える版ではなく、今後Android等へ同じcoreを渡せるportability boundaryであり、client bindingの統合完了を意味しない。
+- **依存・検査・公開運用契約を新しい境界へ同期した。** Webの互換範囲内のbuild依存を更新し、`nanoid`のsecurity patchを取り込んだ。参照corpusのCIはlocal Rust bindingを明示的に組み込んで現行Engine 41を再生成する。公開setupは、local Ollamaを別途導入・起動・model取得・接続・段への割り当てが必要なproviderとして明記し、製品全体をAPI keyや認証設定なしで利用できるという従来の主張を撤回した。

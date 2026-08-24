@@ -622,6 +622,8 @@ DRAW を押した後、記述した文字列に**解釈の度合いを示す色*
 
 本節は**参照インターフェースが実際に何を提供しているか**の記録である。概念ではなく運用の面を持つ。
 
+Web実装では、`+page.svelte`をroute composition shellとし、route lifecycle、画面構成、history／lineageのcross-owner action、短い表示用projectionとowner配線を保持する。Session、単一作品、Batch、Demo、履歴／系譜、Canvas viewport、推敲、Settingsはrouteごとに1個のownerが可変stateと非同期identityを持つ。1回のPaint、履歴保存／再演、推敲候補の計画と適用は、解決済みinputと名前付きcapabilityだけを受けるstateless operationへ分ける。CanvasとSettingsのfocused viewは表示とlocal draftを所有するが、domain state、transport、request serialization、追加のawait境界を複製しない。作品を切り替えた後に古い非同期結果が戻っても、runまたはtarget identityが一致しない結果は現在画面へ適用しない。
+
 短い英語のタブ・ボタン・ラベルは `docs/i18n/glossary.md` の対応表と `web/src/lib/i18n/GLOSSARY.md` の文体規則に従う（2026-08-17 に対応表を前者へ統合した）。後者の規則を `npm run lint:i18n`（v2.7.1）が強制する。iPad 級の幅では Canvas のタブと、表示中の モデル／色／キャンバス／作成時刻のメタデータが 2 行へ折り返し、左パネルは作品メタデータを切り落とさずビューポートに合わせて伸縮する。
 
 Web アプリが現行の参照インターフェースである。v1.72 で推敲とモデル比較を一級の制作面にした。`推敲` タブはタッチ・配置・読み取り・色カタログ・変奏（§12.13）の変更をラジオ選択として提供する — **1 回の推敲で選べる介入はちょうど 1 つ**であり、系譜の各辺は 1 つの原因に帰属できる。
@@ -1221,6 +1223,10 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 - primitive の展開
 - SVG フィルターとテクスチャ効果
 - キャンバス比の扱い
+
+現行の標準実装はRender Engine 41であり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。`renderer.py`はSVGだけを必要とする既存callerの互換facadeであり、第二の描画実装ではない。
+
+Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroid、将来のiOS等へ同じcoreを渡すためのportability boundaryであり、各clientへのbinding統合が完了したことを意味しない。
 
 renderer は制御された揺らぎを生んでよいが、**JSON Score の意図は保たねばならない**。各描画は `render_seed` を持ちうる。同じ seed を与えれば再演は再現し、正本の Score は動かない。演奏の 2 つのスケールと render engine の版史は §13.8 と §13.11 にある。
 

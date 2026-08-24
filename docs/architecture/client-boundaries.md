@@ -33,6 +33,8 @@ flowchart TB
     PAGE["+page.svelte\nroute lifecycle, shell state, and owner wiring"]
     SESSION["features/session/state.svelte.ts\nlogin, profile, actor, and member preferences"]
     WORK["features/work/state.svelte.ts\nsingle-work input, submit/replay/stop, result, timers, and tokens"]
+    BATCH["features/batch/state.svelte.ts\nbatch prompt, resume/retry, run identity, and progress"]
+    DEMO["features/demo/state.svelte.ts\ndemo settings, repetition, run identity, and current result"]
     RUN["features/run/current-work.ts\nstateless one-Paint operation and stream projection"]
     HISTORY["features/history/*\nroute-instance browsing, lineage, mutations, and stateless work actions"]
     VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom, fit, pan, and input handling"]
@@ -55,6 +57,8 @@ flowchart TB
 
     PAGE -->|"construct once"| SESSION
     PAGE -->|"construct once"| WORK
+    PAGE -->|"construct once"| BATCH
+    PAGE -->|"construct once"| DEMO
     PAGE -->|"construct once"| REFINE_COORD
     PAGE -->|"construct once"| SETTINGS
     PAGE -->|"construct once"| HISTORY
@@ -62,6 +66,8 @@ flowchart TB
     PAGE --> COMPONENTS
 
     WORK -->|"resolved defaults + named capabilities"| RUN
+    WORK -->|"one-work Paint + focused callbacks"| BATCH
+    WORK -->|"one-work Paint + focused callbacks"| DEMO
     WORK -->|"selection, refresh, and lineage capabilities"| HISTORY
     WORK -->|"fit requests"| VIEWPORT
     WORK --> REFINE_SESSION
@@ -98,7 +104,9 @@ flowchart TB
 |---|---|---|
 | Route shell memory | Output tab, modal visibility, short presentation projections, and lifecycle wiring | Lost on reload; not Server-canonical. Domain workflows are constructed once and are not copied back into the route |
 | Route-instance Session owner | Login/logout, current actor, profile editing, member UI/history preferences, and download-folder preference | One `createSessionState` per route; authentication callbacks cross a named boundary and password values stay inside the operation |
-| Route-instance Work owner | Single-work input, submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and Batch/Demo run coordination | One `createWorkState` per route; it owns the AbortControllers and stale-run decisions and calls the stateless Paint operation without adding a request or state copy |
+| Route-instance Work owner | Single-work input, submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and one-work Paint coordination with Batch/Demo | One `createWorkState` per route; it owns single-work AbortControllers and stale-run decisions and calls the stateless Paint operation without adding a request or state copy |
+| Route-instance Batch owner | Prompt history, resume/retry plans, line progress, stopping, failures, and latest-result following | One `BatchState` per route; a private run identity rejects late results, and the owner borrows only one-work Paint plus focused history callbacks from Work |
+| Route-instance Demo owner | Demo settings, prompt generation, repetition, timeout/stop, token/elapsed totals, and current-result saving | One `DemoState` per route; a private run identity rejects results from stopped runs, and the owner borrows only one-work Paint plus focused projections from Work |
 | Stateless run feature | One Paint request, stream progress, and immediate saved-work projection | `runCurrentWork` receives resolved defaults and named capabilities from Work; route/component state and outer run ownership do not enter the operation |
 | Route-instance lineage query owner | Lineage graph/loading/error, stale-response identity, branch/overview merge, and nearby works | One `LineageQueryState` per route; query state is not copied into a history action module or the page |
 | Route-instance history browsing owner | Strip items/count/offset/selection, filters, paging/resize, stale-response identity, trash summary, external refresh, mark projections, and manager coordination | One `HistoryBrowsingState` per route constructs exactly one existing `HistoryManagerState`; manager request/cache/page-size semantics are not copied |
@@ -122,7 +130,7 @@ flowchart TB
 | Render payload | Catalog, Wild, and related request fields | Contributors grouped by request kind in `render-payload.ts` |
 | Server DB | History, SVG, Score, lineage | A client does not choose trusted SVG content |
 
-`+page.svelte` is now the route composition shell: it constructs route-instance owners once, keeps top-level lifecycle, authenticated switching, modal/view visibility, build presentation, and short cross-owner projections, and wires named capabilities. `features/work/state.svelte.ts` owns current single-work state plus submit/replay/stop and Batch/Demo coordination; `features/run/current-work.ts` remains the stateless one-Paint operation. `features/session/state.svelte.ts` owns authentication and member preferences. `features/canvas/refinement-coordinator.svelte.ts` owns target identity and refinement orchestration while reusing the existing session and stateless action modules.
+`+page.svelte` is now the route composition shell: it constructs route-instance owners once, keeps top-level lifecycle, authenticated switching, modal/view visibility, build presentation, and short cross-owner projections, and wires named capabilities. `features/work/state.svelte.ts` owns current single-work state plus submit/replay/stop; `features/batch/state.svelte.ts` and `features/demo/state.svelte.ts` own their asynchronous run lifecycles. Work lends each owner only one-work Paint and focused callbacks. `features/run/current-work.ts` remains the stateless one-Paint operation. `features/session/state.svelte.ts` owns authentication and member preferences. `features/canvas/refinement-coordinator.svelte.ts` owns target identity and refinement orchestration while reusing the existing session and stateless action modules.
 
 The following Stage 5-7 paragraphs record the boundary after each historical cut. The Stage 10 paragraph and ownership table above describe the current converged boundary.
 
@@ -165,7 +173,7 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 - Flow: `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Room.
 - `RoutingModelProvider` selects local LiteRT-LM or an OpenAI-compatible remote provider.
-- `CompatibilityConstants.renderEngineVersion` is 35; Server is 38.
+- `CompatibilityConstants.renderEngineVersion` is 35; Server is 41, and the shared Rust core is not yet integrated into Android.
 - Server conditions, schema, seeds, and reference fixtures are ported later. Matching numbers would not by themselves prove identical implementations.
 
 ## Language and UI sources

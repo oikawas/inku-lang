@@ -9,6 +9,7 @@ flowchart LR
     SYS_CLI["inku-cli"]
     SYS_ANDROID["Separate Android implementation"]
     SYS_API["inku Server / FastAPI"]
+    SYS_CORE["Shared Rust Engine 41\none coarse native call"]
     SYS_LLM["External or local LLM provider"]
     SYS_DB[("Server DB / canonical")]
     SYS_FILES[("Work files / optional derivatives")]
@@ -19,6 +20,7 @@ flowchart LR
     SYS_USER -->|"device actions and description"| SYS_ANDROID
     SYS_WEB -->|"same-origin HTTP API"| SYS_API
     SYS_CLI -->|"public HTTP API"| SYS_API
+    SYS_API -->|"validated Score + resolved options"| SYS_CORE
     SYS_API -->|"Stage calls"| SYS_LLM
     SYS_API -->|"history, settings, session"| SYS_DB
     SYS_API -->|"SVG, JSON, DDL, PNG output"| SYS_FILES
@@ -26,7 +28,7 @@ flowchart LR
     SYS_ANDROID -->|"history, settings, lineage"| ANDROID_DB
 ```
 
-Within Web, `+page.svelte` retains route lifecycle and owner wiring while route-instance owners hold Session, Work, Refinement, Settings, history/lineage, and viewport state. Stateless operations perform one Paint or refinement action; focused views own Canvas and Settings presentation. The canonical owner diagram lives in `client-boundaries.md`.
+Within Web, `+page.svelte` retains route lifecycle, view composition, and owner wiring while route-instance owners hold Session, Work, Batch, Demo, Refinement, Settings, history/lineage, and viewport state. Stateless operations perform one Paint or refinement action; focused views own Canvas and Settings presentation. Inside the Server, a thin Python adapter makes one call through an independent wheel, while the platform-independent Rust core owns Engine 41 planning, geometry, marks, surfaces, layers, SVG, and metadata. The canonical owner diagram lives in `client-boundaries.md`; the Rust module diagram lives in `server-components.md`.
 
 ## External and trust boundaries
 
@@ -36,6 +38,7 @@ Within Web, `+page.svelte` retains route lifecycle and owner wiring while route-
 | Web → API | Vite proxy in development; SvelteKit hook proxy in the packaged service | `vite.config.ts`; `web/src/hooks.server.ts` |
 | CLI → API | HTTP through `urllib`; no Server package import | `cli/src/inku_cli/cli.py` |
 | API → provider | Resolve provider/model, then use Anthropic, Gemini, or OpenAI-compatible connections | `model_settings.py`; `interpreter.py`; `composer.py` |
+| API → Rust core | Pass a validated Score and resolved host options as one JSON request and receive SVG plus metadata together | `render_engines/default/adapter.py`; `inku-render-python`; `core/crates/inku-render` |
 | API → DB | Persist Server history, lineage, settings, and authentication state | `db.py`; `rendering.py` |
 | API → files | Best-effort queue independent of DB persistence; a full queue skips only the file job | `api_core/state.py`; `rendering.py:_submit_history_artifact_save` |
 | Android | Separate trust, pipeline, and storage boundary | `InkuRepository`; `InkuDatabase`; `LocalFallbackPipeline` |
@@ -46,5 +49,6 @@ Within Web, `+page.svelte` retains route lifecycle and owner wiring while route-
 |---|---|---|
 | Author, Web, CLI, Android | `SYS-USER`, `SYS-WEB`, `SYS-CLI`, `SYS-ANDROID` | Entry points and client code |
 | FastAPI and provider | `SYS-API`, `SYS-LLM` | `api.py`, `model_settings.py` |
+| Rust render core | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Server DB and files | `SYS-DB`, `SYS-FILES` | `db.py`, `rendering.py` |
 | Android Room | `SYS-ANDROID` | `data/db/InkuDatabase.kt` |

@@ -33,6 +33,8 @@ flowchart TB
     PAGE["+page.svelte\nroute lifecycle・shell state・owner配線"]
     SESSION["features/session/state.svelte.ts\nlogin・profile・actor・member preference"]
     WORK["features/work/state.svelte.ts\nsingle-work input・submit/replay/stop・result・timer/token"]
+    BATCH["features/batch/state.svelte.ts\nbatch prompt・resume/retry・run identity・進行"]
+    DEMO["features/demo/state.svelte.ts\ndemo設定・反復・run identity・current result"]
     RUN["features/run/current-work.ts\nstatelessな1回のPaint operation・stream projection"]
     HISTORY["features/history/*\nroute-instance browsing・lineage・mutationとstateless work action"]
     VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom・fit・pan・input処理"]
@@ -55,6 +57,8 @@ flowchart TB
 
     PAGE -->|"各1回生成"| SESSION
     PAGE -->|"各1回生成"| WORK
+    PAGE -->|"各1回生成"| BATCH
+    PAGE -->|"各1回生成"| DEMO
     PAGE -->|"各1回生成"| REFINE_COORD
     PAGE -->|"各1回生成"| SETTINGS
     PAGE -->|"各1回生成"| HISTORY
@@ -62,6 +66,8 @@ flowchart TB
     PAGE --> COMPONENTS
 
     WORK -->|"解決済みdefault + named capability"| RUN
+    WORK -->|"1作品のPaint + focused callback"| BATCH
+    WORK -->|"1作品のPaint + focused callback"| DEMO
     WORK -->|"選択・refresh・lineage capability"| HISTORY
     WORK -->|"fit要求"| VIEWPORT
     WORK --> REFINE_SESSION
@@ -98,7 +104,9 @@ flowchart TB
 |---|---|---|
 | route shell memory | output tab、modal表示、短い表示用projection、lifecycle配線 | reloadで消える。server正本ではない。domain workflowはrouteごとに1回生成し、routeへ複製しない |
 | route-instance Session owner | login/logout、current actor、profile編集、memberのUI/history preference、download folder preference | routeごとに1個の`createSessionState`。認証後処理はnamed boundaryを通り、password値はoperation内に留まる |
-| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demo run調停 | routeごとに1個の`createWorkState`。AbortControllerとstale-run判断を所有し、requestやstate copyを増やさずstateless Paint operationを呼ぶ |
+| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demoとの1作品Paint調停 | routeごとに1個の`createWorkState`。single-workのAbortControllerとstale-run判断を所有し、requestやstate copyを増やさずstateless Paint operationを呼ぶ |
+| route-instance Batch owner | prompt履歴、resume/retry plan、line進行、停止、failure、latest-result follow | routeごとに1個の`BatchState`。private run identityがlate resultを遮断し、Workから1作品Paintとfocused history callbackだけを借りる |
+| route-instance Demo owner | demo設定、prompt生成、反復、timeout/stop、token/elapsed、current result保存 | routeごとに1個の`DemoState`。private run identityが停止済みrunの遅延結果を遮断し、Workから1作品Paintとfocused projectionだけを借りる |
 | stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`はWorkから解決済みdefaultと名前付きcapabilityを受ける。route/component stateと外側run ownershipはoperationへ入らない |
 | route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge、nearby作品 | routeごとに1個の`LineageQueryState`。query stateをhistory action moduleやpageへ複製しない |
 | route-instance history browsing owner | stripのitems/count/offset/選択、filter、paging/resize、stale-response identity、trash summary、external refresh、mark projection、manager連携 | routeごとに1個の`HistoryBrowsingState`が既存`HistoryManagerState`を必ず1個だけ生成する。managerのrequest/cache/page-size意味論は複製しない |
@@ -122,7 +130,7 @@ flowchart TB
 | render payload | catalog/wild等のrequest field | `render-payload.ts`のkind別contributor |
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
-`+page.svelte`はroute composition shellとなった。route-instance ownerを各1回生成し、top-level lifecycle、認証画面切替、modal/view表示、build表示、短いcross-owner projection、named capability配線を保持する。`features/work/state.svelte.ts`がcurrent single-work state、submit/replay/stop、Batch/Demo調停を所有し、`features/run/current-work.ts`はstatelessな1回のPaint operationに留まる。`features/session/state.svelte.ts`が認証とmember preferenceを所有する。`features/canvas/refinement-coordinator.svelte.ts`がtarget identityとrefinement orchestrationを所有し、既存session/action moduleを再利用する。
+`+page.svelte`はroute composition shellとなった。route-instance ownerを各1回生成し、top-level lifecycle、認証画面切替、modal/view表示、build表示、短いcross-owner projection、named capability配線を保持する。`features/work/state.svelte.ts`がcurrent single-work stateとsubmit/replay/stopを所有し、`features/batch/state.svelte.ts`と`features/demo/state.svelte.ts`が各runの非同期lifecycleを所有する。Workは両ownerへ1作品Paintとfocused callbackだけを貸す。`features/run/current-work.ts`はstatelessな1回のPaint operationに留まる。`features/session/state.svelte.ts`が認証とmember preferenceを所有する。`features/canvas/refinement-coordinator.svelte.ts`がtarget identityとrefinement orchestrationを所有し、既存session/action moduleを再利用する。
 
 以下のStage 5〜7の段落は、各cut直後の境界を記録した履歴である。現在の収束後の境界は、上の責務表とStage 10の段落を正とする。
 
@@ -165,7 +173,7 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 - `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Roomという端末内flow。
 - `RoutingModelProvider` はlocal LiteRT-LMとOpenAI-compatible remote providerを選ぶ。
-- `CompatibilityConstants.renderEngineVersion` は35。Serverの38とは別版である。
+- `CompatibilityConstants.renderEngineVersion` は35。Serverの41とは別版であり、共有Rust coreはまだAndroidへ統合されていない。
 - serverの条件式・schema・seed・参照fixtureを後追い移植する。数字が同じでも自動的な同一実装ではない。
 
 ## i18nとUI token

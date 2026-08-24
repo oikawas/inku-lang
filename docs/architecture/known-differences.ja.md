@@ -35,7 +35,7 @@
 
 ### C-01 `web/src/routes/+page.svelte`
 
-Session、current-workのsubmit/replay/stop、refinement orchestrationとtarget identity、Settings管理slice、最大のCanvas/Settings viewにはroute-instanceまたはfocused ownerができた。pageはroute lifecycle、modal/view state、component配線、history/lineageのcross-owner action、短い表示用projectionを保持する。composition seamではあるが、高変更workflow 3件のcanonical writerではなくなった。
+Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、refinement orchestrationとtarget identity、Settings管理slice、最大のCanvas/Settings viewにはroute-instanceまたはfocused ownerができた。pageはroute lifecycle、modal/view state、component配線、history/lineageのcross-owner action、短い表示用projectionを保持する。composition seamではあるが、高変更workflowのcanonical writerではなくなった。
 
 残る行数だけではowner違反を示さない。次の分割は、同じ変更理由が複数ownerを横断する、mutable stateが二重化する、または非同期failure境界がpageへ戻る場合にだけ検討する。
 

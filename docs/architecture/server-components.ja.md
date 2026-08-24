@@ -98,6 +98,39 @@ flowchart LR
 
 Stage 6でPython Engine 40の統率、planning、mark、surface、layer、SVG emission、stroke moduleを削除した。`default/` に残るのはpackage exportと薄いRust adapterだけである。`/api/reference` も第二のPython実装をimportせず、renderer所有の表をnative coreから読む。Androidはまだ履歴上のKotlin rendererを使っており、このRust coreの採用は次のportability boundaryである。
 
+## Rust core内部
+
+```mermaid
+flowchart LR
+    PYBIND["inku-render-python\nJSON decode・CPython変換だけ"]
+    PUBLIC["lib.rs / types.rs / reference.rs\nengine identity・host-neutral型・reference"]
+    RENDER["render.rs\n粗いrequest/output境界・SVG統率・metadata"]
+    PLAN["performance.rs / planning.rs / arrangement.rs\nplacement.rs / group.rs\nScore-level演奏・関係・反復配置"]
+    GEOMETRY["geometry.rs / arc.rs / cloudform.rs / contact.rs\n純粋な点・輪郭・接触幾何"]
+    MATERIAL["marks.rs / mark_paths.rs / stroke.rs / fills.rs\nsurfaces.rs / surface_geometry.rs / support.rs / materials.rs\n画材・線・面・紙との接触"]
+    CANVAS["ground.rs / ground_patterns.rs / layers.rs / palette.rs\n支持体・presence・色割当"]
+    SVG["svg.rs\n小さいdocument tree・境界で1回serialize"]
+    DETERMINISM["determinism.rs\nhash・seed payload・scalar noise"]
+
+    PYBIND --> PUBLIC
+    PYBIND --> RENDER
+    RENDER --> PUBLIC
+    RENDER --> PLAN
+    RENDER --> MATERIAL
+    RENDER --> CANVAS
+    RENDER --> SVG
+    PLAN --> GEOMETRY
+    MATERIAL --> GEOMETRY
+    PLAN --> DETERMINISM
+    GEOMETRY --> DETERMINISM
+    MATERIAL --> DETERMINISM
+    CANVAS --> DETERMINISM
+    MATERIAL --> SVG
+    CANVAS --> SVG
+```
+
+`types.rs`はPython schemaの代替ではなく、検証・coerce済みの正規Scoreと解決済みhost optionだけを受ける。`render.rs`が唯一の全体統率で、planningは作品レベルの演奏と配置、geometryは副作用のない点列計算、material群はmark／stroke／surfaceとsupportの相互作用、canvas群はground／presence／palette、`svg.rs`は小さいdocument treeと最終serializeを所有する。`determinism.rs`は横断的に使われるがhost entropyは作らない。CPython bindingはこの公開面を粗く呼ぶだけで、内部moduleごとのPython往復やhost SDK依存を入れない。
+
 ## Router分類
 
 | Router | endpoint数 | 主責任 | default guard |

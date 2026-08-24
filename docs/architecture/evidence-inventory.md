@@ -4,12 +4,12 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; renderer and Web client boundaries refreshed 2026-08-24; Engine 41 retirement boundary refreshed 2026-08-24 |
-| Source branch / implementation commit | `refactor/i368-retire-python-renderer` / Stage 6 branch tip (based on `2ea9f683c44d`) |
-| Source uncommitted changes | None at the Stage 6 implementation snapshot; merge is pending |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 975` |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring and the Rust migration boundary reconciled with the current implementation 2026-08-24 |
+| Source branch / implementation commit | `main` / `3429864fe3605f9aaf5b392f3ea22a5602593357` (implementation baseline before this document update) |
+| Source state | Clean at the implementation baseline; this update changes public documentation only |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 976` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `975` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `976` |
 | Render Engine | implementation `default / 41`; shared Rust core with a thin Python adapter |
 | DDL | `ddl_version=3`; `ddl_engine_version=20` |
 | Android | `android/VERSION` = `2.1.4-android.63`; implementation reports Render Engine `35` |
@@ -48,7 +48,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | DATA-LINEAGE | Lineage nodes and edges | Connect only an explicit parent and derivation kind | `LineageNodeRow`; `LineageEdgeRow`; `db.py:add_item`; `test_lineage_acceptance.py` | §21; Project Context | Confirmed |
 | DATA-SAIJIKI | Saijiki | Vocabulary source for prompts, markers, relation literals, display, and references | `saijiki.py`; `test_saijiki_golden.py` | Project Context | Confirmed |
 | DATA-FALLBACK | Fallback records | Store each layer's fallback as a column (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`, Sketch from life = `sketch_state`), keeping "unrecorded" (works older than the column) apart from "not a fallback" | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context | Confirmed |
-| WEB-FEATURES | Web feature modules | Session, Work, Refinement, Settings, history/lineage, and viewport owners extracted from the route shell; stateless operations; focused Canvas and Settings views | `web/src/routes/+page.svelte`; `web/src/lib/features/{session,work,run,history,canvas,settings}/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte`; ownership tests | Project Context | Confirmed |
+| WEB-FEATURES | Web feature modules | Session, Work, Batch, Demo, Refinement, Settings, history/lineage, and viewport owners extracted from the route shell; stateless operations; focused Canvas and Settings views | `web/src/routes/+page.svelte`; `web/src/lib/features/{session,work,batch,demo,run,history,canvas,settings}/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte`; ownership tests | §7.8; Project Context | Confirmed |
 | WEB-REGISTRY | Three settings registries | Collect local storage, user settings, and render payload fields | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context | Confirmed |
 | WEB-I18N | UI language and tokens | Japanese/English UI, English glossary, and CSS tokens | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` | §6–7 | Confirmed |
 | OPS-COMPOSE | Compose distribution | API/Web services and persistent volume | `compose.yaml`; Server and Web Dockerfiles | §22 | Confirmed |

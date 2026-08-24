@@ -98,6 +98,39 @@ The canonical path is `api_core/rendering.py → render_engines` registry → `d
 
 Stage 6 removed the Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules. `default/` now contains only its package export and the thin Rust adapter. `/api/reference` obtains renderer-owned tables from the native core instead of importing a second Python implementation. Android still uses its historical Kotlin renderer; adopting this Rust core there is the next portability boundary.
 
+## Rust core internals
+
+```mermaid
+flowchart LR
+    PYBIND["inku-render-python\nJSON decoding and CPython conversion only"]
+    PUBLIC["lib.rs / types.rs / reference.rs\nengine identity, host-neutral types, and reference"]
+    RENDER["render.rs\ncoarse request/output boundary, SVG orchestration, and metadata"]
+    PLAN["performance.rs / planning.rs / arrangement.rs\nplacement.rs / group.rs\nScore-level performance, relations, and repeated placement"]
+    GEOMETRY["geometry.rs / arc.rs / cloudform.rs / contact.rs\npure point, contour, and contact geometry"]
+    MATERIAL["marks.rs / mark_paths.rs / stroke.rs / fills.rs\nsurfaces.rs / surface_geometry.rs / support.rs / materials.rs\ntools, strokes, surfaces, and support contact"]
+    CANVAS["ground.rs / ground_patterns.rs / layers.rs / color-assignment module\nsupport ground, presence, and color assignment"]
+    SVG["svg.rs\nsmall document tree serialized once at the boundary"]
+    DETERMINISM["determinism.rs\nhashes, seed payloads, and scalar noise"]
+
+    PYBIND --> PUBLIC
+    PYBIND --> RENDER
+    RENDER --> PUBLIC
+    RENDER --> PLAN
+    RENDER --> MATERIAL
+    RENDER --> CANVAS
+    RENDER --> SVG
+    PLAN --> GEOMETRY
+    MATERIAL --> GEOMETRY
+    PLAN --> DETERMINISM
+    GEOMETRY --> DETERMINISM
+    MATERIAL --> DETERMINISM
+    CANVAS --> DETERMINISM
+    MATERIAL --> SVG
+    CANVAS --> SVG
+```
+
+`types.rs` does not replace the Python schema; it receives only the canonical Score after validation/coercion and resolved host options. `render.rs` is the sole whole-render orchestrator. Planning owns work-level performance and placement, geometry owns side-effect-free point calculations, the material group owns marks/strokes/surfaces and their interaction with the support, the canvas group (`ground.rs`, `ground_patterns.rs`, `layers.rs`, and `palette.rs`) owns ground/presence/color assignment, and `svg.rs` owns the small document tree and final serialization. `determinism.rs` is shared across groups but never creates host entropy. The CPython binding calls this public surface coarsely, with no per-module Python round trips or host-SDK dependency in the core.
+
 ## Router groups
 
 | Router | Endpoints | Main responsibility | Default guard |

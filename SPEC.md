@@ -943,6 +943,18 @@ part I rewrote" and "the degree to which the LLM read it" on a single screen.
 What follows records what the reference interface actually provides.  It is
 operational rather than conceptual.
 
+In the Web implementation, `+page.svelte` is the route-composition shell and
+retains route lifecycle, view composition, history/lineage cross-owner actions,
+short presentation projections, and owner wiring. One route-instance owner holds mutable state and asynchronous
+identity for each of Session, single work, Batch, Demo, history/lineage, Canvas
+viewport, Refinement, and Settings. Stateless operations receive only resolved
+inputs and named capabilities for one Paint, history save/replay, or refinement
+plan and adoption. Focused Canvas and Settings views own presentation and local
+drafts, but do not duplicate domain state, transport, request serialization, or
+await boundaries. If an old asynchronous result returns after the selected work
+has changed, it cannot update the current screen unless its run or target
+identity still matches.
+
 Short English tabs, buttons, and labels follow the correspondence table in
 `docs/i18n/glossary.md` and the style rules in `web/src/lib/i18n/GLOSSARY.md`
 (the correspondence table was consolidated into the former on 2026-08-17); the
@@ -1876,6 +1888,26 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 - primitive expansion
 - SVG filters and texture effects
 - canvas aspect handling
+
+The current default implementation is Render Engine 41, whose canonical
+performance implementation is the platform-independent Rust crate
+`core/crates/inku-render`. Python remains canonical for the Score schema and
+coercion, host-side canvas/profile resolution, fresh-seed issuance, and the
+engine registry. The thin `render_engines/default/adapter.py` combines a
+validated Score and resolved options into one canonical JSON request, makes one
+call through the independent `inku-render-python` CPython wheel, and receives
+SVG and metadata together. `renderer.py` is a compatibility facade for existing
+callers that need SVG only, not a second rendering implementation.
+
+Inside the Rust core, host-neutral request/output types and the coarse `render`
+boundary depend in one direction on deterministic seeds, performance planning,
+arrangement/placement/relation, pure geometry, marks/strokes/surfaces/support,
+ground/presence layers/color assignment, and the SVG document. The core has no host-SDK
+or Python-runtime dependency and owns the engine identity plus renderer-owned
+reference data. There is no Python Engine 40 implementation or runtime fallback;
+the old Engine 40 corpus remains only as historical evidence. This boundary lets
+the same core move to Android and a future iOS host without changing Server
+output semantics; it does not claim those client bindings are already integrated.
 
 The renderer is allowed to produce controlled sway, but it must preserve
 the JSON Score's intent.  Each render may carry a `render_seed`; providing the

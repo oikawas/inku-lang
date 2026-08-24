@@ -4,12 +4,12 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、renderer・Web client境界更新 2026-08-24、Engine 41 retirement境界更新 2026-08-24 |
-| source branch / 実装commit | `refactor/i368-retire-python-renderer` / Stage 6 branch tip（`2ea9f683c44d`起点） |
-| source未コミット変更 | Stage 6実装snapshotではなし。merge待ち |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 975` |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoringとRust移行境界を現行実装へ再照合 2026-08-24 |
+| source branch / 実装commit | `main` / `3429864fe3605f9aaf5b392f3ea22a5602593357`（本書更新前の実装baseline） |
+| source状態 | 実装baselineではclean。本更新は公開文書だけを変更する |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 976` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `975` |
+| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `976` |
 | Render Engine | 実装 `default` / `41`、共有Rust coreと薄いPython adapter |
 | DDL | `ddl_version=3` / `ddl_engine_version=20` |
 | Android | `android/VERSION` = `2.1.4-android.63`、実装が名乗る Render Engine `35` |
@@ -48,7 +48,7 @@
 | DATA-LINEAGE | 系譜node/edge | 明示された親とderivation kindだけをedge化 | `LineageNodeRow`, `LineageEdgeRow`, `db.py:add_item`; `test_lineage_acceptance.py` | §21、Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-SAIJIKI | 歳時記 | prompt、marker、relation、Web表示、referenceの語彙正本 | `saijiki.py` (`SAIJIKI`, `prompt_block`, `display_categories`); `test_saijiki_golden.py` | Project Context「語彙」 | 確認済み | 公開可 |
 | DATA-FALLBACK | fallbackの記録 | 各層のfallbackを列として保存（Stage 1 = `interpret_fallback`、Stage 2 = `compose_fallback`、写生 = `sketch_state`）。記録なし（列導入前の作品）とfallbackでないを区別する | `db.py:HistoryRow`; `web/src/lib/composeFallback.ts` | Project Context「設計契約」 | 確認済み | 公開可 |
-| WEB-FEATURES | Web feature modules | route shellから分離したSession・Work・Refinement・Settings・history/lineage・viewport owner、stateless operation、focused Canvas/Settings view | `web/src/routes/+page.svelte`; `web/src/lib/features/{session,work,run,history,canvas,settings}/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte`; ownership tests | Project Context「web」 | 確認済み | 公開可 |
+| WEB-FEATURES | Web feature modules | route shellから分離したSession・Work・Batch・Demo・Refinement・Settings・history/lineage・viewport owner、stateless operation、focused Canvas/Settings view | `web/src/routes/+page.svelte`; `web/src/lib/features/{session,work,batch,demo,run,history,canvas,settings}/`; `web/src/lib/components/{CanvasPanel,SettingsModal}.svelte`; ownership tests | §7.8、Project Context「web」 | 確認済み | 公開可 |
 | WEB-REGISTRY | 3設定登録簿 | localStorage、user settings、render payloadを集約 | `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Project Context「web」 | 確認済み | 公開可 |
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |

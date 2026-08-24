@@ -7994,3 +7994,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **Render Engine 41で、Engine 40の演奏をplatform-independentな共有Rust coreへ移した。** Rustがplanning・geometry・mark・surface・layer・SVG・描画metadataを持ち、Pythonは検証済みScoreと解決済みoptionを1個のrequestとして薄いadapterから1回だけ渡す。旧Python描画実装とruntime fallbackは退役した。これは描画品質を意図的に変える版ではなく、Android等へ同じcoreを渡せるportability boundaryである。
 - **AndroidもEngine 41を薄いJNIから呼び、Kotlin rendererとAndroidSVG fallbackを退役した。** main preview、履歴thumbnail、refinement preview、PNG exportは、別APIの`inku-svg-raster`がcanonical SVGから作るpremultiplied RGBA8を使う。保存SVG、`rh3`、engine版、Android app版／buildは変えていない。同梱arm64 JNIでcanonical SVG 5ケースとraw pixel 4ケースをPixel 9上で照合し、Rust workspaceとAndroid全JVM suiteを通した。共有native境界にはpath-scoped CI gateを追加した。
 - **依存・検査・公開運用契約を新しい境界へ同期した。** Webの互換範囲内のbuild依存を更新し、`nanoid`のsecurity patchを取り込んだ。参照corpusのCIはlocal Rust bindingを明示的に組み込んで現行Engine 41を再生成する。公開setupは、local Ollamaを別途導入・起動・model取得・接続・段への割り当てが必要なproviderとして明記し、製品全体をAPI keyや認証設定なしで利用できるという従来の主張を撤回した。
+
+### Android `2.1.4-android.64` — Pixel 9のlauncherへWebと同じiconを常設する（Build 148107、2026-08-25・[I-373]）
+
+- **Pixel 9のapp一覧にinkuが無かった原因は、`app.inku.mobile`が未インストールだったことだった。** 既存manifestは`.MainActivity`に`MAIN`／`LAUNCHER`を既に持つため、activity alias、boot receiver、常駐serviceを足さず、通常のdebug installでpackageをuser 0へ残した。
+- **Android launcher iconを、Web faviconと同じpixel-grid markへ統一した。** 旧brush／eye意匠を退役し、adaptive foreground、Web light background `#f5f3ef`、legacy／round 5 densityの計12 PNGを黒・灰・赤・緑・青の同じ格子から作った。Web favicon自体は変更していない。
+- **検証:** workerは旧Android iconとWeb faviconのdigest差をcharacterizationし、全assetの寸法・alpha・背景・palette／layoutと`:app:processDebugResources`を確認した。mainで`installDebug`が成功し、Pixel 9はversion `2.1.4-android.64`／Build 148107、installed=true、hidden=false、suspended=falseを報告した。launcher resolverは`app.inku.mobile/.MainActivity`、cold startは成功し、app一覧screenshotで`inku` labelと新iconを確認した。全JVM suite、instrumentation、reference生成、pentalaは行っていない。

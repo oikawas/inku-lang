@@ -3,9 +3,9 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-24。
+最終更新: 2026-08-25。
 
-**追随状況**: Android は `2.1.4-android.63` / **render engine `default / 41`** /
+**追随状況**: Android は `2.1.4-android.64` / **render engine `default / 41`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
 master の web/server も **render engine `41`** / **`ddl_engine_version` 20** であり、
@@ -2202,3 +2202,11 @@ preview、thumbnail、refinement、PNG exportは保存済みcanonical SVGを入�
 Kotlin Engine 35、AndroidSVG依存、renderer-only corpusとテストは撤去した。Pixel 9でEngine 41の
 5ケースSVG byte一致、現行3＋履歴1ケースのraw pixel digest一致、known color/alpha/strideを確認した。
 Score 0.1.0、DDL Engine 20、Room schema、保存形式、`rh3`、app version/build numberは変更していない。
+
+## 2026-08-25 Pixel 9のlauncherへWebと同じiconを常設する（android `2.1.4-android.64`・[I-373]）
+
+通常アプリの`.MainActivity`は既存の`MAIN`／`LAUNCHER`入口を維持する。今回Pixel 9のapp一覧にinkuが無かった原因はpackageが未インストールだったことであり、activity alias、boot receiver、常駐serviceは追加していない。
+
+launcher iconは旧brush／eye意匠を退役し、Web `favicon-192.png`と同じ黒・灰・赤・緑・青のpixel-grid markへ統一した。adaptive iconは透明foregroundとWeb light background `#f5f3ef`を使い、legacy／roundの5 densityも同じmarkを使う。
+
+Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、suspended=falseを確認した。launcher resolverは`app.inku.mobile/.MainActivity`を返し、cold startは成功した。Pixel Launcherのapp一覧でも`inku` labelと新しいpixel-grid iconを確認した。uninstall、data clear、instrumentationは行っていない。

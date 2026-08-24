@@ -114,7 +114,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 41 | `core/crates/inku-render/src/lib.rs` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.63` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.64` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary

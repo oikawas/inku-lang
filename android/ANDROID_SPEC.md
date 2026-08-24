@@ -4,9 +4,9 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-24.
+Last updated: 2026-08-25.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.63` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.64` with **render engine
 `default / 41`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
 `ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `41`
@@ -2709,3 +2709,11 @@ implicitly replay Score. Kotlin Engine 35, AndroidSVG, and renderer-only corpus/
 On Pixel 9, five Engine 41 cases matched SVG bytes, three current plus one historical case matched
 host raw-pixel digests, and known color/alpha/stride mapping passed. Score 0.1.0, DDL Engine 20,
 Room schema, saved format, `rh3`, app version, and BUILD_NUMBER did not change.
+
+## 2026-08-25 Keeping inku visible in the Pixel 9 launcher with the Web icon (android `2.1.4-android.64`, [I-373])
+
+The ordinary `.MainActivity` retains its existing `MAIN` and `LAUNCHER` entry. inku was absent from the Pixel 9 app list because the package was not installed, so this change adds no activity alias, boot receiver, or persistent service.
+
+The former brush-and-eye launcher design is replaced by the same black, gray, red, green, and blue pixel-grid mark used by Web `favicon-192.png`. The adaptive icon uses a transparent foreground over the Web light background `#f5f3ef`; all five legacy and round density assets use the same mark.
+
+Build 148107 was installed normally on the Pixel 9. User 0 reports the package installed with `hidden=false` and `suspended=false`; launcher resolution returns `app.inku.mobile/.MainActivity`, and a cold start succeeds. The Pixel Launcher app list shows the `inku` label with the new pixel-grid icon. No uninstall, data clear, or instrumentation was performed.

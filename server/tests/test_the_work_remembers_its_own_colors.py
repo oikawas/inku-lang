@@ -543,7 +543,7 @@ def test_the_migration_does_not_touch_the_id_a_work_was_drawn_with(tmp_path):
 
 
 def test_the_migration_is_idempotent(tmp_path):
-    """It runs on every start. A second pass must find nothing left to move."""
+    """The transform is safe if an accepted legacy migration retries it."""
     from inku_server.db import _migrate_renamed_catalog_nameplates
 
     db_path = tmp_path / "idempotent.db"

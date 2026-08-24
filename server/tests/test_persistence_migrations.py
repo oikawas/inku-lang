@@ -43,6 +43,7 @@ CREATE TABLE history (
 )
 """
 _REHEARSAL_SCRIPT = Path(__file__).parents[1] / "scripts" / "rehearse_persistence_migration.py"
+_DEPLOY_README = Path(__file__).parents[2] / "deploy" / "README.md"
 _V175_FINGERPRINT = "01f03f2602e5a98c8fa2129195e0243db1375054cfeedd28265260a0d6d27737"
 
 
@@ -321,6 +322,16 @@ def test_snapshot_failure_has_no_plain_file_fallback(
 
     assert not destination.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_digest
+
+
+def test_public_volume_backup_stops_sqlite_writers_while_archiving() -> None:
+    instructions = _DEPLOY_README.read_text(encoding="utf-8")
+    stop = instructions.index("docker compose stop api")
+    archive = instructions.index("busybox tar czf")
+    start = instructions.index("docker compose start api")
+
+    assert stop < archive < start
+    assert "Do not archive the volume while the API is running." in instructions
 
 
 def test_rehearsal_cli_requires_marker_guarded_containment(tmp_path: Path) -> None:

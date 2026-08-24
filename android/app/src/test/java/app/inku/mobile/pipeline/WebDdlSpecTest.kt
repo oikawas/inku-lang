@@ -86,24 +86,5 @@ class WebDdlSpecTest {
         org.junit.Assert.assertFalse("縄 must not appear in prompt", fullPrompt.contains("縄"))
         org.junit.Assert.assertFalse("rope must not be detected", ServerScoreSemantics.detectWeightKey("縄の太い線") == "rope")
 
-        // 4. The retired tool must be gone from the drawing tables too, not only
-        //    from the words. rope was unreachable through the coercer, so a
-        //    prompt-only check passes while the tables still carry it.
-        org.junit.Assert.assertEquals(
-            "the style table must treat rope as unknown",
-            app.inku.mobile.render.ServerRendererStyle.strokeOpacity("unknown-tool"),
-            app.inku.mobile.render.ServerRendererStyle.strokeOpacity("rope"),
-            1e-9,
-        )
-        org.junit.Assert.assertEquals(
-            "the width table must treat rope as unknown",
-            app.inku.mobile.render.ServerRendererStyle.strokeWidth("unknown-tool", 1000.0),
-            app.inku.mobile.render.ServerRendererStyle.strokeWidth("rope", 1000.0),
-            1e-9,
-        )
-        org.junit.Assert.assertNull(
-            "rope must not have a stroke engine grammar",
-            app.inku.mobile.render.GRAMMARS["rope"],
-        )
     }
 }

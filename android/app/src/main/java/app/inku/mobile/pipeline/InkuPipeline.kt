@@ -21,6 +21,7 @@ class InkuPipeline(
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
                 compositionSeed = request.compositionSeed,
+                wild = request.renderWild,
             ),
         )
         return PaintResult(
@@ -123,6 +124,7 @@ data class PaintRequest(
      */
     val sketch: SketchInput = SketchInput(),
     val workColorSnapshot: WorkColorSnapshot? = null,
+    val renderWild: Boolean? = null,
 )
 
 /**
@@ -219,4 +221,6 @@ data class RenderRequest(
     // `renderer.render(..., composition_seed=...)` takes it on the server.
     val compositionSeed: Long? = null,
     val workColorSnapshot: WorkColorSnapshot? = null,
+    /** Explicit host render option. `null` keeps historical Score fallback semantics. */
+    val wild: Boolean? = null,
 )

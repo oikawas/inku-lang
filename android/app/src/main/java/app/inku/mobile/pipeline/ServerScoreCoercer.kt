@@ -1,6 +1,5 @@
 package app.inku.mobile.pipeline
 
-import app.inku.mobile.render.ServerRendererGeometry
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -224,7 +223,7 @@ internal object ServerScoreCoercer {
      * back exactly the invisible surfaces the port takes away elsewhere.
      */
     private fun foldFillAndSurface(primitive: String, data: JSONObject) {
-        if (primitive !in ServerRendererGeometry.CLOSED_SHAPES) return
+        if (primitive !in ScoreGeometryPolicy.closedShapes) return
         val surface = data.optJSONObject("surface")
         val texture = surface?.optString("texture", "none")
         if (texture == "solid") {

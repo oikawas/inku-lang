@@ -1,6 +1,6 @@
 package app.inku.mobile.ui
 
-import app.inku.mobile.render.ServerRendererStyle
+import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.ui.mascot.MascotArt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -106,7 +106,7 @@ class MascotArtStage2Test {
         }
 
         assertEquals("#888888", MascotArt.COLOR_BUBBLE)
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["gray"], MascotArt.COLOR_BUBBLE)
+        assertEquals(ColorCatalogs.get("default").renderMap["gray"], MascotArt.COLOR_BUBBLE)
         assertNotEquals("#ffffff", MascotArt.COLOR_BUBBLE)
     }
 

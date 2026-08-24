@@ -16,7 +16,7 @@ import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Matrix
 import android.net.Uri
 import android.util.LruCache
 import android.view.OrientationEventListener
@@ -174,7 +174,6 @@ import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
-import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
@@ -185,6 +184,8 @@ import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.pipeline.WebDdlSpec
+import app.inku.mobile.render.NativeRenderBridge
+import app.inku.mobile.render.RustArtworkRasterizer
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -193,7 +194,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.caverock.androidsvg.SVG
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -291,13 +291,14 @@ private object ArtworkBitmapCache {
             return ((value.width.toLong() * value.height.toLong() * 4L) / 1024L).coerceAtLeast(1L).toInt()
         }
     }
+    private val rasterizer = RustArtworkRasterizer()
 
     suspend fun get(item: HistoryItemEntity, size: IntSize, rotationDegrees: Int): ImageBitmap? {
         if (size.width <= 0 || size.height <= 0) return null
         val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
         val width = maxOf(1, (size.width * scale).toInt())
         val height = maxOf(1, (size.height * scale).toInt())
-        val key = "${item.renderHash}:$width:$height:${rotationDegrees.floorMod360()}"
+        val key = "${item.renderHash}:${NativeRenderBridge.rasterApiVersion()}:$width:$height:${rotationDegrees.floorMod360()}"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
@@ -314,11 +315,7 @@ private object ArtworkBitmapCache {
 
     private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotationDegrees: Int): ImageBitmap? {
         return runCatching {
-            val parsed = SVG.getFromString(svgText)
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val native = AndroidCanvas(bitmap)
-            renderSvgIntoNativeCanvas(parsed, native, width.toFloat(), height.toFloat(), rotationDegrees)
-            bitmap.asImageBitmap()
+            rasterizedArtworkBitmap(svgText, width, height, rotationDegrees).asImageBitmap()
         }.getOrNull()
     }
 }
@@ -2932,13 +2929,8 @@ private fun RefinementCandidateImage(svg: String, modifier: Modifier = Modifier)
     val image by produceState<ImageBitmap?>(initialValue = null, svg) {
         value = withContext(Dispatchers.Default) {
             runCatching {
-                val parsed = SVG.getFromString(svg)
                 val side = 512
-                val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
-                val native = AndroidCanvas(bitmap)
-                native.drawColor(android.graphics.Color.WHITE)
-                renderSvgIntoNativeCanvas(parsed, native, side.toFloat(), side.toFloat(), 0)
-                bitmap.asImageBitmap()
+                RustArtworkRasterizer().rasterize(svg, targetWidth = side, targetHeight = side).asImageBitmap()
             }.getOrNull()
         }
     }
@@ -3297,6 +3289,9 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
 
 @Composable
 internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    val renderEngineIdentity = remember {
+        "${NativeRenderBridge.renderEngineId()} ${NativeRenderBridge.renderEngineVersion()}"
+    }
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -3311,7 +3306,7 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
             VersionInfoRow("build type", BuildConfig.BUILD_TYPE)
             VersionInfoRow("applicationId", BuildConfig.APPLICATION_ID)
             VersionInfoRow("source spec", "inku v1.48")
-            VersionInfoRow("render engine", "${CompatibilityConstants.renderEngineId} ${CompatibilityConstants.renderEngineVersion}")
+            VersionInfoRow("render engine", renderEngineIdentity)
         }
     }
 }
@@ -5052,20 +5047,12 @@ private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, pr
 }
 
 private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
-    val svg = SVG.getFromString(item.displaySvg)
-    val documentWidth = svg.documentWidth.takeIf { it > 0f } ?: 1000f
-    val documentHeight = svg.documentHeight.takeIf { it > 0f } ?: 1000f
     val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
-    val width = (height * documentWidth / documentHeight).toInt().coerceAtLeast(64)
-    val estimatedBytes = width.toLong() * height.toLong() * 4L
+    val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = height)
+    val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
     // Not `require`: this sentence reaches the reader, so the language is
     // chosen where it is shown rather than here (see InkuFailure).
     if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = AndroidCanvas(bitmap)
-    svg.setDocumentWidth(width.toFloat())
-    svg.setDocumentHeight(height.toFloat())
-    svg.renderToCanvas(canvas)
     val exportDir = File(context.cacheDir, "exports")
     exportDir.mkdirs()
     val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
@@ -6037,38 +6024,19 @@ private fun ArtworkPreview(
     }
 }
 
-private fun renderSvgIntoNativeCanvas(parsed: SVG, native: AndroidCanvas, width: Float, height: Float, rotationDegrees: Int) {
-    val documentWidth = parsed.documentWidth.takeIf { it > 0f } ?: 1000f
-    val documentHeight = parsed.documentHeight.takeIf { it > 0f } ?: 1000f
+private fun rasterizedArtworkBitmap(svg: String, width: Int, height: Int, rotationDegrees: Int): Bitmap {
     val rotation = rotationDegrees.floorMod360()
     val swapsAxes = rotation.swapsAxes()
-    val documentAspect = if (swapsAxes) documentHeight / documentWidth else documentWidth / documentHeight
-    val boxAspect = width / height
-    val drawWidth: Float
-    val drawHeight: Float
-    if (documentAspect >= boxAspect) {
-        drawWidth = width
-        drawHeight = width / documentAspect
-    } else {
-        drawHeight = height
-        drawWidth = height * documentAspect
+    val source = RustArtworkRasterizer().rasterize(
+        svg,
+        targetWidth = if (swapsAxes) height else width,
+        targetHeight = if (swapsAxes) width else height,
+    )
+    if (rotation == 0) return source
+    val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true).also {
+        if (it !== source) source.recycle()
     }
-    val left = (width - drawWidth) / 2f
-    val top = (height - drawHeight) / 2f
-    val contentWidth = if (swapsAxes) drawHeight else drawWidth
-    val contentHeight = if (swapsAxes) drawWidth else drawHeight
-    native.save()
-    if (rotation == 0) {
-        native.translate(left, top)
-    } else {
-        native.translate(width / 2f, height / 2f)
-        native.rotate(rotation.toFloat())
-        native.translate(-contentWidth / 2f, -contentHeight / 2f)
-    }
-    parsed.setDocumentWidth(contentWidth)
-    parsed.setDocumentHeight(contentHeight)
-    parsed.renderToCanvas(native)
-    native.restore()
 }
 
 @Composable

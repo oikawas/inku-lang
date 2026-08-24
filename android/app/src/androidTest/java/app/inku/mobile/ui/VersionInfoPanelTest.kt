@@ -7,7 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.render.NativeRenderBridge
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,9 +27,9 @@ class VersionInfoPanelTest {
         }
 
         composeTestRule.onNodeWithText("render engine").assertIsDisplayed()
-        // Verify that the panel is wired to the same compatibility values as the product.
+        // The product label must come from the packaged Rust library itself.
         composeTestRule.onNodeWithText(
-            "${CompatibilityConstants.renderEngineId} ${CompatibilityConstants.renderEngineVersion}",
+            "${NativeRenderBridge.renderEngineId()} ${NativeRenderBridge.renderEngineVersion()}",
         ).assertIsDisplayed()
     }
 }

@@ -37,7 +37,11 @@ class HeadlessRenderActivity : Activity() {
                     resolvedOutputDir.mkdirs()
                     File(resolvedOutputDir, "status.json").writeText(JSONObject().put("status", "running").put("run_id", resolvedRunId).toString(2))
                 }
-                render(resolvedRunId, resolvedOutputDir)
+                // Rendering may enter the coarse Rust boundary after cutover. Keep
+                // the complete headless drawing path off the Activity/UI dispatcher.
+                withContext(Dispatchers.Default) {
+                    render(resolvedRunId, resolvedOutputDir)
+                }
             }.onFailure { error ->
                 Log.e(TAG, "headless render failed runId=${runId ?: "-"}", error)
                 val id = runId

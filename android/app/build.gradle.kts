@@ -27,18 +27,42 @@ fun nextAndroidBuildNumber(): Int {
 
 val androidVersionName = rootProject.file("VERSION").readText().trim()
 val androidVersionCode = nextAndroidBuildNumber()
+val androidMinSdk = 35
+val rustAndroidTarget = "aarch64-linux-android"
+val rustAndroidApi = androidMinSdk
+val rustNativeLibraryName = "libinku_render_android.so"
+val rustTargetDirectory = layout.buildDirectory.dir("rust-target")
+val rustGeneratedJniLibsDirectory = layout.buildDirectory.dir("generated/rustJniLibs")
+val rustParityAssetsDirectory = layout.buildDirectory.dir("generated/rustParityAssets")
+val rustNdkHostTag = when {
+    System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
+    System.getProperty("os.name").startsWith("Linux") -> "linux-x86_64"
+    else -> error("Unsupported Android native build host: ${System.getProperty("os.name")}")
+}
+val rustParityCaseNames = listOf(
+    "A-pen-circle",
+    "B-wave-medium-line-brush_thick",
+    "C-filter-display-pencil",
+    "D-canvas-wide-region-single",
+    "E-wild-surface-wash-pencil",
+)
 
 android {
     namespace = "app.inku.mobile"
     compileSdk = 36
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "app.inku.mobile"
-        minSdk = 35
+        minSdk = androidMinSdk
         targetSdk = 36
         versionCode = androidVersionCode
         versionName = androidVersionName
         buildConfigField("int", "BUILD_NUMBER", androidVersionCode.toString())
+
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -66,6 +90,10 @@ android {
     // MigrationTestHelper reads the exported schemas from the test APK's assets.
     sourceSets.getByName("androidTest") {
         assets.srcDir("$projectDir/schemas")
+        assets.srcDir(rustParityAssetsDirectory)
+    }
+    sourceSets.getByName("main") {
+        jniLibs.srcDir(rustGeneratedJniLibsDirectory)
     }
 
     testOptions {
@@ -74,6 +102,120 @@ android {
         // this it throws and the only reachable path is `renderFromScore`,
         // which is the one path that chooses no prompt at all.
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+val rustNdkDirectory = androidComponents.sdkComponents.ndkDirectory
+val rustLibrary = rustTargetDirectory.map {
+    it.file("$rustAndroidTarget/release/$rustNativeLibraryName")
+}
+
+val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
+    group = "build"
+    description = "Build the shared Rust render/raster JNI library for arm64-v8a without packaging the app."
+    workingDir(rootProject.file("../core"))
+    inputs.files(
+        rootProject.fileTree("../core") {
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs")
+            exclude("target/**")
+        },
+    )
+    outputs.file(rustLibrary)
+
+    doFirst {
+        val pinnedRustc = providers.exec {
+            commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+        }.standardOutput.asText.get().trim()
+        require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+        val toolchainBin = rustNdkDirectory.get()
+            .dir("toolchains/llvm/prebuilt/$rustNdkHostTag/bin")
+            .asFile
+        val clang = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang")
+        val clangxx = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang++")
+        val archiveTool = toolchainBin.resolve("llvm-ar")
+        require(clang.isFile) { "Pinned NDK clang was not found: ${clang.name}" }
+        require(clangxx.isFile) { "Pinned NDK clang++ was not found: ${clangxx.name}" }
+        require(archiveTool.isFile) { "Pinned NDK llvm-ar was not found" }
+        // `rustup run ... cargo` pins Cargo but Cargo can still resolve a
+        // different `rustc` from PATH, so pin the compiler explicitly too.
+        environment("RUSTC", pinnedRustc)
+        environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", clang.absolutePath)
+        environment("CC_aarch64_linux_android", clang.absolutePath)
+        environment("CXX_aarch64_linux_android", clangxx.absolutePath)
+        environment("AR_aarch64_linux_android", archiveTool.absolutePath)
+    }
+
+    commandLine(
+        "rustup",
+        "run",
+        "1.95.0",
+        "cargo",
+        "build",
+        "--locked",
+        "--package",
+        "inku-render-android",
+        "--target",
+        rustAndroidTarget,
+        "--release",
+        "--target-dir",
+        rustTargetDirectory.get().asFile.absolutePath,
+    )
+}
+
+val syncRustAndroidArm64 = tasks.register<Sync>("syncRustAndroidArm64") {
+    group = "build"
+    description = "Stage the generated arm64-v8a JNI library under app/build/."
+    dependsOn(buildRustAndroidArm64)
+    from(rustLibrary)
+    into(rustGeneratedJniLibsDirectory.map { it.dir("arm64-v8a") })
+}
+
+val checkRustNativePackagingInput = tasks.register("checkRustNativePackagingInput") {
+    group = "verification"
+    description = "Verify the generated JNI packaging input without assembling an APK or changing BUILD_NUMBER."
+    dependsOn(syncRustAndroidArm64)
+    doLast {
+        val root = rustGeneratedJniLibsDirectory.get().asFile
+        val libraries = root.walkTopDown()
+            .filter { it.isFile && it.extension == "so" }
+            .map { it.relativeTo(root).invariantSeparatorsPath }
+            .toList()
+        check(libraries == listOf("arm64-v8a/$rustNativeLibraryName")) {
+            "Expected exactly arm64-v8a/$rustNativeLibraryName, found $libraries"
+        }
+    }
+}
+
+val prepareRustParityAssets = tasks.register<Sync>("prepareRustParityAssets") {
+    group = "verification"
+    description = "Stage a bounded canonical Rust parity corpus for connected-device tests."
+    from(rootProject.file("../server/reference/render-engine-41")) {
+        include("manifest.json")
+        rustParityCaseNames.forEach { include("$it.svg") }
+        into("render-engine-41")
+    }
+    from(rootProject.file("../server/reference/render-engine-21")) {
+        include("G-scatter-edge.svg")
+        into("render-engine-21")
+    }
+    into(rustParityAssetsDirectory)
+}
+
+tasks.register("checkRustNative") {
+    group = "verification"
+    description = "Build and verify the non-package Rust Android native input."
+    dependsOn(checkRustNativePackagingInput)
+}
+
+tasks.configureEach {
+    if (
+        name.startsWith("merge") &&
+        (name.endsWith("NativeLibs") || name.endsWith("JniLibFolders"))
+    ) {
+        dependsOn(syncRustAndroidArm64)
+    }
+    if (name.startsWith("merge") && name.endsWith("AndroidTestAssets")) {
+        dependsOn(prepareRustParityAssets)
     }
 }
 

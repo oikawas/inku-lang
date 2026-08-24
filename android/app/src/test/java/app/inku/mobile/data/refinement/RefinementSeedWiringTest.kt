@@ -3,6 +3,7 @@ package app.inku.mobile.data.refinement
 import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.WebDdlExpander
+import app.inku.mobile.render.DeterministicTestSvgRenderer
 import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ import org.junit.Test
  */
 class RefinementSeedWiringTest {
 
-    private val pipeline = LocalFallbackPipeline()
+    private val pipeline = LocalFallbackPipeline(DeterministicTestSvgRenderer())
 
     /** The Score `bake_catalog.py` drew: one red line, one blue circle. */
     private val score = """

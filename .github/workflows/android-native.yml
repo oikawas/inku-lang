@@ -51,7 +51,8 @@ jobs:
       - name: Install pinned Rust and Android target
         run: rustup toolchain install 1.95.0 --profile minimal --target aarch64-linux-android
       - name: Install pinned NDK
-        run: sdkmanager "ndk;29.0.14206865"
+        run: >-
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865"
       - name: Rust format
         working-directory: core
         run: rustup run 1.95.0 cargo fmt --all -- --check

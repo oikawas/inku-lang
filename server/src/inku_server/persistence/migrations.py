@@ -64,6 +64,10 @@ ACCEPTED_LEGACY_STATES: dict[tuple[str, str], str] = {
         "complete",
     ): "local-development-stage0",
     (
+        "c5f965b2309bea96288c56b78dd8e67dd2ab80f277b1479d34afe51c0f012e52",
+        "complete",
+    ): "fixture-current-without-registry",
+    (
         "01f03f2602e5a98c8fa2129195e0243db1375054cfeedd28265260a0d6d27737",
         "absent",
     ): "fixture-v175",

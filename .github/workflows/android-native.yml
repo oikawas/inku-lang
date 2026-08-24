@@ -49,7 +49,10 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Install pinned Rust and Android target
-        run: rustup toolchain install 1.95.0 --profile minimal --target aarch64-linux-android
+        run: >-
+          rustup toolchain install 1.95.0 --profile minimal
+          --component rustfmt --component clippy
+          --target aarch64-linux-android
       - name: Install pinned NDK
         run: >-
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865"

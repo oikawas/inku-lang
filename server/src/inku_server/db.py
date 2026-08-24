@@ -1,8 +1,4 @@
-"""DB layer — SQLite (default) or PostgreSQL via INKU_DB_URL.
-
-  SQLite:     INKU_DB_URL=sqlite:///~/.local/share/inku/inku.db  (default)
-  PostgreSQL: INKU_DB_URL=postgresql://user:pass@localhost/inku
-"""
+"""Canonical SQLite models, queries, and compatibility façade."""
 from __future__ import annotations
 
 import json
@@ -17,7 +13,7 @@ from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, select, text, true
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, func, inspect, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -25,26 +21,16 @@ from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
 from .identity import description_hash
 from .limits import normalize_limits
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
+from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
+from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
 
-_DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
-_DB_URL = os.getenv("INKU_DB_URL", _DEFAULT_DB)
 _SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 
-_connect_args = {"check_same_thread": False} if _DB_URL.startswith("sqlite") else {}
-engine = create_engine(_DB_URL, echo=False, future=True, connect_args=_connect_args)
-
-
-if _DB_URL.startswith("sqlite"):
-    @event.listens_for(engine, "connect")
-    def _enable_sqlite_integrity(dbapi_connection, _connection_record) -> None:
-        cursor = dbapi_connection.cursor()
-        try:
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA busy_timeout=10000")
-            cursor.execute("PRAGMA journal_mode=WAL")
-        finally:
-            cursor.close()
-
+engine = create_sqlite_engine(
+    PERSISTENCE_CONFIG.canonical_url,
+    setting=CANONICAL_DB_ENV,
+    pragmas=CANONICAL_SQLITE_PRAGMAS,
+)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 _logger = logging.getLogger(__name__)
@@ -681,8 +667,11 @@ _LINEAGE_NODE_INDEX_MIGRATIONS = (
 
 
 def init_db() -> None:
-    if _DB_URL.startswith("sqlite:///"):
-        db_path = Path(_DB_URL[len("sqlite:///"):]).expanduser()
+    db_path = sqlite_database_path(
+        PERSISTENCE_CONFIG.canonical_url,
+        setting=CANONICAL_DB_ENV,
+    )
+    if db_path is not None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
     _migrate_columns()
@@ -2157,7 +2146,7 @@ def database_info() -> dict:
         "driver": url.get_driver_name(),
         "url": url.render_as_string(hide_password=True),
         "database": url.database,
-        "is_default": _DB_URL == _DEFAULT_DB,
+        "is_default": PERSISTENCE_CONFIG.canonical_is_default,
         "file_size_bytes": file_size,
         "file_path": str(db_path) if db_path else None,
     }

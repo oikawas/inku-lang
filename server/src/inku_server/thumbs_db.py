@@ -9,55 +9,25 @@ thumbnail" is `rm thumbs.db`.
   default:  beside INKU_DB_URL's file, named thumbs.db
   override: INKU_THUMBS_DB_URL=sqlite:////var/lib/inku/thumbs.db
 
-The default is derived rather than required, so a deployment that has only ever
-set INKU_DB_URL keeps working without learning a second variable.
+The default is derived rather than required, so a deployment that sets only the
+canonical URL keeps working without learning a second variable.
 """
 from __future__ import annotations
 
-import logging
-import os
 import time
-from pathlib import Path
 
-from sqlalchemy import BigInteger, Column, Integer, LargeBinary, String, create_engine, event, func, select
+from sqlalchemy import BigInteger, Column, Integer, LargeBinary, String, func, select
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# The canonical URL rather than os.getenv: the default that produced it lives in
-# db.py, and reading the environment again here would be a second copy of it.
-from .db import _DB_URL as _CANONICAL_DB_URL
+from .persistence.config import PERSISTENCE_CONFIG, THUMBNAIL_DB_ENV, sqlite_database_path
+from .persistence.engine import THUMBNAIL_SQLITE_PRAGMAS, create_sqlite_engine
 
-_logger = logging.getLogger("inku.thumbs")
-
-_SQLITE_PREFIX = "sqlite:///"
-
-
-def _derived_thumbs_url(canonical_url: str) -> str:
-    """Where thumbnails go when nothing was configured for them."""
-    if canonical_url.startswith(_SQLITE_PREFIX):
-        canonical_path = Path(canonical_url[len(_SQLITE_PREFIX):]).expanduser()
-        return _SQLITE_PREFIX + str(canonical_path.with_name("thumbs.db"))
-    # A canonical database on another server says nothing about where a derived
-    # file belongs, so fall back to the directory the default canonical one uses.
-    return _SQLITE_PREFIX + str(Path.home() / ".local" / "share" / "inku" / "thumbs.db")
-
-
-_THUMBS_DB_URL = os.getenv("INKU_THUMBS_DB_URL") or _derived_thumbs_url(_CANONICAL_DB_URL)
-
-_connect_args = {"check_same_thread": False} if _THUMBS_DB_URL.startswith("sqlite") else {}
-engine = create_engine(_THUMBS_DB_URL, echo=False, future=True, connect_args=_connect_args)
+engine = create_sqlite_engine(
+    PERSISTENCE_CONFIG.thumbnail_url,
+    setting=THUMBNAIL_DB_ENV,
+    pragmas=THUMBNAIL_SQLITE_PRAGMAS,
+)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-
-
-if _THUMBS_DB_URL.startswith("sqlite"):
-    @event.listens_for(engine, "connect")
-    def _enable_sqlite_wal(dbapi_connection, _connection_record) -> None:
-        # Rebuilds write from a pool of threads while the listing reads. WAL lets
-        # those overlap instead of serializing behind a writer.
-        cursor = dbapi_connection.cursor()
-        try:
-            cursor.execute("PRAGMA journal_mode=WAL")
-        finally:
-            cursor.close()
 
 
 class Base(DeclarativeBase):
@@ -97,17 +67,22 @@ def width_for_scale(scale: int) -> int:
 
 
 def init_thumbs_db() -> None:
-    if _THUMBS_DB_URL.startswith(_SQLITE_PREFIX):
-        db_path = Path(_THUMBS_DB_URL[len(_SQLITE_PREFIX):]).expanduser()
+    db_path = sqlite_database_path(
+        PERSISTENCE_CONFIG.thumbnail_url,
+        setting=THUMBNAIL_DB_ENV,
+    )
+    if db_path is not None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
 
 
 def thumbs_db_path() -> str | None:
     """The file backing the store, when it is a file. For reporting its size."""
-    if not _THUMBS_DB_URL.startswith(_SQLITE_PREFIX):
-        return None
-    return str(Path(_THUMBS_DB_URL[len(_SQLITE_PREFIX):]).expanduser())
+    path = sqlite_database_path(
+        PERSISTENCE_CONFIG.thumbnail_url,
+        setting=THUMBNAIL_DB_ENV,
+    )
+    return str(path) if path is not None else None
 
 
 def get_thumb(history_id: str, scale: int) -> dict | None:

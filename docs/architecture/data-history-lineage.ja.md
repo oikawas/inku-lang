@@ -60,6 +60,9 @@ flowchart TD
 
 `GET /api/history/{item_id}/svg?profile=display` が保存SVGを返し、他profileだけ `_render_score_svg` を呼ぶ。過去engineを選択するregistry/APIは確認できない。
 
+Androidも同じ原則に従う。Roomに保存したcanonical SVGを再描画せず、preview、thumbnail、PNGでは
+`inku-svg-raster`からpixel派生を作る。raster APIは作品identityとRender Engine版を所有しない。
+
 ## 実在schema
 
 ```mermaid

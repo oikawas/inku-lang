@@ -1,6 +1,6 @@
 package app.inku.mobile.ui
 
-import app.inku.mobile.render.ServerRendererStyle
+import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.ui.mascot.MascotArt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -89,11 +89,12 @@ class MascotArtStage1Test {
         assertEquals("#2f6b3a", MascotArt.COLOR_INCUBATE_RIGHT)
         assertEquals("#555555", MascotArt.COLOR_INCUBATE_TOP)
 
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["gray"], MascotArt.COLOR_TOP)
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["black"], MascotArt.COLOR_LEFT)
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["blue"], MascotArt.COLOR_RIGHT)
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["red"], MascotArt.COLOR_INCUBATE_LEFT)
-        assertEquals(ServerRendererStyle.DEFAULT_COLOR_MAP["green"], MascotArt.COLOR_INCUBATE_RIGHT)
+        val defaultColors = ColorCatalogs.get("default").renderMap
+        assertEquals(defaultColors["gray"], MascotArt.COLOR_TOP)
+        assertEquals(defaultColors["black"], MascotArt.COLOR_LEFT)
+        assertEquals(defaultColors["blue"], MascotArt.COLOR_RIGHT)
+        assertEquals(defaultColors["red"], MascotArt.COLOR_INCUBATE_LEFT)
+        assertEquals(defaultColors["green"], MascotArt.COLOR_INCUBATE_RIGHT)
     }
 
     @Test

@@ -8,11 +8,11 @@
 - その後、公開commit `8b4d43cc` で同文書が29へ更新され、`render_engines/default.py` と `server/reference/render-engine-29/manifest.json` に一致した。
 - 判定: **現在は解消済み**。本書群のsnapshotも更新後commitへ合わせた。
 
-### F-02 Android仕様メモの版記述
+### F-02 Android仕様メモの版記述（解消）
 
-- `android/ANDROID_SPEC.ja.md` 冒頭は `2.1.4-android.10` / engine 21、server `v2.11.2` / engine 21と記す。
-- 実装は `android/VERSION` が `2.1.4-android.43`、`CompatibilityConstants.renderEngineVersion` が35（2026-08-17に再測）。
-- 判定: **冒頭snapshotが古い**。追随の実況は文書後半の周ごとの節が持ち、冒頭は追いついていない。
+- 旧snapshotでは仕様冒頭と実装のAndroid版／Render Engine版がずれていた。
+- 2026-08-24に冒頭を`2.1.4-android.63`、共有Rust Engine 41、DDL Engine 20へ同期した。
+- 判定: **解消済み**。engine identityはKotlin製品定数でなく同梱native libraryから読む。
 
 ### F-03 Android外部provider実行
 

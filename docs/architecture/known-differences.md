@@ -8,11 +8,11 @@
 - Public commit `8b4d43cc` aligned Project Context with `render_engines/default.py` and `server/reference/render-engine-29/manifest.json`.
 - Status: resolved. The current architecture baseline is later still.
 
-### F-02 Android specification snapshot
+### F-02 Android specification snapshot — resolved
 
-- The beginning of `android/ANDROID_SPEC.ja.md` names `2.1.4-android.10`, engine 21, and an older Server snapshot (`v2.11.2`, engine 21).
-- Implementation is `android/VERSION` `2.1.4-android.43`; `CompatibilityConstants.renderEngineVersion` is 35 (re-measured 2026-08-17).
-- Status: the opening snapshot is stale. The per-cycle sections later in the document carry the live tracking record; the opening has not caught up.
+- The former snapshot disagreed with implementation on the Android and Render Engine versions.
+- On 2026-08-24 the opening was aligned to `2.1.4-android.63`, shared Rust Engine 41, and DDL Engine 20.
+- Status: resolved. Engine identity now comes from the packaged native library rather than a Kotlin product constant.
 
 ### F-03 Android external-provider execution
 

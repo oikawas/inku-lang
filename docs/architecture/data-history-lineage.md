@@ -60,6 +60,10 @@ flowchart TD
 
 `GET /api/history/{item_id}/svg?profile=display` returns the stored SVG. Other profiles call `_render_score_svg`. No old-engine selection registry or API was found.
 
+Android follows the same principle: it does not replay canonical SVG stored in Room. Preview,
+thumbnails, and PNG create pixel derivatives through `inku-svg-raster`; the raster API owns neither
+work identity nor the Render Engine version.
+
 ## Implemented schema
 
 ```mermaid

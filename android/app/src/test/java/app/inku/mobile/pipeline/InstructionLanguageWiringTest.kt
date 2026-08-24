@@ -3,6 +3,7 @@ package app.inku.mobile.pipeline
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.render.DeterministicTestSvgRenderer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +20,11 @@ import org.junit.Test
  * stages hand a model is captured by standing in for the model.
  */
 class InstructionLanguageWiringTest {
+
+    private fun pipeline(provider: ModelProvider) = LocalFallbackPipeline(
+        renderer = DeterministicTestSvgRenderer(),
+        modelProvider = provider,
+    )
 
     /**
      * Records every system prompt a stage sends, in order, and answers Stage 1
@@ -71,7 +77,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `an english request reaches stage 1's english prompt`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.interpret(request(english, "en")) }
 
@@ -85,7 +91,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `a japanese request reaches stage 1's japanese prompt`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.interpret(request(japanese, "ja")) }
 
@@ -102,7 +108,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `auto resolves from the text and stage 1 follows`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         val result = runBlocking { pipeline.interpret(request(english, "auto")) }
 
@@ -115,7 +121,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `an unstated language is the default`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         val result = runBlocking { pipeline.interpret(request(english, null)) }
 
@@ -134,7 +140,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `an english request reaches stage 2's english prompt`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.composeFromDdl("draw five thin lines.", request(english, "en")) }
 
@@ -146,7 +152,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `a japanese request reaches stage 2's japanese prompt`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.composeFromDdl("細い線を五本引く。", request(japanese, "ja")) }
 
@@ -161,7 +167,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `the two stages take their languages separately`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking {
             val interpreted = pipeline.interpret(request(japanese, "ja"))
@@ -188,7 +194,7 @@ class InstructionLanguageWiringTest {
     fun `stage 1 point 5 expands in the resolved language`() {
         val ddl = "Fill background with gray. Draw five thin lines."
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.composeFromDdl(ddl, request(english, "en")) }
         val expandedInEnglish = provider.ddlSent.first()
@@ -207,7 +213,7 @@ class InstructionLanguageWiringTest {
     fun `stage 1 point 5 expands in japanese for a japanese work`() {
         val ddl = "背景を灰色で塗りつぶす。細い線を五本引く。"
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
 
         runBlocking { pipeline.composeFromDdl(ddl, request(japanese, "ja")) }
 
@@ -228,7 +234,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `a litert model asked for english gets the english prompt`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
         val litert = request(english, "en").copy(
             stage1Model = "local-litert-lm:gemma",
             stage2Model = "local-litert-lm:gemma",
@@ -244,7 +250,7 @@ class InstructionLanguageWiringTest {
     @Test
     fun `a litert model in japanese keeps the shortened prompts`() {
         val provider = CapturingProvider()
-        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val pipeline = pipeline(provider)
         val litert = request(japanese, "ja").copy(
             stage1Model = "local-litert-lm:gemma",
             stage2Model = "local-litert-lm:gemma",

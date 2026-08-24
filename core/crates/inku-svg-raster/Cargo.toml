@@ -1,0 +1,18 @@
+[package]
+name = "inku-svg-raster"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Host-neutral SVG raster presentation for inku"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+resvg.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true

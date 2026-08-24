@@ -35,7 +35,7 @@ import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.SketchInput
-import com.caverock.androidsvg.SVG
+import app.inku.mobile.render.RustArtworkRasterizer
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +65,9 @@ class InkuRepository(
     // passing it as a trailing lambda keep working.
     private val newLineageId: () -> String = { java.util.UUID.randomUUID().toString() },
 ) {
+    private val artworkRasterizer by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        RustArtworkRasterizer()
+    }
     private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
     private val modelRouter = RoutingModelProvider(
@@ -848,30 +851,18 @@ class InkuRepository(
     private fun createHistoryThumbnail(svgText: String, renderHash: String): ThumbnailInfo? {
         return runCatching {
             val sizePx = 384
-            val svg = SVG.getFromString(svgText)
-            val documentWidth = svg.documentWidth.takeIf { it > 0f } ?: 1000f
-            val documentHeight = svg.documentHeight.takeIf { it > 0f } ?: 1000f
-            val documentAspect = documentWidth / documentHeight
+            val artwork = artworkRasterizer.rasterize(
+                svgText,
+                targetWidth = sizePx,
+                targetHeight = sizePx,
+            )
             val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             canvas.drawColor(android.graphics.Color.WHITE)
-            val drawWidth: Float
-            val drawHeight: Float
-            if (documentAspect >= 1f) {
-                drawWidth = sizePx.toFloat()
-                drawHeight = sizePx.toFloat() / documentAspect
-            } else {
-                drawHeight = sizePx.toFloat()
-                drawWidth = sizePx.toFloat() * documentAspect
-            }
-            val left = (sizePx - drawWidth) / 2f
-            val top = (sizePx - drawHeight) / 2f
-            canvas.save()
-            canvas.translate(left, top)
-            svg.setDocumentWidth(drawWidth)
-            svg.setDocumentHeight(drawHeight)
-            svg.renderToCanvas(canvas)
-            canvas.restore()
+            val left = (sizePx - artwork.width) / 2f
+            val top = (sizePx - artwork.height) / 2f
+            canvas.drawBitmap(artwork, left, top, null)
+            artwork.recycle()
 
             val dir = File(context.filesDir, "thumbnails").also { it.mkdirs() }
             val file = File(dir, "$renderHash.webp")

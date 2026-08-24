@@ -1,0 +1,19 @@
+[package]
+name = "inku-render-android"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Thin direct-JNI binding for the inku render and raster cores"
+publish = false
+
+[lib]
+name = "inku_render_android"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+inku-render.workspace = true
+inku-svg-raster.workspace = true
+jni.workspace = true
+serde_json.workspace = true

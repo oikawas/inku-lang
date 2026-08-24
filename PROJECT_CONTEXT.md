@@ -195,7 +195,9 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Render Engine 41** — the SVG performance, owned by the shared Rust core and called through one thin Python adapter.
+- **Render Engine 41** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
+Android main preview, thumbnails, and PNG export rasterize canonical saved/current SVG through the
+separate `inku-svg-raster` (`resvg`) crate. Pixels are derived presentation; SVG remains canonical storage.
 **A sheet called by name changes how the brush runs**: each of the seven grounds carries its own
 absorbency and tooth, and those values reach the stroke synthesizer, so the same description leaves
 a different mark on washi than on canvas. `面: 粒` and `面: にじみ` on a line or an arc are read as
@@ -367,9 +369,9 @@ It can lag at any time, so an Android version number must not be read as the ser
 Its interface is bilingual and the language is chosen in the settings screen (default `ja`).
 A Kotlin language pack holds the wording; `server/scripts/gen_saijiki_kt.py` generates the saijiki
 vocabulary.
-Android currently declares render engine `35` and DDL engine `20`. The server declares render
-engine `40` and DDL engine `20`, so the deterministic DDL repairs are current while the drawing
-layer is five versions behind.
+Android and the server now use the same shared Rust render engine `41`; Android's DDL engine is `20`.
+The Android-specific Kotlin drawing engine and AndroidSVG display path are retired, with no runtime
+fallback. Android still owns Stage 1 / 1.5 / 2, Score coerce, Room, history, and `rh3` identity.
 
 ### Verification surfaces
 
@@ -381,10 +383,11 @@ fastapi 0.141 onward**), API-surface identity (compared against
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
 `render-engine-41` (610 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
 byte-identical regeneration.
-- **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
-same way. The port reads the directory for the version it declares, so **raising the server engine
-adds a directory rather than reddening the port**. Older versions cannot be rebaked, so each one is
-held by its own `manifest.json` of names and digests.
+- **Android reference material** — `android/app/src/test/resources/server_reference/` retains only
+DDL, Score, coerce, and history compatibility fixtures. The drawing oracle is the shared Rust core
+and `server/reference/render-engine-41/`; Android does not copy a versioned SVG corpus. Device
+acceptance stages a bounded selection from the canonical manifest and compares packaged-JNI SVG
+bytes and raw pixels directly.
 - **`cli/tests`** — pytest.
 - **`npm run check`**, **`lint:i18n`**, **`lint:models`**, **`lint:recommendations`** — web types,
 terminology, and model resolution.
@@ -392,28 +395,31 @@ terminology, and model resolution.
 dependency).
 - **`scripts/check_docs.py`** — internal references in public documents, the heading shape of each Japanese/English pair, and the **forbidden words on the English side** (the four words of `GLOSSARY.md` §5-1; a backticked span is an identifier and is skipped).
 
-The **deterministic layers** are `coerce/`, `ddl_expander.py`, `core/crates/inku-render/`, the native
+The **deterministic layers** are `coerce/`, `ddl_expander.py`, `core/crates/inku-render/`,
+`core/crates/inku-svg-raster/`, the native
 request boundary, `render_engines/default/`, `renderer.py`, `schema.py`, `saijiki.py`, and
 `language_support/{ja,en}.py`. An output-affecting change requires the frozen-corpus comparison;
 a host-only change proven not to alter the native request or output uses proportionate direct checks.
 Within rendering, the Rust core owns planning, geometry, marks, surfaces, layers, SVG emission,
-deterministic seed derivation, and performance metadata. Python owns only the registry, thin adapter,
-SVG-only compatibility facade, and fresh host entropy.
+deterministic seed derivation, and performance metadata. The raster crate owns only SVG-to-explicit-
+pixel presentation. Python and Android own host adapters, resolved inputs, persistence/identity, and
+UI-specific conversion; Python additionally owns the registry, the SVG-only compatibility facade,
+and fresh host entropy.
 
-**CI runs two workflows.**
+**CI runs three workflows.**
 `reference-corpus` re-bakes the frozen corpora and requires byte-identical output; `checks` runs
 **server (ruff and pytest), cli (ruff and pytest), web (`npm run check`, `test:unit`, `lint:i18n`),
-and the published documents (`check_docs.py`).**
+and the published documents (`check_docs.py`).** `android-native` is path-scoped to shared Rust,
+raster, JNI, and Android-host changes; it checks Rust 1.95, NDK 29, the `arm64-v8a` native library,
+and focused host-JVM boundary tests.
 
 **⚠ Some surfaces are still outside it.**
 **(1) paths that need a key** — the thirty tests that call NVIDIA NIM skip without one;
 **(2) local-only material** — nine tests that use `cli/bench/leaf`, and one that wants `cairosvg`;
-**(3) two comparisons against bytes baked on darwin** — the Android reference fixtures and the
-platform-stability pair test, **which read the Linux bake as a defect and are deselected there**;
-**(4) the Android JVM tests**, for which `checks.yml` simply has no job — its four are `server`,
-`cli`, `web` and `docs` (**⚠ corrected 2026-08-16: the previous reason, "there is no gradle
-wrapper", was false** — `android/gradlew` and `android/gradle/wrapper/` are tracked. Android is not
-entirely absent from CI either: `reference-corpus.yml` carries an `android-design-preview` job);
+**(3) device instrumentation** — canonical SVG-byte and raw-pixel comparisons use the packaged JNI
+on an accepted Pixel 9 and are not replaced by host CI;
+**(4) the full Android JVM suite** — CI runs the focused tests for the shared native boundary while
+the complete suite remains a local gate;
 **(5) the operational scripts under `no-git-sync/`**, which git does not track.
 **The population is not the same as a full local run.**
 

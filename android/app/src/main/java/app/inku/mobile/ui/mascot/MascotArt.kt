@@ -1,6 +1,6 @@
 package app.inku.mobile.ui.mascot
 
-import app.inku.mobile.render.ServerRendererStyle
+import app.inku.mobile.data.model.ColorCatalogs
 
 /**
  * Pure Kotlin data structures and constants for Incu and Yuragi mascots.
@@ -23,12 +23,13 @@ object MascotArt {
         val delaySeconds: Double
     )
 
-    // Palette colors referenced from ServerRendererStyle.DEFAULT_COLOR_MAP where available
-    val COLOR_TOP: String = ServerRendererStyle.DEFAULT_COLOR_MAP["gray"]!!
-    val COLOR_LEFT: String = ServerRendererStyle.DEFAULT_COLOR_MAP["black"]!!
-    val COLOR_RIGHT: String = ServerRendererStyle.DEFAULT_COLOR_MAP["blue"]!!
-    val COLOR_INCUBATE_LEFT: String = ServerRendererStyle.DEFAULT_COLOR_MAP["red"]!!
-    val COLOR_INCUBATE_RIGHT: String = ServerRendererStyle.DEFAULT_COLOR_MAP["green"]!!
+    private val defaultColors = ColorCatalogs.get("default").renderMap
+
+    val COLOR_TOP: String = defaultColors.getValue("gray")
+    val COLOR_LEFT: String = defaultColors.getValue("black")
+    val COLOR_RIGHT: String = defaultColors.getValue("blue")
+    val COLOR_INCUBATE_LEFT: String = defaultColors.getValue("red")
+    val COLOR_INCUBATE_RIGHT: String = defaultColors.getValue("green")
     val COLOR_INCUBATE_TOP: String = "#555555" // Custom mascot-specific shade
 
     // Timing constants for Incu
@@ -105,11 +106,11 @@ object MascotArt {
         val delaySeconds: Double
     )
 
-    val COLOR_RED: String = ServerRendererStyle.DEFAULT_COLOR_MAP["red"]!!
-    val COLOR_EYE_WHITE: String = ServerRendererStyle.DEFAULT_COLOR_MAP["white"]!!
-    val COLOR_EYE_BLACK: String = ServerRendererStyle.DEFAULT_COLOR_MAP["black"]!!
+    val COLOR_RED: String = defaultColors.getValue("red")
+    val COLOR_EYE_WHITE: String = defaultColors.getValue("white")
+    val COLOR_EYE_BLACK: String = defaultColors.getValue("black")
     val COLOR_INCUBATE_INK: String = "#555555"
-    val COLOR_BUBBLE: String = ServerRendererStyle.DEFAULT_COLOR_MAP["gray"]!!
+    val COLOR_BUBBLE: String = defaultColors.getValue("gray")
 
     const val YURAGI_CRAB_STEP_PERIOD_SEC = 1.5
     const val YURAGI_CLAW_LEFT_PERIOD_SEC = 11.0

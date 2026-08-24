@@ -1,7 +1,9 @@
 [workspace]
 members = [
     "crates/inku-render",
+    "crates/inku-render-android",
     "crates/inku-render-python",
+    "crates/inku-svg-raster",
 ]
 resolver = "2"
 
@@ -13,7 +15,10 @@ license = "MIT"
 
 [workspace.dependencies]
 inku-render = { path = "crates/inku-render" }
+inku-svg-raster = { path = "crates/inku-svg-raster" }
+jni = "=0.21.1"
 pyo3 = { version = "=0.29.2", features = ["abi3-py312", "extension-module"] }
+resvg = { version = "=0.48.0", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.11.0"

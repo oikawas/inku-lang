@@ -4,8 +4,9 @@ import android.util.Log
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
-import app.inku.mobile.render.DefaultSvgRenderer
-import app.inku.mobile.render.ServerRendererGeometry
+import app.inku.mobile.render.AndroidRenderHost
+import app.inku.mobile.render.SvgRenderer
+import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.math.round
@@ -13,9 +14,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class LocalFallbackPipeline(
-    private val renderer: DefaultSvgRenderer = DefaultSvgRenderer(),
+    renderer: SvgRenderer? = null,
     private val modelProvider: ModelProvider? = null,
 ) {
+    private val renderer: SvgRenderer by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        renderer ?: AndroidRenderHost()
+    }
     suspend fun paint(request: PaintRequest): PaintResult {
         val started = System.currentTimeMillis()
         Log.i(
@@ -134,6 +138,7 @@ class LocalFallbackPipeline(
         }
         val renderStarted = System.currentTimeMillis()
         val renderSeed = effectiveRenderSeed(request)
+        val renderScoreJson = ServerScoreCompat.migrateScore(JSONObject(scoreJson)).toString()
         Log.i(
             PERF_TAG,
             "render_start model_id=${request.stage2Model} score_chars=${scoreJson.length} " +
@@ -141,12 +146,13 @@ class LocalFallbackPipeline(
         )
         val render = renderer.render(
             RenderRequest(
-                scoreJson = scoreJson,
+                scoreJson = renderScoreJson,
                 colorCatalogId = request.colorCatalogId,
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
                 renderSeed = renderSeed,
                 compositionSeed = request.compositionSeed,
+                wild = request.renderWild,
             ),
         )
         Log.i(
@@ -207,7 +213,7 @@ class LocalFallbackPipeline(
      * when its Score is identical.
      */
     private fun withRenderSeed(metadataJson: String, renderSeed: Long): String =
-        JSONObject(metadataJson).put("render_seed", renderSeed).toString()
+        JSONObject(metadataJson).put("render_seed", exactSeed(renderSeed)).toString()
 
     fun renderFromScore(scoreJson: String, request: PaintRequest): PaintResult {
         // Replaying a Score reads no description and runs no stage, so 0.5 has
@@ -217,15 +223,17 @@ class LocalFallbackPipeline(
         // column empty would claim the row is older than the column.
         val carriedSketch = (request.sketch.text ?: "").trim().ifEmpty { null }
         val normalizedScore = JSONObject(scoreJson).toString()
+        val renderScoreJson = ServerScoreCompat.migrateScore(JSONObject(normalizedScore)).toString()
         val renderSeed = effectiveRenderSeed(request)
         val render = renderer.render(
             RenderRequest(
-                scoreJson = normalizedScore,
+                scoreJson = renderScoreJson,
                 colorCatalogId = request.colorCatalogId,
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
                 renderSeed = renderSeed,
                 compositionSeed = request.compositionSeed,
+                wild = request.renderWild,
                 workColorSnapshot = request.workColorSnapshot,
             ),
         )
@@ -1758,7 +1766,7 @@ class LocalFallbackPipeline(
         // The request, not the boolean: `surface.texture="solid"` asks for the same fill,
         // and a governor that reads only half of the vocabulary lets the same drawing
         // through or holds it back depending on how the request happened to be written.
-        if (!ServerRendererGeometry.fillIsAskedFor(item)) return item
+        if (!ScoreGeometryPolicy.fillIsAskedFor(item)) return item
         if (item.has("arrangement") && !item.isNull("arrangement")) return item
         val primitive = item.optString("primitive")
         if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon")) return item
@@ -1955,13 +1963,26 @@ class LocalFallbackPipeline(
         return "dh1:" + sha256(normalized)
     }
 
-    private fun canonicalSeed(value: Any?): Any? {
+    internal fun canonicalSeed(value: Any?): Any? {
         if (value == null || value == JSONObject.NULL) return null
         return when (value) {
-            is Number -> value.toLong().let { if (it in Int.MIN_VALUE..Int.MAX_VALUE) it.toInt() else it }
-            is String -> value.toIntOrNull() ?: value.toLongOrNull() ?: value
+            is BigInteger -> value
+            is Long -> exactSeed(value).let { seed ->
+                if (seed.bitLength() < Int.SIZE_BITS) seed.toInt() else seed
+            }
+            is Int, is Short, is Byte -> (value as Number).toLong().let { seed ->
+                if (seed >= 0L) seed.toInt() else exactSeed(seed)
+            }
+            is Number -> value
+            is String -> value.toBigIntegerOrNull() ?: value
             else -> value
         }
+    }
+
+    private fun exactSeed(seed: Long): BigInteger = if (seed >= 0L) {
+        BigInteger.valueOf(seed)
+    } else {
+        BigInteger(java.lang.Long.toUnsignedString(seed))
     }
 
     private fun renderHash(input: String, ddl: String, scoreJson: String, svg: String, renderMetadataJson: String, catalogId: String): String {

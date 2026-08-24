@@ -1,6 +1,5 @@
 package app.inku.mobile.pipeline
 
-import app.inku.mobile.render.ServerRendererGeometry
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -14,14 +13,14 @@ internal object DdlEngineRepairs {
             val instruction = repaired[index]
             val surface = instruction.optJSONObject("surface") ?: continue
             val texture = surface.optString("texture", "none")
-            if (texture == "none" || instruction.optString("primitive") in ServerRendererGeometry.CLOSED_SHAPES) {
+            if (texture == "none" || instruction.optString("primitive") in ScoreGeometryPolicy.closedShapes) {
                 continue
             }
             if (texture in markSurfaceWords) continue
 
             instruction.remove("surface")
             val target = (index - 1 downTo 0).firstOrNull {
-                repaired[it].optString("primitive") in ServerRendererGeometry.CLOSED_SHAPES
+                repaired[it].optString("primitive") in ScoreGeometryPolicy.closedShapes
             } ?: continue
             val held = repaired[target].optJSONObject("surface")
             if (held != null && held.optString("texture", "none") != "none") continue

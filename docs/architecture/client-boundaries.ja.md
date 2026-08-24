@@ -171,10 +171,11 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 ## Android境界
 
-- `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Roomという端末内flow。
+- `InkuRepository` → `LocalFallbackPipeline` → `SvgRenderer` / `AndroidRenderHost` → JNI → 共有`inku-render` → Roomという端末内flow。
 - `RoutingModelProvider` はlocal LiteRT-LMとOpenAI-compatible remote providerを選ぶ。
-- `CompatibilityConstants.renderEngineVersion` は35。Serverの41とは別版であり、共有Rust coreはまだAndroidへ統合されていない。
-- serverの条件式・schema・seed・参照fixtureを後追い移植する。数字が同じでも自動的な同一実装ではない。
+- engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
+- preview、thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
+- Kotlinが引き続き所有するのはStage 1 / 1.5 / 2、Score coerce／repair、host option、Room／history、`rh3` identityである。
 
 ## i18nとUI token
 

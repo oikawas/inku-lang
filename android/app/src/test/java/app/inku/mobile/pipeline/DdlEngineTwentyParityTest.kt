@@ -1,8 +1,6 @@
 package app.inku.mobile.pipeline
 
 import app.inku.mobile.ReferenceCorpus
-import app.inku.mobile.data.model.CanvasAspects
-import app.inku.mobile.render.DefaultSvgRenderer
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -299,21 +297,6 @@ class DdlEngineTwentyParityTest {
         assertEquals(1, ordinaryMixed.count { it.getJSONObject("arrangement").getInt("count") == 200 })
         assertEquals(1, ordinaryMixed.count { it.getJSONObject("arrangement").getBoolean("preserve_space") })
 
-        val expand = DefaultSvgRenderer::class.java.getDeclaredMethod(
-            "expandCompositeGroups",
-            JSONArray::class.java,
-            java.lang.Long::class.java,
-            java.lang.Long::class.java,
-            app.inku.mobile.data.model.CanvasSize::class.java,
-        ).apply { isAccessible = true }
-        val expanded = expand.invoke(
-            DefaultSvgRenderer(),
-            JSONArray(composite),
-            23L,
-            17L,
-            CanvasAspects.sizeFor("square"),
-        ) as JSONArray
-        assertEquals(6, expanded.length())
     }
 
     @Test

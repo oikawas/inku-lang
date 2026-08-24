@@ -163,7 +163,9 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
 **強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
 切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
-- **Render Engine 41** — 共有Rust coreが所有し、薄いPython adapterから1 requestで呼ぶSVGの演奏。
+- **Render Engine 41** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
+Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
+`inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。
 **名前で呼んだ支持体は筆の走り方を変える** —— 地の 7 種はそれぞれ吸い方と歯の強さを持ち、
 その値が筆の合成へ渡るので、同じ記述でも和紙とカンバスでは痕が違う形で出る。
 `面: 粒` と `面: にじみ` は線や弧に付いたとき、その 1 命令だけ紙を強く働かせる指示として読まれ（上限 3.0 倍）、
@@ -288,38 +290,37 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 追随の遅れは常にありうるので、Android の版数と server の版数を同じものとして読まない。
 UI は日英で、切替は設定画面から行う（既定は `ja`）。
 画面の文言は Kotlin の言語パックが、歳時記の語彙は `server/scripts/gen_saijiki_kt.py` の生成物が持つ。
-現行 Android は render engine `35`、DDL engine `20` を名乗る。server は render engine `40`、DDL engine `20` なので、
-DDL の決定的修復は追いつき、描画層は 5 版遅れている。
+現行AndroidとServerは同じ共有Rust render engine `41`を使い、AndroidのDDL engineは`20`である。
+Android固有のKotlin描画engineとAndroidSVG artwork pathはretire済みで、runtime fallbackは無い。
+Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityは引き続きAndroid hostが所有する。
 
 ### 検査面
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
 現役は `render-engine-41`（610 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
-- **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
-移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
-旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。
+- **Android の参照材料** — `android/app/src/test/resources/server_reference/` はDDL、Score、coerce、履歴互換だけを保持する。
+描画の正本は`server/reference/render-engine-41/`と共有Rust coreであり、Androidへ版別SVG corpusを複製しない。
+端末受入はcanonical manifestから選んだ少数のrequestをtest assetへ生成し、同梱JNIのSVG byteとraw pixelを直接照合する。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
 - **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。
 - **`scripts/check_docs.py`** — 公開文書の内部参照と、日英の見出し形状と、**英語側の禁止語**（`GLOSSARY.md` §5-1 の 4 語。バックティックの中は識別子として除く）。
 
-**決定的な層**は`coerce/`・`ddl_expander.py`・`core/crates/inku-render/`・native request境界・`render_engines/default/`・`renderer.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`である。出力へ影響する変更では凍結corpusを照合し、native request/outputを変えないと証明したhost-only変更は比例した直接検査を使う。描画内部ではRust coreがplanning、geometry、mark、surface、layer、SVG emission、決定的seed派生、演奏metadataを所有する。Pythonが所有するのはregistry、薄いadapter、SVG-only互換facade、fresh host entropyだけである。
+**決定的な層**は`coerce/`・`ddl_expander.py`・`core/crates/inku-render/`・`core/crates/inku-svg-raster/`・native request境界・`render_engines/default/`・`renderer.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`である。出力へ影響する変更では凍結corpusを照合し、native request/outputを変えないと証明したhost-only変更は比例した直接検査を使う。描画内部ではRust coreがplanning、geometry、mark、surface、layer、SVG emission、決定的seed派生、演奏metadataを所有する。raster crateはSVGから明示pixelを作るpresentationだけを所有する。PythonとAndroidが所有するのはhost adapter、解決済み入力、保存／identityとUI固有変換である。
 
-**CI は 2 本の workflow を回す。**
+**CI は 3 本の workflow を回す。**
 `reference-corpus` が凍結コーパスの再生成を照合し、`checks` が
 **server（ruff と pytest）・cli（ruff と pytest）・web（`npm run check`・`test:unit`・`lint:i18n`）・
-公開文書（`check_docs.py`）**を回す。
+公開文書（`check_docs.py`）**を回す。`android-native` は共有Rust core / raster / JNI / Android hostの
+変更だけで起動し、Rust 1.95、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
 
 **⚠ CI が見ていないものは残っている。**
 **① 鍵の要る経路**（NVIDIA NIM を叩く 30 件は鍵が無いので skip する）、
 **② ローカル専用の材料**（`cli/bench/leaf` を使う 9 件と `cairosvg` の 1 件）、
-**③ darwin で焼いた凍結物と照合する 2 件**（Android の参照 fixture の焼き直しと、
-platform 安定性の対のテスト。**linux で焼くと違う値になるので CI では外してある**）、
-**④ Android の JVM テスト**（`checks.yml` の job は `server` / `cli` / `web` / `docs` の 4 つで、
-**回す job が無い**。**⚠ 2026-08-16 訂正: 旧記載の「gradle wrapper が無いため」は誤り** ——
-`android/gradlew` と `android/gradle/wrapper/` は追跡されている。
-なお `reference-corpus.yml` には `android-design-preview` job が在るので、**Android が CI に 1 つも無いわけではない**）、
+**③端末instrumentation**（canonical SVG byte / raw pixel照合は、同梱JNIを使うPixel 9受入であり、
+host CIでは代替しない）、
+**④Androidの全JVM suite**（CIは共有native境界に関係するfocused testだけを回す。全走はlocal gateである）、
 **⑤ `no-git-sync/` の運用スクリプト**（git が追跡しないので CI から見えない）。
 **手元の全走とは母集団が違う。**
 

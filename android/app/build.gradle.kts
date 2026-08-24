@@ -6,6 +6,37 @@ plugins {
     id("androidx.room")
 }
 
+val androidInstrumentationRetentionProperty =
+    "android.injected.androidTest.leaveApksInstalledAfterRun"
+val androidInstrumentationGuardProperty = "inku.androidInstrumentationGuard"
+val androidInstrumentationGuardEnvironment = "INKU_ANDROID_INSTRUMENTATION_GUARD"
+
+fun isConnectedAndroidInstrumentationTask(taskName: String): Boolean =
+    taskName.startsWith("connected") && taskName.endsWith("AndroidTest")
+
+gradle.taskGraph.whenReady {
+    val connectedTasks = allTasks.filter { task ->
+        isConnectedAndroidInstrumentationTask(task.name)
+    }
+    if (connectedTasks.isEmpty()) return@whenReady
+
+    val retention = providers.gradleProperty(androidInstrumentationRetentionProperty).orNull
+    check(retention == "true") {
+        "Android instrumentation is blocked because APK retention is not enabled. " +
+            "Use the repository-approved safe instrumentation runner; direct connected*AndroidTest is forbidden."
+    }
+
+    val guardProperty = providers.gradleProperty(androidInstrumentationGuardProperty).orNull
+    val guardEnvironment = providers.environmentVariable(androidInstrumentationGuardEnvironment).orNull
+    check(
+        !guardProperty.isNullOrBlank() &&
+            guardProperty == guardEnvironment
+    ) {
+        "Android instrumentation is blocked because the preflight/backup guard is missing. " +
+            "Use the repository-approved safe instrumentation runner."
+    }
+}
+
 fun shouldIncrementAndroidBuildNumber(): Boolean {
     return gradle.startParameter.taskNames.any { taskName ->
         val name = taskName.substringAfterLast(':')

@@ -1,4 +1,4 @@
-"""Migrate history.json → SQLite/PostgreSQL DB.
+"""Migrate history.json into the canonical SQLite database.
 
 Usage:
     uv run python -m inku_server.migrate_history [--json PATH]

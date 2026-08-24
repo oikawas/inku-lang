@@ -1896,8 +1896,10 @@ coercion, host-side canvas/profile resolution, fresh-seed issuance, and the
 engine registry. The thin `render_engines/default/adapter.py` combines a
 validated Score and resolved options into one canonical JSON request, makes one
 call through the independent `inku-render-python` CPython wheel, and receives
-SVG and metadata together. `renderer.py` is a compatibility facade for existing
-callers that need SVG only, not a second rendering implementation.
+SVG and metadata together. Android resolves the coerced Score, canvas, color map,
+profile, and seeds in its Kotlin host, then calls the thin `inku-render-android`
+JNI layer with the same coarse request. `renderer.py` is a compatibility facade
+for existing Server callers that need SVG only, not a second rendering implementation.
 
 Inside the Rust core, host-neutral request/output types and the coarse `render`
 boundary depend in one direction on deterministic seeds, performance planning,
@@ -1906,8 +1908,14 @@ ground/presence layers/color assignment, and the SVG document. The core has no h
 or Python-runtime dependency and owns the engine identity plus renderer-owned
 reference data. There is no Python Engine 40 implementation or runtime fallback;
 the old Engine 40 corpus remains only as historical evidence. This boundary lets
-the same core move to Android and a future iOS host without changing Server
-output semantics; it does not claim those client bindings are already integrated.
+the same core move to Android and future clients without changing Server output
+semantics. Android's Engine 41 binding is integrated and has no fallback to an
+Android-specific Kotlin renderer.
+
+SVG-to-pixel presentation belongs to a separate `core/crates/inku-svg-raster` API, not to the
+Render Engine. Android main preview, history thumbnails, refinement preview, and PNG export convert
+saved or newly generated canonical SVG into resource-independent premultiplied RGBA8. A raster API
+change does not by itself change the Render Engine version or the meaning of saved SVG and `rh3`.
 
 The renderer is allowed to produce controlled sway, but it must preserve
 the JSON Score's intent.  Each render may carry a `render_seed`; providing the

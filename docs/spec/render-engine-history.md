@@ -444,6 +444,13 @@ retired in a separate stage. Engine 40 remains in Git history and its frozen cor
 evidence. **This version contains no intentional drawing improvement.** Improvements after the
 Engine 41 freeze belong to a separate contract and the next engine version.
 
+On 2026-08-24 Android also moved to the same Engine 41 core through a thin JNI binding and retired
+its Android-specific Kotlin renderer and runtime fallback. Five canonical Engine 41 cases match the
+server corpus byte for byte through the packaged arm64 JNI library; three current cases and one
+historical Engine 21 case also match at the raw-pixel boundary. This port does not increment the
+engine version. The separate `inku-svg-raster` API owns SVG-to-pixel conversion and is not part of
+the Render Engine version history.
+
 ## engine 40 — non-computer solid becomes a mottled base fill, not scan lines (v2.13.46)
 
 **Non-computer `surface.texture="solid"` no longer grows scan lines with area.** A real base fill always remains, with a standard SVG filter mottle over it calibrated to `baseFrequency=0.035`, `numOctaves=3`, and an alpha floor of 0.31. The filter seed and ID derive deterministically from the render seed and instruction identity, so a Score, seed, and profile remain byte-identical and filter IDs do not collide within a work.

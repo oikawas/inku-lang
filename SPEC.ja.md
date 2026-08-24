@@ -1224,9 +1224,11 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 - SVG フィルターとテクスチャ効果
 - キャンバス比の扱い
 
-現行の標準実装はRender Engine 41であり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。`renderer.py`はSVGだけを必要とする既存callerの互換facadeであり、第二の描画実装ではない。
+現行の標準実装はRender Engine 41であり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostでcoerce済みScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
 
-Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroid、将来のiOS等へ同じcoreを渡すためのportability boundaryであり、各clientへのbinding統合が完了したことを意味しない。
+Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroidと将来のclientへ同じcoreを渡すportability boundaryである。Android bindingはEngine 41で統合済みであり、Android固有のKotlin rendererへfallbackしない。
+
+SVGからpixelへのpresentationはRender Engineと別の`core/crates/inku-svg-raster` APIが所有する。Androidのmain preview、履歴thumbnail、refinement preview、PNG exportは、保存済みまたは生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換する。このraster APIの変更は、それ自体ではRender Engineの版を変えず、保存SVGや`rh3`の意味も変えない。
 
 renderer は制御された揺らぎを生んでよいが、**JSON Score の意図は保たねばならない**。各描画は `render_seed` を持ちうる。同じ seed を与えれば再演は再現し、正本の Score は動かない。演奏の 2 つのスケールと render engine の版史は §13.8 と §13.11 にある。
 

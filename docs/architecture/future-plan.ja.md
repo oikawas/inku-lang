@@ -23,12 +23,13 @@ flowchart TD
         DOCS["推敲の再入点図・注入点の表\npipeline文書へ反映"]
         PORT_BOUNDARY["描画portability boundary 1\nPython pure geometryをSVG emissionから分離"]
         RUST_CORE["描画portability boundary 2\nServerを共有Rust Engine 41へ移行"]
+        ANDROID_RUST["描画portability boundary 3\nAndroidが共有Rust render/rasterを採用"]
     end
     subgraph NEXT["これから"]
         MIRROR["coerceの鏡\n（調査先行）"]
         P41["要求配達repairの調査\n（対照生成つき）"]
         GOV["Score schema版の統治\n（現状: 統治なし・実質凍結）"]
-        ANDROID_RUST["Androidで共有Rust coreを採用\n（次のportability boundary）"]
+        PIPELINE_PORT["Android決定的pipelineの共有化\n（別契約・境界未裁定）"]
     end
     HELD["保留: 要求配達の上流移設\n（実装は調査の裁定後）"]
 
@@ -36,7 +37,8 @@ flowchart TD
     P41 -->|"三案比較 → 裁定"| HELD
     RITUAL -.->|"層帰属の実測"| P41
     PORT_BOUNDARY --> RUST_CORE
-    RUST_CORE -.->|"portable coreは準備済み"| ANDROID_RUST
+    RUST_CORE --> ANDROID_RUST
+    ANDROID_RUST -.->|"描画以外はAndroid host所有"| PIPELINE_PORT
 ```
 
 ## 済んだもの
@@ -47,12 +49,13 @@ flowchart TD
 - **文書の補完** — 推敲の再入点の図と、生成パラメータの注入点×rh3該否の表を `ddl-processing-pipeline.ja.md` へ、判定単位の全経路を `description-to-svg.ja.md` へ収めた（本書群・日英同時）。
 - **描画portability boundary 1** — `renderer.py` をSVG-only互換入口へ縮め、`default/mark_kernel.py` にscalarと点列だけを返す決定的な幾何計算を分離した。`marks.py` はkernelを一方向に消費してSVGを組み立てる。Engine 40のbyte出力、Score、seed、APIは変えていない。
 - **描画portability boundary 2** — Engine 41でplanning、geometry、mark、surface、layer、SVG serialize、決定的seed派生、演奏metadataをplatform-independentなRust crate `inku-render` へ移した。Serverは粗い1 requestの`inku-render-python`境界から呼び、runtime fallbackを持たない。受入済みEngine 41 corpusが現行byteを固定し、Python Engine 40実装はretireした。
+- **描画portability boundary 3** — Androidは`inku-render-android`の粗いJNI境界から同じEngine 41を呼び、保存済み／現行SVGをhost-neutralな`inku-svg-raster`でpixel化する。Kotlin Engine 35とAndroidSVGはretireし、runtime fallbackを持たない。Score、DDL、Room、保存形式、`rh3`は動かしていない。
 
 ## 別契約で完了したもの — 共有Rust描画core
 
 Serverはplatform-independentなRust crate `inku-render` で演奏する。独立した薄い`inku-render-python` wheelが正規JSON request/responseを1回で渡し、Server packageは`uv_build`を維持する。Rust coreはPython、DB、filesystem、network、host platformへ依存せず、利用者を先回りしたgeneric Scene IRも追加していない。
 
-Androidは引き続き既存Kotlin rendererで演奏しており、JNI、UniFFI、Swift binding、Android/iOS application integrationはまだ無い。次のportability boundaryはAndroid採用で、iOSは将来の利用者である。後続契約はEngine 41のrequest/output semanticsを守り、移植都合でServerの意味論を曲げずに性能とbinary sizeを測る。
+Android採用も完了し、ServerのPython bindingとAndroid JNI bindingが同じ`inku-render`を使う。Android presentationは別の`inku-svg-raster`を使い、保存の正本はSVGのままである。iOS binding、Server raster採用、AndroidのStage 1.5／coerce等の共有化は将来の別契約であり、移植都合でEngine 41や`rh3`の意味を曲げない。
 
 ## これから 1 — coerceの鏡（調査先行）
 

@@ -96,7 +96,7 @@ flowchart LR
 
 正規経路は `api_core/rendering.py → render_engines` registry → `default/adapter.py` → 独立した `inku-render-python` wheel → platform-independentな `inku-render` core である。adapterはhost所有のcanvas/profileを解決し、正規requestを1回serializeして、SVGとmetadataを1回のcallで受け取る。`renderer.py` はSVG-only互換facadeとして残り、同じregistryへ委譲する。
 
-Stage 6でPython Engine 40の統率、planning、mark、surface、layer、SVG emission、stroke moduleを削除した。`default/` に残るのはpackage exportと薄いRust adapterだけである。`/api/reference` も第二のPython実装をimportせず、renderer所有の表をnative coreから読む。Androidはまだ履歴上のKotlin rendererを使っており、このRust coreの採用は次のportability boundaryである。
+Stage 6でPython Engine 40の統率、planning、mark、surface、layer、SVG emission、stroke moduleを削除した。`default/` に残るのはpackage exportと薄いRust adapterだけである。`/api/reference` も第二のPython実装をimportせず、renderer所有の表をnative coreから読む。Androidも`inku-render-android`の薄いJNI adapterから同じcoreを呼ぶ。AndroidのSVG presentationは別crate `inku-svg-raster`が担い、Serverの既存PNG raster経路はこの境界では変更しない。
 
 ## Rust core内部
 

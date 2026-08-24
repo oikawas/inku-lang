@@ -1,26 +1,13 @@
 package app.inku.mobile
 
-import app.inku.mobile.data.model.CompatibilityConstants
 import java.io.InputStreamReader
 import org.json.JSONObject
 
 /**
  * Resolves a reference fixture to the corpus directory that governs it.
  *
- * These files are historical artifacts held by a manifest. While they sat in
- * one flat directory, raising the Server engine rewrote the port's expectations
- * in place. Each Android engine version now keeps its own directory, and a newer
- * Server engine must not rebake it.
- *
- * The port therefore asks for a fixture by bare name and reads the directory for
- * the version it implements. Raising the server engine adds a directory; it does
- * not touch the one this reads. Catching up then means moving
- * [CompatibilityConstants.renderEngineVersion] -- one line, on purpose, in its
- * own contract.
- *
- * A name is resolved by the axis that moves it, and a misfiled name fails loudly:
- * the file exists under exactly one of these three, so getting the axis wrong
- * raises "not found" rather than silently comparing against the wrong version.
+ * Android keeps only DDL and flat compatibility fixtures. Render parity is owned
+ * by the shared Rust core corpus rather than copied into the application tests.
  */
 object ReferenceCorpus {
 
@@ -43,7 +30,7 @@ object ReferenceCorpus {
     fun path(name: String): String = when (name) {
         in FLAT -> "/server_reference/$name"
         DDL_ENGINE_FIXTURE -> "/server_reference/ddl-engine-$ddlEngineVersion/$name"
-        else -> "/server_reference/render-engine-${CompatibilityConstants.renderEngineVersion}/$name"
+        else -> error("Unknown Android reference fixture: $name")
     }
 
     fun text(name: String): String {

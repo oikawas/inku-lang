@@ -349,6 +349,11 @@ Engine 40へのruntime fallbackを持たない。本番切替後の別Stageで�
 surface、layer、SVG emission、stroke moduleをretireした。Engine 40はGit historyに残り、凍結corpusは履歴根拠として
 残る。**この版には描画改善を含めない。** 改善はEngine 41の凍結後に別契約・次のengine版で扱う。
 
+2026-08-24にAndroidも薄いJNI bindingから同じEngine 41 coreを呼ぶよう切り替え、Android固有のKotlin
+rendererとruntime fallbackをretireした。canonical Engine 41の5ケースは同梱arm64 JNIからserver corpusと
+SVG byte一致し、current 3ケースとhistorical Engine 21の1ケースはraw pixelでも一致した。この移植では
+engine版を上げない。SVGからpixelへの変換は別APIの`inku-svg-raster`が所有し、Render Engineの版史へ混ぜない。
+
 ## engine 40 — non-computer の solid は走査線でなくむらを持つ base fill になる（v2.13.46）
 
 **non-computer の `surface.texture="solid"` は、面積に比例して増える走査線をやめた。** 常に残る実体の base fill の上に、`baseFrequency=0.035`、`numOctaves=3`、alpha floor 0.31 の standard SVG filter によるむらを重ねる。filter seed と ID は render seed と instruction identity から決定的に導き、同じ Score・seed・profile は byte-identical のまま、同一 work 内でも filter ID は衝突しない。

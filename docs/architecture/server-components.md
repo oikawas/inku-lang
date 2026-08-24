@@ -96,7 +96,7 @@ flowchart LR
 
 The canonical path is `api_core/rendering.py → render_engines` registry → `default/adapter.py` → the independent `inku-render-python` wheel → the platform-independent `inku-render` core. The adapter resolves host-owned canvas/profile data, serializes one canonical request, and receives SVG plus metadata in one call. `renderer.py` remains the SVG-only compatibility facade and delegates through the same registry.
 
-Stage 6 removed the Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules. `default/` now contains only its package export and the thin Rust adapter. `/api/reference` obtains renderer-owned tables from the native core instead of importing a second Python implementation. Android still uses its historical Kotlin renderer; adopting this Rust core there is the next portability boundary.
+Stage 6 removed the Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules. `default/` now contains only its package export and the thin Rust adapter. `/api/reference` obtains renderer-owned tables from the native core instead of importing a second Python implementation. Android now calls the same core through the thin `inku-render-android` JNI adapter. Its SVG presentation uses the separate `inku-svg-raster` crate; this boundary does not change the Server's existing PNG raster path.
 
 ## Rust core internals
 

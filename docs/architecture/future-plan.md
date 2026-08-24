@@ -23,12 +23,13 @@ flowchart TD
         DOCS["Refinement re-entry diagram and injection table\nreflected into the pipeline document"]
         PORT_BOUNDARY["Drawing portability boundary 1\nPython pure geometry separated from SVG emission"]
         RUST_CORE["Drawing portability boundary 2\nServer moved to shared Rust Engine 41"]
+        ANDROID_RUST["Drawing portability boundary 3\nAndroid adopted shared Rust render/raster"]
     end
     subgraph NEXT["Ahead"]
         MIRROR["The coerce mirror\n(investigation first)"]
         P41["Request-delivery repair investigation\n(with control generations)"]
         GOV["Score schema version governance\n(today: ungoverned, frozen in practice)"]
-        ANDROID_RUST["Android adoption of the shared Rust core\n(next portability boundary)"]
+        PIPELINE_PORT["Sharing Android deterministic pipeline\n(separate contract, boundary undecided)"]
     end
     HELD["Held: moving request delivery upstream\n(implementation only after the investigation is ruled)"]
 
@@ -36,7 +37,8 @@ flowchart TD
     P41 -->|"three options compared → ruling"| HELD
     RITUAL -.->|"measured layer attribution"| P41
     PORT_BOUNDARY --> RUST_CORE
-    RUST_CORE -.->|"portable core is ready"| ANDROID_RUST
+    RUST_CORE --> ANDROID_RUST
+    ANDROID_RUST -.->|"non-render stages remain host-owned"| PIPELINE_PORT
 ```
 
 ## Done
@@ -47,12 +49,13 @@ flowchart TD
 - **The document complement** — the refinement re-entry diagram and the injection-point × rh3 table went into `ddl-processing-pipeline.md`, and the full decision-level road into `description-to-svg.md` (this document set, both languages at once).
 - **Drawing portability boundary 1** — `renderer.py` was contracted to the SVG-only compatibility entrypoint, while `default/mark_kernel.py` now owns deterministic geometry that returns only scalars and point collections. `marks.py` consumes the kernel in one direction and constructs SVG. Engine 40 bytes, the Score, seeds, and the API did not change.
 - **Drawing portability boundary 2** — Engine 41 moved planning, geometry, marks, surfaces, layers, SVG serialization, deterministic seed derivation, and performance metadata into the platform-independent `inku-render` Rust crate. The Server calls it through one coarse `inku-render-python` request, with no runtime fallback. The accepted Engine 41 corpus pins the current bytes; the Python Engine 40 implementation has been retired.
+- **Drawing portability boundary 3** — Android calls the same Engine 41 through the coarse `inku-render-android` JNI boundary and rasterizes saved/current SVG through host-neutral `inku-svg-raster`. Kotlin Engine 35 and AndroidSVG are retired, with no runtime fallback. Score, DDL, Room, saved format, and `rh3` did not move.
 
 ## Completed under a separate contract — shared Rust drawing core
 
 The Server now performs through the platform-independent `inku-render` Rust crate. A thin independent `inku-render-python` wheel carries one canonical JSON request and response across the Python boundary; the Server package keeps its `uv_build` backend. The Rust core has no Python, database, filesystem, network, or host-platform dependency, and no generic Scene IR was added ahead of a consumer need.
 
-Android still performs through its existing Kotlin renderer, and no JNI, UniFFI, Swift binding, or Android/iOS application integration exists yet. Android adoption is the next portability boundary; iOS remains a future consumer. Those contracts must preserve the Engine 41 request/output semantics and measure performance and binary size without bending Server semantics around port convenience.
+Android adoption is also complete: the Server Python binding and Android JNI binding use the same `inku-render`, while Android presentation uses the separate `inku-svg-raster` and SVG remains canonical storage. An iOS binding, Server raster adoption, and sharing Android Stage 1.5/coerce semantics are future separate contracts; none may bend Engine 41 or `rh3` semantics for port convenience.
 
 ## Ahead 1 — the coerce mirror (investigation first)
 

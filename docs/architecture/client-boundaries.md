@@ -171,10 +171,11 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 ## Android boundary
 
-- Flow: `InkuRepository` → `LocalFallbackPipeline` → `DefaultSvgRenderer` → Room.
+- Flow: `InkuRepository` → `LocalFallbackPipeline` → `SvgRenderer` / `AndroidRenderHost` → JNI → shared `inku-render` → Room.
 - `RoutingModelProvider` selects local LiteRT-LM or an OpenAI-compatible remote provider.
-- `CompatibilityConstants.renderEngineVersion` is 35; Server is 41, and the shared Rust core is not yet integrated into Android.
-- Server conditions, schema, seeds, and reference fixtures are ported later. Matching numbers would not by themselves prove identical implementations.
+- Engine identity and renderer reference come from the packaged Rust core; Kotlin keeps no version literal.
+- Preview, thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
+- Kotlin continues to own Stage 1 / 1.5 / 2, Score coerce/repair, host options, Room/history, and `rh3` identity.
 
 ## Language and UI sources
 

@@ -5,18 +5,18 @@
 
 最終更新: 2026-08-24。
 
-**追随状況**: Android は `2.1.4-android.63` / **render engine version `35`** /
-**DDL engine version `20`** の世代にある（描画版は `data/model/CompatibilityConstants.kt`、
-DDL 参照版は `ReferenceCorpus.kt` が名乗る）。master の web/server は v2.13.47 /
-**render engine `41`** / **`ddl_engine_version` 20** なので、**DDL の決定的修復は一致し、
-現行の Kotlin 描画層は 6 版遅れている**。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
+**追随状況**: Android は `2.1.4-android.63` / **render engine `default / 41`** /
+**DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
+`core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
+master の web/server も **render engine `41`** / **`ddl_engine_version` 20** であり、
+ServerとAndroidは同じRust描画実装を共有する。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
 （末尾の 2026-08-05 の節を参照）。
 
-**次サイクルの確定方針**: Android の production SVG engine を、server と同じ
-`core/crates/inku-render/` の共有 Rust core へ切り替える。切替の受入が完了するまでは
-`DefaultSvgRenderer.kt` が engine `35` の現行実装であり、Android は Rust engine `41` を名乗らない。
-切替完了後は Kotlin に描画アルゴリズムの複製を残して追随する方式を廃止し、Rust core の版と出力を共有する。
-binding、packaging、段階的な撤去と検査は次サイクルの契約で固定し、本書では未実装を実装済みとして扱わない。
+**共有Rust切替は完了した**: productionのScore → SVG / metadataは
+`AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。保存済み／現行SVGの
+preview、thumbnail、PNG出力は、別のhost-neutral crate `core/crates/inku-svg-raster/` が
+`resvg`で生成するpixelをBitmapへ機械変換する。Kotlin Engine 35とAndroidSVGはproductionから撤去し、
+runtime fallbackを持たない。保存済みSVG、Room schema、Score schema、DDL engine、`rh3`の意味は変更しない。
 
 **ただし「層の版が同じ」は「移植が終わった」ではない。**
 版の数字は描画の同一性を主張するものであって、UI・保存・語彙の差までは覆わない。
@@ -46,8 +46,7 @@ binding、packaging、段階的な撤去と検査は次サイクルの契約で�
 - production の Score -> SVG と演奏metadataは、serverとAndroidが同じ
   `core/crates/inku-render/` を使う。Androidはnative境界から1 requestで共有coreを呼び、
   Kotlinに別の正本engineを持たない。
-- Rust切替前の現行実装はKotlin `DefaultSvgRenderer`である。切替後、main preview、thumbnail、
-  headless、DDL replayを含むproduction描画入口はRustが返すSVGとmetadataを使う。
+- main preview、thumbnail、headless、DDL replayを含むproduction描画入口はRustが返すSVGとmetadataを使う。
   Compose CanvasはUI表示の補助になれても、別のengine versionやrender identityを生成しない。
 - 保存済み作品のSVGは切替時に書き換えない。過去作品の表示は保存済みSVG、明示的なreplayは
   その時点の最新Rust engineで担保する。
@@ -61,8 +60,8 @@ binding、packaging、段階的な撤去と検査は次サイクルの契約で�
 
 Android ワークスペースには、namespace `app.inku.mobile` の build 可能な単体アプリがある。
 
-2026-08-24時点ではAndroid用Rust binding、Cargo/Gradle packaging、native libraryは未導入である。
-production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以下はRust切替前の現行状態を記す。
+2026-08-24時点でAndroid用Rust binding、Cargo/Gradle packaging、arm64 native library、
+Rust raster presentationを導入済みである。以下は切替後の現行状態を記す。
 
 実装済み:
 
@@ -93,6 +92,13 @@ production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以�
   - DDL -> JSON Score
   - JSON Score -> SVG
   - render hash / render metadata generation
+- `AndroidRenderHost`が、coerce済みScore、解決済みcanvas／色map、catalog、profile、seed、`wild`を
+  1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust Engine 41を呼ぶ。
+- `inku-svg-raster`は`resvg 0.48.0`を使い、保存済み／現行SVGを明示的な
+  premultiplied RGBA8、width、height、strideへ変換する。Android側はBitmapのBGRA byte順へだけ変換する。
+- main preview、履歴thumbnail、refinement preview、PNG exportは`RustArtworkRasterizer`を使う。
+  raster cache keyはSVG identity、target size、raster API/optionsを含み、通常recompositionで再rasterしない。
+- Rust render/raster native処理はcoroutineのbackground dispatcherで実行し、runtime renderer/raster fallbackを持たない。
 - Android rendering は Web `/api/paint` と同じ論理 stage を辿る:
   Stage 1 interpretation、intermediate DDL expansion、Stage 2 Score composition、
   Score repair/coercion、SVG rendering、render hash generation、Room history persistence。
@@ -131,10 +137,8 @@ production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以�
   Compose の `指示` field、`解釈（正規化DDL）` field、rendered Score、saved history が同じ user-visible flow で整合する。
 - LiteRT-LM text response は DDL path に入る前に sanitize する。
   Gemma chat control token や、SQL-like text など明らかな non-DDL output は reject し、deterministic fallback に回す。
-- Kotlin SVG renderer は current primitive subset を移植済み。
-- Renderer は fallback path に必要な Web Score fields を扱う:
-  `arrangement.color_cycle`、`arrangement.path`、clustered high-count groups、primitive `rotation`。
-- 保存済み JSON Score 用 Native Compose preview renderer。
+- KotlinのStage 1 / 1.5 / 2、Score coerce／repair、Room／historyは引き続きAndroidが所有する。
+  描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
   - bottom navigation: Compose, History, Demo, Settings
@@ -160,18 +164,10 @@ production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以�
 
 未実装:
 
-- **次サイクルの最優先**: Android production描画を共有Rust coreへ切り替える。
-  Android native bindingとpackaging、1-request境界、全production入口の結線、engine id/version、
-  SVG / metadata / referenceの直接検査、Kotlin rendererのproduction caller撤去を1契約で扱う。
-- Rust切替の受入まではengine-core固有のKotlin追随を増やさない。`pipeline/`、`render/`、
-  coerce / geometry / materialのアルゴリズム複製、render版追随、reference焼き直しは停止する。
 - background continuation、notification progress、metered-network policy、low-storage recovery を含む production-polished model download UX。
 - 外部 provider execution。provider record は現時点では compatibility data structures として存在する。
 - import/export、plugin management、advanced settings、user-management equivalents、admin/server-only web features の full web feature parity。
 - Web-compatible JSON export からの import。
-- SVG / render metadata レベルの reference compatibility tests。
-  **Score レベルは 2026-07-23 に着手済み**（`ServerScoreParityTest.kt` が
-  `server/tests/fixtures/stage2/` の 15 ケースと `dh1` / `rh2` の値一致を検証する。末尾の節を参照）。
 
 ## 実機検証状態
 
@@ -182,6 +178,9 @@ production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以�
 
 実機確認済み:
 
+- 同梱`arm64-v8a` JNIを通したcanonical Engine 41の5ケースがserver corpusのSVG byteと一致する。
+- current 3ケースとhistorical Engine 21の1ケースが64 px targetのraw pixel、寸法、stride、SHA-256で一致する。
+- native identityはdefault engine `41`、renderer reference `11`、core / raster API `0.1.0`を返す。
 - App installs and launches。
 - launch 後 process は running のまま維持される。
 - Draw action が新しい Room history item を作る。
@@ -189,7 +188,7 @@ production描画はKotlin `DefaultSvgRenderer`（engine `35`）を使う。以�
 - Latest checked history count: `4`。
 - Latest checked render hash short: `6D8E`。
 - Stored JSON Score と render metadata は JSON render tab から確認できる。
-- Main preview と history thumbnails は device 上で JSON Score から render される。
+- Main preview と history thumbnails は保存済みcanonical SVGを共有Rust rasterizerでpixel化する。
 - Star state update は Room に永続化され、選択中 history UI に反映される。
 - JSON share export は app cache に `inku-<render_hash_short>.json` を書き、
   `FileProvider` 経由で Android share sheet を開く。
@@ -291,9 +290,9 @@ Android 側の互換コードは server source の責務境界に対応するフ
 
 | Canonical source / current bridge | Android側 | Responsibility |
 | --- | --- | --- |
-| `core/crates/inku-render/` | 次サイクルで追加するAndroid native adapter | planning、geometry、mark、surface、layer、SVG emission、決定的seed、演奏metadata |
+| `core/crates/inku-render/` | `AndroidRenderHost` → `NativeRenderBridge` → `inku-render-android` | planning、geometry、mark、surface、layer、SVG emission、決定的seed、演奏metadata |
 | `server/src/inku_server/render_engines/default/adapter.py` | Android host adapter | canonical Scoreとrender optionを1 requestで渡し、SVGとmetadataを受け取る薄いhost境界 |
-| `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | 現行engine `35`の移行bridge | Rust切替受入まではproductionを担う。受入後はproduction callerを持たず、共有coreの別実装として延命しない |
+| `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` | canonical SVGをhost-neutral pixelへ変換するpresentation境界。Score、engine identity、`rh3`を所有しない |
 
 切替受入では、単発描画、batch、demo、保存Scoreのreplay、headless、main preview、thumbnailの
 production描画がRust境界へ到達すること、engine id/versionがRust coreから来ること、同じrequestの
@@ -321,7 +320,7 @@ Rust描画切替はこのKotlin pipeline表を自動的にRustへ移す許可で
 | `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair order、fallback Score construction、Stage 1/2 provider fallback control |
 | `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema、Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
 | `server/src/inku_server/composer.py::_score_tool_schema()` の生成結果 | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSchemaJson.kt` | Stage 2 tool schema の JSON 本体。primitive / weight / style の列挙、`additionalProperties: false`、arrangement・`at`・`relation`・`surface` の定義。**server schema の変更はまずここへ反映する** |
-| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` の `renderHash` / `descriptionHash` / `canonicalSeed` | `rh2` payload の 8 項目と canonical JSON 規則、`dh1` の正規化規則、seed の整数化 |
+| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` の `renderHash` / `descriptionHash` / `canonicalSeed` | `rh3` payload、canonical JSON規則、`render_wild`の正規化、`dh1`の正規化規則、seedの整数化 |
 
 指示から描画までの function-level parity table:
 
@@ -339,7 +338,8 @@ Rust描画切替はこのKotlin pipeline表を自動的にRustへ移す許可で
 | DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | clause extraction、primitive selection、coverage instruction defaults を一致させる。`円` / `circle` は server と同じく coverage repair では `ellipse` へ寄せる。 |
 | Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | provider failure / unusable Stage 2 output 時の primitive、geometry、arrangement defaults を server に合わせる。 |
 | Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | visible color、dedupe、coverage、shape/color/motif/composition/context/motion/presence/density の順序を比較し、Android 固有順序を残さない。 |
-| SVG render engine | `core/crates/inku-render/`（serverは`render_engines/default/adapter.py`経由） | 次サイクルのAndroid native adapter。切替前だけ`DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | productionは同じRust coreへ1 requestを渡す。切替後にKotlinへ描画アルゴリズムを複製しない。 |
+| SVG render engine | `core/crates/inku-render/`（serverは`render_engines/default/adapter.py`経由） | `AndroidRenderHost` / `NativeRenderBridge` | productionは同じRust coreへ1 requestを渡し、engine identityとrenderer referenceも同じownerから読む。 |
+| SVG raster presentation | `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` / Bitmap・Compose | 保存済み／現行SVGを変更せずpixel化する。AndroidSVGやKotlin描画fallbackは持たない。 |
 | Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | hash input fields、build number handling、engine id/version、catalog/canvas metadata を一致させる。 |
 | History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | saved input、DDL、Score、SVG、metadata、model IDs、catalog/canvas、hash、timestamps を同じ user-visible data として保持する。 |
 | Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | server/android とも履歴保存可能にし、summary に history_id、DDL、hash、catalog を残す。 |
@@ -393,19 +393,18 @@ local single-user equivalent と明記されたものを除き、Web component �
 
 1. Project skeleton、Room schema、compatibility data models。
 2. Local settings、model download state placeholders、provider abstraction。
-3. engine `35`までのKotlin renderer port（Rust切替前の現行bridge）。
+3. engine `35`までのKotlin renderer portをretireし、共有Rust Engine 41とRust raster presentationへ切替。
 4. Deterministic fallback を含む Stage 1 / Stage 1.5 / Stage 2 pipeline shape。
 5. Single drawing、batch、demo、history、settings shell、render previews、prompt view、JSON view の Compose UI。
 
 次の残作業:
 
-1. Android production描画を`core/crates/inku-render/`へ切り替え、全入口、版、metadata、referenceを直接検査してKotlin engineのproduction ownershipを終える。
-2. Pixel 9 上で、downloaded Gemma 4 E2B/E4B `.litertlm` model files を使った LiteRT-LM inference を end-to-end verify し、
+1. Pixel 9 上で、downloaded Gemma 4 E2B/E4B `.litertlm` model files を使った LiteRT-LM inference を end-to-end verify し、
    provider failure を silent fallback ではなく UI/log surface に出す。
-3. foreground service または WorkManager、notifications、metered-network policy、user-visible storage recovery で model download UX を harden する。
-4. JSON Score parserをfull web surfaceまで拡張する。描画アルゴリズムはKotlinへ拡張しない。
-5. 現在の single-item share export から、Android Storage Access Framework を使う full history import/export flows へ export compatibility を拡張する。
-6. Non-history settings operation の destructive confirmation を完了し、Android UI state transition の automated parity coverage を追加する。
+2. foreground service または WorkManager、notifications、metered-network policy、user-visible storage recovery で model download UX を harden する。
+3. JSON Score parserをfull web surfaceまで拡張する。描画アルゴリズムはKotlinへ拡張しない。
+4. 現在の single-item share export から、Android Storage Access Framework を使う full history import/export flows へ export compatibility を拡張する。
+5. Non-history settings operation の destructive confirmation を完了し、Android UI state transition の automated parity coverage を追加する。
 
 ## 2026-05-07 Server Parity 修正記録
 
@@ -2192,12 +2191,14 @@ I-360のmodel tooltipへ、作品が保存した短縮render hashを既存の`F`
 
 既存`HistoryItemEntity.starred`、`toggleStar(HistoryItemEntity)`、Star保存、系譜再取得、`HistoryBadge`だけを使う。保存後に同じfocusでgraphを再取得して表示を更新し、既存card tap、thumbnail、世代・状態、描画要素／DDL／モデル／言語actionを保つ。新しいproducer、repository/DAO/query、Room/schema/migration、保存形式、i18n、pipeline、render、server/web/sharedは変更していない。
 
-## 2026-08-24 次サイクルで共有Rust描画engineへ切り替える
+## 2026-08-24 共有Rust描画engineとRust raster presentationへ切替完了（I-369）
 
-Android固有のKotlin描画engineを版ごとに追随させる方式を終え、次サイクルでserverと同じ
-`core/crates/inku-render/`をproduction描画へ接続する。現時点のAndroidはengine `35`であり、
-Rust bindingとpackagingは未実装なので、切替受入前にengine `41`を名乗らない。
+Android固有のKotlin描画engineを版ごとに追随させる方式を終え、serverと同じ
+`core/crates/inku-render/`をproduction描画へ接続した。`inku-render-android`の粗いJNI境界は
+Engine 41のSVGとmetadataを1回で返し、engine identity、API version、renderer referenceも同じRust ownerから読む。
 
-切替対象はScoreからSVGと演奏metadataを作る描画境界である。UI、Room、履歴、provider routingは
-Androidに残し、既存履歴の保存済みSVGを書き換えない。binding、全production入口、版とmetadata、
-server hostとの直接一致、Kotlin engineのproduction caller撤去を次サイクルの契約で固定する。
+`inku-svg-raster`を別crateとして追加し、`resvg 0.48.0`で現行／履歴SVGをpixel化する。
+preview、thumbnail、refinement、PNG exportは保存済みcanonical SVGを入力とし、Scoreを暗黙replayしない。
+Kotlin Engine 35、AndroidSVG依存、renderer-only corpusとテストは撤去した。Pixel 9でEngine 41の
+5ケースSVG byte一致、現行3＋履歴1ケースのraw pixel digest一致、known color/alpha/strideを確認した。
+Score 0.1.0、DDL Engine 20、Room schema、保存形式、`rh3`、app version/build numberは変更していない。

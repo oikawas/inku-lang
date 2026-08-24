@@ -12,7 +12,7 @@
 | Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `976` |
 | Render Engine | 実装 `default` / `41`、共有Rust coreと薄いPython adapter |
 | DDL | `ddl_version=3` / `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.63`、実装が名乗る Render Engine `35` |
+| Android | `android/VERSION` = `2.1.4-android.63`、共有Rust Render Engine `41`、DDL Engine `20` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -23,7 +23,7 @@
 | SYS-USER | 利用者 | 記述、明示的な派生、設定、書き出しを開始する | `web/src/routes/+page.svelte`; `cli/src/inku_cli/cli.py`; `android/app/src/main/java/app/inku/mobile/ui/InkuApp.kt` | `SPEC.ja.md` §7, §23 | 確認済み | 公開可 |
 | SYS-WEB | Web frontend | SvelteKit UI、同一origin API proxy、ブラウザ状態 | `web/src/routes/+page.svelte`; `web/src/hooks.server.ts`; `web/package.json` | §7, §21 | 確認済み | 公開可 |
 | SYS-CLI | CLI | 公開HTTP APIクライアント、機能試験とベンチ補助 | `cli/src/inku_cli/cli.py` (`ApiClient`, parser); server内部importなし | §23 | 確認済み | 公開可 |
-| SYS-ANDROID | Android | Kotlinによる端末内の別パイプライン、Room履歴 | `InkuRepository`, `LocalFallbackPipeline`, `DefaultSvgRenderer`, `InkuDatabase` | `android/ANDROID_SPEC.ja.md` | 確認済み | 公開可 |
+| SYS-ANDROID | Android | Kotlinによる端末内のStage 1 / 1.5 / 2、Room履歴と`rh3`、共有RustによるSVG描画とraster presentation | `InkuRepository`; `LocalFallbackPipeline`; `AndroidRenderHost`; `RustArtworkRasterizer`; `InkuDatabase` | `android/ANDROID_SPEC.ja.md` | 確認済み | 公開可 |
 | SYS-API | FastAPI app | middleware、lifespan、router組立て | `server/src/inku_server/api.py` (`app`, `_lifespan`, `include_router`) | §22; Project Context「server」 | 確認済み | 公開可 |
 | SYS-LLM | LLM providers | Stage 0.5/1/2等の外部推論 | `model_settings.py` (`provider_for_model`, `connection_for`); `interpreter.py`; `composer.py` | §12.5–12.8 | 確認済み | 抽象化すれば可 |
 | SYS-DB | Server DB | 履歴、系譜、利用者、session、設定の正本 | `db.py` (`HistoryRow`ほか、`add_item`) | §21–22 | 確認済み | 公開可 |
@@ -40,7 +40,8 @@
 | PIPE-S15 | Stage 1.5 | 決定的な焦点書換えと明示変奏 | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | 確認済み | 公開可 |
 | PIPE-S2 | Stage 2 | DDLからJSON Score、schema tool利用 | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | 確認済み | 公開可 |
 | PIPE-COERCE | coerce/validation | 不正値drop、要求配達、天井、描画可能性確保 | `coerce/__init__.py:coerce_score`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | 確認済み | 公開可 |
-| PIPE-RENDER | Render Engine | Score、seed、解決済みhost optionから、粗いnative 1-call境界を通してSVGと描画metadataを作る | `render_engines/default/adapter.py`; `inku-render-python`; `core/crates/inku-render`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
+| PIPE-RENDER | Render Engine | Score、seed、解決済みhost optionから、PythonまたはAndroid JNIの粗いnative 1-call境界を通してSVGと描画metadataを作る | `render_engines/default/adapter.py`; `inku-render-python`; `inku-render-android`; `AndroidRenderHost`; `core/crates/inku-render`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
+| PIPE-RASTER | SVG raster presentation | 保存済み／生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換し、pixel format・寸法・strideを明示する | `core/crates/inku-svg-raster`; `NativeRenderBridge`; `RustArtworkRasterizer` | Android仕様 | 確認済み | 公開可 |
 | PIPE-HISTORY | 履歴保存 | `/api/paint`のserver生成物をDBへ保存 | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | 確認済み | 公開可 |
 | DATA-DH1 | `dh1` | 正規化した記述の同一性 | `identity.py:description_hash` | Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-RH3 | `rh3` | Score、render seed、wild、engine、色カタログによるedition同一性 | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context「設計契約」 | 確認済み | 公開可 |
@@ -54,9 +55,9 @@
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |
 | TEST-SERVER | Server検査 | pytest、API surface、認可、route所在 | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context「検査面」 | 確認済み | 公開可 |
 | TEST-CORPUS | 凍結コーパス | 現行Render Engine 41の610件とDDL 20の49件を再生成照合し、Engine 40の610件は履歴根拠としてのみ保持 | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
-| TEST-ANDROID | Android参照 | server版ごとのfixtureをmanifest固定 | `android/app/src/test/resources/server_reference/`; `server/tests/test_android_reference_fixtures_are_current.py` | Android仕様メモ | 確認済み | 公開可 |
+| TEST-ANDROID | Android native受入 | canonical manifestから生成した少数assetを同梱JNIでSVG byte照合し、current / historical代表をraw pixel・stride・digestで照合する | `NativeRenderDeviceTest`; `syncNativeParityAssets`; `inku-svg-raster` digest tests | Android仕様 | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
-| CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、docs検査、corpus・Android design preview再生成、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `release.yml` | §11, §22 | 確認済み | 公開可 |
+| CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、docs検査、corpus再生成、共有Rust / raster / JNI / Android hostのpath-scoped native gate、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
 
 ## 信頼度の読み方
 

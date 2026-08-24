@@ -4,15 +4,22 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-23.
+Last updated: 2026-08-24.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.63` with **render engine
 version `35`** and **DDL engine version `20`** (declared by
 `data/model/CompatibilityConstants.kt` and `ReferenceCorpus.kt`, respectively). The master
-web/server implementation is at v2.13.47 with **render engine `40`** and
-**`ddl_engine_version` 20**, so **the deterministic DDL repairs match while the drawing layer is
-five versions behind**. The Stage 1.5 expander followed the staffage level being folded away on
+web/server implementation is at v2.13.47 with **render engine `41`** and
+**`ddl_engine_version` 20**, so **the deterministic DDL repairs match while the current Kotlin
+drawing layer is six versions behind**. The Stage 1.5 expander followed the staffage level being folded away on
 2026-08-05 (see the 2026-08-05 section at the end of this document).
+
+**Fixed direction for the next cycle**: replace Android's production SVG engine with the same
+shared Rust core under `core/crates/inku-render/` that the server uses. Until that cutover is
+accepted, `DefaultSvgRenderer.kt` remains the current engine `35` implementation and Android must
+not claim Rust engine `41`. After acceptance, Android no longer follows engine versions by keeping
+a separate Kotlin copy of drawing algorithms. Binding, packaging, staged retirement, and direct
+checks are fixed by the next-cycle contract; this document does not describe unimplemented work as complete.
 
 **Matching layer versions is not the same as a finished port.** The version number asserts that
 drawing is identical; it says nothing about the UI, storage, or vocabulary. **The gaps that remain
@@ -47,9 +54,18 @@ When updating Android specifications:
 - JSON Score, render metadata, history import/export, color catalogs, canvas
   aspects, SVG profiles, and render hashes must remain compatible with the web
   implementation.
-- SVG generation is ported to Kotlin. The app also has a native Compose Canvas
-  preview path that renders stored JSON Score directly for reliable on-device
-  thumbnails and main previews.
+- Production Score-to-SVG rendering and performance metadata use the same
+  `core/crates/inku-render/` in server and Android. Android calls the shared core
+  through one native request boundary and does not keep a second canonical engine in Kotlin.
+- Before the Rust cutover, the current implementation remains Kotlin `DefaultSvgRenderer`.
+  After the cutover, production paths including main preview, thumbnails, headless rendering,
+  and DDL replay use SVG and metadata returned by Rust. Compose Canvas may remain a UI aid,
+  but it does not mint a separate engine version or render identity.
+- Saved SVGs are not rewritten during the cutover. Existing editions display their saved SVG;
+  an explicit replay uses the latest Rust engine available at that time.
+- The Rust engine cutover does not by itself expand into Room schema, persistence format,
+  LLM providers, Stage 1 / 1.5 / 2, or coerce. Expanding the shared-core boundary requires a
+  separate decision and contract.
 - Gemma 4 E2B is the default local model. Gemma 4 E4B is a high-quality option.
 - First launch downloads the selected local model after a license confirmation.
 - Target device class is Pixel 9 or newer.
@@ -58,6 +74,10 @@ When updating Android specifications:
 
 The Android workspace currently contains a buildable standalone application
 package with namespace `app.inku.mobile`.
+
+As of 2026-08-24, Android has no Rust binding, Cargo/Gradle packaging, or native engine library.
+Production rendering still uses Kotlin `DefaultSvgRenderer` at engine `35`. The list below records
+the current state before the Rust cutover.
 
 Implemented:
 
@@ -166,11 +186,24 @@ Implemented:
   - star / unstar
   - soft trash
   - JSON share export through Android `FileProvider`
+- The normal Compose screen has a history thumbnail strip below the canvas. It reads only saved
+  history values for selection, Star toggling, Stage 1/2 models, saved time, color-catalog ID,
+  work hash, and canvas tooltips.
+- A read-only generation-information sheet shows saved sketch, models and languages, seeds and
+  variation, color catalog and color map, canvas, render hash and engine, creation time, and elapsed time.
+- Lineage cards support editing saved DDL and Star toggling without changing the current focus when
+  the action targets another card.
 - Startup restoration of the latest selected history item into prompt, DDL,
   catalog, and canvas settings.
 - Pixel 9 status bar and navigation bar safe-area handling.
 
 Not implemented yet:
+- **First priority in the next cycle**: move Android production rendering to the shared Rust core.
+  One contract covers Android native binding and packaging, the one-request boundary, every production
+  entry point, engine ID/version, direct SVG/metadata/reference checks, and removal of Kotlin production callers.
+- Until the Rust cutover is accepted, do not add more engine-core-specific Kotlin catch-up work.
+  Algorithm copies under `pipeline/` and `render/`, coerce/geometry/material copies, render-version
+  catch-up, and reference rebakes remain stopped.
 - Production-polished model download UX, including background continuation,
   notification progress, metered-network policy, and low-storage recovery.
 - External provider execution. Provider records exist only as compatibility
@@ -182,12 +215,6 @@ Not implemented yet:
   **Score-level parity started on 2026-07-23** (`ServerScoreParityTest.kt` checks the 15
   cases in `server/tests/fixtures/stage2/` plus exact `dh1` / `rh2` values; see the final
   section).
-- Catching up with the web/server v2 generation (renderer engine 2 → 26, variation,
-  plugins, lineage). **The drawing layer has reached engine 26** (measured 2026-08-09: engine 22's fill and tools, 23's placement seed, 24's fade, 25's sizes, 26's angles).
-  Lineage is ported as far as the data layer; **the UI does not yet declare a parent**
-  (see the `android` area of the issue ledger).
-  **The staffage level was folded away as an axis in v2.11.0, so it is no longer
-  something to catch up with** (see the 2026-08-05 section at the end).
 
 ## Verified Device State
 
@@ -303,30 +330,29 @@ clear local single-user equivalent.
 
 ## Web/Server Master Policy
 
-The Android port always treats the `web/` and `server/` implementations as the
-development master. Android is still a standalone native application package,
-but the behavioral source of truth for DDL interpretation, Stage 1.5 expansion,
-Score coercion/repair, SVG rendering, and history/render metadata is the
-web/server implementation.
+The Android UI, host orchestration, and persistence use `web/` and `server/` as their reference.
+The canonical drawing engine is the shared Rust core under `core/crates/inku-render/`, used by both
+server and Android. Android remains a standalone native package: web/server stay authoritative for
+DDL interpretation, Stage 1.5 expansion, Score coercion/repair, and history persistence, while the
+Rust core is authoritative for SVG output and performance metadata.
 
 Whenever web/server changes, the corresponding Android parity surface must be
 checked in the same change unit. Android compatibility code is split along the
 same responsibility boundaries as the server source so that future diffs are
 easier to inspect and omissions are easier to catch.
 
-Current renderer compatibility layout:
+Drawing-engine ownership and cutover boundary:
 
-| server source | Android compatibility file | Responsibility |
+| Canonical source / current bridge | Android side | Responsibility |
 | --- | --- | --- |
-| `server/src/inku_server/renderer.py` / `_stroke_attrs`, dash, texture, blur | `android/app/src/main/java/app/inku/mobile/render/ServerRendererStyle.kt` | Stroke/fill attributes, material weight style, texture filters, blur filters, hint opacity |
-| `server/src/inku_server/renderer.py` / `_arc_path_d`, point generation, variation | `android/app/src/main/java/app/inku/mobile/render/ServerRendererGeometry.kt` | SVG geometry, arc sweep/large-arc rules, regular polygon points, triangle bbox points, variation paths |
-| `server/src/inku_server/renderer.py` / material outline helpers | `android/app/src/main/java/app/inku/mobile/render/ServerRendererMaterial.kt` | Pencil/crayon/chalk/brush/rope outlines, specks, rope twists |
-| `server/src/inku_server/renderer.py` / `render` and `_render_instruction` flow | `android/app/src/main/java/app/inku/mobile/render/DefaultSvgRenderer.kt` | Android SVG renderer orchestration, arrangement expansion, presence layer, metadata emission |
+| `core/crates/inku-render/` | Android native adapter added in the next cycle | Planning, geometry, marks, surfaces, layers, SVG emission, deterministic seeds, and performance metadata |
+| `server/src/inku_server/render_engines/default/adapter.py` | Android host adapter | Thin host boundary that sends canonical Score and render options in one request and receives SVG plus metadata |
+| `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | Current engine `35` transition bridge | Owns production until Rust acceptance; afterward it has no production callers and is not kept alive as another implementation of the shared core |
 
-`DefaultSvgRenderer.kt` keeps orchestration only. Server-derived details belong
-in `ServerRendererStyle.kt`, `ServerRendererGeometry.kt`, and
-`ServerRendererMaterial.kt`. When server `renderer.py` changes, those files are
-the first Android update targets.
+Cutover acceptance directly checks that single drawing, batch, demo, saved-Score replay, headless,
+main preview, and thumbnail production paths reach Rust; engine ID/version comes from the Rust core;
+and the same request yields matching SVG and engine metadata on the server host. Existing saved SVGs
+are not regenerated.
 
 The same policy applies to the pipeline. Changes in
 `server/src/inku_server/interpreter.py`, `ddl_expander.py`, `coerce.py`, and
@@ -334,6 +360,9 @@ The same policy applies to the pipeline. Changes in
 compatibility data models. Android-specific UI, Room, LiteRT-LM, and provider
 routing can remain native, but user-visible DDL, Score, SVG, render metadata,
 and history persistence behavior prioritize web/server parity.
+The rendering cutover does not automatically move this Kotlin pipeline into Rust. Moving Stage 1,
+Stage 1.5, Stage 2, or coerce into the shared core requires a separate contract that fixes the
+boundary and persistence compatibility.
 
 Current pipeline compatibility layout:
 
@@ -366,7 +395,7 @@ Function-level parity table from prompt to rendering:
 | DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | Match clause extraction, primitive selection, and coverage instruction defaults. `円` / `circle` follows server behavior and becomes `ellipse` in coverage repair. |
 | Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | Match primitive, geometry, and arrangement defaults after provider failure or unusable Stage 2 output. |
 | Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | Compare visible color, dedupe, coverage, shape/color/motif/composition/context/motion/presence/density order and remove Android-only ordering. |
-| SVG render engine | `render_engines/default.py` / `renderer.py::render` / `_render_instruction` | `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` | Match instruction expansion, arrangement placement, material outlines, filters, and metadata. |
+| SVG render engine | `core/crates/inku-render/` (the server calls it through `render_engines/default/adapter.py`) | Next-cycle Android native adapter; `DefaultSvgRenderer.kt` / `ServerRenderer*.kt` only before cutover | Production sends one request to the same Rust core. Drawing algorithms are not copied into Kotlin after cutover. |
 | Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | Match hash input fields, build number handling, engine id/version, catalog/canvas metadata. |
 | History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | Store the same user-visible data: input, DDL, Score, SVG, metadata, model IDs, catalog/canvas, hash, and timestamps. |
 | Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | Let both server and Android save history, and keep history_id, DDL, hash, and catalog in summaries. |
@@ -412,7 +441,7 @@ component unless marked as a local single-user equivalent.
 | `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
 | `CanvasPanel.svelte` | Ported for `artwork`/`prompt`/`score` tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
 | `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
-| `HistoryStrip.svelte` | Android removes the unused bottom history strip and consolidates history access into the history-grid tab and selected render controls. |
+| `HistoryStrip.svelte` | Ported as a thumbnail strip below the Compose canvas, with selection, Star, model names, and saved-metadata tooltips. The history grid remains a separate entry point. |
 | `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
 | `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
 | `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
@@ -425,24 +454,23 @@ Completed or substantially implemented:
 
 1. Project skeleton, Room schema, and compatibility data models.
 2. Local settings, model download state placeholders, and provider abstraction.
-3. Kotlin renderer port for the current SVG primitive subset.
+3. Kotlin renderer through engine `35`, retained as the current bridge before the Rust cutover.
 4. Stage 1 / Stage 1.5 / Stage 2 pipeline shape with deterministic fallback.
 5. Compose UI for single drawing, batch, demo, history, settings shell, render
    previews, prompt view, and JSON view.
 
 Remaining next order:
 
-1. Verify LiteRT-LM inference end to end on Pixel 9 with the downloaded Gemma 4
+1. Move Android production rendering to `core/crates/inku-render/`, directly check every entry point,
+   version, metadata, and reference, and end the Kotlin engine's production ownership.
+2. Verify LiteRT-LM inference end to end on Pixel 9 with the downloaded Gemma 4
    E2B/E4B `.litertlm` model files and expose provider failures in the UI/log
    surface instead of silently falling back.
-2. Harden model download UX with a foreground service or WorkManager,
+3. Harden model download UX with a foreground service or WorkManager,
    notifications, metered-network policy, and user-visible storage recovery.
-3. Expand the Kotlin renderer and JSON Score parser to cover the full web
-   primitive and style surface.
-4. Extend export compatibility from current single-item share export to full
+4. Expand the JSON Score parser to cover the full web surface. Do not expand drawing algorithms in Kotlin.
+5. Extend export compatibility from current single-item share export to full
    history import/export flows with Android Storage Access Framework.
-5. Add automated compatibility tests against reference web JSON and SVG/render
-   metadata fixtures.
 6. Complete destructive confirmations for every non-history settings operation
    and add automated parity coverage for the Android UI state transitions.
 
@@ -2668,3 +2696,15 @@ No new editor, producer, repository or DAO query, Room schema or migration, pers
 Every lineage card with a normal work now keeps a visible `★` or `☆` control at the upper right of its thumbnail. The control is a separate tap target from card selection, so starring or unstarring a non-focused card does not change the selected work or lineage focus. Tombstones have no control.
 
 The UI uses only the existing `HistoryItemEntity.starred`, `toggleStar(HistoryItemEntity)`, Star persistence, lineage reload, and `HistoryBadge`. Reloading the graph after persistence updates the same card under the same focus. Existing card taps, thumbnails, generation and state labels, and Elements, DDL, Model, and Language actions are preserved. No new producer, repository or DAO query, Room schema or migration, persistence format, i18n, pipeline, rendering, server, Web, or shared path changed.
+
+## 2026-08-24 Moving to the shared Rust drawing engine in the next cycle
+
+Android will stop following engine versions with its own Kotlin drawing engine and connect the same
+`core/crates/inku-render/` used by the server to production rendering in the next cycle. Android is
+still engine `35` today; the Rust binding and packaging do not exist yet, so it must not claim engine
+`41` before cutover acceptance.
+
+The cutover covers the boundary that turns Score into SVG and performance metadata. UI, Room,
+history, and provider routing stay on Android, and saved SVGs in existing history are not rewritten.
+The next-cycle contract fixes the binding, every production entry point, version and metadata,
+direct agreement with the server host, and removal of Kotlin engine production callers.

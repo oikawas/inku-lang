@@ -453,7 +453,7 @@ fun InkuApp() {
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
                 if (!state.canvasPresentationMode && !state.descriptionFocused) {
-                    BottomNavigationBar(state.tab, viewModel)
+                    BottomNavigationBar(state.tab, state.composeMode, viewModel)
                 }
             },
             containerColor = MaterialTheme.colorScheme.background,
@@ -1160,7 +1160,7 @@ private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
 }
 
 @Composable
-private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
+private fun BottomNavigationBar(selected: AppTab, composeMode: ComposeMode, viewModel: InkuViewModel) {
     val context = LocalContext.current
     Surface(
         modifier = Modifier
@@ -1192,14 +1192,14 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
                 NavButton(
                     mark = mark,
                     label = label,
-                    selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose ||
+                    selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose && composeMode == ComposeMode.Write ||
                         destination == BottomNavigationDestination.History && selected == AppTab.History ||
                         destination == BottomNavigationDestination.Lineage && selected == AppTab.Lineage,
                     onClick = {
                         when (destination) {
                             BottomNavigationDestination.Write -> {
-                                viewModel.setTab(AppTab.Compose)
                                 viewModel.setComposeMode(ComposeMode.Write)
+                                viewModel.setTab(AppTab.Compose)
                             }
                             BottomNavigationDestination.Camera -> context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
                             BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)

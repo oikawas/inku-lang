@@ -30,6 +30,26 @@ class AppMenuNavigationTest {
     }
 
     @Test
+    fun writeIsSelectedOnlyWhenComposeIsInWriteMode() {
+        val source = appSource()
+        val start = source.indexOf("private fun BottomNavigationBar(")
+        val end = source.indexOf("private fun canvasLabel(", start)
+        assertTrue("bottom navigation must exist", start >= 0 && end > start)
+        val bottomNavigation = source.substring(start, end)
+
+        assertTrue("bottom navigation must receive the compose mode", bottomNavigation.contains("composeMode: ComposeMode"))
+        assertTrue(
+            "Write must not remain selected while Batch is shown",
+            bottomNavigation.contains("selected == AppTab.Compose && composeMode == ComposeMode.Write"),
+        )
+        assertTrue(
+            "Write must set Write mode before returning to Compose",
+            bottomNavigation.indexOf("viewModel.setComposeMode(ComposeMode.Write)") <
+                bottomNavigation.indexOf("viewModel.setTab(AppTab.Compose)"),
+        )
+    }
+
+    @Test
     fun cameraLaunchesOnlyTheStillImageCameraIntent() {
         val source = appSource()
         assertTrue("camera action must use the platform still-image camera intent", source.contains("MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA"))

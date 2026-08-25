@@ -8018,3 +8018,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **下部navigationを「記述・カメラ・履歴・系譜」に組み替えた。** 記述はWrite modeへ戻り、Batch表示中は選択状態にしない。カメラはAndroid標準の静止画camera Intentを起動するだけで、撮影結果、permission、URI、保存、DB writeは追加しない。
 - **canvas control stripは全画面を中央、横三本線menuを右端に置いた。** menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsを廃止し、Batchの可視入口をmenuへ一本化した。
 - **検証:** focused fail-firstは旧navigation構造の4件と、Batch中の記述選択境界1件を捉えた。枝先は`AppMenuNavigationTest` 5件と`WordingLintTest` 6件、production Kotlin compile、diff checkがgreen。署名一致とversionCode増加を確認したdebug APKをPixel 9へ`adb install -r`だけでdata-preserving installし、`.67` Build 148110をcold startした。検証済みbackupの展開前後はともにschema 10、history 17、lineage 17、provider settings 7、app settings 4、model assets 2、export templates 3、thumbnail 17で、DB／WAL／SHMは各時点の端末bytesと一致した。Room/schema/migration、pipeline/render/Rust、Server/Web/shared、instrumentation、pentalaは変更・実行していない。
+
+### Android `2.1.4-android.68` — カメラ画像をlocal Gemmaの編集可能な記述へ変換（Build 148111、2026-08-26・[I-395]）
+
+- **Cameraはthumbnailではなく`TakePicture`でfull-size画像を受け取り、確認後にlocal E2Bだけで記述へ変換する。** 既存記述がある場合は上書きを確認し、結果は編集可能な記述欄へ置く。Stage 1／2、SVG生成、保存、系譜、外部providerは自動実行しない。
+- **画像前処理とlocal推論を型付き境界へ分離した。** EXIF向きを反映して長辺1280px以内へ縮小し、JPEG quality 85で渡す。text／visionは同じLiteRT-LM providerとmutexを共有し、visionはE2B固定、GPU backend、同時画像1枚とした。成功・失敗・取消のいずれでもcache内の撮影一時fileを回収する。
+- **検証:** production edit前のfocused JVMは未実装境界7件を捉え、枝先の6 classes・17 tests、production Kotlin compile、debug APK build、docs check、diff checkがgreen。署名一致を確認した`.68` Build 148111をPixel 9へ`adb install -r`でdata-preserving installし、作者が撮影から編集可能な記述表示までを実機確認した。local E2B visionは2回とも成功（720×1280、約101KB／97KB、12.5秒／12.8秒）、終了後のcamera一時fileは0件。検証済みbackupの展開前後はともにschema 10、history 17、lineage 17、provider settings 7、app settings 4、model assets 2、export templates 3、thumbnail 17で、DB／WAL／SHMは各時点の端末bytesと一致した。全JVM suite、instrumentation、Server／Web／Rust、pentalaは変更・実行していない。

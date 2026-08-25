@@ -3062,31 +3062,11 @@ def history_svgs(ids: list[str]) -> dict[str, str]:
 
 
 def get_items(user_id: str, ids: list[str]) -> list[dict]:
-    """Fetch works by id, in the order asked for, skipping the trash.
-
-    Trashed works are addressable by id but are not a thing to act on: every
-    caller here exports, rebuilds, or inspects a work. The trash view has its
-    own listing (`list_items(trashed=True)`) and cannot load a work onto the
-    canvas, so nothing legitimate is lost by not answering for them here.
-    Without this filter an id sent straight to the export endpoints put a
-    trashed work into the output (ledger I-094).
-    """
-    if not ids:
-        return []
-    order = {item_id: index for index, item_id in enumerate(ids)}
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        rows = (
-            session.query(HistoryRow)
-            .filter(
-                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                HistoryRow.id.in_(ids),
-                HistoryRow.trashed == 0,
-            )
-            .all()
-        )
-        items = _rows_to_dicts_with_lineage(session, rows, actor)
-        return sorted(items, key=lambda item: order.get(item["id"], len(order)))
+    return _history.HistoryItemReader(
+        SessionLocal,
+        _actor_of,
+        _rows_to_dicts_with_lineage,
+    ).get_items(user_id, ids)
 
 
 def _neighbor_score(raw: str | None) -> dict:

@@ -109,7 +109,7 @@
   },
   "hosts": {
     "server": {
-      "source": "server/src/inku_server/db.py",
+      "source": "server/src/inku_server/persistence/schema.py",
       "records": {
         "history": {
           "model": "HistoryRow",

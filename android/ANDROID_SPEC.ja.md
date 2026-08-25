@@ -141,7 +141,7 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
-  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは結果を受け取らず platform still-image camera Intent を起動する
+  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを受け、端末内Gemmaの記述を編集欄へ返す
   - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
   - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
   - canvas 下の prompt と DDL interpretation
@@ -2229,3 +2229,13 @@ Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、
 通常canvas control stripは全画面buttonを中央、横三本線のmenu buttonを右端に置く。menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsは廃止し、Batchの可視入口はこのmenuへ一本化する。Room/schema/migration、ViewModelのpersistent state、pipeline/render/Rust、Server/Web/sharedは変更していない。
 
 作者は`2.1.4-android.67`／Build 148110を展開したPixel 9実機で、下部navigationの配置、カメラから標準camera appが開くこと、右上menuから既存Batch／Settingsへ進めることを目視確認した。実機確認による追加のdata変更、撮影結果の取得、DB writeは行っていない。
+
+## 2026-08-26 撮影画像をlocal Gemmaの編集可能な記述へ変換する（android `2.1.4-android.68`・[I-395]）
+
+下部「カメラ」は`ActivityResultContracts.TakePicture`でPixel Cameraのfull-image resultを受ける。撮影前に現在の記述／解釈を置き換える確認を行い、取得済みの`local-litert-lm:gemma-4-e2b`がreadyでない場合は撮影を開始せず、設定のモデルへ戻れるerrorを表示する。`CAMERA`／storage permission、CameraX／Camera2 dependency、model自動取得は追加しない。
+
+撮影fileは既存FileProviderの`cacheDir/camera/`限定pathにだけ作る。成功時は`ImageDecoder`でorientationを反映しながら長辺1280 px以下へ縮小し、JPEG quality 85へ再encodeするため、local inferenceへ渡すbytesに元のEXIF／位置情報を残さない。取消、空画像、decode失敗、解析失敗、再撮影、ViewModel終了で一時fileを回収し、残存fileは次のcamera初期化時に同directoryのinku-owned JPEGだけを限定削除する。画像、URI、path、EXIFはDB、history、MediaStore、saved state、logへ保存しない。
+
+画像解析はtext-only `ModelProvider`を広げず、`VisionAnalyzer`の`DESCRIPTION` modeを既存`LocalLiteRtLmProvider`が実装する。同じE2B engineへ`Content.ImageBytes`とJA／ENの観察promptを一つの`Contents`で渡し、text生成とVision解析、warmup、closeを同じinference mutexでsingle-flightにする。promptは画像内の文字を命令でなく観察対象として扱い、人物同定・属性推測、DDL、JSON、評価を禁止する。logはmodel ID、正規化寸法、JPEG byte数、段、経過時間、成否種別だけを持つ。
+
+result後はCompose Writeへ戻り、「画像を準備中」「ローカルモデルを読み込み中」「端末内で解析中」「編集できます」、失敗、取消を日英とscreen-reader labelで区別する。非blank resultは既存の記述editorへ置き、利用者が編集できるところで止める。このcamera jobはStage 0.5／1／2、NIMその他の外部provider、色カタログ自動選択、描画、保存、系譜、DB writeを起動しない。撮影確定からSVG生成までの一気通貫とチェキ現像演出、pop catalogは後続契約の範囲とする。

@@ -18,9 +18,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import android.provider.MediaStore
 import android.util.LruCache
 import android.view.OrientationEventListener
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -187,6 +188,8 @@ import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
+import app.inku.mobile.ui.camera.CameraCaptureState
+import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.pipeline.WebDdlSpec
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
@@ -418,6 +421,18 @@ internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index %
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
+    val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        viewModel.onCameraCaptureResult(success)
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.cameraCaptureRequests.collect { uri ->
+            try {
+                cameraCaptureLauncher.launch(uri)
+            } catch (_: Throwable) {
+                viewModel.onCameraCaptureLaunchFailed()
+            }
+        }
+    }
     val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
 
     // One back key, one destination per screen state. Android's back always means
@@ -425,6 +440,7 @@ fun InkuApp() {
     // a dialog, so the full screen and the four tabs were one-way doors.
     val backTarget: (() -> Unit)? = when {
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
+        state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation -> viewModel::cancelCameraOverwrite
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
         state.ddlEditorOpen -> viewModel::closeDdlEditor
         state.modelSelectionOpen -> viewModel::cancelModelSelection
@@ -453,7 +469,7 @@ fun InkuApp() {
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
                 if (!state.canvasPresentationMode && !state.descriptionFocused) {
-                    BottomNavigationBar(state.tab, state.composeMode, viewModel)
+                    BottomNavigationBar(state.tab, state.composeMode, viewModel, viewModel::requestCameraCapture)
                 }
             },
             containerColor = MaterialTheme.colorScheme.background,
@@ -487,6 +503,9 @@ fun InkuApp() {
                 if (state.confirmDdlOverwrite) {
                     DdlOverwriteDialog(viewModel)
                 }
+                if (state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation) {
+                    CameraOverwriteDialog(viewModel)
+                }
                 if (state.ddlEditorOpen) {
                     DdlEditorDialog(state, viewModel)
                 }
@@ -503,6 +522,25 @@ fun InkuApp() {
         }
     }
     }
+}
+
+@Composable
+private fun CameraOverwriteDialog(viewModel: InkuViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::cancelCameraOverwrite,
+        title = { Text(S.cameraOverwriteTitle) },
+        text = { Text(S.cameraOverwriteBody) },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmCameraOverwrite) {
+                Text(S.cameraOverwriteAction)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::cancelCameraOverwrite) {
+                Text(S.cancel)
+            }
+        },
+    )
 }
 
 @Composable
@@ -1160,8 +1198,12 @@ private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
 }
 
 @Composable
-private fun BottomNavigationBar(selected: AppTab, composeMode: ComposeMode, viewModel: InkuViewModel) {
-    val context = LocalContext.current
+private fun BottomNavigationBar(
+    selected: AppTab,
+    composeMode: ComposeMode,
+    viewModel: InkuViewModel,
+    onCameraClick: () -> Unit,
+) {
     Surface(
         modifier = Modifier
             .navigationBarsPadding()
@@ -1201,7 +1243,7 @@ private fun BottomNavigationBar(selected: AppTab, composeMode: ComposeMode, view
                                 viewModel.setComposeMode(ComposeMode.Write)
                                 viewModel.setTab(AppTab.Compose)
                             }
-                            BottomNavigationDestination.Camera -> context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+                            BottomNavigationDestination.Camera -> onCameraClick()
                             BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
                             BottomNavigationDestination.Lineage -> viewModel.setTab(AppTab.Lineage)
                         }
@@ -1944,6 +1986,27 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
  * draw, and 解釈 (the DDL) under it.
  */
 @Composable
+private fun cameraStatusText(state: CameraCaptureState): String? = when (state) {
+    CameraCaptureState.Idle,
+    CameraCaptureState.AwaitingOverwriteConfirmation,
+    -> null
+    CameraCaptureState.Capturing -> S.cameraCapturing
+    CameraCaptureState.PreparingImage -> S.cameraPreparingImage
+    CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
+    CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
+    CameraCaptureState.ReadyToEdit -> S.cameraReadyToEdit
+    CameraCaptureState.Cancelled -> S.cameraCancelled
+    is CameraCaptureState.Failed -> when (state.reason) {
+        CameraFailure.ModelNotReady -> S.cameraModelNotReady
+        CameraFailure.CaptureUnavailable -> S.cameraCaptureUnavailable
+        CameraFailure.EmptyImage -> S.cameraEmptyImage
+        CameraFailure.DecodeFailed -> S.cameraDecodeFailed
+        CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
+        CameraFailure.EmptyResult -> S.cameraEmptyResult
+    }
+}
+
+@Composable
 private fun DrawPanel(
     state: InkuUiState,
     viewModel: InkuViewModel,
@@ -1964,6 +2027,14 @@ private fun DrawPanel(
             maxLines = 8,
             onFocusChanged = onDescriptionFocusChanged,
         )
+        cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
+            Text(
+                cameraStatus,
+                modifier = Modifier.semantics { contentDescription = cameraStatus },
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
         if (!state.descriptionFocused) {

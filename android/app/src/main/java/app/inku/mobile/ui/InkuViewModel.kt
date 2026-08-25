@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import android.app.Application
+import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,18 +34,27 @@ import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
+import app.inku.mobile.llm.VisionAnalysisRequest
+import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.ui.camera.CameraCaptureFileStore
+import app.inku.mobile.ui.camera.CameraCaptureState
+import app.inku.mobile.ui.camera.CameraFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -161,6 +171,7 @@ data class InkuUiState(
     // action the writing is heading for.
     val descriptionFocused: Boolean = false,
     val ddlEditorOpen: Boolean = false,
+    val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val isDrawing: Boolean = false,
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
@@ -355,6 +366,12 @@ class InkuViewModel @JvmOverloads constructor(
     private var lineageJob: Job? = null
     private var refinementJob: Job? = null
     private var litertWarmupJob: Job? = null
+    private var cameraJob: Job? = null
+    private val cameraFiles = CameraCaptureFileStore(application.applicationContext)
+    private var pendingCameraFile: java.io.File? = null
+    private var cameraRunSerial: Long = 0L
+    private val mutableCameraCaptureRequests = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
+    val cameraCaptureRequests: SharedFlow<Uri> = mutableCameraCaptureRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
     private var promptEditedByUser = false
@@ -440,6 +457,10 @@ class InkuViewModel @JvmOverloads constructor(
         refinementJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
+        cameraRunSerial += 1
+        cameraJob?.cancel()
+        cameraFiles.delete(pendingCameraFile)
+        pendingCameraFile = null
         (getApplication() as InkuApplication).applicationScope.launch {
             repository.close()
         }
@@ -449,6 +470,173 @@ class InkuViewModel @JvmOverloads constructor(
     fun setPrompt(value: String) {
         promptEditedByUser = true
         localState.value = localState.value.copy(prompt = value, message = null)
+    }
+
+    fun requestCameraCapture() {
+        cameraRunSerial += 1
+        cameraJob?.cancel()
+        cameraFiles.delete(pendingCameraFile)
+        pendingCameraFile = null
+        val current = localState.value
+        val overwriteRisk = current.prompt.isNotBlank() ||
+            current.ddl.isNotBlank() ||
+            current.selectedHistory != null ||
+            current.refinementCandidates.isNotEmpty()
+        if (overwriteRisk) {
+            localState.value = current.copy(
+                cameraCaptureState = CameraCaptureState.AwaitingOverwriteConfirmation,
+                message = null,
+            )
+        } else {
+            startCameraCapture()
+        }
+    }
+
+    fun cancelCameraOverwrite() {
+        if (localState.value.cameraCaptureState != CameraCaptureState.AwaitingOverwriteConfirmation) return
+        localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Idle)
+    }
+
+    fun confirmCameraOverwrite() {
+        if (localState.value.cameraCaptureState != CameraCaptureState.AwaitingOverwriteConfirmation) return
+        startCameraCapture()
+    }
+
+    private fun startCameraCapture() {
+        cameraRunSerial += 1
+        val serial = cameraRunSerial
+        cameraJob?.cancel()
+        cameraFiles.delete(pendingCameraFile)
+        pendingCameraFile = null
+        cameraJob = viewModelScope.launch {
+            try {
+                if (!repository.isLocalVisionModelReady()) {
+                    if (serial == cameraRunSerial) {
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
+                        )
+                    }
+                    return@launch
+                }
+                val file = withContext(Dispatchers.IO) { cameraFiles.createPendingCapture() }
+                if (serial != cameraRunSerial) {
+                    cameraFiles.delete(file)
+                    return@launch
+                }
+                pendingCameraFile = file
+                localState.value = localState.value.copy(
+                    cameraCaptureState = CameraCaptureState.Capturing,
+                    message = null,
+                )
+                mutableCameraCaptureRequests.emit(cameraFiles.contentUri(file))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                cameraFiles.delete(pendingCameraFile)
+                pendingCameraFile = null
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.CaptureUnavailable),
+                    )
+                }
+            }
+        }
+    }
+
+    fun onCameraCaptureResult(success: Boolean) {
+        val file = pendingCameraFile
+        pendingCameraFile = null
+        if (!success) {
+            cameraFiles.delete(file)
+            localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Cancelled)
+            return
+        }
+        if (file == null || !file.isFile || file.length() == 0L) {
+            cameraFiles.delete(file)
+            localState.value = localState.value.copy(
+                tab = AppTab.Compose,
+                composeMode = ComposeMode.Write,
+                cameraCaptureState = CameraCaptureState.Failed(CameraFailure.EmptyImage),
+            )
+            return
+        }
+
+        cameraRunSerial += 1
+        val serial = cameraRunSerial
+        cameraJob?.cancel()
+        cameraJob = viewModelScope.launch {
+            localState.value = localState.value.copy(
+                tab = AppTab.Compose,
+                composeMode = ComposeMode.Write,
+                cameraCaptureState = CameraCaptureState.PreparingImage,
+                message = null,
+            )
+            try {
+                val prepared = try {
+                    VisionImagePreparer.prepare(file)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    if (serial == cameraRunSerial) {
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.DecodeFailed),
+                        )
+                    }
+                    return@launch
+                }
+                if (serial != cameraRunSerial) return@launch
+                localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.LoadingLocalModel)
+                repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID)
+                if (serial != cameraRunSerial) return@launch
+                localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.AnalyzingLocally)
+                val result = repository.analyzeLocalVision(
+                    VisionAnalysisRequest(
+                        normalizedJpeg = prepared.jpegBytes,
+                        width = prepared.width,
+                        height = prepared.height,
+                        languageCode = localState.value.uiLanguage.code,
+                    ),
+                )
+                if (serial != cameraRunSerial) return@launch
+                if (result.text.isBlank()) {
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.EmptyResult),
+                    )
+                    return@launch
+                }
+                promptEditedByUser = true
+                localState.value = localState.value.copy(
+                    prompt = result.text.trim(),
+                    ddl = "",
+                    ddlEditedAfterGeneration = false,
+                    cameraCaptureState = CameraCaptureState.ReadyToEdit,
+                    message = null,
+                )
+            } catch (error: CancellationException) {
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Cancelled)
+                }
+                throw error
+            } catch (_: Throwable) {
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.AnalysisFailed),
+                    )
+                }
+            } finally {
+                cameraFiles.delete(file)
+            }
+        }
+    }
+
+    fun onCameraCaptureLaunchFailed() {
+        cameraRunSerial += 1
+        cameraJob?.cancel()
+        cameraFiles.delete(pendingCameraFile)
+        pendingCameraFile = null
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.CaptureUnavailable),
+        )
     }
 
     fun clearPrompt() {

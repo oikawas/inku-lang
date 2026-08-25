@@ -24,11 +24,14 @@ import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementRoute
 import app.inku.mobile.llm.DefaultModelDownloads
+import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.VisionAnalysisRequest
+import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.LocalFallbackPipeline
@@ -358,6 +361,15 @@ class InkuRepository(
         if (asset.downloadState != "ready") return
         localLiteRtProvider.warmup(modelId)
     }
+
+    suspend fun isLocalVisionModelReady(): Boolean {
+        val asset = database.modelAssetDao().getByModelId(LOCAL_VISION_MODEL_ID) ?: return false
+        val path = asset.localPath ?: return false
+        return asset.downloadState == "ready" && File(path).isFile
+    }
+
+    suspend fun analyzeLocalVision(request: VisionAnalysisRequest): VisionAnalysisResult =
+        localLiteRtProvider.analyze(request)
 
     suspend fun markModelDownloadQueued(modelId: String) {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return

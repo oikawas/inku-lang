@@ -106,7 +106,7 @@ def test_neighbor_candidates_owner_and_facades_keep_their_boundaries(monkeypatch
         for part in imported.split(".")
     }
     assert not {
-        "api_core", "config", "db", "engine", "lineage", "render", "render_engines", "router", "search",
+        "api_core", "config", "db", "engine", "lineage", "render", "render_engines", "renderer", "router", "search",
     } & imported_parts
 
     db_owner_source = inspect.getsource(db.list_neighbor_candidates)
@@ -134,8 +134,28 @@ def test_neighbor_candidates_owner_and_facades_keep_their_boundaries(monkeypatch
         if keyword.arg == "key" and isinstance(keyword.value, ast.Lambda)
     )
     assert isinstance(key_lambda.body, ast.Tuple)
-    assert isinstance(key_lambda.body.elts[1], ast.UnaryOp)
-    assert isinstance(key_lambda.body.elts[1].op, ast.USub)
+    tie_break = key_lambda.body.elts[1]
+    assert isinstance(tie_break, ast.UnaryOp)
+    assert isinstance(tie_break.op, ast.USub)
+    assert isinstance(tie_break.operand, ast.Call)
+    assert isinstance(tie_break.operand.func, ast.Name)
+    assert tie_break.operand.func.id == "int"
+    assert len(tie_break.operand.args) == 1
+    at_or_zero = tie_break.operand.args[0]
+    assert isinstance(at_or_zero, ast.BoolOp)
+    assert isinstance(at_or_zero.op, ast.Or)
+    assert len(at_or_zero.values) == 2
+    item_at = at_or_zero.values[0]
+    assert isinstance(item_at, ast.Call)
+    assert isinstance(item_at.func, ast.Attribute)
+    assert isinstance(item_at.func.value, ast.Name)
+    assert item_at.func.value.id == "item"
+    assert item_at.func.attr == "get"
+    assert len(item_at.args) == 1
+    assert isinstance(item_at.args[0], ast.Constant)
+    assert item_at.args[0].value == "at"
+    assert isinstance(at_or_zero.values[1], ast.Constant)
+    assert at_or_zero.values[1].value == 0
 
 
 def test_neighbor_candidates_filter_order_limit_and_score_fallbacks() -> None:

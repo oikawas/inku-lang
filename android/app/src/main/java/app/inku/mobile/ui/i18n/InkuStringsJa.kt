@@ -340,6 +340,8 @@ object InkuStringsJa : InkuStrings {
     override val language = "言語"
     override val miscSubtitle = "言語・テーマ・密度"
     override val description = "記述"
+    override val camera = "カメラ"
+    override val menu = "メニュー"
     override val settings = "設定"
     override val saijikiTapNote = "語を押すと DDL 編集欄へ挿入します。"
     override val descriptionField = "説明"

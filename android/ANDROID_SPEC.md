@@ -174,8 +174,8 @@ Implemented:
 - Dark Compose UI in transition from the web-style workbench to a Pixel 9
   mobile-first layout based on the Claude Design prototype:
   - top application header
-  - bottom navigation: Compose, History, Demo, Settings
-  - Compose segmented mode: Write, Batch
+  - bottom navigation: Description, Camera, History, Lineage. Description returns to Write; Camera launches the platform still-image camera Intent without receiving a result
+  - the canvas control strip centers Full screen and puts a right-end menu for the existing Batch and Settings routes; the drawing-settings panel has no Write/Batch segmented mode
   - bounded first-screen canvas card that respects the selected canvas aspect
     while keeping the prompt and DDL path reachable on Pixel 9
   - prompt and DDL interpretation below the canvas

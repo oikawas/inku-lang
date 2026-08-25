@@ -173,10 +173,11 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_label": "中央値 35s / 7〜64s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
         + "4 実行のうち 2 回完走。1 回は空の応答、1 回は色語彙に無い色 (黄) を書いた"
-        + "(Score の色は 6 語しかない)。補正の発火は平均 11.5 で最も多い。",
+        + "（2026-07-29当時のScore語彙は6語だったが、現在は黄を含む9色）。補正の発火は平均 11.5 で最も多い。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
         + " Completed two of four runs: one came back empty, and one named a colour the Score has no"
-        + " word for (yellow; the vocabulary holds six). Correction load averaged 11.5, the heaviest"
+        + " word for (yellow; the Score vocabulary held six colours on 2026-07-29, while the current"
+        + " vocabulary has nine colours including yellow). Correction load averaged 11.5, the heaviest"
         + " measured.",
     },
     {

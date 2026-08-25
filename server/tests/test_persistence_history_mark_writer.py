@@ -49,6 +49,12 @@ def test_history_mark_writer_owns_both_marks_and_db_delegates() -> None:
     with pytest.raises(FrozenInstanceError):
         owner(None, None, None).session_factory = None
 
+    assert str(inspect.signature(owner.set_item_starred)) == (
+        "(self, user_id: 'str', item_id: 'str', starred: 'bool', note: 'str | None' = None) -> 'dict | None'"
+    )
+    assert str(inspect.signature(owner.set_item_for_revision)) == (
+        "(self, user_id: 'str', item_id: 'str', for_revision: 'bool') -> 'dict | None'"
+    )
     assert str(inspect.signature(db.set_item_starred)) == (
         "(user_id: 'str', item_id: 'str', starred: 'bool', note: 'str | None' = None) -> 'dict | None'"
     )
@@ -76,15 +82,36 @@ def test_history_mark_writer_owns_both_marks_and_db_delegates() -> None:
     assert "row.note = clean_note or None" in owner_source
     assert "Independent of starred: neither reads the other." in owner_source
     module_source = inspect.getsource(history)
-    for forbidden in (
-        "from inku_server import db",
-        "api_core.routers",
-        "persistence.engine",
-        "persistence.config",
-        "persistence.search",
-        "persistence.lineage",
-    ):
-        assert forbidden not in module_source
+    import_nodes = [
+        node for node in ast.walk(ast.parse(module_source)) if isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    imported_modules = {
+        alias.name
+        for node in import_nodes
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        "." * node.level + (node.module or "")
+        for node in import_nodes
+        if isinstance(node, ast.ImportFrom)
+    }
+    forbidden_roots = {
+        "api_core",
+        "config",
+        "db",
+        "engine",
+        "lineage",
+        "renderer",
+        "render_engines",
+        "router",
+        "search",
+        "share",
+        "share_policy",
+    }
+    assert all(
+        module.lstrip(".").split(".")[0] not in forbidden_roots for module in imported_modules
+    )
+    assert ".schema" in imported_modules
 
 
 def test_mark_facades_resolve_dependencies_at_call_time(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -198,9 +225,34 @@ def test_mark_writer_preserves_real_sqlalchemy_access_state_and_order(
 
     monkeypatch.setattr(history.access, "_writable_by", lambda *arguments: events.append("writable") or True)
     ordered = history.HistoryMarkWriter(lambda: Session(), lambda _: {"id": "owner"}, lambda value: events.append("project") or {"id": value.id})
-    assert ordered.set_item_for_revision("owner", "ordered", False) == {"id": "ordered"}
-    assert row.starred == 0 and row.for_revision == 0 and row.note == "before"
+    assert ordered.set_item_starred("owner", "ordered", True, "after") == {"id": "ordered"}
+    assert row.starred == 1 and row.for_revision == 1 and row.note == "after"
     assert events == ["query", "writable", "filter", "first", "commit", "refresh", "project"]
+
+    events.clear()
+    row = SimpleNamespace(id="ordered", starred=1, for_revision=1, note="after")
+    assert ordered.set_item_for_revision("owner", "ordered", False) == {"id": "ordered"}
+    assert row.starred == 1 and row.for_revision == 0 and row.note == "after"
+    assert events == ["query", "writable", "filter", "first", "commit", "refresh", "project"]
+
+    class FailingSession(Session):
+        def commit(self) -> None:
+            events.append("commit")
+            raise RuntimeError("commit failure")
+
+    failing = history.HistoryMarkWriter(
+        lambda: FailingSession(),
+        lambda _: {"id": "owner"},
+        lambda value: events.append("project") or {"id": value.id},
+    )
+    for method_name, arguments in (
+        ("set_item_starred", ("owner", "ordered", True, "ignored")),
+        ("set_item_for_revision", ("owner", "ordered", False)),
+    ):
+        events.clear()
+        with pytest.raises(RuntimeError, match="commit failure"):
+            getattr(failing, method_name)(*arguments)
+        assert events == ["query", "writable", "filter", "first", "commit"]
 
 
 def _api_item(user_id: str) -> dict:

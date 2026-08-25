@@ -2749,4 +2749,10 @@ The Star display and action are removed from the ordinary Compose history thumbn
 
 The line-oriented batch editor shows an explicit delete control only on a blank row, removing that row together with its separating newline. Editing nonblank rows, pasted line breaks, CRLF normalization, and the single empty editor remain intact.
 
-`Choose from description` now precedes the thirteen fixed catalogs in the dialog. Auto is an independent selection call through the selected Stage 1 model; fixed selection, direct DDL drawing, saved-work replay, and refinement add no call. History stores only the resolved real ID. Room schema and migrations, pipeline and rendering, Rust, and existing palette codes and render maps are unchanged.
+`Choose from description` now precedes the thirteen fixed catalogs in the dialog. Auto is an independent selection call through the selected Stage 1 model; fixed selection, direct DDL drawing, saved-work replay, and refinement add no call. History stores only the resolved real ID. Room schema and migrations, pipeline and rendering, Rust, and existing color-catalog codes and render maps are unchanged.
+
+## 2026-08-25 Bottom camera entry and canvas overflow menu (android `2.1.4-android.67`, [I-388])
+
+The bottom navigation runs left to right as Write, Camera, History, and Lineage. Write returns Compose to Write mode and is not selected while Batch is visible. Camera only launches Android's standard still-camera intent; it does not receive a capture result or add permissions, URIs, persistence, description generation, or database writes.
+
+On the ordinary canvas control strip, Full screen is centered and a three-line menu sits at the right. Batch opens the existing Batch panel and Settings opens the existing Settings screen. The former Write/Batch segmented controls at the start of the drawing-settings panel are removed, leaving this menu as Batch's single visible entry. Room schema and migrations, persistent ViewModel state, pipeline and rendering, Rust, and Server/Web/shared are unchanged.

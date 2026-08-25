@@ -2220,4 +2220,10 @@ Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、
 
 行別batch editorは空行にだけ明示的な削除controlを表示し、その行と区切り改行を一緒に除去する。非空行の編集、貼り付け時の改行、CRLF正規化、単一空editorは維持する。
 
-色カタログdialogの固定13件より上に「記述から自動選択」を追加した。autoは選択中のStage 1モデルを使う独立した選択呼び出しであり、fixed、DDL直接描画、保存作品の再演、推敲には追加呼び出しを行わない。履歴へ保存するのは解決済み実IDだけで、Room/schema/migration、pipeline/render/Rust、既存palette code/mapは変更していない。
+色カタログdialogの固定13件より上に「記述から自動選択」を追加した。autoは選択中のStage 1モデルを使う独立した選択呼び出しであり、fixed、DDL直接描画、保存作品の再演、推敲には追加呼び出しを行わない。履歴へ保存するのは解決済み実IDだけで、Room/schema/migration、pipeline/render/Rust、既存の色カタログcode／描画mapは変更していない。
+
+## 2026-08-25 下部カメラ導線とcanvas overflow menu（android `2.1.4-android.67`・[I-388]）
+
+下部navigationは左から「記述・カメラ・履歴・系譜」とする。「記述」はComposeのWrite modeへ戻し、Batch表示中は選択状態にしない。「カメラ」はAndroid標準の静止画camera Intentを起動するだけで、撮影結果の取得、permission、URI、保存、記述生成、DB writeを行わない。
+
+通常canvas control stripは全画面buttonを中央、横三本線のmenu buttonを右端に置く。menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsは廃止し、Batchの可視入口はこのmenuへ一本化する。Room/schema/migration、ViewModelのpersistent state、pipeline/render/Rust、Server/Web/sharedは変更していない。

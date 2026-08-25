@@ -8012,3 +8012,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **通常Compose画面の履歴stripからStar表示と操作を外した。** 作品選択、選択枠、scroll、Stage 1短縮名と保存済みmetadata tooltipは維持し、履歴grid・系譜card・Star保存とfilterは変更していない。行別batch editorは空行にだけ削除controlを出し、その行と区切り改行を一緒に除去する。
 - **色カタログの先頭へ「記述から自動選択」を追加した。** autoは通常描画、batch各行、demo各回で選択中のStage 1 modelへ記述を追加で1回送り、serverと同じ13件card、temperature 0.3、最大200 token、JSON優先／known ID fallbackで実IDを選ぶ。固定選択、DDL直接描画、保存作品の再演、推敲は追加呼び出し0で、履歴には解決済み実IDだけを保存する。NIM APIは無料で、NIM以外の外部providerは料金が発生し得る。
 - **検証:** production edit前は新helper／selector未実装だけでcompile red、cancellation境界はdefaultへ飲み込む1 testだけがredになった。枝先focused JVMは4 classes・21 testsでfailure／error／skipped 0、production Kotlin compileとdiff checkもgreen。Sol／High reviewの未知旧ID表示findingを修正した。作者の追加指示でPixel 9のschema 10 DBを検証済みbackup後、`.66` Build 148109を`adb install -r`でdata-preserving installしてcold startした。展開前後ともhistory 6、lineage 6、provider settings 7、app settings 3、model assets 2、thumbnail 6で、DB／WAL／SHM／thumbnail backupは端末bytesと一致した。Room/schema/migration、pipeline/render/Rust、既存palette code/map、instrumentation、pentalaは変更・実行していない。
+
+### Android `2.1.4-android.67` — 下部カメラ導線とcanvas overflow menu（Build 148110、2026-08-25・[I-388]）
+
+- **下部navigationを「記述・カメラ・履歴・系譜」に組み替えた。** 記述はWrite modeへ戻り、Batch表示中は選択状態にしない。カメラはAndroid標準の静止画camera Intentを起動するだけで、撮影結果、permission、URI、保存、DB writeは追加しない。
+- **canvas control stripは全画面を中央、横三本線menuを右端に置いた。** menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsを廃止し、Batchの可視入口をmenuへ一本化した。
+- **検証:** focused fail-firstは旧navigation構造の4件と、Batch中の記述選択境界1件を捉えた。枝先は`AppMenuNavigationTest` 5件と`WordingLintTest` 6件、production Kotlin compile、diff checkがgreen。Room/schema/migration、pipeline/render/Rust、Server/Web/shared、instrumentation、pentalaは変更・実行していない。

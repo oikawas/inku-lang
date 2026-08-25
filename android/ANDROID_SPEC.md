@@ -2743,7 +2743,7 @@ The former brush-and-eye launcher design is replaced by the same black, gray, re
 
 Build 148107 was installed normally on the Pixel 9. User 0 reports the package installed with `hidden=false` and `suspended=false`; launcher resolution returns `app.inku.mobile/.MainActivity`, and a cold start succeeds. The Pixel Launcher app list shows the `inku` label with the new pixel-grid icon. No uninstall, data clear, or instrumentation was performed.
 
-## 2026-08-25 History, blank batch rows, and automatic color catalogs in the writing UI ([I-382])
+## 2026-08-25 History, blank batch rows, and automatic color catalogs in the writing UI (android `2.1.4-android.66`, [I-382])
 
 The Star display and action are removed from the ordinary Compose history thumbnail strip. Work selection, its selection ring and scrolling, the compact Stage 1 name, and the tooltip for saved Stage 1 and Stage 2 models, time, color-catalog ID, hash, and canvas remain. The history grid, lineage cards, Provenance sheet, Star persistence, and Star filter are unchanged.
 

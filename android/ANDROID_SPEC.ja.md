@@ -2214,7 +2214,7 @@ launcher iconは旧brush／eye意匠を退役し、Web `favicon-192.png`と同�
 
 Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、suspended=falseを確認した。launcher resolverは`app.inku.mobile/.MainActivity`を返し、cold startは成功した。Pixel Launcherのapp一覧でも`inku` labelと新しいpixel-grid iconを確認した。uninstall、data clear、instrumentationは行っていない。
 
-## 2026-08-25 記述UIの履歴・バッチ空行・色カタログ自動選択（[I-382]）
+## 2026-08-25 記述UIの履歴・バッチ空行・色カタログ自動選択（android `2.1.4-android.66`・[I-382]）
 
 通常Compose画面の履歴thumbnail stripからStar表示と操作を外した。作品選択、選択枠、scroll、Stage 1短縮名と保存済みStage 1／2モデル・日時・色カタログID・hash・canvasのtooltipは維持する。履歴grid、系譜card、生成情報、Star保存とfilterは変更しない。
 

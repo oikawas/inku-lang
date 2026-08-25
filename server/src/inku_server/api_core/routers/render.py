@@ -887,6 +887,27 @@ def _should_retry_compose_result(score: Score, *, tokens_out: int | None, elapse
     return _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms) != "none"
 
 
+def _compose_retry_policy() -> tuple[int, bool]:
+    """Return (additional-attempt limit, diagnostic override is explicit)."""
+    raw = os.getenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT")
+    if raw is None:
+        return 1, False
+    try:
+        limit = int(raw)
+    except ValueError as exc:
+        raise ValueError("INKU_STAGE2_COMPOSE_RETRY_LIMIT must be an integer from 0 through 10") from exc
+    if not 0 <= limit <= 10:
+        raise ValueError("INKU_STAGE2_COMPOSE_RETRY_LIMIT must be from 0 through 10")
+    return limit, True
+
+
+def _is_terminated_stage2_request_timeout(exc: BaseException) -> bool:
+    """Recognize a provider request timeout only after its HTTP call has ended."""
+    from openai import APITimeoutError
+
+    return isinstance(exc, APITimeoutError)
+
+
 def _compose_retry_prompt(*, reason: str, lang: str, canvas_aspect: str | None = None) -> str:
     canvas_line = canvas_retry_line(canvas_aspect, lang)
     if lang == "en":
@@ -975,6 +996,7 @@ def _call_compose_detail(
     plugin_instructions = list(
         getattr(plugin_expansion, "score_instructions", plugin_expansion.instructions)
     )
+    retry_limit, retry_override = _compose_retry_policy()
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -1056,58 +1078,76 @@ def _call_compose_detail(
             return value[0], value[1], value[2], elapsed_ms
         return value, None, None, elapsed_ms
 
-    try:
-        score, tokens_in, tokens_out, elapsed_ms = invoke(system_prompt)
-    except StageHardTimeoutError:
-        _record_fallback_attempt()
-        return ComposeDetail(
-            score=_fallback_score_from_ddl(ddl, lang=lang),
-            ddl=ddl,
-            retry_reasons=["stage2_hard_timeout"],
-            fallback_used=True,
-            plugin_provenance=plugin_provenance,
-            plugin_instructions=plugin_instructions,
-            plugin_warnings=plugin_warnings,
-            **_detail_fields(),
-        )
-    if score.instructions and not _should_retry_compose_result(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms):
-        return ComposeDetail(
-            score=score,
-            ddl=ddl,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            plugin_provenance=plugin_provenance,
-            plugin_instructions=plugin_instructions,
-            plugin_warnings=plugin_warnings,
-            **_detail_fields(),
-        )
+    score: Score
+    tokens_in: int | None = None
+    tokens_out: int | None = None
+    prompt = system_prompt
+    while True:
+        try:
+            attempt_score, attempt_tokens_in, attempt_tokens_out, elapsed_ms = invoke(prompt)
+        except StageHardTimeoutError:
+            # The worker may still be alive after the outer guard fires. Never
+            # start another provider request here: that would make a sequential
+            # diagnostic overlap its own timed-out attempt.
+            fallback_used = True
+            retry_reasons.append(
+                "stage2_retry_hard_timeout" if retry_count else "stage2_hard_timeout"
+            )
+            score = _fallback_score_from_ddl(ddl, lang=lang)
+            _record_fallback_attempt()
+            break
+        except Exception as exc:
+            if not retry_override or not _is_terminated_stage2_request_timeout(exc):
+                raise
+            if include_trace:
+                attempts.append(
+                    {
+                        "attempt": len(attempts) + 1,
+                        "raw_text": None,
+                        "parse_ok": None,
+                        "fallback": False,
+                        "error": "stage2_request_timeout",
+                    }
+                )
+            if retry_count >= retry_limit:
+                fallback_used = True
+                retry_reasons.append("fallback_after_request_timeout_retry")
+                score = _fallback_score_from_ddl(ddl, lang=lang)
+                if include_trace and attempts:
+                    attempts[-1]["fallback"] = True
+                break
+            retry_count += 1
+            retry_reasons.append("stage2_request_timeout")
+            continue
 
-    reason = _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms)
-    retry_count += 1
-    retry_reasons.append(reason)
-    try:
-        retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(
-            _compose_retry_prompt(reason=reason, lang=lang, canvas_aspect=canvas_aspect)
+        if attempt_tokens_in is not None:
+            tokens_in = (tokens_in or 0) + attempt_tokens_in
+        if attempt_tokens_out is not None:
+            tokens_out = (tokens_out or 0) + attempt_tokens_out
+        reason = _compose_retry_reason(
+            attempt_score,
+            tokens_out=attempt_tokens_out,
+            elapsed_ms=elapsed_ms,
         )
-    except StageHardTimeoutError:
-        fallback_used = True
-        retry_reasons.append("stage2_retry_hard_timeout")
-        retry_score = _fallback_score_from_ddl(ddl, lang=lang)
-        retry_tokens_in = None
-        retry_tokens_out = None
-        _record_fallback_attempt()
-    if retry_tokens_in is not None:
-        tokens_in = (tokens_in or 0) + retry_tokens_in
-    if retry_tokens_out is not None:
-        tokens_out = (tokens_out or 0) + retry_tokens_out
-    if not retry_score.instructions:
-        fallback_used = True
-        retry_reasons.append("fallback_after_empty_retry")
-        retry_score = _fallback_score_from_ddl(ddl, lang=lang)
-        if include_trace and attempts:
-            attempts[-1]["fallback"] = True
+        if reason == "none":
+            score = attempt_score
+            break
+        if retry_count >= retry_limit:
+            fallback_used = True
+            retry_reasons.append("fallback_after_empty_retry")
+            score = _fallback_score_from_ddl(ddl, lang=lang)
+            if include_trace and attempts:
+                attempts[-1]["fallback"] = True
+            break
+        retry_count += 1
+        retry_reasons.append(reason)
+        prompt = _compose_retry_prompt(
+            reason=reason,
+            lang=lang,
+            canvas_aspect=canvas_aspect,
+        )
     return ComposeDetail(
-        score=retry_score,
+        score=score,
         ddl=ddl,
         tokens_in=tokens_in,
         tokens_out=tokens_out,

@@ -1372,6 +1372,125 @@ def test_compose_retry_reason_only_retries_empty_instructions():
     assert render_routes._compose_retry_reason(score, tokens_out=999999, elapsed_ms=999999) == "none"
 
 
+def test_compose_retry_default_stays_at_one(monkeypatch):
+    monkeypatch.delenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", raising=False)
+    calls = 0
+
+    def empty_compose(ddl, **kwargs):
+        nonlocal calls
+        calls += 1
+        return Score(instructions=[]), 1, 1
+
+    monkeypatch.setattr(render_routes, "compose", empty_compose)
+    detail = render_routes._call_compose_detail("黒い円。")
+
+    assert calls == 2
+    assert detail.retry_count == 1
+    assert detail.fallback_used is True
+
+
+def test_compose_retry_override_accepts_the_eleventh_attempt_sequentially(monkeypatch):
+    monkeypatch.setenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", "10")
+    calls = 0
+    active = 0
+    max_active = 0
+
+    def tenth_retry_succeeds(ddl, **kwargs):
+        nonlocal calls, active, max_active
+        calls += 1
+        active += 1
+        max_active = max(max_active, active)
+        try:
+            if calls <= 10:
+                return Score(instructions=[]), 1, 1
+            return Score.model_validate(
+                {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+            ), 1, 1
+        finally:
+            active -= 1
+
+    monkeypatch.setattr(render_routes, "compose", tenth_retry_succeeds)
+    detail = render_routes._call_compose_detail("黒い円。", include_trace=True)
+
+    assert calls == 11
+    assert max_active == 1
+    assert detail.retry_count == 10
+    assert detail.retry_reasons == ["empty_instructions"] * 10
+    assert detail.fallback_used is False
+    assert len(detail.stage2_raw_attempts or []) == 11
+
+
+def test_compose_retry_override_retries_a_terminated_request_timeout(monkeypatch):
+    import httpx
+    from openai import APITimeoutError
+
+    monkeypatch.setenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", "10")
+    calls = 0
+
+    def timeout_then_score(ddl, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise APITimeoutError(request=httpx.Request("POST", "https://nvidia.invalid/v1"))
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        ), 1, 1
+
+    monkeypatch.setattr(render_routes, "compose", timeout_then_score)
+    detail = render_routes._call_compose_detail("黒い円。", include_trace=True)
+
+    assert calls == 2
+    assert detail.retry_count == 1
+    assert detail.retry_reasons == ["stage2_request_timeout"]
+    assert detail.fallback_used is False
+    assert (detail.stage2_raw_attempts or [])[0]["error"] == "stage2_request_timeout"
+
+
+def test_compose_retry_override_falls_back_after_ten_additional_attempts(monkeypatch):
+    monkeypatch.setenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", "10")
+    calls = 0
+
+    def always_empty(ddl, **kwargs):
+        nonlocal calls
+        calls += 1
+        return Score(instructions=[]), 1, 1
+
+    monkeypatch.setattr(render_routes, "compose", always_empty)
+    detail = render_routes._call_compose_detail("黒い円。", include_trace=True)
+
+    assert calls == 11
+    assert detail.retry_count == 10
+    assert detail.retry_reasons == ["empty_instructions"] * 10 + ["fallback_after_empty_retry"]
+    assert detail.fallback_used is True
+    assert (detail.stage2_raw_attempts or [])[-1]["fallback"] is True
+
+
+def test_compose_retry_override_does_not_retry_a_nonempty_semantic_failure(monkeypatch):
+    monkeypatch.setenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", "10")
+    calls = 0
+
+    def parsed_but_wrong(ddl, **kwargs):
+        nonlocal calls
+        calls += 1
+        return Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        ), 1, 1
+
+    monkeypatch.setattr(render_routes, "compose", parsed_but_wrong)
+    detail = render_routes._call_compose_detail("Surface: flat.")
+
+    assert calls == 1
+    assert detail.retry_count == 0
+    assert detail.fallback_used is False
+
+
+@pytest.mark.parametrize("value", ["-1", "11", "invalid"])
+def test_compose_retry_override_rejects_values_outside_zero_through_ten(monkeypatch, value):
+    monkeypatch.setenv("INKU_STAGE2_COMPOSE_RETRY_LIMIT", value)
+    with pytest.raises(ValueError, match="INKU_STAGE2_COMPOSE_RETRY_LIMIT"):
+        render_routes._call_compose_detail("黒い円。")
+
+
 def test_stage1_fallback_does_not_treat_dawn_as_night():
     ddl = render_routes._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
 

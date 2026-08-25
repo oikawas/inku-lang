@@ -63,13 +63,16 @@ def _enclosing_function(tree: ast.AST, node: ast.AST) -> str:
     return best
 
 
-def _called_name(node: ast.AST) -> str | None:
-    """A direct or module-attribute function name."""
+def _is_approved_predicate_call(node: ast.AST) -> bool:
+    """A bare predicate call, or the exact sibling access-module form."""
     if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
+        return node.id in PREDICATES
+    return (
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "access"
+        and node.attr in PREDICATES
+    )
 
 
 def test_owner_filters_go_through_the_visibility_predicates() -> None:
@@ -131,7 +134,7 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if _called_name(node.func) not in PREDICATES or len(node.args) < 2:
+            if not _is_approved_predicate_call(node.func) or len(node.args) < 2:
                 continue
             column = node.args[1]
             if isinstance(column, ast.Attribute) and isinstance(column.value, ast.Name):
@@ -140,13 +143,28 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
         f"tables no longer filtered through a predicate: {sorted(OWNED_TABLES - covered)}"
     )
 
-    # (5) And the raw-SQL form is reached too: the recursive lineage CTEs and the
-    # full-text search are the only paths a SQLAlchemy expression cannot enter.
-    readable_sql_calls = [
+    # (5) Both raw-SQL owners remain independently load-bearing. The history
+    # search uses db.py's bare helper, while lineage must go through the exact
+    # sibling module attribute rather than an arbitrary object with that name.
+    db_readable_sql_calls = [
         node
-        for _, tree in parsed.values()
-        for node in ast.walk(tree)
+        for node in ast.walk(parsed["db.py"][1])
         if isinstance(node, ast.Call)
-        and _called_name(node.func) in {"_readable_sql", "_readable_node_sql"}
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_readable_sql"
     ]
-    assert readable_sql_calls, "no caller reaches _readable_sql; the raw SQL paths are unscoped"
+    assert db_readable_sql_calls, "db.py no longer routes full-text search through _readable_sql"
+
+    lineage_readable_sql_calls = [
+        node
+        for node in ast.walk(parsed["persistence/lineage.py"][1])
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "access"
+        and node.func.attr == "_readable_node_sql"
+    ]
+    assert lineage_readable_sql_calls, (
+        "persistence/lineage.py no longer routes recursive CTEs through "
+        "access._readable_node_sql"
+    )

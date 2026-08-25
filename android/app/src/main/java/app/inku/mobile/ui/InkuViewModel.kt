@@ -45,6 +45,11 @@ import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraFailure
+import app.inku.mobile.ui.camera.CameraNimDrawRoute
+import app.inku.mobile.ui.camera.CameraNimDrawRouting
+import app.inku.mobile.ui.camera.CameraNimProviderIssue
+import app.inku.mobile.ui.camera.clearCameraOrigin
+import app.inku.mobile.ui.camera.providerIssue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -646,6 +651,7 @@ class InkuViewModel @JvmOverloads constructor(
             prompt = "",
             ddl = "",
             ddlEditedAfterGeneration = false,
+            cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
             message = null,
         )
     }
@@ -1042,6 +1048,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddl = item.normalizedDdl,
             ddlEditedAfterGeneration = false,
             confirmDdlOverwrite = false,
+            cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
             selectedCatalogId = item.colorCatalogId,
             selectedCanvasAspect = item.canvasAspect,
             tab = tab,
@@ -1152,6 +1159,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun draw() {
         val current = state.value
+        val route = CameraNimDrawRouting.forState(current.cameraCaptureState)
         // 「候補生成中は他の生成・描画操作を禁止し」. Before the model check, because
         // what stops this drawing has to be the refinement rather than whichever
         // reason happens to be found first.
@@ -1159,11 +1167,11 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
-        validateSelectedModels(current)?.let { message ->
+        validateModelsForRun(current, route)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
         }
-        runSubmit(current)
+        runSubmit(current, route)
     }
 
     fun cancelDdlOverwrite() {
@@ -1304,7 +1312,7 @@ class InkuViewModel @JvmOverloads constructor(
         return text != sourceTextOf(parent)
     }
 
-    private fun runSubmit(current: InkuUiState) {
+    private fun runSubmit(current: InkuUiState, route: CameraNimDrawRoute? = null) {
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
             return
@@ -1315,10 +1323,16 @@ class InkuViewModel @JvmOverloads constructor(
         }
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
-        val declared = describeLineage(current)
+        val declared = if (route == null) describeLineage(current) else LineageDeclaration()
         // Read here for the same reason: it is decided against the parent, and
         // the coroutine clears the parent before it draws.
-        val sketchRequest = describeSketchInput(current)
+        val sketchRequest = if (route == null) describeSketchInput(current) else SketchInput()
+        val stage1ModelId = route?.stage1ModelId ?: current.selectedModelId
+        val stage2ModelId = route?.stage2ModelId ?: current.selectedStage2ModelId
+        val stage1CatalogId = route?.catalogId ?:
+            CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId)
+        val autoRepair = route?.autoRepair ?: current.ddlAutoRepairEnabled
+        val litertStage1PromptOptimization = if (route == null) current.litertStage1PromptOptimization else false
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             val lineage = withPreviewParent(current, declared)
@@ -1334,12 +1348,12 @@ class InkuViewModel @JvmOverloads constructor(
                 val interpreted = withContext(Dispatchers.IO) {
                     repository.interpret(
                         current.prompt,
-                        CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId),
+                        stage1CatalogId,
                         current.selectedCanvasAspect,
-                        current.selectedModelId,
-                        current.selectedStage2ModelId,
-                        current.ddlAutoRepairEnabled,
-                        current.litertStage1PromptOptimization,
+                        stage1ModelId,
+                        stage2ModelId,
+                        autoRepair,
+                        litertStage1PromptOptimization,
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
                         sketch = sketchRequest,
@@ -1351,7 +1365,7 @@ class InkuViewModel @JvmOverloads constructor(
                     ddlEditedAfterGeneration = false,
                     message = strings().statusStage2,
                 )
-                val catalogId = if (sketchRequest.text != null) {
+                val catalogId = route?.catalogId ?: if (sketchRequest.text != null) {
                     CatalogSelection.resolvedCatalogIdForRun(
                         if (current.selectedCatalogId == CatalogSelection.AUTO_ID) "default" else current.selectedCatalogId,
                     )
@@ -1360,7 +1374,7 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.selectCatalogId(
                             current.selectedCatalogId,
                             interpreted.sketchText ?: current.prompt,
-                            current.selectedModelId,
+                            stage1ModelId,
                         )
                     }
                 }
@@ -1370,10 +1384,10 @@ class InkuViewModel @JvmOverloads constructor(
                         interpreted.ddlForDisplay,
                         catalogId,
                         current.selectedCanvasAspect,
-                        current.selectedModelId,
-                        current.selectedStage2ModelId,
-                        current.ddlAutoRepairEnabled,
-                        current.litertStage1PromptOptimization,
+                        stage1ModelId,
+                        stage2ModelId,
+                        autoRepair,
+                        litertStage1PromptOptimization,
                         lineage = lineage,
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
@@ -1399,6 +1413,7 @@ class InkuViewModel @JvmOverloads constructor(
                     // A saved work is what the next one comes from (web lowers
                     // the same flag on every save, +page.svelte:2883, :3304).
                     lineageDetached = false,
+                    cameraCaptureState = if (route != null) CameraCaptureState.Idle else localState.value.cameraCaptureState,
                     isDrawing = false,
                     message = "Rendered ${item.renderHashShort}",
                 )
@@ -2366,9 +2381,31 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun validateSelectedModels(state: InkuUiState): String? {
-        return listOf("Stage1" to state.selectedModelId, "Stage2" to state.selectedStage2ModelId)
-            .distinctBy { it.second }
+    private fun validateSelectedModels(state: InkuUiState): String? =
+        validateModelsForRun(state)
+
+    private fun validateModelsForRun(
+        state: InkuUiState,
+        route: CameraNimDrawRoute? = null,
+    ): String? {
+        val models = listOf(
+            "Stage1" to (route?.stage1ModelId ?: state.selectedModelId),
+            "Stage2" to (route?.stage2ModelId ?: state.selectedStage2ModelId),
+        ).distinctBy { it.second }
+
+        route?.providerIssue(state.providerSettings)?.let { issue ->
+            val providerName = state.providerSettings
+                .firstOrNull { it.providerId == "nvidia" }
+                ?.displayName
+                ?: "NVIDIA NIM"
+            return when (issue) {
+                CameraNimProviderIssue.MissingOrDisabled -> strings().errorProviderNotFoundForModel(route.stage1ModelId)
+                CameraNimProviderIssue.BaseUrlMissing -> strings().errorProviderBaseUrlMissing(providerName)
+                CameraNimProviderIssue.ApiKeyMissing -> strings().errorProviderApiKeyMissing(providerName)
+            }
+        }
+
+        return models
             .firstNotNullOfOrNull { (stage, modelId) ->
                 if (!modelId.startsWith("local-litert-lm:")) return@firstNotNullOfOrNull null
                 val asset = state.modelAssets.firstOrNull { it.modelId == modelId }

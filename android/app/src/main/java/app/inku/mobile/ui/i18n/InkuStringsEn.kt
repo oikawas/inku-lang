@@ -368,6 +368,8 @@ object InkuStringsEn : InkuStrings {
     override val language = "Language"
     override val miscSubtitle = "Language, theme and density"
     override val description = "Description"
+    override val camera = "Camera"
+    override val menu = "Menu"
     override val settings = "Settings"
     override val saijikiTapNote = "Tap a word to insert it into the instructions."
     // 説明 is a template's note, not the 記述 the author writes. Sharing

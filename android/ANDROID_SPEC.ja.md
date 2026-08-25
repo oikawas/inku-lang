@@ -141,8 +141,8 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
-  - bottom navigation: Compose, History, Demo, Settings
-  - Compose segmented mode: Write, Batch
+  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは結果を受け取らず platform still-image camera Intent を起動する
+  - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
   - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
   - canvas 下の prompt と DDL interpretation
   - local LLM work 中の layout jump を避ける fixed-height drawing CTA と in-place generating state / progress indicator

@@ -286,6 +286,8 @@ interface InkuStrings {
     val language: String
     val miscSubtitle: String
     val description: String
+    val camera: String
+    val menu: String
     val settings: String
     val saijikiTapNote: String
     val descriptionField: String

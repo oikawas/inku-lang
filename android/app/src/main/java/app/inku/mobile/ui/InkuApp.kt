@@ -18,6 +18,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.LruCache
 import android.view.OrientationEventListener
 import androidx.compose.foundation.Canvas
@@ -148,6 +149,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -1158,6 +1161,7 @@ private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
 
 @Composable
 private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
+    val context = LocalContext.current
     Surface(
         modifier = Modifier
             .navigationBarsPadding()
@@ -1172,24 +1176,36 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
                 .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
         ) {
-            AppTab.entries.forEach { tab ->
-                val label = when (tab) {
-                    AppTab.Compose -> S.description
-                    AppTab.History -> S.history
-                    AppTab.Lineage -> S.lineage
-                    AppTab.Settings -> S.settings
+            BottomNavigationDestination.entries.forEach { destination ->
+                val label = when (destination) {
+                    BottomNavigationDestination.Write -> S.description
+                    BottomNavigationDestination.Camera -> S.camera
+                    BottomNavigationDestination.History -> S.history
+                    BottomNavigationDestination.Lineage -> S.lineage
                 }
-                val mark = when (tab) {
-                    AppTab.Compose -> "✎"
-                    AppTab.History -> "◫"
-                    AppTab.Lineage -> "⌥"
-                    AppTab.Settings -> "⚙"
+                val mark = when (destination) {
+                    BottomNavigationDestination.Write -> "✎"
+                    BottomNavigationDestination.Camera -> "◉"
+                    BottomNavigationDestination.History -> "◫"
+                    BottomNavigationDestination.Lineage -> "⌥"
                 }
                 NavButton(
                     mark = mark,
                     label = label,
-                    selected = selected == tab,
-                    onClick = { viewModel.setTab(tab) },
+                    selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose ||
+                        destination == BottomNavigationDestination.History && selected == AppTab.History ||
+                        destination == BottomNavigationDestination.Lineage && selected == AppTab.Lineage,
+                    onClick = {
+                        when (destination) {
+                            BottomNavigationDestination.Write -> {
+                                viewModel.setTab(AppTab.Compose)
+                                viewModel.setComposeMode(ComposeMode.Write)
+                            }
+                            BottomNavigationDestination.Camera -> context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+                            BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
+                            BottomNavigationDestination.Lineage -> viewModel.setTab(AppTab.Lineage)
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -1197,41 +1213,11 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
     }
 }
 
-@Composable
-private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(100))
-            .padding(Dimens.spaceXs),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-    ) {
-        ComposeMode.entries.forEach { tab ->
-            val active = selected == tab
-            val label = when (tab) {
-                ComposeMode.Write -> S.description
-                ComposeMode.Batch -> S.batch
-            }
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(Dimens.buttonHeightSmall)
-                    .clickable { viewModel.setComposeMode(tab) },
-                shape = RoundedCornerShape(100),
-                color = if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                tonalElevation = if (active) Dimens.spaceXs else 0.dp,
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
+private enum class BottomNavigationDestination {
+    Write,
+    Camera,
+    History,
+    Lineage,
 }
 
 private fun canvasLabel(state: InkuUiState): String {
@@ -1430,7 +1416,6 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        ComposeModeTabs(state.composeMode, viewModel)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1489,6 +1474,8 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    var canvasMenuOpen by remember { mutableStateOf(false) }
+    val canvasMenuContentDescription = S.menu
     var instructionCaptionVisible by remember {
         mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
@@ -1565,8 +1552,32 @@ private fun CanvasHeroCard(
                     MiniPill(
                         text = S.fullScreen,
                         onClick = viewModel::enterCanvasPresentationMode,
-                        modifier = Modifier.align(Alignment.CenterEnd),
+                        modifier = Modifier.align(Alignment.Center),
                     )
+                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                        MiniPill(
+                            text = "☰",
+                            onClick = { canvasMenuOpen = true },
+                            modifier = Modifier.semantics { contentDescription = canvasMenuContentDescription },
+                        )
+                        DropdownMenu(expanded = canvasMenuOpen, onDismissRequest = { canvasMenuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(S.batch) },
+                                onClick = {
+                                    canvasMenuOpen = false
+                                    viewModel.setTab(AppTab.Compose)
+                                    viewModel.setComposeMode(ComposeMode.Batch)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(S.settings) },
+                                onClick = {
+                                    canvasMenuOpen = false
+                                    viewModel.setTab(AppTab.Settings)
+                                },
+                            )
+                        }
+                    }
                 }
             }
             Surface(

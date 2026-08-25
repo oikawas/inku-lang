@@ -956,7 +956,7 @@ Android 版の安定性とローカルデータ保護のため、以下を実装
 - 描画、DDL描画、バッチ、デモは run id を持ち、古い Job の完了・失敗通知が新しい描画状態を上書きしないようにする。
 - バッチ実行は最大 100 件までとする。100 件を超える入力は実行前に拒否する。
 - デモ実行は開始 1 回あたり最大 100 サイクルまでとし、上限到達時に停止する。
-- Room DB は履歴、provider 設定、API key 関連のユーザーデータを保持するため、破壊的 migration を使わない。schema 変更時は明示的な Room migration を追加する。
+- 2026-08-24の作者裁定により、Room v1–9はこの移行に限り一度だけ明示的にresetする。通常のRoom singletonを開始する前にreset coordinatorが`inku.sqlite`を判定し、v1–9だけをallowlistして、open handleを閉じた後にAndroidのdatabase APIでDB本体とjournalを削除し、派生`files/thumbnails` treeを削除する。旧rowはmigration、export、保存しない。その後は既存bootstrap ownerでfresh v10を通常起動する。missing/0-byte DBはfresh v10を作成し、既存v10は削除せず通常openする。ダウンロード済みmodel file（`files/models/`）はSQLite外であり、このresetで削除しない。v11以上、non-empty v0、SQLiteとして読めないDBは、DB・thumbnail・modelのbyteを変更せずfail closedし、安全説明とretryだけを表示する。retryは同じ判定を再実行するだけでclear/deleteしない。v10以後のschema変更は明示的なRoom migrationまたは新しい作者裁定を必要とし、generic destructive fallbackは使わない。
 - ローカルモデル download は `ModelDownloadSpec.maxDownloadBytes` を持ち、Content-Length 判明時と stream 中の両方で上限を超える download を中断する。
 - 履歴サムネイルの decode は `files/thumbnails` 配下の canonical path のみ許可する。DB破損や想定外 path による任意ファイル decode を避ける。
 - Compose の artwork / history thumbnail cache は entry 数ではなく推定 bitmap byte 数で制限する。
@@ -970,7 +970,7 @@ Android 版は Pixel 9 実機での履歴表示、描画 preview、ローカル�
 - 履歴詳細、再描画、JSON / Prompt 表示など完全な履歴内容が必要な操作では、履歴 ID から `HistoryItemEntity` を遅延取得する。
 - 履歴サムネイルは描画保存時に 384px の WebP としてアプリ内部領域へ永続化し、Room `history_items` に `thumbnail_path`、`thumbnail_width`、`thumbnail_height` を保存する。
 - 既存履歴でサムネイルが存在しないものは、起動時に最大 100 件までバックフィルする。
-- この DB schema 変更は Room version 2 とし、`MIGRATION_1_2` で上記 3 列を追加する。破壊的 migration は使わない。
+- この DB schema 変更は Room version 2 とし、`MIGRATION_1_2` で上記 3 列を追加する。この当時のv2変更では破壊的 migration を使わなかった。
 - 記述 / 履歴のメイン描画 preview は SVG を毎 recomposition で再描画せず、表示サイズと回転状態を key にした `LruCache` 上の bitmap を再利用する。
 - Renderer の hot path では、色適用時の不要な JSON stringify / parse deep copy を避ける。ただし server/web 互換の Score、SVG、render metadata、render hash の意味は変更しない。
 - LiteRT-LM モデルが選択され、かつ取得済み `ready` の場合、設定復元後、モデル選択後、モデル取得完了後に background で Engine warmup を試行する。
@@ -984,7 +984,7 @@ Android 版は Pixel 9 実機での履歴表示、描画 preview、ローカル�
 
 Android 版は追加の性能改善として、以下を実装する。
 
-- Room DB を version 3 に上げ、履歴一覧で使う `trashed, created_at` と `starred, trashed, created_at` の複合 index を追加する。migration は `MIGRATION_2_3` で行い、破壊的 migration は使わない。
+- Room DB を version 3 に上げ、履歴一覧で使う `trashed, created_at` と `starred, trashed, created_at` の複合 index を追加する。migration は `MIGRATION_2_3` で行い、この当時のv3変更では破壊的 migration を使わなかった。
 - `HistoryListItem` は検索用の lower-case 連結文字列を生成済み property として持ち、履歴検索入力ごとの全文連結・lowercaseを避ける。
 - 履歴 Flow はトップレベルで常時 collect せず、履歴タブ表示時にのみ collect する。これにより記述 / デモ / 設定操作時の履歴リスト更新による不要な compose work を減らす。
 - 描画保存時は履歴本体を先に保存し、384px WebP thumbnail 生成は repository 内の IO coroutine で非同期実行する。thumbnail列更新後に履歴一覧へ反映する。

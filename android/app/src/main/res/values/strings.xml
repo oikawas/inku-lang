@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">inku</string>
+    <string name="database_startup_refused_title">Local data could not be opened safely</string>
+    <string name="database_startup_refused_message">inku stopped because the local database could not be prepared safely. An unrecognized database will not be cleared or overwritten. Check the app storage or restore a supported database, then try again.</string>
+    <string name="database_startup_retry">Try again</string>
 </resources>

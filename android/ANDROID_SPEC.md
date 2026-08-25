@@ -1324,9 +1324,21 @@ rules.
   rejected before execution.
 - Demo execution is limited to 100 cycles per start and stops when the limit is
   reached.
-- Room DB stores history, provider settings, and API-key-related user data, so
-  destructive migration is prohibited. Schema changes must add explicit Room
-  migrations.
+- Under the 2026-08-24 author ruling, Room v1–9 is intentionally reset once for
+  this transition only. Before starting the normal Room singleton, a reset
+  coordinator classifies `inku.sqlite`; only the v1–9 allowlist closes open
+  handles, removes the database and its journals through the Android database
+  API, and removes the derived `files/thumbnails` tree. Old rows are not
+  migrated, exported, or retained. The existing bootstrap owner then starts a
+  fresh v10 database normally. A missing or zero-byte DB creates fresh v10,
+  while an existing v10 DB opens normally without deletion. Downloaded model
+  files under `files/models/` are outside SQLite and are not deleted by this
+  reset. Version 11 or later, non-empty version 0, and unreadable SQLite DBs
+  fail closed without changing database, thumbnail, or model bytes, and show
+  only a safety explanation and retry. Retry repeats classification only; it
+  never clears or deletes. Schema changes after v10 require an explicit Room
+  migration or a new author ruling, and no generic destructive fallback is
+  used.
 - Local model downloads carry `ModelDownloadSpec.maxDownloadBytes`, and
   downloads are aborted both when `Content-Length` is too large and when the
   streamed byte count exceeds the limit.
@@ -1355,7 +1367,8 @@ history browsing, work previews, and first local-model render latency.
 - Existing history rows without thumbnails are backfilled at startup, up to 100
   rows per startup pass.
 - This schema change uses Room version 2 and `MIGRATION_1_2` to add the three
-  thumbnail columns. Destructive migration remains prohibited.
+  thumbnail columns. No destructive migration was used for this historical v2
+  change.
 - Main work previews in Compose and History reuse bitmap output through an
   `LruCache` keyed by history item, display size, and presentation rotation,
   instead of re-rendering SVG on every recomposition.
@@ -1382,7 +1395,8 @@ The Android app implements the following additional performance improvements.
 
 - Room DB is upgraded to version 3 and adds composite history indexes for
   `trashed, created_at` and `starred, trashed, created_at`. The schema change is
-  handled by `MIGRATION_2_3`; destructive migration remains prohibited.
+  handled by `MIGRATION_2_3`; no destructive migration was used for this
+  historical v3 change.
 - `HistoryListItem` exposes a precomputed lower-case search string so history
   filtering does not rebuild and lowercase the same fields on every query
   change.

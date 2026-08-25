@@ -15,6 +15,7 @@ import androidx.room.PrimaryKey
         Index("trashed"),
         Index(value = ["trashed", "created_at"]),
         Index(value = ["starred", "trashed", "created_at"]),
+        Index(value = ["lineage_node_id"], unique = true),
     ],
 )
 data class HistoryItemEntity(

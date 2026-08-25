@@ -1,0 +1,5 @@
+<resources>
+    <string name="database_startup_refused_title">ローカルデータを安全に開けませんでした</string>
+    <string name="database_startup_refused_message">ローカルデータベースを安全に準備できなかったため、inku は停止しました。判定できないデータベースを消去したり上書きしたりすることはありません。アプリのストレージを確認するか、対応するデータベースを復元してから、もう一度お試しください。</string>
+    <string name="database_startup_retry">再試行</string>
+</resources>

@@ -41,6 +41,37 @@ def _project(row: HistoryRow) -> dict:
     }
 
 
+_FORBIDDEN_HISTORY_IMPORT_PARTS = {
+    "api_core",
+    "config",
+    "db",
+    "engine",
+    "lineage",
+    "renderer",
+    "render_engines",
+    "router",
+    "search",
+    "share",
+    "share_policy",
+}
+
+
+def _import_targets(source: str) -> set[str]:
+    targets: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            targets.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            prefix = "." * node.level
+            module_prefix = f"{prefix}{node.module}." if node.module else prefix
+            targets.update(f"{module_prefix}{alias.name}" for alias in node.names)
+    return targets
+
+
+def _is_forbidden_history_import(target: str) -> bool:
+    return bool(set(target.lstrip(".").split(".")) & _FORBIDDEN_HISTORY_IMPORT_PARTS)
+
+
 def test_history_mark_writer_owns_both_marks_and_db_delegates() -> None:
     owner = getattr(history, "HistoryMarkWriter", None)
     assert owner is not None, "HistoryMarkWriter must own history mark writes"
@@ -82,36 +113,12 @@ def test_history_mark_writer_owns_both_marks_and_db_delegates() -> None:
     assert "row.note = clean_note or None" in owner_source
     assert "Independent of starred: neither reads the other." in owner_source
     module_source = inspect.getsource(history)
-    import_nodes = [
-        node for node in ast.walk(ast.parse(module_source)) if isinstance(node, (ast.Import, ast.ImportFrom))
-    ]
-    imported_modules = {
-        alias.name
-        for node in import_nodes
-        if isinstance(node, ast.Import)
-        for alias in node.names
-    } | {
-        "." * node.level + (node.module or "")
-        for node in import_nodes
-        if isinstance(node, ast.ImportFrom)
-    }
-    forbidden_roots = {
-        "api_core",
-        "config",
-        "db",
-        "engine",
-        "lineage",
-        "renderer",
-        "render_engines",
-        "router",
-        "search",
-        "share",
-        "share_policy",
-    }
-    assert all(
-        module.lstrip(".").split(".")[0] not in forbidden_roots for module in imported_modules
-    )
-    assert ".schema" in imported_modules
+    imported_modules = _import_targets(module_source)
+    assert all(not _is_forbidden_history_import(module) for module in imported_modules)
+    assert ".access" in imported_modules
+    assert ".schema.HistoryRow" in imported_modules
+    for escaped_import in ("from inku_server import db", "from . import renderer"):
+        assert any(_is_forbidden_history_import(target) for target in _import_targets(escaped_import))
 
 
 def test_mark_facades_resolve_dependencies_at_call_time(monkeypatch: pytest.MonkeyPatch) -> None:

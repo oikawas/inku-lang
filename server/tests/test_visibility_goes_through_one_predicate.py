@@ -36,6 +36,7 @@ import re
 SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "src/inku_server"
 SOURCES = {
     "db.py": SOURCE_ROOT / "db.py",
+    "persistence/history.py": SOURCE_ROOT / "persistence/history.py",
     "persistence/lineage.py": SOURCE_ROOT / "persistence/lineage.py",
 }
 

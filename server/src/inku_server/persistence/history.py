@@ -11,6 +11,7 @@ from hashlib import sha256
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from . import access
 from .schema import CoerceTraceCatalogRow, HistoryRow, LineageEdgeRow, LineageNodeRow
 
 
@@ -68,6 +69,42 @@ class HistoryThumbnailSourceReader:
                 select(HistoryRow.id, HistoryRow.svg).where(HistoryRow.id.in_(ids))
             ).all()
         return {str(item_id): (svg or "") for item_id, svg in rows}
+
+
+@dataclass(frozen=True)
+class HistoryItemReader:
+    """ID-addressed history reads with runtime-owned compatibility dependencies."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    rows_to_dicts_with_lineage_fn: Callable[[object, list[HistoryRow], dict], list[dict]]
+
+    def get_items(self, user_id: str, ids: list[str]) -> list[dict]:
+        """Fetch works by id, in the order asked for, skipping the trash.
+
+        Trashed works are addressable by id but are not a thing to act on: every
+        caller here exports, rebuilds, or inspects a work. The trash view has its
+        own listing (`list_items(trashed=True)`) and cannot load a work onto the
+        canvas, so nothing legitimate is lost by not answering for them here.
+        Without this filter an id sent straight to the export endpoints put a
+        trashed work into the output (ledger I-094).
+        """
+        if not ids:
+            return []
+        order = {item_id: index for index, item_id in enumerate(ids)}
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            rows = (
+                session.query(HistoryRow)
+                .filter(
+                    access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                    HistoryRow.id.in_(ids),
+                    HistoryRow.trashed == 0,
+                )
+                .all()
+            )
+            items = self.rows_to_dicts_with_lineage_fn(session, rows, actor)
+            return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 
 @dataclass(frozen=True)

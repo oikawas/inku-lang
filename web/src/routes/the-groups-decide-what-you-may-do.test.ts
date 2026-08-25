@@ -26,11 +26,12 @@ const admin = { permission_groups: ['admins'] as const };
 const plain = { permission_groups: ['users'] as const };
 const leader = { permission_groups: ['leaders'] as const };
 
-test('the admins group opens all five administrator tabs', () => {
-	assert.equal(ADMIN_ONLY_SETTINGS_TABS.length, 5);
+test('the admins group opens all six administrator tabs', () => {
+	assert.deepEqual(ADMIN_ONLY_SETTINGS_TABS, ['models', 'db', 'users', 'server_misc', 'logs', 'limits']);
 	for (const tab of ADMIN_ONLY_SETTINGS_TABS) {
 		assert.equal(canAccessSettingsTab(tab, admin), true, tab);
 	}
+	assert.equal(canAccessSettingsTab('limits', admin), true, 'limits stays open to administrators');
 	assert.equal(defaultSettingsTab(admin), 'models');
 	assert.equal(holdsPermissionGroup(admin, 'admins'), true);
 });
@@ -42,6 +43,8 @@ test('the users group opens none of them, and neither does a leader', () => {
 		assert.equal(canAccessSettingsTab(tab, plain), false, tab);
 		assert.equal(canAccessSettingsTab(tab, leader), false, tab);
 	}
+	assert.equal(canAccessSettingsTab('limits', plain), false, 'limits stays closed to plain users');
+	assert.equal(canAccessSettingsTab('limits', leader), false, 'limits stays closed to leaders');
 	assert.equal(canAccessSettingsTab('plugins', plain), true, 'the shared tabs stay open');
 	assert.equal(defaultSettingsTab(plain), 'plugins');
 	assert.equal(holdsPermissionGroup(plain, 'admins'), false);

@@ -19,7 +19,7 @@ export function holdsPermissionGroup(user: MemberLike, name: PermissionGroup): b
 }
 
 /** Settings tabs only the administrators group reaches. */
-export const ADMIN_ONLY_SETTINGS_TABS = ['models', 'db', 'users', 'server_misc', 'logs'] as const;
+export const ADMIN_ONLY_SETTINGS_TABS = ['models', 'db', 'users', 'server_misc', 'logs', 'limits'] as const;
 
 export function canAccessSettingsTab(tab: string, user: MemberLike): boolean {
 	if ((ADMIN_ONLY_SETTINGS_TABS as readonly string[]).includes(tab)) {

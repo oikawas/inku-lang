@@ -59,6 +59,14 @@ def _edge(child_id: str, parent_id: str, user_id: str, kind: str = "touch_change
     )
 
 
+def _in_filter_values(filters: tuple[object, ...], column_name: str) -> set[str]:
+    for criterion in filters:
+        left = getattr(criterion, "left", None)
+        if getattr(left, "name", None) == column_name:
+            return set(criterion.right.value)
+    raise AssertionError(f"missing IN filter for {column_name}")
+
+
 def test_history_list_projector_is_the_frozen_sole_owner_and_db_is_a_facade(monkeypatch):
     assert is_dataclass(history.HistoryListProjector)
     projector = history.HistoryListProjector(lambda row: {"id": row.id}, lambda edge: {"metadata": {}})
@@ -78,11 +86,35 @@ def test_history_list_projector_is_the_frozen_sole_owner_and_db_is_a_facade(monk
 
     projected: list[str] = []
     monkeypatch.setattr(db, "_row_to_dict", lambda row: projected.append(row.id) or {"id": row.id})
-    monkeypatch.setattr(db, "_lineage_edge_to_dict", lambda edge: {"metadata": {"wrong": True}})
     row = _row("ordinary", "owner", None)
 
     assert db._rows_to_dicts_with_lineage(_ProjectionSession([], []), [row]) == [{"id": "ordinary"}]
-    assert projected == ["ordinary"]
+    edge = _edge("node", "parent", "owner")
+    lineage_row = _row("lineage", "owner", "node")
+    edge_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        db,
+        "_lineage_edge_to_dict",
+        lambda value: edge_calls.append(("first", value.child_node_id)) or {"metadata": {"call": "first"}},
+    )
+    first = db._rows_to_dicts_with_lineage(
+        _ProjectionSession([_node("node", "owner", None)], [[edge], [edge], []]),
+        [lineage_row],
+    )
+    monkeypatch.setattr(
+        db,
+        "_lineage_edge_to_dict",
+        lambda value: edge_calls.append(("second", value.child_node_id)) or {"metadata": {"call": "second"}},
+    )
+    second = db._rows_to_dicts_with_lineage(
+        _ProjectionSession([_node("node", "owner", None)], [[edge], [edge], []]),
+        [lineage_row],
+    )
+
+    assert first[0]["derivation_metadata"] == {"call": "first"}
+    assert second[0]["derivation_metadata"] == {"call": "second"}
+    assert edge_calls == [("first", "node"), ("second", "node")]
+    assert projected == ["ordinary", "lineage", "lineage"]
 
 
 def test_projector_keeps_order_shared_markers_and_no_node_fast_path():
@@ -159,11 +191,15 @@ def test_projector_preserves_queries_generation_owner_gates_and_provenance():
         LineageEdgeRow,
         LineageEdgeRow,
     ]
-    first_node_filters = " ".join(map(str, session.calls[0][1]))
-    first_edge_filters = " ".join(map(str, session.calls[1][1]))
-    assert "lineage_nodes.id IN" in first_node_filters
-    assert "lineage_edges.user_id IN" in first_edge_filters
-    assert "lineage_edges.child_node_id IN" in first_edge_filters
+    assert _in_filter_values(session.calls[0][1], "id") == {"child", "root", "mismatch"}
+    assert _in_filter_values(session.calls[1][1], "user_id") == {"owner"}
+    assert _in_filter_values(session.calls[1][1], "child_node_id") == {"child", "root", "mismatch"}
+    assert _in_filter_values(session.calls[2][1], "user_id") == {"owner"}
+    assert _in_filter_values(session.calls[2][1], "child_node_id") == {"child", "root", "mismatch"}
+    assert _in_filter_values(session.calls[3][1], "user_id") == {"owner"}
+    assert _in_filter_values(session.calls[3][1], "child_node_id") == {"parent", "untrusted-parent"}
+    assert _in_filter_values(session.calls[4][1], "user_id") == {"owner"}
+    assert _in_filter_values(session.calls[4][1], "child_node_id") == {"root"}
 
 
 def test_projector_stops_on_missing_parents_and_cycles_without_attaching_missing_data():

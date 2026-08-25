@@ -329,6 +329,8 @@ object InkuStringsJa : InkuStrings {
     override val svgEditableNote = "編集用メタデータとIDを含む"
     override val renderExpressionSubtitle = "脱・規則化"
     override val colorCatalog = "色カタログ"
+    override val colorCatalogAuto = "記述から自動選択"
+    override val colorCatalogAutoDescription = "描画ごとに記述を読み、合う色カタログを選びます。"
     override val uiModeTitle = "表示モード"
     override val svgDisplay = "表示用SVG"
     override val demoInterval = "表示間隔"

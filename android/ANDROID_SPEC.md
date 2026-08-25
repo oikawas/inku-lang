@@ -192,7 +192,7 @@ Implemented:
   - soft trash
   - JSON share export through Android `FileProvider`
 - The normal Compose screen has a history thumbnail strip below the canvas. It reads only saved
-  history values for selection, Star toggling, Stage 1/2 models, saved time, color-catalog ID,
+  history values for selection, Stage 1/2 models, saved time, color-catalog ID,
   work hash, and canvas tooltips.
 - A read-only generation-information sheet shows saved sketch, models and languages, seeds and
   variation, color catalog and color map, canvas, render hash and engine, creation time, and elapsed time.
@@ -442,7 +442,7 @@ component unless marked as a local single-user equivalent.
 | `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
 | `CanvasPanel.svelte` | Ported for `artwork`/`prompt`/`score` tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
 | `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
-| `HistoryStrip.svelte` | Ported as a thumbnail strip below the Compose canvas, with selection, Star, model names, and saved-metadata tooltips. The history grid remains a separate entry point. |
+| `HistoryStrip.svelte` | Ported as a thumbnail strip below the Compose canvas, with selection, model names, and saved-metadata tooltips. The Star-capable history grid remains a separate entry point. |
 | `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
 | `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
 | `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
@@ -875,8 +875,19 @@ screen buttons instead of the Settings menu.
 - Android removes `Settings > Color Catalog`.
 - The color catalog selection dialog remains available from the writing /
   drawing screen color catalog button.
-- `color_catalog` persistence, history DB records, render metadata, JSON
-  display, and render hash behavior are unchanged.
+- `Choose from description` appears before the thirteen fixed catalogs. The
+  `auto` sentinel is saved and restored through the existing `color_catalog`
+  setting, while history stores only the real catalog ID resolved for a draw.
+- Auto sends the description once per ordinary draw, batch line, or demo cycle
+  to the selected Stage 1 model with the same catalog card, temperature 0.3,
+  and 200-token ceiling as the server. JSON is read before a known ID in bare
+  text; blank, failed, or unknown answers fall back to `default`.
+- When the sketch layer produced prose, ordinary drawing selects from that
+  prose. Fixed selection, direct DDL drawing, replay of a saved work, and
+  refinement add no selection call. The NIM API is free; other external
+  providers may incur provider charges.
+- Room schema, render-metadata format, JSON display, render hashes, and the
+  render maps and color codes of the existing thirteen catalogs are unchanged.
 - The setting that controls whether history selection applies the history color
   catalog remains under Display settings, matching the server/web behavior.
 
@@ -2731,3 +2742,11 @@ The ordinary `.MainActivity` retains its existing `MAIN` and `LAUNCHER` entry. i
 The former brush-and-eye launcher design is replaced by the same black, gray, red, green, and blue pixel-grid mark used by Web `favicon-192.png`. The adaptive icon uses a transparent foreground over the Web light background `#f5f3ef`; all five legacy and round density assets use the same mark.
 
 Build 148107 was installed normally on the Pixel 9. User 0 reports the package installed with `hidden=false` and `suspended=false`; launcher resolution returns `app.inku.mobile/.MainActivity`, and a cold start succeeds. The Pixel Launcher app list shows the `inku` label with the new pixel-grid icon. No uninstall, data clear, or instrumentation was performed.
+
+## 2026-08-25 History, blank batch rows, and automatic color catalogs in the writing UI ([I-382])
+
+The Star display and action are removed from the ordinary Compose history thumbnail strip. Work selection, its selection ring and scrolling, the compact Stage 1 name, and the tooltip for saved Stage 1 and Stage 2 models, time, color-catalog ID, hash, and canvas remain. The history grid, lineage cards, Provenance sheet, Star persistence, and Star filter are unchanged.
+
+The line-oriented batch editor shows an explicit delete control only on a blank row, removing that row together with its separating newline. Editing nonblank rows, pasted line breaks, CRLF normalization, and the single empty editor remain intact.
+
+`Choose from description` now precedes the thirteen fixed catalogs in the dialog. Auto is an independent selection call through the selected Stage 1 model; fixed selection, direct DDL drawing, saved-work replay, and refinement add no call. History stores only the resolved real ID. Room schema and migrations, pipeline and rendering, Rust, and existing palette codes and render maps are unchanged.

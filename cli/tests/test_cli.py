@@ -10,6 +10,7 @@ import subprocess
 import urllib.error
 import urllib.request
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
@@ -1399,6 +1400,34 @@ def _replay_summary(tmp_path, client, *, replay: int = 3, replay_limit: int = 5)
         replay_limit=replay_limit,
         client=client,
     )
+
+
+def test_pillow_pixel_api_replay_occupancy_has_stable_order(monkeypatch):
+    from PIL import Image
+
+    image = Image.new("L", (2, 2))
+    image.putdata([0, 64, 128, 255])
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    monkeypatch.setattr(cli, "_rasterize_png", lambda svg: buffer.getvalue())
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        occupancy = cli._svg_occupancy_grid("<svg/>", cells=2)
+
+    assert occupancy == [1.0, 191.0 / 255.0, 127.0 / 255.0, 0.0]
+
+
+def test_removed_pillow_getdata_is_absent_from_cli_production_sources():
+    production_root = Path(cli.__file__).resolve().parent
+    source_paths = sorted(production_root.glob("*.py"))
+    assert source_paths
+    offenders = [
+        str(path)
+        for path in source_paths
+        if re.search(r"\.getdata\s*\(", path.read_text(encoding="utf-8"))
+    ]
+    assert not offenders, f"deprecated Pillow pixel API remains in: {offenders}"
 
 
 # T-1

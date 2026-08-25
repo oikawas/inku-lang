@@ -2227,3 +2227,5 @@ Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、
 下部navigationは左から「記述・カメラ・履歴・系譜」とする。「記述」はComposeのWrite modeへ戻し、Batch表示中は選択状態にしない。「カメラ」はAndroid標準の静止画camera Intentを起動するだけで、撮影結果の取得、permission、URI、保存、記述生成、DB writeを行わない。
 
 通常canvas control stripは全画面buttonを中央、横三本線のmenu buttonを右端に置く。menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsは廃止し、Batchの可視入口はこのmenuへ一本化する。Room/schema/migration、ViewModelのpersistent state、pipeline/render/Rust、Server/Web/sharedは変更していない。
+
+作者は`2.1.4-android.67`／Build 148110を展開したPixel 9実機で、下部navigationの配置、カメラから標準camera appが開くこと、右上menuから既存Batch／Settingsへ進めることを目視確認した。実機確認による追加のdata変更、撮影結果の取得、DB writeは行っていない。

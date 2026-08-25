@@ -1627,67 +1627,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
 
 
 def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow], actor: dict | None = None) -> list[dict]:
-    """Attach edge provenance while keeping lineage_edges as the source of truth.
-
-    `actor` marks the works that reached this listing through someone else's
-    permission -- a group scope or a grant -- rather than by being the caller's
-    own. Without the mark, another person's work sits in the listing looking
-    exactly like one of yours, and the first thing anyone does with a listing is
-    select and delete from it.
-
-    Set only when true, so `response_model_exclude_none` keeps it off the wire
-    for the ordinary case of a person looking at their own works.
-    """
-    items = [_row_to_dict(row) for row in rows]
-    if actor is not None:
-        for item, row in zip(items, rows):
-            if row.user_id != actor["id"]:
-                item["shared"] = True
-    node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
-    if not node_ids:
-        return items
-    nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
-    node_by_id = {node.id: node for node in nodes}
-    user_ids = {row.user_id for row in rows}
-    edges = session.query(LineageEdgeRow).filter(
-        LineageEdgeRow.user_id.in_(user_ids),
-        LineageEdgeRow.child_node_id.in_(node_ids),
-    ).all()
-    edge_by_child = {edge.child_node_id: edge for edge in edges}
-    generation_by_node = {node_id: 1 for node_id in node_ids}
-    ancestor_by_target = {node_id: node_id for node_id in node_ids}
-    seen_by_target = {node_id: {node_id} for node_id in node_ids}
-    frontier = set(node_ids)
-    while frontier:
-        ancestor_edges = session.query(LineageEdgeRow).filter(
-            LineageEdgeRow.user_id.in_(user_ids),
-            LineageEdgeRow.child_node_id.in_(frontier),
-        ).all()
-        parent_by_child = {edge.child_node_id: edge.parent_node_id for edge in ancestor_edges}
-        next_frontier: set[str] = set()
-        for target_id, ancestor_id in ancestor_by_target.items():
-            parent_id = parent_by_child.get(ancestor_id)
-            if parent_id is None or parent_id in seen_by_target[target_id]:
-                continue
-            seen_by_target[target_id].add(parent_id)
-            ancestor_by_target[target_id] = parent_id
-            generation_by_node[target_id] += 1
-            next_frontier.add(parent_id)
-        frontier = next_frontier
-
-    for row, item in zip(rows, items, strict=True):
-        node = node_by_id.get(row.lineage_node_id)
-        if node is not None and node.user_id == row.user_id:
-            item["lineage_root_node_id"] = node.root_node_id or node.id
-            item["lineage_generation"] = generation_by_node[node.id]
-            item["lineage_state"] = node.state
-        edge = edge_by_child.get(row.lineage_node_id)
-        if edge is None or edge.user_id != row.user_id:
-            continue
-        item["lineage_parent_node_id"] = edge.parent_node_id
-        item["derivation_kind"] = edge.derivation_kind
-        item["derivation_metadata"] = _lineage_edge_to_dict(edge)["metadata"]
-    return items
+    """Compatibility façade for the lineage-aware history list projection."""
+    return _history.HistoryListProjector(
+        row_to_dict_fn=_row_to_dict,
+        lineage_edge_to_dict_fn=_lineage_edge_to_dict,
+    ).rows_to_dicts_with_lineage(session, rows, actor=actor)
 
 
 def _group_to_dict(row: UserGroupRow) -> dict:

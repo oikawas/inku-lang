@@ -392,3 +392,22 @@ def test_legacy_catalog_fills_only_missing_current_snapshot_values() -> None:
     assert item["render_color_catalog_id"] == "legacy-id"
     assert item["render_color_catalog_name"] == "Current"
     assert item["render_color_catalog_sub"] == "legacy-sub"
+
+
+def test_history_projection_preserves_raw_seed_wild_and_falsy_hash_branches() -> None:
+    item, logger = _project(
+        _row(
+            render_hash="",
+            render_seed="not-an-integer",
+            composition_seed="also-not-an-integer",
+            render_wild="true",
+        )
+    )
+
+    assert logger.calls == []
+    assert item["render_hash_short"] is None
+    assert item["render_seed"] == "not-an-integer"
+    assert item["composition_seed"] == "also-not-an-integer"
+    assert item["render_wild"] is False
+    assert history.render_hash_short(None) is None
+    assert history.render_hash_short("") is None

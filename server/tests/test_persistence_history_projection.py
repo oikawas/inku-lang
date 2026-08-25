@@ -130,8 +130,22 @@ def test_persistence_history_owns_projection_and_db_keeps_thin_facades() -> None
         ("from", 0, "__future__", (("annotations", None),)),
         ("import", 0, "", (("json", None),)),
         ("import", 0, "", (("logging", None),)),
+        ("import", 0, "", (("uuid", None),)),
         ("from", 0, "collections.abc", (("Callable", None),)),
-        ("from", 1, "schema", (("HistoryRow", None),)),
+        ("from", 0, "dataclasses", (("dataclass", None),)),
+        ("from", 0, "hashlib", (("sha256", None),)),
+        ("from", 0, "sqlalchemy.exc", (("IntegrityError", None),)),
+        (
+            "from",
+            1,
+            "schema",
+            (
+                ("CoerceTraceCatalogRow", None),
+                ("HistoryRow", None),
+                ("LineageEdgeRow", None),
+                ("LineageNodeRow", None),
+            ),
+        ),
     ]
     assert inspect.signature(db.render_hash_short) == inspect.Signature(
         [inspect.Parameter("render_hash", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation="str | None")],

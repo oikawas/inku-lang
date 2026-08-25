@@ -68,29 +68,7 @@ engine = create_sqlite_engine(
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 _logger = logging.getLogger(__name__)
 _HISTORY_FTS_ENABLED = False
-LINEAGE_DERIVATION_KINDS = {
-    "touch_change",
-    "layout_change",
-    "catalog_change",
-    "reinterpretation",
-    "model_comparison",
-    "language_comparison",
-    "ddl_edit",
-    "description_edit",
-    "replay",
-    "render_engine_change",
-    "age_change",
-    "hacho_change",
-    "renga_reply",
-    "external_seed_change",
-    "canvas_aspect_change",
-    "variation",  # Stage 1.5 variation, renamed from hensou in v2.8.0.
-    # Sketching (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
-    # which includes switching the layer on or off (the grain is fine, coarse
-    # or absent). The web client has sent this since v2.9.37; until v2.11.3 the
-    # server did not know the name and the whole save was lost ([I-137]).
-    "sketch_grain_change",
-}
+LINEAGE_DERIVATION_KINDS = _history.LINEAGE_DERIVATION_KINDS
 
 # What a member may do.  Fixed on purpose: a user-extensible set would make the
 # authorization branches resolve at runtime, and nothing could be asserted about
@@ -2023,169 +2001,18 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
 
 
 def add_item(item: dict) -> dict:
-    canvas_aspect_id = item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect")
-    if canvas_aspect_id is not None:
-        canvas_aspect_id = normalize_canvas_aspect_id(canvas_aspect_id)
-        item.setdefault("render_canvas_aspect", canvas_aspect_id)
-        item["render_canvas_aspect_id"] = canvas_aspect_id
-        item.setdefault("render_canvas_aspect_ratio", canvas_aspect_ratio_for_aspect(canvas_aspect_id))
-    render_hash = render_hash_for_item(item)
-    source_text = item.get("source_text")
-    if source_text is None:
-        source_text = item.get("input", "")
-    desc_hash = description_hash(source_text)
-    visibility = item.get("history_visibility") or "normal"
-    if visibility not in {"normal", "lineage_only"}:
-        raise ValueError("invalid history visibility")
-    parent_node_id = item.get("lineage_parent_node_id")
-    derivation_kind = item.get("derivation_kind")
-    derivation_metadata = item.get("derivation_metadata") or {}
-    if parent_node_id and derivation_kind not in LINEAGE_DERIVATION_KINDS:
-        raise ValueError("invalid lineage derivation kind")
-    if not parent_node_id and derivation_kind:
-        raise ValueError("lineage parent is required for a derivation")
-    if not isinstance(derivation_metadata, dict):
-        raise ValueError("lineage derivation metadata must be an object")
-
-    node_id = str(uuid.uuid4())
-    row = HistoryRow(
-        id=item["id"], user_id=item["user_id"], at=item["at"], input=item.get("input", ""),
-        ddl=item.get("ddl"), expanded_ddl=item.get("expanded_ddl"),
-        score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
-        output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
-        stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
-        stage1_prompt_digest=item.get("stage1_prompt_digest"),
-        stage1_prompt_base_digest=item.get("stage1_prompt_base_digest"),
-        stage2_prompt_digest=item.get("stage2_prompt_digest"),
-        tokens_in=item.get("tokens_in"), tokens_out=item.get("tokens_out"), catalog_id=item.get("catalog_id"),
-        catalog_mode=item.get("catalog_mode"),
-        ddl_version=item.get("ddl_version"), ddl_engine_version=item.get("ddl_engine_version"),
-        render_build_number=item.get("render_build_number"),
-        render_color_profile=json.dumps(item.get("render_color_profile"), ensure_ascii=False) if item.get("render_color_profile") is not None else None,
-        render_engine_id=item.get("render_engine_id"), render_engine_version=item.get("render_engine_version"),
-        render_color_catalog_id=item.get("render_color_catalog_id"),
-        render_color_catalog_name=item.get("render_color_catalog_name"),
-        render_color_catalog_sub=item.get("render_color_catalog_sub"),
-        render_color_map=json.dumps(item.get("render_color_map"), ensure_ascii=False) if item.get("render_color_map") is not None else None,
-        render_canvas_aspect=item.get("render_canvas_aspect"),
-        render_canvas_aspect_id=item.get("render_canvas_aspect_id") or item.get("render_canvas_aspect"),
-        render_canvas_aspect_ratio=item.get("render_canvas_aspect_ratio"),
-        instruction_lang_requested=item.get("instruction_lang_requested"),
-        instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
-        render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
-        render_wild=("1" if item.get("render_wild") else "0") if item.get("render_wild") is not None else None,
-        composition_seed=str(item.get("composition_seed")) if item.get("composition_seed") is not None else None,
-        tenkei=item.get("tenkei"), focus=item.get("focus"),
-        variation_amplitude=item.get("variation_amplitude"),
-        variation_seed=str(item.get("variation_seed")) if item.get("variation_seed") is not None else None,
-        interpret_fallback=item.get("interpret_fallback"),
-        # Carried through, never derived: an absent key means the writer said
-        # nothing, and guessing "none" here would put a claim in the row that
-        # nobody made.
-        compose_fallback=item.get("compose_fallback"),
-        interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
-        seed_text=item.get("seed_text"),
-        sketch_text=item.get("sketch_text"),
-        sketch_grain=item.get("sketch_grain"),
-        # Carried through, never derived here: an import restores what the
-        # exporting database recorded, and an old export legitimately has none.
-        sketch_state=item.get("sketch_state"),
-        render_limits=json.dumps(item.get("render_limits"), ensure_ascii=False, sort_keys=True) if isinstance(item.get("render_limits"), dict) else None,
-        # A new work is closed, and the destination stays NULL rather than being
-        # filled with the author's group: a work nobody opened has no readers, and
-        # writing the group here would make "closed" and "open to my own group"
-        # look the same in the table.
-        render_hash=render_hash, trashed=0, starred=0, for_revision=0, for_share=0, note=item.get("note"),
-        score_pre_coerce=json.dumps(item.get("score_pre_coerce"), ensure_ascii=False) if item.get("score_pre_coerce") is not None else None,
-        coerce_trace_version=item.get("coerce_trace_version"), coerce_catalog_digest=item.get("coerce_catalog_digest"),
-        coerce_trace=json.dumps(item.get("coerce_trace"), ensure_ascii=False) if item.get("coerce_trace") is not None else None,
-        source_text=source_text, display_label=item.get("display_label"),
-        batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
-        description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
-    )
-    node = LineageNodeRow(
-        id=node_id, user_id=item["user_id"], history_id=item["id"],
-        state="lineage_only" if visibility == "lineage_only" else "active",
-        description_hash=desc_hash, render_hash=render_hash, at=item["at"],
-        root_node_id=node_id,
-    )
-    actor = _actor_of(item["user_id"])
-    with SessionLocal() as session:
-        idempotency_key = item.get("idempotency_key")
-        if idempotency_key:
-            existing = session.query(HistoryRow).filter(
-                _owned_by(actor, HistoryRow.user_id),
-                HistoryRow.idempotency_key == idempotency_key,
-            ).first()
-            if existing is not None:
-                result = _row_to_dict(existing)
-                result["_idempotent_replay"] = True
-                return result
-        if parent_node_id:
-            parent = session.query(LineageNodeRow).filter(
-                LineageNodeRow.id == parent_node_id,
-                _readable_node(actor),
-                LineageNodeRow.state != "tombstone",
-            ).first()
-            if parent is None:
-                raise ValueError("lineage parent not found")
-            node.root_node_id = parent.root_node_id or parent.id
-        row.idempotency_key = idempotency_key
-        if item.get("coerce_catalog_digest") and item.get("coerce_catalog_snapshot") is not None:
-            digest = item["coerce_catalog_digest"]
-            trace_version = item.get("coerce_trace_version") or 1
-            snapshot_json = json.dumps(
-                item["coerce_catalog_snapshot"], ensure_ascii=False, separators=(",", ":")
-            )
-            if sha256(snapshot_json.encode("utf-8")).hexdigest() != digest:
-                raise ValueError("coerce catalog digest does not match its snapshot bytes")
-            catalog = session.get(CoerceTraceCatalogRow, digest)
-            if catalog is None:
-                session.add(
-                    CoerceTraceCatalogRow(
-                        digest=digest,
-                        trace_version=trace_version,
-                        snapshot_json=snapshot_json,
-                    )
-                )
-            elif (
-                catalog.trace_version != trace_version
-                or catalog.snapshot_json != snapshot_json
-            ):
-                raise ValueError("coerce catalog digest does not match its immutable snapshot")
-        session.add(row)
-        session.add(node)
-        # SQLite foreign-key enforcement requires the new child node to exist
-        # before its edge is inserted. Both writes remain in one transaction.
-        try:
-            session.flush()
-        except IntegrityError:
-            session.rollback()
-            if not idempotency_key:
-                raise
-            existing = session.query(HistoryRow).filter(
-                _owned_by(actor, HistoryRow.user_id),
-                HistoryRow.idempotency_key == idempotency_key,
-            ).first()
-            if existing is None:
-                raise
-            result = _row_to_dict(existing)
-            result["_idempotent_replay"] = True
-            return result
-        if parent_node_id:
-            session.add(LineageEdgeRow(
-                id=str(uuid.uuid4()), user_id=item["user_id"], parent_node_id=parent_node_id,
-                child_node_id=node_id, derivation_kind=derivation_kind,
-                metadata_json=_canonical_json(derivation_metadata), at=item["at"],
-            ))
-        session.commit()
-        session.refresh(row)
-        result = _row_to_dict(row)
-        if parent_node_id:
-            result["lineage_parent_node_id"] = parent_node_id
-            result["derivation_kind"] = derivation_kind
-            result["derivation_metadata"] = derivation_metadata
-        return result
+    return _history.HistoryWriter(
+        session_factory=SessionLocal,
+        actor_of_fn=_actor_of,
+        owned_by_fn=_owned_by,
+        readable_node_fn=_readable_node,
+        row_to_dict_fn=_row_to_dict,
+        render_hash_for_item_fn=render_hash_for_item,
+        description_hash_fn=description_hash,
+        normalize_canvas_aspect_id_fn=normalize_canvas_aspect_id,
+        canvas_aspect_ratio_for_aspect_fn=canvas_aspect_ratio_for_aspect,
+        canonical_json_fn=_canonical_json,
+    ).add_item(item)
 
 
 def record_unread_words(user_id: str, words: list[str], context: str, *, at: int) -> None:

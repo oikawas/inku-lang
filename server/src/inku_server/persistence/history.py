@@ -107,6 +107,41 @@ class HistoryItemReader:
             return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 
+def _neighbor_score(raw: str | None) -> dict:
+    try:
+        score = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return score if isinstance(score, dict) else {}
+
+
+@dataclass(frozen=True)
+class HistoryNeighborCandidateReader:
+    """Load the small candidate projection used by history-neighbor ranking."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    score_decode_fn: Callable[[str | None], dict]
+
+    def list_neighbor_candidates(self, user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
+        """Load only fields used by similarity ranking, avoiding SVG and lineage hydration."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            rows = (
+                session.query(HistoryRow.id, HistoryRow.at, HistoryRow.score)
+                .filter(
+                    access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                    HistoryRow.id != item_id,
+                    HistoryRow.trashed == 0,
+                    HistoryRow.history_visibility == "normal",
+                )
+                .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+                .limit(limit)
+                .all()
+            )
+            return [{"id": row.id, "at": row.at, "score": self.score_decode_fn(row.score)} for row in rows]
+
+
 @dataclass(frozen=True)
 class HistoryListProjector:
     row_to_dict_fn: Callable[[HistoryRow], dict]

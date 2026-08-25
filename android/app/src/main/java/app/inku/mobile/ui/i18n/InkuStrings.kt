@@ -287,6 +287,21 @@ interface InkuStrings {
     val miscSubtitle: String
     val description: String
     val camera: String
+    val cameraOverwriteTitle: String
+    val cameraOverwriteBody: String
+    val cameraOverwriteAction: String
+    val cameraCapturing: String
+    val cameraPreparingImage: String
+    val cameraLoadingLocalModel: String
+    val cameraAnalyzingLocally: String
+    val cameraReadyToEdit: String
+    val cameraCancelled: String
+    val cameraModelNotReady: String
+    val cameraCaptureUnavailable: String
+    val cameraEmptyImage: String
+    val cameraDecodeFailed: String
+    val cameraAnalysisFailed: String
+    val cameraEmptyResult: String
     val menu: String
     val settings: String
     val saijikiTapNote: String

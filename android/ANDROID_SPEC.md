@@ -174,7 +174,7 @@ Implemented:
 - Dark Compose UI in transition from the web-style workbench to a Pixel 9
   mobile-first layout based on the Claude Design prototype:
   - top application header
-  - bottom navigation: Description, Camera, History, Lineage. Description returns to Write; Camera launches the platform still-image camera Intent without receiving a result
+  - bottom navigation: Description, Camera, History, Lineage. Description returns to Write; Camera receives a full-image result and returns an on-device Gemma description to the editor
   - the canvas control strip centers Full screen and puts a right-end menu for the existing Batch and Settings routes; the drawing-settings panel has no Write/Batch segmented mode
   - bounded first-screen canvas card that respects the selected canvas aspect
     while keeping the prompt and DDL path reachable on Pixel 9
@@ -2758,3 +2758,13 @@ The bottom navigation runs left to right as Write, Camera, History, and Lineage.
 On the ordinary canvas control strip, Full screen is centered and a three-line menu sits at the right. Batch opens the existing Batch panel and Settings opens the existing Settings screen. The former Write/Batch segmented controls at the start of the drawing-settings panel are removed, leaving this menu as Batch's single visible entry. Room schema and migrations, persistent ViewModel state, pipeline and rendering, Rust, and Server/Web/shared are unchanged.
 
 On the Pixel 9 running `2.1.4-android.67` Build 148110, the author visually confirmed the bottom-navigation arrangement, that Camera opens the standard camera application, and that the upper-right menu reaches the existing Batch and Settings screens. This device check added no data mutation, capture-result handling, or database write.
+
+## 2026-08-26 Turning a captured image into an editable local-Gemma description (android `2.1.4-android.68`, [I-395])
+
+The bottom Camera action receives Pixel Camera's full-image result through `ActivityResultContracts.TakePicture`. Before capture it confirms replacement of the current description and interpretation. If the downloaded `local-litert-lm:gemma-4-e2b` is not ready, capture does not start and an error points back to Models in Settings. The app adds no Camera or storage permission, CameraX or Camera2 dependency, or automatic model download.
+
+The capture file exists only under the existing FileProvider's restricted `cacheDir/camera/` path. On success, `ImageDecoder` applies orientation while bounding the long edge to 1280 px, then re-encodes at JPEG quality 85 so the bytes passed to local inference retain no original EXIF or location data. Cancellation, empty or undecodable images, analysis failure, recapture, and ViewModel shutdown reclaim temporary files. The next camera initialization removes only inku-owned JPEGs left in that directory. Images, URIs, paths, and EXIF are not stored in Room, history, MediaStore, saved state, or logs.
+
+Image analysis does not widen the text-only `ModelProvider`. The existing `LocalLiteRtLmProvider` implements a `DESCRIPTION`-only `VisionAnalyzer`, sends `Content.ImageBytes` and the JA or EN observation prompt to the same E2B engine in one `Contents`, and serializes text generation, vision analysis, warmup, and close with one inference mutex. The prompt treats text in the image as an observed object rather than an instruction and forbids identifying people, inferring personal attributes, DDL, JSON, or evaluation. Logs are limited to model ID, normalized dimensions, JPEG byte count, phase, elapsed time, and success or failure kind.
+
+After the result, the app returns to Compose Write and distinguishes Preparing image, Loading local model, Analyzing locally, Ready to edit, failure, and cancellation in JA and EN with screen-reader labels. A nonblank result replaces the existing description editor and stops for user editing. The camera job itself never invokes Stage 0.5, Stage 1 or 2, NIM or another remote provider, automatic catalog selection, drawing, saving, lineage, or database writes. One-touch capture-to-SVG, instant-film development effects, and a pop catalog remain follow-up contracts.

@@ -50,11 +50,11 @@ class AppMenuNavigationTest {
     }
 
     @Test
-    fun cameraLaunchesOnlyTheStillImageCameraIntent() {
+    fun cameraUsesAFullImageResultContract() {
         val source = appSource()
-        assertTrue("camera action must use the platform still-image camera intent", source.contains("MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA"))
-        assertFalse("camera capture result handling is outside this skeleton", source.contains("ActivityResultContracts.TakePicture"))
-        assertFalse("camera result imports are outside this skeleton", source.contains("rememberLauncherForActivityResult"))
+        assertFalse("the fire-and-forget camera skeleton must be removed", source.contains("MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA"))
+        assertTrue("camera action must receive a full-image result", source.contains("ActivityResultContracts.TakePicture"))
+        assertTrue("the result contract must be registered by Compose", source.contains("rememberLauncherForActivityResult"))
     }
 
     @Test

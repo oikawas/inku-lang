@@ -23,7 +23,7 @@ services:
       INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # LLM backend wiring for bench parity with bare metal. Values come from the
+      # LLM backend wiring for release Compose verification. Values come from the
       # pentala-local --env-file (never committed).
       INKU_LLM_BACKEND: ${INKU_LLM_BACKEND:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}

@@ -2900,39 +2900,15 @@ def item_position(
 
 
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        row = (
-            session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
-            .first()
-        )
-        if not row:
-            return None
-        row.starred = 1 if starred else 0
-        if note is not None:
-            clean_note = note.strip()[:240]
-            row.note = clean_note or None
-        session.commit()
-        session.refresh(row)
-        return _row_to_dict(row)
+    return _history.HistoryMarkWriter(SessionLocal, _actor_of, _row_to_dict).set_item_starred(
+        user_id, item_id, starred, note
+    )
 
 
 def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dict | None:
-    """Raise or drop the revision mark. Independent of starred: neither reads the other."""
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        row = (
-            session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
-            .first()
-        )
-        if not row:
-            return None
-        row.for_revision = 1 if for_revision else 0
-        session.commit()
-        session.refresh(row)
-        return _row_to_dict(row)
+    return _history.HistoryMarkWriter(SessionLocal, _actor_of, _row_to_dict).set_item_for_revision(
+        user_id, item_id, for_revision
+    )
 
 
 def set_item_for_share(

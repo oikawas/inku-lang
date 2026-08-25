@@ -8017,4 +8017,4 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 
 - **下部navigationを「記述・カメラ・履歴・系譜」に組み替えた。** 記述はWrite modeへ戻り、Batch表示中は選択状態にしない。カメラはAndroid標準の静止画camera Intentを起動するだけで、撮影結果、permission、URI、保存、DB writeは追加しない。
 - **canvas control stripは全画面を中央、横三本線menuを右端に置いた。** menuの「バッチ」は既存Batch panel、「設定」は既存Settingsへ進む。描画設定panel先頭の記述／バッチsegmented buttonsを廃止し、Batchの可視入口をmenuへ一本化した。
-- **検証:** focused fail-firstは旧navigation構造の4件と、Batch中の記述選択境界1件を捉えた。枝先は`AppMenuNavigationTest` 5件と`WordingLintTest` 6件、production Kotlin compile、diff checkがgreen。Room/schema/migration、pipeline/render/Rust、Server/Web/shared、instrumentation、pentalaは変更・実行していない。
+- **検証:** focused fail-firstは旧navigation構造の4件と、Batch中の記述選択境界1件を捉えた。枝先は`AppMenuNavigationTest` 5件と`WordingLintTest` 6件、production Kotlin compile、diff checkがgreen。署名一致とversionCode増加を確認したdebug APKをPixel 9へ`adb install -r`だけでdata-preserving installし、`.67` Build 148110をcold startした。検証済みbackupの展開前後はともにschema 10、history 17、lineage 17、provider settings 7、app settings 4、model assets 2、export templates 3、thumbnail 17で、DB／WAL／SHMは各時点の端末bytesと一致した。Room/schema/migration、pipeline/render/Rust、Server/Web/shared、instrumentation、pentalaは変更・実行していない。

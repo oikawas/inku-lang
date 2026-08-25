@@ -141,6 +141,40 @@ def parse_room_schema(path: Path) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _has_unique_index(table: dict[str, Any], columns: list[str]) -> bool:
+    return any(
+        index.get("unique") and index.get("columnNames") == columns
+        for index in table["indices"]
+    )
+
+
+def _validate_android_self_edge_triggers(path: Path) -> None:
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ContractError(f"cannot read Android Room callback authority: {path}") from exc
+
+    sql_blocks = [
+        re.sub(r"\s+", " ", block.replace("`", "")).strip().upper()
+        for block in re.findall(r'"""(.*?)"""\.trimIndent\(\)', source, re.DOTALL)
+    ]
+    for trigger_name, event in (
+        ("ck_lineage_no_self_edge_insert", "INSERT"),
+        ("ck_lineage_no_self_edge_update", "UPDATE"),
+    ):
+        matching = [block for block in sql_blocks if trigger_name.upper() in block]
+        required = (
+            f"CREATE TRIGGER IF NOT EXISTS {trigger_name.upper()}",
+            f"BEFORE {event} ON LINEAGE_EDGES",
+            "WHEN NEW.PARENT_NODE_ID = NEW.CHILD_NODE_ID",
+            "RAISE(ABORT",
+        )
+        if len(matching) != 1 or any(fragment not in matching[0] for fragment in required):
+            raise ContractError(
+                f"Android Room callback must define the {event} self-edge rejection trigger"
+            )
+
+
 def _logical_fields(contract: dict[str, Any], record_name: str) -> dict[str, dict[str, Any]]:
     try:
         fields = contract["records"][record_name]["fields"]
@@ -363,12 +397,17 @@ def _validate_android(
     ]
     if not render_hash_indices or any(index.get("unique") for index in render_hash_indices):
         raise ContractError("Android render_hash index must exist and remain non-unique")
+    if not _has_unique_index(history, ["lineage_node_id"]):
+        raise ContractError("Android history lineage_node_id must be unique")
+    nodes = tables[host["records"]["lineage_nodes"]["table"]]
+    if not _has_unique_index(nodes, ["history_id"]):
+        raise ContractError("Android lineage node history_id must be unique")
     edges = tables[host["records"]["lineage_edges"]["table"]]
-    if not any(
-        index.get("unique") and index.get("columnNames") == ["child_node_id"]
-        for index in edges["indices"]
-    ):
+    if not _has_unique_index(edges, ["child_node_id"]):
         raise ContractError("Android lineage edge must have one primary parent")
+    _validate_android_self_edge_triggers(
+        root / "android/app/src/main/java/app/inku/mobile/data/db/InkuDatabase.kt"
+    )
     return tables
 
 

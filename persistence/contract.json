@@ -150,7 +150,7 @@
       }
     },
     "android": {
-      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/9.json",
+      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/10.json",
       "records": {
         "history": {
           "table": "history_items",
@@ -186,10 +186,10 @@
       "constraint_coverage": {
         "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "HistoryItemEntity.id"},
         "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "index_history_items_render_hash"},
-        "history.lineage_node_id.unique": {"status": "gap", "mechanism": "none", "authority": "Room v9", "target_stage": "Android reset"},
-        "lineage_nodes.history_id.unique": {"status": "gap", "mechanism": "none", "authority": "Room v9", "target_stage": "Android reset"},
+        "history.lineage_node_id.unique": {"status": "enforced", "mechanism": "database", "authority": "index_history_items_lineage_node_id"},
+        "lineage_nodes.history_id.unique": {"status": "enforced", "mechanism": "database", "authority": "index_lineage_nodes_history_id"},
         "lineage_edges.child_node_id.unique": {"status": "enforced", "mechanism": "database", "authority": "uq_lineage_primary_parent"},
-        "lineage_edges.no_self_edge": {"status": "gap", "mechanism": "none", "authority": "Room v9 and LineagePlanner", "target_stage": "Android reset"},
+        "lineage_edges.no_self_edge": {"status": "enforced", "mechanism": "database", "authority": "ck_lineage_no_self_edge_insert and ck_lineage_no_self_edge_update"},
         "history_lineage.atomic_write": {"status": "enforced", "mechanism": "application_transaction", "authority": "InkuRepository.saveResult"}
       }
     }

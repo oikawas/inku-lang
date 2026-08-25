@@ -38,27 +38,27 @@ Dedicated Android columns are authoritative for `render_seed`, `composition_seed
 - History primary-key collisions are rejected rather than replaced.
 - Persistence does not recalculate `rh3`, `dh1`, Score, or canonical SVG.
 
-## Existing runtime characterization
+## Current runtime ownership
 
-Stage 0 records these existing owners; it does not move them:
+The portable contract records these owners without moving them:
 
 - Server `init_db()` creates metadata, runs `_migrate_columns()`, seeds bootstrap/permission rows, assigns unowned history, and backfills history identity/lineage. Later migration stages must turn the unbounded repair work into named one-shot migrations.
 - Android `InkuRepository.saveResult()` already wraps the history row, lineage node, and optional edge in one `database.withTransaction` block. Thumbnail generation runs after that canonical transaction.
-- Android Room v9 enforces one parent per child, but it does not enforce the two history/node one-to-one keys or reject a self-edge. The normal writer generates a fresh child id, so it does not intentionally create those invalid shapes, but freshness is not a database constraint. `contract.json` records these as gaps for the destructive Android reset rather than overstating the current guarantee.
+- Android Room v10 enforces the history/node one-to-one keys and one parent per child with unique indexes. The fresh-schema callback creates separate INSERT and UPDATE triggers that reject self-edges. The intentional one-time reset discards only Room v1–9 databases before creating this v10 schema; v10 and later databases are not a destructive fallback.
 
 Constraint coverage is host-specific:
 
-| Logical constraint | Server | Android Room v9 |
+| Logical constraint | Server | Android Room v10 |
 |---|---|---|
 | history id collision rejected | database | database |
 | render hash remains non-unique | database | database |
-| history to lineage node is one-to-one | database | gap; Android reset |
-| lineage node to history is one-to-one | database | gap; Android reset |
+| history to lineage node is one-to-one | database | database |
+| lineage node to history is one-to-one | database | database |
 | one primary parent per child | database | database |
-| parent cannot equal child | database | gap; Android reset |
+| parent cannot equal child | database | database |
 | history, node, and edge write atomically | application transaction | application transaction |
 
-The logical reference SQL expresses the target constraints. A host mapping can be current only when every difference is either enforced at its adapter boundary or explicitly recorded as a bounded gap. Stage 0 identifies gaps; it does not change Room v9.
+The logical reference SQL expresses the target constraints. A host mapping is current only when every declared constraint is enforced at its adapter boundary. The current Server and Android Room v10 mappings have no declared constraint gaps.
 
 ## Legacy Server schema fingerprint
 

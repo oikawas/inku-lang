@@ -18,7 +18,7 @@ def test_current_host_definitions_satisfy_the_portable_contract():
 
     assert summary["logical_fields"] == 57
     assert summary["semantic_rules"] == 12
-    assert summary["declared_gaps"] == 3
+    assert summary["declared_gaps"] == 0
     assert summary["server_tables"] >= 3
     assert summary["room_tables"] == 9
 
@@ -30,30 +30,37 @@ def test_physical_names_are_mappings_not_portable_authority():
 
     assert server["table"] == "history"
     assert android["table"] == "history_items"
+    assert contract["hosts"]["android"]["source"] == (
+        "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/10.json"
+    )
     assert server["fields"]["input"]["column"] == "input"
     assert android["fields"]["input"]["column"] == "original_input"
     assert android["fields"]["render_engine_id"]["json_path"] == "$.render_engine_id"
     assert "compose_fallback" not in android["fields"]
 
 
-def test_current_constraint_gaps_are_explicit_and_bounded():
+def test_current_constraints_are_enforced_by_real_host_authorities():
     contract = json.loads((ROOT / "persistence/contract.json").read_text(encoding="utf-8"))
     server = contract["hosts"]["server"]["constraint_coverage"]
     android = contract["hosts"]["android"]["constraint_coverage"]
 
     assert all(item["status"] == "enforced" for item in server.values())
-    assert {
-        key for key, item in android.items() if item["status"] == "gap"
-    } == {
-        "history.lineage_node_id.unique",
-        "lineage_nodes.history_id.unique",
-        "lineage_edges.no_self_edge",
+    assert all(item["status"] == "enforced" for item in android.values())
+    assert android["history.lineage_node_id.unique"] == {
+        "status": "enforced",
+        "mechanism": "database",
+        "authority": "index_history_items_lineage_node_id",
     }
-    assert all(
-        android[key]["target_stage"] == "Android reset"
-        for key in android
-        if android[key]["status"] == "gap"
-    )
+    assert android["lineage_nodes.history_id.unique"] == {
+        "status": "enforced",
+        "mechanism": "database",
+        "authority": "index_lineage_nodes_history_id",
+    }
+    assert android["lineage_edges.no_self_edge"] == {
+        "status": "enforced",
+        "mechanism": "database",
+        "authority": "ck_lineage_no_self_edge_insert and ck_lineage_no_self_edge_update",
+    }
 
 
 def test_schema_fingerprint_is_order_insensitive_and_materially_sensitive():

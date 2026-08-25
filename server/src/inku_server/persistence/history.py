@@ -108,6 +108,51 @@ class HistoryItemReader:
 
 
 @dataclass(frozen=True)
+class HistoryMarkWriter:
+    """Write the two independent, user-owned marks on one history row."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    row_to_dict_fn: Callable[[HistoryRow], dict]
+
+    def set_item_starred(
+        self, user_id: str, item_id: str, starred: bool, note: str | None = None
+    ) -> dict | None:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            row = (
+                session.query(HistoryRow)
+                .filter(access._writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
+                .first()
+            )
+            if not row:
+                return None
+            row.starred = 1 if starred else 0
+            if note is not None:
+                clean_note = note.strip()[:240]
+                row.note = clean_note or None
+            session.commit()
+            session.refresh(row)
+            return self.row_to_dict_fn(row)
+
+    def set_item_for_revision(self, user_id: str, item_id: str, for_revision: bool) -> dict | None:
+        """Raise or drop the revision mark. Independent of starred: neither reads the other."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            row = (
+                session.query(HistoryRow)
+                .filter(access._writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
+                .first()
+            )
+            if not row:
+                return None
+            row.for_revision = 1 if for_revision else 0
+            session.commit()
+            session.refresh(row)
+            return self.row_to_dict_fn(row)
+
+
+@dataclass(frozen=True)
 class HistoryListStateReader:
     session_factory: Callable[[], object]
     actor_of_fn: Callable[[str], dict]

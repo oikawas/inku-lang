@@ -53,12 +53,14 @@ def test_history_item_position_reader_owns_the_exact_query_and_db_is_thin_facade
 
 def test_db_item_position_resolves_owner_dependencies_at_each_call(monkeypatch) -> None:
     calls = []
+    downstream_calls = []
 
     class Reader:
         def __init__(self, session_factory, actor_of_fn) -> None:
             calls.append((session_factory, actor_of_fn))
 
         def item_position(self, *args):
+            downstream_calls.append(args)
             return len(calls)
 
     monkeypatch.setattr(db._history, "HistoryItemPositionReader", Reader)
@@ -71,6 +73,10 @@ def test_db_item_position_resolves_owner_dependencies_at_each_call(monkeypatch) 
     monkeypatch.setattr(db, "_actor_of", second_actor_of)
     assert db.item_position("second", "b", True, True, True, True) == 2
     assert calls == [(first_session_factory, first_actor_of), (second_session_factory, second_actor_of)]
+    assert downstream_calls == [
+        ("first", "a", False, False, False, False),
+        ("second", "b", True, True, True, True),
+    ]
 
 
 def test_history_item_position_preserves_visibility_filters_flags_and_zero_based_order() -> None:

@@ -3137,6 +3137,10 @@ def test_user_management_crud():
     settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "users"}, headers=headers)
     assert settings_r.status_code == 200
     assert settings_r.json()["settings_tab"] == "users"
+    limits_settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "limits"}, headers=headers)
+    assert limits_settings_r.status_code == 200
+    assert limits_settings_r.json()["settings_tab"] == "limits"
+    assert client.get("/api/auth/me", headers=headers).json()["settings_tab"] == "limits"
     bad_settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "connection"}, headers=headers)
     assert bad_settings_r.status_code == 400
 

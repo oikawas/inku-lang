@@ -41,3 +41,11 @@ test('T-1001/T-1003: each Settings responsibility has one focused owner', () => 
 	assert.doesNotMatch(model, /\/api\/plugins|\/api\/users|\/api\/user-groups/);
 	assert.doesNotMatch(user, /\/api\/plugins|\/api\/settings\/(?:status|models)/);
 });
+
+test('I-245: limits is a persisted content tab through the existing guarded path', () => {
+	const navigation = read('./navigation-state.svelte.ts');
+
+	assert.match(navigation, /function isSettingsContentTab[\s\S]*tab === 'limits'/);
+	assert.match(navigation, /function selectSettingsTab[\s\S]*updateUserSettingsTab\(tab\)/);
+	assert.match(navigation, /function openSettings[\s\S]*isSettingsContentTab\(saved\)[\s\S]*canAccessSettingsTab\(candidate\)/);
+});

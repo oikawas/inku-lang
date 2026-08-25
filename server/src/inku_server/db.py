@@ -10,7 +10,7 @@ from contextlib import contextmanager, nullcontext
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import and_, case, func, inspect, or_, select, text
+from sqlalchemy import and_, case, func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -3054,31 +3054,11 @@ def set_item_for_share(
 
 
 def history_render_hashes() -> list[tuple[str, str | None]]:
-    """Every stored work and the render hash of the SVG it holds.
-
-    Unscoped, unlike get_items(): the only caller is the thumbnail rebuild,
-    which the settings screen runs for the whole installation and which returns
-    no work to anybody -- it writes pictures into the derived store, and every
-    read of that store goes back through the ordinary visibility rules.
-    """
-    with SessionLocal() as session:
-        rows = session.execute(select(HistoryRow.id, HistoryRow.render_hash)).all()
-    return [(str(item_id), render_hash) for item_id, render_hash in rows]
+    return _history.HistoryThumbnailSourceReader(SessionLocal).history_render_hashes()
 
 
 def history_svgs(ids: list[str]) -> dict[str, str]:
-    """The stored SVG of each id, for the thumbnail rebuild. Unscoped, as above.
-
-    Taken in batches by the caller: one work's SVG averages about a megabyte,
-    so the whole table at once is the very cost this exists to remove.
-    """
-    if not ids:
-        return {}
-    with SessionLocal() as session:
-        rows = session.execute(
-            select(HistoryRow.id, HistoryRow.svg).where(HistoryRow.id.in_(ids))
-        ).all()
-    return {str(item_id): (svg or "") for item_id, svg in rows}
+    return _history.HistoryThumbnailSourceReader(SessionLocal).history_svgs(ids)
 
 
 def get_items(user_id: str, ids: list[str]) -> list[dict]:

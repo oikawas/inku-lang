@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from .schema import CoerceTraceCatalogRow, HistoryRow, LineageEdgeRow, LineageNodeRow
@@ -36,6 +37,37 @@ LINEAGE_DERIVATION_KINDS = {
     # server did not know the name and the whole save was lost ([I-137]).
     "sketch_grain_change",
 }
+
+
+@dataclass(frozen=True)
+class HistoryThumbnailSourceReader:
+    session_factory: Callable[[], object]
+
+    def history_render_hashes(self) -> list[tuple[str, str | None]]:
+        """Every stored work and the render hash of the SVG it holds.
+
+        Unscoped, unlike get_items(): the only caller is the thumbnail rebuild,
+        which the settings screen runs for the whole installation and which returns
+        no work to anybody -- it writes pictures into the derived store, and every
+        read of that store goes back through the ordinary visibility rules.
+        """
+        with self.session_factory() as session:
+            rows = session.execute(select(HistoryRow.id, HistoryRow.render_hash)).all()
+        return [(str(item_id), render_hash) for item_id, render_hash in rows]
+
+    def history_svgs(self, ids: list[str]) -> dict[str, str]:
+        """The stored SVG of each id, for the thumbnail rebuild. Unscoped, as above.
+
+        Taken in batches by the caller: one work's SVG averages about a megabyte,
+        so the whole table at once is the very cost this exists to remove.
+        """
+        if not ids:
+            return {}
+        with self.session_factory() as session:
+            rows = session.execute(
+                select(HistoryRow.id, HistoryRow.svg).where(HistoryRow.id.in_(ids))
+            ).all()
+        return {str(item_id): (svg or "") for item_id, svg in rows}
 
 
 @dataclass(frozen=True)

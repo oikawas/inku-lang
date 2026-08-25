@@ -3070,30 +3070,15 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
 
 
 def _neighbor_score(raw: str | None) -> dict:
-    try:
-        score = json.loads(raw) if raw else {}
-    except (json.JSONDecodeError, TypeError):
-        return {}
-    return score if isinstance(score, dict) else {}
+    return _history._neighbor_score(raw)
 
 
 def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
-    """Load only fields used by similarity ranking, avoiding SVG and lineage hydration."""
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        rows = (
-            session.query(HistoryRow.id, HistoryRow.at, HistoryRow.score)
-            .filter(
-                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                HistoryRow.id != item_id,
-                HistoryRow.trashed == 0,
-                HistoryRow.history_visibility == "normal",
-            )
-            .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
-            .limit(limit)
-            .all()
-        )
-        return [{"id": row.id, "at": row.at, "score": _neighbor_score(row.score)} for row in rows]
+    return _history.HistoryNeighborCandidateReader(
+        SessionLocal,
+        _actor_of,
+        _history._neighbor_score,
+    ).list_neighbor_candidates(user_id, item_id, limit=limit)
 
 
 def delete_all(user_id: str) -> None:

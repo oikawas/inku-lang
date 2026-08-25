@@ -33,7 +33,11 @@ import ast
 import pathlib
 import re
 
-DB_SOURCE = pathlib.Path(__file__).resolve().parents[1] / "src/inku_server/db.py"
+SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "src/inku_server"
+SOURCES = {
+    "db.py": SOURCE_ROOT / "db.py",
+    "persistence/lineage.py": SOURCE_ROOT / "persistence/lineage.py",
+}
 
 # The four tables a work is made of. Everything the ACL work widens lives here.
 OWNED_TABLES = {"HistoryRow", "LineageNodeRow", "LineageEdgeRow", "OkugakiRow"}
@@ -59,25 +63,40 @@ def _enclosing_function(tree: ast.AST, node: ast.AST) -> str:
     return best
 
 
+def _called_name(node: ast.AST) -> str | None:
+    """A direct or module-attribute function name."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
 def test_owner_filters_go_through_the_visibility_predicates() -> None:
-    source = DB_SOURCE.read_text(encoding="utf-8")
-    tree = ast.parse(source)
+    parsed = {
+        name: (source := path.read_text(encoding="utf-8"), ast.parse(source))
+        for name, path in SOURCES.items()
+    }
 
     # (1) No direct comparison on an owned table's user_id column.
     direct = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
-            continue
-        if not isinstance(node.ops[0], (ast.Eq, ast.NotEq)):
-            continue
-        for side in (node.left, *node.comparators):
-            if (
-                isinstance(side, ast.Attribute)
-                and side.attr == "user_id"
-                and isinstance(side.value, ast.Name)
-                and side.value.id in OWNED_TABLES
-            ):
-                direct.append(f"{_enclosing_function(tree, node)} (db.py:{node.lineno}): {side.value.id}.user_id")
+    for source_name, (_, tree) in parsed.items():
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+                continue
+            if not isinstance(node.ops[0], (ast.Eq, ast.NotEq)):
+                continue
+            for side in (node.left, *node.comparators):
+                if (
+                    isinstance(side, ast.Attribute)
+                    and side.attr == "user_id"
+                    and isinstance(side.value, ast.Name)
+                    and side.value.id in OWNED_TABLES
+                ):
+                    direct.append(
+                        f"{_enclosing_function(tree, node)} "
+                        f"({source_name}:{node.lineno}): {side.value.id}.user_id"
+                    )
     assert not direct, (
         "owner filters that bypass the visibility predicates:\n  " + "\n  ".join(direct)
     )
@@ -85,7 +104,8 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
     # (2) The same test written as `filter_by(user_id=...)` would not appear as a
     # Compare node, so it gets its own check rather than a wider regex above.
     filter_by = [
-        f"db.py:{node.lineno}"
+        f"{source_name}:{node.lineno}"
+        for source_name, (_, tree) in parsed.items()
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
@@ -96,7 +116,8 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
 
     # (3) No owner filter spelled out inside raw SQL.
     raw = [
-        f"db.py:{lineno}"
+        f"{source_name}:{lineno}"
+        for source_name, (source, _) in parsed.items()
         for lineno, line in enumerate(source.splitlines(), start=1)
         if RAW_SQL_OWNER_FILTER.search(line)
     ]
@@ -106,14 +127,15 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
     # this, deleting a filter outright -- rather than bypassing it -- would leave
     # the three checks above green while the rows stopped being scoped at all.
     covered: set[str] = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
-            continue
-        if node.func.id not in PREDICATES or len(node.args) < 2:
-            continue
-        column = node.args[1]
-        if isinstance(column, ast.Attribute) and isinstance(column.value, ast.Name):
-            covered.add(column.value.id)
+    for _, tree in parsed.values():
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if _called_name(node.func) not in PREDICATES or len(node.args) < 2:
+                continue
+            column = node.args[1]
+            if isinstance(column, ast.Attribute) and isinstance(column.value, ast.Name):
+                covered.add(column.value.id)
     assert OWNED_TABLES <= covered, (
         f"tables no longer filtered through a predicate: {sorted(OWNED_TABLES - covered)}"
     )
@@ -122,9 +144,9 @@ def test_owner_filters_go_through_the_visibility_predicates() -> None:
     # full-text search are the only paths a SQLAlchemy expression cannot enter.
     readable_sql_calls = [
         node
+        for _, tree in parsed.values()
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "_readable_sql"
+        and _called_name(node.func) in {"_readable_sql", "_readable_node_sql"}
     ]
     assert readable_sql_calls, "no caller reaches _readable_sql; the raw SQL paths are unscoped"

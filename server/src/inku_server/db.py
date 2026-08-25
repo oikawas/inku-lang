@@ -505,7 +505,7 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
 # is what reaches the picker.
 _BATCH_PROMPT_HISTORY_LIMIT = 50
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
-_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc", "logs"}
+_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc", "logs", "limits"}
 _UI_MODES = {"simple", "full", "custom"}
 _UI_CUSTOM_KEYS = {
     "input_modes", "drawing_settings", "ddl_tools", "detail_status",

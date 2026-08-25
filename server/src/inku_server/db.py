@@ -10,7 +10,7 @@ from contextlib import contextmanager, nullcontext
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import and_, case, func, inspect, or_, text
+from sqlalchemy import case, func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -2894,36 +2894,9 @@ def item_position(
     for_revision: bool = False,
     for_share: bool = False,
 ) -> int | None:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        target = session.query(HistoryRow).filter(
-            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-            HistoryRow.id == item_id,
-            HistoryRow.trashed == (1 if trashed else 0),
-            HistoryRow.history_visibility == "normal",
-        ).first()
-        if target is None or (starred and not target.starred):
-            return None
-        if for_revision and not target.for_revision:
-            return None
-        if for_share and not target.for_share:
-            return None
-        query = session.query(func.count(HistoryRow.id)).filter(
-            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-            HistoryRow.trashed == (1 if trashed else 0),
-            HistoryRow.history_visibility == "normal",
-            or_(
-                HistoryRow.at > target.at,
-                and_(HistoryRow.at == target.at, HistoryRow.id < target.id),
-            ),
-        )
-        if starred:
-            query = query.filter(HistoryRow.starred == 1)
-        if for_revision:
-            query = query.filter(HistoryRow.for_revision == 1)
-        if for_share:
-            query = query.filter(HistoryRow.for_share == 1)
-        return int(query.scalar() or 0)
+    return _history.HistoryItemPositionReader(SessionLocal, _actor_of).item_position(
+        user_id, item_id, trashed, starred, for_revision, for_share
+    )
 
 
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:

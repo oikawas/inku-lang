@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 9,
-    "identityHash": "a9cf23b2c15c0abc67be8cc1bb3b8909",
+    "version": 10,
+    "identityHash": "0f5dcabae426daa980b24a2ecab17309",
     "entities": [
       {
         "tableName": "history_items",
@@ -275,6 +275,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_history_items_starred_trashed_created_at` ON `${TABLE_NAME}` (`starred`, `trashed`, `created_at`)"
+          },
+          {
+            "name": "index_history_items_lineage_node_id",
+            "unique": true,
+            "columnNames": [
+              "lineage_node_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_history_items_lineage_node_id` ON `${TABLE_NAME}` (`lineage_node_id`)"
           }
         ]
       },
@@ -683,7 +692,18 @@
           "columnNames": [
             "id"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_lineage_nodes_history_id",
+            "unique": true,
+            "columnNames": [
+              "history_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_lineage_nodes_history_id` ON `${TABLE_NAME}` (`history_id`)"
+          }
+        ]
       },
       {
         "tableName": "lineage_edges",
@@ -748,7 +768,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9cf23b2c15c0abc67be8cc1bb3b8909')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0f5dcabae426daa980b24a2ecab17309')"
     ]
   }
 }

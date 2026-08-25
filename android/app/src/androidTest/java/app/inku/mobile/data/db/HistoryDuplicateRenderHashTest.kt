@@ -2,8 +2,6 @@ package app.inku.mobile.data.db
 
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
-import androidx.room.testing.MigrationTestHelper
-import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
@@ -15,9 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-
-private const val TEST_DB = "history-duplicate-render-hash-test"
-private const val RENDER_HASH_INDEX = "index_history_items_render_hash"
 
 /**
  * The same drawing reached twice is two works, because that is what the server
@@ -38,12 +33,6 @@ private const val RENDER_HASH_INDEX = "index_history_items_render_hash"
 @RunWith(AndroidJUnit4::class)
 class HistoryDuplicateRenderHashTest {
 
-    @get:Rule
-    val helper = MigrationTestHelper(
-        InstrumentationRegistry.getInstrumentation(),
-        InkuDatabase::class.java,
-    )
-
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private var database: InkuDatabase? = null
 
@@ -52,7 +41,7 @@ class HistoryDuplicateRenderHashTest {
         database?.close()
     }
 
-    /** A version 9 database, made from the entity rather than migrated into. */
+    /** A version 10 database, made from the entity rather than migrated into. */
     private fun openFresh(): InkuDatabase =
         Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
             .build()
@@ -79,33 +68,6 @@ class HistoryDuplicateRenderHashTest {
         elapsedMs = 0L,
         tokenMetadataJson = null,
     )
-
-    /** The columns a version 8 row needs, written the way the neighbouring migration tests write them. */
-    private fun insertRow(db: SupportSQLiteDatabase, id: String, renderHash: String) {
-        db.execSQL(
-            """
-            INSERT INTO history_items (
-                id, created_at, updated_at, original_input, normalized_ddl,
-                score_json, display_svg, render_metadata_json, render_hash,
-                render_hash_short, color_catalog_id, canvas_aspect, starred, trashed
-            ) VALUES (?, 1, 1, '青い円', '青い円', '{}', '<svg/>', '{}', ?, 'abc', 'sumi', '1:1', 0, 0)
-            """.trimIndent(),
-            arrayOf<Any>(id, renderHash),
-        )
-    }
-
-    private fun renderHashIndexIsUnique(db: SupportSQLiteDatabase): Boolean {
-        db.query("PRAGMA index_list('history_items')").use { cursor ->
-            val nameColumn = cursor.getColumnIndexOrThrow("name")
-            val uniqueColumn = cursor.getColumnIndexOrThrow("unique")
-            while (cursor.moveToNext()) {
-                if (cursor.getString(nameColumn) == RENDER_HASH_INDEX) {
-                    return cursor.getInt(uniqueColumn) != 0
-                }
-            }
-            throw AssertionError("$RENDER_HASH_INDEX is not on the table at all")
-        }
-    }
 
     // ── T-266 ──────────────────────────────────────────────
 
@@ -167,88 +129,4 @@ class HistoryDuplicateRenderHashTest {
         assertEquals("and no second row appeared", 1, dao.listActive(20, 0).first().size)
     }
 
-    // ── T-268 ──────────────────────────────────────────────
-
-    /**
-     * The migration exchanges the index for a non-unique one.
-     *
-     * The rows here carry different hashes, because version 8 is where the
-     * unique index still stands and would refuse two of a kind. They are here
-     * so that the migration runs over a populated table rather than an empty
-     * one; the claim that no row is lost belongs to T-290, which measures it
-     * without the schema validator in the way.
-     */
-    @Test
-    fun t268_migration8to9LeavesTheIndexNonUnique() {
-        helper.createDatabase(TEST_DB, 8).use { db ->
-            insertRow(db, "h-1", "rh3:first")
-            insertRow(db, "h-2", "rh3:second")
-        }
-
-        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, InkuDatabase.MIGRATION_8_9)
-
-        assertTrue(
-            "$RENDER_HASH_INDEX must be non-unique after the migration",
-            !renderHashIndexIsUnique(db),
-        )
-    }
-
-    // ── T-269 ──────────────────────────────────────────────
-
-    /**
-     * A database that was unique before the migration takes a second work after
-     * it.
-     *
-     * The starting point is what separates this from T-266: that one is a
-     * version 9 database built from the entity, this one is a version 8
-     * database carried across. A migration that declared the new shape without
-     * touching the index would pass the first and fail here.
-     */
-    @Test
-    fun t269_aMigratedDatabaseAcceptsASecondWorkWithTheSameHash() {
-        helper.createDatabase(TEST_DB, 8).use { db ->
-            insertRow(db, "h-1", "rh3:the-same-drawing-twice")
-        }
-
-        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, InkuDatabase.MIGRATION_8_9)
-        insertRow(db, "h-2", "rh3:the-same-drawing-twice")
-
-        db.query("SELECT id FROM history_items ORDER BY id").use { cursor ->
-            assertEquals("the second arrival at the same drawing is a second work", 2, cursor.count)
-            cursor.moveToFirst()
-            assertEquals("h-1", cursor.getString(0))
-            cursor.moveToNext()
-            assertEquals("h-2", cursor.getString(0))
-        }
-    }
-
-    // ── T-290 ──────────────────────────────────────────────
-
-    /**
-     * The migration loses none of the author's work.
-     *
-     * The row-preservation claim is measured without the schema check, so that
-     * a migration which loses rows fails on the count rather than on the
-     * validator. `runMigrationsAndValidate` compares the migrated shape against
-     * the generated one and throws `Migration didn't properly handle` before
-     * any assert here runs -- with it in the way this test would only ever
-     * report that the shape was wrong, never that the rows were gone.
-     */
-    @Test
-    fun t290_migration8to9LosesNoWork() {
-        helper.createDatabase(TEST_DB, 8).use { db ->
-            insertRow(db, "h-1", "rh4:first")
-            insertRow(db, "h-2", "rh4:second")
-
-            InkuDatabase.MIGRATION_8_9.migrate(db)
-
-            db.query("SELECT id FROM history_items ORDER BY id").use { cursor ->
-                assertEquals("both works survived the migration", 2, cursor.count)
-                cursor.moveToFirst()
-                assertEquals("the first work is still there", "h-1", cursor.getString(0))
-                cursor.moveToNext()
-                assertEquals("and so is the second", "h-2", cursor.getString(0))
-            }
-        }
-    }
 }

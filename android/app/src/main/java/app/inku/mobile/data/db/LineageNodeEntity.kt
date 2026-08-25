@@ -2,9 +2,13 @@ package app.inku.mobile.data.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "lineage_nodes")
+@Entity(
+    tableName = "lineage_nodes",
+    indices = [Index(value = ["history_id"], unique = true)],
+)
 data class LineageNodeEntity(
     @PrimaryKey
     val id: String,

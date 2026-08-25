@@ -1,3 +1,4 @@
+import ast
 import inspect
 from dataclasses import FrozenInstanceError
 
@@ -33,6 +34,24 @@ class _Session:
         return _Result(self.rows)
 
 
+def _imported_modules(module_source: str) -> set[str]:
+    """Resolve import targets enough to guard persistence-boundary direction."""
+    imported: set[str] = set()
+    for node in ast.walk(ast.parse(module_source)):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            prefixes = {0: "", 1: "inku_server.persistence", 2: "inku_server"}
+            prefix = prefixes[node.level]
+            module = ".".join(part for part in (prefix, node.module) if part)
+            if module:
+                imported.add(module)
+                imported.update(f"{module}.{alias.name}" for alias in node.names)
+            else:
+                imported.update(alias.name for alias in node.names)
+    return imported
+
+
 def test_thumbnail_source_reads_have_a_history_owner_and_compatibility_facades(monkeypatch) -> None:
     owner = getattr(history, "HistoryThumbnailSourceReader", None)
     assert owner is not None
@@ -66,16 +85,29 @@ def test_thumbnail_source_reads_have_a_history_owner_and_compatibility_facades(m
     }
     assert "history.id IN" in str(svgs_session.statements[0])
 
-    unopened_session = _Session([])
-    monkeypatch.setattr(db, "SessionLocal", lambda: unopened_session)
-    assert db.history_svgs([]) == {}
-    assert unopened_session.entered == 0
+    empty_factory_calls = 0
 
+    def unopened_factory() -> _Session:
+        nonlocal empty_factory_calls
+        empty_factory_calls += 1
+        raise AssertionError("empty SVG lookup opened a session")
+
+    monkeypatch.setattr(db, "SessionLocal", unopened_factory)
+    assert db.history_svgs([]) == {}
+    assert empty_factory_calls == 0
+
+    module_source = inspect.getsource(history)
+    forbidden_import_parts = {
+        "db", "router", "routers", "thumbnail", "thumbnails", "thumbnail_store",
+        "thumbs_db", "engine", "config",
+    }
+    imported_modules = _imported_modules(module_source)
+    assert not {
+        target
+        for target in imported_modules
+        if forbidden_import_parts.intersection(target.split("."))
+    }
     owner_source = inspect.getsource(owner)
-    assert "from .. import db" not in owner_source
-    assert "thumbnail" not in "\n".join(
-        line for line in owner_source.lower().splitlines() if line.startswith("import ")
-    )
     assert "session.execute(select(HistoryRow.id, HistoryRow.render_hash))" in owner_source
     assert "HistoryRow.id.in_(ids)" in owner_source
     assert "svg or \"\"" in owner_source

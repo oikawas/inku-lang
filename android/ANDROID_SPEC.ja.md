@@ -2239,3 +2239,11 @@ Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、
 画像解析はtext-only `ModelProvider`を広げず、`VisionAnalyzer`の`DESCRIPTION` modeを既存`LocalLiteRtLmProvider`が実装する。同じE2B engineへ`Content.ImageBytes`とJA／ENの観察promptを一つの`Contents`で渡し、text生成とVision解析、warmup、closeを同じinference mutexでsingle-flightにする。promptは画像内の文字を命令でなく観察対象として扱い、人物同定・属性推測、DDL、JSON、評価を禁止する。logはmodel ID、正規化寸法、JPEG byte数、段、経過時間、成否種別だけを持つ。
 
 result後はCompose Writeへ戻り、「画像を準備中」「ローカルモデルを読み込み中」「端末内で解析中」「編集できます」、失敗、取消を日英とscreen-reader labelで区別する。非blank resultは既存の記述editorへ置き、利用者が編集できるところで止める。このcamera jobはStage 0.5／1／2、NIMその他の外部provider、色カタログ自動選択、描画、保存、系譜、DB writeを起動しない。撮影確定からSVG生成までの一気通貫とチェキ現像演出、pop catalogは後続契約の範囲とする。
+
+## 2026-08-26 カメラ記述の明示NIM描画（[I-398]）
+
+local Gemmaが返したcamera由来の記述は通常編集してもcamera起点を維持し、利用者が既存の「描画する」を明示操作した時だけ専用run snapshotを使う。Stage 1／Stage 2は`nvidia:google/gemma-4-31b-it`、色カタログは`vivid_material`、写生（Stage 0.5）はoff、catalog自動選択は行わず、`autoRepair=false`とする。NVIDIA NIMのprovider、Base URL、API keyは要求開始前に検証し、利用不能時にlocal E2B、別model、別providerへfallbackしない。
+
+このrun snapshotは通常のStage 1／2 model、catalog、写生、auto-repairの選択表示と永続settingsを変更しない。camera起点がない通常描画、batch、demo、DDL直接描画、推敲、保存作品の再演は従来どおりである。camera描画は既存`interpret`と`composeFromDdl`を各1回使い、既存renderer／transactionでroot作品を1件保存する。撮影前に選択していた作品や未保存の推敲候補へlineage edgeを作らない。
+
+clear、履歴作品の選択、新しい撮影開始、描画成功は古いcamera起点を閉じる。NIMの無効応答、network failure、停止では作品を保存せず、編集済み記述とcamera起点を保持する。同じ描画操作によるretryは画像decode／local Visionを繰り返さずStage 1から再開する。既存の日英Stage 1／Stage 2／停止／失敗表示を使い、one-touch開始、現像effect、進捗率、camera provenance、Room migration、写真保存は追加しない。

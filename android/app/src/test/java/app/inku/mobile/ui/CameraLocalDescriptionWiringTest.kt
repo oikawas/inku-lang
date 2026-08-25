@@ -47,4 +47,50 @@ class CameraLocalDescriptionWiringTest {
         assertFalse(cameraBoundary.contains("composeFromDdl("))
         assertFalse(cameraBoundary.contains("saveHistory("))
     }
+
+    @Test
+    fun cameraOriginOwnsOnlyTheExplicitDrawSnapshot() {
+        val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
+        val draw = section(viewModel, "fun draw()", "fun cancelDdlOverwrite()")
+        val submit = section(viewModel, "private fun runSubmit", "fun drawFromDdl()")
+
+        assertTrue(draw.contains("CameraNimDrawRouting.forState(current.cameraCaptureState)"))
+        assertTrue(draw.contains("validateModelsForRun(current, route)"))
+        assertTrue(draw.contains("runSubmit(current, route)"))
+        assertTrue(submit.contains("route?.stage1ModelId ?: current.selectedModelId"))
+        assertTrue(submit.contains("route?.stage2ModelId ?: current.selectedStage2ModelId"))
+        assertTrue(submit.contains("route?.catalogId ?:"))
+        assertTrue(submit.contains("route?.autoRepair ?: current.ddlAutoRepairEnabled"))
+        assertTrue(submit.contains("if (route == null) describeLineage(current) else LineageDeclaration()"))
+        assertTrue(submit.contains("if (route == null) describeSketchInput(current) else SketchInput()"))
+        assertFalse("camera snapshot must not persist or mutate normal selections", submit.contains("persistSetting("))
+        listOf("selectedModelId", "selectedStage2ModelId", "selectedCatalogId", "sketchMode").forEach { field ->
+            assertFalse("$field must not be assigned", Regex("$field\\s*=(?!=)").containsMatchIn(submit))
+        }
+    }
+
+    @Test
+    fun cameraOriginLifecyclePreservesRetryAndClearsAtExplicitBoundaries() {
+        val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
+        val setPrompt = section(viewModel, "fun setPrompt", "fun requestCameraCapture()")
+        val clearPrompt = section(viewModel, "fun clearPrompt()", "fun setDdl")
+        val history = section(viewModel, "private fun applyHistorySelection", "fun selectHistory(item: HistoryListItem)")
+        val submit = section(viewModel, "private fun runSubmit", "fun drawFromDdl()")
+        val success = section(submit, ".onSuccess", ".onFailure")
+        val failure = submit.substring(submit.indexOf(".onFailure"))
+
+        assertFalse("ordinary edits preserve camera origin", setPrompt.contains("cameraCaptureState ="))
+        assertTrue(clearPrompt.contains("cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin()"))
+        assertTrue(history.contains("cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin()"))
+        assertTrue(success.contains("cameraCaptureState = if (route != null) CameraCaptureState.Idle"))
+        assertFalse("failure must preserve camera origin for retry", failure.contains("cameraCaptureState ="))
+    }
+
+    private fun section(source: String, start: String, end: String): String {
+        val from = source.indexOf(start)
+        assertTrue("missing source section beginning $start", from >= 0)
+        val until = source.indexOf(end, from + start.length)
+        assertTrue("missing source section ending $end", until > from)
+        return source.substring(from, until)
+    }
 }

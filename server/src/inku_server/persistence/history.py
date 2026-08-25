@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from . import access
@@ -148,6 +148,52 @@ class HistoryListStateReader:
             if newest is None:
                 return int(total), None, None
             return int(total), int(newest.at), str(newest.id)
+
+
+@dataclass(frozen=True)
+class HistoryItemPositionReader:
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+
+    def item_position(
+        self,
+        user_id: str,
+        item_id: str,
+        trashed: bool = False,
+        starred: bool = False,
+        for_revision: bool = False,
+        for_share: bool = False,
+    ) -> int | None:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            target = session.query(HistoryRow).filter(
+                access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                HistoryRow.id == item_id,
+                HistoryRow.trashed == (1 if trashed else 0),
+                HistoryRow.history_visibility == "normal",
+            ).first()
+            if target is None or (starred and not target.starred):
+                return None
+            if for_revision and not target.for_revision:
+                return None
+            if for_share and not target.for_share:
+                return None
+            query = session.query(func.count(HistoryRow.id)).filter(
+                access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                HistoryRow.trashed == (1 if trashed else 0),
+                HistoryRow.history_visibility == "normal",
+                or_(
+                    HistoryRow.at > target.at,
+                    and_(HistoryRow.at == target.at, HistoryRow.id < target.id),
+                ),
+            )
+            if starred:
+                query = query.filter(HistoryRow.starred == 1)
+            if for_revision:
+                query = query.filter(HistoryRow.for_revision == 1)
+            if for_share:
+                query = query.filter(HistoryRow.for_share == 1)
+            return int(query.scalar() or 0)
 
 
 def _neighbor_score(raw: str | None) -> dict:

@@ -42,7 +42,7 @@ def _row(item_id: str, at: int, score: str | None, **kwargs) -> HistoryRow:
 
 
 def test_neighbor_candidates_owner_and_facades_keep_their_boundaries(monkeypatch) -> None:
-    assert inspect.signature(db._neighbor_score) == inspect.signature(history._neighbor_score)
+    assert str(inspect.signature(db._neighbor_score)) == "(raw: 'str | None') -> 'dict'"
     assert str(inspect.signature(db.list_neighbor_candidates)) == "(user_id: 'str', item_id: 'str', *, limit: 'int' = 10000) -> 'list[dict]'"
     assert getattr(history.HistoryNeighborCandidateReader, "__dataclass_params__").frozen
     owner_source = inspect.getsource(history.HistoryNeighborCandidateReader.list_neighbor_candidates)
@@ -84,17 +84,30 @@ def test_neighbor_candidates_owner_and_facades_keep_their_boundaries(monkeypatch
         and node.func.attr == "_readable_by"
     ]
     assert len(readable_calls) == 1
+    query_call = next(
+        node for node in calls
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "query"
+    )
+    assert [ast.unparse(column) for column in query_call.args] == [
+        "HistoryRow.id",
+        "HistoryRow.at",
+        "HistoryRow.score",
+    ]
     assert "HistoryRow.svg" not in owner_source
     assert "HistoryRow.lineage_" not in owner_source
 
     history_tree = ast.parse(Path(history.__file__).read_text(encoding="utf-8"))
-    imported = {
-        alias.name
+    imported_parts = {
+        part
         for node in ast.walk(history_tree)
         if isinstance(node, (ast.Import, ast.ImportFrom))
-        for alias in node.names
+        for imported in ([node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+        + [alias.name for alias in node.names]
+        for part in imported.split(".")
     }
-    assert not {"db", "router", "search", "lineage"} & imported
+    assert not {
+        "api_core", "config", "db", "engine", "lineage", "render", "render_engines", "router", "search",
+    } & imported_parts
 
     db_owner_source = inspect.getsource(db.list_neighbor_candidates)
     assert "session.query" not in db_owner_source
@@ -110,6 +123,19 @@ def test_neighbor_candidates_owner_and_facades_keep_their_boundaries(monkeypatch
     assert router_body.count("_db.get_items") == 2
     assert "composition_distance" in router_body
     assert "[:3]" in router_body
+    ranked_assignment = next(
+        node for node in router_function.body
+        if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "ranked" for target in node.targets)
+    )
+    assert isinstance(ranked_assignment.value, ast.Subscript)
+    assert isinstance(ranked_assignment.value.value, ast.Call)
+    key_lambda = next(
+        keyword.value for keyword in ranked_assignment.value.value.keywords
+        if keyword.arg == "key" and isinstance(keyword.value, ast.Lambda)
+    )
+    assert isinstance(key_lambda.body, ast.Tuple)
+    assert isinstance(key_lambda.body.elts[1], ast.UnaryOp)
+    assert isinstance(key_lambda.body.elts[1].op, ast.USub)
 
 
 def test_neighbor_candidates_filter_order_limit_and_score_fallbacks() -> None:
@@ -143,4 +169,5 @@ def test_neighbor_score_keeps_all_original_fallbacks() -> None:
     assert history._neighbor_score("") == {}
     assert history._neighbor_score("not-json") == {}
     assert history._neighbor_score(None) == {}
+    assert history._neighbor_score(1) == {}  # type: ignore[arg-type]
     assert history._neighbor_score("[]") == {}

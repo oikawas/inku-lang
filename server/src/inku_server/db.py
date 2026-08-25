@@ -35,7 +35,6 @@ from .persistence.legacy_schema import (
     USER_ACCOUNT_COLUMN_MIGRATIONS as _USER_ACCOUNT_COLUMN_MIGRATIONS,
 )
 from .persistence.schema import (
-    AppSettingRow,
     Base,
     CoerceTraceCatalogRow,
     ExternalIdentityRow,
@@ -54,6 +53,7 @@ from .persistence.schema import (
 from .persistence.migrations import MigrationExecutionError, ensure_current_schema, install_history_fts
 from .persistence import search as _history_search
 from .persistence.search import HistorySearchService as _HistorySearchService
+from .persistence.settings import AppSettingsStore
 
 _SESSION_MAX_AGE_SECONDS = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
 
@@ -1748,29 +1748,16 @@ def _sqlite_db_path() -> Path | None:
     return Path(database).expanduser()
 
 
+def _app_settings_store() -> AppSettingsStore:
+    return AppSettingsStore(SessionLocal, _now_ms)
+
+
 def _read_app_setting(key: str) -> dict | None:
-    with SessionLocal() as session:
-        row = session.get(AppSettingRow, key)
-        if not row:
-            return None
-        try:
-            value = json.loads(row.value or "{}")
-        except json.JSONDecodeError:
-            return None
-        return value if isinstance(value, dict) else None
+    return _app_settings_store().read(key)
 
 
 def _write_app_setting(key: str, value: dict) -> dict:
-    with SessionLocal() as session:
-        row = session.get(AppSettingRow, key)
-        if row:
-            row.value = json.dumps(value, ensure_ascii=False)
-            row.at = _now_ms()
-        else:
-            row = AppSettingRow(key=key, value=json.dumps(value, ensure_ascii=False), at=_now_ms())
-            session.add(row)
-        session.commit()
-        return value
+    return _app_settings_store().write(key, value)
 
 
 def _backup_service() -> _BackupService:

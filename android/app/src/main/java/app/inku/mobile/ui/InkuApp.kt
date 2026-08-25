@@ -171,6 +171,7 @@ import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
@@ -893,6 +894,7 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
+    val autoSelected = state.selectedCatalogId == CatalogSelection.AUTO_ID
     val current = ColorCatalogs.get(state.selectedCatalogId)
     AlertDialog(
         onDismissRequest = viewModel::confirmCatalogSelection,
@@ -902,6 +904,23 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                 modifier = Modifier.fillMaxWidth().height(Dimens.colorCatalogDialogHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { viewModel.setCatalog(CatalogSelection.AUTO_ID) },
+                    shape = RoundedCornerShape(Dimens.radiusCard),
+                    color = if (autoSelected) ActiveRowTint else MaterialTheme.colorScheme.surface,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Dimens.spaceM),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(S.colorCatalogAuto, style = MaterialTheme.typography.bodySmall)
+                            Text(S.colorCatalogAutoDescription, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (autoSelected) Text("✓", color = MaterialTheme.colorScheme.secondary)
+                    }
+                }
                 ColorCatalogs.all.forEach { catalog ->
                     val active = catalog.id == state.selectedCatalogId
                     Surface(
@@ -923,17 +942,22 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                         }
                     }
                 }
-                SettingsSectionHeader(current.name.uppercase(), S.catalogDetail)
-                current.map.forEach { (name, code) ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                        Box(
-                            modifier = Modifier
-                                .size(Dimens.swatchSize)
-                                .background(parseColor(code), RoundedCornerShape(100))
-                                .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(100)),
-                        )
-                        Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        Text(code, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (autoSelected) {
+                    SettingsSectionHeader(S.colorCatalogAuto.uppercase(), S.catalogDetail)
+                    Text(S.colorCatalogAutoDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    SettingsSectionHeader(current.name.uppercase(), S.catalogDetail)
+                    current.map.forEach { (name, code) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(Dimens.swatchSize)
+                                    .background(parseColor(code), RoundedCornerShape(100))
+                                    .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(100)),
+                            )
+                            Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            Text(code, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -1703,7 +1727,6 @@ private fun CanvasHeroCard(
                     selectedId = item?.id,
                     enabled = !state.isRunning,
                     onSelect = viewModel::selectHistory,
-                    onToggleStar = viewModel::toggleStar,
                 )
             }
             // Under the canvas: on the left the ways of looking at the same work,
@@ -2106,6 +2129,13 @@ private fun NumberedBatchTextField(
                                 }
                             },
                     )
+                    if (enabled && line.isEmpty()) {
+                        TextButton(
+                            onClick = { onValueChange(removeBatchEditorLine(lines, index)) },
+                        ) {
+                            Text(S.delete)
+                        }
+                    }
                 }
             }
             if (lineCount < 6) {
@@ -2115,16 +2145,23 @@ private fun NumberedBatchTextField(
     }
 }
 
-private fun splitBatchEditorLines(value: String): List<String> {
+internal fun splitBatchEditorLines(value: String): List<String> {
     if (value.isEmpty()) return listOf("")
-    return value.split('\n')
+    return value.replace("\r\n", "\n").replace('\r', '\n').split('\n')
 }
 
-private fun replaceBatchEditorLine(lines: List<String>, index: Int, edited: String): String {
+internal fun replaceBatchEditorLine(lines: List<String>, index: Int, edited: String): String {
     val replacement = edited.replace("\r\n", "\n").replace('\r', '\n').split('\n')
     val next = lines.toMutableList()
     next.removeAt(index)
     next.addAll(index, replacement)
+    return next.joinToString("\n")
+}
+
+internal fun removeBatchEditorLine(lines: List<String>, index: Int): String {
+    if (lines.size <= 1) return lines.singleOrNull().orEmpty()
+    val next = lines.toMutableList()
+    next.removeAt(index)
     return next.joinToString("\n")
 }
 
@@ -2330,17 +2367,6 @@ internal fun historyStripModelTooltipText(
     return lines.joinToString("\n")
 }
 
-internal data class HistoryStripStarControl(
-    val symbol: String,
-    val enabled: Boolean,
-)
-
-internal fun historyStripStarControl(starred: Boolean, stripEnabled: Boolean): HistoryStripStarControl =
-    HistoryStripStarControl(
-        symbol = if (starred) "★" else "☆",
-        enabled = stripEnabled,
-    )
-
 internal fun historyGridStarSymbol(starred: Boolean): String = if (starred) "★" else "☆"
 
 /** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
@@ -2351,7 +2377,6 @@ private fun HistoryThumbnailStrip(
     selectedId: String?,
     enabled: Boolean,
     onSelect: (HistoryListItem) -> Unit,
-    onToggleStar: (HistoryListItem) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val selectedIndex = remember(history, selectedId) {
@@ -2368,7 +2393,6 @@ private fun HistoryThumbnailStrip(
         items(history, key = { it.id }) { historyItem ->
             val selected = historyItem.id == selectedId
             val modelLabel = historyStripModelLabel(historyItem.stage1Model)
-            val starControl = historyStripStarControl(historyItem.starred, enabled)
             Column(
                 modifier = Modifier.width(Dimens.buttonHeightLarge),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -2389,12 +2413,6 @@ private fun HistoryThumbnailStrip(
                     ) {
                         HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
                     }
-                    HistoryBadge(
-                        text = starControl.symbol,
-                        selected = historyItem.starred,
-                        onClick = if (starControl.enabled) ({ onToggleStar(historyItem) }) else null,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs),
-                    )
                 }
                 modelLabel?.let {
                     val tooltipText = historyStripModelTooltipText(
@@ -4530,8 +4548,10 @@ private fun selectedModelLabel(state: InkuUiState): String {
         ?: state.selectedModelId.substringAfterLast(":")
 }
 
+@Composable
 private fun shortCatalogLabel(state: InkuUiState): String {
-    return ColorCatalogs.get(state.selectedCatalogId).name.compactLabel(12)
+    val label = if (state.selectedCatalogId == CatalogSelection.AUTO_ID) S.colorCatalogAuto else ColorCatalogs.get(state.selectedCatalogId).name
+    return label.compactLabel(12)
 }
 
 private fun shortModelLabel(state: InkuUiState): String {
@@ -5565,7 +5585,8 @@ private fun MetaPanel(
     catalogIdOverride: String? = null,
     canvasAspectOverride: String? = null,
 ) {
-    val catalogName = ColorCatalogs.get(catalogIdOverride ?: state.selectedCatalogId).name
+    val catalogId = catalogIdOverride ?: state.selectedCatalogId
+    val catalogName = if (catalogId == CatalogSelection.AUTO_ID) S.colorCatalogAuto else ColorCatalogs.get(catalogId).name
     val canvasAspect = canvasLabelFor(canvasAspectOverride ?: state.selectedCanvasAspect)
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {

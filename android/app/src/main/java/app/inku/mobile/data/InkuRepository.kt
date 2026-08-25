@@ -17,6 +17,7 @@ import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.LineagePlanner
+import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.refinement.RefinementParent
@@ -486,6 +487,17 @@ class InkuRepository(
             .firstOrNull { it.isNotBlank() }
             ?: inkuError { it.demoPromptGenerationEmpty }
     }
+
+    suspend fun selectCatalogId(
+        selectedCatalogId: String,
+        sourceText: String,
+        stage1ModelId: String,
+    ): String = CatalogSelection.resolveCatalogIdForRun(
+        selectedCatalogId = selectedCatalogId,
+        sourceText = sourceText,
+        stage1ModelId = stage1ModelId,
+        modelProvider = activeModelProvider,
+    )
 
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()

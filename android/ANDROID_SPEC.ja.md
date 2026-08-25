@@ -154,7 +154,7 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   - star / unstar
   - soft trash
   - Android `FileProvider` 経由の JSON share export
-- Compose画面のキャンバス直下に履歴thumbnail stripを持つ。選択、Star／解除、Stage 1 / 2モデル、
+- Compose画面のキャンバス直下に履歴thumbnail stripを持つ。選択、Stage 1 / 2モデル、
   保存日時、色カタログID、作品hash、canvasを、保存済み履歴値だけから表示する。
 - 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと変奏、色カタログと色map、
   canvas、render hash / engine、作成日時、処理時間を読み取り専用で表示する。
@@ -380,7 +380,7 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `SaijikiDrawer.svelte` | Android では inline Saijiki panel が mobile equivalent。drawer layout は使わない。 |
 | `CanvasPanel.svelte` | artwork/prompt/score tabs、star、hash copy、render metadata、zoom/pan controls、SVG share、PNG share として移植。 |
 | `OutputTabsContent.svelte` | saved Room history item からの prompt / JSON views として移植。 |
-| `HistoryStrip.svelte` | Compose画面のキャンバス直下へthumbnail stripとして移植。選択、Star、モデル名と保存済みmetadataのtooltipを持ち、履歴gridも別入口として維持する。 |
+| `HistoryStrip.svelte` | Compose画面のキャンバス直下へthumbnail stripとして移植。選択、モデル名と保存済みmetadataのtooltipを持ち、Star操作を持つ履歴gridも別入口として維持する。 |
 | `HistoryManager.svelte` | thumbnails/list modes、search、starred filter、selection、trash、restore、permanent delete として移植。 |
 | `HistoryThumbnail.svelte` | history tiles / list rows の `ArtworkPreview` 経由で移植。 |
 | `ConfirmDialog.svelte` | DDL overwrite と destructive history operations に移植。Non-history destructive settings confirmations は parity test backlog。 |
@@ -733,7 +733,10 @@ Android 版では、server/web 版 `InputPanel` と `ColorCatalogModal` に合�
 - server/web 版には独立した「色カタログ」設定タブはない。
 - `設定 > 色カタログ` は廃止する。
 - 色カタログ選択ダイアログは維持し、記述 / 描画画面の色カタログボタンから開く。
-- `color_catalog` の保存、履歴 DB、render metadata、JSON 表示、render hash の扱いは変更しない。
+- 固定13カタログの先頭に「記述から自動選択」を置く。autoは設定`color_catalog`へ保存・復元するが、履歴には描画時に解決した実カタログIDだけを保存する。
+- autoは通常描画ごと、バッチ各行ごと、デモ各回ごとに、選択中のStage 1モデルへ記述を追加で1回送り、serverと同じcard、temperature 0.3、最大200 tokenで実IDを選ぶ。JSONを先に、次に本文中の既知IDを読み、空・例外・未知IDは`default`へ落とす。
+- 写生層が出力した文があれば通常描画の選択入力にはその文を使う。固定選択、DDL直接描画、保存作品の再演、推敲では追加の選択呼び出しをしない。NIM APIは無料だが、NIM以外の外部providerでは利用料金が発生し得る。
+- Room schema、render metadata形式、JSON表示、render hash、既存13カタログのrender map／色コードは変更しない。
 - 履歴選択時に履歴の色カタログを反映するかどうかの設定は、server/web 版と同じく表示設定側に残す。
 
 ## 2026-05-08 モデル設定パネルの接続先 UI
@@ -2210,3 +2213,11 @@ Score 0.1.0、DDL Engine 20、Room schema、保存形式、`rh3`、app version/b
 launcher iconは旧brush／eye意匠を退役し、Web `favicon-192.png`と同じ黒・灰・赤・緑・青のpixel-grid markへ統一した。adaptive iconは透明foregroundとWeb light background `#f5f3ef`を使い、legacy／roundの5 densityも同じmarkを使う。
 
 Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、suspended=falseを確認した。launcher resolverは`app.inku.mobile/.MainActivity`を返し、cold startは成功した。Pixel Launcherのapp一覧でも`inku` labelと新しいpixel-grid iconを確認した。uninstall、data clear、instrumentationは行っていない。
+
+## 2026-08-25 記述UIの履歴・バッチ空行・色カタログ自動選択（[I-382]）
+
+通常Compose画面の履歴thumbnail stripからStar表示と操作を外した。作品選択、選択枠、scroll、Stage 1短縮名と保存済みStage 1／2モデル・日時・色カタログID・hash・canvasのtooltipは維持する。履歴grid、系譜card、生成情報、Star保存とfilterは変更しない。
+
+行別batch editorは空行にだけ明示的な削除controlを表示し、その行と区切り改行を一緒に除去する。非空行の編集、貼り付け時の改行、CRLF正規化、単一空editorは維持する。
+
+色カタログdialogの固定13件より上に「記述から自動選択」を追加した。autoは選択中のStage 1モデルを使う独立した選択呼び出しであり、fixed、DDL直接描画、保存作品の再演、推敲には追加呼び出しを行わない。履歴へ保存するのは解決済み実IDだけで、Room/schema/migration、pipeline/render/Rust、既存palette code/mapは変更していない。

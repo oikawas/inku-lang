@@ -357,6 +357,8 @@ object InkuStringsEn : InkuStrings {
     override val svgEditableNote = "Carries the editing metadata and ids"
     override val renderExpressionSubtitle = "Letting the stroke off its rules"
     override val colorCatalog = "Color catalog"
+    override val colorCatalogAuto = "Choose from description"
+    override val colorCatalogAutoDescription = "Reads each description and chooses a matching color catalog."
     override val uiModeTitle = "Layout"
     override val svgDisplay = "Display SVG"
     override val demoInterval = "Interval"

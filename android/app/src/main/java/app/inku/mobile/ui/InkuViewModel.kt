@@ -496,8 +496,9 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun setCatalog(id: String) {
-        localState.value = localState.value.copy(selectedCatalogId = ColorCatalogs.get(id).id)
-        persistSetting("color_catalog", JSONObject().put("value", ColorCatalogs.get(id).id).toString())
+        val selectionId = CatalogSelection.normalizedSelectionId(id)
+        localState.value = localState.value.copy(selectedCatalogId = selectionId)
+        persistSetting("color_catalog", JSONObject().put("value", selectionId).toString())
     }
 
     fun setCanvasAspect(id: String) {
@@ -1162,11 +1163,24 @@ class InkuViewModel @JvmOverloads constructor(
                     ddlEditedAfterGeneration = false,
                     message = strings().statusStage2,
                 )
+                val catalogId = if (sketchRequest.text != null) {
+                    CatalogSelection.resolvedCatalogIdForRun(
+                        if (current.selectedCatalogId == CatalogSelection.AUTO_ID) "default" else current.selectedCatalogId,
+                    )
+                } else {
+                    withContext(Dispatchers.IO) {
+                        repository.selectCatalogId(
+                            current.selectedCatalogId,
+                            interpreted.sketchText ?: current.prompt,
+                            current.selectedModelId,
+                        )
+                    }
+                }
                 withContext(Dispatchers.IO) {
                     repository.composeFromDdl(
                         current.prompt,
                         interpreted.ddlForDisplay,
-                        CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId),
+                        catalogId,
                         current.selectedCanvasAspect,
                         current.selectedModelId,
                         current.selectedStage2ModelId,
@@ -1299,7 +1313,13 @@ class InkuViewModel @JvmOverloads constructor(
                     message = strings().batchRunning(index + 1, lines.size),
                 )
                 runCatching {
-                    val catalogId = CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId)
+                    val catalogId = withContext(Dispatchers.IO) {
+                        repository.selectCatalogId(
+                            current.selectedCatalogId,
+                            prompt,
+                            current.selectedModelId,
+                        )
+                    }
                     withContext(Dispatchers.IO) {
                         repository.paint(
                             description = prompt,
@@ -1413,7 +1433,13 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
                     if (!isCurrentDrawingRun(runId)) return@launch
-                    val catalogId = CatalogSelection.resolvedCatalogIdForRun(cycle.selectedCatalogId)
+                    val catalogId = withContext(Dispatchers.IO) {
+                        repository.selectCatalogId(
+                            cycle.selectedCatalogId,
+                            prompt,
+                            cycle.selectedModelId,
+                        )
+                    }
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,
@@ -2213,7 +2239,7 @@ class InkuViewModel @JvmOverloads constructor(
             ?: settings["include_thinking"]?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking
         localState.value = current.copy(
-            selectedCatalogId = ColorCatalogs.get(catalog).id,
+            selectedCatalogId = CatalogSelection.normalizedSelectionId(catalog),
             selectedCanvasAspect = CanvasAspects.normalize(canvas),
             canvasAspectPluginEnabled = canvasPlugin,
             pngAlphaWhite = pngAlpha,

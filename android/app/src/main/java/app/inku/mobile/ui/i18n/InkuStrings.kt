@@ -275,6 +275,8 @@ interface InkuStrings {
     val svgEditableNote: String
     val renderExpressionSubtitle: String
     val colorCatalog: String
+    val colorCatalogAuto: String
+    val colorCatalogAutoDescription: String
     val uiModeTitle: String
     val svgDisplay: String
     val demoInterval: String

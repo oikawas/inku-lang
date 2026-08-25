@@ -755,7 +755,7 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
         raise CliError("analyze --replay requires resvg-py") from exc
     with Image.open(buffer) as image:
         image = image.convert("L").resize((cells, cells))
-        pixels = list(image.getdata())
+        pixels = list(image.get_flattened_data())
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
 
 # Render engine 23 split the placement off the performance: the renderer takes

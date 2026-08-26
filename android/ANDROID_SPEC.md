@@ -4,9 +4,9 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-25.
+Last updated: 2026-08-26.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.64` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.72` with **render engine
 `default / 41`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
 `ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `41`
@@ -2777,10 +2777,12 @@ The snapshot does not change the visible or persisted normal Stage 1, Stage 2, c
 
 Clear, history selection, starting a new capture, and a successful draw close the old camera origin. An invalid NIM response, network failure, or stop saves no work and retains the edited description and camera origin. Pressing Draw again restarts at Stage 1 without repeating image decoding or local Vision. The existing JA/EN Stage 1, Stage 2, stopped, and failure status wording is reused. One-touch start, development effects, estimated percentages, camera provenance, Room migration, and photo persistence are not added.
 
-## 2026-08-26 Saving and showing camera input provenance ([I-401])
+## 2026-08-26 Saving and showing camera input provenance (android `2.1.4-android.72`, [I-401])
 
 M3 of Abstract Instant Print captures an in-process camera-input audit snapshot when local Vision succeeds. The snapshot contains only `origin=camera`, `route=local_description_to_nim`, the Vision provider and actual model ID, prompt version, output mode, and the normalized image dimensions actually sent to local Vision. Ordinary editing preserves it. Only I-398's explicit NIM draw passes it into a successfully saved work. NIM failure, cancellation, and retry retain the same snapshot; success, Clear, history selection, and a new capture close it.
 
 The stored form is one top-level `input_provenance` object in the existing `history_items.render_metadata_json`. Non-camera saves do not add the key. If renderer metadata already contains the key, saving fails instead of overwriting it. The object is audit data, not SVG performance input, so `render_hash` and `render_hash_short` are not recomputed. It stores no photo bytes, URI, path, filename, capture time, EXIF, location, image digest, or local-Vision output text; the existing `original_input` and `source_text` remain authoritative for the description. There is no History entity, DAO, Room schema-version, migration, old-row backfill, or export-format change.
 
 Generation Info prepends an Input section only for a valid camera `input_provenance` with every required field and positive integer dimensions. It shows origin, route, Vision provider and model, prompt version, output mode, and normalized image dimensions. Origin, route, and mode are localized; IDs and versions remain raw audit values. Existing and ordinary works without the key retain the same five sections. A non-object value, missing field, wrong type, or non-positive dimension hides only Input and leaves all other generation information available. This implementation round omits a full Pixel 9 database table inspection, row-count comparison, raw SQLite queries, post-install full-backup comparison, and real-device instrumentation.
+
+The local-Vision output boundary corrected during acceptance collects only `Content.Text` from the response message instead of rendering the whole LiteRT-LM conversation template for every streamed chunk. It removes any remaining template markers and joins Japanese clause-level line breaks without inserting spaces, so control strings such as `<jturn>model` and unwanted line breaks do not enter the description field. The NIM Stage 2 tool schema requires at least one `instructions` item and no longer accepts an empty array as a successful drawable response. In the final Pixel 9 acceptance run, local Vision, fixed-NIM Stage 1, fixed-NIM Stage 2, and the `vivid_material` render each completed once, and the author confirmed the completed SVG. Deployment reused the verified backup for that JST date and preserved application data; the full database inspection and device instrumentation remained omitted as contracted.

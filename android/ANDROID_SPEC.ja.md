@@ -3,9 +3,9 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-25。
+最終更新: 2026-08-26。
 
-**追随状況**: Android は `2.1.4-android.64` / **render engine `default / 41`** /
+**追随状況**: Android は `2.1.4-android.72` / **render engine `default / 41`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
 master の web/server も **render engine `41`** / **`ddl_engine_version` 20** であり、
@@ -2248,10 +2248,12 @@ local Gemmaが返したcamera由来の記述は通常編集してもcamera起点
 
 clear、履歴作品の選択、新しい撮影開始、描画成功は古いcamera起点を閉じる。NIMの無効応答、network failure、停止では作品を保存せず、編集済み記述とcamera起点を保持する。同じ描画操作によるretryは画像decode／local Visionを繰り返さずStage 1から再開する。既存の日英Stage 1／Stage 2／停止／失敗表示を使い、one-touch開始、現像effect、進捗率、camera provenance、Room migration、写真保存は追加しない。
 
-## 2026-08-26 カメラ入力provenanceの保存と表示（[I-401]）
+## 2026-08-26 カメラ入力provenanceの保存と表示（android `2.1.4-android.72`・[I-401]）
 
 Abstract Instant Print／抽象画インスタントプリントのM3では、local Vision成功時にcamera入力の監査snapshotをprocess内の編集状態へ保持する。snapshotは`origin=camera`、`route=local_description_to_nim`、Vision provider／実model ID、prompt版、output mode、local Visionへ実際に渡した正規化画像寸法だけを持つ。利用者が記述を編集してもsnapshotは維持し、I-398の明示NIM描画が成功して作品を保存する時だけ渡す。NIM失敗／取消／retryでは同じsnapshotを保持し、成功、clear、履歴選択、新しい撮影開始で閉じる。
 
 保存形は既存`history_items.render_metadata_json`のtop-level `input_provenance` objectであり、cameraでない保存にはkey自体を追加しない。renderer metadataに同名keyが既にある異常入力は上書きせず失敗させる。これは作品の監査情報でありSVG演奏入力ではないため、`render_hash`／`render_hash_short`を再計算しない。写真bytes、URI、path、file名、撮影時刻、EXIF、位置情報、image digest、local Visionの生成文は保存せず、記述は既存`original_input`／`source_text`を正本とする。Room entity、DAO、schema version、migration、過去rowのbackfill、export formatは変更しない。
 
 生成情報sheetは、必須fieldと正の整数寸法を持つ有効なcamera `input_provenance`だけに「入力」sectionを先頭追加し、起点、経路、Vision provider／model、prompt版、output mode、正規化画像寸法を表示する。起点、経路、modeは表示言語へ写し、ID／versionは監査用raw値を示す。keyのない既存作品と通常作品は従来の5 sectionのままとし、objectでない、field欠落、型不正、非正寸法の場合は入力sectionだけを隠して他の生成情報を表示する。本実装回はPixel 9 DBの全table検査、row count比較、raw SQLite query、事後full backup比較、real-device instrumentationを行わない。
+
+受入で見つかったlocal Vision出力境界では、LiteRT-LMの会話template全体をstream chunkごとに再描画せず、応答messageの`Content.Text`だけを収集する。残存するtemplate markerを除去し、日本語の文節単位改行は空白を挟まず連結するため、`<jturn>model`等の制御文字列と不要な改行を記述欄へ渡さない。NIM Stage 2のtool schemaは`instructions`を1件以上必須とし、空配列を成功応答として受理しない。Pixel 9上の最終受入ではlocal Vision、固定NIM Stage 1、固定NIM Stage 2、`vivid_material`描画が各1回で完了し、作者がSVG完成を確認した。当日分の検証済みbackupを再利用してdata-preserving installし、DB全検査と実機instrumentationは契約どおり省略した。

@@ -85,6 +85,23 @@ val ServerCanvasBoxColor = Color(0xFF242321)
 /** The sheet itself -- the paper the ink lands on. */
 val ServerCanvasPaperColor = Color(0xFFF5F1E9)
 
+// --- Camera development ----------------------------------------------------
+
+val CameraDevelopmentBackdrop = Color(0xFF171717)
+val CameraDevelopmentPaper = Color(0xFFF8F5EE)
+val CameraDevelopmentInk = Color(0xFF1C1C1C)
+val CameraDevelopmentMutedInk = Color(0xFF5D554F)
+val CameraDevelopmentVividPink = Color(0xFFF50087)
+val CameraDevelopmentVividGreen = Color(0xFF008F39)
+val CameraDevelopmentVividSky = Color(0xFF73C2FB)
+val CameraDevelopmentVividOrange = Color(0xFFFF9800)
+val CameraDevelopmentVividPurple = Color(0xFF8A4FC9)
+val CameraDevelopmentVividYellow = Color(0xFFFFF200)
+val CameraDevelopmentCanvasPaper = Color(0xFFF4F4F4)
+val CameraDevelopmentExposureGlow = Color(0xFFFFF2B8)
+val CameraDevelopmentGrain = Color(0xFF7D6F66)
+val CameraDevelopmentOutline = Color(0xFF1C1C1C)
+
 // --- Presentation mode ------------------------------------------------------
 // Picked by the artwork's own luminance, so both a dark and a light ground exist.
 

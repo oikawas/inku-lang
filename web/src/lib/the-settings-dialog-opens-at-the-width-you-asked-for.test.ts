@@ -82,14 +82,14 @@ test('T-46  the detailed mode is what adds exactly those four tabs', () => {
 });
 
 test('T-46  the four are named for what they are, not for who may see them', () => {
-	// Three of the four are already behind the administrators group; `plugins`
+	// Two of the four are already behind the administrators group; `plugins`
 	// and `unread` are not. The two questions are separate, and an
 	// implementation that had quietly folded this one into the permission list
 	// would answer differently here.
 	const admin = ADMIN_ONLY_SETTINGS_TABS as readonly string[];
 	assert.equal(admin.includes('plugins'), false);
 	assert.equal(admin.includes('unread'), false);
-	assert.equal(admin.includes('limits'), false);
+	assert.equal(admin.includes('limits'), true);
 	assert.equal(admin.includes('server_misc'), true);
 });
 

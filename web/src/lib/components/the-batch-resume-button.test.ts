@@ -74,16 +74,24 @@ test('T-66  resuming an auto run resumes under auto, not under what it resolved 
 test('T-66  the mode reaches the row it is read from', () => {
 	// A field the client never sends is a column that is always null, and the
 	// gate above would then be green while nothing was ever restored.
-	const DB = readFileSync(
-		fileURLToPath(new URL('../../../../server/src/inku_server/db.py', import.meta.url)),
+	const SCHEMA = readFileSync(
+		fileURLToPath(new URL('../../../../server/src/inku_server/persistence/schema.py', import.meta.url)),
+		'utf8',
+	);
+	const LEGACY_SCHEMA = readFileSync(
+		fileURLToPath(new URL('../../../../server/src/inku_server/persistence/legacy_schema.py', import.meta.url)),
+		'utf8',
+	);
+	const HISTORY = readFileSync(
+		fileURLToPath(new URL('../../../../server/src/inku_server/persistence/history.py', import.meta.url)),
 		'utf8',
 	);
 	const RENDER = readFileSync(
 		fileURLToPath(new URL('../../../../server/src/inku_server/api_core/routers/render.py', import.meta.url)),
 		'utf8',
 	);
-	assert.match(DB, /^ {4}catalog_mode = Column\(String, +nullable=True\)$/m, 'the row has no column for it');
-	assert.match(DB, /"catalog_mode": "ALTER TABLE history ADD COLUMN catalog_mode VARCHAR"/, 'an existing database never gets the column');
-	assert.match(DB, /"catalog_mode": row\.catalog_mode,/, 'the column is stored but never handed back');
+	assert.match(SCHEMA, /^ {4}catalog_mode = Column\(String, +nullable=True\)$/m, 'the row has no column for it');
+	assert.match(LEGACY_SCHEMA, /"catalog_mode": "ALTER TABLE history ADD COLUMN catalog_mode VARCHAR"/, 'an existing database never gets the column');
+	assert.match(HISTORY, /"catalog_mode": row\.catalog_mode,/, 'the column is stored but never handed back');
 	assert.match(RENDER, /catalog_mode=req\.catalog_mode,/, 'the paint route drops the mode on the way to the row');
 });

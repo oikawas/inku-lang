@@ -123,17 +123,20 @@ class UiLanguageSettingTest {
         )
 
         val viewModel = source("main/java/app/inku/mobile/ui/InkuViewModel.kt")
+        val uiLanguageCalls = Regex(
+            """uiLang = (?:(?:current|cycle)\.uiLanguage\.code|input\.uiLanguageCode)""",
+        ).findAll(viewModel).count()
         assertEquals(
             "every screen call that starts a drawing must send the ui language",
-            5,
-            Regex("""uiLang = (current|cycle)\.uiLanguage\.code""").findAll(viewModel).count(),
+            7,
+            uiLanguageCalls,
         )
         // Without `auto` the resolution never reaches the fallback, so the wire
         // above would be carrying a value nothing ever reads. The web sends a
         // constant `instruction_lang: 'auto'` on every paint (`+page.svelte:329`).
         assertEquals(
             "every one of those calls must also request auto",
-            5,
+            uiLanguageCalls,
             Regex("""instructionLang = InstructionLanguages\.AUTO""").findAll(viewModel).count(),
         )
     }

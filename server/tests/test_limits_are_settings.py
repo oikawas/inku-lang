@@ -407,7 +407,9 @@ def test_t6_a_row_without_the_column_is_absent_not_default():
     """Absent is a third state. Backfilling old rows would claim a configuration
     nobody recorded, which is the same mistake sketch_state was added to avoid.
     """
-    migrations = (SERVER_ROOT / "src" / "inku_server" / "db.py").read_text(encoding="utf-8")
+    migrations = (
+        SERVER_ROOT / "src" / "inku_server" / "persistence" / "legacy_schema.py"
+    ).read_text(encoding="utf-8")
     statement = 'ALTER TABLE history ADD COLUMN render_limits TEXT'
     assert statement in migrations
     assert "render_limits TEXT DEFAULT" not in migrations, "a DEFAULT would erase the distinction"

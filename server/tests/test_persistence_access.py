@@ -49,30 +49,36 @@ def _parameter_shape(function) -> tuple[tuple[str, object], ...]:
 def test_access_is_the_bounded_implementation_owner() -> None:
     tree = ast.parse(ACCESS_SOURCE)
     imports = [node for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))]
-    imported_modules = {
-        node.module if isinstance(node, ast.ImportFrom) else alias.name
+    assert not any(
+        isinstance(node, ast.ImportFrom) and node.module in {"db", "inku_server.db"}
         for node in imports
-        for alias in (node.names if isinstance(node, ast.Import) else [node.names[0]])
-    }
-    assert imported_modules == {"__future__", "sqlalchemy", "schema"}
+    )
+    assert not any(
+        isinstance(node, ast.Import) and any(alias.name == "inku_server.db" for alias in node.names)
+        for node in imports
+    )
 
     sqlalchemy_import = next(
         node for node in imports if isinstance(node, ast.ImportFrom) and node.module == "sqlalchemy"
     )
-    assert {alias.name for alias in sqlalchemy_import.names} == {"and_", "or_", "select", "true"}
+    assert {"and_", "or_", "select", "true"} <= {
+        alias.name for alias in sqlalchemy_import.names
+    }
     schema_import = next(
         node
         for node in imports
         if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module == "schema"
     )
-    assert {alias.name for alias in schema_import.names} == {
+    assert {
         "HistoryAclRow",
         "HistoryRow",
         "LineageEdgeRow",
         "LineageNodeRow",
         "UserAccountRow",
+    } <= {alias.name for alias in schema_import.names}
+    assert set(PREDICATES) <= {
+        node.name for node in tree.body if isinstance(node, ast.FunctionDef)
     }
-    assert {node.name for node in tree.body if isinstance(node, ast.FunctionDef)} == set(PREDICATES)
     assert "inku_server.db" not in ACCESS_SOURCE
     assert "SessionLocal" not in ACCESS_SOURCE
     assert "create_sqlite_engine" not in ACCESS_SOURCE

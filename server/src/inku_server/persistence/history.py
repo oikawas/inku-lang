@@ -12,7 +12,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from . import access
-from .schema import CoerceTraceCatalogRow, HistoryRow, LineageEdgeRow, LineageNodeRow
+from .schema import CoerceTraceCatalogRow, HistoryRow, LineageEdgeRow, LineageNodeRow, UserGroupRow
 
 
 LINEAGE_DERIVATION_KINDS = {
@@ -147,6 +147,72 @@ class HistoryMarkWriter:
             if not row:
                 return None
             row.for_revision = 1 if for_revision else 0
+            session.commit()
+            session.refresh(row)
+            return self.row_to_dict_fn(row)
+
+
+@dataclass(frozen=True)
+class HistoryShareWriter:
+    """Write a work's group-read bit and its retained destination."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    row_to_dict_fn: Callable[[HistoryRow], dict]
+    has_permission_group_fn: Callable[[dict, str], bool]
+
+    def set_item_for_share(
+        self, user_id: str, item_id: str, for_share: bool, share_group_id: str | None = None
+    ) -> dict | None:
+        """Open a work to an organisation group, or close it again.
+
+        Who may do it is `_writable_by`, the same test starring uses -- opening a
+        work is an act of its owner, not of everyone who can read it. `None` means
+        the caller may not write this work, and the route answers 404 rather than
+        403: telling a caller that a work they may not touch exists is itself a
+        disclosure.
+
+        Raising the bit with no destination names the owner's own organisation
+        group, the way a new file takes the group of whoever made it. Naming
+        somebody else's group is an administrator's act, because a member who could
+        do it would be able to hand their organisation's work to any other.
+
+        Dropping the bit leaves the destination where it is: `chmod g-r` does not
+        forget the group, and clearing it would silently re-aim the work the next
+        time the bit went up.
+        """
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            row = (
+                session.query(HistoryRow)
+                .filter(access._writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
+                .first()
+            )
+            if not row:
+                return None
+            if not for_share:
+                row.for_share = 0
+                session.commit()
+                session.refresh(row)
+                return self.row_to_dict_fn(row)
+            # Only a NAMED group is checked, not the one already on the row. `chmod
+            # g+r` asks nothing of the group the file is in; re-opening a work its
+            # owner had opened before is the same act, and requiring administrator
+            # rights for it would make the destination unrepeatable by the one person
+            # who chose it.
+            if share_group_id and share_group_id != actor.get("group_id") and not self.has_permission_group_fn(actor, "admins"):
+                raise PermissionError("only administrators may share a work outside their own group")
+            owner_group_id = self.actor_of_fn(row.user_id)["group_id"] if row.user_id else None
+            # The destination the work already carries wins over the owner's own: it
+            # is what "the bit went down and came back up" has to mean, and a fresh
+            # work has none, so the owner's group is what fills the blank.
+            target_group = share_group_id or row.share_group_id or owner_group_id
+            if not target_group:
+                raise ValueError("this work has no organisation group to be shared with")
+            if session.get(UserGroupRow, target_group) is None:
+                raise ValueError(f"no such organisation group: {target_group}")
+            row.for_share = 1
+            row.share_group_id = target_group
             session.commit()
             session.refresh(row)
             return self.row_to_dict_fn(row)

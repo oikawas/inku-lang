@@ -2914,58 +2914,9 @@ def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dic
 def set_item_for_share(
     user_id: str, item_id: str, for_share: bool, share_group_id: str | None = None
 ) -> dict | None:
-    """Open a work to an organisation group, or close it again.
-
-    Who may do it is `_writable_by`, the same test starring uses -- opening a
-    work is an act of its owner, not of everyone who can read it. `None` means
-    the caller may not write this work, and the route answers 404 rather than
-    403: telling a caller that a work they may not touch exists is itself a
-    disclosure.
-
-    Raising the bit with no destination names the owner's own organisation
-    group, the way a new file takes the group of whoever made it. Naming
-    somebody else's group is an administrator's act, because a member who could
-    do it would be able to hand their organisation's work to any other.
-
-    Dropping the bit leaves the destination where it is: `chmod g-r` does not
-    forget the group, and clearing it would silently re-aim the work the next
-    time the bit went up.
-    """
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        row = (
-            session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
-            .first()
-        )
-        if not row:
-            return None
-        if not for_share:
-            row.for_share = 0
-            session.commit()
-            session.refresh(row)
-            return _row_to_dict(row)
-        # Only a NAMED group is checked, not the one already on the row. `chmod
-        # g+r` asks nothing of the group the file is in; re-opening a work its
-        # owner had opened before is the same act, and requiring administrator
-        # rights for it would make the destination unrepeatable by the one person
-        # who chose it.
-        if share_group_id and share_group_id != actor.get("group_id") and not has_permission_group(actor, "admins"):
-            raise PermissionError("only administrators may share a work outside their own group")
-        owner_group_id = _actor_of(row.user_id)["group_id"] if row.user_id else None
-        # The destination the work already carries wins over the owner's own: it
-        # is what "the bit went down and came back up" has to mean, and a fresh
-        # work has none, so the owner's group is what fills the blank.
-        target_group = share_group_id or row.share_group_id or owner_group_id
-        if not target_group:
-            raise ValueError("this work has no organisation group to be shared with")
-        if session.get(UserGroupRow, target_group) is None:
-            raise ValueError(f"no such organisation group: {target_group}")
-        row.for_share = 1
-        row.share_group_id = target_group
-        session.commit()
-        session.refresh(row)
-        return _row_to_dict(row)
+    return _history.HistoryShareWriter(
+        SessionLocal, _actor_of, _row_to_dict, has_permission_group
+    ).set_item_for_share(user_id, item_id, for_share, share_group_id)
 
 
 def history_render_hashes() -> list[tuple[str, str | None]]:

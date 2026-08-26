@@ -180,7 +180,7 @@ with the aspect actually performed on.**
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
 **The words this layer judges a description with are declared in one place**, `COERCE_MARKERS` in
-`language_support/{ja,en}.py` (72 systems, 693 distinct words).
+`language_support/{ja,en}.py` (77 systems, 693 distinct words).
 **No matching literal is written into a branch of `coerce/`** — the one exception is a string this
 layer wrote itself and a later branch reads back (a `note`). Tests hold both halves.
 **When the description names exactly one abstract color, the color cycle folds to that one color**

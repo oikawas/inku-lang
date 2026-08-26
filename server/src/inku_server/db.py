@@ -881,42 +881,24 @@ def single_user_mode_enabled() -> bool:
     return _single_user_mode_resolver().enabled()
 
 
-def _create_single_user_account() -> str | None:
-    """Make the one account an empty database is missing.
+def _single_user_account_creator() -> _accounts.SingleUserAccountCreator:
+    return _accounts.SingleUserAccountCreator(
+        SessionLocal,
+        _ensure_default_user_group,
+        _ensure_permission_groups,
+        _bootstrap_admin_password,
+        secrets.token_urlsafe,
+        _hash_password,
+        _derived_role,
+        _set_permission_groups,
+        uuid.uuid4,
+        _now_ms,
+        os.getenv,
+    )
 
-    Only ever reached when there is no account at all: with no bootstrap
-    password set, _ensure_bootstrap_admin leaves the database empty and the
-    first request would have nobody to be.
-    """
-    _ensure_default_user_group()
-    _ensure_permission_groups()
-    with SessionLocal() as session:
-        if session.query(UserAccountRow).first():
-            return None
-        group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
-        # No bootstrap password means nobody chose one.  The account still
-        # needs a hash, so it gets an unusable random one; the UI tells the
-        # owner to set a password before they ever turn single-user mode off,
-        # because that password is the only way back in.
-        password = _bootstrap_admin_password() or secrets.token_urlsafe(32)
-        row = UserAccountRow(
-            id=str(uuid.uuid4()),
-            username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
-            email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
-            password_hash=_hash_password(password),
-            role=_derived_role(["admins"]),
-            group_id=group.id if group else None,
-            at=_now_ms(),
-        )
-        session.add(row)
-        session.commit()
-        # The one account owns the server, so it holds `admins`.  _oldest_admin_id
-        # asks the permission groups now, and it is the same query that resolves
-        # the history owner: leaving this to the role mirror would make the two
-        # name different people.
-        _set_permission_groups(session, row, ["admins"])
-        session.commit()
-        return row.id
+
+def _create_single_user_account() -> str | None:
+    return _single_user_account_creator().create()
 
 
 def single_user_account() -> dict | None:

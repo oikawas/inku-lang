@@ -669,8 +669,9 @@ def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> No
     # Say how many were looked at: a gate that silently checked nothing reads
     # exactly like a gate that passed. 15 at ddl-engine 12, which added two coerce
     # cases that carry a DDL; 18 at ddl-engine 15, whose three surface cases each
-    # carry one; 22 at ddl-engine 16, whose four size cases each carry one too.
-    assert checked == 22
+    # carry one; 22 at ddl-engine 16, whose four size cases each carry one too;
+    # and 26 at ddl-engine 21, whose four stated-surface cases all carry one.
+    assert checked == 26
 
 
 def test_the_corpus_holds_a_case_of_the_production_shape() -> None:

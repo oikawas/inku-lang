@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .schema import HistoryAclRow, UserAccountRow, UserGroupRow
+from .schema import HistoryAclRow, PermissionGroupRow, UserAccountRow, UserGroupRow, UserPermissionGroupRow
 
 
 PERMISSION_GROUPS = ("admins", "leaders", "users")
@@ -43,6 +43,35 @@ def normalize_permission_groups(names) -> list[str]:
     if not requested:
         raise ValueError("at least one permission group is required")
     return [name for name in PERMISSION_GROUPS if name in requested]
+
+
+@dataclass(frozen=True)
+class PermissionGroupMembershipStore:
+    uuid_fn: Callable[[], object]
+    now_ms_fn: Callable[[], int]
+
+    def group_ids(self, session) -> dict[str, str]:
+        return {row.name: row.id for row in session.query(PermissionGroupRow).all()}
+
+    def groups_of(self, session, user_id: str) -> list[str]:
+        held = {name for (name,) in session.query(PermissionGroupRow.name).join(UserPermissionGroupRow, UserPermissionGroupRow.permission_group_id == PermissionGroupRow.id).filter(UserPermissionGroupRow.user_id == user_id).all()}
+        return [name for name in PERMISSION_GROUPS if name in held]
+
+    def set_groups(self, session, row: UserAccountRow, names) -> list[str]:
+        wanted = normalize_permission_groups(names)
+        by_name = self.group_ids(session)
+        missing = [name for name in wanted if name not in by_name]
+        if missing:
+            raise ValueError(f"permission group not found: {missing[0]}")
+        session.query(UserPermissionGroupRow).filter(UserPermissionGroupRow.user_id == row.id).delete(synchronize_session=False)
+        for name in wanted:
+            session.add(UserPermissionGroupRow(id=str(self.uuid_fn()), user_id=row.id, permission_group_id=by_name[name], at=self.now_ms_fn()))
+        row.role = derived_role(wanted)
+        return wanted
+
+    def holds_no_elevated_group(self, session):
+        elevated = session.query(UserPermissionGroupRow.user_id).join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id).filter(PermissionGroupRow.name.in_(ELEVATED_PERMISSION_GROUPS))
+        return ~UserAccountRow.id.in_(elevated)
 
 
 def group_to_dict(row: UserGroupRow) -> dict:

@@ -2769,7 +2769,7 @@ Image analysis does not widen the text-only `ModelProvider`. The existing `Local
 
 After the result, the app returns to Compose Write and distinguishes Preparing image, Loading local model, Analyzing locally, Ready to edit, failure, and cancellation in JA and EN with screen-reader labels. A nonblank result replaces the existing description editor and stops for user editing. The camera job itself never invokes Stage 0.5, Stage 1 or 2, NIM or another remote provider, automatic catalog selection, drawing, saving, lineage, or database writes. One-touch capture-to-SVG, instant-film development effects, and a pop catalog remain follow-up contracts.
 
-## 2026-08-26 Explicit NIM drawing from a camera description ([I-398])
+## 2026-08-26 Explicit NIM drawing from a camera description (android `2.1.4-android.69`, [I-398])
 
 A camera-origin description returned by local Gemma retains its camera origin through ordinary editing. Only an explicit press of the existing Draw action uses a dedicated run snapshot: Stage 1 and Stage 2 are `nvidia:google/gemma-4-31b-it`, the color catalog is `vivid_material`, Sketch from Life (Stage 0.5) is off, catalog auto-selection is skipped, and `autoRepair=false`. The NVIDIA NIM provider, Base URL, and API key are validated before a request begins; an unavailable route never falls back to local E2B, another model, or another provider.
 

@@ -2240,7 +2240,7 @@ Build 148107をPixel 9へ通常installし、user 0でinstalled、hidden=false、
 
 result後はCompose Writeへ戻り、「画像を準備中」「ローカルモデルを読み込み中」「端末内で解析中」「編集できます」、失敗、取消を日英とscreen-reader labelで区別する。非blank resultは既存の記述editorへ置き、利用者が編集できるところで止める。このcamera jobはStage 0.5／1／2、NIMその他の外部provider、色カタログ自動選択、描画、保存、系譜、DB writeを起動しない。撮影確定からSVG生成までの一気通貫とチェキ現像演出、pop catalogは後続契約の範囲とする。
 
-## 2026-08-26 カメラ記述の明示NIM描画（[I-398]）
+## 2026-08-26 カメラ記述の明示NIM描画（android `2.1.4-android.69`・[I-398]）
 
 local Gemmaが返したcamera由来の記述は通常編集してもcamera起点を維持し、利用者が既存の「描画する」を明示操作した時だけ専用run snapshotを使う。Stage 1／Stage 2は`nvidia:google/gemma-4-31b-it`、色カタログは`vivid_material`、写生（Stage 0.5）はoff、catalog自動選択は行わず、`autoRepair=false`とする。NVIDIA NIMのprovider、Base URL、API keyは要求開始前に検証し、利用不能時にlocal E2B、別model、別providerへfallbackしない。
 

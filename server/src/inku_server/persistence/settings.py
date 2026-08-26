@@ -130,6 +130,7 @@ AUTH_DEFAULT_SETTINGS = {
     "google_enabled": False,
     "local_enabled": True,
 }
+SINGLE_USER_SETTINGS_KEY = "single_user"
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -610,6 +611,23 @@ class AuthSettingsStore:
             "local_enabled": bool(local_enabled),
         }
         return self.app_settings.write(AUTH_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class SingleUserPinStore:
+    """Read and merge-write the account pinned by single-user mode."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> str | None:
+        return (self.app_settings.read(SINGLE_USER_SETTINGS_KEY) or {}).get("user_id")
+
+    def update(self, user_id: str) -> str:
+        stored = self.app_settings.read(SINGLE_USER_SETTINGS_KEY) or {}
+        self.app_settings.write(
+            SINGLE_USER_SETTINGS_KEY, {**stored, "user_id": user_id}
+        )
+        return user_id
 
 
 @dataclass(frozen=True)

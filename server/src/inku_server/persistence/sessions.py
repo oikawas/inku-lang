@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import sha256
 
 from .schema import UserAccountRow, UserGroupRow, UserSessionRow
+
+
+def hash_token(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)

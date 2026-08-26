@@ -20,7 +20,8 @@ from ..counts import (
 )
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..limits import DEFAULT_LIMITS, Limits, note_limit
-from ..schema import Instruction, fill_is_asked_for
+from ..saijiki import texture_for_surface
+from ..schema import CLOSED_SHAPES, Instruction, SurfaceSpec, fill_is_asked_for
 from .normalize import (
     VISIBLE_ON_BACKGROUND,
     _budgeted_count,
@@ -1207,6 +1208,11 @@ def _with_context_density_governor(
 
 
 DDL_CLAUSE_SPLIT = re.compile(r"[。\n;；]+|(?<!\d)\.\s+")
+STATED_SURFACE_CLAUSE = re.compile(
+    r"^(?:面\s*[:：]|surface\s*:)\s*(?P<word>[^()（）.]+?)\s*"
+    r"(?:[（(][^()（）]*[）)])?\s*\.?$",
+    re.IGNORECASE,
+)
 # Words that ask for many colors at once. A description carrying one of these
 # has asked for a cycle, so the rule that folds unrequested cycles away must
 # not touch it.
@@ -1215,6 +1221,47 @@ POLYCHROME_MARKERS: tuple[str, ...] = _coerce_marker_values("polychrome_request"
 
 def _split_ddl_clauses(ddl: str) -> list[str]:
     return [part.strip() for part in DDL_CLAUSE_SPLIT.split(ddl) if part.strip()]
+
+
+def _stated_surface_texture(ddl: str | None) -> str | None:
+    """Read one whole normalized surface clause without guessing from prose."""
+    if not ddl:
+        return None
+    mapping = texture_for_surface()
+    stated: list[str | None] = []
+    for clause in _split_ddl_clauses(ddl):
+        match = STATED_SURFACE_CLAUSE.fullmatch(clause)
+        if match is None:
+            continue
+        word = match.group("word").strip()
+        stated.append(mapping.get(word, mapping.get(word.lower())))
+    if len(stated) != 1 or stated[0] in (None, "none"):
+        return None
+    return stated[0]
+
+
+def _with_stated_surface_fidelity(
+    instructions: list[Instruction], *, ddl: str | None
+) -> list[Instruction]:
+    """Deliver one positive stated surface to the one closed shape it names."""
+    texture = _stated_surface_texture(ddl)
+    if texture is None:
+        return instructions
+    closed = [index for index, ins in enumerate(instructions) if ins.primitive in CLOSED_SHAPES]
+    if len(closed) != 1:
+        return instructions
+    index = closed[0]
+    holder = instructions[index]
+    if holder.surface is not None and holder.surface.texture == texture:
+        return instructions
+    surface = (
+        SurfaceSpec(texture=texture)
+        if holder.surface is None
+        else holder.surface.model_copy(update={"texture": texture})
+    )
+    repaired = list(instructions)
+    repaired[index] = holder.model_copy(update={"surface": surface})
+    return repaired
 
 
 def _marks_only_ddl(ddl: str | None) -> str:

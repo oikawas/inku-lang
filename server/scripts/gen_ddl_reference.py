@@ -28,22 +28,19 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-16"
+FROZEN_AT = "2026-08-26"
 REASON = (
-    "two of the nine surface words are about the mark, not about an interior. "
-    "Since engine 15 `_with_surface_on_a_closed_shape` has moved every surface "
-    "off a line or an arc, which is right for the seven words that say what "
-    "fills a shape and wrong for the two that say how the mark itself runs: 粒 "
-    "is the tool skipping on the sheet and にじみ is the ink spreading into it, "
-    "and a line has no interior to hold either. Both now stay where the sentence "
-    "put them, and render engine 37 raises the sheet's own two quantities for "
-    "that one instruction. ONE CASE MOVES: `B-surface-with-nowhere-to-move`, the "
-    "only input here holding a mark word on an open shape, whose 粒 used to be "
-    "dropped for having no shape to go back to. No branch is added, so the other "
-    "twenty-nine reports are byte-identical -- the opposite of engines 11, 15 "
-    "and 18, where a new branch name entered every case whether it fired or not. "
-    "The seven interior words are untouched: `wash` on a line still moves back "
-    "or is dropped, which is what `B-surface-on-a-line-moves-back` keeps saying."
+    "one positive whole `面:` or `Surface:` clause reaches the one closed shape "
+    "left after structural dedupe. The repair addresses two measured Stage 2 "
+    "failures: English `Surface: flat.` left as none, and Japanese 塗り emitted "
+    "twice as fill-equivalent duplicate circles. Solid surface and filled=true "
+    "are therefore one structural spelling only when every other field agrees; "
+    "then the live saijiki mapping supplies the texture, with no guess when the "
+    "clause or closed shape is absent or plural. FOUR B CASES JOIN: the English "
+    "miss, Japanese duplicate, a two-shape ambiguity, and empty-surface no-op. "
+    "A new branch key enters all 34 B reports, so all B digests move; the 30 "
+    "carried Scores remain byte-identical. Parts A and C do not enter coerce and "
+    "remain byte-identical. Render engine remains 41; this is DDL engine 21."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -346,6 +343,69 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
             })]),
             ddl="細いペンの横線を中央に引く。面: 粒。",
             lang="ja",
+        ),
+        # ddl-engine 21. Stage 2 reached the surface vocabulary but not one
+        # stable Score spelling: English flat could remain none, while Japanese
+        # 塗り could arrive as two otherwise identical circles, one solid and
+        # one filled. The controls say where the repair must decline to guess.
+        "B-stated-surface-english-delivery": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None,
+                center=[0.5, 0.5], radius=0.16,
+                surface={
+                    "texture": "none", "density": 0.35, "scale": 0.35,
+                    "opacity": 0.28, "bleed": 0.0, "direction": "none",
+                    "spacing_gradient": "none", "tone_steps": 3, "seed": None,
+                },
+            )]),
+            ddl="Figure: one black circle. Surface: flat.",
+            lang="en",
+        ),
+        "B-stated-surface-fill-equivalent-duplicate": _coerce_input(
+            _score([
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None,
+                    center=[0.5, 0.5], radius=0.16,
+                    surface={
+                        "texture": "solid", "density": 0.35, "scale": 0.35,
+                        "opacity": 0.28, "bleed": 0.0, "direction": "none",
+                        "spacing_gradient": "none", "tone_steps": 3, "seed": None,
+                    },
+                ),
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None,
+                    center=[0.5, 0.5], radius=0.16, filled=True,
+                ),
+            ]),
+            ddl="図形: 黒い円を一つ。面: 塗り。",
+            lang="ja",
+        ),
+        "B-stated-surface-two-shapes-declines": _coerce_input(
+            _score([
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None,
+                    center=[0.3, 0.5], radius=0.16,
+                ),
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None,
+                    center=[0.7, 0.5], radius=0.16,
+                ),
+            ]),
+            ddl="Figure: two black circles. Surface: flat.",
+            lang="en",
+        ),
+        "B-stated-surface-empty-declines": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None,
+                center=[0.5, 0.5], radius=0.16,
+                surface={
+                    "texture": "none", "density": 0.35, "scale": 0.35,
+                    "opacity": 0.28, "bleed": 0.0, "direction": "none",
+                    "spacing_gradient": "none", "tone_steps": 3, "seed": None,
+                },
+            )]),
+            ddl="Figure: one black circle. Surface: empty.",
+            lang="en",
         ),
         "B-production-multiline": _coerce_input(
             _score([_instruction(color="white")], background="black"),

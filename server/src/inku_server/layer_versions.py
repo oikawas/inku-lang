@@ -1,5 +1,17 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 21 (2026-08-26): one positive whole `面:` / `Surface:` clause reaches the one
+# closed shape left after structural dedupe. Stage 2 sometimes left an English
+# `Surface: flat.` as `none`, and sometimes expressed Japanese 塗り twice --
+# once as `surface.texture=solid` and once as `filled=true` on an otherwise
+# identical duplicate. Coerce now recognizes those two fill spellings as the
+# same structural instruction, then delivers the stated surface only when both
+# sides are unambiguous: exactly one positive clause and exactly one closed
+# shape. It reads the live saijiki mapping, preserves every non-texture surface
+# field, and runs on both coerce exits immediately before the existing fill
+# fold. Four cases join part B: the English miss, the Japanese duplicate, and
+# one ambiguity and one empty-surface control. A branch name enters every B
+# report, so all 34 B digests move; the 30 carried Scores stay byte-identical.
 # 20 (2026-08-16): two of the nine surface words are about the mark, not about
 # an interior. `_with_surface_on_a_closed_shape` has moved every surface off a
 # line or an arc since engine 15, which was right for the seven words that
@@ -244,7 +256,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "20"
+DDL_ENGINE_VERSION = "21"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

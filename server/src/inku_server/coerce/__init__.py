@@ -27,6 +27,7 @@ from .compose import (
     _with_semantic_visual_event_hints,
     _with_shape_delivery_repair,
     _with_stated_count_fidelity,
+    _with_stated_surface_fidelity,
     _with_stated_size,
     _with_unintentional_filled_shape_tempering,
     _with_visual_event_type_hints,
@@ -76,7 +77,8 @@ COERCE_BRANCH_ORDER = (
     "with_total_density_budget", "with_explicit_constraint_enforcement",
     "with_stated_count_fidelity", "with_literal_grid_fidelity",
     "drop_invalid_relations", "without_explicit_region_support",
-    "with_fill_as_a_surface_word", "without_unrequested_color_cycle",
+    "with_stated_surface_fidelity", "with_fill_as_a_surface_word",
+    "without_unrequested_color_cycle",
 )
 
 
@@ -119,6 +121,19 @@ def _folded_of_the_two_ways_to_say_a_fill(
     folded = _with_fill_as_a_surface_word(instructions)
     _record_branch_fire(branch_report, "with_fill_as_a_surface_word", before, folded)
     return folded
+
+
+def _delivered_stated_surface(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    branch_report: dict[str, int] | None,
+) -> list[Instruction]:
+    """Run deterministic stated-surface delivery on both coerce exits."""
+    before = instructions
+    delivered = _with_stated_surface_fidelity(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "with_stated_surface_fidelity", before, delivered)
+    return delivered
 
 
 def _coerce_score(
@@ -173,6 +188,12 @@ def _coerce_score(
         _branch_before = instructions
         instructions = _without_explicit_region_support(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+        _branch_before = instructions
+        instructions = _with_structural_duplicate_repair(instructions)
+        _record_branch_fire(branch_report, "with_structural_duplicate_repair", _branch_before, instructions)
+        instructions = _delivered_stated_surface(
+            instructions, ddl=ddl, branch_report=branch_report
+        )
         instructions = _folded_of_the_two_ways_to_say_a_fill(
             instructions, branch_report=branch_report
         )
@@ -332,6 +353,9 @@ def _coerce_score(
     _branch_before = instructions
     instructions = _without_explicit_region_support(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+    instructions = _delivered_stated_surface(
+        instructions, ddl=ddl, branch_report=branch_report
+    )
     instructions = _folded_of_the_two_ways_to_say_a_fill(
         instructions, branch_report=branch_report
     )

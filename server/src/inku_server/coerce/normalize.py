@@ -286,11 +286,23 @@ def _dedupe_instruction_key(ins: Instruction) -> str:
     data = ins.model_dump(by_alias=True, exclude_none=True)
     data.pop("color_hint", None)
     data.pop("note", None)
+    if ins.primitive in CLOSED_SHAPES:
+        surface = ins.surface
+        if surface is not None and surface.texture == "solid":
+            data["filled"] = True
+        elif ins.filled and (surface is None or surface.texture == "none"):
+            solid = (
+                SurfaceSpec(texture="solid")
+                if surface is None
+                else surface.model_copy(update={"texture": "solid"})
+            )
+            data["surface"] = solid.model_dump(by_alias=True, exclude_none=True)
+            data["filled"] = True
     return json.dumps(data, sort_keys=True, ensure_ascii=False)
 
 
 def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[Instruction]:
-    """Merge structurally identical helper layers that differ only in machine notes."""
+    """Merge semantic duplicates, including the two compatible fill spellings."""
     repaired: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:

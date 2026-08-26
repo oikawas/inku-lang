@@ -45,18 +45,17 @@ from .persistence.legacy_schema import (
 from .persistence.schema import (
     Base,
     CoerceTraceCatalogRow,
-    ExternalIdentityRow,
     HistoryAclRow,
     HistoryRow,
     LineageEdgeRow,
     LineageNodeRow,
     OkugakiRow,
     PermissionGroupRow,
-    UnreadWordRow,
+    UnreadWordRow,  # noqa: F401 - compatibility re-export for direct integrity readers
     UserAccountRow,
     UserGroupRow,
     UserPermissionGroupRow,
-    UserSessionRow,
+    UserSessionRow,  # noqa: F401 - compatibility re-export for direct session readers
 )
 from .persistence.migrations import MigrationExecutionError, ensure_current_schema, install_history_fts
 from .persistence import search as _history_search
@@ -2229,48 +2228,19 @@ def _delete_acl_for_histories(session, history_ids: list[str]) -> None:
     return _history_acl_service().delete_acl_for_histories(session, history_ids)
 
 
+def _account_deleter() -> _accounts.UserAccountDeleter:
+    return _accounts.UserAccountDeleter(
+        SessionLocal,
+        has_permission_group,
+        _holds_no_elevated_group,
+        _owner_actor,
+        _owned_by,
+        _delete_acl_for_histories,
+    )
+
+
 def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = None) -> bool:
-    with SessionLocal() as session:
-        query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
-        if actor is not None and not has_permission_group(actor, "admins"):
-            if not has_permission_group(actor, "leaders") or not actor.get("group_id"):
-                return False
-            query = query.filter(
-                UserAccountRow.group_id == actor["group_id"],
-                _holds_no_elevated_group(session),
-            )
-        row = query.first()
-        if not row:
-            return False
-        # The account being deleted, not the one doing the deleting: the cascade
-        # selects by ownership so that widening what an admin may write never
-        # widens what one deletion removes.
-        target_owner = _owner_actor(user_id)
-        if not cascade:
-            if session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).first():
-                raise ValueError("user has history")
-        else:
-            _delete_acl_for_histories(session, [
-                item_id for item_id, in
-                session.query(HistoryRow.id).filter(_owned_by(target_owner, HistoryRow.user_id))
-            ])
-            session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).delete()
-        # Both directions: the works this account owned, above, and the grants
-        # that named this account as a guest, here. Only the first is a cascade;
-        # the second would otherwise survive on other people's works.
-        session.query(HistoryAclRow).filter(
-            HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == user_id
-        ).delete(synchronize_session=False)
-        session.query(OkugakiRow).filter(_owned_by(target_owner, OkugakiRow.user_id)).delete()
-        session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
-        session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
-        session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
-        session.query(LineageEdgeRow).filter(_owned_by(target_owner, LineageEdgeRow.user_id)).delete()
-        session.query(LineageNodeRow).filter(_owned_by(target_owner, LineageNodeRow.user_id)).delete()
-        session.query(UserPermissionGroupRow).filter(UserPermissionGroupRow.user_id == user_id).delete()
-        session.delete(row)
-        session.commit()
-        return True
+    return _account_deleter().delete_user(user_id, cascade=cascade, actor=actor)
 
 
 def _fts_match_query(search: str) -> str:

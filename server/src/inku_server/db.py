@@ -2964,31 +2964,11 @@ def delete_all(user_id: str) -> None:
 
 
 def trash_items(user_id: str, ids: list[str]) -> int:
-    if not ids:
-        return 0
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        count = (
-            session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
-            .update({HistoryRow.trashed: 1}, synchronize_session=False)
-        )
-        session.commit()
-        return count
+    return _history.HistoryTrashStateWriter(SessionLocal, _actor_of).trash_items(user_id, ids)
 
 
 def restore_items(user_id: str, ids: list[str]) -> int:
-    if not ids:
-        return 0
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        count = (
-            session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
-            .update({HistoryRow.trashed: 0}, synchronize_session=False)
-        )
-        session.commit()
-        return count
+    return _history.HistoryTrashStateWriter(SessionLocal, _actor_of).restore_items(user_id, ids)
 
 
 def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:

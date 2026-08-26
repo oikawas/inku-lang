@@ -153,6 +153,48 @@ class HistoryMarkWriter:
 
 
 @dataclass(frozen=True)
+class HistoryTrashStateWriter:
+    """Move history rows between the active listing and the trash."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+
+    def trash_items(self, user_id: str, ids: list[str]) -> int:
+        if not ids:
+            return 0
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            count = (
+                session.query(HistoryRow)
+                .filter(
+                    access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                    HistoryRow.id.in_(ids),
+                    HistoryRow.trashed == 0,
+                )
+                .update({HistoryRow.trashed: 1}, synchronize_session=False)
+            )
+            session.commit()
+            return count
+
+    def restore_items(self, user_id: str, ids: list[str]) -> int:
+        if not ids:
+            return 0
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            count = (
+                session.query(HistoryRow)
+                .filter(
+                    access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                    HistoryRow.id.in_(ids),
+                    HistoryRow.trashed == 1,
+                )
+                .update({HistoryRow.trashed: 0}, synchronize_session=False)
+            )
+            session.commit()
+            return count
+
+
+@dataclass(frozen=True)
 class HistoryShareWriter:
     """Write a work's group-read bit and its retained destination."""
 

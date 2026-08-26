@@ -195,6 +195,62 @@ class HistoryTrashStateWriter:
 
 
 @dataclass(frozen=True)
+class HistoryPermanentDeleteWriter:
+    """Permanently remove selected history and preserve its lineage tombstone."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    now_ms_fn: Callable[[], int]
+    delete_acl_for_histories_fn: Callable[[object, list[str]], None]
+
+    def delete_items(
+        self, user_id: str, ids: list[str], *, require_trashed: bool = False
+    ) -> int:
+        if not ids:
+            return 0
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            query = session.query(HistoryRow).filter(
+                access._writable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                HistoryRow.id.in_(ids),
+            )
+            if require_trashed:
+                query = query.filter(HistoryRow.trashed == 1)
+            rows = query.all()
+            now = self.now_ms_fn()
+            node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
+            if node_ids:
+                # No owner test on these two. They follow `rows`, which the filter
+                # above already authorised, and the nodes and edges belong to the
+                # WORK's owner -- who is not the actor once a write grant lets
+                # someone else delete it. Re-testing against the actor would match
+                # nothing and quietly leave the deleted work's node un-tombstoned,
+                # its child still pointing at a parent whose history is gone.
+                nodes = session.query(LineageNodeRow).filter(
+                    LineageNodeRow.id.in_(node_ids),
+                ).all()
+                for node in nodes:
+                    node.state = "tombstone"
+                    node.history_id = None
+                    node.description_hash = None
+                    node.render_hash = None
+                    node.deleted_at = now
+                touching = session.query(LineageEdgeRow).filter(
+                    or_(
+                        LineageEdgeRow.parent_node_id.in_(node_ids),
+                        LineageEdgeRow.child_node_id.in_(node_ids),
+                    ),
+                ).all()
+                for edge in touching:
+                    edge.metadata_json = "{}"
+            self.delete_acl_for_histories_fn(session, [row.id for row in rows])
+            for row in rows:
+                session.delete(row)
+            session.commit()
+            return len(rows)
+
+
+@dataclass(frozen=True)
 class HistoryShareWriter:
     """Write a work's group-read bit and its retained destination."""
 

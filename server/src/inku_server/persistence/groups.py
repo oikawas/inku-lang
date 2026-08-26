@@ -131,6 +131,49 @@ class PermissionGroupSeeder:
 
 
 @dataclass(frozen=True)
+class LegacyRoleMembershipMigrator:
+    session_factory: Callable[[], Any]
+    uuid_fn: Callable[[], object]
+    now_ms_fn: Callable[[], int]
+
+    def migrate(self, session=None) -> None:
+        if session is not None:
+            self._migrate_in_session(session, owns_session=False)
+            return
+        with self.session_factory() as active_session:
+            self._migrate_in_session(active_session, owns_session=True)
+
+    def _migrate_in_session(self, session, *, owns_session: bool) -> None:
+        by_name = PermissionGroupMembershipStore(self.uuid_fn, self.now_ms_fn).group_ids(session)
+        if not by_name:
+            return
+        assigned = {
+            user_id
+            for (user_id,) in session.query(UserPermissionGroupRow.user_id).distinct().all()
+        }
+        added = False
+        for row in session.query(UserAccountRow).all():
+            if row.id in assigned:
+                continue
+            name = LEGACY_ROLE_TO_PERMISSION_GROUP.get(row.role, "users")
+            session.add(
+                UserPermissionGroupRow(
+                    id=str(self.uuid_fn()),
+                    user_id=row.id,
+                    permission_group_id=by_name[name],
+                    at=self.now_ms_fn(),
+                )
+            )
+            added = True
+        if not added:
+            return
+        if owns_session:
+            session.commit()
+        else:
+            session.flush()
+
+
+@dataclass(frozen=True)
 class UserGroupStore:
     session_factory: Callable[[], Any]
     uuid_fn: Callable[[], object]

@@ -7,9 +7,18 @@ import org.json.JSONObject
 internal object WebScoreTool {
     val submitScore = ModelTool(
         name = "submit_score",
-        description = "正規化DDLから導出した JSON Score を提出する。",
-        parametersJson = ServerScoreSchemaJson.parameters,
+        description = "正規化DDLから導出した、1件以上の描画命令を持つ JSON Score を提出する。",
+        parametersJson = drawableParametersJson(),
     )
+
+    private fun drawableParametersJson(): String {
+        val parameters = JSONObject(ServerScoreSchemaJson.parameters)
+        parameters
+            .getJSONObject("properties")
+            .getJSONObject("instructions")
+            .put("minItems", 1)
+        return parameters.toString()
+    }
 
     fun extractJsonObject(text: String): JSONObject {
         val trimmed = text.trim()

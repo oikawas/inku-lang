@@ -47,6 +47,8 @@ class LocalVisionRequestContractTest {
         assertTrue(provider.contains("VisionAnalyzer"))
         assertTrue(provider.contains("Content.ImageBytes"))
         assertTrue(provider.contains("Content.Text"))
+        assertTrue(provider.contains("message.contents.contents"))
+        assertFalse(provider.contains("renderMessageIntoString"))
         assertTrue(provider.contains("visionBackend = Backend.GPU()"))
         assertTrue(provider.contains("inferenceMutex.withLock"))
     }

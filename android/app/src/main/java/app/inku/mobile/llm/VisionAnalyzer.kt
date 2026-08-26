@@ -25,6 +25,44 @@ interface VisionAnalyzer {
     suspend fun analyze(request: VisionAnalysisRequest): VisionAnalysisResult
 }
 
+/** Converts structured LiteRT-LM stream content into app-visible model text. */
+internal object LocalLiteRtLmOutput {
+    private val templateMarkers = listOf(
+        Regex("""(?i)<jturn>\s*(?:model|user)?"""),
+        Regex("""(?i)<start_of_turn>\s*(?:model|user)?"""),
+        Regex("""(?i)<end_of_turn>"""),
+        Regex("""(?i)<\|turn>\s*(?:model|user)?"""),
+        Regex("""(?i)<turn\|>"""),
+        Regex("""<\|[^>]+>"""),
+    )
+
+    fun appendStreamChunk(current: StringBuilder, chunk: String) {
+        if (chunk.isEmpty()) return
+        if (current.isEmpty()) {
+            current.append(chunk)
+            return
+        }
+        val existing = current.toString()
+        when {
+            chunk == existing -> Unit
+            chunk.startsWith(existing) -> current.append(chunk.substring(existing.length))
+            else -> current.append(chunk)
+        }
+    }
+
+    fun modelText(text: String): String = templateMarkers
+        .fold(text) { cleaned, marker -> cleaned.replace(marker, "") }
+        .trim()
+
+    fun visionDescription(text: String, languageCode: String): String {
+        val lineJoin = if (languageCode == "en") " " else ""
+        return modelText(text)
+            .replace(Regex("""[ \t]*[\r\n]+[ \t]*"""), lineJoin)
+            .replace(Regex("""[ \t]{2,}"""), " ")
+            .trim()
+    }
+}
+
 /** One owner for the equivalent JA / EN local-observation prompts. */
 internal object VisionPrompts {
     const val VERSION = "camera-description-v1"

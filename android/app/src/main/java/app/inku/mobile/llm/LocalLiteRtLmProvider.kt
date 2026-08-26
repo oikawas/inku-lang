@@ -56,10 +56,10 @@ class LocalLiteRtLmProvider(
                 try {
                     withTimeout(REQUEST_TIMEOUT_MS) {
                         conversation.sendMessageAsync(prompt).collect { message ->
-                            val rendered = conversation.renderMessageIntoString(message).trim()
-                            if (rendered.isNotBlank()) {
-                                mergeStreamText(text, rendered)
-                            }
+                            val chunk = message.contents.contents
+                                .filterIsInstance<Content.Text>()
+                                .joinToString("") { it.text }
+                            LocalLiteRtLmOutput.appendStreamChunk(text, chunk)
                         }
                     }
                 } catch (error: TimeoutCancellationException) {
@@ -69,7 +69,8 @@ class LocalLiteRtLmProvider(
                     conversation.cancelProcess()
                     throw error
                 }
-                text.toString().ifBlank { error("LiteRT-LM returned an empty response.") }
+                LocalLiteRtLmOutput.modelText(text.toString())
+                    .ifBlank { error("LiteRT-LM returned an empty response.") }
             }
             Log.i(
                 PERF_TAG,
@@ -115,8 +116,10 @@ class LocalLiteRtLmProvider(
                     try {
                         withTimeout(REQUEST_TIMEOUT_MS) {
                             conversation.sendMessageAsync(contents).collect { message ->
-                                val rendered = conversation.renderMessageIntoString(message).trim()
-                                if (rendered.isNotBlank()) mergeStreamText(text, rendered)
+                                val chunk = message.contents.contents
+                                    .filterIsInstance<Content.Text>()
+                                    .joinToString("") { it.text }
+                                LocalLiteRtLmOutput.appendStreamChunk(text, chunk)
                             }
                         }
                     } catch (error: TimeoutCancellationException) {
@@ -126,7 +129,8 @@ class LocalLiteRtLmProvider(
                         conversation.cancelProcess()
                         throw error
                     }
-                    text.toString().trim().ifBlank { error("Local image analysis returned an empty description.") }
+                    LocalLiteRtLmOutput.visionDescription(text.toString(), request.languageCode)
+                        .ifBlank { error("Local image analysis returned an empty description.") }
                 }
                 val elapsedMs = System.currentTimeMillis() - started
                 Log.i(
@@ -223,20 +227,6 @@ class LocalLiteRtLmProvider(
             temperature = 0.2,
         ),
     )
-
-    private fun mergeStreamText(current: StringBuilder, rendered: String) {
-        if (current.isEmpty()) {
-            current.append(rendered)
-            return
-        }
-        val existing = current.toString()
-        if (rendered == existing) return
-        if (rendered.startsWith(existing)) {
-            current.append(rendered.substring(existing.length))
-            return
-        }
-        current.append(rendered)
-    }
 
     suspend fun close() {
         inferenceMutex.withLock {

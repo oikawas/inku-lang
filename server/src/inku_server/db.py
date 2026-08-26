@@ -52,11 +52,9 @@ from .persistence.schema import (
     LineageEdgeRow,
     LineageNodeRow,
     OkugakiRow,
-    PermissionGroupRow,
     UnreadWordRow,  # noqa: F401 - compatibility re-export for direct integrity readers
     UserAccountRow,
     UserGroupRow,
-    UserPermissionGroupRow,
     UserSessionRow,  # noqa: F401 - compatibility re-export for direct session readers
 )
 from .persistence.migrations import MigrationExecutionError, ensure_current_schema, install_history_fts
@@ -847,30 +845,16 @@ def delete_okugaki(user_id: str, okugaki_id: str) -> bool:
 
 
 
-def _oldest_admin_id(session) -> str | None:
-    """The administrator who has been here longest.
+def _account_owner_resolver() -> _accounts.AccountOwnerResolver:
+    return _accounts.AccountOwnerResolver(SessionLocal)
 
-    Shared by the history-owner fallback and by single-user mode so the two
-    can never drift into naming different people.
-    """
-    admin = (
-        session.query(UserAccountRow)
-        .join(UserPermissionGroupRow, UserPermissionGroupRow.user_id == UserAccountRow.id)
-        .join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id)
-        .filter(PermissionGroupRow.name == "admins")
-        .order_by(UserAccountRow.at.asc())
-        .first()
-    )
-    return admin.id if admin else None
+
+def _oldest_admin_id(session) -> str | None:
+    return _account_owner_resolver().oldest_admin_id(session)
 
 
 def _history_owner_user_id(session: Session | None = None) -> str | None:
-    with _session_scope(session) as (active_session, _owns_session):
-        admin_id = _oldest_admin_id(active_session)
-        if admin_id:
-            return admin_id
-        user = active_session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
-        return user.id if user else None
+    return _account_owner_resolver().history_owner_user_id(session)
 
 
 def admin_history_owner_id() -> str | None:

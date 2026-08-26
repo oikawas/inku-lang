@@ -1432,7 +1432,7 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        awaitPointerEvent(PointerEventPass.Final).changes.forEach { it.consume() }
                     }
                 }
             }

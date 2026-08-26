@@ -504,13 +504,12 @@ def verify_password(password: str, stored_hash: str) -> bool:
 _DUMMY_PASSWORD_HASH = _accounts.DUMMY_PASSWORD_HASH
 
 
+def _default_user_group_seeder() -> _groups.DefaultUserGroupSeeder:
+    return _groups.DefaultUserGroupSeeder(SessionLocal, uuid.uuid4, _now_ms)
+
+
 def _ensure_default_user_group(session: Session | None = None) -> None:
-    with _session_scope(session) as (active_session, owns_session):
-        exists = active_session.query(UserGroupRow).first()
-        if exists:
-            return
-        active_session.add(UserGroupRow(id=str(uuid.uuid4()), name="default", at=_now_ms()))
-        _finish_session(active_session, owns_session)
+    return _default_user_group_seeder().ensure(session)
 
 
 def has_permission_group(actor: dict, name: str) -> bool:

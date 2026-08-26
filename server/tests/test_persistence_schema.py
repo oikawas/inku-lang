@@ -13,7 +13,7 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = SERVER_ROOT / "src" / "inku_server" / "db.py"
 OWNER_PATH = SERVER_ROOT / "src" / "inku_server" / "persistence" / "schema.py"
-MODEL_NAMES = (
+SCHEMA_MODEL_NAMES = (
     "Base",
     "HistoryRow",
     "CoerceTraceCatalogRow",
@@ -30,6 +30,7 @@ MODEL_NAMES = (
     "ExternalIdentityRow",
     "AppSettingRow",
 )
+DB_COMPAT_MODEL_NAMES = tuple(name for name in SCHEMA_MODEL_NAMES if name != "AppSettingRow")
 EXPECTED_TABLE_NAMES = {
     "history",
     "coerce_trace_catalogs",
@@ -70,13 +71,16 @@ def test_orm_schema_has_one_persistence_owner_and_creates_the_same_tables():
         for node in ast.parse(DB_PATH.read_text()).body
         if isinstance(node, ast.ClassDef)
     }
-    assert inline_classes.isdisjoint(MODEL_NAMES)
+    assert inline_classes.isdisjoint(SCHEMA_MODEL_NAMES)
 
     from inku_server import db
     from inku_server.persistence import schema
 
-    for name in MODEL_NAMES:
+    for name in SCHEMA_MODEL_NAMES:
+        assert hasattr(schema, name)
+    for name in DB_COMPAT_MODEL_NAMES:
         assert getattr(db, name) is getattr(schema, name)
+    assert not hasattr(db, "AppSettingRow")
     assert db.Base.metadata is schema.Base.metadata
     assert (
         hashlib.sha256(_compiled_schema_payload(schema.Base)).hexdigest()

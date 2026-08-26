@@ -1441,12 +1441,12 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                 contentDescription = presentation.message
                 if (presentation.politeLiveRegion) liveRegion = LiveRegionMode.Polite
             },
-        color = Color(0xFF171717),
+        color = CameraDevelopmentBackdrop,
     ) {
         Box(modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl), contentAlignment = Alignment.Center) {
             Surface(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp).aspectRatio(0.78f),
-                color = Color(0xFFF8F5EE),
+                modifier = Modifier.fillMaxWidth().widthIn(max = Dimens.cameraDevelopmentCardMaxWidth).aspectRatio(0.78f),
+                color = CameraDevelopmentPaper,
                 shape = RoundedCornerShape(Dimens.radiusCard),
                 shadowElevation = Dimens.spaceL,
             ) {
@@ -1463,7 +1463,7 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                     Text(
                         presentation.message,
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF1C1C1C),
+                        color = CameraDevelopmentInk,
                         textAlign = TextAlign.Center,
                     )
                     cameraStatusText(state.cameraCaptureState)
@@ -1472,7 +1472,7 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                             Text(
                                 state.message?.takeIf(String::isNotBlank) ?: detail,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF5D554F),
+                                color = CameraDevelopmentMutedInk,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -1483,14 +1483,14 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                         if (presentation.showRetry) {
                             Button(
                                 onClick = viewModel::retryCameraDevelopment,
-                                modifier = Modifier.heightIn(min = 48.dp),
+                                modifier = Modifier.heightIn(min = Dimens.cameraControlMinHeight),
                             ) {
                                 Text(S.retry)
                             }
                         }
                         OutlinedButton(
                             onClick = viewModel::cancelCameraDevelopment,
-                            modifier = Modifier.heightIn(min = 48.dp),
+                            modifier = Modifier.heightIn(min = Dimens.cameraControlMinHeight),
                         ) {
                             Text(S.cancel)
                         }
@@ -1508,29 +1508,29 @@ private fun CameraDevelopmentEffectCanvas(
     modifier: Modifier = Modifier,
 ) {
     val vivid = listOf(
-        Color(0xFFF50087),
-        Color(0xFF008F39),
-        Color(0xFF73C2FB),
-        Color(0xFFFF9800),
-        Color(0xFF8A4FC9),
-        Color(0xFFFFF200),
+        CameraDevelopmentVividPink,
+        CameraDevelopmentVividGreen,
+        CameraDevelopmentVividSky,
+        CameraDevelopmentVividOrange,
+        CameraDevelopmentVividPurple,
+        CameraDevelopmentVividYellow,
     )
     Canvas(modifier = modifier.clipToBounds()) {
-        drawRect(Color(0xFFF4F4F4))
+        drawRect(CameraDevelopmentCanvasPaper)
         when (effect) {
             CameraDevelopmentEffect.PaperExposure -> {
-                drawCircle(Color(0xFFFFF2B8).copy(alpha = 0.16f + pulse * 0.18f), radius = size.minDimension * 0.38f, center = center)
+                drawCircle(CameraDevelopmentExposureGlow.copy(alpha = 0.16f + pulse * 0.18f), radius = size.minDimension * 0.38f, center = center)
                 repeat(18) { index ->
                     val x = size.width * ((index * 37 % 101) / 100f)
                     val y = size.height * ((index * 61 % 97) / 96f)
-                    drawCircle(Color(0xFF7D6F66).copy(alpha = 0.08f + pulse * 0.06f), 1.5f + index % 3, Offset(x, y))
+                    drawCircle(CameraDevelopmentGrain.copy(alpha = 0.08f + pulse * 0.06f), 1.5f + index % 3, Offset(x, y))
                 }
             }
             CameraDevelopmentEffect.GrainAndForms -> {
                 repeat(8) { index ->
                     val x = size.width * (0.12f + (index % 4) * 0.24f)
                     val y = size.height * (0.18f + (index / 4) * 0.5f)
-                    drawCircle(Color(0xFF7D6F66).copy(alpha = 0.16f + pulse * 0.16f), size.minDimension * (0.05f + (index % 3) * 0.02f), Offset(x, y))
+                    drawCircle(CameraDevelopmentGrain.copy(alpha = 0.16f + pulse * 0.16f), size.minDimension * (0.05f + (index % 3) * 0.02f), Offset(x, y))
                 }
             }
             CameraDevelopmentEffect.VividColorFields -> {
@@ -1554,7 +1554,7 @@ private fun CameraDevelopmentEffectCanvas(
                         center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
                     )
                     drawCircle(
-                        Color(0xFF1C1C1C).copy(alpha = 0.45f + pulse * 0.35f),
+                        CameraDevelopmentOutline.copy(alpha = 0.45f + pulse * 0.35f),
                         radius = size.minDimension * (0.1f + (index % 2) * 0.03f),
                         center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
                         style = Stroke(width = 2f + pulse * 2f),
@@ -3608,13 +3608,13 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 ChipButton(
                     S.cameraVisionModeDescription,
                     selected = state.cameraVisionOutputMode == VisionOutputMode.DESCRIPTION,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
                     onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DESCRIPTION) },
                 )
                 ChipButton(
                     S.cameraVisionModeDdl,
                     selected = state.cameraVisionOutputMode == VisionOutputMode.DDL,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
                     onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DDL) },
                 )
             }

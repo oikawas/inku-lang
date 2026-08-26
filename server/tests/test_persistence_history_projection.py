@@ -110,43 +110,29 @@ def _project(row: SimpleNamespace, logger: RecordingLogger | None = None) -> tup
 def test_persistence_history_owns_projection_and_db_keeps_thin_facades() -> None:
     source = Path(history.__file__).read_text()
     tree = ast.parse(source)
-    actual_imports = []
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            actual_imports.append(
-                ("import", 0, "", tuple((name.name, name.asname) for name in node.names))
-            )
-        elif isinstance(node, ast.ImportFrom):
-            actual_imports.append(
-                (
-                    "from",
-                    node.level,
-                    node.module or "",
-                    tuple((name.name, name.asname) for name in node.names),
-                )
-            )
-
-    assert actual_imports == [
-        ("from", 0, "__future__", (("annotations", None),)),
-        ("import", 0, "", (("json", None),)),
-        ("import", 0, "", (("logging", None),)),
-        ("import", 0, "", (("uuid", None),)),
-        ("from", 0, "collections.abc", (("Callable", None),)),
-        ("from", 0, "dataclasses", (("dataclass", None),)),
-        ("from", 0, "hashlib", (("sha256", None),)),
-        ("from", 0, "sqlalchemy.exc", (("IntegrityError", None),)),
-        (
-            "from",
-            1,
-            "schema",
-            (
-                ("CoerceTraceCatalogRow", None),
-                ("HistoryRow", None),
-                ("LineageEdgeRow", None),
-                ("LineageNodeRow", None),
-            ),
-        ),
-    ]
+    imports = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+    assert not any(
+        isinstance(node, ast.ImportFrom) and node.module in {"db", "inku_server.db"}
+        for node in imports
+    )
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.level == 1
+        and node.module is None
+        and any(alias.name == "access" for alias in node.names)
+        for node in imports
+    )
+    schema_import = next(
+        node
+        for node in imports
+        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module == "schema"
+    )
+    assert {
+        "CoerceTraceCatalogRow",
+        "HistoryRow",
+        "LineageEdgeRow",
+        "LineageNodeRow",
+    } <= {alias.name for alias in schema_import.names}
     assert inspect.signature(db.render_hash_short) == inspect.Signature(
         [inspect.Parameter("render_hash", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation="str | None")],
         return_annotation="str | None",

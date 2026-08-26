@@ -19,9 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
 import app.inku.mobile.ui.InkuApp
+import app.inku.mobile.ui.theme.Dimens
 import app.inku.mobile.ui.theme.InkuColors
 
 class MainActivity : ComponentActivity() {
@@ -49,8 +49,8 @@ internal fun DatabaseStartupRefusedScreen(onRetry: () -> Unit) {
             color = MaterialTheme.colorScheme.background,
         ) {
             Column(
-                modifier = Modifier.padding(32.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
+                modifier = Modifier.padding(Dimens.databaseStartupPageInset),
+                verticalArrangement = Arrangement.spacedBy(Dimens.databaseStartupGap, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(

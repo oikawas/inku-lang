@@ -94,6 +94,9 @@ object Dimens {
     /** 44dp. The narrowest a presentation control may get. */
     val presentationControlMinWidth: Dp = 44.dp
 
+    /** 48dp. The minimum touch height for camera actions and camera-mode choices. */
+    val cameraControlMinHeight: Dp = 48.dp
+
     /** 56dp. 主 -- the one action a screen is for. */
     val buttonHeightLarge: Dp = 56.dp
 
@@ -167,6 +170,9 @@ object Dimens {
     /** 420dp. The add-provider card. */
     val addProviderCardHeight: Dp = 420.dp
 
+    /** 440dp. The camera-development card's readable maximum width. */
+    val cameraDevelopmentCardMaxWidth: Dp = 440.dp
+
     /** 432dp. The model selection dialog. */
     val modelDialogMaxHeight: Dp = 432.dp
 
@@ -181,4 +187,12 @@ object Dimens {
 
     /** 680dp. The local model management dialog. */
     val localModelDialogMaxHeight: Dp = 680.dp
+
+    // --- Database startup refusal -----------------------------------------
+
+    /** 32dp. Page inset on the startup refusal screen. */
+    val databaseStartupPageInset: Dp = 32.dp
+
+    /** 20dp. Preserved separation between refusal-screen blocks. */
+    val databaseStartupGap: Dp = 20.dp
 }

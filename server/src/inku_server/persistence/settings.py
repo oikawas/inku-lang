@@ -105,6 +105,18 @@ RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
 RENDER_CONCURRENCY_MIN = 1
 RENDER_CONCURRENCY_MAX = 16
 RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
+THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
+# Off by default: the second size doubles the rebuild and roughly quadruples the
+# stored bytes, and is worth neither until someone is looking at the listing on
+# a HiDPI screen.
+# The parallelism is the administrator's to enter: nothing here reads the core
+# count, and in a container the host's count is the wrong answer anyway.
+THUMBNAIL_DEFAULT_SETTINGS = {
+    "hidpi": False,
+    "workers": 4,
+}
+THUMBNAIL_WORKERS_MIN = 1
+THUMBNAIL_WORKERS_MAX = 16
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -410,6 +422,23 @@ def normalize_render_concurrency_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_thumbnail_settings(settings: dict | None) -> dict:
+    clean = dict(THUMBNAIL_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "hidpi" in settings:
+        clean["hidpi"] = bool(settings["hidpi"])
+    if "workers" in settings:
+        try:
+            workers = int(settings["workers"])
+        except (TypeError, ValueError):
+            workers = clean["workers"]
+        clean["workers"] = max(
+            THUMBNAIL_WORKERS_MIN, min(THUMBNAIL_WORKERS_MAX, workers)
+        )
+    return clean
+
+
 @dataclass(frozen=True)
 class UserPluginStorageStore:
     """Read and write one user's validated plugin storage."""
@@ -547,6 +576,22 @@ class RenderLimitSettingsStore:
             )
         clean = self.normalize(current)
         return self.app_settings.write(RENDER_LIMIT_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class ThumbnailSettingsStore:
+    """Read and write normalized thumbnail settings."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_thumbnail_settings(
+            self.app_settings.read(THUMBNAIL_SETTINGS_KEY)
+        )
+
+    def update(self, hidpi: bool, workers: int) -> dict:
+        clean = normalize_thumbnail_settings({"hidpi": hidpi, "workers": workers})
+        return self.app_settings.write(THUMBNAIL_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

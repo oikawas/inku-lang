@@ -605,18 +605,11 @@ def _normalize_permission_groups(names) -> list[str]:
 
 
 def _permission_group_ids(session) -> dict[str, str]:
-    return {row.name: row.id for row in session.query(PermissionGroupRow).all()}
+    return _permission_group_membership_store().group_ids(session)
 
 
 def _permission_groups_of(session, user_id: str) -> list[str]:
-    held = {
-        name
-        for (name,) in session.query(PermissionGroupRow.name)
-        .join(UserPermissionGroupRow, UserPermissionGroupRow.permission_group_id == PermissionGroupRow.id)
-        .filter(UserPermissionGroupRow.user_id == user_id)
-        .all()
-    }
-    return [name for name in PERMISSION_GROUPS if name in held]
+    return _permission_group_membership_store().groups_of(session, user_id)
 
 
 def _set_permission_groups(session, row: UserAccountRow, names) -> list[str]:
@@ -625,25 +618,7 @@ def _set_permission_groups(session, row: UserAccountRow, names) -> list[str]:
     Writes the memberships that decide what the member may do, then the legacy
     role column that only exists so older builds can still read this database.
     """
-    wanted = _normalize_permission_groups(names)
-    by_name = _permission_group_ids(session)
-    missing = [name for name in wanted if name not in by_name]
-    if missing:
-        raise ValueError(f"permission group not found: {missing[0]}")
-    session.query(UserPermissionGroupRow).filter(
-        UserPermissionGroupRow.user_id == row.id
-    ).delete(synchronize_session=False)
-    for name in wanted:
-        session.add(
-            UserPermissionGroupRow(
-                id=str(uuid.uuid4()),
-                user_id=row.id,
-                permission_group_id=by_name[name],
-                at=_now_ms(),
-            )
-        )
-    row.role = _derived_role(wanted)
-    return wanted
+    return _permission_group_membership_store().set_groups(session, row, names)
 
 
 def _holds_no_elevated_group(session):
@@ -652,12 +627,11 @@ def _holds_no_elevated_group(session):
     Asks the memberships rather than the role mirror, so an account whose legacy
     column still says `user` is judged by what it actually holds.
     """
-    elevated = (
-        session.query(UserPermissionGroupRow.user_id)
-        .join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id)
-        .filter(PermissionGroupRow.name.in_(_ELEVATED_PERMISSION_GROUPS))
-    )
-    return ~UserAccountRow.id.in_(elevated)
+    return _permission_group_membership_store().holds_no_elevated_group(session)
+
+
+def _permission_group_membership_store() -> _groups.PermissionGroupMembershipStore:
+    return _groups.PermissionGroupMembershipStore(uuid.uuid4, _now_ms)
 
 
 def _ensure_permission_groups(session: Session | None = None) -> None:

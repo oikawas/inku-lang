@@ -90,3 +90,50 @@ class UserAccountReader:
                 .all()
             )
             return [{"id": peer.id, "username": peer.username} for peer in peers]
+
+
+@dataclass(frozen=True)
+class UserAccountCreator:
+    session_factory: Callable[[], Any]
+    uuid_fn: Callable[[], Any]
+    now_fn: Callable[[], int]
+    hash_password_fn: Callable[[str], str]
+    normalize_permission_groups_fn: Callable[[list[str]], list[str]]
+    derived_role_fn: Callable[[list[str]], str]
+    set_permission_groups_fn: Callable[[Any, UserAccountRow, list[str]], list[str]]
+    user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+
+    def add_user(
+        self,
+        username: str,
+        email: str,
+        password: str,
+        permission_groups: list[str],
+        group_id: str | None,
+    ) -> dict:
+        username = username.strip()
+        email = email.strip()
+        if not username:
+            raise ValueError("username is required")
+        if not email:
+            raise ValueError("email is required")
+        wanted = self.normalize_permission_groups_fn(permission_groups)
+        row = UserAccountRow(
+            id=str(self.uuid_fn()),
+            username=username,
+            email=email,
+            password_hash=self.hash_password_fn(password),
+            role=self.derived_role_fn(wanted),
+            group_id=group_id,
+            at=self.now_fn(),
+        )
+        with self.session_factory() as session:
+            if group_id and not session.get(UserGroupRow, group_id):
+                raise ValueError("group not found")
+            session.add(row)
+            session.commit()
+            self.set_permission_groups_fn(session, row, wanted)
+            session.commit()
+            session.refresh(row)
+            group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+            return self.user_to_dict_fn(row, group_name)

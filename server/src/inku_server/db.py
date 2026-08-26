@@ -1741,33 +1741,21 @@ def list_group_peers(user_id: str) -> list[dict]:
     return _account_reader().list_group_peers(user_id)
 
 
-def add_user(username: str, email: str, password: str, permission_groups: list[str], group_id: str | None) -> dict:
-    username = username.strip()
-    email = email.strip()
-    if not username:
-        raise ValueError("username is required")
-    if not email:
-        raise ValueError("email is required")
-    wanted = _normalize_permission_groups(permission_groups)
-    row = UserAccountRow(
-        id=str(uuid.uuid4()),
-        username=username,
-        email=email,
-        password_hash=_hash_password(password),
-        role=_derived_role(wanted),
-        group_id=group_id,
-        at=_now_ms(),
+def _account_creator() -> _accounts.UserAccountCreator:
+    return _accounts.UserAccountCreator(
+        SessionLocal,
+        uuid.uuid4,
+        _now_ms,
+        _hash_password,
+        _normalize_permission_groups,
+        _derived_role,
+        _set_permission_groups,
+        _user_to_dict,
     )
-    with SessionLocal() as session:
-        if group_id and not session.get(UserGroupRow, group_id):
-            raise ValueError("group not found")
-        session.add(row)
-        session.commit()
-        _set_permission_groups(session, row, wanted)
-        session.commit()
-        session.refresh(row)
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+
+
+def add_user(username: str, email: str, password: str, permission_groups: list[str], group_id: str | None) -> dict:
+    return _account_creator().add_user(username, email, password, permission_groups, group_id)
 
 
 def update_user(

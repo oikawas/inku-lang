@@ -1167,15 +1167,10 @@ def db_backup_status() -> dict:
 
 
 def _assign_unowned_history_to_admin(session: Session | None = None) -> None:
-    with _session_scope(session) as (active_session, owns_session):
-        owner_id = _history_owner_user_id(active_session)
-        if not owner_id:
-            return
-        active_session.query(HistoryRow).filter(HistoryRow.user_id.is_(None)).update(
-            {HistoryRow.user_id: owner_id},
-            synchronize_session=False,
-        )
-        _finish_session(active_session, owns_session)
+    return _history.UnownedHistoryOwnerBackfill(
+        SessionLocal,
+        _history_owner_user_id,
+    ).assign(session)
 
 
 def _row_to_dict(row: HistoryRow) -> dict:

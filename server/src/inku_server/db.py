@@ -33,6 +33,7 @@ from .persistence import access as _access
 from .persistence import okugaki as _okugaki
 from .persistence import sessions as _sessions
 from .persistence import settings as _settings
+from .persistence import engine as _persistence_engine
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
 from .persistence.legacy_schema import (
@@ -1134,18 +1135,11 @@ def single_user_pin_status() -> dict:
 
 
 def database_info() -> dict:
-    url = engine.url
-    db_path = _sqlite_db_path()
-    file_size = db_path.stat().st_size if db_path and db_path.exists() else None
-    return {
-        "backend": url.get_backend_name(),
-        "driver": url.get_driver_name(),
-        "url": url.render_as_string(hide_password=True),
-        "database": url.database,
-        "is_default": PERSISTENCE_CONFIG.canonical_is_default,
-        "file_size_bytes": file_size,
-        "file_path": str(db_path) if db_path else None,
-    }
+    return _database_info_reader().get()
+
+
+def _database_info_reader() -> _persistence_engine.DatabaseInfoReader:
+    return _persistence_engine.DatabaseInfoReader(engine, PERSISTENCE_CONFIG)
 
 
 def _sqlite_db_path() -> Path | None:

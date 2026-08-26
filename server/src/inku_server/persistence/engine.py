@@ -8,7 +8,12 @@ from sqlalchemy import create_engine as _sqlalchemy_create_engine
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from .config import validate_sqlite_url
+from .config import (
+    CANONICAL_DB_ENV,
+    PersistenceConfig,
+    sqlite_database_path,
+    validate_sqlite_url,
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +33,35 @@ CANONICAL_SQLITE_PRAGMAS = SQLitePragmas(
 # Thumbnail rebuilds write from a worker pool while listings read. WAL lets
 # those overlap instead of serializing every reader behind the writer.
 THUMBNAIL_SQLITE_PRAGMAS = SQLitePragmas(wal=True)
+
+
+@dataclass(frozen=True)
+class DatabaseInfoReader:
+    """Report the selected canonical store without opening or changing it."""
+
+    engine: Engine
+    config: PersistenceConfig
+
+    def get(self) -> dict:
+        url = self.engine.url
+        database_path = sqlite_database_path(
+            self.config.canonical_url,
+            setting=CANONICAL_DB_ENV,
+        )
+        file_size = (
+            database_path.stat().st_size
+            if database_path is not None and database_path.exists()
+            else None
+        )
+        return {
+            "backend": url.get_backend_name(),
+            "driver": url.get_driver_name(),
+            "url": url.render_as_string(hide_password=True),
+            "database": url.database,
+            "is_default": self.config.canonical_is_default,
+            "file_size_bytes": file_size,
+            "file_path": str(database_path) if database_path else None,
+        }
 
 
 def create_sqlite_engine(

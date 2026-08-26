@@ -58,6 +58,27 @@ DEMO_DEFAULT_SETTINGS = {
     "interval_seconds": 30,
     "timeout_seconds": 3600,
 }
+EXPORT_TEMPLATE_LIMIT = 20
+EXPORT_TEMPLATE_DEFAULTS = [
+    {
+        "id": "png-1080",
+        "name": "PNG 1080px",
+        "description": "PNG / Y軸 1080px",
+        "y_px": 1080,
+    },
+    {
+        "id": "png-2160",
+        "name": "PNG 2160px",
+        "description": "PNG / Y軸 2160px",
+        "y_px": 2160,
+    },
+    {
+        "id": "png-4320",
+        "name": "PNG 4320px",
+        "description": "PNG / Y軸 4320px",
+        "y_px": 4320,
+    },
+]
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -210,6 +231,87 @@ class UserDemoSettingsStore:
             if not row:
                 return None
             row.demo_settings = json.dumps(clean, ensure_ascii=False)
+            session.commit()
+            return clean
+
+
+def normalize_export_templates(items: list[dict]) -> list[dict]:
+    if not isinstance(items, list):
+        raise ValueError("export templates must be a list")
+    if (
+        len(items) == 2
+        and items[0].get("id") == "png-1024"
+        and items[0].get("y_px") == 1024
+        and items[1].get("id") == "png-2048"
+        and items[1].get("y_px") == 2048
+    ):
+        return [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("export template must be an object")
+        template_id = item.get("id")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise ValueError("export template id is required")
+        template_id = template_id.strip()[:80]
+        if template_id in seen:
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("export template name is required")
+        description = item.get("description", "")
+        if not isinstance(description, str):
+            raise ValueError("export template description must be a string")
+        try:
+            y_px = int(item.get("y_px"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("export template y_px must be an integer") from exc
+        if y_px < 64 or y_px > 12000:
+            raise ValueError("export template y_px must be between 64 and 12000")
+        normalized.append(
+            {
+                "id": template_id,
+                "name": name.strip()[:80],
+                "description": description.strip()[:240],
+                "y_px": y_px,
+            }
+        )
+        seen.add(template_id)
+        if len(normalized) >= EXPORT_TEMPLATE_LIMIT:
+            break
+    return normalized or [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+
+
+@dataclass(frozen=True)
+class UserExportTemplateStore:
+    """Read and write one user's normalized export templates."""
+
+    session_factory: Callable[[], Session]
+
+    def get(self, user_id: str) -> list[dict]:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+            try:
+                parsed = json.loads(row.export_templates or "[]")
+            except json.JSONDecodeError:
+                return [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+            if not isinstance(parsed, list) or not parsed:
+                return [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+            try:
+                return normalize_export_templates(parsed)
+            except ValueError:
+                return [dict(item) for item in EXPORT_TEMPLATE_DEFAULTS]
+
+    def update(self, user_id: str, items: list[dict]) -> list[dict] | None:
+        clean = normalize_export_templates(items)
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            row.export_templates = json.dumps(clean, ensure_ascii=False)
             session.commit()
             return clean
 

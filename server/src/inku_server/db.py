@@ -934,22 +934,18 @@ def set_single_user_pin(user_id: str) -> dict:
     return _single_user_pin_updater().update(user_id)
 
 
+def _single_user_pin_status_reader() -> _accounts.SingleUserPinStatusReader:
+    return _accounts.SingleUserPinStatusReader(
+        _single_user_pin_store(),
+        get_user,
+        SessionLocal,
+        _permission_groups_of,
+        single_user_mode_enabled,
+    )
+
+
 def single_user_pin_status() -> dict:
-    """Who the app opens as, and who it could open as instead."""
-    pinned_id = single_user_pinned_id()
-    pinned = get_user(pinned_id) if pinned_id else None
-    with SessionLocal() as session:
-        eligible = [
-            {"id": row.id, "username": row.username}
-            for row in session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).all()
-            if "admins" in _permission_groups_of(session, row.id)
-        ]
-    return {
-        "enabled": single_user_mode_enabled(),
-        "user_id": pinned_id,
-        "username": pinned["username"] if pinned else None,
-        "eligible": eligible,
-    }
+    return _single_user_pin_status_reader().read()
 
 
 def database_info() -> dict:

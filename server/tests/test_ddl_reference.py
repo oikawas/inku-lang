@@ -564,13 +564,14 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # The Japanese pair is first recognized as one structural instruction;
         # its surviving solid texture is already correct when delivery runs.
         "B-stated-surface-english-delivery": {
-            "with_stated_surface_fidelity", "with_fill_as_a_surface_word",
+            "presence_from_ddl", "with_stated_surface_fidelity",
+            "with_fill_as_a_surface_word",
         },
         "B-stated-surface-fill-equivalent-duplicate": {
             "with_structural_duplicate_repair", "with_fill_as_a_surface_word",
         },
-        "B-stated-surface-two-shapes-declines": set(),
-        "B-stated-surface-empty-declines": set(),
+        "B-stated-surface-two-shapes-declines": {"presence_from_ddl"},
+        "B-stated-surface-empty-declines": {"presence_from_ddl"},
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id

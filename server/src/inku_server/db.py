@@ -141,15 +141,10 @@ _THUMBNAIL_DEFAULT_SETTINGS = {
 }
 THUMBNAIL_WORKERS_MIN = 1
 THUMBNAIL_WORKERS_MAX = 16
-_RENDER_CONCURRENCY_SETTINGS_KEY = "render_concurrency_settings"
-# INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT seed the first value only;
-# once stored, the DB row is the source of truth (admin settings screen).
-_RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
-    "server_limit": int(os.getenv("INKU_RENDER_CONCURRENCY", "2")),
-    "client_limit": int(os.getenv("INKU_CLIENT_FANOUT_LIMIT", "4")),
-}
-RENDER_CONCURRENCY_MIN = 1
-RENDER_CONCURRENCY_MAX = 16
+_RENDER_CONCURRENCY_SETTINGS_KEY = _settings.RENDER_CONCURRENCY_SETTINGS_KEY
+_RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETTINGS
+RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
+RENDER_CONCURRENCY_MAX = _settings.RENDER_CONCURRENCY_MAX
 _RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
 _LOG_RETENTION_SETTINGS_KEY = "log_retention_settings"
 _LOG_RETENTION_DEFAULT_SETTINGS = {
@@ -1241,34 +1236,23 @@ def _normalize_output_save_settings(settings: dict | None) -> dict:
 
 
 def _normalize_render_concurrency_settings(settings: dict | None) -> dict:
-    clean = dict(_RENDER_CONCURRENCY_DEFAULT_SETTINGS)
-    for key in ("server_limit", "client_limit"):
-        clean[key] = _clamped_concurrency(clean[key], key)
-    if not isinstance(settings, dict):
-        return clean
-    for key in ("server_limit", "client_limit"):
-        if key in settings:
-            clean[key] = _clamped_concurrency(settings[key], key)
-    return clean
+    return _settings.normalize_render_concurrency_settings(settings)
 
 
 def _clamped_concurrency(value: object, key: str) -> int:
-    try:
-        number = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{key} must be an integer") from exc
-    if number < RENDER_CONCURRENCY_MIN or number > RENDER_CONCURRENCY_MAX:
-        raise ValueError(f"{key} must be between {RENDER_CONCURRENCY_MIN} and {RENDER_CONCURRENCY_MAX}")
-    return number
+    return _settings.clamped_concurrency(value, key)
 
 
 def get_render_concurrency_settings() -> dict:
-    return _normalize_render_concurrency_settings(_read_app_setting(_RENDER_CONCURRENCY_SETTINGS_KEY))
+    return _render_concurrency_settings_store().get()
+
+
+def _render_concurrency_settings_store() -> _settings.RenderConcurrencySettingsStore:
+    return _settings.RenderConcurrencySettingsStore(_app_settings_store())
 
 
 def update_render_concurrency_settings(server_limit: int, client_limit: int) -> dict:
-    clean = _normalize_render_concurrency_settings({"server_limit": server_limit, "client_limit": client_limit})
-    return _write_app_setting(_RENDER_CONCURRENCY_SETTINGS_KEY, clean)
+    return _render_concurrency_settings_store().update(server_limit, client_limit)
 
 
 def get_render_limit_settings() -> dict:

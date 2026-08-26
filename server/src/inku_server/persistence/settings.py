@@ -40,6 +40,13 @@ UI_CUSTOM_KEYS = {
 HISTORY_STRIP_FIELDS = ("generation", "model", "engine_version", "bytes")
 HISTORY_STRIP_FIELD_LIMIT = 2
 HISTORY_STRIP_FIELDS_DEFAULT = ["generation", "model"]
+# How many past batch prompts a member keeps. Cut on the way in and on the way
+# out, so lowering it later drops the tail of what is already stored. The web
+# client holds the same number (BATCH_PROMPT_HISTORY_LIMIT in +page.svelte);
+# raising one without the other changes nothing, because the shorter of the two
+# is what reaches the picker.
+BATCH_PROMPT_HISTORY_LIMIT = 50
+BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -55,6 +62,57 @@ def normalize_history_strip_fields(value) -> list[str]:
     chosen = {item for item in value if item in HISTORY_STRIP_FIELDS}
     ordered = [field for field in HISTORY_STRIP_FIELDS if field in chosen]
     return ordered[:HISTORY_STRIP_FIELD_LIMIT]
+
+
+def normalize_batch_prompt_history(items: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, str):
+            raise ValueError("batch prompt history must contain strings")
+        prompt = item.strip().replace("\r\n", "\n").replace("\r", "\n")
+        if not prompt or prompt in seen:
+            continue
+        if len(prompt) > BATCH_PROMPT_HISTORY_MAX_TEXT:
+            raise ValueError("batch prompt history item is too long")
+        normalized.append(prompt)
+        seen.add(prompt)
+        if len(normalized) >= BATCH_PROMPT_HISTORY_LIMIT:
+            break
+    return normalized
+
+
+@dataclass(frozen=True)
+class UserBatchPromptHistoryStore:
+    """Read and write one user's normalized batch prompt history."""
+
+    session_factory: Callable[[], Session]
+
+    def get(self, user_id: str) -> list[str]:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return []
+            try:
+                parsed = json.loads(row.batch_prompt_history or "[]")
+            except json.JSONDecodeError:
+                return []
+            if not isinstance(parsed, list):
+                return []
+            try:
+                return normalize_batch_prompt_history(parsed)
+            except ValueError:
+                return []
+
+    def update(self, user_id: str, items: list[str]) -> list[str] | None:
+        prompts = normalize_batch_prompt_history(items)
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            row.batch_prompt_history = json.dumps(prompts, ensure_ascii=False)
+            session.commit()
+            return prompts
 
 
 @dataclass(frozen=True)

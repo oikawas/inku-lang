@@ -102,6 +102,35 @@ class DefaultUserGroupSeeder:
 
 
 @dataclass(frozen=True)
+class PermissionGroupSeeder:
+    session_factory: Callable[[], Any]
+    uuid_fn: Callable[[], object]
+    now_ms_fn: Callable[[], int]
+
+    def ensure(self, session=None) -> None:
+        if session is not None:
+            self._ensure_in_session(session, owns_session=False)
+            return
+        with self.session_factory() as active_session:
+            self._ensure_in_session(active_session, owns_session=True)
+
+    def _ensure_in_session(self, session, *, owns_session: bool) -> None:
+        existing = {row.name for row in session.query(PermissionGroupRow).all()}
+        added = False
+        for name in PERMISSION_GROUPS:
+            if name in existing:
+                continue
+            session.add(PermissionGroupRow(id=str(self.uuid_fn()), name=name, at=self.now_ms_fn()))
+            added = True
+        if not added:
+            return
+        if owns_session:
+            session.commit()
+        else:
+            session.flush()
+
+
+@dataclass(frozen=True)
 class UserGroupStore:
     session_factory: Callable[[], Any]
     uuid_fn: Callable[[], object]

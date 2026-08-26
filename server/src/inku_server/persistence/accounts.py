@@ -53,6 +53,31 @@ def verify_password(password: str, stored_hash: str) -> bool:
 DUMMY_PASSWORD_HASH = hash_password("inku-nonexistent-account-timing-guard")
 
 
+@dataclass(frozen=True)
+class BootstrapAdminPasswordResolver:
+    getenv_fn: Callable[[str, str | None], str | None]
+
+    def resolve(self) -> str | None:
+        # An empty value means unset, not a zero-length password: compose interpolation
+        # (${VAR:-}) and env-file templates hand one over whenever the operator left the
+        # field blank. Raising there would fail startup on an empty database, where the
+        # bootstrap admin is the only thing that reads this.
+        password = self.getenv_fn("INKU_BOOTSTRAP_ADMIN_PASSWORD", None)
+        if password:
+            if len(password) < 8:
+                raise ValueError(
+                    "INKU_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters"
+                )
+            return password
+
+        allow_insecure = self.getenv_fn(
+            "INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", ""
+        ).lower() in {"1", "true", "yes"}
+        if allow_insecure:
+            return "inku-admin"
+        return None
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

@@ -644,21 +644,12 @@ def _migrate_roles_to_permission_groups(session: Session | None = None) -> None:
     return _legacy_role_membership_migrator().migrate(session)
 
 
-def _bootstrap_admin_password() -> str | None:
-    # An empty value means unset, not a zero-length password: compose interpolation
-    # (${VAR:-}) and env-file templates hand one over whenever the operator left the
-    # field blank. Raising there would fail startup on an empty database, where the
-    # bootstrap admin is the only thing that reads this.
-    password = os.getenv("INKU_BOOTSTRAP_ADMIN_PASSWORD")
-    if password:
-        if len(password) < 8:
-            raise ValueError("INKU_BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters")
-        return password
+def _bootstrap_admin_password_resolver() -> _accounts.BootstrapAdminPasswordResolver:
+    return _accounts.BootstrapAdminPasswordResolver(os.getenv)
 
-    allow_insecure = os.getenv("INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN", "").lower() in {"1", "true", "yes"}
-    if allow_insecure:
-        return "inku-admin"
-    return None
+
+def _bootstrap_admin_password() -> str | None:
+    return _bootstrap_admin_password_resolver().resolve()
 
 
 def _ensure_bootstrap_admin(session: Session | None = None) -> None:

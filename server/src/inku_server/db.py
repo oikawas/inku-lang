@@ -7,7 +7,7 @@ import os
 import secrets
 import uuid
 from contextlib import contextmanager, nullcontext
-from hashlib import pbkdf2_hmac, sha256
+from hashlib import sha256
 from pathlib import Path
 
 from sqlalchemy import inspect, or_, text
@@ -508,12 +508,7 @@ def _backfill_render_hashes(conn) -> None:
 
 
 def _hash_password(password: str) -> str:
-    if not password:
-        raise ValueError("password is required")
-    salt = secrets.token_bytes(16)
-    iterations = 310_000
-    digest = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+    return _accounts.hash_password(password)
 
 
 def _hash_token(token: str) -> str:
@@ -521,20 +516,10 @@ def _hash_token(token: str) -> str:
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
-    try:
-        algorithm, iterations_raw, salt_hex, digest_hex = stored_hash.split("$", 3)
-        if algorithm != "pbkdf2_sha256":
-            return False
-        iterations = int(iterations_raw)
-        salt = bytes.fromhex(salt_hex)
-        expected = bytes.fromhex(digest_hex)
-    except Exception:  # noqa: BLE001
-        return False
-    actual = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-    return secrets.compare_digest(actual, expected)
+    return _accounts.verify_password(password, stored_hash)
 
 
-_DUMMY_PASSWORD_HASH = _hash_password("inku-nonexistent-account-timing-guard")
+_DUMMY_PASSWORD_HASH = _accounts.DUMMY_PASSWORD_HASH
 
 
 def _ensure_default_user_group(session: Session | None = None) -> None:

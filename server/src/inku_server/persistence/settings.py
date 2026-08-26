@@ -95,6 +95,15 @@ OUTPUT_SAVE_DEFAULT_SETTINGS = {
     ),
     "png_size": int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160")),
 }
+RENDER_CONCURRENCY_SETTINGS_KEY = "render_concurrency_settings"
+# INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT seed the first value only;
+# once stored, the DB row is the source of truth (admin settings screen).
+RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
+    "server_limit": int(os.getenv("INKU_RENDER_CONCURRENCY", "2")),
+    "client_limit": int(os.getenv("INKU_CLIENT_FANOUT_LIMIT", "4")),
+}
+RENDER_CONCURRENCY_MIN = 1
+RENDER_CONCURRENCY_MAX = 16
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -375,6 +384,31 @@ def normalize_output_save_settings(settings: dict | None) -> dict:
     return clean
 
 
+def clamped_concurrency(value: object, key: str) -> int:
+    try:
+        number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key} must be an integer") from exc
+    if number < RENDER_CONCURRENCY_MIN or number > RENDER_CONCURRENCY_MAX:
+        raise ValueError(
+            f"{key} must be between {RENDER_CONCURRENCY_MIN} and "
+            f"{RENDER_CONCURRENCY_MAX}"
+        )
+    return number
+
+
+def normalize_render_concurrency_settings(settings: dict | None) -> dict:
+    clean = dict(RENDER_CONCURRENCY_DEFAULT_SETTINGS)
+    for key in ("server_limit", "client_limit"):
+        clean[key] = clamped_concurrency(clean[key], key)
+    if not isinstance(settings, dict):
+        return clean
+    for key in ("server_limit", "client_limit"):
+        if key in settings:
+            clean[key] = clamped_concurrency(settings[key], key)
+    return clean
+
+
 @dataclass(frozen=True)
 class UserPluginStorageStore:
     """Read and write one user's validated plugin storage."""
@@ -468,6 +502,24 @@ class OutputSaveSettingsStore:
             }
         )
         return self.app_settings.write(OUTPUT_SAVE_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class RenderConcurrencySettingsStore:
+    """Read and write normalized render-concurrency settings."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_render_concurrency_settings(
+            self.app_settings.read(RENDER_CONCURRENCY_SETTINGS_KEY)
+        )
+
+    def update(self, server_limit: int, client_limit: int) -> dict:
+        clean = normalize_render_concurrency_settings(
+            {"server_limit": server_limit, "client_limit": client_limit}
+        )
+        return self.app_settings.write(RENDER_CONCURRENCY_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

@@ -49,6 +49,50 @@ LINEAGE_DERIVATION_KINDS = {
 
 
 @dataclass(frozen=True)
+class HistoryRenderHashService:
+    """Calculate the persisted legacy and current render identities."""
+
+    canonical_json_fn: Callable[[Any], str]
+
+    @staticmethod
+    def _canonical_seed(value):
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
+
+    def legacy_render_hash_for_item(self, item: dict) -> str:
+        payload = {
+            "version": "rh2",
+            "score": item.get("score") or {},
+            "render_seed": self._canonical_seed(item.get("render_seed")),
+            # Freeze the key as `vary_seed`: it is hash material, not a field label.
+            # Renaming it would change every persisted rh2. The value still comes
+            # from the renamed column; a v2.8.0 check caught this exact drift.
+            "vary_seed": self._canonical_seed(item.get("composition_seed")),
+            "render_build_number": item.get("render_build_number"),
+            "render_engine_id": item.get("render_engine_id"),
+            "render_engine_version": item.get("render_engine_version"),
+            "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+        }
+        return "rh2:" + sha256(self.canonical_json_fn(payload).encode("utf-8")).hexdigest()
+
+    def render_hash_for_item(self, item: dict) -> str:
+        payload = {
+            "version": "rh3",
+            "score": item.get("score") or {},
+            "render_seed": self._canonical_seed(item.get("render_seed")),
+            "render_wild": bool(item.get("render_wild")),
+            "render_engine_id": item.get("render_engine_id"),
+            "render_engine_version": item.get("render_engine_version"),
+            "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
+        }
+        return "rh3:" + sha256(self.canonical_json_fn(payload).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
 class UnownedHistoryOwnerBackfill:
     """Assign the canonical account only to legacy history rows without an owner."""
 

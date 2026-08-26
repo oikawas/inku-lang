@@ -162,6 +162,30 @@ class AccountOwnerResolver:
         return user.id if user else None
 
 
+@dataclass(frozen=True)
+class SingleUserModeResolver:
+    getenv_fn: Callable[[str], str | None]
+
+    def enabled(self) -> bool:
+        """Whether this server runs as one person's own.
+
+        Off unless explicitly asked for: a deployment that merely upgrades must
+        not quietly lose its login screen.  The distribution turns it on in its
+        own compose file, not here.
+
+        An empty value reads as unset, matching how _bootstrap_admin_password
+        treats a blank field handed over by compose interpolation.
+
+        This is the only reader of the variable.  deps.py and the /api/info
+        banner both come through here, so the guard and what the banner claims
+        cannot disagree.
+        """
+        value = self.getenv_fn("INKU_SINGLE_USER")
+        if value is None:
+            return False
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

@@ -19,6 +19,8 @@ import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.data.model.mergeInputProvenance
 import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
@@ -453,7 +455,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -477,7 +479,7 @@ class InkuRepository(
                 sketch = sketch,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance)
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
@@ -624,12 +626,16 @@ class InkuRepository(
         historyVisibility = historyVisibility,
     )
 
-    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null): HistoryItemEntity {
+    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null, inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         // The server writes every one of these as a string
         // (`db.py:2090-2097`), including the numeric ones.
         val renderSeedText = result.renderSeed?.let { java.lang.Long.toUnsignedString(it) }
-        val renderMetadataJson = JSONObject(result.renderMetadataJson)
+        val renderMetadata = mergeInputProvenance(
+            JSONObject(result.renderMetadataJson),
+            inputProvenance,
+        )
+        val renderMetadataJson = renderMetadata
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()

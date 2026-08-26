@@ -42,6 +42,8 @@ class CameraLocalDescriptionWiringTest {
         val cameraBoundary = viewModel.substring(cameraStart, cameraEnd)
 
         assertTrue(cameraBoundary.contains("analyzeLocalVision"))
+        assertTrue(cameraBoundary.contains("val request = VisionAnalysisRequest("))
+        assertTrue(cameraBoundary.contains("CameraInputProvenance.fromAnalysis(request, result)"))
         assertTrue(cameraBoundary.contains("prompt = result.text"))
         assertFalse(cameraBoundary.contains("repository.interpret("))
         assertFalse(cameraBoundary.contains("composeFromDdl("))
@@ -61,6 +63,7 @@ class CameraLocalDescriptionWiringTest {
         assertTrue(submit.contains("route?.stage2ModelId ?: current.selectedStage2ModelId"))
         assertTrue(submit.contains("route?.catalogId ?:"))
         assertTrue(submit.contains("route?.autoRepair ?: current.ddlAutoRepairEnabled"))
+        assertTrue(submit.contains("inputProvenance = route?.inputProvenance"))
         assertTrue(submit.contains("if (route == null) describeLineage(current) else LineageDeclaration()"))
         assertTrue(submit.contains("if (route == null) describeSketchInput(current) else SketchInput()"))
         assertFalse("camera snapshot must not persist or mutate normal selections", submit.contains("persistSetting("))

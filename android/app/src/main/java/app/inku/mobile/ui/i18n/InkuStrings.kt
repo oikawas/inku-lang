@@ -313,11 +313,22 @@ interface InkuStrings {
     val sameAsTargetSuffix: String
     val renderTabArtwork: String
     val generationInfoTitle: String
+    val generationInfoInputSection: String
     val generationInfoSketchSection: String
     val generationInfoInterpretationSection: String
     val generationInfoPerformanceSection: String
     val generationInfoIdentitySection: String
     val generationInfoRunSection: String
+    val generationInfoInputOrigin: String
+    val generationInfoInputRoute: String
+    val generationInfoVisionProvider: String
+    val generationInfoVisionModel: String
+    val generationInfoVisionPromptVersion: String
+    val generationInfoVisionOutputMode: String
+    val generationInfoNormalizedImageDimensions: String
+    val generationInfoInputOriginCamera: String
+    val generationInfoInputRouteLocalDescriptionToNim: String
+    val generationInfoVisionOutputModeDescription: String
     val generationInfoSketchGrain: String
     val generationInfoSketchState: String
     val generationInfoStage1Model: String

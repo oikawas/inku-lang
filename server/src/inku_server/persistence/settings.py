@@ -47,6 +47,17 @@ HISTORY_STRIP_FIELDS_DEFAULT = ["generation", "model"]
 # is what reaches the picker.
 BATCH_PROMPT_HISTORY_LIMIT = 50
 BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+DEMO_DEFAULT_SETTINGS = {
+    "save_db": False,
+    "save_files": False,
+    # v2.9.1: the provider is kept beside the model, as every stage does. The
+    # picker used to hand over a provider that was thrown away here.
+    "prompt_provider": "nvidia",
+    "prompt_model": "google/gemma-4-31b-it",
+    "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
+    "interval_seconds": 30,
+    "timeout_seconds": 3600,
+}
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -113,6 +124,94 @@ class UserBatchPromptHistoryStore:
             row.batch_prompt_history = json.dumps(prompts, ensure_ascii=False)
             session.commit()
             return prompts
+
+
+def normalize_demo_settings(settings: dict) -> dict:
+    if not isinstance(settings, dict):
+        raise ValueError("demo settings must be an object")
+    clean = dict(DEMO_DEFAULT_SETTINGS)
+    if "save_db" in settings:
+        clean["save_db"] = bool(settings["save_db"])
+    if "save_files" in settings:
+        clean["save_files"] = bool(settings["save_files"])
+    if "prompt_provider" in settings:
+        provider = settings["prompt_provider"]
+        if not isinstance(provider, str) or not provider.strip():
+            raise ValueError("demo prompt provider is required")
+        clean["prompt_provider"] = provider.strip()
+    if "prompt_model" in settings:
+        model = settings["prompt_model"]
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("demo prompt model is required")
+        clean["prompt_model"] = model.strip()
+    # Values stored before prompt_provider existed carry the provider inside
+    # prompt_model. Read both shapes, write the pair.
+    from ..model_settings import split_model_ref
+
+    prompt_prefix, prompt_bare = split_model_ref(str(clean["prompt_model"]), None)
+    if prompt_prefix:
+        clean["prompt_provider"] = prompt_prefix
+        clean["prompt_model"] = prompt_bare
+    if "seed_phrase" in settings:
+        phrase = settings["seed_phrase"]
+        if not isinstance(phrase, str):
+            raise ValueError("demo seed phrase must be a string")
+        phrase = phrase.strip()
+        if not phrase:
+            raise ValueError("demo seed phrase is required")
+        if len(phrase) > 1000:
+            raise ValueError("demo seed phrase is too long")
+        clean["seed_phrase"] = phrase
+    if "interval_seconds" in settings:
+        try:
+            interval = int(settings["interval_seconds"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("demo interval must be an integer") from exc
+        if interval < 1 or interval > 3600:
+            raise ValueError("demo interval must be between 1 and 3600 seconds")
+        clean["interval_seconds"] = interval
+    if "timeout_seconds" in settings:
+        try:
+            timeout = int(settings["timeout_seconds"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("demo timeout must be an integer") from exc
+        if timeout < 60 or timeout > 86400:
+            raise ValueError("demo timeout must be between 60 and 86400 seconds")
+        clean["timeout_seconds"] = timeout
+    return clean
+
+
+@dataclass(frozen=True)
+class UserDemoSettingsStore:
+    """Read and write one user's normalized demo settings."""
+
+    session_factory: Callable[[], Session]
+
+    def get(self, user_id: str) -> dict:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return dict(DEMO_DEFAULT_SETTINGS)
+            try:
+                parsed = json.loads(row.demo_settings or "{}")
+            except json.JSONDecodeError:
+                return dict(DEMO_DEFAULT_SETTINGS)
+            if not isinstance(parsed, dict):
+                return dict(DEMO_DEFAULT_SETTINGS)
+            try:
+                return normalize_demo_settings(parsed)
+            except ValueError:
+                return dict(DEMO_DEFAULT_SETTINGS)
+
+    def update(self, user_id: str, settings: dict) -> dict | None:
+        clean = normalize_demo_settings(settings)
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            row.demo_settings = json.dumps(clean, ensure_ascii=False)
+            session.commit()
+            return clean
 
 
 @dataclass(frozen=True)

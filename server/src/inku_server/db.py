@@ -517,6 +517,10 @@ def has_permission_group(actor: dict, name: str) -> bool:
     return _access.has_permission_group(actor, name)
 
 
+def _account_actor_reader() -> _accounts.AccountActorReader:
+    return _accounts.AccountActorReader(SessionLocal, _permission_groups_of)
+
+
 def _actor_of(user_id: str) -> dict:
     """The actor a scope decision is made against: identity plus what it holds.
 
@@ -524,17 +528,7 @@ def _actor_of(user_id: str) -> dict:
     function in this module is handed a bare `user_id` and a scope that trusted
     what it was told would widen for anyone who could name an id.
     """
-    with SessionLocal() as session:
-        row = session.query(UserAccountRow).filter(UserAccountRow.id == user_id).first()
-        if row is None:
-            # No account, no groups: falls through to the owner-only branch of
-            # every predicate. An unknown id must never widen anything.
-            return {"id": user_id, "permission_groups": [], "group_id": None}
-        return {
-            "id": user_id,
-            "permission_groups": _permission_groups_of(session, user_id),
-            "group_id": row.group_id,
-        }
+    return _account_actor_reader().get(user_id)
 
 
 def _owner_actor(user_id: str) -> dict:

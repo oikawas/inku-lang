@@ -133,6 +133,25 @@ class UserAccountProjector:
 
 
 @dataclass(frozen=True)
+class AccountActorReader:
+    session_factory: Callable[[], Any]
+    permission_groups_of_fn: Callable[[Any, str], list[str]]
+
+    def get(self, user_id: str) -> dict:
+        with self.session_factory() as session:
+            row = session.query(UserAccountRow).filter(UserAccountRow.id == user_id).first()
+            if row is None:
+                # No account, no groups: falls through to the owner-only branch of
+                # every predicate. An unknown id must never widen anything.
+                return {"id": user_id, "permission_groups": [], "group_id": None}
+            return {
+                "id": user_id,
+                "permission_groups": self.permission_groups_of_fn(session, user_id),
+                "group_id": row.group_id,
+            }
+
+
+@dataclass(frozen=True)
 class UserAccountReader:
     session_factory: Callable[[], Any]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]

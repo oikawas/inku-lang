@@ -99,13 +99,8 @@ _LEGACY_ROLE_TO_PERMISSION_GROUP = {
     "user": "users",
 }
 _UNSET = object()
-# How many past batch prompts a member keeps. Cut on the way in and on the way
-# out, so lowering it later drops the tail of what is already stored. The web
-# client holds the same number (BATCH_PROMPT_HISTORY_LIMIT in +page.svelte);
-# raising one without the other changes nothing, because the shorter of the two
-# is what reaches the picker.
-_BATCH_PROMPT_HISTORY_LIMIT = 50
-_BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
+_BATCH_PROMPT_HISTORY_LIMIT = _settings.BATCH_PROMPT_HISTORY_LIMIT
+_BATCH_PROMPT_HISTORY_MAX_TEXT = _settings.BATCH_PROMPT_HISTORY_MAX_TEXT
 _SETTINGS_TABS = _settings.SETTINGS_TABS
 _UI_MODES = _settings.UI_MODES
 _UI_CUSTOM_KEYS = _settings.UI_CUSTOM_KEYS
@@ -1840,49 +1835,19 @@ def update_user_settings(
 
 
 def _normalize_batch_prompt_history(items: list[str]) -> list[str]:
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for item in items:
-        if not isinstance(item, str):
-            raise ValueError("batch prompt history must contain strings")
-        prompt = item.strip().replace("\r\n", "\n").replace("\r", "\n")
-        if not prompt or prompt in seen:
-            continue
-        if len(prompt) > _BATCH_PROMPT_HISTORY_MAX_TEXT:
-            raise ValueError("batch prompt history item is too long")
-        normalized.append(prompt)
-        seen.add(prompt)
-        if len(normalized) >= _BATCH_PROMPT_HISTORY_LIMIT:
-            break
-    return normalized
+    return _settings.normalize_batch_prompt_history(items)
+
+
+def _user_batch_prompt_history_store() -> _settings.UserBatchPromptHistoryStore:
+    return _settings.UserBatchPromptHistoryStore(SessionLocal)
 
 
 def get_user_batch_prompt_history(user_id: str) -> list[str]:
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return []
-        try:
-            parsed = json.loads(row.batch_prompt_history or "[]")
-        except json.JSONDecodeError:
-            return []
-        if not isinstance(parsed, list):
-            return []
-        try:
-            return _normalize_batch_prompt_history(parsed)
-        except ValueError:
-            return []
+    return _user_batch_prompt_history_store().get(user_id)
 
 
 def update_user_batch_prompt_history(user_id: str, items: list[str]) -> list[str] | None:
-    prompts = _normalize_batch_prompt_history(items)
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        row.batch_prompt_history = json.dumps(prompts, ensure_ascii=False)
-        session.commit()
-        return prompts
+    return _user_batch_prompt_history_store().update(user_id, items)
 
 
 def _normalize_demo_settings(settings: dict) -> dict:

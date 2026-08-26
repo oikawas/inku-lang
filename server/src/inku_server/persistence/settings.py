@@ -125,6 +125,11 @@ LOG_RETENTION_DEFAULT_SETTINGS = {
     "compress": True,
 }
 MODEL_SETTINGS_KEY = "model_connection_settings"
+AUTH_SETTINGS_KEY = "auth_settings"
+AUTH_DEFAULT_SETTINGS = {
+    "google_enabled": False,
+    "local_enabled": True,
+}
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -475,6 +480,28 @@ def normalize_log_retention_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_auth_settings(
+    settings: dict | None, defaults: dict | None = None
+) -> dict:
+    clean = dict(AUTH_DEFAULT_SETTINGS if defaults is None else defaults)
+    if not isinstance(settings, dict):
+        return clean
+    if "google_enabled" in settings:
+        clean["google_enabled"] = bool(settings["google_enabled"])
+    if "local_enabled" in settings:
+        clean["local_enabled"] = bool(settings["local_enabled"])
+    return clean
+
+
+def auth_defaults_from_env(getenv: Callable[[str, str], str]) -> dict:
+    return {
+        "google_enabled": getenv("INKU_AUTH_GOOGLE_ENABLED", "false").lower()
+        in ("true", "1", "yes"),
+        "local_enabled": getenv("INKU_AUTH_LOCAL_ENABLED", "true").lower()
+        in ("true", "1", "yes"),
+    }
+
+
 @dataclass(frozen=True)
 class UserPluginStorageStore:
     """Read and write one user's validated plugin storage."""
@@ -563,6 +590,26 @@ class ModelSettingsStore:
         stored = self.storage(settings)
         self.app_settings.write(MODEL_SETTINGS_KEY, stored)
         return self.normalize(stored)
+
+
+@dataclass(frozen=True)
+class AuthSettingsStore:
+    """Read and write authentication switches with environment-seeded defaults."""
+
+    app_settings: AppSettingsStore
+    getenv: Callable[[str, str], str]
+
+    def get(self) -> dict:
+        defaults = auth_defaults_from_env(self.getenv)
+        stored = self.app_settings.read(AUTH_SETTINGS_KEY)
+        return normalize_auth_settings(stored, defaults)
+
+    def update(self, google_enabled: bool, local_enabled: bool) -> dict:
+        clean = {
+            "google_enabled": bool(google_enabled),
+            "local_enabled": bool(local_enabled),
+        }
+        return self.app_settings.write(AUTH_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

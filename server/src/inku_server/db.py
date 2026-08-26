@@ -1318,51 +1318,24 @@ def update_model_settings(settings: dict) -> dict:
     return _model_settings_store().update(settings)
 
 
-_AUTH_SETTINGS_KEY = "auth_settings"
-_AUTH_DEFAULT_SETTINGS = {
-    "google_enabled": False,
-    "local_enabled": True,
-}
+_AUTH_SETTINGS_KEY = _settings.AUTH_SETTINGS_KEY
+_AUTH_DEFAULT_SETTINGS = _settings.AUTH_DEFAULT_SETTINGS
 
 
 def _normalize_auth_settings(settings: dict | None) -> dict:
-    clean = dict(_AUTH_DEFAULT_SETTINGS)
-    if not isinstance(settings, dict):
-        return clean
-    if "google_enabled" in settings:
-        clean["google_enabled"] = bool(settings["google_enabled"])
-    if "local_enabled" in settings:
-        clean["local_enabled"] = bool(settings["local_enabled"])
-    return clean
+    return _settings.normalize_auth_settings(settings)
+
+
+def _auth_settings_store():
+    return _settings.AuthSettingsStore(_app_settings_store(), os.getenv)
 
 
 def get_auth_settings() -> dict:
-    env_google = os.getenv("INKU_AUTH_GOOGLE_ENABLED", "false").lower() in ("true", "1", "yes")
-    env_local = os.getenv("INKU_AUTH_LOCAL_ENABLED", "true").lower() in ("true", "1", "yes")
-
-    defaults = {
-        "google_enabled": env_google,
-        "local_enabled": env_local
-    }
-
-    stored = _read_app_setting(_AUTH_SETTINGS_KEY)
-    if stored is None:
-        return defaults
-
-    merged = dict(defaults)
-    if "google_enabled" in stored:
-        merged["google_enabled"] = bool(stored["google_enabled"])
-    if "local_enabled" in stored:
-        merged["local_enabled"] = bool(stored["local_enabled"])
-    return merged
+    return _auth_settings_store().get()
 
 
 def update_auth_settings(google_enabled: bool, local_enabled: bool) -> dict:
-    clean = {
-        "google_enabled": bool(google_enabled),
-        "local_enabled": bool(local_enabled),
-    }
-    return _write_app_setting(_AUTH_SETTINGS_KEY, clean)
+    return _auth_settings_store().update(google_enabled, local_enabled)
 
 
 def _db_backup_file(kind: str, at_ms: int) -> Path:

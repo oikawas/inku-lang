@@ -10,7 +10,7 @@ from contextlib import contextmanager, nullcontext
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import case, func, inspect, or_, text
+from sqlalchemy import inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -2633,6 +2633,15 @@ def list_state(user_id: str, trashed: bool = False) -> tuple[int, int | None, st
     return _history.HistoryListStateReader(SessionLocal, _actor_of).list_state(user_id, trashed)
 
 
+def _history_lineage_group_reader() -> _history.HistoryLineageGroupReader:
+    return _history.HistoryLineageGroupReader(
+        SessionLocal,
+        _actor_of,
+        _rows_to_dicts_with_lineage,
+        _history_search_clause,
+    )
+
+
 def list_lineage_groups(
     user_id: str,
     offset: int = 0,
@@ -2644,96 +2653,17 @@ def list_lineage_groups(
     for_share: bool = False,
     min_item_count: int = 1,
 ) -> tuple[list[dict], int]:
-    """List deterministic history groups, paginated by lineage rather than artwork.
-
-    `min_item_count` drops lineages with fewer members than that. The filter has
-    to run here rather than on the returned page: a caller that threw away the
-    one-work groups after the fact would show fewer than `limit` cards per page
-    and would disagree with `total`.
-    """
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        query = (
-            session.query(HistoryRow)
-            .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
-            .filter(
-                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                _readable_node(actor),
-                HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
-            )
-        )
-        if starred:
-            query = query.filter(HistoryRow.starred == 1)
-        if for_revision:
-            query = query.filter(HistoryRow.for_revision == 1)
-        if for_share:
-            query = query.filter(HistoryRow.for_share == 1)
-        search = query_text.strip()
-        if search:
-            query = query.filter(_history_search_clause(search))
-        root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
-        grouped = query.with_entities(
-            root_id.label("root_node_id"),
-            func.count(HistoryRow.id).label("item_count"),
-            func.sum(case((HistoryRow.starred == 1, 1), else_=0)).label("starred_count"),
-            func.sum(case((HistoryRow.for_revision == 1, 1), else_=0)).label("for_revision_count"),
-            func.max(HistoryRow.at).label("latest_at"),
-        ).group_by(root_id)
-        if min_item_count > 1:
-            grouped = grouped.having(func.count(HistoryRow.id) >= min_item_count)
-        aggregates = grouped.subquery()
-        # total counts the same subquery, so the page and the count cannot disagree.
-        total = int(session.query(func.count()).select_from(aggregates).scalar() or 0)
-        page_rows = (
-            session.query(aggregates)
-            .order_by(aggregates.c.latest_at.desc(), aggregates.c.root_node_id.asc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-        if not page_rows:
-            return [], total
-
-        ranked = (
-            query.with_entities(
-                HistoryRow.id.label("history_id"),
-                root_id.label("root_node_id"),
-                func.row_number().over(
-                    partition_by=root_id,
-                    order_by=(HistoryRow.at.desc(), HistoryRow.id.asc()),
-                ).label("row_number"),
-            )
-            .subquery()
-        )
-        selected_roots = [row.root_node_id for row in page_rows]
-        representative_pairs = (
-            session.query(ranked.c.root_node_id, ranked.c.history_id)
-            .filter(ranked.c.root_node_id.in_(selected_roots), ranked.c.row_number == 1)
-            .all()
-        )
-        representative_id_by_root = {root: history_id for root, history_id in representative_pairs}
-        representative_ids = list(representative_id_by_root.values())
-        representative_rows = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids)).all()
-        representative_by_id = {
-            item["id"]: item
-            for item in _rows_to_dicts_with_lineage(session, representative_rows, actor)
-        }
-        groups = []
-        for row in page_rows:
-            representative_id = representative_id_by_root.get(row.root_node_id)
-            representative = representative_by_id.get(representative_id or "")
-            if representative is None:
-                continue
-            groups.append({
-                "root_node_id": row.root_node_id,
-                "representative": representative,
-                "item_count": int(row.item_count or 0),
-                "starred_count": int(row.starred_count or 0),
-                "for_revision_count": int(row.for_revision_count or 0),
-                "latest_at": int(row.latest_at or 0),
-            })
-        return groups, total
+    return _history_lineage_group_reader().list_lineage_groups(
+        user_id,
+        offset,
+        limit,
+        trashed,
+        query_text,
+        starred,
+        for_revision,
+        for_share,
+        min_item_count,
+    )
 
 
 def list_lineage_group_items(
@@ -2747,45 +2677,17 @@ def list_lineage_group_items(
     for_revision: bool = False,
     for_share: bool = False,
 ) -> tuple[list[dict], int]:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        # The root is looked up without a readability test, and the members
-        # below are filtered with one. A lineage started by someone else and
-        # continued here has THEIR work as its root: requiring the root to be
-        # readable would close the group on its own later members, who would see
-        # a card in the listing that opens onto nothing. Nothing about the root
-        # is returned from this lookup -- only the fact that the id names a root.
-        root = session.get(LineageNodeRow, root_node_id)
-        if root is None or (root.root_node_id or root.id) != root_node_id:
-            return [], 0
-        query = (
-            session.query(HistoryRow)
-            .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
-            .filter(
-                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                _readable_node(actor),
-                # coalesce, not a bare ==, and the same expression list_lineage_groups
-                # groups by: the root_node_id column was added by migration without a
-                # backfill, so a root node created before it holds NULL and would not
-                # match its own id. Such a lineage counted its own root in the group
-                # aggregate but dropped it from the member list.
-                func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id) == root_node_id,
-                HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
-            )
-        )
-        if starred:
-            query = query.filter(HistoryRow.starred == 1)
-        if for_revision:
-            query = query.filter(HistoryRow.for_revision == 1)
-        if for_share:
-            query = query.filter(HistoryRow.for_share == 1)
-        search = query_text.strip()
-        if search:
-            query = query.filter(_history_search_clause(search))
-        total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
-        rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
-        return _rows_to_dicts_with_lineage(session, rows, actor), total
+    return _history_lineage_group_reader().list_lineage_group_items(
+        user_id,
+        root_node_id,
+        offset,
+        limit,
+        trashed,
+        query_text,
+        starred,
+        for_revision,
+        for_share,
+    )
 
 
 def item_position(

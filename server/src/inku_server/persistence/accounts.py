@@ -19,6 +19,7 @@ from .schema import (
     LineageEdgeRow,
     LineageNodeRow,
     OkugakiRow,
+    PermissionGroupRow,
     UnreadWordRow,
     UserAccountRow,
     UserGroupRow,
@@ -119,6 +120,46 @@ class BootstrapAdminSeeder:
             session.commit()
         else:
             session.flush()
+
+
+@dataclass(frozen=True)
+class AccountOwnerResolver:
+    session_factory: Callable[[], Any]
+
+    def oldest_admin_id(self, session: Any) -> str | None:
+        """The administrator who has been here longest.
+
+        Shared by the history-owner fallback and by single-user mode so the two
+        can never drift into naming different people.
+        """
+        admin = (
+            session.query(UserAccountRow)
+            .join(
+                UserPermissionGroupRow,
+                UserPermissionGroupRow.user_id == UserAccountRow.id,
+            )
+            .join(
+                PermissionGroupRow,
+                PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id,
+            )
+            .filter(PermissionGroupRow.name == "admins")
+            .order_by(UserAccountRow.at.asc())
+            .first()
+        )
+        return admin.id if admin else None
+
+    def history_owner_user_id(self, session: Any | None = None) -> str | None:
+        if session is not None:
+            return self._history_owner_user_id(session)
+        with self.session_factory() as owned_session:
+            return self._history_owner_user_id(owned_session)
+
+    def _history_owner_user_id(self, session: Any) -> str | None:
+        admin_id = self.oldest_admin_id(session)
+        if admin_id:
+            return admin_id
+        user = session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
+        return user.id if user else None
 
 
 def loads_or_none(raw: str | None):

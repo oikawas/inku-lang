@@ -11,7 +11,6 @@ from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
 from sqlalchemy import inspect, or_, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
@@ -27,6 +26,7 @@ from .persistence.backup import (
 from .persistence import history as _history
 from .persistence import lineage as _lineage
 from .persistence import access as _access
+from .persistence import okugaki as _okugaki
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
 from .persistence.legacy_schema import (
@@ -1005,108 +1005,32 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
 
 
 def _okugaki_to_dict(row: OkugakiRow) -> dict:
-    def load(value: str, fallback):
-        try:
-            return json.loads(value)
-        except (TypeError, json.JSONDecodeError):
-            return fallback
+    return _okugaki.okugaki_to_dict(row)
 
-    return {
-        "id": row.id,
-        "target_node_id": row.target_node_id,
-        "branch_snapshot": load(row.branch_snapshot_json, []),
-        "model": row.model,
-        "at": row.at,
-        "language": row.language,
-        "body": row.body,
-        "warnings": load(row.warnings_json, []),
-        "fact_sheet": load(row.fact_sheet_json, {}),
-    }
+
+def _okugaki_store() -> _okugaki.OkugakiStore:
+    return _okugaki.OkugakiStore(
+        SessionLocal,
+        _actor_of,
+        _owner_actor,
+        _canonical_json,
+    )
 
 
 def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None) -> dict:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        if idempotency_key:
-            existing = session.query(OkugakiRow).filter(
-                _owned_by(actor, OkugakiRow.user_id),
-                OkugakiRow.idempotency_key == idempotency_key,
-            ).first()
-            if existing is not None:
-                result = _okugaki_to_dict(existing)
-                result["_idempotent_replay"] = True
-                return result
-        target = session.query(LineageNodeRow).filter(
-            _readable_node(actor),
-            LineageNodeRow.id == item["target_node_id"],
-        ).first()
-        if target is None:
-            raise ValueError("lineage target not found")
-        row = OkugakiRow(
-            id=item.get("id") or str(uuid.uuid4()),
-            user_id=user_id,
-            target_node_id=item["target_node_id"],
-            branch_snapshot_json=_canonical_json(item["branch_snapshot"]),
-            model=item["model"],
-            at=item["at"],
-            language=item["language"],
-            body=item["body"],
-            warnings_json=_canonical_json(item.get("warnings") or []),
-            fact_sheet_json=_canonical_json(item.get("fact_sheet") or {}),
-            idempotency_key=idempotency_key,
-        )
-        session.add(row)
-        try:
-            session.commit()
-        except IntegrityError:
-            session.rollback()
-            if not idempotency_key:
-                raise
-            existing = session.query(OkugakiRow).filter(
-                _owned_by(actor, OkugakiRow.user_id),
-                OkugakiRow.idempotency_key == idempotency_key,
-            ).first()
-            if existing is None:
-                raise
-            result = _okugaki_to_dict(existing)
-            result["_idempotent_replay"] = True
-            return result
-        session.refresh(row)
-        return _okugaki_to_dict(row)
+    return _okugaki_store().add_okugaki(user_id, item, idempotency_key=idempotency_key)
 
 
 def list_okugaki(user_id: str, target_node_id: str) -> list[dict]:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        rows = session.query(OkugakiRow).filter(
-            _readable_by(actor, OkugakiRow.user_id),
-            OkugakiRow.target_node_id == target_node_id,
-        ).order_by(OkugakiRow.at.asc(), OkugakiRow.id.asc()).all()
-        return [_okugaki_to_dict(row) for row in rows]
+    return _okugaki_store().list_okugaki(user_id, target_node_id)
 
 
 def get_okugaki_by_idempotency(user_id: str, idempotency_key: str) -> dict | None:
-    owner = _owner_actor(user_id)
-    with SessionLocal() as session:
-        row = session.query(OkugakiRow).filter(
-            _owned_by(owner, OkugakiRow.user_id),
-            OkugakiRow.idempotency_key == idempotency_key,
-        ).first()
-        return _okugaki_to_dict(row) if row is not None else None
+    return _okugaki_store().get_okugaki_by_idempotency(user_id, idempotency_key)
 
 
 def delete_okugaki(user_id: str, okugaki_id: str) -> bool:
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        row = session.query(OkugakiRow).filter(
-            OkugakiRow.id == okugaki_id,
-            _writable_by(actor, OkugakiRow.user_id),
-        ).first()
-        if row is None:
-            return False
-        session.delete(row)
-        session.commit()
-        return True
+    return _okugaki_store().delete_okugaki(user_id, okugaki_id)
 
 
 

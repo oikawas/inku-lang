@@ -186,6 +186,58 @@ class SingleUserModeResolver:
         return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+@dataclass(frozen=True)
+class SingleUserAccountCreator:
+    session_factory: Callable[[], Any]
+    ensure_default_user_group_fn: Callable[[], None]
+    ensure_permission_groups_fn: Callable[[], None]
+    bootstrap_password_fn: Callable[[], str | None]
+    random_password_fn: Callable[[int], str]
+    hash_password_fn: Callable[[str], str]
+    derived_role_fn: Callable[[Collection[str]], str]
+    set_permission_groups_fn: Callable[[Any, UserAccountRow, Collection[str]], Any]
+    uuid_fn: Callable[[], Any]
+    now_ms_fn: Callable[[], int]
+    getenv_fn: Callable[[str, str], str | None]
+
+    def create(self) -> str | None:
+        """Make the one account an empty database is missing.
+
+        Only ever reached when there is no account at all: with no bootstrap
+        password set, _ensure_bootstrap_admin leaves the database empty and the
+        first request would have nobody to be.
+        """
+        self.ensure_default_user_group_fn()
+        self.ensure_permission_groups_fn()
+        with self.session_factory() as session:
+            if session.query(UserAccountRow).first():
+                return None
+            group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
+            # No bootstrap password means nobody chose one.  The account still
+            # needs a hash, so it gets an unusable random one; the UI tells the
+            # owner to set a password before they ever turn single-user mode off,
+            # because that password is the only way back in.
+            password = self.bootstrap_password_fn() or self.random_password_fn(32)
+            row = UserAccountRow(
+                id=str(self.uuid_fn()),
+                username=self.getenv_fn("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
+                email=self.getenv_fn("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
+                password_hash=self.hash_password_fn(password),
+                role=self.derived_role_fn(["admins"]),
+                group_id=group.id if group else None,
+                at=self.now_ms_fn(),
+            )
+            session.add(row)
+            session.commit()
+            # The one account owns the server, so it holds `admins`.  _oldest_admin_id
+            # asks the permission groups now, and it is the same query that resolves
+            # the history owner: leaving this to the role mirror would make the two
+            # name different people.
+            self.set_permission_groups_fn(session, row, ["admins"])
+            session.commit()
+            return row.id
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

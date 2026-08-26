@@ -7,7 +7,19 @@ from dataclasses import dataclass
 from typing import Any
 
 from .access import has_permission_group
-from .schema import UserAccountRow, UserGroupRow
+from .schema import (
+    ExternalIdentityRow,
+    HistoryAclRow,
+    HistoryRow,
+    LineageEdgeRow,
+    LineageNodeRow,
+    OkugakiRow,
+    UnreadWordRow,
+    UserAccountRow,
+    UserGroupRow,
+    UserPermissionGroupRow,
+    UserSessionRow,
+)
 
 
 @dataclass(frozen=True)
@@ -195,3 +207,81 @@ class UserAccountUpdater:
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
             return self.user_to_dict_fn(row, group_name)
+
+
+@dataclass(frozen=True)
+class UserAccountDeleter:
+    session_factory: Callable[[], Any]
+    has_permission_group_fn: Callable[[dict, str], bool]
+    holds_no_elevated_group_fn: Callable[[Any], Any]
+    owner_actor_fn: Callable[[str], dict]
+    owned_by_fn: Callable[[dict, Any], Any]
+    delete_acl_for_histories_fn: Callable[[Any, list[str]], None]
+
+    def delete_user(
+        self,
+        user_id: str,
+        *,
+        cascade: bool = False,
+        actor: dict | None = None,
+    ) -> bool:
+        with self.session_factory() as session:
+            query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
+            if actor is not None and not self.has_permission_group_fn(actor, "admins"):
+                if not self.has_permission_group_fn(actor, "leaders") or not actor.get("group_id"):
+                    return False
+                query = query.filter(
+                    UserAccountRow.group_id == actor["group_id"],
+                    self.holds_no_elevated_group_fn(session),
+                )
+            row = query.first()
+            if not row:
+                return False
+            # The account being deleted, not the one doing the deleting: the cascade
+            # selects by ownership so that widening what an admin may write never
+            # widens what one deletion removes.
+            target_owner = self.owner_actor_fn(user_id)
+            if not cascade:
+                if (
+                    session.query(HistoryRow)
+                    .filter(self.owned_by_fn(target_owner, HistoryRow.user_id))
+                    .first()
+                ):
+                    raise ValueError("user has history")
+            else:
+                self.delete_acl_for_histories_fn(
+                    session,
+                    [
+                        item_id
+                        for item_id, in session.query(HistoryRow.id).filter(
+                            self.owned_by_fn(target_owner, HistoryRow.user_id)
+                        )
+                    ],
+                )
+                session.query(HistoryRow).filter(
+                    self.owned_by_fn(target_owner, HistoryRow.user_id)
+                ).delete()
+            # Both directions: the works this account owned, above, and the grants
+            # that named this account as a guest, here. Only the first is a cascade;
+            # the second would otherwise survive on other people's works.
+            session.query(HistoryAclRow).filter(
+                HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == user_id
+            ).delete(synchronize_session=False)
+            session.query(OkugakiRow).filter(
+                self.owned_by_fn(target_owner, OkugakiRow.user_id)
+            ).delete()
+            session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
+            session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
+            session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
+            session.query(LineageEdgeRow).filter(
+                self.owned_by_fn(target_owner, LineageEdgeRow.user_id)
+            ).delete()
+            session.query(LineageNodeRow).filter(
+                self.owned_by_fn(target_owner, LineageNodeRow.user_id)
+            ).delete()
+            session.query(UserPermissionGroupRow).filter(
+                UserPermissionGroupRow.user_id == user_id
+            ).delete()
+            session.delete(row)
+            session.commit()
+            return True

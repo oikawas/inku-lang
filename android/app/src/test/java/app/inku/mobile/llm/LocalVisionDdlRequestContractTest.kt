@@ -2,6 +2,7 @@ package app.inku.mobile.llm
 
 import app.inku.mobile.pipeline.LocalVisionDdlValidation
 import app.inku.mobile.pipeline.ServerDdlText
+import app.inku.mobile.pipeline.WebDdlSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,6 +22,10 @@ class LocalVisionDdlRequestContractTest {
         val en = VisionPrompts.forLanguage("en", VisionOutputMode.DDL)
 
         assertEquals("camera-ddl-v1", VisionPrompts.versionFor(VisionOutputMode.DDL))
+        assertTrue("JA camera DDL prompt is too large: ${ja.length} chars", ja.length <= 4_096)
+        assertTrue("EN camera DDL prompt is too large: ${en.length} chars", en.length <= 4_096)
+        assertTrue(ja.startsWith(WebDdlSpec.stage1LiteRtVisionSystemPromptForDisplay()))
+        assertTrue(en.startsWith(WebDdlSpec.stage1LiteRtVisionSystemPromptForDisplay()))
         assertTrue(ja.contains("Saijiki"))
         assertTrue(en.contains("Saijiki"))
         assertTrue(ja.contains("画像内に見える文字"))

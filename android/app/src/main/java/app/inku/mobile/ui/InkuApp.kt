@@ -6,6 +6,7 @@ import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
@@ -19,6 +20,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.provider.Settings
 import android.util.LruCache
 import android.view.OrientationEventListener
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -152,6 +154,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -190,7 +194,10 @@ import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.camera.CameraCaptureState
+import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
+import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
+import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.pipeline.WebDdlSpec
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
@@ -440,6 +447,8 @@ fun InkuApp() {
     // "up one level"; before this it meant "leave the app" from everywhere except
     // a dialog, so the full screen and the four tabs were one-way doors.
     val backTarget: (() -> Unit)? = when {
+        state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
+            viewModel::cancelCameraDevelopment
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
         state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation -> viewModel::cancelCameraOverwrite
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
@@ -469,7 +478,7 @@ fun InkuApp() {
                 // step aside: keeping them would hold a bar's worth of height
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
-                if (!state.canvasPresentationMode && !state.descriptionFocused) {
+                if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction) {
                     BottomNavigationBar(state.tab, state.composeMode, viewModel, viewModel::requestCameraCapture)
                 }
             },
@@ -519,6 +528,7 @@ fun InkuApp() {
                 if (state.canvasSelectionOpen) {
                     CanvasAspectSelectionDialog(state, viewModel)
                 }
+                CameraDevelopmentSurface(state, viewModel)
             }
         }
     }
@@ -1332,7 +1342,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             RunStatusRow(state, viewModel)
-            CanvasHeroCard(state, viewModel)
+            CameraRevealCanvasHeroCard(state, viewModel)
             DrawSettingsPanel(state, viewModel)
             if (state.composeMode == ComposeMode.Batch) {
                 BatchPanel(state, viewModel)
@@ -1351,6 +1361,213 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
         }
     }
 }
+
+@Composable
+private fun CameraRevealCanvasHeroCard(state: InkuUiState, viewModel: InkuViewModel) {
+    val completedId = (state.cameraCaptureState as? CameraCaptureState.Completed)?.historyId
+    var revealed by remember(completedId) { mutableStateOf(completedId == null) }
+    LaunchedEffect(completedId) {
+        if (completedId != null) revealed = true
+    }
+    val alpha by animateFloatAsState(
+        targetValue = if (revealed) 1f else 0f,
+        animationSpec = tween(durationMillis = 420),
+        label = "camera-artwork-reveal",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        if (completedId != null) {
+            Text(
+                cameraDevelopmentPresentation(
+                    state.cameraCaptureState,
+                    isJapanese = !state.uiLanguage.isEnglish,
+                    animationsEnabled = false,
+                )?.message.orEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+            )
+        }
+        CanvasHeroCard(
+            state,
+            viewModel,
+            modifier = Modifier.fillMaxWidth().graphicsLayer(alpha = alpha),
+        )
+    }
+}
+
+@Composable
+private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewModel) {
+    val shouldCover = state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed
+    if (!shouldCover) return
+    val context = LocalContext.current
+    val animationsEnabled = remember(context, state.cameraCaptureState) {
+        systemAnimationsEnabled(context)
+    }
+    val presentation = cameraDevelopmentPresentation(
+        state.cameraCaptureState,
+        isJapanese = !state.uiLanguage.isEnglish,
+        animationsEnabled = animationsEnabled,
+    ) ?: return
+    val pulse = if (presentation.animationsEnabled) {
+        val transition = rememberInfiniteTransition(label = "camera-development")
+        val value by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1200, easing = LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "camera-development-pulse",
+        )
+        value
+    } else {
+        1f
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                    }
+                }
+            }
+            .semantics {
+                contentDescription = presentation.message
+                if (presentation.politeLiveRegion) liveRegion = LiveRegionMode.Polite
+            },
+        color = Color(0xFF171717),
+    ) {
+        Box(modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl), contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp).aspectRatio(0.78f),
+                color = Color(0xFFF8F5EE),
+                shape = RoundedCornerShape(Dimens.radiusCard),
+                shadowElevation = Dimens.spaceL,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CameraDevelopmentEffectCanvas(
+                        effect = presentation.effect,
+                        pulse = pulse,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                    Text(
+                        presentation.message,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF1C1C1C),
+                        textAlign = TextAlign.Center,
+                    )
+                    cameraStatusText(state.cameraCaptureState)
+                        ?.takeIf { it != presentation.message }
+                        ?.let { detail ->
+                            Text(
+                                state.message?.takeIf(String::isNotBlank) ?: detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF5D554F),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM, Alignment.CenterHorizontally),
+                    ) {
+                        if (presentation.showRetry) {
+                            Button(
+                                onClick = viewModel::retryCameraDevelopment,
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(S.retry)
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = viewModel::cancelCameraDevelopment,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            Text(S.cancel)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraDevelopmentEffectCanvas(
+    effect: CameraDevelopmentEffect,
+    pulse: Float,
+    modifier: Modifier = Modifier,
+) {
+    val vivid = listOf(
+        Color(0xFFF50087),
+        Color(0xFF008F39),
+        Color(0xFF73C2FB),
+        Color(0xFFFF9800),
+        Color(0xFF8A4FC9),
+        Color(0xFFFFF200),
+    )
+    Canvas(modifier = modifier.clipToBounds()) {
+        drawRect(Color(0xFFF4F4F4))
+        when (effect) {
+            CameraDevelopmentEffect.PaperExposure -> {
+                drawCircle(Color(0xFFFFF2B8).copy(alpha = 0.16f + pulse * 0.18f), radius = size.minDimension * 0.38f, center = center)
+                repeat(18) { index ->
+                    val x = size.width * ((index * 37 % 101) / 100f)
+                    val y = size.height * ((index * 61 % 97) / 96f)
+                    drawCircle(Color(0xFF7D6F66).copy(alpha = 0.08f + pulse * 0.06f), 1.5f + index % 3, Offset(x, y))
+                }
+            }
+            CameraDevelopmentEffect.GrainAndForms -> {
+                repeat(8) { index ->
+                    val x = size.width * (0.12f + (index % 4) * 0.24f)
+                    val y = size.height * (0.18f + (index / 4) * 0.5f)
+                    drawCircle(Color(0xFF7D6F66).copy(alpha = 0.16f + pulse * 0.16f), size.minDimension * (0.05f + (index % 3) * 0.02f), Offset(x, y))
+                }
+            }
+            CameraDevelopmentEffect.VividColorFields -> {
+                vivid.forEachIndexed { index, color ->
+                    val column = index % 3
+                    val row = index / 3
+                    drawCircle(
+                        color.copy(alpha = 0.32f + pulse * 0.4f),
+                        radius = size.minDimension * (0.11f + (index % 2) * 0.035f),
+                        center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
+                    )
+                }
+            }
+            CameraDevelopmentEffect.OutlineSettling -> {
+                vivid.forEachIndexed { index, color ->
+                    val column = index % 3
+                    val row = index / 3
+                    drawCircle(
+                        color.copy(alpha = 0.62f),
+                        radius = size.minDimension * (0.1f + (index % 2) * 0.03f),
+                        center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
+                    )
+                    drawCircle(
+                        Color(0xFF1C1C1C).copy(alpha = 0.45f + pulse * 0.35f),
+                        radius = size.minDimension * (0.1f + (index % 2) * 0.03f),
+                        center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
+                        style = Stroke(width = 2f + pulse * 2f),
+                    )
+                }
+            }
+            CameraDevelopmentEffect.FinalArtwork -> Unit
+        }
+    }
+}
+
+private fun systemAnimationsEnabled(context: Context): Boolean = runCatching {
+    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+}.getOrDefault(true)
 
 /**
  * The main action, pinned above the keyboard.
@@ -1995,6 +2212,17 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
     CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
     CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
+    CameraCaptureState.InterpretingWithNim,
+    CameraCaptureState.ComposingWithNim,
+    CameraCaptureState.Rendering,
+    CameraCaptureState.Saving,
+    is CameraCaptureState.Completed,
+    CameraCaptureState.Cancelling,
+    -> cameraDevelopmentPresentation(
+        state,
+        isJapanese = !LocalUiLanguage.current.isEnglish,
+        animationsEnabled = false,
+    )?.message
     is CameraCaptureState.ReadyToEdit -> S.cameraReadyToEdit
     CameraCaptureState.Cancelled -> S.cameraCancelled
     is CameraCaptureState.Failed -> when (state.reason) {
@@ -2004,6 +2232,8 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
         CameraFailure.EmptyResult -> S.cameraEmptyResult
+        CameraFailure.NimNotReady -> S.cameraNimNotReady
+        CameraFailure.NimFailed -> S.cameraNimFailed
     }
 }
 

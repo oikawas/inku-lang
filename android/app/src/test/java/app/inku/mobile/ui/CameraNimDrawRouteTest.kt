@@ -8,6 +8,7 @@ import app.inku.mobile.data.model.CameraVisionOutputMode
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraNimDrawRouting
 import app.inku.mobile.ui.camera.CameraNimProviderIssue
+import app.inku.mobile.ui.camera.cameraNimProviderIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
 import app.inku.mobile.ui.camera.providerIssue
 import org.junit.Assert.assertEquals
@@ -48,14 +49,17 @@ class CameraNimDrawRouteTest {
         assertEquals(CameraNimProviderIssue.BaseUrlMissing, route.providerIssue(listOf(provider(baseUrl = null))))
         assertEquals(CameraNimProviderIssue.ApiKeyMissing, route.providerIssue(listOf(provider(apiKey = null))))
         assertNull(route.providerIssue(listOf(provider())))
+        assertEquals(CameraNimProviderIssue.MissingOrDisabled, cameraNimProviderIssue(emptyList()))
+        assertNull(cameraNimProviderIssue(listOf(provider())))
     }
 
     @Test
-    fun explicitBoundaryActionsClearOnlyTheReadyCameraOrigin() {
+    fun explicitBoundaryActionsClearTerminalCameraOrigin() {
         assertSame(CameraCaptureState.Idle, readyState().clearCameraOrigin())
         val failed = CameraCaptureState.Failed(app.inku.mobile.ui.camera.CameraFailure.AnalysisFailed)
-        assertEquals(failed, failed.clearCameraOrigin())
-        assertSame(CameraCaptureState.Cancelled, CameraCaptureState.Cancelled.clearCameraOrigin())
+        assertSame(CameraCaptureState.Idle, failed.clearCameraOrigin())
+        assertSame(CameraCaptureState.Idle, CameraCaptureState.Cancelled.clearCameraOrigin())
+        assertSame(CameraCaptureState.Idle, CameraCaptureState.Completed("history-id").clearCameraOrigin())
     }
 
     private fun provider(

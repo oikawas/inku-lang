@@ -13,6 +13,11 @@ import kotlin.math.round
 import org.json.JSONArray
 import org.json.JSONObject
 
+enum class ComposeFromDdlProgress {
+    Rendering,
+    Saving,
+}
+
 class LocalFallbackPipeline(
     renderer: SvgRenderer? = null,
     private val modelProvider: ModelProvider? = null,
@@ -110,7 +115,11 @@ class LocalFallbackPipeline(
         )
     }
 
-    suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
+    suspend fun composeFromDdl(
+        ddl: String,
+        request: PaintRequest,
+        onProgress: suspend (ComposeFromDdlProgress) -> Unit = {},
+    ): PaintResult {
         // `description or req.ddl` (`render.py:1317-1322`): an endpoint that
         // begins at Stage 2 may carry no description, and then the DDL is the
         // only text there is to read. `ifEmpty` is that same falsy test.
@@ -136,6 +145,7 @@ class LocalFallbackPipeline(
         } else {
             scoreFromWebRules(expandedDdl, request.canvasAspect, resolvedLang).toString()
         }
+        onProgress(ComposeFromDdlProgress.Rendering)
         val renderStarted = System.currentTimeMillis()
         val renderSeed = effectiveRenderSeed(request)
         val renderScoreJson = ServerScoreCompat.migrateScore(JSONObject(scoreJson)).toString()

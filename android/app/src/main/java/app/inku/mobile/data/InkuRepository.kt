@@ -37,6 +37,7 @@ import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.LocalFallbackPipeline
+import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
@@ -46,6 +47,8 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -455,7 +458,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -478,7 +481,13 @@ class InkuRepository(
                 uiLang = uiLang,
                 sketch = sketch,
             ),
+            onProgress = onProgress,
         )
+        currentCoroutineContext().ensureActive()
+        onProgress(ComposeFromDdlProgress.Saving)
+        currentCoroutineContext().ensureActive()
+        beforeSave()
+        currentCoroutineContext().ensureActive()
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance)
     }
 

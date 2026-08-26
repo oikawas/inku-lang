@@ -13,8 +13,17 @@ sealed interface CameraCaptureState {
     data object PreparingImage : CameraCaptureState
     data object LoadingLocalModel : CameraCaptureState
     data object AnalyzingLocally : CameraCaptureState
+    data object InterpretingWithNim : CameraCaptureState
+    data object ComposingWithNim : CameraCaptureState
+    data object Rendering : CameraCaptureState
+    data object Saving : CameraCaptureState
+    data class Completed(val historyId: String) : CameraCaptureState
+    data object Cancelling : CameraCaptureState
     data class ReadyToEdit(val inputProvenance: CameraInputProvenance) : CameraCaptureState
-    data class Failed(val reason: CameraFailure) : CameraCaptureState
+    data class Failed(
+        val reason: CameraFailure,
+        val canRetryNim: Boolean = false,
+    ) : CameraCaptureState
     data object Cancelled : CameraCaptureState
 }
 
@@ -25,7 +34,23 @@ enum class CameraFailure {
     DecodeFailed,
     AnalysisFailed,
     EmptyResult,
+    NimNotReady,
+    NimFailed,
 }
+
+internal val CameraCaptureState.locksCameraInteraction: Boolean
+    get() = when (this) {
+        CameraCaptureState.PreparingImage,
+        CameraCaptureState.LoadingLocalModel,
+        CameraCaptureState.AnalyzingLocally,
+        CameraCaptureState.InterpretingWithNim,
+        CameraCaptureState.ComposingWithNim,
+        CameraCaptureState.Rendering,
+        CameraCaptureState.Saving,
+        CameraCaptureState.Cancelling,
+        -> true
+        else -> false
+    }
 
 /** Owns only ephemeral camera files under cacheDir/camera. */
 class CameraCaptureFileStore(private val context: Context) {

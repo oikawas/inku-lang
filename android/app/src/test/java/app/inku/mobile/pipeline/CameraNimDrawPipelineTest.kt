@@ -45,6 +45,24 @@ class CameraNimDrawPipelineTest {
         assertEquals("invalid explicit Stage 2 must make one provider call", 1, provider.calls)
     }
 
+    @Test
+    fun composeReportsTheRealRenderingBoundaryWithoutInventingProgress() {
+        val provider = SuccessfulProvider()
+        val renderer = CapturingRenderer()
+        val pipeline = LocalFallbackPipeline(renderer = renderer, modelProvider = provider)
+        val progress = mutableListOf<ComposeFromDdlProgress>()
+
+        runBlocking {
+            pipeline.composeFromDdl(
+                "赤い円を中央に置く。",
+                cameraRequest(),
+                onProgress = progress::add,
+            )
+        }
+
+        assertEquals(listOf(ComposeFromDdlProgress.Rendering), progress)
+    }
+
     private fun cameraRequest() = PaintRequest(
         description = "camera description",
         originalText = "camera description",

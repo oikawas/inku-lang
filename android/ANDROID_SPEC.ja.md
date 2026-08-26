@@ -141,7 +141,7 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
-  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを受け、端末内Gemmaの記述を編集欄へ返す
+  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを端末内Gemmaで記述化し、固定NIM／`vivid_material`描画・保存までone-touchで進める
   - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
   - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
   - canvas 下の prompt と DDL interpretation
@@ -2257,3 +2257,13 @@ Abstract Instant Print／抽象画インスタントプリントのM3では、lo
 生成情報sheetは、必須fieldと正の整数寸法を持つ有効なcamera `input_provenance`だけに「入力」sectionを先頭追加し、起点、経路、Vision provider／model、prompt版、output mode、正規化画像寸法を表示する。起点、経路、modeは表示言語へ写し、ID／versionは監査用raw値を示す。keyのない既存作品と通常作品は従来の5 sectionのままとし、objectでない、field欠落、型不正、非正寸法の場合は入力sectionだけを隠して他の生成情報を表示する。本実装回はPixel 9 DBの全table検査、row count比較、raw SQLite query、事後full backup比較、real-device instrumentationを行わない。
 
 受入で見つかったlocal Vision出力境界では、LiteRT-LMの会話template全体をstream chunkごとに再描画せず、応答messageの`Content.Text`だけを収集する。残存するtemplate markerを除去し、日本語の文節単位改行は空白を挟まず連結するため、`<jturn>model`等の制御文字列と不要な改行を記述欄へ渡さない。NIM Stage 2のtool schemaは`instructions`を1件以上必須とし、空配列を成功応答として受理しない。Pixel 9上の最終受入ではlocal Vision、固定NIM Stage 1、固定NIM Stage 2、`vivid_material`描画が各1回で完了し、作者がSVG完成を確認した。当日分の検証済みbackupを再利用してdata-preserving installし、DB全検査と実機instrumentationは契約どおり省略した。
+
+## 2026-08-26 one-touch抽象画インスタントプリント（[I-407]）
+
+Abstract Instant Print／抽象画インスタントプリントのM4では、既存の記述／解釈上書き確認を維持し、撮影を始める前にlocal E2B readinessと固定NVIDIA NIMのenabled provider、Base URL、API keyを検証する。撮影結果の確定後は追加の編集や「描画する」操作を挟まず、単一のcamera runが画像準備、local Vision、固定NIM Stage 1、固定NIM Stage 2、Rust render、既存transactionのroot保存、完成作品選択まで所有する。
+
+Stage 1／2は`nvidia:google/gemma-4-31b-it`、色カタログは`vivid_material`、写生off、catalog自動選択0、`autoRepair=false`でrun単位に固定し、通常設定を変更・保存しない。camera画像は端末内local Visionにだけ渡し、NIMへ送るのは生成されたtextだけである。写真bytes、URI、path、EXIFはremote request、履歴、metadataへ入れず、NIM以外のproviderへfallbackしない。保存作品はI-401のcamera provenanceを持つrootであり、撮影前の作品や推敲候補へlineage edgeを作らない。
+
+撮影結果後は白いpaper上で、画像準備／local Visionを「光を読み取っています」／`Reading the light`、Stage 1を「かたちを起こしています」／`Bringing out the forms`、Stage 2を「色と配置を定着させています」／`Fixing color and placement`、render／saveを「現像しています」／`Developing`、保存成功を「現像できました」／`Developed`と表示する。paper／露光、粒子／形、`vivid_material`色面、輪郭定着は実処理段からだけ導くprocedural effectであり、架空の中間SVG、進捗率、ETA、人工delayを作らない。system animation scaleが0なら同じ段をstatic surfaceで示し、保存後の実SVGを即時表示する。
+
+camera run中は別のcamera、描画、設定、主要navigationを閉じ、Cancelとsystem Backを同じ取消境界へ配線する。取消はjobと一時fileを閉じ、run IDとrepository save直前のcoroutine gateでlate result／保存を拒否し、process-localに保持した開始前Compose状態へ戻す。local Vision失敗は撮り直しを要求する。local Vision成功後のNIM／render失敗は記述とprovenanceを保持し、Retryで画像準備／local Visionを繰り返さず固定Stage 1から再開する。rotationはViewModelの現段を再表示して外部callを再開始しない。Room schema／migration、写真保存、Photo Picker、DDL direct、段別resume、foreground service、独自reduce-motion設定は追加しない。

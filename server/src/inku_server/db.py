@@ -25,6 +25,7 @@ from .persistence.backup import (
 )
 from .persistence import feedback as _feedback
 from .persistence import history as _history
+from .persistence import identities as _identities
 from .persistence import lineage as _lineage
 from .persistence import access as _access
 from .persistence import okugaki as _okugaki
@@ -1751,6 +1752,10 @@ def delete_session(token: str) -> bool:
     return _session_store().delete_session(token)
 
 
+def _external_identity_store() -> _identities.ExternalIdentityStore:
+    return _identities.ExternalIdentityStore(SessionLocal, uuid.uuid4, _now_ms, _user_to_dict)
+
+
 def link_external_identity(
     user_id: str,
     *,
@@ -1758,48 +1763,16 @@ def link_external_identity(
     subject: str,
     email: str | None = None,
 ) -> dict:
-    clean_provider = provider.strip().lower()
-    clean_subject = subject.strip()
-    if not clean_provider or len(clean_provider) > 64:
-        raise ValueError("invalid identity provider")
-    if not clean_subject or len(clean_subject) > 512:
-        raise ValueError("invalid external subject")
-    with SessionLocal() as session:
-        if session.get(UserAccountRow, user_id) is None:
-            raise ValueError("user not found")
-        row = ExternalIdentityRow(
-            id=str(uuid.uuid4()),
-            user_id=user_id,
-            provider=clean_provider,
-            subject=clean_subject,
-            email=(email or "").strip() or None,
-            at=_now_ms(),
-        )
-        session.add(row)
-        session.commit()
-        return {
-            "id": row.id,
-            "user_id": row.user_id,
-            "provider": row.provider,
-            "subject": row.subject,
-            "email": row.email,
-            "at": row.at,
-        }
+    return _external_identity_store().link_external_identity(
+        user_id,
+        provider=provider,
+        subject=subject,
+        email=email,
+    )
 
 
 def get_user_by_external_identity(provider: str, subject: str) -> dict | None:
-    with SessionLocal() as session:
-        identity = session.query(ExternalIdentityRow).filter(
-            ExternalIdentityRow.provider == provider.strip().lower(),
-            ExternalIdentityRow.subject == subject.strip(),
-        ).first()
-        if identity is None:
-            return None
-        row = session.get(UserAccountRow, identity.user_id)
-        if row is None:
-            return None
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _external_identity_store().get_user_by_external_identity(provider, subject)
 
 
 def list_users_for_actor(actor: dict) -> list[dict]:

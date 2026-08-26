@@ -84,6 +84,16 @@ class CameraLocalDescriptionWiringTest {
     }
 
     @Test
+    fun developmentOverlayLetsChildControlsHandleInputBeforeBlockingBackground() {
+        val app = projectFile("app/src/main/java/app/inku/mobile/ui/InkuApp.kt").readText()
+        val surface = section(app, "private fun CameraDevelopmentSurface", "private fun CameraDevelopmentEffectCanvas")
+
+        assertTrue(surface.contains("awaitPointerEvent(PointerEventPass.Final)"))
+        assertFalse(surface.contains("awaitPointerEvent(PointerEventPass.Initial)"))
+        assertTrue(surface.contains("onClick = viewModel::cancelCameraDevelopment"))
+    }
+
+    @Test
     fun cameraOriginOwnsOnlyTheExplicitDrawSnapshot() {
         val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
         val draw = section(viewModel, "fun draw()", "fun cancelDdlOverwrite()")

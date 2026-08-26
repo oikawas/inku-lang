@@ -117,6 +117,13 @@ THUMBNAIL_DEFAULT_SETTINGS = {
 }
 THUMBNAIL_WORKERS_MIN = 1
 THUMBNAIL_WORKERS_MAX = 16
+LOG_RETENTION_SETTINGS_KEY = "log_retention_settings"
+LOG_RETENTION_DEFAULT_SETTINGS = {
+    "enabled": True,
+    "retention_days": int(os.getenv("INKU_LOG_RETENTION_DAYS", "90")),
+    "rotate": os.getenv("INKU_LOG_ROTATE", "daily"),
+    "compress": True,
+}
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -439,6 +446,34 @@ def normalize_thumbnail_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_log_retention_settings(settings: dict | None) -> dict:
+    clean = dict(LOG_RETENTION_DEFAULT_SETTINGS)
+    if clean["rotate"] not in {"daily", "weekly", "monthly"}:
+        clean["rotate"] = "daily"
+    if clean["retention_days"] < 1:
+        clean["retention_days"] = 90
+    if not isinstance(settings, dict):
+        return clean
+    if "enabled" in settings:
+        clean["enabled"] = bool(settings["enabled"])
+    if "retention_days" in settings:
+        try:
+            retention_days = int(settings["retention_days"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("log retention days must be an integer") from exc
+        if retention_days < 1 or retention_days > 3650:
+            raise ValueError("log retention days must be between 1 and 3650")
+        clean["retention_days"] = retention_days
+    if "rotate" in settings:
+        rotate = str(settings["rotate"] or "").strip().lower()
+        if rotate not in {"daily", "weekly", "monthly"}:
+            raise ValueError("log rotate must be daily, weekly, or monthly")
+        clean["rotate"] = rotate
+    if "compress" in settings:
+        clean["compress"] = bool(settings["compress"])
+    return clean
+
+
 @dataclass(frozen=True)
 class UserPluginStorageStore:
     """Read and write one user's validated plugin storage."""
@@ -592,6 +627,35 @@ class ThumbnailSettingsStore:
     def update(self, hidpi: bool, workers: int) -> dict:
         clean = normalize_thumbnail_settings({"hidpi": hidpi, "workers": workers})
         return self.app_settings.write(THUMBNAIL_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class LogRetentionSettingsStore:
+    """Read and write normalized log-retention settings."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_log_retention_settings(
+            self.app_settings.read(LOG_RETENTION_SETTINGS_KEY)
+        )
+
+    def update(
+        self,
+        enabled: bool,
+        retention_days: int,
+        rotate: str,
+        compress: bool,
+    ) -> dict:
+        clean = normalize_log_retention_settings(
+            {
+                "enabled": enabled,
+                "retention_days": retention_days,
+                "rotate": rotate,
+                "compress": compress,
+            }
+        )
+        return self.app_settings.write(LOG_RETENTION_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

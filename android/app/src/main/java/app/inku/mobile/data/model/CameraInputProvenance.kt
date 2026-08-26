@@ -15,10 +15,12 @@ enum class CameraInputOrigin(val wireValue: String) {
 
 enum class CameraInputRoute(val wireValue: String) {
     LocalDescriptionToNim("local_description_to_nim"),
+    LocalDdlToNimStage2("local_ddl_to_nim_stage2"),
 }
 
 enum class CameraVisionOutputMode(val wireValue: String) {
     Description("description"),
+    Ddl("ddl"),
 }
 
 /** Immutable, non-image audit data captured at the local Vision boundary. */
@@ -56,12 +58,16 @@ data class CameraInputProvenance(
             result: VisionAnalysisResult,
         ): CameraInputProvenance = CameraInputProvenance(
             origin = CameraInputOrigin.Camera,
-            route = CameraInputRoute.LocalDescriptionToNim,
+            route = when (request.outputMode) {
+                VisionOutputMode.DESCRIPTION -> CameraInputRoute.LocalDescriptionToNim
+                VisionOutputMode.DDL -> CameraInputRoute.LocalDdlToNimStage2
+            },
             visionProviderId = LOCAL_VISION_PROVIDER_ID,
             visionModelId = result.modelId,
-            visionPromptVersion = VisionPrompts.VERSION,
+            visionPromptVersion = VisionPrompts.versionFor(request.outputMode),
             visionOutputMode = when (request.outputMode) {
                 VisionOutputMode.DESCRIPTION -> CameraVisionOutputMode.Description
+                VisionOutputMode.DDL -> CameraVisionOutputMode.Ddl
             },
             normalizedImageWidth = request.width,
             normalizedImageHeight = request.height,

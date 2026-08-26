@@ -94,14 +94,13 @@ class LocalLiteRtLmProvider(
     }
 
     override suspend fun analyze(request: VisionAnalysisRequest): VisionAnalysisResult = withContext(Dispatchers.IO) {
-        require(request.outputMode == VisionOutputMode.DESCRIPTION) { "Only description output is supported." }
         require(request.modelId == LOCAL_VISION_MODEL_ID) { "Camera analysis requires the local Gemma 4 E2B model." }
         require(request.normalizedJpeg.isNotEmpty()) { "The normalized camera image is empty." }
         val started = System.currentTimeMillis()
         Log.i(
             PERF_TAG,
             "litert_vision_start model_id=${request.modelId} width=${request.width} height=${request.height} " +
-                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.VERSION}",
+                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.versionFor(request.outputMode)}",
         )
         try {
             inferenceMutex.withLock {
@@ -111,7 +110,7 @@ class LocalLiteRtLmProvider(
                     val text = StringBuilder()
                     val contents = Contents.of(
                         Content.ImageBytes(request.normalizedJpeg),
-                        Content.Text(VisionPrompts.forLanguage(request.languageCode)),
+                        Content.Text(VisionPrompts.forLanguage(request.languageCode, request.outputMode)),
                     )
                     try {
                         withTimeout(REQUEST_TIMEOUT_MS) {
@@ -129,8 +128,10 @@ class LocalLiteRtLmProvider(
                         conversation.cancelProcess()
                         throw error
                     }
-                    LocalLiteRtLmOutput.visionDescription(text.toString(), request.languageCode)
-                        .ifBlank { error("Local image analysis returned an empty description.") }
+                    when (request.outputMode) {
+                        VisionOutputMode.DESCRIPTION -> LocalLiteRtLmOutput.visionDescription(text.toString(), request.languageCode)
+                        VisionOutputMode.DDL -> LocalLiteRtLmOutput.modelText(text.toString())
+                    }.ifBlank { error("Local image analysis returned an empty result.") }
                 }
                 val elapsedMs = System.currentTimeMillis() - started
                 Log.i(

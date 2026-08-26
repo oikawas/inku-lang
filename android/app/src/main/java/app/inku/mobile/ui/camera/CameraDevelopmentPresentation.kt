@@ -51,9 +51,9 @@ internal fun cameraDevelopmentPresentation(
             CameraDevelopmentEffect.PaperExposure,
         )
         is CameraCaptureState.Failed -> Triple(
-            if (state.reason == CameraFailure.NimFailed) "現像に失敗しました" else "撮影処理に失敗しました",
-            if (state.reason == CameraFailure.NimFailed) "Development failed" else "Camera processing failed",
-            if (state.reason == CameraFailure.NimFailed) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PaperExposure,
+            if (state.reason.isNimFailure) "現像に失敗しました" else "撮影処理に失敗しました",
+            if (state.reason.isNimFailure) "Development failed" else "Camera processing failed",
+            if (state.reason.isNimFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PaperExposure,
         )
         else -> return null
     }
@@ -65,3 +65,6 @@ internal fun cameraDevelopmentPresentation(
         showRetry = state is CameraCaptureState.Failed && state.canRetryNim,
     )
 }
+
+private val CameraFailure.isNimFailure: Boolean
+    get() = this == CameraFailure.NimFailed || this == CameraFailure.NimFailedDirectDdl

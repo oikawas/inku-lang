@@ -2,6 +2,7 @@ package app.inku.mobile.data.model
 
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
+import app.inku.mobile.llm.VisionOutputMode
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +38,20 @@ class CameraInputProvenanceTest {
         listOf("text", "image", "uri", "path", "filename", "exif", "location", "digest", "captured_at").forEach {
             assertFalse("must not persist $it", provenance.has(it))
         }
+    }
+
+    @Test
+    fun directDdlSnapshotUsesItsOwnBackwardCompatibleRouteAndPromptVersion() {
+        val snapshot = CameraInputProvenance.fromAnalysis(
+            request = request().copy(outputMode = VisionOutputMode.DDL),
+            result = result().copy(text = "青い円を右上に置く。"),
+        )
+        val parsed = cameraInputProvenance(mergeInputProvenance("{}", snapshot))
+            ?: error("direct DDL provenance missing")
+
+        assertEquals(CameraInputRoute.LocalDdlToNimStage2, parsed.route)
+        assertEquals(CameraVisionOutputMode.Ddl, parsed.visionOutputMode)
+        assertEquals("camera-ddl-v1", parsed.visionPromptVersion)
     }
 
     @Test

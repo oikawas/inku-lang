@@ -34,8 +34,10 @@ enum class CameraFailure {
     DecodeFailed,
     AnalysisFailed,
     EmptyResult,
+    InvalidDdl,
     NimNotReady,
     NimFailed,
+    NimFailedDirectDdl,
 }
 
 internal val CameraCaptureState.locksCameraInteraction: Boolean

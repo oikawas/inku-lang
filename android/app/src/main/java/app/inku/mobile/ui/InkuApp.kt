@@ -2,6 +2,7 @@ package app.inku.mobile.ui
 
 import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.model.cameraInputProvenance
+import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -2232,8 +2233,10 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
         CameraFailure.EmptyResult -> S.cameraEmptyResult
+        CameraFailure.InvalidDdl -> S.cameraInvalidDdl
         CameraFailure.NimNotReady -> S.cameraNimNotReady
         CameraFailure.NimFailed -> S.cameraNimFailed
+        CameraFailure.NimFailedDirectDdl -> S.cameraNimFailedDirectDdl
     }
 }
 
@@ -3594,6 +3597,26 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton(S.uiModeFull, selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
                 ChipButton(S.uiModeSimple, selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
+            }
+        }
+        SettingsCard(
+            S.cameraVisionModeTitle,
+            S.cameraVisionModeSubtitle,
+            if (state.cameraVisionOutputMode == VisionOutputMode.DDL) S.cameraVisionModeDdl else S.cameraVisionModeDescription,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                ChipButton(
+                    S.cameraVisionModeDescription,
+                    selected = state.cameraVisionOutputMode == VisionOutputMode.DESCRIPTION,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DESCRIPTION) },
+                )
+                ChipButton(
+                    S.cameraVisionModeDdl,
+                    selected = state.cameraVisionOutputMode == VisionOutputMode.DDL,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DDL) },
+                )
             }
         }
         SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
@@ -5271,7 +5294,9 @@ private fun generationInfoDisplayValue(row: GenerationInfoRow): String =
 internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStrings): String = when {
     row.field == GenerationInfoField.InputOrigin && row.value == "camera" -> strings.generationInfoInputOriginCamera
     row.field == GenerationInfoField.InputRoute && row.value == "local_description_to_nim" -> strings.generationInfoInputRouteLocalDescriptionToNim
+    row.field == GenerationInfoField.InputRoute && row.value == "local_ddl_to_nim_stage2" -> strings.generationInfoInputRouteLocalDdlToNimStage2
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
+    row.field == GenerationInfoField.VisionOutputMode && row.value == "ddl" -> strings.generationInfoVisionOutputModeDdl
     row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn
     row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoOff
     row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> strings.variationAmplitudeLabel(row.value)

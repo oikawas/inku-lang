@@ -5,6 +5,7 @@ import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.mergeInputProvenance
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
+import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.ui.i18n.InkuStringsEn
 import app.inku.mobile.ui.i18n.InkuStringsJa
 import org.junit.Assert.assertEquals
@@ -171,6 +172,53 @@ class GenerationInfoSheetTest {
             assertFalse(sections.any { it.id == GenerationInfoSectionId.Input })
             assertEquals(GenerationInfoSectionId.Sketch, sections.first().id)
         }
+    }
+
+    @Test
+    fun directDdlGenerationInfoNamesTheSkippedRouteAndLocalProducer() {
+        val metadata = mergeInputProvenance(
+            "{}",
+            CameraInputProvenance.fromAnalysis(
+                request = VisionAnalysisRequest(
+                    normalizedJpeg = byteArrayOf(1),
+                    width = 720,
+                    height = 1280,
+                    languageCode = "ja",
+                    outputMode = VisionOutputMode.DDL,
+                ),
+                result = VisionAnalysisResult(
+                    text = "青い円を右上に置く。",
+                    modelId = "local-litert-lm:gemma-4-e2b",
+                    elapsedMs = 321L,
+                ),
+            ),
+        )
+        val item = historyItem(
+            renderMetadataJson = metadata,
+            stage1Model = "local-litert-lm:gemma-4-e2b",
+        )
+        val sections = generationInfoSections(item)
+        val rows = sections.flatMap { it.rows }.associate { it.field to it.value }
+
+        assertEquals("local_ddl_to_nim_stage2", rows[GenerationInfoField.InputRoute])
+        assertEquals("camera-ddl-v1", rows[GenerationInfoField.VisionPromptVersion])
+        assertEquals("ddl", rows[GenerationInfoField.VisionOutputMode])
+        assertEquals("local-litert-lm:gemma-4-e2b", rows[GenerationInfoField.Stage1Model])
+        assertEquals("stage-2-model", rows[GenerationInfoField.Stage2Model])
+        assertEquals(
+            "端末内DDL → NIM Stage 2",
+            generationInfoDisplayValue(
+                sections.first().rows.first { it.field == GenerationInfoField.InputRoute },
+                InkuStringsJa,
+            ),
+        )
+        assertEquals(
+            "DDL",
+            generationInfoDisplayValue(
+                sections.first().rows.first { it.field == GenerationInfoField.VisionOutputMode },
+                InkuStringsEn,
+            ),
+        )
     }
 
     private fun historyItem(

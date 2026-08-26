@@ -294,6 +294,10 @@ interface InkuStrings {
     val cameraPreparingImage: String
     val cameraLoadingLocalModel: String
     val cameraAnalyzingLocally: String
+    val cameraVisionModeTitle: String
+    val cameraVisionModeSubtitle: String
+    val cameraVisionModeDescription: String
+    val cameraVisionModeDdl: String
     val cameraReadyToEdit: String
     val cameraCancelled: String
     val cameraModelNotReady: String
@@ -302,8 +306,10 @@ interface InkuStrings {
     val cameraDecodeFailed: String
     val cameraAnalysisFailed: String
     val cameraEmptyResult: String
+    val cameraInvalidDdl: String
     val cameraNimNotReady: String
     val cameraNimFailed: String
+    val cameraNimFailedDirectDdl: String
     val retry: String
     val menu: String
     val settings: String
@@ -331,7 +337,9 @@ interface InkuStrings {
     val generationInfoNormalizedImageDimensions: String
     val generationInfoInputOriginCamera: String
     val generationInfoInputRouteLocalDescriptionToNim: String
+    val generationInfoInputRouteLocalDdlToNimStage2: String
     val generationInfoVisionOutputModeDescription: String
+    val generationInfoVisionOutputModeDdl: String
     val generationInfoSketchGrain: String
     val generationInfoSketchState: String
     val generationInfoStage1Model: String

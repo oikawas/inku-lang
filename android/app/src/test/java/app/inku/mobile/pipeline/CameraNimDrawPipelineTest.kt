@@ -46,6 +46,26 @@ class CameraNimDrawPipelineTest {
     }
 
     @Test
+    fun directDdlComposeMakesZeroStageOneAndOneFixedStageTwoCall() = runBlocking {
+        val provider = SuccessfulProvider()
+        val pipeline = LocalFallbackPipeline(
+            renderer = CapturingRenderer(),
+            modelProvider = provider,
+        )
+        val request = cameraRequest().copy(
+            description = "青い円を右上に置く。",
+            originalText = "青い円を右上に置く。",
+            stage1Model = "local-litert-lm:gemma-4-e2b",
+        )
+
+        pipeline.composeFromDdl("青い円を右上に置く。", request)
+
+        assertEquals(1, provider.requests.size)
+        assertEquals("nvidia:google/gemma-4-31b-it", provider.requests.single().modelId)
+        assertTrue(provider.requests.single().tool != null)
+    }
+
+    @Test
     fun composeReportsTheRealRenderingBoundaryWithoutInventingProgress() {
         val provider = SuccessfulProvider()
         val renderer = CapturingRenderer()

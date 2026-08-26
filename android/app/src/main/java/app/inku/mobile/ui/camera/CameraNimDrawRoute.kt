@@ -2,6 +2,8 @@ package app.inku.mobile.ui.camera
 
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.data.model.CameraVisionOutputMode
+import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 
 internal const val CAMERA_NIM_PROVIDER_ID = "nvidia"
 internal const val CAMERA_NIM_MODEL_ID = "nvidia:google/gemma-4-31b-it"
@@ -10,7 +12,11 @@ internal const val CAMERA_NIM_CATALOG_ID = "vivid_material"
 /** Immutable run values used only while drawing an editable camera description. */
 internal data class CameraNimDrawRoute(
     val inputProvenance: CameraInputProvenance,
-    val stage1ModelId: String = CAMERA_NIM_MODEL_ID,
+    val stage1ModelId: String = if (inputProvenance.visionOutputMode == CameraVisionOutputMode.Ddl) {
+        LOCAL_VISION_MODEL_ID
+    } else {
+        CAMERA_NIM_MODEL_ID
+    },
     val stage2ModelId: String = CAMERA_NIM_MODEL_ID,
     val catalogId: String = CAMERA_NIM_CATALOG_ID,
     val sketchRequested: Boolean = false,

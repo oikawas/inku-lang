@@ -45,10 +45,15 @@ class CameraLocalDescriptionWiringTest {
         assertTrue(cameraBoundary.contains("analyzeLocalVision"))
         assertTrue(cameraBoundary.contains("val request = VisionAnalysisRequest("))
         assertTrue(cameraBoundary.contains("CameraInputProvenance.fromAnalysis(request, result)"))
-        assertTrue(cameraBoundary.contains("description = result.text.trim()"))
+        assertTrue(cameraBoundary.contains("outputMode = cameraComposeSnapshot?.cameraVisionOutputMode"))
+        assertTrue(cameraBoundary.contains("ServerDdlText.validateLocalVisionDdl(result.text)"))
+        assertTrue(cameraBoundary.contains("description = directDdl ?: result.text.trim()"))
+        assertTrue(cameraBoundary.contains("directDdl = directDdl"))
         assertTrue(cameraBoundary.contains("prompt = input.description"))
+        assertTrue(cameraBoundary.contains("ddl = input.directDdl.orEmpty()"))
         assertTrue(cameraBoundary.contains("repository.interpret("))
         assertTrue(cameraBoundary.contains("repository.composeFromDdl("))
+        assertTrue(cameraBoundary.contains("input.directDdl ?: requireNotNull(interpreted).ddlForDisplay"))
         assertTrue(cameraBoundary.contains("beforeSave ="))
         assertTrue(cameraBoundary.contains("serial != cameraRunSerial"))
         assertFalse(cameraBoundary.contains("CameraCaptureState.ReadyToEdit"))
@@ -68,6 +73,21 @@ class CameraLocalDescriptionWiringTest {
         assertTrue(providerReady > localReady)
         assertTrue(createFile > providerReady)
         assertTrue(emit > createFile)
+    }
+
+    @Test
+    fun invalidDirectDdlStopsBeforeRetryInputAndEveryRemoteBoundary() {
+        val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
+        val camera = section(viewModel, "private suspend fun runCameraInstantPrint", "fun retryCameraDevelopment()")
+        val validation = camera.indexOf("ServerDdlText.validateLocalVisionDdl(result.text)")
+        val rejection = camera.indexOf("CameraStageFailure(CameraFailure.InvalidDdl)")
+        val retained = camera.indexOf("cameraRetryInput = input")
+        val remote = camera.indexOf("interpret = ::interpretCameraInput")
+
+        assertTrue(validation >= 0)
+        assertTrue(rejection > validation)
+        assertTrue(retained > rejection)
+        assertTrue(remote > retained)
     }
 
     @Test

@@ -1734,47 +1734,11 @@ def get_user_by_external_identity(provider: str, subject: str) -> dict | None:
 
 
 def list_users_for_actor(actor: dict) -> list[dict]:
-    if has_permission_group(actor, "admins"):
-        return list_users()
-    if has_permission_group(actor, "leaders") and actor.get("group_id"):
-        with SessionLocal() as session:
-            rows = (
-                session.query(UserAccountRow, UserGroupRow.name)
-                .outerjoin(UserGroupRow, UserAccountRow.group_id == UserGroupRow.id)
-                .filter(UserAccountRow.group_id == actor["group_id"])
-                .order_by(UserAccountRow.username.asc())
-                .all()
-            )
-            return [_user_to_dict(row, group_name) for row, group_name in rows]
-    return []
+    return _account_reader().list_users_for_actor(actor)
 
 
 def list_group_peers(user_id: str) -> list[dict]:
-    """The caller's own organisation group, as names to share a work with.
-
-    Id and display name only, and only the caller's own group. Sharing needs a
-    way to name a person, and the account listing is a member manager's -- the
-    owner of a work usually is not one, so before this they had to be told a raw
-    id and paste it. Opening the whole listing instead would put every name on
-    the server in front of everyone, to solve a problem that stops at the
-    organisation boundary.
-
-    An account with no organisation group gets an empty list, not everyone.
-    """
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if row is None or not row.group_id:
-            return []
-        peers = (
-            session.query(UserAccountRow)
-            .filter(
-                UserAccountRow.group_id == row.group_id,
-                UserAccountRow.id != user_id,   # sharing with oneself is not a thing
-            )
-            .order_by(UserAccountRow.username.asc())
-            .all()
-        )
-        return [{"id": peer.id, "username": peer.username} for peer in peers]
+    return _account_reader().list_group_peers(user_id)
 
 
 def add_user(username: str, email: str, password: str, permission_groups: list[str], group_id: str | None) -> dict:

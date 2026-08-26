@@ -210,6 +210,42 @@ class UserAccountUpdater:
 
 
 @dataclass(frozen=True)
+class CurrentUserProfileUpdater:
+    session_factory: Callable[[], Any]
+    verify_password_fn: Callable[[str, str], bool]
+    hash_password_fn: Callable[[str], str]
+    user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+
+    def update_current_user_profile(
+        self,
+        user_id: str,
+        *,
+        email: str | None = None,
+        password: str | None = None,
+        current_password: str | None = None,
+    ) -> dict | None:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            if email is not None:
+                email = email.strip()
+                if not email:
+                    raise ValueError("email is required")
+                row.email = email
+            if password is not None and password:
+                if not current_password or not self.verify_password_fn(
+                    current_password, row.password_hash
+                ):
+                    raise ValueError("current password is invalid")
+                row.password_hash = self.hash_password_fn(password)
+            session.commit()
+            session.refresh(row)
+            group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+            return self.user_to_dict_fn(row, group_name)
+
+
+@dataclass(frozen=True)
 class UserAccountDeleter:
     session_factory: Callable[[], Any]
     has_permission_group_fn: Callable[[dict, str], bool]

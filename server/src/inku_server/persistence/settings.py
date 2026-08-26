@@ -124,6 +124,7 @@ LOG_RETENTION_DEFAULT_SETTINGS = {
     "rotate": os.getenv("INKU_LOG_ROTATE", "daily"),
     "compress": True,
 }
+MODEL_SETTINGS_KEY = "model_connection_settings"
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -545,6 +546,23 @@ class AppSettingsStore:
                 session.add(row)
             session.commit()
             return value
+
+
+@dataclass(frozen=True)
+class ModelSettingsStore:
+    """Read and write model settings through their established transformations."""
+
+    app_settings: AppSettingsStore
+    normalize: Callable[[dict | None], dict]
+    storage: Callable[[dict], dict]
+
+    def get(self) -> dict:
+        return self.normalize(self.app_settings.read(MODEL_SETTINGS_KEY))
+
+    def update(self, settings: dict) -> dict:
+        stored = self.storage(settings)
+        self.app_settings.write(MODEL_SETTINGS_KEY, stored)
+        return self.normalize(stored)
 
 
 @dataclass(frozen=True)

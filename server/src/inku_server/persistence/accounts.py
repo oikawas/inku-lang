@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from hashlib import pbkdf2_hmac
+import json
 import secrets
 from typing import Any
 
@@ -50,6 +51,85 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 DUMMY_PASSWORD_HASH = hash_password("inku-nonexistent-account-timing-guard")
+
+
+def loads_or_none(raw: str | None):
+    """The stored JSON, or None when there is nothing readable stored.
+
+    None and a stored empty list have to stay apart: the first is an account
+    that never answered and takes the default, the second is an account that
+    asked for nothing.
+    """
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+@dataclass(frozen=True)
+class UserAccountProjector:
+    object_session_fn: Callable[[UserAccountRow], Any]
+    permission_groups_of_fn: Callable[[Any, str], list[str]]
+    permission_group_labels: Mapping[str, str]
+    ui_modes: Collection[str]
+    ui_custom_keys: Collection[str]
+    settings_tabs: Collection[str]
+    normalize_history_strip_fields_fn: Callable[[Any], list[str]]
+    normalize_user_model_settings_fn: Callable[[Any], dict]
+
+    def project(self, row: UserAccountRow, group_name: str | None = None) -> dict:
+        # Read the memberships through the row's own session rather than defaulting
+        # to an empty list when there is none: an actor that silently came back with
+        # no permission groups would be refused everywhere, and nothing would say why.
+        session = self.object_session_fn(row)
+        if session is None:
+            raise RuntimeError("_user_to_dict needs an attached row to read permission groups")
+        permission_groups = self.permission_groups_of_fn(session, row.id)
+
+        try:
+            model_settings = json.loads(row.model_settings or "{}")
+        except json.JSONDecodeError:
+            model_settings = {}
+        try:
+            ui_custom_raw = json.loads(row.ui_custom or "{}")
+        except json.JSONDecodeError:
+            ui_custom_raw = {}
+        ui_custom = (
+            {
+                key: value
+                for key, value in ui_custom_raw.items()
+                if key in self.ui_custom_keys and isinstance(value, bool)
+            }
+            if isinstance(ui_custom_raw, dict)
+            else {}
+        )
+        history_strip_fields = self.normalize_history_strip_fields_fn(
+            loads_or_none(row.history_strip_fields)
+        )
+        return {
+            "id": row.id,
+            "username": row.username,
+            "email": row.email,
+            "permission_groups": permission_groups,
+            "permission_group_labels": [
+                self.permission_group_labels.get(name, name) for name in permission_groups
+            ],
+            "group_id": row.group_id,
+            "group_name": group_name,
+            "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
+            "ui_mode": row.ui_mode if row.ui_mode in self.ui_modes else "simple",
+            "ui_custom": ui_custom,
+            "history_strip_fields": history_strip_fields,
+            "tooltips_enabled": row.tooltips_enabled is not False,
+            "download_folder_enabled": row.download_folder_enabled is True,
+            "download_folder_name": row.download_folder_name,
+            "settings_tab": row.settings_tab if row.settings_tab in self.settings_tabs else "db",
+            "model_settings": self.normalize_user_model_settings_fn(model_settings),
+            "image_generation_count": row.image_generation_count or 0,
+            "at": row.at,
+        }
 
 
 @dataclass(frozen=True)

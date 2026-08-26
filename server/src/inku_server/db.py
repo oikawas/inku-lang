@@ -103,18 +103,7 @@ _HISTORY_STRIP_FIELDS_DEFAULT = _settings.HISTORY_STRIP_FIELDS_DEFAULT
 
 
 def _loads_or_none(raw: str | None):
-    """The stored JSON, or None when there is nothing readable stored.
-
-    None and a stored empty list have to stay apart: the first is an account
-    that never answered and takes the default, the second is an account that
-    asked for nothing.
-    """
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return None
+    return _accounts.loads_or_none(raw)
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -1339,56 +1328,24 @@ def _group_to_dict(row: UserGroupRow) -> dict:
     return _groups.group_to_dict(row)
 
 
-def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
+def _user_account_projector() -> _accounts.UserAccountProjector:
     from sqlalchemy.orm import object_session
     from .model_settings import normalize_user_model_settings
 
-    # Read the memberships through the row's own session rather than defaulting
-    # to an empty list when there is none: an actor that silently came back with
-    # no permission groups would be refused everywhere, and nothing would say why.
-    session = object_session(row)
-    if session is None:
-        raise RuntimeError("_user_to_dict needs an attached row to read permission groups")
-    permission_groups = _permission_groups_of(session, row.id)
-
-    try:
-        model_settings = json.loads(row.model_settings or "{}")
-    except json.JSONDecodeError:
-        model_settings = {}
-    try:
-        ui_custom_raw = json.loads(row.ui_custom or "{}")
-    except json.JSONDecodeError:
-        ui_custom_raw = {}
-    ui_custom = {
-        key: value
-        for key, value in ui_custom_raw.items()
-        if key in _UI_CUSTOM_KEYS and isinstance(value, bool)
-    } if isinstance(ui_custom_raw, dict) else {}
-    history_strip_fields = normalize_history_strip_fields(
-        _loads_or_none(row.history_strip_fields)
+    return _accounts.UserAccountProjector(
+        object_session,
+        _permission_groups_of,
+        PERMISSION_GROUP_LABELS,
+        _UI_MODES,
+        _UI_CUSTOM_KEYS,
+        _SETTINGS_TABS,
+        normalize_history_strip_fields,
+        normalize_user_model_settings,
     )
-    return {
-        "id": row.id,
-        "username": row.username,
-        "email": row.email,
-        "permission_groups": permission_groups,
-        "permission_group_labels": [
-            PERMISSION_GROUP_LABELS.get(name, name) for name in permission_groups
-        ],
-        "group_id": row.group_id,
-        "group_name": group_name,
-        "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
-        "ui_mode": row.ui_mode if row.ui_mode in _UI_MODES else "simple",
-        "ui_custom": ui_custom,
-        "history_strip_fields": history_strip_fields,
-        "tooltips_enabled": row.tooltips_enabled is not False,
-        "download_folder_enabled": row.download_folder_enabled is True,
-        "download_folder_name": row.download_folder_name,
-        "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
-        "model_settings": normalize_user_model_settings(model_settings),
-        "image_generation_count": row.image_generation_count or 0,
-        "at": row.at,
-    }
+
+
+def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
+    return _user_account_projector().project(row, group_name)
 
 
 def add_item(item: dict) -> dict:

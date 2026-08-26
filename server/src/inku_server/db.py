@@ -145,7 +145,7 @@ _EXPORT_TEMPLATE_LIMIT = _settings.EXPORT_TEMPLATE_LIMIT
 _EXPORT_TEMPLATE_DEFAULTS = _settings.EXPORT_TEMPLATE_DEFAULTS
 _DEFAULT_DB_BACKUP_DIR = Path.home() / ".local" / "share" / "inku" / "db-backups"
 _DB_BACKUP_DIR = Path(os.getenv("INKU_DB_BACKUP_DIR", str(_DEFAULT_DB_BACKUP_DIR))).expanduser()
-_MODEL_SETTINGS_KEY = "model_connection_settings"
+_MODEL_SETTINGS_KEY = _settings.MODEL_SETTINGS_KEY
 def init_db() -> None:
     global _HISTORY_FTS_ENABLED
 
@@ -1300,18 +1300,22 @@ def update_log_retention_settings(enabled: bool, retention_days: int, rotate: st
     )
 
 
-def get_model_settings() -> dict:
+def _model_settings_store():
     from .model_settings import normalize_model_settings
 
-    return normalize_model_settings(_read_app_setting(_MODEL_SETTINGS_KEY))
+    from .model_settings import storage_model_settings
+
+    return _settings.ModelSettingsStore(
+        _app_settings_store(), normalize_model_settings, storage_model_settings
+    )
+
+
+def get_model_settings() -> dict:
+    return _model_settings_store().get()
 
 
 def update_model_settings(settings: dict) -> dict:
-    from .model_settings import normalize_model_settings, storage_model_settings
-
-    stored = storage_model_settings(settings)
-    _write_app_setting(_MODEL_SETTINGS_KEY, stored)
-    return normalize_model_settings(stored)
+    return _model_settings_store().update(settings)
 
 
 _AUTH_SETTINGS_KEY = "auth_settings"

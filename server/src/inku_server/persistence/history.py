@@ -251,6 +251,28 @@ class HistoryPermanentDeleteWriter:
 
 
 @dataclass(frozen=True)
+class HistoryTrashPurgeWriter:
+    """Select one owner's trash before delegating permanent deletion."""
+
+    session_factory: Callable[[], object]
+    owner_actor_fn: Callable[[str], dict]
+    delete_items_fn: Callable[..., int]
+
+    def delete_all_trashed_items(self, user_id: str) -> int:
+        # Ownership, not write permission: emptying the trash empties one's own trash.
+        owner = self.owner_actor_fn(user_id)
+        with self.session_factory() as session:
+            ids = [
+                item_id
+                for item_id, in session.query(HistoryRow.id).filter(
+                    access._owned_by(owner, HistoryRow.user_id),
+                    HistoryRow.trashed == 1,
+                )
+            ]
+        return self.delete_items_fn(user_id, ids, require_trashed=True)
+
+
+@dataclass(frozen=True)
 class HistoryShareWriter:
     """Write a work's group-read bit and its retained destination."""
 

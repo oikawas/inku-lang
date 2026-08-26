@@ -2981,14 +2981,8 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
 
 
 def delete_all_trashed_items(user_id: str) -> int:
-    # Same reason as delete_all: emptying the trash empties one's own trash.
-    owner = _owner_actor(user_id)
-    with SessionLocal() as session:
-        ids = [
-            item_id
-            for item_id, in session.query(HistoryRow.id).filter(
-                _owned_by(owner, HistoryRow.user_id),
-                HistoryRow.trashed == 1,
-            )
-        ]
-    return delete_items(user_id, ids, require_trashed=True)
+    return _history.HistoryTrashPurgeWriter(
+        SessionLocal,
+        _owner_actor,
+        delete_items,
+    ).delete_all_trashed_items(user_id)

@@ -2972,45 +2972,12 @@ def restore_items(user_id: str, ids: list[str]) -> int:
 
 
 def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:
-    if not ids:
-        return 0
-    actor = _actor_of(user_id)
-    with SessionLocal() as session:
-        query = session.query(HistoryRow).filter(
-            _writable_by(actor, HistoryRow.user_id, HistoryRow.id),
-            HistoryRow.id.in_(ids),
-        )
-        if require_trashed:
-            query = query.filter(HistoryRow.trashed == 1)
-        rows = query.all()
-        now = _now_ms()
-        node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
-        if node_ids:
-            # No owner test on these two. They follow `rows`, which the filter
-            # above already authorised, and the nodes and edges belong to the
-            # WORK's owner -- who is not the actor once a write grant lets
-            # someone else delete it. Re-testing against the actor would match
-            # nothing and quietly leave the deleted work's node un-tombstoned,
-            # its child still pointing at a parent whose history is gone.
-            nodes = session.query(LineageNodeRow).filter(
-                LineageNodeRow.id.in_(node_ids),
-            ).all()
-            for node in nodes:
-                node.state = "tombstone"
-                node.history_id = None
-                node.description_hash = None
-                node.render_hash = None
-                node.deleted_at = now
-            touching = session.query(LineageEdgeRow).filter(
-                or_(LineageEdgeRow.parent_node_id.in_(node_ids), LineageEdgeRow.child_node_id.in_(node_ids)),
-            ).all()
-            for edge in touching:
-                edge.metadata_json = "{}"
-        _delete_acl_for_histories(session, [row.id for row in rows])
-        for row in rows:
-            session.delete(row)
-        session.commit()
-        return len(rows)
+    return _history.HistoryPermanentDeleteWriter(
+        SessionLocal,
+        _actor_of,
+        _now_ms,
+        _delete_acl_for_histories,
+    ).delete_items(user_id, ids, require_trashed=require_trashed)
 
 
 def delete_all_trashed_items(user_id: str) -> int:

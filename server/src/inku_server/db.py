@@ -17,6 +17,7 @@ from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
 from .identity import description_hash
 from .limits import normalize_limits
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
+from .persistence import accounts as _accounts
 from .persistence.backup import (
     DB_BACKUP_DEFAULT_SETTINGS as _DB_BACKUP_DEFAULT_SETTINGS,  # noqa: F401
     DB_BACKUP_LIST_LIMIT as _DB_BACKUP_LIST_LIMIT,
@@ -1657,35 +1658,25 @@ def delete_user_group(group_id: str) -> bool:
     return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).delete_user_group(group_id)
 
 
+def _account_reader() -> _accounts.UserAccountReader:
+    return _accounts.UserAccountReader(
+        SessionLocal,
+        _user_to_dict,
+        verify_password,
+        _DUMMY_PASSWORD_HASH,
+    )
+
+
 def list_users() -> list[dict]:
-    with SessionLocal() as session:
-        rows = (
-            session.query(UserAccountRow, UserGroupRow.name)
-            .outerjoin(UserGroupRow, UserAccountRow.group_id == UserGroupRow.id)
-            .order_by(UserAccountRow.username.asc())
-            .all()
-        )
-        return [_user_to_dict(row, group_name) for row, group_name in rows]
+    return _account_reader().list_users()
 
 
 def get_user(user_id: str) -> dict | None:
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _account_reader().get_user(user_id)
 
 
 def authenticate_user(username: str, password: str) -> dict | None:
-    with SessionLocal() as session:
-        row = session.query(UserAccountRow).filter(UserAccountRow.username == username.strip()).first()
-        stored_hash = row.password_hash if row is not None else _DUMMY_PASSWORD_HASH
-        password_matches = verify_password(password, stored_hash)
-        if row is None or not password_matches:
-            return None
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _account_reader().authenticate_user(username, password)
 
 
 def _session_store() -> _sessions.SessionStore:

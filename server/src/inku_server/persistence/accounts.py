@@ -1,0 +1,49 @@
+"""User-account read and authentication persistence owner."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
+from .schema import UserAccountRow, UserGroupRow
+
+
+@dataclass(frozen=True)
+class UserAccountReader:
+    session_factory: Callable[[], Any]
+    user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    verify_password_fn: Callable[[str, str], bool]
+    dummy_password_hash: str
+
+    def list_users(self) -> list[dict]:
+        with self.session_factory() as session:
+            rows = (
+                session.query(UserAccountRow, UserGroupRow.name)
+                .outerjoin(UserGroupRow, UserAccountRow.group_id == UserGroupRow.id)
+                .order_by(UserAccountRow.username.asc())
+                .all()
+            )
+            return [self.user_to_dict_fn(row, group_name) for row, group_name in rows]
+
+    def get_user(self, user_id: str) -> dict | None:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+            return self.user_to_dict_fn(row, group_name)
+
+    def authenticate_user(self, username: str, password: str) -> dict | None:
+        with self.session_factory() as session:
+            row = (
+                session.query(UserAccountRow)
+                .filter(UserAccountRow.username == username.strip())
+                .first()
+            )
+            stored_hash = row.password_hash if row is not None else self.dummy_password_hash
+            password_matches = self.verify_password_fn(password, stored_hash)
+            if row is None or not password_matches:
+                return None
+            group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+            return self.user_to_dict_fn(row, group_name)

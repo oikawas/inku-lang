@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from hashlib import pbkdf2_hmac
+import secrets
 from typing import Any
 
 from sqlalchemy import text
@@ -22,6 +24,32 @@ from .schema import (
     UserPermissionGroupRow,
     UserSessionRow,
 )
+
+
+def hash_password(password: str) -> str:
+    if not password:
+        raise ValueError("password is required")
+    salt = secrets.token_bytes(16)
+    iterations = 310_000
+    digest = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        algorithm, iterations_raw, salt_hex, digest_hex = stored_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        iterations = int(iterations_raw)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+    except Exception:  # noqa: BLE001
+        return False
+    actual = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return secrets.compare_digest(actual, expected)
+
+
+DUMMY_PASSWORD_HASH = hash_password("inku-nonexistent-account-timing-guard")
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from inku_server import db
+from inku_server.persistence import history
 from inku_server.persistence import search
 from inku_server.persistence.schema import HistoryRow
 
@@ -185,8 +186,9 @@ def test_persistence_search_owns_implementation_and_db_keeps_exact_facades() -> 
         assert "_history_search" in source, name
 
     assert db._WHOLE_RENDER_HASH is search._WHOLE_RENDER_HASH
-    assert "_history_search_clause(search)" in inspect.getsource(db.list_lineage_groups)
-    assert "_history_search_clause(search)" in inspect.getsource(db.list_lineage_group_items)
+    group_owner_source = inspect.getsource(history.HistoryLineageGroupReader)
+    assert group_owner_source.count("self.history_search_clause_fn(search)") == 2
+    assert "_history_search_clause" in inspect.getsource(db._history_lineage_group_reader)
 
 
 def test_db_facade_resolves_every_replaceable_dependency_at_call_time(
@@ -215,6 +217,14 @@ def test_db_facade_resolves_every_replaceable_dependency_at_call_time(
         "readable_sql",
         "rows_to_dicts_with_lineage",
     )}
+    first_sql_calls: list[tuple[object, ...]] = []
+    first_sql_result = object()
+
+    def first_readable_sql(*args: object) -> object:
+        first_sql_calls.append(args)
+        return first_sql_result
+
+    first["readable_sql"] = first_readable_sql
     monkeypatch.setattr(db, "_HistorySearchService", _ProbeService)
     monkeypatch.setattr(db, "_HISTORY_FTS_ENABLED", True)
     monkeypatch.setattr(db, "engine", SimpleNamespace(dialect=SimpleNamespace(name="sqlite")))
@@ -228,13 +238,26 @@ def test_db_facade_resolves_every_replaceable_dependency_at_call_time(
     assert db._list_items_with_fts(object(), {"id": "actor"}, 1, 2, False, "q", True)[0] == "fts"
     assert db.list_items("user", 3, 4, True, " q ", True, True, True)[0] == "orm"
     for dependencies in constructed:
-        assert dependencies == {
+        readable_sql = dependencies.pop("readable_sql")
+        expected = {
             "fts_enabled": True,
             "dialect_name": "sqlite",
             **first,
         }
+        expected.pop("readable_sql")
+        assert dependencies == expected
+        assert readable_sql("actor", "owner", "history") is first_sql_result
+    assert first_sql_calls == [("actor", "owner", "history")] * len(constructed)
 
     second = {name: object() for name in first}
+    second_sql_calls: list[tuple[object, ...]] = []
+    second_sql_result = object()
+
+    def second_readable_sql(*args: object) -> object:
+        second_sql_calls.append(args)
+        return second_sql_result
+
+    second["readable_sql"] = second_readable_sql
     monkeypatch.setattr(db, "_HISTORY_FTS_ENABLED", False)
     monkeypatch.setattr(db, "engine", SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
     monkeypatch.setattr(db, "SessionLocal", second["session_factory"])
@@ -244,11 +267,16 @@ def test_db_facade_resolves_every_replaceable_dependency_at_call_time(
     monkeypatch.setattr(db, "_rows_to_dicts_with_lineage", second["rows_to_dicts_with_lineage"])
 
     assert db._use_history_fts("second")[0:2] == ("use", "second")
-    assert constructed[-1] == {
+    readable_sql = constructed[-1].pop("readable_sql")
+    expected = {
         "fts_enabled": False,
         "dialect_name": "postgresql",
         **second,
     }
+    expected.pop("readable_sql")
+    assert constructed[-1] == expected
+    assert readable_sql("actor-2", "owner-2", "history-2") is second_sql_result
+    assert second_sql_calls == [("actor-2", "owner-2", "history-2")]
 
 
 def test_quote_hash_clause_and_fts_selection_behavior_remains_exact() -> None:

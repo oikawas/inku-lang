@@ -39,6 +39,8 @@ import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.ComposeFromDdlProgress
+import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
@@ -49,11 +51,17 @@ import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.ui.camera.CameraNimDrawRoute
 import app.inku.mobile.ui.camera.CameraNimDrawRouting
 import app.inku.mobile.ui.camera.CameraNimProviderIssue
+import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
+import app.inku.mobile.ui.camera.CameraInstantPrintPhase
+import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
+import app.inku.mobile.ui.camera.cameraNimProviderIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
+import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.ui.camera.providerIssue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -230,8 +238,17 @@ data class InkuUiState(
      * DDL editor's draw; `refinementBusy` covers the lineage's refinement and
      * the model and language comparisons.
      */
-    val isRunning: Boolean get() = isDrawing || refinementBusy
+    val isRunning: Boolean get() = isDrawing || refinementBusy || cameraCaptureState.locksCameraInteraction
 }
+
+private data class CameraNimRunInput(
+    val description: String,
+    val inputProvenance: CameraInputProvenance,
+    val canvasAspect: String,
+    val uiLanguageCode: String,
+)
+
+private class CameraStageFailure(val failure: CameraFailure) : RuntimeException()
 
 /**
  * The three sub-views of 推敲 (SPEC `:616`, `:686`).
@@ -376,6 +393,8 @@ class InkuViewModel @JvmOverloads constructor(
     private val cameraFiles = CameraCaptureFileStore(application.applicationContext)
     private var pendingCameraFile: java.io.File? = null
     private var cameraRunSerial: Long = 0L
+    private var cameraComposeSnapshot: InkuUiState? = null
+    private var cameraRetryInput: CameraNimRunInput? = null
     private val mutableCameraCaptureRequests = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
     val cameraCaptureRequests: SharedFlow<Uri> = mutableCameraCaptureRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
@@ -479,11 +498,18 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun requestCameraCapture() {
+        if (localState.value.cameraCaptureState.locksCameraInteraction) return
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
         pendingCameraFile = null
         val current = localState.value
+        cameraComposeSnapshot = current.copy(
+            cameraCaptureState = CameraCaptureState.Idle,
+            isDrawing = false,
+            message = null,
+        )
+        cameraRetryInput = null
         val overwriteRisk = current.prompt.isNotBlank() ||
             current.ddl.isNotBlank() ||
             current.selectedHistory != null ||
@@ -501,6 +527,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun cancelCameraOverwrite() {
         if (localState.value.cameraCaptureState != CameraCaptureState.AwaitingOverwriteConfirmation) return
         localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Idle)
+        cameraComposeSnapshot = null
     }
 
     fun confirmCameraOverwrite() {
@@ -520,6 +547,16 @@ class InkuViewModel @JvmOverloads constructor(
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(
                             cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
+                        )
+                    }
+                    return@launch
+                }
+                val cameraProviders = providerSettings.first()
+                cameraNimProviderIssue(cameraProviders)?.let { issue ->
+                    if (serial == cameraRunSerial) {
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.NimNotReady),
+                            message = cameraNimIssueMessage(issue, cameraProviders),
                         )
                     }
                     return@launch
@@ -554,7 +591,7 @@ class InkuViewModel @JvmOverloads constructor(
         pendingCameraFile = null
         if (!success) {
             cameraFiles.delete(file)
-            localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Cancelled)
+            restoreCameraComposeSnapshot()
             return
         }
         if (file == null || !file.isFile || file.length() == 0L) {
@@ -571,68 +608,281 @@ class InkuViewModel @JvmOverloads constructor(
         val serial = cameraRunSerial
         cameraJob?.cancel()
         cameraJob = viewModelScope.launch {
-            localState.value = localState.value.copy(
-                tab = AppTab.Compose,
-                composeMode = ComposeMode.Write,
-                cameraCaptureState = CameraCaptureState.PreparingImage,
-                message = null,
-            )
-            try {
-                val prepared = try {
-                    VisionImagePreparer.prepare(file)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (_: Throwable) {
-                    if (serial == cameraRunSerial) {
-                        localState.value = localState.value.copy(
-                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.DecodeFailed),
-                        )
+            runCameraInstantPrint(serial, file)
+        }
+    }
+
+    private suspend fun runCameraInstantPrint(serial: Long, file: java.io.File) {
+        val coordinator = cameraCoordinator(serial)
+        try {
+            val outcome = coordinator.run(
+                prepare = {
+                    try {
+                        withContext(Dispatchers.IO) { VisionImagePreparer.prepare(file) }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        throw CameraStageFailure(CameraFailure.DecodeFailed)
                     }
-                    return@launch
-                }
-                if (serial != cameraRunSerial) return@launch
-                localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.LoadingLocalModel)
-                repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID)
-                if (serial != cameraRunSerial) return@launch
-                localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.AnalyzingLocally)
-                val request = VisionAnalysisRequest(
-                    normalizedJpeg = prepared.jpegBytes,
-                    width = prepared.width,
-                    height = prepared.height,
-                    languageCode = localState.value.uiLanguage.code,
-                )
-                val result = repository.analyzeLocalVision(request)
-                if (serial != cameraRunSerial) return@launch
-                if (result.text.isBlank()) {
-                    localState.value = localState.value.copy(
-                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.EmptyResult),
+                },
+                load = { repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID) },
+                analyze = { prepared ->
+                    val current = localState.value
+                    val request = VisionAnalysisRequest(
+                        normalizedJpeg = prepared.jpegBytes,
+                        width = prepared.width,
+                        height = prepared.height,
+                        languageCode = current.uiLanguage.code,
                     )
-                    return@launch
-                }
-                promptEditedByUser = true
+                    val result = repository.analyzeLocalVision(request)
+                    if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
+                    CameraNimRunInput(
+                        description = result.text.trim(),
+                        inputProvenance = CameraInputProvenance.fromAnalysis(request, result),
+                        canvasAspect = cameraComposeSnapshot?.selectedCanvasAspect ?: current.selectedCanvasAspect,
+                        uiLanguageCode = current.uiLanguage.code,
+                    )
+                },
+                onLocalReady = { input ->
+                    cameraRetryInput = input
+                    promptEditedByUser = true
+                    localState.value = localState.value.copy(
+                        prompt = input.description,
+                        ddl = "",
+                        ddlEditedAfterGeneration = false,
+                        message = null,
+                    )
+                },
+                interpret = ::interpretCameraInput,
+                compose = { input, interpreted, progress ->
+                    composeCameraInput(serial, input, interpreted, progress)
+                },
+            )
+            finishCameraRun(serial, outcome.result)
+        } catch (error: CameraStageFailure) {
+            failCameraRun(serial, error.failure, canRetryNim = false)
+        } catch (error: CancellationException) {
+            if (serial == cameraRunSerial) {
                 localState.value = localState.value.copy(
-                    prompt = result.text.trim(),
-                    ddl = "",
-                    ddlEditedAfterGeneration = false,
-                    cameraCaptureState = CameraCaptureState.ReadyToEdit(
-                        CameraInputProvenance.fromAnalysis(request, result),
-                    ),
-                    message = null,
+                    cameraCaptureState = CameraCaptureState.Cancelled,
+                    isDrawing = false,
                 )
+            }
+            throw error
+        } catch (_: Throwable) {
+            failCameraRun(
+                serial,
+                if (cameraRetryInput != null) CameraFailure.NimFailed else CameraFailure.AnalysisFailed,
+                canRetryNim = cameraRetryInput != null,
+            )
+        } finally {
+            cameraFiles.delete(file)
+        }
+    }
+
+    fun retryCameraDevelopment() {
+        val failed = localState.value.cameraCaptureState as? CameraCaptureState.Failed ?: return
+        val input = cameraRetryInput ?: return
+        if (!failed.canRetryNim) return
+        cameraRunSerial += 1
+        val serial = cameraRunSerial
+        cameraJob?.cancel()
+        cameraJob = viewModelScope.launch {
+            val cameraProviders = providerSettings.first()
+            cameraNimProviderIssue(cameraProviders)?.let { issue ->
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.NimNotReady, canRetryNim = true),
+                        isDrawing = false,
+                        message = cameraNimIssueMessage(issue, cameraProviders),
+                    )
+                }
+                return@launch
+            }
+            val coordinator = cameraCoordinator(serial)
+            try {
+                val outcome = coordinator.runFromNim(
+                    local = input,
+                    interpret = ::interpretCameraInput,
+                    compose = { retained, interpreted, progress ->
+                        composeCameraInput(serial, retained, interpreted, progress)
+                    },
+                )
+                finishCameraRun(serial, outcome.result)
             } catch (error: CancellationException) {
                 if (serial == cameraRunSerial) {
-                    localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Cancelled)
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Cancelled,
+                        isDrawing = false,
+                    )
                 }
                 throw error
             } catch (_: Throwable) {
-                if (serial == cameraRunSerial) {
-                    localState.value = localState.value.copy(
-                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.AnalysisFailed),
-                    )
-                }
-            } finally {
-                cameraFiles.delete(file)
+                failCameraRun(serial, CameraFailure.NimFailed, canRetryNim = true)
             }
+        }
+    }
+
+    fun cancelCameraDevelopment() {
+        val current = localState.value.cameraCaptureState
+        if (!current.locksCameraInteraction && current !is CameraCaptureState.Failed) return
+        cameraRunSerial += 1
+        val cancelSerial = cameraRunSerial
+        val job = cameraJob
+        cameraJob = null
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.Cancelling,
+            isDrawing = false,
+            message = null,
+        )
+        viewModelScope.launch {
+            job?.cancelAndJoin()
+            cameraFiles.delete(pendingCameraFile)
+            pendingCameraFile = null
+            if (cancelSerial == cameraRunSerial) restoreCameraComposeSnapshot()
+        }
+    }
+
+    private fun cameraCoordinator(serial: Long) = CameraInstantPrintCoordinator(
+        isCurrent = { serial == cameraRunSerial },
+        onPhase = { phase -> updateCameraPhase(serial, phase) },
+    )
+
+    private fun updateCameraPhase(serial: Long, phase: CameraInstantPrintPhase) {
+        if (serial != cameraRunSerial || phase == CameraInstantPrintPhase.Completed) return
+        val captureState = when (phase) {
+            CameraInstantPrintPhase.PreparingImage -> CameraCaptureState.PreparingImage
+            CameraInstantPrintPhase.LoadingLocalModel -> CameraCaptureState.LoadingLocalModel
+            CameraInstantPrintPhase.AnalyzingLocally -> CameraCaptureState.AnalyzingLocally
+            CameraInstantPrintPhase.InterpretingWithNim -> CameraCaptureState.InterpretingWithNim
+            CameraInstantPrintPhase.ComposingWithNim -> CameraCaptureState.ComposingWithNim
+            CameraInstantPrintPhase.Rendering -> CameraCaptureState.Rendering
+            CameraInstantPrintPhase.Saving -> CameraCaptureState.Saving
+            CameraInstantPrintPhase.Completed -> return
+        }
+        val current = localState.value
+        val presentation = cameraDevelopmentPresentation(
+            captureState,
+            isJapanese = !current.uiLanguage.isEnglish,
+            animationsEnabled = false,
+        )
+        localState.value = current.copy(
+            tab = AppTab.Compose,
+            composeMode = ComposeMode.Write,
+            cameraCaptureState = captureState,
+            isDrawing = phase >= CameraInstantPrintPhase.InterpretingWithNim,
+            selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.selectedHistory,
+            message = presentation?.message,
+        )
+    }
+
+    private suspend fun interpretCameraInput(input: CameraNimRunInput): InterpretResult {
+        val route = CameraNimDrawRoute(input.inputProvenance)
+        return withContext(Dispatchers.IO) {
+            repository.interpret(
+                input.description,
+                route.catalogId,
+                input.canvasAspect,
+                route.stage1ModelId,
+                route.stage2ModelId,
+                route.autoRepair,
+                false,
+                instructionLang = InstructionLanguages.AUTO,
+                uiLang = input.uiLanguageCode,
+                sketch = SketchInput(),
+            )
+        }
+    }
+
+    private suspend fun composeCameraInput(
+        serial: Long,
+        input: CameraNimRunInput,
+        interpreted: InterpretResult,
+        progress: suspend (CameraInstantPrintPhase) -> Unit,
+    ): HistoryItemEntity = withContext(Dispatchers.IO) {
+        val route = CameraNimDrawRoute(input.inputProvenance)
+        repository.composeFromDdl(
+            input.description,
+            interpreted.ddlForDisplay,
+            route.catalogId,
+            input.canvasAspect,
+            route.stage1ModelId,
+            route.stage2ModelId,
+            route.autoRepair,
+            false,
+            lineage = LineageDeclaration(),
+            instructionLang = InstructionLanguages.AUTO,
+            uiLang = input.uiLanguageCode,
+            sketch = SketchInput(),
+            inputProvenance = input.inputProvenance,
+            onProgress = { pipelinePhase ->
+                progress(
+                    when (pipelinePhase) {
+                        ComposeFromDdlProgress.Rendering -> CameraInstantPrintPhase.Rendering
+                        ComposeFromDdlProgress.Saving -> CameraInstantPrintPhase.Saving
+                    },
+                )
+            },
+            beforeSave = {
+                if (serial != cameraRunSerial) throw CancellationException("Camera run was cancelled before save.")
+            },
+        )
+    }
+
+    private fun finishCameraRun(serial: Long, item: HistoryItemEntity) {
+        if (serial != cameraRunSerial) return
+        promptEditedByUser = false
+        cameraRetryInput = null
+        cameraComposeSnapshot = null
+        localState.value = localState.value.copy(
+            prompt = item.originalInput,
+            ddl = item.normalizedDdl,
+            ddlEditedAfterGeneration = false,
+            confirmDdlOverwrite = false,
+            selectedHistory = item,
+            lineageDetached = false,
+            cameraCaptureState = CameraCaptureState.Completed(item.id),
+            isDrawing = false,
+            message = cameraDevelopmentPresentation(
+                CameraCaptureState.Completed(item.id),
+                isJapanese = !localState.value.uiLanguage.isEnglish,
+                animationsEnabled = false,
+            )?.message,
+        )
+    }
+
+    private fun failCameraRun(serial: Long, failure: CameraFailure, canRetryNim: Boolean) {
+        if (serial != cameraRunSerial) return
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.Failed(failure, canRetryNim),
+            isDrawing = false,
+            message = null,
+        )
+    }
+
+    private fun restoreCameraComposeSnapshot() {
+        val snapshot = cameraComposeSnapshot
+        cameraComposeSnapshot = null
+        cameraRetryInput = null
+        localState.value = (snapshot ?: localState.value).copy(
+            cameraCaptureState = CameraCaptureState.Idle,
+            isDrawing = false,
+            message = null,
+        )
+    }
+
+    private fun cameraNimIssueMessage(
+        issue: CameraNimProviderIssue,
+        providers: List<ProviderSettingEntity>,
+    ): String {
+        val providerName = providers
+            .firstOrNull { it.providerId == "nvidia" }
+            ?.displayName
+            ?: "NVIDIA NIM"
+        return when (issue) {
+            CameraNimProviderIssue.MissingOrDisabled -> strings().errorProviderNotFoundForModel(app.inku.mobile.ui.camera.CAMERA_NIM_MODEL_ID)
+            CameraNimProviderIssue.BaseUrlMissing -> strings().errorProviderBaseUrlMissing(providerName)
+            CameraNimProviderIssue.ApiKeyMissing -> strings().errorProviderApiKeyMissing(providerName)
         }
     }
 

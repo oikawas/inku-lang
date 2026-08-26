@@ -302,6 +302,9 @@ interface InkuStrings {
     val cameraDecodeFailed: String
     val cameraAnalysisFailed: String
     val cameraEmptyResult: String
+    val cameraNimNotReady: String
+    val cameraNimFailed: String
+    val retry: String
     val menu: String
     val settings: String
     val saijikiTapNote: String

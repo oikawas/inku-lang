@@ -33,7 +33,7 @@ class CameraLocalDescriptionWiringTest {
     }
 
     @Test
-    fun cameraResultStopsAtTheEditableDescriptionBoundary() {
+    fun cameraResultHandsTheLocalDescriptionToTheOneTouchOwner() {
         val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
         val cameraStart = viewModel.indexOf("fun onCameraCaptureResult")
         val cameraEnd = viewModel.indexOf("fun onCameraCaptureLaunchFailed", cameraStart)
@@ -41,13 +41,46 @@ class CameraLocalDescriptionWiringTest {
         assertTrue("camera result owner must be bounded", cameraEnd > cameraStart)
         val cameraBoundary = viewModel.substring(cameraStart, cameraEnd)
 
+        assertTrue(cameraBoundary.contains("runCameraInstantPrint"))
         assertTrue(cameraBoundary.contains("analyzeLocalVision"))
         assertTrue(cameraBoundary.contains("val request = VisionAnalysisRequest("))
         assertTrue(cameraBoundary.contains("CameraInputProvenance.fromAnalysis(request, result)"))
-        assertTrue(cameraBoundary.contains("prompt = result.text"))
-        assertFalse(cameraBoundary.contains("repository.interpret("))
-        assertFalse(cameraBoundary.contains("composeFromDdl("))
+        assertTrue(cameraBoundary.contains("description = result.text.trim()"))
+        assertTrue(cameraBoundary.contains("prompt = input.description"))
+        assertTrue(cameraBoundary.contains("repository.interpret("))
+        assertTrue(cameraBoundary.contains("repository.composeFromDdl("))
+        assertTrue(cameraBoundary.contains("beforeSave ="))
+        assertTrue(cameraBoundary.contains("serial != cameraRunSerial"))
+        assertFalse(cameraBoundary.contains("CameraCaptureState.ReadyToEdit"))
         assertFalse(cameraBoundary.contains("saveHistory("))
+    }
+
+    @Test
+    fun cameraPreflightsLocalVisionAndFixedNimBeforeEmittingTheCaptureRequest() {
+        val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
+        val start = section(viewModel, "private fun startCameraCapture()", "fun onCameraCaptureResult")
+        val localReady = start.indexOf("repository.isLocalVisionModelReady()")
+        val providerReady = start.indexOf("cameraNimProviderIssue(cameraProviders)")
+        val createFile = start.indexOf("cameraFiles.createPendingCapture()")
+        val emit = start.indexOf("mutableCameraCaptureRequests.emit")
+
+        assertTrue(localReady >= 0)
+        assertTrue(providerReady > localReady)
+        assertTrue(createFile > providerReady)
+        assertTrue(emit > createFile)
+    }
+
+    @Test
+    fun savingPhaseIsReportedBeforeTheFinalCancellationFenceAndTransaction() {
+        val repository = projectFile("app/src/main/java/app/inku/mobile/data/InkuRepository.kt").readText()
+        val compose = section(repository, "suspend fun composeFromDdl", "suspend fun generateDemoPrompt")
+        val saving = compose.indexOf("onProgress(ComposeFromDdlProgress.Saving)")
+        val fence = compose.indexOf("beforeSave()")
+        val save = compose.indexOf("return saveResult(")
+
+        assertTrue(saving >= 0)
+        assertTrue(fence > saving)
+        assertTrue(save > fence)
     }
 
     @Test

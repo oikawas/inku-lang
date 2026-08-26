@@ -33,6 +33,10 @@ internal enum class CameraNimProviderIssue {
 
 internal fun CameraNimDrawRoute.providerIssue(
     providers: List<ProviderSettingEntity>,
+): CameraNimProviderIssue? = cameraNimProviderIssue(providers)
+
+internal fun cameraNimProviderIssue(
+    providers: List<ProviderSettingEntity>,
 ): CameraNimProviderIssue? {
     val provider = providers.firstOrNull { it.providerId == CAMERA_NIM_PROVIDER_ID }
         ?.takeIf { it.isEnabled }
@@ -44,4 +48,11 @@ internal fun CameraNimDrawRoute.providerIssue(
 
 /** Clear only a camera description that is still eligible for the fixed draw route. */
 internal fun CameraCaptureState.clearCameraOrigin(): CameraCaptureState =
-    if (this is CameraCaptureState.ReadyToEdit) CameraCaptureState.Idle else this
+    when (this) {
+        is CameraCaptureState.ReadyToEdit,
+        is CameraCaptureState.Completed,
+        is CameraCaptureState.Failed,
+        CameraCaptureState.Cancelled,
+        -> CameraCaptureState.Idle
+        else -> this
+    }

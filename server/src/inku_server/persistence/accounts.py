@@ -137,3 +137,61 @@ class UserAccountCreator:
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
             return self.user_to_dict_fn(row, group_name)
+
+
+@dataclass(frozen=True)
+class UserAccountUpdater:
+    session_factory: Callable[[], Any]
+    hash_password_fn: Callable[[str], str]
+    set_permission_groups_fn: Callable[[Any, UserAccountRow, list[str]], list[str]]
+    has_permission_group_fn: Callable[[dict, str], bool]
+    holds_no_elevated_group_fn: Callable[[Any], Any]
+    user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    unset: object
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        username: str | None = None,
+        email: str | None = None,
+        password: str | None = None,
+        permission_groups: list[str] | None = None,
+        group_id: str | None | object = None,
+        actor: dict | None = None,
+    ) -> dict | None:
+        with self.session_factory() as session:
+            query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
+            if actor is not None and not self.has_permission_group_fn(actor, "admins"):
+                if not self.has_permission_group_fn(actor, "leaders") or not actor.get("group_id"):
+                    return None
+                query = query.filter(
+                    UserAccountRow.group_id == actor["group_id"],
+                    self.holds_no_elevated_group_fn(session),
+                )
+            row = query.first()
+            if not row:
+                return None
+            if username is not None:
+                username = username.strip()
+                if not username:
+                    raise ValueError("username is required")
+                row.username = username
+            if email is not None:
+                email = email.strip()
+                if not email:
+                    raise ValueError("email is required")
+                row.email = email
+            if password is not None and password:
+                row.password_hash = self.hash_password_fn(password)
+            if permission_groups is not None:
+                self.set_permission_groups_fn(session, row, permission_groups)
+            if group_id is not self.unset:
+                group_id = group_id if isinstance(group_id, str) else None
+                if group_id and not session.get(UserGroupRow, group_id):
+                    raise ValueError("group not found")
+                row.group_id = group_id or None
+            session.commit()
+            session.refresh(row)
+            group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
+            return self.user_to_dict_fn(row, group_name)

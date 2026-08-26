@@ -873,24 +873,12 @@ def admin_history_owner_id() -> str | None:
 _SINGLE_USER_SETTING_KEY = _settings.SINGLE_USER_SETTINGS_KEY
 
 
+def _single_user_mode_resolver() -> _accounts.SingleUserModeResolver:
+    return _accounts.SingleUserModeResolver(os.getenv)
+
+
 def single_user_mode_enabled() -> bool:
-    """Whether this server runs as one person's own.
-
-    Off unless explicitly asked for: a deployment that merely upgrades must
-    not quietly lose its login screen.  The distribution turns it on in its
-    own compose file, not here.
-
-    An empty value reads as unset, matching how _bootstrap_admin_password
-    treats a blank field handed over by compose interpolation.
-
-    This is the only reader of the variable.  deps.py and the /api/info
-    banner both come through here, so the guard and what the banner claims
-    cannot disagree.
-    """
-    value = os.getenv("INKU_SINGLE_USER")
-    if value is None:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    return _single_user_mode_resolver().enabled()
 
 
 def _create_single_user_account() -> str | None:

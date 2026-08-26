@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Iterator
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, get_args
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -33,7 +33,7 @@ from ...languages import expand_intermediate_for_lang
 from ...limits import DEFAULT_LIMITS, Limits, limits_as_dict, using_limits
 from ...plugins import DOCUMENT_PLUGIN_MANAGER
 from ...carriage import carriage_warnings as _carriage_warnings
-from ...schema import Score
+from ...schema import Color, Score
 from ...sketch import (
     DEFAULT_SKETCH_GRAIN,
     SketchDetail,
@@ -52,6 +52,8 @@ from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
+
+_RETRY_SCORE_COLORS = ", ".join(get_args(Color))
 
 
 def _provider_failure_detail(operation: str, exc: BaseException | None) -> dict | None:
@@ -918,7 +920,7 @@ def _compose_retry_prompt(*, reason: str, lang: str, canvas_aspect: str | None =
             "Submit a valid Score through the submit_score tool.\n"
             "Required: instructions must contain 1-5 drawable items.\n"
             "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc, cloudform.\n"
-            "Allowed colors: white, black, blue, red, green, gray.\n"
+            f"Allowed colors: {_RETRY_SCORE_COLORS}.\n"
             "For repeated marks in the same placement, use one instruction with arrangement instead of many instructions. Groups with different counts or placements may use separate instructions.\n"
             "Do not draw humans, faces, or animals as objects; convert them to abstract presence, weight, spacing, symmetry, or gaze pressure.\n"
             "Do not add unspecified helper lines or helper shapes. Apply adjectives and motion words to the requested primitive.\n"
@@ -931,7 +933,7 @@ def _compose_retry_prompt(*, reason: str, lang: str, canvas_aspect: str | None =
         "submit_score tool で有効な Score を提出する。\n"
         "必須: instructions には描画可能な命令を1〜5個入れる。空配列は禁止。\n"
         "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc, cloudform。\n"
-        "使用できる color: white, black, blue, red, green, gray。\n"
+        f"使用できる color: {_RETRY_SCORE_COLORS}。\n"
         "同一配置の繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。個数や配置が異なる群は別 instruction でよい。\n"
         "人・顔・動物を対象物として描かず、存在感、重心、余白、対称性、視線圧として抽象化する。\n"
         "未指定の補助線・補助図形を追加しない。形容・動作語は指定された primitive へ適用する。\n"

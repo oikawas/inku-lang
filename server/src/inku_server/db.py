@@ -28,6 +28,7 @@ from .persistence import history as _history
 from .persistence import lineage as _lineage
 from .persistence import access as _access
 from .persistence import okugaki as _okugaki
+from .persistence import sessions as _sessions
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
 from .persistence.legacy_schema import (
@@ -1719,62 +1720,35 @@ def authenticate_user(username: str, password: str) -> dict | None:
         return _user_to_dict(row, group_name)
 
 
-def create_session(user_id: str) -> str:
-    token = secrets.token_urlsafe(32)
-    with SessionLocal() as session:
-        if not session.get(UserAccountRow, user_id):
-            raise ValueError("user not found")
-        _delete_expired_sessions(session)
-        session.add(UserSessionRow(token_hash=_hash_token(token), user_id=user_id, at=_now_ms()))
-        session.commit()
-    return token
-
-
-def _session_expiry_cutoff_ms(now_ms: int | None = None) -> int | None:
-    if _SESSION_MAX_AGE_SECONDS <= 0:
-        return None
-    now = _now_ms() if now_ms is None else now_ms
-    return now - (_SESSION_MAX_AGE_SECONDS * 1000)
-
-
-def _delete_expired_sessions(session) -> int:
-    cutoff = _session_expiry_cutoff_ms()
-    if cutoff is None:
-        return 0
-    return (
-        session.query(UserSessionRow)
-        .filter(UserSessionRow.at < cutoff)
-        .delete(synchronize_session=False)
+def _session_store() -> _sessions.SessionStore:
+    return _sessions.SessionStore(
+        SessionLocal,
+        secrets.token_urlsafe,
+        _hash_token,
+        _now_ms,
+        _SESSION_MAX_AGE_SECONDS,
+        _user_to_dict,
     )
 
 
+def create_session(user_id: str) -> str:
+    return _session_store().create_session(user_id)
+
+
+def _session_expiry_cutoff_ms(now_ms: int | None = None) -> int | None:
+    return _session_store().session_expiry_cutoff_ms(now_ms)
+
+
+def _delete_expired_sessions(session) -> int:
+    return _session_store().delete_expired_sessions(session)
+
+
 def get_session_user(token: str) -> dict | None:
-    with SessionLocal() as session:
-        session_row = session.get(UserSessionRow, _hash_token(token))
-        if not session_row:
-            return None
-        cutoff = _session_expiry_cutoff_ms()
-        if cutoff is not None and session_row.at < cutoff:
-            session.delete(session_row)
-            session.commit()
-            return None
-        row = session.get(UserAccountRow, session_row.user_id)
-        if not row:
-            session.delete(session_row)
-            session.commit()
-            return None
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _session_store().get_session_user(token)
 
 
 def delete_session(token: str) -> bool:
-    with SessionLocal() as session:
-        row = session.get(UserSessionRow, _hash_token(token))
-        if not row:
-            return False
-        session.delete(row)
-        session.commit()
-        return True
+    return _session_store().delete_session(token)
 
 
 def link_external_identity(

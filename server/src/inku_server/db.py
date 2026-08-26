@@ -512,7 +512,7 @@ def _hash_password(password: str) -> str:
 
 
 def _hash_token(token: str) -> str:
-    return sha256(token.encode("utf-8")).hexdigest()
+    return _sessions.hash_token(token)
 
 
 def verify_password(password: str, stored_hash: str) -> bool:

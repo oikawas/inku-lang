@@ -1758,6 +1758,18 @@ def add_user(username: str, email: str, password: str, permission_groups: list[s
     return _account_creator().add_user(username, email, password, permission_groups, group_id)
 
 
+def _account_updater() -> _accounts.UserAccountUpdater:
+    return _accounts.UserAccountUpdater(
+        SessionLocal,
+        _hash_password,
+        _set_permission_groups,
+        has_permission_group,
+        _holds_no_elevated_group,
+        _user_to_dict,
+        _UNSET,
+    )
+
+
 def update_user(
     user_id: str,
     *,
@@ -1768,41 +1780,15 @@ def update_user(
     group_id: str | None | object = _UNSET,
     actor: dict | None = None,
 ) -> dict | None:
-    with SessionLocal() as session:
-        query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
-        if actor is not None and not has_permission_group(actor, "admins"):
-            if not has_permission_group(actor, "leaders") or not actor.get("group_id"):
-                return None
-            query = query.filter(
-                UserAccountRow.group_id == actor["group_id"],
-                _holds_no_elevated_group(session),
-            )
-        row = query.first()
-        if not row:
-            return None
-        if username is not None:
-            username = username.strip()
-            if not username:
-                raise ValueError("username is required")
-            row.username = username
-        if email is not None:
-            email = email.strip()
-            if not email:
-                raise ValueError("email is required")
-            row.email = email
-        if password is not None and password:
-            row.password_hash = _hash_password(password)
-        if permission_groups is not None:
-            _set_permission_groups(session, row, permission_groups)
-        if group_id is not _UNSET:
-            group_id = group_id if isinstance(group_id, str) else None
-            if group_id and not session.get(UserGroupRow, group_id):
-                raise ValueError("group not found")
-            row.group_id = group_id or None
-        session.commit()
-        session.refresh(row)
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _account_updater().update_user(
+        user_id,
+        username=username,
+        email=email,
+        password=password,
+        permission_groups=permission_groups,
+        group_id=group_id,
+        actor=actor,
+    )
 
 
 def update_current_user_profile(

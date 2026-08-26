@@ -325,6 +325,10 @@ PRESENCE_CENTER_LEFT_HALF_MARKERS: tuple[str, ...] = _coerce_marker_values("pres
 PRESENCE_INTENSITY_HIGH_MARKERS: tuple[str, ...] = _coerce_marker_values("presence_intensity_high")
 CLAUSE_NAMES_A_MARK_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_names_a_mark")
 CLAUSE_SHAPE_CLOUDFORM_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_cloudform")
+CLAUSE_SHAPE_POLYGON_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_polygon")
+CLAUSE_SHAPE_SQUARE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_square")
+CLAUSE_SHAPE_TRIANGLE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_triangle")
+CLAUSE_SHAPE_ARC_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_arc")
 CLAUSE_SHAPE_ELLIPSE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_ellipse")
 CLAUSE_SHAPE_CIRCLE_MARKERS: tuple[str, ...] = _coerce_marker_values("clause_shape_circle")
 SMALL_MARK_SIZE_MARKERS: tuple[str, ...] = _coerce_marker_values("small_mark_size")
@@ -1882,13 +1886,13 @@ def _primitive_from_clause(clause: str) -> str:
     # the clause's count onto whatever line the Score happens to carry.
     if _observed_raw_any(CLAUSE_SHAPE_CLOUDFORM_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_cloudform"):
         return "cloudform"
-    if ("多角形" in clause) or ("五角" in clause) or ("六角" in clause) or ("polygon" in lower):
+    if _observed_raw_any(CLAUSE_SHAPE_POLYGON_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_polygon"):
         return "polygon"
-    if ("四角" in clause) or ("square" in lower) or ("rectangle" in lower):
+    if _observed_raw_any(CLAUSE_SHAPE_SQUARE_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_square"):
         return "square"
-    if ("三角" in clause) or ("triangle" in lower):
+    if _observed_raw_any(CLAUSE_SHAPE_TRIANGLE_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_triangle"):
         return "triangle"
-    if ("弧" in clause) or ("arc" in lower):
+    if _observed_raw_any(CLAUSE_SHAPE_ARC_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_arc"):
         return "arc"
     if _observed_raw_any(CLAUSE_SHAPE_ELLIPSE_MARKERS, clause, lower, decision_site="coerce.compose._primitive_from_clause.clause_shape_ellipse"):
         return "ellipse"

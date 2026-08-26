@@ -273,7 +273,7 @@ def test_the_scan_reads_all_four_shapes_and_skips_the_notes() -> None:
 
     found = judgement_literals()
     files = {path for places in found.values() for path, _ in places}
-    assert files == {"compose.py", "normalize.py"}, files
+    assert files == {"normalize.py"}, files
 
     # Compose-local author inputs no longer look like raw containment tests: they
     # are registered by `_direct_marker_values` and attached to explicit runtime

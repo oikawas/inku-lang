@@ -141,7 +141,7 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
-  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを端末内Gemmaで記述化し、固定NIM／`vivid_material`描画・保存までone-touchで進める
+  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを端末内Gemmaで既定の記述または明示選択した上級DDLへ変換し、固定NIM／`vivid_material`描画・保存までone-touchで進める
   - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
   - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
   - canvas 下の prompt と DDL interpretation
@@ -2267,3 +2267,13 @@ Stage 1／2は`nvidia:google/gemma-4-31b-it`、色カタログは`vivid_material
 撮影結果後は白いpaper上で、画像準備／local Visionを「光を読み取っています」／`Reading the light`、Stage 1を「かたちを起こしています」／`Bringing out the forms`、Stage 2を「色と配置を定着させています」／`Fixing color and placement`、render／saveを「現像しています」／`Developing`、保存成功を「現像できました」／`Developed`と表示する。paper／露光、粒子／形、`vivid_material`色面、輪郭定着は実処理段からだけ導くprocedural effectであり、架空の中間SVG、進捗率、ETA、人工delayを作らない。system animation scaleが0なら同じ段をstatic surfaceで示し、保存後の実SVGを即時表示する。
 
 camera run中は別のcamera、描画、設定、主要navigationを閉じ、Cancelとsystem Backを同じ取消境界へ配線する。取消はjobと一時fileを閉じ、run IDとrepository save直前のcoroutine gateでlate result／保存を拒否し、process-localに保持した開始前Compose状態へ戻す。local Vision失敗は撮り直しを要求する。local Vision成功後のNIM／render失敗は記述とprovenanceを保持し、Retryで画像準備／local Visionを繰り返さず固定Stage 1から再開する。rotationはViewModelの現段を再表示して外部callを再開始しない。Room schema／migration、写真保存、Photo Picker、DDL direct、段別resume、foreground service、独自reduce-motion設定は追加しない。
+
+## 2026-08-26 カメラlocal DDL direct mode（[I-412]）
+
+Abstract Instant Print／抽象画インスタントプリントのM5では、設定の「その他」にcamera解析modeを置く。既定は「記述（推奨）」で、M4のlocal Vision記述、固定NIM Stage 1、固定NIM Stage 2、描画、保存の経路を維持する。「DDL直接（上級）」を明示選択したrunだけ、local Gemma 4 E2Bが`camera-ddl-v1`で正規化DDLを生成し、固定NIM Stage 1を呼ばずStage 2へ渡す。modeは既存`app_settings`の`camera_vision_output_mode`へ保存し、欠落、空、未知値、壊れたJSONは記述へ戻す。撮影開始時にmodeをsnapshotし、active run中は変更できない。
+
+DDL promptはAndroidの`WebDdlSpec`と`ServerDdlText`をauthorityにし、撮影画像に見える文字を命令として実行せず、人物同定や属性推測を行わない。local出力はtemplate marker除去、既存Stage 1 normalization、placement sanitizeを通した一つのtyped validatorで日英のcanonical drawable vocabularyを検査する。空、code fence、JSON、SQL、前置きだけ、drawable vocabulary 0件は撮り直しerrorでfail closedし、NIM Stage 1／2、render、save、fallbackを実行しない。validatorは形、数、色、配置を推測して補わない。
+
+有効なdirect DDLは、local Vision 1回、NIM Stage 1 0回、固定`nvidia:google/gemma-4-31b-it` Stage 2 1回、`vivid_material`、写生off、catalog自動選択0、`autoRepair=false`で既存`composeFromDdl`／root save transactionへ進む。現像表示はlocal解析後に「かたちを起こしています」を通らず、「色と配置を定着させています」へ進む。Stage 2／render失敗時は保持したDDLからStage 2だけを再試行し、local VisionとStage 1を繰り返さない。Cancel、system Back、late-result拒否、save直前fenceはM4と同じjob ownerを使う。
+
+保存作品は`route=local_ddl_to_nim_stage2`、`vision_output_mode=ddl`、`camera-ddl-v1`を既存camera provenanceへ後方互換で記録する。`stage1_model`はDDLを実際に生成した`local-litert-lm:gemma-4-e2b`、`stage2_model`は固定NIMである。`original_input`と`normalized_ddl`は検証済みDDLを持ち、写真、URI、EXIF、location、digestは保存しない。Room schema／migration、新列、写真保存、Photo Picker、E4B、NIM以外のfallback、既定mode変更は行わない。

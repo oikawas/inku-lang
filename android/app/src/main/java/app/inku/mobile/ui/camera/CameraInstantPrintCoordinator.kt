@@ -15,6 +15,11 @@ internal enum class CameraInstantPrintPhase {
     Completed,
 }
 
+internal enum class CameraInstantPrintRoute {
+    Description,
+    DirectDdl,
+}
+
 internal data class CameraInstantPrintOutcome<Local, Result>(
     val local: Local,
     val result: Result,
@@ -26,6 +31,7 @@ internal class CameraInstantPrintCoordinator(
     private val onPhase: (CameraInstantPrintPhase) -> Unit,
 ) {
     suspend fun <Prepared, Local, Interpreted, Result> run(
+        route: CameraInstantPrintRoute = CameraInstantPrintRoute.Description,
         prepare: suspend () -> Prepared,
         load: suspend () -> Unit,
         analyze: suspend (Prepared) -> Local,
@@ -33,7 +39,7 @@ internal class CameraInstantPrintCoordinator(
         interpret: suspend (Local) -> Interpreted,
         compose: suspend (
             Local,
-            Interpreted,
+            Interpreted?,
             suspend (CameraInstantPrintPhase) -> Unit,
         ) -> Result,
     ): CameraInstantPrintOutcome<Local, Result> {
@@ -48,21 +54,26 @@ internal class CameraInstantPrintCoordinator(
         ensureCurrent()
         onLocalReady(local)
         ensureCurrent()
-        return runFromNim(local, interpret, compose)
+        return runFromNim(route, local, interpret, compose)
     }
 
     suspend fun <Local, Interpreted, Result> runFromNim(
+        route: CameraInstantPrintRoute = CameraInstantPrintRoute.Description,
         local: Local,
         interpret: suspend (Local) -> Interpreted,
         compose: suspend (
             Local,
-            Interpreted,
+            Interpreted?,
             suspend (CameraInstantPrintPhase) -> Unit,
         ) -> Result,
     ): CameraInstantPrintOutcome<Local, Result> {
-        emit(CameraInstantPrintPhase.InterpretingWithNim)
-        val interpreted = interpret(local)
-        ensureCurrent()
+        val interpreted = when (route) {
+            CameraInstantPrintRoute.Description -> {
+                emit(CameraInstantPrintPhase.InterpretingWithNim)
+                interpret(local).also { ensureCurrent() }
+            }
+            CameraInstantPrintRoute.DirectDdl -> null
+        }
         emit(CameraInstantPrintPhase.ComposingWithNim)
         val result = compose(local, interpreted) { phase ->
             require(

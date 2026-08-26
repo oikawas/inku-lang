@@ -33,6 +33,22 @@ class CameraNimDrawRouteTest {
     }
 
     @Test
+    fun directDdlRecordsLocalStageOneProducerAndKeepsFixedNimStageTwo() {
+        val direct = provenance().copy(
+            route = CameraInputRoute.LocalDdlToNimStage2,
+            visionPromptVersion = "camera-ddl-v1",
+            visionOutputMode = CameraVisionOutputMode.Ddl,
+        )
+        val route = CameraNimDrawRouting.forState(CameraCaptureState.ReadyToEdit(direct))
+            ?: error("camera route missing")
+
+        assertEquals("local-litert-lm:gemma-4-e2b", route.stage1ModelId)
+        assertEquals("nvidia:google/gemma-4-31b-it", route.stage2ModelId)
+        assertEquals("vivid_material", route.catalogId)
+        assertFalse(route.autoRepair)
+    }
+
+    @Test
     fun onlyReadyToEditOwnsTheCameraRoute() {
         assertNull(CameraNimDrawRouting.forState(CameraCaptureState.Idle))
         assertNull(CameraNimDrawRouting.forState(CameraCaptureState.Capturing))

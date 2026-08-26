@@ -36,15 +36,19 @@ import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
+import app.inku.mobile.llm.CameraVisionModeSetting
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
+import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.LocalVisionDdlValidation
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.pipeline.ServerDdlText
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraFailure
@@ -53,6 +57,7 @@ import app.inku.mobile.ui.camera.CameraNimDrawRouting
 import app.inku.mobile.ui.camera.CameraNimProviderIssue
 import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
 import app.inku.mobile.ui.camera.CameraInstantPrintPhase
+import app.inku.mobile.ui.camera.CameraInstantPrintRoute
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.cameraNimProviderIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
@@ -186,6 +191,7 @@ data class InkuUiState(
     val descriptionFocused: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
+    val cameraVisionOutputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION,
     val isDrawing: Boolean = false,
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
@@ -243,10 +249,14 @@ data class InkuUiState(
 
 private data class CameraNimRunInput(
     val description: String,
+    val directDdl: String?,
     val inputProvenance: CameraInputProvenance,
     val canvasAspect: String,
     val uiLanguageCode: String,
-)
+) {
+    val instantPrintRoute: CameraInstantPrintRoute
+        get() = if (directDdl == null) CameraInstantPrintRoute.Description else CameraInstantPrintRoute.DirectDdl
+}
 
 private class CameraStageFailure(val failure: CameraFailure) : RuntimeException()
 
@@ -616,6 +626,10 @@ class InkuViewModel @JvmOverloads constructor(
         val coordinator = cameraCoordinator(serial)
         try {
             val outcome = coordinator.run(
+                route = cameraComposeSnapshot
+                    ?.cameraVisionOutputMode
+                    ?.let { if (it == VisionOutputMode.DDL) CameraInstantPrintRoute.DirectDdl else CameraInstantPrintRoute.Description }
+                    ?: CameraInstantPrintRoute.Description,
                 prepare = {
                     try {
                         withContext(Dispatchers.IO) { VisionImagePreparer.prepare(file) }
@@ -633,11 +647,20 @@ class InkuViewModel @JvmOverloads constructor(
                         width = prepared.width,
                         height = prepared.height,
                         languageCode = current.uiLanguage.code,
+                        outputMode = cameraComposeSnapshot?.cameraVisionOutputMode ?: current.cameraVisionOutputMode,
                     )
                     val result = repository.analyzeLocalVision(request)
                     if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
+                    val directDdl = when (request.outputMode) {
+                        VisionOutputMode.DESCRIPTION -> null
+                        VisionOutputMode.DDL -> when (val validation = ServerDdlText.validateLocalVisionDdl(result.text)) {
+                            is LocalVisionDdlValidation.Valid -> validation.ddl
+                            LocalVisionDdlValidation.Invalid -> throw CameraStageFailure(CameraFailure.InvalidDdl)
+                        }
+                    }
                     CameraNimRunInput(
-                        description = result.text.trim(),
+                        description = directDdl ?: result.text.trim(),
+                        directDdl = directDdl,
                         inputProvenance = CameraInputProvenance.fromAnalysis(request, result),
                         canvasAspect = cameraComposeSnapshot?.selectedCanvasAspect ?: current.selectedCanvasAspect,
                         uiLanguageCode = current.uiLanguage.code,
@@ -648,7 +671,7 @@ class InkuViewModel @JvmOverloads constructor(
                     promptEditedByUser = true
                     localState.value = localState.value.copy(
                         prompt = input.description,
-                        ddl = "",
+                        ddl = input.directDdl.orEmpty(),
                         ddlEditedAfterGeneration = false,
                         message = null,
                     )
@@ -672,7 +695,7 @@ class InkuViewModel @JvmOverloads constructor(
         } catch (_: Throwable) {
             failCameraRun(
                 serial,
-                if (cameraRetryInput != null) CameraFailure.NimFailed else CameraFailure.AnalysisFailed,
+                cameraRetryInput?.nimFailure() ?: CameraFailure.AnalysisFailed,
                 canRetryNim = cameraRetryInput != null,
             )
         } finally {
@@ -702,6 +725,7 @@ class InkuViewModel @JvmOverloads constructor(
             val coordinator = cameraCoordinator(serial)
             try {
                 val outcome = coordinator.runFromNim(
+                    route = input.instantPrintRoute,
                     local = input,
                     interpret = ::interpretCameraInput,
                     compose = { retained, interpreted, progress ->
@@ -718,7 +742,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 throw error
             } catch (_: Throwable) {
-                failCameraRun(serial, CameraFailure.NimFailed, canRetryNim = true)
+                failCameraRun(serial, input.nimFailure(), canRetryNim = true)
             }
         }
     }
@@ -797,13 +821,13 @@ class InkuViewModel @JvmOverloads constructor(
     private suspend fun composeCameraInput(
         serial: Long,
         input: CameraNimRunInput,
-        interpreted: InterpretResult,
+        interpreted: InterpretResult?,
         progress: suspend (CameraInstantPrintPhase) -> Unit,
     ): HistoryItemEntity = withContext(Dispatchers.IO) {
         val route = CameraNimDrawRoute(input.inputProvenance)
         repository.composeFromDdl(
             input.description,
-            interpreted.ddlForDisplay,
+            input.directDdl ?: requireNotNull(interpreted).ddlForDisplay,
             route.catalogId,
             input.canvasAspect,
             route.stage1ModelId,
@@ -1230,6 +1254,12 @@ class InkuViewModel @JvmOverloads constructor(
         val normalized = if (mode == "simple") "simple" else "full"
         localState.value = localState.value.copy(uiMode = normalized, message = null)
         persistSetting("ui_mode", JSONObject().put("value", normalized).toString())
+    }
+
+    fun setCameraVisionOutputMode(mode: VisionOutputMode) {
+        if (cameraVisionModeChangeLocked(localState.value.cameraCaptureState)) return
+        localState.value = localState.value.copy(cameraVisionOutputMode = mode, message = null)
+        persistSetting(CameraVisionModeSetting.KEY, CameraVisionModeSetting.encode(mode))
     }
 
     /**
@@ -2690,6 +2720,7 @@ class InkuViewModel @JvmOverloads constructor(
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
         val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
+        val cameraVisionOutputMode = CameraVisionModeSetting.decode(settings[CameraVisionModeSetting.KEY])
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
         // rather than being rejected -- the same thing the server does with an
@@ -2726,6 +2757,7 @@ class InkuViewModel @JvmOverloads constructor(
             historySelectionCatalog = histCatalog,
             ddlAutoRepairEnabled = ddlAutoRepair,
             litertStage1PromptOptimization = litertPromptOptimization,
+            cameraVisionOutputMode = cameraVisionOutputMode,
             uiMode = uiMode,
             uiLanguage = uiLanguage,
             mascotKind = mascotKind,
@@ -2802,3 +2834,11 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 }
+
+internal fun cameraVisionModeChangeLocked(state: CameraCaptureState): Boolean =
+    state.locksCameraInteraction ||
+        state == CameraCaptureState.AwaitingOverwriteConfirmation ||
+        state == CameraCaptureState.Capturing
+
+private fun CameraNimRunInput.nimFailure(): CameraFailure =
+    if (directDdl == null) CameraFailure.NimFailed else CameraFailure.NimFailedDirectDdl

@@ -8047,3 +8047,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 
 - **作者実機確認で、撮影から作品保存までは成功した一方、現像中の取消buttonを押せないことが分かった。** 全画面overlayの親pointer handlerが`PointerEventPass.Initial`で先に全入力をconsumeし、配下のbuttonへ届く前に遮断していた。consumeを`Final`へ移し、Cancel／Retryなど子controlが処理した後に背景だけを遮断するよう修正した。cancel job、run-ID fence、保存直前gate、UI復元の意味論は変更していない。
 - **検証:** 新しい配線testは旧`Initial`実装で計画どおりredになり、修正後はI-407 focused 7 classes・28 tests、production Kotlin compile、debug APK、diff checkがgreen。当日分の検証済みbackupを再利用し、保持1世代を確認して`.74` Build 148117をPixel 9へdata-preserving installした。version／Build確認と565 msのcold startは成功した。作者が処理中のCancelを押せること、開始前画面へ戻ること、新規履歴が表示されないことを再確認し、I-407の受入を完了した。DB全検査、raw SQLite query、real-device instrumentation、Server／Web／Rust、pentala、public GitHub pushは実行していない。
+
+### Android `2.1.4-android.75` — カメラ画像から端末内DDLを直接現像する上級mode（Build 148118、2026-08-26・[I-412]）
+
+- **「その他」に「記述（推奨）」／「DDL直接（上級）」を追加し、既定の記述経路を維持した。** DDL直接を明示した撮影だけがlocal Gemma 4 E2Bの`camera-ddl-v1`出力を検証し、NIM Stage 1を0回のまま固定NIM Stage 2、`vivid_material`描画、既存root save transactionへ進む。modeは既存`app_settings`へ保存し、欠落、空、未知値、壊れたJSONは記述へfail safeする。Room schema／migration、新列、写真保存、通常設定の変更はない。
+- **日英のDDL promptは既存`WebDdlSpec`／`ServerDdlText`をauthorityにし、画像内textを命令として実行せず、人物同定／属性推測を禁止した。** typed validatorはtemplate marker、改行、placementを既存規律で正規化し、空、code fence、JSON／SQL、前置きだけ、drawable語彙0件をremote call／save 0で拒否する。成功時のprovenanceは`local_ddl_to_nim_stage2`／`ddl`／`camera-ddl-v1`を持ち、`stage1_model`は実producerのlocal E2B、`stage2_model`は固定NIMを記録する。Stage 2 retryはlocal Vision／Stage 1を繰り返さない。
+- **検証:** production edit前の新規3 focused classesは未実装symbolで計画どおりredになった。枝先ではI-412を直接読む12 classes、production Kotlin compile、debug APK、日英docs、diff checkがgreen。全JVM suite、release build、DB全検査、raw SQLite query、real-device instrumentation、Server／Web／Rust、pentala、public GitHub pushは実行していない。Pixel 9の作者実機確認は展開後の受入項目として残る。

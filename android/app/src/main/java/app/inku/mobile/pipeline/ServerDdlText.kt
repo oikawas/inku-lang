@@ -1,5 +1,10 @@
 package app.inku.mobile.pipeline
 
+internal sealed interface LocalVisionDdlValidation {
+    data class Valid(val ddl: String) : LocalVisionDdlValidation
+    data object Invalid : LocalVisionDdlValidation
+}
+
 internal object ServerDdlText {
     fun cleanModelText(text: String): String {
         return text.trim()
@@ -7,6 +12,7 @@ internal object ServerDdlText {
             .replace("<|turn>model", "", ignoreCase = true)
             .replace("<|turn>user", "", ignoreCase = true)
             .replace("<turn|>", "", ignoreCase = true)
+            .replace(Regex("""(?i)<jturn>\s*(?:model|user)?"""), "")
             .replace(Regex("""<\|[^>]+>"""), "")
             .replace(Regex("""\n{3,}"""), "\n\n")
             .trim()
@@ -44,7 +50,7 @@ internal object ServerDdlText {
         return clauses.filter { clause ->
             val key = clause.trim().trimEnd('。')
             seen.add(key)
-        }.joinToString("") { if (it.endsWith("。")) it else "$it。" }
+        }.joinToString("") { if (it.lastOrNull() in setOf('。', '.', '!', '?')) it else "$it。" }
     }
 
     fun isUsableStage1Ddl(text: String): Boolean {
@@ -55,7 +61,27 @@ internal object ServerDdlText {
     }
 
     fun hasDrawableVocabulary(text: String): Boolean {
-        return text.containsAny("線", "円", "楕円", "弧", "四角", "三角", "多角", "点", "粒", "背景", "塗", "散ら", "並べ", "膜", "光", "香り", "雨", "雪", "月", "山", "紙片", "波")
+        return text.containsAny(
+            "線", "円", "楕円", "弧", "四角", "三角", "多角", "点", "粒", "背景", "塗", "散ら", "並べ", "膜", "光", "香り", "雨", "雪", "月", "山", "紙片", "波",
+            "line", "circle", "ellipse", "arc", "square", "triangle", "polygon", "cloudform",
+            "scatter", "place", "draw", "fill background", "paper", "washi", "canvas", "ground",
+        )
+    }
+
+    fun validateLocalVisionDdl(text: String): LocalVisionDdlValidation {
+        val raw = text.trim()
+        if (raw.isBlank() || raw.contains("```") || looksStructuredOrSql(raw) || hasPreamble(raw)) {
+            return LocalVisionDdlValidation.Invalid
+        }
+        val normalized = cleanModelText(raw)
+            .let(::normalizeStage1DdlText)
+            .let(::sanitizePlacementWords)
+            .trim()
+        return if (isUsableStage1Ddl(normalized)) {
+            LocalVisionDdlValidation.Valid(normalized)
+        } else {
+            LocalVisionDdlValidation.Invalid
+        }
     }
 
     fun ensurePlacement(text: String): String {
@@ -72,5 +98,15 @@ internal object ServerDdlText {
         return Regex("""(?<=[。.!?])""").split(text).map { it.trim() }.filter { it.isNotBlank() }
     }
 
-    private fun String.containsAny(vararg markers: String): Boolean = markers.any { contains(it) }
+    private fun String.containsAny(vararg markers: String): Boolean = markers.any { contains(it, ignoreCase = true) }
+
+    private fun looksStructuredOrSql(text: String): Boolean {
+        val trimmed = text.trimStart()
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true
+        return Regex("""(?is)^\s*(select|insert|update|delete|create|drop)\b""").containsMatchIn(trimmed)
+    }
+
+    private fun hasPreamble(text: String): Boolean = Regex(
+        """(?is)^\s*(here(?:'s| is)\s+(?:the\s+)?(?:ddl|output)|the\s+(?:ddl|output)\s+is|こちら.{0,12}(?:ddl|出力)|以下.{0,12}(?:ddl|出力)|撮影した画像について説明)""",
+    ).containsMatchIn(text)
 }

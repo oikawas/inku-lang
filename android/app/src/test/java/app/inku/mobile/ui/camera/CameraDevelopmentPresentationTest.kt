@@ -58,8 +58,15 @@ class CameraDevelopmentPresentationTest {
             isJapanese = false,
             animationsEnabled = true,
         ) ?: error("local failure presentation missing")
+        val direct = cameraDevelopmentPresentation(
+            CameraCaptureState.Failed(CameraFailure.NimFailedDirectDdl, canRetryNim = true),
+            isJapanese = false,
+            animationsEnabled = true,
+        ) ?: error("direct DDL NIM failure presentation missing")
 
         assertTrue(nim.showRetry)
+        assertTrue(direct.showRetry)
+        assertEquals(CameraDevelopmentEffect.OutlineSettling, direct.effect)
         assertTrue(nim.showCancel)
         assertFalse(local.showRetry)
         assertTrue(local.showCancel)

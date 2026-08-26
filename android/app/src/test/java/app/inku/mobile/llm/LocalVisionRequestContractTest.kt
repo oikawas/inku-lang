@@ -15,7 +15,7 @@ class LocalVisionRequestContractTest {
     }
 
     @Test
-    fun visionHasATypedDescriptionOnlyBoundary() {
+    fun visionKeepsDescriptionAsTheTypedDefaultWhileAddingDirectDdl() {
         val boundary = source("VisionAnalyzer.kt")
         assertTrue(boundary.contains("interface VisionAnalyzer"))
         assertTrue(boundary.contains("VisionAnalysisRequest"))
@@ -24,7 +24,8 @@ class LocalVisionRequestContractTest {
         val modeStart = boundary.indexOf("enum class VisionOutputMode")
         val modeEnd = boundary.indexOf("data class VisionAnalysisRequest", modeStart)
         assertTrue(modeStart >= 0 && modeEnd > modeStart)
-        assertFalse(boundary.substring(modeStart, modeEnd).contains("DDL"))
+        assertTrue(boundary.substring(modeStart, modeEnd).contains("DDL"))
+        assertTrue(boundary.contains("val outputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION"))
     }
 
     @Test

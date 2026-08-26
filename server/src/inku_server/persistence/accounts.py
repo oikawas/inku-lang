@@ -78,6 +78,49 @@ class BootstrapAdminPasswordResolver:
         return None
 
 
+@dataclass(frozen=True)
+class BootstrapAdminSeeder:
+    session_factory: Callable[[], Any]
+    bootstrap_password_fn: Callable[[], str | None]
+    hash_password_fn: Callable[[str], str]
+    derived_role_fn: Callable[[Collection[str]], str]
+    set_permission_groups_fn: Callable[[Any, UserAccountRow, Collection[str]], Any]
+    uuid_fn: Callable[[], Any]
+    now_ms_fn: Callable[[], int]
+    getenv_fn: Callable[[str, str], str | None]
+
+    def ensure(self, session: Any | None = None) -> None:
+        if session is not None:
+            self._ensure(session, owns_session=False)
+            return
+        with self.session_factory() as owned_session:
+            self._ensure(owned_session, owns_session=True)
+
+    def _ensure(self, session: Any, *, owns_session: bool) -> None:
+        if session.query(UserAccountRow).first():
+            return
+        group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
+        password = self.bootstrap_password_fn()
+        if password is None:
+            return
+        row = UserAccountRow(
+            id=str(self.uuid_fn()),
+            username=self.getenv_fn("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
+            email=self.getenv_fn("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
+            password_hash=self.hash_password_fn(password),
+            role=self.derived_role_fn(["admins"]),
+            group_id=group.id if group else None,
+            at=self.now_ms_fn(),
+        )
+        session.add(row)
+        session.flush()
+        self.set_permission_groups_fn(session, row, ["admins"])
+        if owns_session:
+            session.commit()
+        else:
+            session.flush()
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

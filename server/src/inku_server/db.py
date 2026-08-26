@@ -652,27 +652,21 @@ def _bootstrap_admin_password() -> str | None:
     return _bootstrap_admin_password_resolver().resolve()
 
 
+def _bootstrap_admin_seeder() -> _accounts.BootstrapAdminSeeder:
+    return _accounts.BootstrapAdminSeeder(
+        SessionLocal,
+        _bootstrap_admin_password,
+        _hash_password,
+        _derived_role,
+        _set_permission_groups,
+        uuid.uuid4,
+        _now_ms,
+        os.getenv,
+    )
+
+
 def _ensure_bootstrap_admin(session: Session | None = None) -> None:
-    with _session_scope(session) as (active_session, owns_session):
-        if active_session.query(UserAccountRow).first():
-            return
-        group = active_session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
-        password = _bootstrap_admin_password()
-        if password is None:
-            return
-        row = UserAccountRow(
-            id=str(uuid.uuid4()),
-            username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
-            email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
-            password_hash=_hash_password(password),
-            role=_derived_role(["admins"]),
-            group_id=group.id if group else None,
-            at=_now_ms(),
-        )
-        active_session.add(row)
-        active_session.flush()
-        _set_permission_groups(active_session, row, ["admins"])
-        _finish_session(active_session, owns_session)
+    return _bootstrap_admin_seeder().ensure(session)
 
 
 def _backfill_history_identity_and_lineage(session: Session | None = None) -> None:

@@ -238,6 +238,47 @@ class SingleUserAccountCreator:
             return row.id
 
 
+@dataclass(frozen=True)
+class SingleUserAccountResolver:
+    pin_store: Any
+    get_user_fn: Callable[[str], dict | None]
+    session_factory: Callable[[], Any]
+    oldest_admin_id_fn: Callable[[Any], str | None]
+    create_account_fn: Callable[[], str | None]
+
+    def resolve(self) -> dict | None:
+        """The account this server belongs to, or None when it has none.
+
+        Resolution is pinned rather than derived on every call.  A derived answer
+        moves the moment the oldest administrator is deleted, which would read as
+        "my works disappeared"; a pinned one is a row in the same database, so a
+        restored backup brings the same person back with it.
+
+        The pin holds the account id, not its name, because the name can be
+        changed from the settings screen.
+        """
+        pinned = self.pin_store.get()
+        if pinned:
+            user = self.get_user_fn(pinned)
+            if user:
+                return user
+        with self.session_factory() as session:
+            user_id = self.oldest_admin_id_fn(session)
+            if user_id is None and session.query(UserAccountRow).first():
+                # Accounts exist but none of them administers.  Single-user mode
+                # has nobody to hand the server to, so the login screen stays.
+                return None
+        if user_id is None:
+            user_id = self.create_account_fn()
+        if user_id is None:
+            return None
+        user = self.get_user_fn(user_id)
+        if user is None:
+            return None
+        self.pin_store.update(user_id)
+        return user
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

@@ -279,6 +279,40 @@ class SingleUserAccountResolver:
         return user
 
 
+@dataclass(frozen=True)
+class SingleUserPinUpdater:
+    mode_enabled_fn: Callable[[], bool]
+    session_factory: Callable[[], Any]
+    permission_groups_of_fn: Callable[[Any, str], Collection[str]]
+    pin_store: Any
+    status_fn: Callable[[], dict]
+
+    def update(self, user_id: str) -> dict:
+        """Move the pin to another account. Raises ValueError when it may not move.
+
+        Only an account holding `admins` may receive it. Anyone else would open the
+        app to a settings screen they cannot reach, unable to change the LLM
+        connection -- which is the whole point of a server that belongs to one
+        person.
+
+        Sessions already open are left alone deliberately. The pin decides who the
+        NEXT automatic login becomes; revoking the current one would drop whoever is
+        working right now, and the person moving the pin is usually that person.
+        """
+        if not self.mode_enabled_fn():
+            # Nothing reads the pin when the mode is off, so writing it would look
+            # like it had taken effect and change nothing.
+            raise ValueError("single-user mode is not enabled")
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if row is None:
+                raise ValueError("user not found")
+            if "admins" not in self.permission_groups_of_fn(session, user_id):
+                raise ValueError("the single user must hold the admins permission group")
+        self.pin_store.update(user_id)
+        return self.status_fn()
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

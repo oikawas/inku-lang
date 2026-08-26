@@ -259,10 +259,10 @@ def test_t2_every_writer_of_the_prose_also_writes_the_state():
     # back to a client that saves for itself.
     assert "api_core/routers/render.py:_add_history_item(kwargs)" in labels
     assert "api_core/routers/history.py:_add_history_item(kwargs)" in labels
-    assert "db.py:HistoryRow(kwargs)" in labels
+    assert "persistence/history.py:HistoryRow(kwargs)" in labels
     assert "api_core/rendering.py:def _add_history_item" in labels
     assert "api_core/rendering.py:dict" in labels
-    assert "db.py:migration table" in labels
+    assert "persistence/legacy_schema.py:migration table" in labels
     assert "api_core/routers/render.py:ComposeResponse(kwargs)" in labels
     assert "api_core/routers/render.py:PaintResponse(kwargs)" in labels
 

@@ -279,7 +279,9 @@ def test_t8_no_sender_writes_the_key_any_more() -> None:
         [
             "git", "grep", "-n", "-i", "tenkei", "--",
             "web/src", "cli/src", "cli/README.md", "server/src",
-            ":(exclude)server/src/inku_server/db.py",
+            ":(exclude)server/src/inku_server/persistence/schema.py",
+            ":(exclude)server/src/inku_server/persistence/legacy_schema.py",
+            ":(exclude)server/src/inku_server/persistence/history.py",
         ],
         cwd=ROOT, capture_output=True, text=True,
     )
@@ -305,11 +307,14 @@ def test_t8_no_sender_writes_the_key_any_more() -> None:
 
 def test_t8_db_keeps_the_column_and_its_only_exit() -> None:
     """T-8 の対照。**送り手が 0 でも、読み手を消してはならない。**"""
-    source = (ROOT / "server/src/inku_server/db.py").read_text()
-    assert "tenkei = Column(String, nullable=True)" in source
-    assert '"tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR"' in source
-    assert "if row.tenkei is not None:" in source
-    assert 'item["tenkei"] = row.tenkei' in source
+    persistence = ROOT / "server/src/inku_server/persistence"
+    schema = (persistence / "schema.py").read_text()
+    legacy_schema = (persistence / "legacy_schema.py").read_text()
+    history = (persistence / "history.py").read_text()
+    assert "tenkei = Column(String, nullable=True)" in schema
+    assert '"tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR"' in legacy_schema
+    assert "if row.tenkei is not None:" in history
+    assert 'item["tenkei"] = row.tenkei' in history
 
 
 # ── T-9 ──────────────────────────────────────────────────────────────────────

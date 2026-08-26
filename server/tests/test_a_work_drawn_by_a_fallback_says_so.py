@@ -372,8 +372,8 @@ def test_t242_every_server_writer_of_a_work_also_writes_the_compose_state():
     assert "api_core/routers/history.py:_add_history_item(kwargs)" in labels
     assert "api_core/rendering.py:def _add_history_item" in labels
     assert "api_core/rendering.py:dict" in labels
-    assert "db.py:HistoryRow(kwargs)" in labels
-    assert "db.py:migration table" in labels
+    assert "persistence/history.py:HistoryRow(kwargs)" in labels
+    assert "persistence/legacy_schema.py:migration table" in labels
     # The count is part of the claim, for the same reason the sketch census
     # keeps one: a new writer has to be named here rather than added quietly.
     assert len(sites) == 6, f"expected 6 sites, saw {len(sites)}: {sorted(labels)}"

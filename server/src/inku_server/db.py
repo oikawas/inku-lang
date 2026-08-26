@@ -920,30 +920,18 @@ def single_user_pinned_id() -> str | None:
     return _single_user_pin_store().get()
 
 
+def _single_user_pin_updater() -> _accounts.SingleUserPinUpdater:
+    return _accounts.SingleUserPinUpdater(
+        single_user_mode_enabled,
+        SessionLocal,
+        _permission_groups_of,
+        _single_user_pin_store(),
+        single_user_pin_status,
+    )
+
+
 def set_single_user_pin(user_id: str) -> dict:
-    """Move the pin to another account. Raises ValueError when it may not move.
-
-    Only an account holding `admins` may receive it. Anyone else would open the
-    app to a settings screen they cannot reach, unable to change the LLM
-    connection -- which is the whole point of a server that belongs to one
-    person.
-
-    Sessions already open are left alone deliberately. The pin decides who the
-    NEXT automatic login becomes; revoking the current one would drop whoever is
-    working right now, and the person moving the pin is usually that person.
-    """
-    if not single_user_mode_enabled():
-        # Nothing reads the pin when the mode is off, so writing it would look
-        # like it had taken effect and change nothing.
-        raise ValueError("single-user mode is not enabled")
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if row is None:
-            raise ValueError("user not found")
-        if "admins" not in _permission_groups_of(session, user_id):
-            raise ValueError("the single user must hold the admins permission group")
-    _single_user_pin_store().update(user_id)
-    return single_user_pin_status()
+    return _single_user_pin_updater().update(user_id)
 
 
 def single_user_pin_status() -> dict:

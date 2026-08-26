@@ -129,18 +129,10 @@ def normalize_history_strip_fields(value) -> list[str]:
 _PLUGIN_STORAGE_MAX_BYTES = _settings.PLUGIN_STORAGE_MAX_BYTES
 _OUTPUT_SAVE_SETTINGS_KEY = _settings.OUTPUT_SAVE_SETTINGS_KEY
 _OUTPUT_SAVE_DEFAULT_SETTINGS = _settings.OUTPUT_SAVE_DEFAULT_SETTINGS
-_THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
-# Off by default: the second size doubles the rebuild and roughly quadruples the
-# stored bytes, and is worth neither until someone is looking at the listing on
-# a HiDPI screen.
-# The parallelism is the administrator's to enter: nothing here reads the core
-# count, and in a container the host's count is the wrong answer anyway.
-_THUMBNAIL_DEFAULT_SETTINGS = {
-    "hidpi": False,
-    "workers": 4,
-}
-THUMBNAIL_WORKERS_MIN = 1
-THUMBNAIL_WORKERS_MAX = 16
+_THUMBNAIL_SETTINGS_KEY = _settings.THUMBNAIL_SETTINGS_KEY
+_THUMBNAIL_DEFAULT_SETTINGS = _settings.THUMBNAIL_DEFAULT_SETTINGS
+THUMBNAIL_WORKERS_MIN = _settings.THUMBNAIL_WORKERS_MIN
+THUMBNAIL_WORKERS_MAX = _settings.THUMBNAIL_WORKERS_MAX
 _RENDER_CONCURRENCY_SETTINGS_KEY = _settings.RENDER_CONCURRENCY_SETTINGS_KEY
 _RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETTINGS
 RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
@@ -1280,27 +1272,19 @@ def update_output_save_settings(enabled: bool, output_dir: str, png_size: int) -
 
 
 def _normalize_thumbnail_settings(settings: dict | None) -> dict:
-    clean = dict(_THUMBNAIL_DEFAULT_SETTINGS)
-    if not isinstance(settings, dict):
-        return clean
-    if "hidpi" in settings:
-        clean["hidpi"] = bool(settings["hidpi"])
-    if "workers" in settings:
-        try:
-            workers = int(settings["workers"])
-        except (TypeError, ValueError):
-            workers = clean["workers"]
-        clean["workers"] = max(THUMBNAIL_WORKERS_MIN, min(THUMBNAIL_WORKERS_MAX, workers))
-    return clean
+    return _settings.normalize_thumbnail_settings(settings)
 
 
 def get_thumbnail_settings() -> dict:
-    return _normalize_thumbnail_settings(_read_app_setting(_THUMBNAIL_SETTINGS_KEY))
+    return _thumbnail_settings_store().get()
+
+
+def _thumbnail_settings_store() -> _settings.ThumbnailSettingsStore:
+    return _settings.ThumbnailSettingsStore(_app_settings_store())
 
 
 def update_thumbnail_settings(hidpi: bool, workers: int) -> dict:
-    clean = _normalize_thumbnail_settings({"hidpi": hidpi, "workers": workers})
-    return _write_app_setting(_THUMBNAIL_SETTINGS_KEY, clean)
+    return _thumbnail_settings_store().update(hidpi, workers)
 
 
 def _normalize_log_retention_settings(settings: dict | None) -> dict:

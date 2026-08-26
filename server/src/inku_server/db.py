@@ -901,38 +901,18 @@ def _create_single_user_account() -> str | None:
     return _single_user_account_creator().create()
 
 
+def _single_user_account_resolver() -> _accounts.SingleUserAccountResolver:
+    return _accounts.SingleUserAccountResolver(
+        _single_user_pin_store(),
+        get_user,
+        SessionLocal,
+        _oldest_admin_id,
+        _create_single_user_account,
+    )
+
+
 def single_user_account() -> dict | None:
-    """The account this server belongs to, or None when it has none.
-
-    Resolution is pinned rather than derived on every call.  A derived answer
-    moves the moment the oldest administrator is deleted, which would read as
-    "my works disappeared"; a pinned one is a row in the same database, so a
-    restored backup brings the same person back with it.
-
-    The pin holds the account id, not its name, because the name can be
-    changed from the settings screen.
-    """
-    pin_store = _single_user_pin_store()
-    pinned = pin_store.get()
-    if pinned:
-        user = get_user(pinned)
-        if user:
-            return user
-    with SessionLocal() as session:
-        user_id = _oldest_admin_id(session)
-        if user_id is None and session.query(UserAccountRow).first():
-            # Accounts exist but none of them administers.  Single-user mode
-            # has nobody to hand the server to, so the login screen stays.
-            return None
-    if user_id is None:
-        user_id = _create_single_user_account()
-    if user_id is None:
-        return None
-    user = get_user(user_id)
-    if user is None:
-        return None
-    pin_store.update(user_id)
-    return user
+    return _single_user_account_resolver().resolve()
 
 
 def single_user_pinned_id() -> str | None:

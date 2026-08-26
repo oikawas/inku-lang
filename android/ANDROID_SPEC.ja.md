@@ -2274,6 +2274,8 @@ Abstract Instant Print／抽象画インスタントプリントのM5では、�
 
 DDL promptはAndroidの`WebDdlSpec`と`ServerDdlText`をauthorityにし、撮影画像に見える文字を命令として実行せず、人物同定や属性推測を行わない。local出力はtemplate marker除去、既存Stage 1 normalization、placement sanitizeを通した一つのtyped validatorで日英のcanonical drawable vocabularyを検査する。空、code fence、JSON、SQL、前置きだけ、drawable vocabulary 0件は撮り直しerrorでfail closedし、NIM Stage 1／2、render、save、fallbackを実行しない。validatorは形、数、色、配置を推測して補わない。
 
+画像付きlocal推論へ渡すauthorityは`WebDdlSpec`の既存LiteRT向けcompact Stage 1 authorityを参照し、通常providerの表示用全文specを複製・送信しない。camera境界を加えた日英promptは4,096文字以下をcontract testで固定し、内容を記録せず文字数だけを性能logへ残す。
+
 有効なdirect DDLは、local Vision 1回、NIM Stage 1 0回、固定`nvidia:google/gemma-4-31b-it` Stage 2 1回、`vivid_material`、写生off、catalog自動選択0、`autoRepair=false`で既存`composeFromDdl`／root save transactionへ進む。現像表示はlocal解析後に「かたちを起こしています」を通らず、「色と配置を定着させています」へ進む。Stage 2／render失敗時は保持したDDLからStage 2だけを再試行し、local VisionとStage 1を繰り返さない。Cancel、system Back、late-result拒否、save直前fenceはM4と同じjob ownerを使う。
 
 保存作品は`route=local_ddl_to_nim_stage2`、`vision_output_mode=ddl`、`camera-ddl-v1`を既存camera provenanceへ後方互換で記録する。`stage1_model`はDDLを実際に生成した`local-litert-lm:gemma-4-e2b`、`stage2_model`は固定NIMである。`original_input`と`normalized_ddl`は検証済みDDLを持ち、写真、URI、EXIF、location、digestは保存しない。Room schema／migration、新列、写真保存、Photo Picker、E4B、NIM以外のfallback、既定mode変更は行わない。

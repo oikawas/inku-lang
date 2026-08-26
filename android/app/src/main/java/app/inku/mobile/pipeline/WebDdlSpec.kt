@@ -182,6 +182,10 @@ internal object WebDdlSpec {
         return if (lang == "en") STAGE1_PROMPT_PREFIX_EN else STAGE1_PROMPT_PREFIX_JA
     }
 
+    fun stage1LiteRtVisionSystemPromptForDisplay(): String {
+        return STAGE1_PROMPT_PREFIX_JA_LITERT
+    }
+
     fun stage2SystemPromptForDisplay(lang: String = "ja"): String {
         return if (lang == "en") STAGE2_SYSTEM_PROMPT_EN else STAGE2_SYSTEM_PROMPT_JA
     }

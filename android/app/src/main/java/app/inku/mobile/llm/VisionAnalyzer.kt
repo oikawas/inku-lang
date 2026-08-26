@@ -121,7 +121,7 @@ internal object VisionPrompts {
     }
 
     private fun ddlForLanguage(languageCode: String): String {
-        val authority = WebDdlSpec.stage1SystemPromptForDisplay(languageCode)
+        val authority = WebDdlSpec.stage1LiteRtVisionSystemPromptForDisplay()
         val cameraBoundary = if (languageCode == "en") {
             """
             # Camera input boundary

@@ -97,10 +97,12 @@ class LocalLiteRtLmProvider(
         require(request.modelId == LOCAL_VISION_MODEL_ID) { "Camera analysis requires the local Gemma 4 E2B model." }
         require(request.normalizedJpeg.isNotEmpty()) { "The normalized camera image is empty." }
         val started = System.currentTimeMillis()
+        val prompt = VisionPrompts.forLanguage(request.languageCode, request.outputMode)
         Log.i(
             PERF_TAG,
             "litert_vision_start model_id=${request.modelId} width=${request.width} height=${request.height} " +
-                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.versionFor(request.outputMode)}",
+                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.versionFor(request.outputMode)} " +
+                "prompt_chars=${prompt.length}",
         )
         try {
             inferenceMutex.withLock {
@@ -110,7 +112,7 @@ class LocalLiteRtLmProvider(
                     val text = StringBuilder()
                     val contents = Contents.of(
                         Content.ImageBytes(request.normalizedJpeg),
-                        Content.Text(VisionPrompts.forLanguage(request.languageCode, request.outputMode)),
+                        Content.Text(prompt),
                     )
                     try {
                         withTimeout(REQUEST_TIMEOUT_MS) {

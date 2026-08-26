@@ -80,25 +80,17 @@ LINEAGE_DERIVATION_KINDS = _history.LINEAGE_DERIVATION_KINDS
 # What a member may do.  Fixed on purpose: a user-extensible set would make the
 # authorization branches resolve at runtime, and nothing could be asserted about
 # them.  Per-object sharing is a different mechanism and does not live here.
-PERMISSION_GROUPS = ("admins", "leaders", "users")
-PERMISSION_GROUP_LABELS = {
-    "admins": "管理者",
-    "leaders": "リーダー",
-    "users": "ユーザー",
-}
+PERMISSION_GROUPS = _groups.PERMISSION_GROUPS
+PERMISSION_GROUP_LABELS = _groups.PERMISSION_GROUP_LABELS
 
 # The legacy `user_accounts.role` column is kept as a derived mirror so a database
 # taken after this change still starts on a build from before it.  Nothing reads
 # it to decide anything; it is written from the permission groups and never the
 # other way round.
-_ROLE_MIRROR_BY_GROUP = {"admins": "admin", "leaders": "group_lead"}
+_ROLE_MIRROR_BY_GROUP = _groups.ROLE_MIRROR_BY_GROUP
 # Groups that put a member above the ones a leader may administer.
-_ELEVATED_PERMISSION_GROUPS = ("admins", "leaders")
-_LEGACY_ROLE_TO_PERMISSION_GROUP = {
-    "admin": "admins",
-    "group_lead": "leaders",
-    "user": "users",
-}
+_ELEVATED_PERMISSION_GROUPS = _groups.ELEVATED_PERMISSION_GROUPS
+_LEGACY_ROLE_TO_PERMISSION_GROUP = _groups.LEGACY_ROLE_TO_PERMISSION_GROUP
 _UNSET = object()
 _BATCH_PROMPT_HISTORY_LIMIT = _settings.BATCH_PROMPT_HISTORY_LIMIT
 _BATCH_PROMPT_HISTORY_MAX_TEXT = _settings.BATCH_PROMPT_HISTORY_MAX_TEXT
@@ -605,24 +597,11 @@ def _readable_sql(actor: dict, owner_column: str, acl_history_id: str | None = N
 
 
 def _derived_role(names) -> str:
-    """The legacy role column's value, derived from the groups a member holds."""
-    for group, role in _ROLE_MIRROR_BY_GROUP.items():
-        if group in names:
-            return role
-    return "user"
+    return _groups.derived_role(names)
 
 
 def _normalize_permission_groups(names) -> list[str]:
-    """Requested group names, deduplicated and ordered by PERMISSION_GROUPS."""
-    if isinstance(names, str):
-        raise ValueError("permission_groups must be a list")
-    requested = set(names or ())
-    unknown = requested - set(PERMISSION_GROUPS)
-    if unknown:
-        raise ValueError(f"invalid permission group: {sorted(unknown)[0]}")
-    if not requested:
-        raise ValueError("at least one permission group is required")
-    return [name for name in PERMISSION_GROUPS if name in requested]
+    return _groups.normalize_permission_groups(names)
 
 
 def _permission_group_ids(session) -> dict[str, str]:

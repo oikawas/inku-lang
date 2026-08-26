@@ -138,13 +138,8 @@ _RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETT
 RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
 RENDER_CONCURRENCY_MAX = _settings.RENDER_CONCURRENCY_MAX
 _RENDER_LIMIT_SETTINGS_KEY = _settings.RENDER_LIMIT_SETTINGS_KEY
-_LOG_RETENTION_SETTINGS_KEY = "log_retention_settings"
-_LOG_RETENTION_DEFAULT_SETTINGS = {
-    "enabled": True,
-    "retention_days": int(os.getenv("INKU_LOG_RETENTION_DAYS", "90")),
-    "rotate": os.getenv("INKU_LOG_ROTATE", "daily"),
-    "compress": True,
-}
+_LOG_RETENTION_SETTINGS_KEY = _settings.LOG_RETENTION_SETTINGS_KEY
+_LOG_RETENTION_DEFAULT_SETTINGS = _settings.LOG_RETENTION_DEFAULT_SETTINGS
 _DEMO_DEFAULT_SETTINGS = _settings.DEMO_DEFAULT_SETTINGS
 _EXPORT_TEMPLATE_LIMIT = _settings.EXPORT_TEMPLATE_LIMIT
 _EXPORT_TEMPLATE_DEFAULTS = _settings.EXPORT_TEMPLATE_DEFAULTS
@@ -1288,42 +1283,21 @@ def update_thumbnail_settings(hidpi: bool, workers: int) -> dict:
 
 
 def _normalize_log_retention_settings(settings: dict | None) -> dict:
-    clean = dict(_LOG_RETENTION_DEFAULT_SETTINGS)
-    if clean["rotate"] not in {"daily", "weekly", "monthly"}:
-        clean["rotate"] = "daily"
-    if clean["retention_days"] < 1:
-        clean["retention_days"] = 90
-    if not isinstance(settings, dict):
-        return clean
-    if "enabled" in settings:
-        clean["enabled"] = bool(settings["enabled"])
-    if "retention_days" in settings:
-        try:
-            retention_days = int(settings["retention_days"])
-        except (TypeError, ValueError) as exc:
-            raise ValueError("log retention days must be an integer") from exc
-        if retention_days < 1 or retention_days > 3650:
-            raise ValueError("log retention days must be between 1 and 3650")
-        clean["retention_days"] = retention_days
-    if "rotate" in settings:
-        rotate = str(settings["rotate"] or "").strip().lower()
-        if rotate not in {"daily", "weekly", "monthly"}:
-            raise ValueError("log rotate must be daily, weekly, or monthly")
-        clean["rotate"] = rotate
-    if "compress" in settings:
-        clean["compress"] = bool(settings["compress"])
-    return clean
+    return _settings.normalize_log_retention_settings(settings)
 
 
 def get_log_retention_settings() -> dict:
-    return _normalize_log_retention_settings(_read_app_setting(_LOG_RETENTION_SETTINGS_KEY))
+    return _log_retention_settings_store().get()
+
+
+def _log_retention_settings_store() -> _settings.LogRetentionSettingsStore:
+    return _settings.LogRetentionSettingsStore(_app_settings_store())
 
 
 def update_log_retention_settings(enabled: bool, retention_days: int, rotate: str, compress: bool) -> dict:
-    clean = _normalize_log_retention_settings(
-        {"enabled": enabled, "retention_days": retention_days, "rotate": rotate, "compress": compress}
+    return _log_retention_settings_store().update(
+        enabled, retention_days, rotate, compress
     )
-    return _write_app_setting(_LOG_RETENTION_SETTINGS_KEY, clean)
 
 
 def get_model_settings() -> dict:

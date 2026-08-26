@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy import text
+
 from .access import has_permission_group
 from .schema import (
     ExternalIdentityRow,
@@ -243,6 +245,34 @@ class CurrentUserProfileUpdater:
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
             return self.user_to_dict_fn(row, group_name)
+
+
+@dataclass(frozen=True)
+class UserGenerationCounter:
+    session_factory: Callable[[], Any]
+
+    def increment_user_generation_count(self, user_id: str, amount: int = 1) -> int | None:
+        if amount <= 0:
+            raise ValueError("amount must be positive")
+        with self.session_factory() as session:
+            result = session.execute(
+                text(
+                    """
+                    UPDATE user_accounts
+                    SET image_generation_count = COALESCE(image_generation_count, 0) + :amount
+                    WHERE id = :user_id
+                    """
+                ),
+                {"amount": amount, "user_id": user_id},
+            )
+            if result.rowcount == 0:
+                session.rollback()
+                return None
+            session.commit()
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            return row.image_generation_count or 0
 
 
 @dataclass(frozen=True)

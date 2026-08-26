@@ -2948,19 +2948,11 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
 
 
 def delete_all(user_id: str) -> None:
-    # Ownership, not write permission: "erase everything of mine" must keep
-    # meaning one account's works however wide writing becomes.
-    owner = _owner_actor(user_id)
-    with SessionLocal() as session:
-        _delete_acl_for_histories(session, [
-            item_id for item_id, in
-            session.query(HistoryRow.id).filter(_owned_by(owner, HistoryRow.user_id))
-        ])
-        session.query(OkugakiRow).filter(_owned_by(owner, OkugakiRow.user_id)).delete()
-        session.query(LineageEdgeRow).filter(_owned_by(owner, LineageEdgeRow.user_id)).delete()
-        session.query(LineageNodeRow).filter(_owned_by(owner, LineageNodeRow.user_id)).delete()
-        session.query(HistoryRow).filter(_owned_by(owner, HistoryRow.user_id)).delete()
-        session.commit()
+    return _history.HistoryOwnedDataPurgeWriter(
+        SessionLocal,
+        _owner_actor,
+        _delete_acl_for_histories,
+    ).delete_all(user_id)
 
 
 def trash_items(user_id: str, ids: list[str]) -> int:

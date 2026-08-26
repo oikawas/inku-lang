@@ -12,7 +12,14 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from . import access
-from .schema import CoerceTraceCatalogRow, HistoryRow, LineageEdgeRow, LineageNodeRow, UserGroupRow
+from .schema import (
+    CoerceTraceCatalogRow,
+    HistoryRow,
+    LineageEdgeRow,
+    LineageNodeRow,
+    OkugakiRow,
+    UserGroupRow,
+)
 
 
 LINEAGE_DERIVATION_KINDS = {
@@ -248,6 +255,40 @@ class HistoryPermanentDeleteWriter:
                 session.delete(row)
             session.commit()
             return len(rows)
+
+
+@dataclass(frozen=True)
+class HistoryOwnedDataPurgeWriter:
+    """Delete every history-domain row owned by one account."""
+
+    session_factory: Callable[[], object]
+    owner_actor_fn: Callable[[str], dict]
+    delete_acl_for_histories_fn: Callable[[object, list[str]], None]
+
+    def delete_all(self, user_id: str) -> None:
+        # Ownership, not write permission: "erase everything of mine" must keep
+        # meaning one account's works however wide writing becomes.
+        owner = self.owner_actor_fn(user_id)
+        with self.session_factory() as session:
+            self.delete_acl_for_histories_fn(session, [
+                item_id for item_id, in
+                session.query(HistoryRow.id).filter(
+                    access._owned_by(owner, HistoryRow.user_id)
+                )
+            ])
+            session.query(OkugakiRow).filter(
+                access._owned_by(owner, OkugakiRow.user_id)
+            ).delete()
+            session.query(LineageEdgeRow).filter(
+                access._owned_by(owner, LineageEdgeRow.user_id)
+            ).delete()
+            session.query(LineageNodeRow).filter(
+                access._owned_by(owner, LineageNodeRow.user_id)
+            ).delete()
+            session.query(HistoryRow).filter(
+                access._owned_by(owner, HistoryRow.user_id)
+            ).delete()
+            session.commit()
 
 
 @dataclass(frozen=True)

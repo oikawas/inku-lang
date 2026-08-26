@@ -616,18 +616,13 @@ def _permission_group_membership_store() -> _groups.PermissionGroupMembershipSto
     return _groups.PermissionGroupMembershipStore(uuid.uuid4, _now_ms)
 
 
+def _permission_group_seeder() -> _groups.PermissionGroupSeeder:
+    return _groups.PermissionGroupSeeder(SessionLocal, uuid.uuid4, _now_ms)
+
+
 def _ensure_permission_groups(session: Session | None = None) -> None:
     """Seed the three fixed permission groups. Idempotent."""
-    with _session_scope(session) as (active_session, owns_session):
-        existing = {row.name for row in active_session.query(PermissionGroupRow).all()}
-        added = False
-        for name in PERMISSION_GROUPS:
-            if name in existing:
-                continue
-            active_session.add(PermissionGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms()))
-            added = True
-        if added:
-            _finish_session(active_session, owns_session)
+    return _permission_group_seeder().ensure(session)
 
 
 def _migrate_roles_to_permission_groups(session: Session | None = None) -> None:

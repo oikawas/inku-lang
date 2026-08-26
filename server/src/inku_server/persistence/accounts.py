@@ -313,6 +313,32 @@ class SingleUserPinUpdater:
         return self.status_fn()
 
 
+@dataclass(frozen=True)
+class SingleUserPinStatusReader:
+    pin_store: Any
+    get_user_fn: Callable[[str], dict | None]
+    session_factory: Callable[[], Any]
+    permission_groups_of_fn: Callable[[Any, str], Collection[str]]
+    mode_enabled_fn: Callable[[], bool]
+
+    def read(self) -> dict:
+        """Who the app opens as, and who it could open as instead."""
+        pinned_id = self.pin_store.get()
+        pinned = self.get_user_fn(pinned_id) if pinned_id else None
+        with self.session_factory() as session:
+            eligible = [
+                {"id": row.id, "username": row.username}
+                for row in session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).all()
+                if "admins" in self.permission_groups_of_fn(session, row.id)
+            ]
+        return {
+            "enabled": self.mode_enabled_fn(),
+            "user_id": pinned_id,
+            "username": pinned["username"] if pinned else None,
+            "eligible": eligible,
+        }
+
+
 def loads_or_none(raw: str | None):
     """The stored JSON, or None when there is nothing readable stored.
 

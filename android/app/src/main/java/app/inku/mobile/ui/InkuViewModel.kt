@@ -22,6 +22,7 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -594,14 +595,13 @@ class InkuViewModel @JvmOverloads constructor(
                 repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID)
                 if (serial != cameraRunSerial) return@launch
                 localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.AnalyzingLocally)
-                val result = repository.analyzeLocalVision(
-                    VisionAnalysisRequest(
-                        normalizedJpeg = prepared.jpegBytes,
-                        width = prepared.width,
-                        height = prepared.height,
-                        languageCode = localState.value.uiLanguage.code,
-                    ),
+                val request = VisionAnalysisRequest(
+                    normalizedJpeg = prepared.jpegBytes,
+                    width = prepared.width,
+                    height = prepared.height,
+                    languageCode = localState.value.uiLanguage.code,
                 )
+                val result = repository.analyzeLocalVision(request)
                 if (serial != cameraRunSerial) return@launch
                 if (result.text.isBlank()) {
                     localState.value = localState.value.copy(
@@ -614,7 +614,9 @@ class InkuViewModel @JvmOverloads constructor(
                     prompt = result.text.trim(),
                     ddl = "",
                     ddlEditedAfterGeneration = false,
-                    cameraCaptureState = CameraCaptureState.ReadyToEdit,
+                    cameraCaptureState = CameraCaptureState.ReadyToEdit(
+                        CameraInputProvenance.fromAnalysis(request, result),
+                    ),
                     message = null,
                 )
             } catch (error: CancellationException) {
@@ -1399,6 +1401,7 @@ class InkuViewModel @JvmOverloads constructor(
                             grain = interpreted.sketchGrain,
                             claimedState = interpreted.sketchState,
                         ),
+                        inputProvenance = route?.inputProvenance,
                     )
                 }
             }.onSuccess { item ->

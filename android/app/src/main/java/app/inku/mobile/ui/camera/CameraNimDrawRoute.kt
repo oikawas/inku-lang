@@ -1,6 +1,7 @@
 package app.inku.mobile.ui.camera
 
 import app.inku.mobile.data.db.ProviderSettingEntity
+import app.inku.mobile.data.model.CameraInputProvenance
 
 internal const val CAMERA_NIM_PROVIDER_ID = "nvidia"
 internal const val CAMERA_NIM_MODEL_ID = "nvidia:google/gemma-4-31b-it"
@@ -8,6 +9,7 @@ internal const val CAMERA_NIM_CATALOG_ID = "vivid_material"
 
 /** Immutable run values used only while drawing an editable camera description. */
 internal data class CameraNimDrawRoute(
+    val inputProvenance: CameraInputProvenance,
     val stage1ModelId: String = CAMERA_NIM_MODEL_ID,
     val stage2ModelId: String = CAMERA_NIM_MODEL_ID,
     val catalogId: String = CAMERA_NIM_CATALOG_ID,
@@ -17,8 +19,10 @@ internal data class CameraNimDrawRoute(
 )
 
 internal object CameraNimDrawRouting {
-    fun forState(state: CameraCaptureState): CameraNimDrawRoute? =
-        if (state == CameraCaptureState.ReadyToEdit) CameraNimDrawRoute() else null
+    fun forState(state: CameraCaptureState): CameraNimDrawRoute? {
+        val ready = state as? CameraCaptureState.ReadyToEdit ?: return null
+        return CameraNimDrawRoute(inputProvenance = ready.inputProvenance)
+    }
 }
 
 internal enum class CameraNimProviderIssue {
@@ -40,4 +44,4 @@ internal fun CameraNimDrawRoute.providerIssue(
 
 /** Clear only a camera description that is still eligible for the fixed draw route. */
 internal fun CameraCaptureState.clearCameraOrigin(): CameraCaptureState =
-    if (this == CameraCaptureState.ReadyToEdit) CameraCaptureState.Idle else this
+    if (this is CameraCaptureState.ReadyToEdit) CameraCaptureState.Idle else this

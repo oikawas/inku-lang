@@ -1,6 +1,10 @@
 package app.inku.mobile.ui
 
 import app.inku.mobile.data.db.ProviderSettingEntity
+import app.inku.mobile.data.model.CameraInputOrigin
+import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.data.model.CameraInputRoute
+import app.inku.mobile.data.model.CameraVisionOutputMode
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraNimDrawRouting
 import app.inku.mobile.ui.camera.CameraNimProviderIssue
@@ -15,7 +19,7 @@ import org.junit.Test
 class CameraNimDrawRouteTest {
     @Test
     fun readyCameraDescriptionUsesTheFixedNimSnapshot() {
-        val route = CameraNimDrawRouting.forState(CameraCaptureState.ReadyToEdit)
+        val route = CameraNimDrawRouting.forState(readyState())
             ?: error("camera route missing")
 
         assertEquals("nvidia:google/gemma-4-31b-it", route.stage1ModelId)
@@ -24,6 +28,7 @@ class CameraNimDrawRouteTest {
         assertFalse(route.sketchRequested)
         assertFalse(route.autoSelectCatalog)
         assertFalse(route.autoRepair)
+        assertEquals(provenance(), route.inputProvenance)
     }
 
     @Test
@@ -35,7 +40,7 @@ class CameraNimDrawRouteTest {
 
     @Test
     fun fixedNimProviderMustBeEnabledAndConfiguredBeforeTheRun() {
-        val route = CameraNimDrawRouting.forState(CameraCaptureState.ReadyToEdit)
+        val route = CameraNimDrawRouting.forState(readyState())
             ?: error("camera route missing")
 
         assertEquals(CameraNimProviderIssue.MissingOrDisabled, route.providerIssue(emptyList()))
@@ -47,7 +52,7 @@ class CameraNimDrawRouteTest {
 
     @Test
     fun explicitBoundaryActionsClearOnlyTheReadyCameraOrigin() {
-        assertSame(CameraCaptureState.Idle, CameraCaptureState.ReadyToEdit.clearCameraOrigin())
+        assertSame(CameraCaptureState.Idle, readyState().clearCameraOrigin())
         val failed = CameraCaptureState.Failed(app.inku.mobile.ui.camera.CameraFailure.AnalysisFailed)
         assertEquals(failed, failed.clearCameraOrigin())
         assertSame(CameraCaptureState.Cancelled, CameraCaptureState.Cancelled.clearCameraOrigin())
@@ -67,5 +72,18 @@ class CameraNimDrawRouteTest {
         isEnabled = enabled,
         isDefaultLocal = false,
         updatedAt = 0L,
+    )
+
+    private fun readyState() = CameraCaptureState.ReadyToEdit(provenance())
+
+    private fun provenance() = CameraInputProvenance(
+        origin = CameraInputOrigin.Camera,
+        route = CameraInputRoute.LocalDescriptionToNim,
+        visionProviderId = "local-litert-lm",
+        visionModelId = "local-litert-lm:gemma-4-e2b",
+        visionPromptVersion = "camera-description-v1",
+        visionOutputMode = CameraVisionOutputMode.Description,
+        normalizedImageWidth = 720,
+        normalizedImageHeight = 1280,
     )
 }

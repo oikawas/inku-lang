@@ -1,6 +1,12 @@
 package app.inku.mobile.ui
 
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.data.model.mergeInputProvenance
+import app.inku.mobile.llm.VisionAnalysisRequest
+import app.inku.mobile.llm.VisionAnalysisResult
+import app.inku.mobile.ui.i18n.InkuStringsEn
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -79,6 +85,92 @@ class GenerationInfoSheetTest {
         assertEquals("—", rows[GenerationInfoField.CanvasRatio])
         assertEquals("—", rows[GenerationInfoField.Elapsed])
         assertTrue(rows.values.none { it.contains("broken") })
+    }
+
+    @Test
+    fun validCameraProvenanceAddsACompleteInputSectionBeforeTheExistingFive() {
+        val metadata = mergeInputProvenance(
+            """{"render_engine_id":"inku-svg"}""",
+            CameraInputProvenance.fromAnalysis(
+                request = VisionAnalysisRequest(
+                    normalizedJpeg = byteArrayOf(1),
+                    width = 720,
+                    height = 1280,
+                    languageCode = "ja",
+                ),
+                result = VisionAnalysisResult(
+                    text = "赤い円が見える。",
+                    modelId = "local-litert-lm:gemma-4-e2b",
+                    elapsedMs = 321L,
+                ),
+            ),
+        )
+        val sections = generationInfoSections(
+            historyItem(renderMetadataJson = metadata),
+        )
+
+        assertEquals(
+            listOf(
+                GenerationInfoSectionId.Input,
+                GenerationInfoSectionId.Sketch,
+                GenerationInfoSectionId.Interpretation,
+                GenerationInfoSectionId.Performance,
+                GenerationInfoSectionId.Identity,
+                GenerationInfoSectionId.Run,
+            ),
+            sections.map { it.id },
+        )
+        val inputRows = sections.first().rows.associate { it.field to it.value }
+        assertEquals(7, inputRows.size)
+        assertEquals("camera", inputRows[GenerationInfoField.InputOrigin])
+        assertEquals("local_description_to_nim", inputRows[GenerationInfoField.InputRoute])
+        assertEquals("local-litert-lm", inputRows[GenerationInfoField.VisionProvider])
+        assertEquals("local-litert-lm:gemma-4-e2b", inputRows[GenerationInfoField.VisionModel])
+        assertEquals("camera-description-v1", inputRows[GenerationInfoField.VisionPromptVersion])
+        assertEquals("description", inputRows[GenerationInfoField.VisionOutputMode])
+        assertEquals("720 × 1280", inputRows[GenerationInfoField.NormalizedImageDimensions])
+
+        assertEquals(
+            "カメラ",
+            generationInfoDisplayValue(
+                sections.first().rows.first { it.field == GenerationInfoField.InputOrigin },
+                InkuStringsJa,
+            ),
+        )
+        assertEquals(
+            "Local description → NIM",
+            generationInfoDisplayValue(
+                sections.first().rows.first { it.field == GenerationInfoField.InputRoute },
+                InkuStringsEn,
+            ),
+        )
+        assertEquals(
+            "Description",
+            generationInfoDisplayValue(
+                sections.first().rows.first { it.field == GenerationInfoField.VisionOutputMode },
+                InkuStringsEn,
+            ),
+        )
+        assertEquals("観察指示版", InkuStringsJa.generationInfoVisionPromptVersion)
+        assertEquals("正規化撮影寸法", InkuStringsJa.generationInfoNormalizedImageDimensions)
+        assertEquals("Observation version", InkuStringsEn.generationInfoVisionPromptVersion)
+        assertEquals("Normalized capture size", InkuStringsEn.generationInfoNormalizedImageDimensions)
+    }
+
+    @Test
+    fun malformedCameraProvenanceHidesOnlyTheInputSection() {
+        val malformedValues = listOf(
+            """{"input_provenance":"camera"}""",
+            """{"input_provenance":{"origin":"camera"}}""",
+            """{"input_provenance":{"origin":"camera","route":"local_description_to_nim","vision_provider_id":"local-litert-lm","vision_model_id":"model","vision_prompt_version":"v1","vision_output_mode":"description","normalized_image_width":"720","normalized_image_height":1280}}""",
+        )
+
+        malformedValues.forEach { metadata ->
+            val sections = generationInfoSections(historyItem(renderMetadataJson = metadata))
+            assertEquals(5, sections.size)
+            assertFalse(sections.any { it.id == GenerationInfoSectionId.Input })
+            assertEquals(GenerationInfoSectionId.Sketch, sections.first().id)
+        }
     }
 
     private fun historyItem(

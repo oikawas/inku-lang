@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import app.inku.mobile.data.model.workColorSnapshot
+import app.inku.mobile.data.model.cameraInputProvenance
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -1994,7 +1995,7 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
     CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
     CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
-    CameraCaptureState.ReadyToEdit -> S.cameraReadyToEdit
+    is CameraCaptureState.ReadyToEdit -> S.cameraReadyToEdit
     CameraCaptureState.Cancelled -> S.cameraCancelled
     is CameraCaptureState.Failed -> when (state.reason) {
         CameraFailure.ModelNotReady -> S.cameraModelNotReady
@@ -4725,6 +4726,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
 }
 
 internal enum class GenerationInfoSectionId {
+    Input,
     Sketch,
     Interpretation,
     Performance,
@@ -4733,6 +4735,13 @@ internal enum class GenerationInfoSectionId {
 }
 
 internal enum class GenerationInfoField {
+    InputOrigin,
+    InputRoute,
+    VisionProvider,
+    VisionModel,
+    VisionPromptVersion,
+    VisionOutputMode,
+    NormalizedImageDimensions,
     SketchGrain,
     SketchState,
     Stage1Model,
@@ -4816,7 +4825,26 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
         "—"
     }
 
-    return listOf(
+    val inputSection = cameraInputProvenance(item.renderMetadataJson)?.let { provenance ->
+        GenerationInfoSection(
+            GenerationInfoSectionId.Input,
+            listOf(
+                GenerationInfoRow(GenerationInfoField.InputOrigin, provenance.origin.wireValue),
+                GenerationInfoRow(GenerationInfoField.InputRoute, provenance.route.wireValue),
+                GenerationInfoRow(GenerationInfoField.VisionProvider, provenance.visionProviderId),
+                GenerationInfoRow(GenerationInfoField.VisionModel, provenance.visionModelId),
+                GenerationInfoRow(GenerationInfoField.VisionPromptVersion, provenance.visionPromptVersion),
+                GenerationInfoRow(GenerationInfoField.VisionOutputMode, provenance.visionOutputMode.wireValue),
+                GenerationInfoRow(
+                    GenerationInfoField.NormalizedImageDimensions,
+                    "${provenance.normalizedImageWidth} × ${provenance.normalizedImageHeight}",
+                ),
+            ),
+        )
+    }
+
+    return listOfNotNull(
+        inputSection,
         GenerationInfoSection(
             GenerationInfoSectionId.Sketch,
             listOf(
@@ -4966,6 +4994,7 @@ private fun GenerationInfoColorMapEntryRow(entry: GenerationInfoColorMapEntry) {
 
 @Composable
 private fun generationInfoSectionLabel(section: GenerationInfoSectionId): String = when (section) {
+    GenerationInfoSectionId.Input -> S.generationInfoInputSection
     GenerationInfoSectionId.Sketch -> S.generationInfoSketchSection
     GenerationInfoSectionId.Interpretation -> S.generationInfoInterpretationSection
     GenerationInfoSectionId.Performance -> S.generationInfoPerformanceSection
@@ -4975,6 +5004,13 @@ private fun generationInfoSectionLabel(section: GenerationInfoSectionId): String
 
 @Composable
 private fun generationInfoFieldLabel(field: GenerationInfoField): String = when (field) {
+    GenerationInfoField.InputOrigin -> S.generationInfoInputOrigin
+    GenerationInfoField.InputRoute -> S.generationInfoInputRoute
+    GenerationInfoField.VisionProvider -> S.generationInfoVisionProvider
+    GenerationInfoField.VisionModel -> S.generationInfoVisionModel
+    GenerationInfoField.VisionPromptVersion -> S.generationInfoVisionPromptVersion
+    GenerationInfoField.VisionOutputMode -> S.generationInfoVisionOutputMode
+    GenerationInfoField.NormalizedImageDimensions -> S.generationInfoNormalizedImageDimensions
     GenerationInfoField.SketchGrain -> S.generationInfoSketchGrain
     GenerationInfoField.SketchState -> S.generationInfoSketchState
     GenerationInfoField.Stage1Model -> S.generationInfoStage1Model
@@ -4999,10 +5035,16 @@ private fun generationInfoFieldLabel(field: GenerationInfoField): String = when 
 }
 
 @Composable
-private fun generationInfoDisplayValue(row: GenerationInfoRow): String = when {
-    row.field == GenerationInfoField.RenderWild && row.value == "true" -> S.generationInfoOn
-    row.field == GenerationInfoField.RenderWild && row.value == "false" -> S.generationInfoOff
-    row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> S.variationAmplitudeLabel(row.value)
+private fun generationInfoDisplayValue(row: GenerationInfoRow): String =
+    generationInfoDisplayValue(row, S)
+
+internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStrings): String = when {
+    row.field == GenerationInfoField.InputOrigin && row.value == "camera" -> strings.generationInfoInputOriginCamera
+    row.field == GenerationInfoField.InputRoute && row.value == "local_description_to_nim" -> strings.generationInfoInputRouteLocalDescriptionToNim
+    row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
+    row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn
+    row.field == GenerationInfoField.RenderWild && row.value == "false" -> strings.generationInfoOff
+    row.field == GenerationInfoField.VariationAmplitude && row.value != "—" -> strings.variationAmplitudeLabel(row.value)
     else -> row.value
 }
 

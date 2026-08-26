@@ -3,6 +3,7 @@ package app.inku.mobile.ui.camera
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import app.inku.mobile.data.model.CameraInputProvenance
 import java.io.File
 
 sealed interface CameraCaptureState {
@@ -12,7 +13,7 @@ sealed interface CameraCaptureState {
     data object PreparingImage : CameraCaptureState
     data object LoadingLocalModel : CameraCaptureState
     data object AnalyzingLocally : CameraCaptureState
-    data object ReadyToEdit : CameraCaptureState
+    data class ReadyToEdit(val inputProvenance: CameraInputProvenance) : CameraCaptureState
     data class Failed(val reason: CameraFailure) : CameraCaptureState
     data object Cancelled : CameraCaptureState
 }

@@ -1004,7 +1004,7 @@ def admin_history_owner_id() -> str | None:
 # changes is only who an unauthenticated request is taken to be.
 # ---------------------------------------------------------------------------
 
-_SINGLE_USER_SETTING_KEY = "single_user"
+_SINGLE_USER_SETTING_KEY = _settings.SINGLE_USER_SETTINGS_KEY
 
 
 def single_user_mode_enabled() -> bool:
@@ -1076,8 +1076,8 @@ def single_user_account() -> dict | None:
     The pin holds the account id, not its name, because the name can be
     changed from the settings screen.
     """
-    stored = _read_app_setting(_SINGLE_USER_SETTING_KEY) or {}
-    pinned = stored.get("user_id")
+    pin_store = _single_user_pin_store()
+    pinned = pin_store.get()
     if pinned:
         user = get_user(pinned)
         if user:
@@ -1095,13 +1095,13 @@ def single_user_account() -> dict | None:
     user = get_user(user_id)
     if user is None:
         return None
-    _write_app_setting(_SINGLE_USER_SETTING_KEY, {**stored, "user_id": user_id})
+    pin_store.update(user_id)
     return user
 
 
 def single_user_pinned_id() -> str | None:
     """The pinned account id, without resolving or writing one."""
-    return (_read_app_setting(_SINGLE_USER_SETTING_KEY) or {}).get("user_id")
+    return _single_user_pin_store().get()
 
 
 def set_single_user_pin(user_id: str) -> dict:
@@ -1126,8 +1126,7 @@ def set_single_user_pin(user_id: str) -> dict:
             raise ValueError("user not found")
         if "admins" not in _permission_groups_of(session, user_id):
             raise ValueError("the single user must hold the admins permission group")
-    stored = _read_app_setting(_SINGLE_USER_SETTING_KEY) or {}
-    _write_app_setting(_SINGLE_USER_SETTING_KEY, {**stored, "user_id": user_id})
+    _single_user_pin_store().update(user_id)
     return single_user_pin_status()
 
 
@@ -1175,6 +1174,10 @@ def _sqlite_db_path() -> Path | None:
 
 def _app_settings_store() -> AppSettingsStore:
     return AppSettingsStore(SessionLocal, _now_ms)
+
+
+def _single_user_pin_store() -> _settings.SingleUserPinStore:
+    return _settings.SingleUserPinStore(_app_settings_store())
 
 
 def _read_app_setting(key: str) -> dict | None:

@@ -625,6 +625,10 @@ def _ensure_permission_groups(session: Session | None = None) -> None:
     return _permission_group_seeder().ensure(session)
 
 
+def _legacy_role_membership_migrator() -> _groups.LegacyRoleMembershipMigrator:
+    return _groups.LegacyRoleMembershipMigrator(SessionLocal, uuid.uuid4, _now_ms)
+
+
 def _migrate_roles_to_permission_groups(session: Session | None = None) -> None:
     """Give every pre-existing account the one group its legacy role names.
 
@@ -637,30 +641,7 @@ def _migrate_roles_to_permission_groups(session: Session | None = None) -> None:
     permission group is left alone, so a second run adds nothing and an account
     later given `admins` + `leaders` is not knocked back down to one.
     """
-    with _session_scope(session) as (active_session, owns_session):
-        by_name = _permission_group_ids(active_session)
-        if not by_name:
-            return
-        assigned = {
-            user_id
-            for (user_id,) in active_session.query(UserPermissionGroupRow.user_id).distinct().all()
-        }
-        added = False
-        for row in active_session.query(UserAccountRow).all():
-            if row.id in assigned:
-                continue
-            name = _LEGACY_ROLE_TO_PERMISSION_GROUP.get(row.role, "users")
-            active_session.add(
-                UserPermissionGroupRow(
-                    id=str(uuid.uuid4()),
-                    user_id=row.id,
-                    permission_group_id=by_name[name],
-                    at=_now_ms(),
-                )
-            )
-            added = True
-        if added:
-            _finish_session(active_session, owns_session)
+    return _legacy_role_membership_migrator().migrate(session)
 
 
 def _bootstrap_admin_password() -> str | None:

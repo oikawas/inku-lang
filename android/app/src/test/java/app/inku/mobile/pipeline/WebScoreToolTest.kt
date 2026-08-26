@@ -6,6 +6,16 @@ import org.junit.Test
 
 class WebScoreToolTest {
     @Test
+    fun submitScoreToolRequiresAtLeastOneDrawableInstruction() {
+        val parameters = JSONObject(WebScoreTool.submitScore.parametersJson)
+        val instructions = parameters
+            .getJSONObject("properties")
+            .getJSONObject("instructions")
+
+        assertEquals(1, instructions.getInt("minItems"))
+    }
+
+    @Test
     fun extractJsonObjectRepairsLiteRtNumericWhitespaceAndTrimmedKeys() {
         val malformed = """
             {

@@ -24,6 +24,7 @@ from .persistence.backup import (
     BackupService as _BackupService,
 )
 from .persistence import feedback as _feedback
+from .persistence import groups as _groups
 from .persistence import history as _history
 from .persistence import identities as _identities
 from .persistence import lineage as _lineage
@@ -1562,7 +1563,7 @@ def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow], actor: dict | N
 
 
 def _group_to_dict(row: UserGroupRow) -> dict:
-    return {"id": row.id, "name": row.name, "at": row.at}
+    return _groups.group_to_dict(row)
 
 
 def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
@@ -1641,53 +1642,19 @@ def list_unread_words(user_id: str | None = None, *, limit: int = 100) -> list[d
 
 
 def list_user_groups() -> list[dict]:
-    with SessionLocal() as session:
-        rows = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).all()
-        return [_group_to_dict(row) for row in rows]
+    return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).list_user_groups()
 
 
 def add_user_group(name: str) -> dict:
-    name = name.strip()
-    if not name:
-        raise ValueError("group name is required")
-    row = UserGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms())
-    with SessionLocal() as session:
-        session.add(row)
-        session.commit()
-        session.refresh(row)
-        return _group_to_dict(row)
+    return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).add_user_group(name)
 
 
 def update_user_group(group_id: str, name: str) -> dict | None:
-    name = name.strip()
-    if not name:
-        raise ValueError("group name is required")
-    with SessionLocal() as session:
-        row = session.get(UserGroupRow, group_id)
-        if not row:
-            return None
-        row.name = name
-        row.at = _now_ms()
-        session.commit()
-        session.refresh(row)
-        return _group_to_dict(row)
+    return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).update_user_group(group_id, name)
 
 
 def delete_user_group(group_id: str) -> bool:
-    with SessionLocal() as session:
-        if session.query(UserAccountRow).filter(UserAccountRow.group_id == group_id).first():
-            raise ValueError("group has users")
-        row = session.get(UserGroupRow, group_id)
-        if not row:
-            return False
-        # Grants naming this organisation outlive it otherwise, and a later group
-        # created with the same id would inherit them.
-        session.query(HistoryAclRow).filter(
-            HistoryAclRow.subject_type == "org_group", HistoryAclRow.subject_id == group_id
-        ).delete(synchronize_session=False)
-        session.delete(row)
-        session.commit()
-        return True
+    return _groups.UserGroupStore(SessionLocal, uuid.uuid4, _now_ms).delete_user_group(group_id)
 
 
 def list_users() -> list[dict]:

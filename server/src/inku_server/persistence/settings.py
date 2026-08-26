@@ -104,6 +104,7 @@ RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
 }
 RENDER_CONCURRENCY_MIN = 1
 RENDER_CONCURRENCY_MAX = 16
+RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -520,6 +521,32 @@ class RenderConcurrencySettingsStore:
             {"server_limit": server_limit, "client_limit": client_limit}
         )
         return self.app_settings.write(RENDER_CONCURRENCY_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class RenderLimitSettingsStore:
+    """Read and merge-write normalized render-limit settings."""
+
+    app_settings: AppSettingsStore
+    normalize: Callable[[object], dict[str, int]]
+
+    def get(self) -> dict[str, int]:
+        return self.normalize(self.app_settings.read(RENDER_LIMIT_SETTINGS_KEY))
+
+    def update(self, settings: dict) -> dict:
+        """Merge a partial update over what is stored and normalize the result.
+
+        Rounding happens before the write, so what comes back is what took effect --
+        a caller that sent a self-contradicting set gets the corrected one, not its
+        own input echoed.
+        """
+        current = self.get()
+        if isinstance(settings, dict):
+            current.update(
+                {key: value for key, value in settings.items() if key in current}
+            )
+        clean = self.normalize(current)
+        return self.app_settings.write(RENDER_LIMIT_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

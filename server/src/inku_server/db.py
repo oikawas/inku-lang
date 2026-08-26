@@ -145,7 +145,7 @@ _RENDER_CONCURRENCY_SETTINGS_KEY = _settings.RENDER_CONCURRENCY_SETTINGS_KEY
 _RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETTINGS
 RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
 RENDER_CONCURRENCY_MAX = _settings.RENDER_CONCURRENCY_MAX
-_RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
+_RENDER_LIMIT_SETTINGS_KEY = _settings.RENDER_LIMIT_SETTINGS_KEY
 _LOG_RETENTION_SETTINGS_KEY = "log_retention_settings"
 _LOG_RETENTION_DEFAULT_SETTINGS = {
     "enabled": True,
@@ -1256,23 +1256,15 @@ def update_render_concurrency_settings(server_limit: int, client_limit: int) -> 
 
 
 def get_render_limit_settings() -> dict:
-    return normalize_limits(_read_app_setting(_RENDER_LIMIT_SETTINGS_KEY))
+    return _render_limit_settings_store().get()
+
+
+def _render_limit_settings_store() -> _settings.RenderLimitSettingsStore:
+    return _settings.RenderLimitSettingsStore(_app_settings_store(), normalize_limits)
 
 
 def update_render_limit_settings(settings: dict) -> dict:
-    """Merge a partial update over what is stored and normalize the result.
-
-    Rounding happens before the write, so what comes back is what took effect --
-    a caller that sent a self-contradicting set gets the corrected one, not its
-    own input echoed.
-    """
-    current = get_render_limit_settings()
-    if isinstance(settings, dict):
-        current.update(
-            {key: value for key, value in settings.items() if key in current}
-        )
-    clean = normalize_limits(current)
-    return _write_app_setting(_RENDER_LIMIT_SETTINGS_KEY, clean)
+    return _render_limit_settings_store().update(settings)
 
 
 def get_output_save_settings() -> dict:

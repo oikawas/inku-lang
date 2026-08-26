@@ -56,6 +56,11 @@ EXPECTED_BRANCH_ORDER = [
     "with_literal_grid_fidelity",
     "drop_invalid_relations",
     "without_explicit_region_support",
+    # After structural dedupe and every branch that can change the final shape
+    # inventory. It only delivers one positive whole Surface/面 clause when
+    # exactly one closed shape remains, then the existing fill fold says that
+    # result once in both compatible spellings (ddl-engine 21).
+    "with_stated_surface_fidelity",
     # Second to last, and on both exits (ddl-engine 18). It says the interior's
     # state once, in one vocabulary, whichever of the two ways it arrived in --
     # so it has to run after everything that can write `filled` or a `surface`:

@@ -120,7 +120,12 @@ def test_ddl_reference_versions_and_parts() -> None:
     # fired or not. The seven interior words did not move: `wash` on a line is
     # still carried back or dropped, which `B-surface-on-a-line-moves-back`
     # (`hatch`) and `B-surface-already-on-a-closed-shape` (`wash`) keep saying.
-    assert DDL_ENGINE_VERSION == "20"
+    # Engine 21 (2026-08-26): one positive whole surface clause reaches exactly
+    # one closed shape after fill-equivalent duplicates are folded. Four B
+    # cases join: two measured failures and two decline/no-op controls. The new
+    # branch key enters every B report, so all 34 B digests move while each of
+    # the 30 carried Scores remains byte-identical.
+    assert DDL_ENGINE_VERSION == "21"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -169,9 +174,9 @@ def test_ddl_reference_versions_and_parts() -> None:
     # moves and two it must leave alone -- so the part is thirty. A and C do not
     # move: the rule lives inside coerce and reads a clause the expander never
     # writes.
-    assert len(manifest["cases"]) == 49
+    assert len(manifest["cases"]) == 53
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 30
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 34
     assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
     # Three entries, and they are two different quantities: `beside-cjk` is the
     # one case whose judgement moved (one unit to twelve, because the exclusion is
@@ -270,15 +275,14 @@ def test_ddl_reference_versions_and_parts() -> None:
         assert case["bytes"] == eighteen["cases"][case_id]["bytes"], case_id
 
     # Engine 20 (2026-08-16): 粒 and にじみ stay on the open shape the sentence
-    # put them on. **ONE case moves and it is not new.** No branch was added, so
-    # unlike engines 11, 15 and 18 the other twenty-nine reports are untouched --
-    # the arithmetic engine 16 wrote down. The one that moves is the only input
-    # here holding a mark word on a line: its 粒 used to be dropped for having no
-    # closed shape to go back to, and the drop is what the branch report counted.
-    assert manifest["changed_from_previous"] == ["B-surface-with-nowhere-to-move"]
-    assert set(manifest["cases"]) == set(nineteen["cases"])
+    # put them on. **ONE case moves and it is not new.** Read the frozen version
+    # by name so this historical attribution does not silently become engine 21.
+    twenty_dir = root / "ddl-engine-20"
+    twenty = json.loads((twenty_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert twenty["changed_from_previous"] == ["B-surface-with-nowhere-to-move"]
+    assert set(twenty["cases"]) == set(nineteen["cases"])
     moved_body = json.loads(
-        (root / f"ddl-engine-{DDL_ENGINE_VERSION}" / "b_coerce"
+        (twenty_dir / "b_coerce"
          / "B-surface-with-nowhere-to-move.json").read_text(encoding="utf-8")
     )
     was_body = json.loads(
@@ -290,11 +294,43 @@ def test_ddl_reference_versions_and_parts() -> None:
     assert moved_body["score"]["instructions"][0]["surface"]["texture"] == "grain"
     assert was_body["branch_report"]["with_surface_on_a_closed_shape"] == 1
     assert moved_body["branch_report"]["with_surface_on_a_closed_shape"] == 0
-    for case_id, case in manifest["cases"].items():
+    for case_id, case in twenty["cases"].items():
         if case_id == "B-surface-with-nowhere-to-move":
             continue
         assert case["digest"] == nineteen["cases"][case_id]["digest"], case_id
         assert case["bytes"] == nineteen["cases"][case_id]["bytes"], case_id
+
+    # Engine 21: all 34 B records move because the observable branch inventory
+    # gains one key; the 30 carried Scores do not. The four new cases are the
+    # only new files, while A and C remain byte-identical to engine 20.
+    new_cases = {
+        "B-stated-surface-english-delivery",
+        "B-stated-surface-fill-equivalent-duplicate",
+        "B-stated-surface-two-shapes-declines",
+        "B-stated-surface-empty-declines",
+    }
+    current_b = {
+        case_id
+        for case_id, case in manifest["cases"].items()
+        if case["part"] == "b_coerce"
+    }
+    assert manifest["changed_from_previous"] == sorted(current_b)
+    assert set(manifest["cases"]) == set(twenty["cases"]) | new_cases
+    for case_id, prior_case in twenty["cases"].items():
+        case = manifest["cases"][case_id]
+        if case["part"] != "b_coerce":
+            assert case["digest"] == prior_case["digest"], case_id
+            assert case["bytes"] == prior_case["bytes"], case_id
+            continue
+        assert case["digest"] != prior_case["digest"], case_id
+        body = json.loads(
+            (MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8")
+        )
+        prior_body = json.loads(
+            (twenty_dir / prior_case["output_path"]).read_text(encoding="utf-8")
+        )
+        assert body["score"] == prior_body["score"], case_id
+        assert body["branch_report"]["with_stated_surface_fidelity"] == 0, case_id
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -524,6 +560,17 @@ def test_ddl_reference_coerce_discriminators() -> None:
             "coerce_and_repair_instruction", "with_stated_count_fidelity",
         },
         "B-stated-size-outranks-the-word": {"with_stated_count_fidelity"},
+        # ddl-engine 21: only the English miss needs the new delivery branch.
+        # The Japanese pair is first recognized as one structural instruction;
+        # its surviving solid texture is already correct when delivery runs.
+        "B-stated-surface-english-delivery": {
+            "with_stated_surface_fidelity", "with_fill_as_a_surface_word",
+        },
+        "B-stated-surface-fill-equivalent-duplicate": {
+            "with_structural_duplicate_repair", "with_fill_as_a_surface_word",
+        },
+        "B-stated-surface-two-shapes-declines": set(),
+        "B-stated-surface-empty-declines": set(),
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id
@@ -532,6 +579,9 @@ def test_ddl_reference_coerce_discriminators() -> None:
     assert cases["B-surface-tension-words"]["instruction_count"] == 1
     assert cases["B-baseline-no-ddl"]["instruction_count"] == 1
     assert cases["B-dense-forty"]["instruction_count"] == 40
+    assert cases["B-stated-surface-english-delivery"]["instruction_count"] == 1
+    assert cases["B-stated-surface-fill-equivalent-duplicate"]["instruction_count"] == 1
+    assert cases["B-stated-surface-two-shapes-declines"]["instruction_count"] == 2
     # No branch that invents may fire anywhere in the corpus.
     gone = {
         "with_visual_event",

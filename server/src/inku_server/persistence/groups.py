@@ -9,6 +9,42 @@ from typing import Any
 from .schema import HistoryAclRow, UserAccountRow, UserGroupRow
 
 
+PERMISSION_GROUPS = ("admins", "leaders", "users")
+PERMISSION_GROUP_LABELS = {
+    "admins": "管理者",
+    "leaders": "リーダー",
+    "users": "ユーザー",
+}
+ROLE_MIRROR_BY_GROUP = {"admins": "admin", "leaders": "group_lead"}
+ELEVATED_PERMISSION_GROUPS = ("admins", "leaders")
+LEGACY_ROLE_TO_PERMISSION_GROUP = {
+    "admin": "admins",
+    "group_lead": "leaders",
+    "user": "users",
+}
+
+
+def derived_role(names) -> str:
+    """The legacy role column's value, derived from permission groups."""
+    for group, role in ROLE_MIRROR_BY_GROUP.items():
+        if group in names:
+            return role
+    return "user"
+
+
+def normalize_permission_groups(names) -> list[str]:
+    """Requested names, deduplicated and ordered by the fixed vocabulary."""
+    if isinstance(names, str):
+        raise ValueError("permission_groups must be a list")
+    requested = set(names or ())
+    unknown = requested - set(PERMISSION_GROUPS)
+    if unknown:
+        raise ValueError(f"invalid permission group: {sorted(unknown)[0]}")
+    if not requested:
+        raise ValueError("at least one permission group is required")
+    return [name for name in PERMISSION_GROUPS if name in requested]
+
+
 def group_to_dict(row: UserGroupRow) -> dict:
     return {"id": row.id, "name": row.name, "at": row.at}
 

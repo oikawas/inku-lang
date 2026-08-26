@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import Any
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -45,6 +46,34 @@ LINEAGE_DERIVATION_KINDS = {
     # server did not know the name and the whole save was lost ([I-137]).
     "sketch_grain_change",
 }
+
+
+@dataclass(frozen=True)
+class UnownedHistoryOwnerBackfill:
+    """Assign the canonical account only to legacy history rows without an owner."""
+
+    session_factory: Callable[[], Any]
+    history_owner_user_id_fn: Callable[[Any], str | None]
+
+    def assign(self, session: Any | None = None) -> None:
+        if session is not None:
+            self._assign(session, owns_session=False)
+            return
+        with self.session_factory() as owned_session:
+            self._assign(owned_session, owns_session=True)
+
+    def _assign(self, session: Any, *, owns_session: bool) -> None:
+        owner_id = self.history_owner_user_id_fn(session)
+        if not owner_id:
+            return
+        session.query(HistoryRow).filter(HistoryRow.user_id.is_(None)).update(
+            {HistoryRow.user_id: owner_id},
+            synchronize_session=False,
+        )
+        if owns_session:
+            session.commit()
+        else:
+            session.flush()
 
 
 @dataclass(frozen=True)

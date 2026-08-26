@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from sqlalchemy import and_, or_, select, true
 
 from .schema import HistoryAclRow, HistoryRow, LineageEdgeRow, LineageNodeRow, UserAccountRow
@@ -30,6 +34,162 @@ ACL_SUBJECT_TYPES = ("user", "org_group")
 # the acceptance surface for a need nobody has measured yet, and it can be added
 # later without moving what is already here.
 ACL_PERMISSIONS = ("read", "write")
+
+
+def acl_to_dict(row: HistoryAclRow) -> dict:
+    return {
+        "id": row.id,
+        "history_id": row.history_id,
+        "subject_type": row.subject_type,
+        "subject_id": row.subject_id,
+        "permission": row.permission,
+        "at": row.at,
+    }
+
+
+def may_share(actor: dict, session, item_id: str) -> bool:
+    """Only the owner and an admin may hand a work to someone else.
+
+    Not everyone who can READ it: a leader reads their organisation's works, and
+    if reading were enough to grant, the leader could pass any of them outside
+    the organisation and the scope would stop meaning anything.
+    """
+    if has_permission_group(actor, "admins"):
+        return session.query(HistoryRow).filter(HistoryRow.id == item_id).first() is not None
+    return (
+        session.query(HistoryRow)
+        .filter(HistoryRow.id == item_id, _owned_by(actor, HistoryRow.user_id))
+        .first()
+        is not None
+    )
+
+
+def validated_acl_entries(entries: list[dict]) -> list[tuple[str, str, str]]:
+    clean: dict[tuple[str, str], tuple[str, str, str]] = {}
+    for entry in entries:
+        subject_type = str(entry.get("subject_type") or "")
+        subject_id = str(entry.get("subject_id") or "")
+        permission = str(entry.get("permission") or "")
+        if subject_type not in ACL_SUBJECT_TYPES:
+            raise ValueError(f"invalid subject_type: {subject_type}")
+        if permission not in ACL_PERMISSIONS:
+            raise ValueError(f"invalid permission: {permission}")
+        if not subject_id:
+            raise ValueError("subject_id is required")
+        # Last entry wins rather than raising: a caller that names the same
+        # subject twice is stating one intention clumsily, not two.
+        clean[(subject_type, subject_id)] = (subject_type, subject_id, permission)
+    return list(clean.values())
+
+
+@dataclass(frozen=True)
+class HistoryAclService:
+    """Own the guest-list transaction while db.py remains its compatibility facade."""
+
+    session_factory: Callable[[], object]
+    actor_of_fn: Callable[[str], dict]
+    now_ms_fn: Callable[[], int]
+
+    def list_history_acl(self, user_id: str, item_id: str) -> list[dict] | None:
+        """The guest list of one work, or None when the caller may not see it."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            if not may_share(actor, session, item_id):
+                return None
+            rows = (
+                session.query(HistoryAclRow)
+                .filter(HistoryAclRow.history_id == item_id)
+                .order_by(HistoryAclRow.at.asc(), HistoryAclRow.id.asc())
+                .all()
+            )
+            return [acl_to_dict(row) for row in rows]
+
+    def replace_history_acl(
+        self,
+        user_id: str,
+        item_id: str,
+        entries: list[dict],
+    ) -> list[dict] | None:
+        """Set the whole guest list at once. Absent subjects lose their access.
+
+        A whole-list write rather than a patch: the caller sends what the list should
+        be, so revoking is expressible. A patch API would need a separate delete verb
+        and a client that forgot it would silently never revoke anything.
+        """
+        wanted = validated_acl_entries(entries)
+        actor = self.actor_of_fn(user_id)
+        now = self.now_ms_fn()
+        with self.session_factory() as session:
+            if not may_share(actor, session, item_id):
+                return None
+            existing = {
+                (row.subject_type, row.subject_id): row
+                for row in session.query(HistoryAclRow).filter(HistoryAclRow.history_id == item_id).all()
+            }
+            for subject_type, subject_id, permission in wanted:
+                row = existing.pop((subject_type, subject_id), None)
+                if row is None:
+                    session.add(HistoryAclRow(
+                        id=str(uuid.uuid4()), history_id=item_id, subject_type=subject_type,
+                        subject_id=subject_id, permission=permission, at=now,
+                    ))
+                elif row.permission != permission:
+                    row.permission = permission
+                    row.at = now
+            for row in existing.values():
+                session.delete(row)
+            session.commit()
+        return self.list_history_acl(user_id, item_id)
+
+    def grant_history_acl(
+        self,
+        user_id: str,
+        item_id: str,
+        subject_type: str,
+        subject_id: str,
+        permission: str,
+    ) -> list[dict] | None:
+        """Add or raise one entry, leaving the rest of the list alone."""
+        current = self.list_history_acl(user_id, item_id)
+        if current is None:
+            return None
+        entries = [
+            entry for entry in current
+            if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+        ]
+        entries.append({"subject_type": subject_type, "subject_id": subject_id, "permission": permission})
+        return self.replace_history_acl(user_id, item_id, entries)
+
+    def revoke_history_acl(
+        self,
+        user_id: str,
+        item_id: str,
+        subject_type: str,
+        subject_id: str,
+    ) -> list[dict] | None:
+        """Drop one entry, leaving the rest of the list alone."""
+        current = self.list_history_acl(user_id, item_id)
+        if current is None:
+            return None
+        entries = [
+            entry for entry in current
+            if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+        ]
+        return self.replace_history_acl(user_id, item_id, entries)
+
+    def delete_acl_for_histories(self, session, history_ids: list[str]) -> None:
+        """Drop the guest lists of works that are going away.
+
+        An orphaned row is not merely untidy. Ids are handed out by uuid4 here, but
+        an import or a restore can reintroduce one, and a stale grant would then
+        attach to whatever took the id -- someone else's work, shared with someone
+        who was never told.
+        """
+        if not history_ids:
+            return
+        session.query(HistoryAclRow).filter(HistoryAclRow.history_id.in_(history_ids)).delete(
+            synchronize_session=False
+        )
 
 
 def _acl_grants(actor: dict, permissions: tuple[str, ...]):

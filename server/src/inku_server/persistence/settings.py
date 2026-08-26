@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -80,6 +82,19 @@ EXPORT_TEMPLATE_DEFAULTS = [
     },
 ]
 PLUGIN_STORAGE_MAX_BYTES = 20_000
+OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
+OUTPUT_SAVE_DEFAULT_SETTINGS = {
+    "enabled": True,
+    "output_dir": str(
+        Path(
+            os.getenv(
+                "INKU_OUTPUT_DIR",
+                str(Path.home() / ".local" / "share" / "inku" / "outputs"),
+            )
+        )
+    ),
+    "png_size": int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160")),
+}
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -335,6 +350,31 @@ def normalize_plugin_storage(storage: dict) -> dict:
     return normalized
 
 
+def normalize_output_save_settings(settings: dict | None) -> dict:
+    clean = dict(OUTPUT_SAVE_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "enabled" in settings:
+        clean["enabled"] = bool(settings["enabled"])
+    if "output_dir" in settings:
+        raw_path = str(settings["output_dir"] or "").strip()
+        if not raw_path:
+            raise ValueError("output directory must not be empty")
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            raise ValueError("output directory must be an absolute path")
+        clean["output_dir"] = str(path)
+    if "png_size" in settings:
+        try:
+            png_size = int(settings["png_size"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("PNG size must be 1080 or 2160") from exc
+        if png_size not in {1080, 2160}:
+            raise ValueError("PNG size must be 1080 or 2160")
+        clean["png_size"] = png_size
+    return clean
+
+
 @dataclass(frozen=True)
 class UserPluginStorageStore:
     """Read and write one user's validated plugin storage."""
@@ -406,6 +446,28 @@ class AppSettingsStore:
                 session.add(row)
             session.commit()
             return value
+
+
+@dataclass(frozen=True)
+class OutputSaveSettingsStore:
+    """Read and write normalized output-save settings."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_output_save_settings(
+            self.app_settings.read(OUTPUT_SAVE_SETTINGS_KEY)
+        )
+
+    def update(self, enabled: bool, output_dir: str, png_size: int) -> dict:
+        clean = normalize_output_save_settings(
+            {
+                "enabled": enabled,
+                "output_dir": output_dir,
+                "png_size": png_size,
+            }
+        )
+        return self.app_settings.write(OUTPUT_SAVE_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

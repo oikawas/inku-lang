@@ -127,12 +127,8 @@ def _loads_or_none(raw: str | None):
 def normalize_history_strip_fields(value) -> list[str]:
     return _settings.normalize_history_strip_fields(value)
 _PLUGIN_STORAGE_MAX_BYTES = _settings.PLUGIN_STORAGE_MAX_BYTES
-_OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
-_OUTPUT_SAVE_DEFAULT_SETTINGS = {
-    "enabled": True,
-    "output_dir": str(Path(os.getenv("INKU_OUTPUT_DIR", str(Path.home() / ".local" / "share" / "inku" / "outputs")))),
-    "png_size": int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160")),
-}
+_OUTPUT_SAVE_SETTINGS_KEY = _settings.OUTPUT_SAVE_SETTINGS_KEY
+_OUTPUT_SAVE_DEFAULT_SETTINGS = _settings.OUTPUT_SAVE_DEFAULT_SETTINGS
 _THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
 # Off by default: the second size doubles the rebuild and roughly quadruples the
 # stored bytes, and is worth neither until someone is looking at the listing on
@@ -1241,28 +1237,7 @@ def update_db_backup_settings(
 
 
 def _normalize_output_save_settings(settings: dict | None) -> dict:
-    clean = dict(_OUTPUT_SAVE_DEFAULT_SETTINGS)
-    if not isinstance(settings, dict):
-        return clean
-    if "enabled" in settings:
-        clean["enabled"] = bool(settings["enabled"])
-    if "output_dir" in settings:
-        raw_path = str(settings["output_dir"] or "").strip()
-        if not raw_path:
-            raise ValueError("output directory must not be empty")
-        path = Path(raw_path).expanduser()
-        if not path.is_absolute():
-            raise ValueError("output directory must be an absolute path")
-        clean["output_dir"] = str(path)
-    if "png_size" in settings:
-        try:
-            png_size = int(settings["png_size"])
-        except (TypeError, ValueError) as exc:
-            raise ValueError("PNG size must be 1080 or 2160") from exc
-        if png_size not in {1080, 2160}:
-            raise ValueError("PNG size must be 1080 or 2160")
-        clean["png_size"] = png_size
-    return clean
+    return _settings.normalize_output_save_settings(settings)
 
 
 def _normalize_render_concurrency_settings(settings: dict | None) -> dict:
@@ -1317,12 +1292,15 @@ def update_render_limit_settings(settings: dict) -> dict:
 
 
 def get_output_save_settings() -> dict:
-    return _normalize_output_save_settings(_read_app_setting(_OUTPUT_SAVE_SETTINGS_KEY))
+    return _output_save_settings_store().get()
+
+
+def _output_save_settings_store() -> _settings.OutputSaveSettingsStore:
+    return _settings.OutputSaveSettingsStore(_app_settings_store())
 
 
 def update_output_save_settings(enabled: bool, output_dir: str, png_size: int) -> dict:
-    clean = _normalize_output_save_settings({"enabled": enabled, "output_dir": output_dir, "png_size": png_size})
-    return _write_app_setting(_OUTPUT_SAVE_SETTINGS_KEY, clean)
+    return _output_save_settings_store().update(enabled, output_dir, png_size)
 
 
 def _normalize_thumbnail_settings(settings: dict | None) -> dict:

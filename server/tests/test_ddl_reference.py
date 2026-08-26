@@ -674,3 +674,276 @@ def test_the_corpus_holds_a_stated_count_above_the_band_engine_eleven_stopped_at
         ) + value > DEFAULT_LIMITS.max_expanded_primitives
         for value in stated
     ), "and over the budget only once the stated count is written"
+
+
+def test_ddl_reference_publish_rejects_same_identity_before_touching_live_tree(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / f"ddl-engine-{generator.DDL_ENGINE_VERSION}"
+    for part in ("a_expand", "b_coerce", "c_plugin_expand"):
+        (output_dir / part).mkdir(parents=True, exist_ok=True)
+    (output_dir / "a_expand" / "old.txt").write_text("old body\n", encoding="utf-8")
+    manifest = {
+        "corpus_format_version": generator.CORPUS_FORMAT_VERSION,
+        "layer": "ddl-engine",
+        "engine_version": generator.DDL_ENGINE_VERSION,
+        "ddl_version": generator.DDL_VERSION,
+        "schema_version": generator.SCHEMA_VERSION,
+        "frozen_at": "2026-08-24",
+        "commit": "old-commit",
+        "reason": "old reason",
+        "changed_from_previous": ["old"],
+        "cases": {"old": {"digest": "old"}},
+    }
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_text(generator._canonical_output(manifest), encoding="utf-8")
+    before = {
+        path.relative_to(output_dir).as_posix(): path.read_bytes()
+        for path in output_dir.rglob("*")
+        if path.is_file()
+    }
+
+    monkeypatch.setattr(generator, "OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(generator, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(
+        generator,
+        "_render_cases",
+        lambda: (
+            {"new": {"digest": "new"}},
+            {"a_expand/new.txt": "new body\n"},
+        ),
+    )
+
+    try:
+        generator.generate()
+    except SystemExit as exc:
+        assert "identity-field change" in str(exc)
+    else:
+        raise AssertionError("same-identity rewrite must be rejected")
+
+    after = {
+        path.relative_to(output_dir).as_posix(): path.read_bytes()
+        for path in output_dir.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+    assert not list(tmp_path.glob(f".{output_dir.name}.staging-*"))
+    assert not (tmp_path / f".{output_dir.name}.previous").exists()
+
+
+def _ddl_publish_manifest(generator, case_id: str, output_path: str) -> dict:
+    return {
+        "corpus_format_version": generator.CORPUS_FORMAT_VERSION,
+        "layer": "ddl-engine",
+        "engine_version": generator.DDL_ENGINE_VERSION,
+        "ddl_version": generator.DDL_VERSION,
+        "schema_version": generator.SCHEMA_VERSION,
+        "frozen_at": "2026-08-26",
+        "commit": "test-commit",
+        "reason": "publication test",
+        "changed_from_previous": [case_id],
+        "cases": {
+            case_id: {
+                "digest": hashlib.md5(case_id.encode()).hexdigest(),
+                "output_path": output_path,
+            }
+        },
+    }
+
+
+def _write_complete_ddl_test_corpus(
+    generator,
+    output_dir: pathlib.Path,
+    manifest: dict,
+    outputs: dict[str, str],
+) -> None:
+    for part in ("a_expand", "b_coerce", "c_plugin_expand"):
+        (output_dir / part).mkdir(parents=True, exist_ok=True)
+    for relative, body in outputs.items():
+        (output_dir / relative).write_text(body, encoding="utf-8")
+    (output_dir / "manifest.json").write_text(
+        generator._canonical_output(manifest), encoding="utf-8"
+    )
+
+
+def _ddl_test_tree_bytes(output_dir: pathlib.Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(output_dir).as_posix(): path.read_bytes()
+        for path in output_dir.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_ddl_reference_publish_replaces_one_complete_parent_directory(
+    tmp_path: pathlib.Path,
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    old_manifest = _ddl_publish_manifest(generator, "old", "a_expand/old.txt")
+    _write_complete_ddl_test_corpus(
+        generator, output_dir, old_manifest, {"a_expand/old.txt": "old\n"}
+    )
+    new_manifest = _ddl_publish_manifest(generator, "new", "b_coerce/new.json")
+    new_outputs = {"b_coerce/new.json": "{\"new\": true}\n"}
+
+    generator._publish_output_directory(
+        new_manifest, new_outputs, output_dir=output_dir
+    )
+
+    assert generator._is_complete_output_directory(output_dir)
+    assert not (output_dir / "a_expand" / "old.txt").exists()
+    assert (output_dir / "b_coerce" / "new.json").read_text() == new_outputs[
+        "b_coerce/new.json"
+    ]
+    assert not (tmp_path / ".ddl-engine-test.previous").exists()
+    assert not list(tmp_path.glob(".ddl-engine-test.staging-*"))
+
+    first = _ddl_test_tree_bytes(output_dir)
+    generator._publish_output_directory(
+        new_manifest, new_outputs, output_dir=output_dir
+    )
+    assert _ddl_test_tree_bytes(output_dir) == first
+
+
+def test_ddl_reference_publish_creates_an_initial_complete_directory(
+    tmp_path: pathlib.Path,
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    manifest = _ddl_publish_manifest(generator, "first", "c_plugin_expand/first.json")
+
+    generator._publish_output_directory(
+        manifest,
+        {"c_plugin_expand/first.json": "{\"first\": true}\n"},
+        output_dir=output_dir,
+    )
+
+    assert generator._is_complete_output_directory(output_dir)
+    assert not list(tmp_path.glob(".ddl-engine-test.*"))
+
+
+def test_ddl_reference_publish_staging_failure_leaves_live_tree_untouched(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    old_manifest = _ddl_publish_manifest(generator, "old", "a_expand/old.txt")
+    _write_complete_ddl_test_corpus(
+        generator, output_dir, old_manifest, {"a_expand/old.txt": "old\n"}
+    )
+    before = _ddl_test_tree_bytes(output_dir)
+
+    def fail_staging(stage, manifest, outputs):
+        stage.mkdir()
+        (stage / "partial").write_text("partial", encoding="utf-8")
+        raise OSError("injected staging failure")
+
+    monkeypatch.setattr(generator, "_write_output_directory", fail_staging)
+    try:
+        generator._publish_output_directory(
+            _ddl_publish_manifest(generator, "new", "b_coerce/new.json"),
+            {"b_coerce/new.json": "new\n"},
+            output_dir=output_dir,
+        )
+    except OSError as exc:
+        assert str(exc) == "injected staging failure"
+    else:
+        raise AssertionError("injected staging failure must propagate")
+
+    assert _ddl_test_tree_bytes(output_dir) == before
+    assert not list(tmp_path.glob(".ddl-engine-test.staging-*"))
+    assert not (tmp_path / ".ddl-engine-test.previous").exists()
+
+
+def test_ddl_reference_publish_rename_failure_restores_the_old_tree(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    old_manifest = _ddl_publish_manifest(generator, "old", "a_expand/old.txt")
+    _write_complete_ddl_test_corpus(
+        generator, output_dir, old_manifest, {"a_expand/old.txt": "old\n"}
+    )
+    before = _ddl_test_tree_bytes(output_dir)
+    original_rename = pathlib.Path.rename
+
+    def fail_stage_publish(path, target):
+        if path.name.startswith(".ddl-engine-test.staging-") and pathlib.Path(
+            target
+        ) == output_dir:
+            raise OSError("injected publication failure")
+        return original_rename(path, target)
+
+    monkeypatch.setattr(pathlib.Path, "rename", fail_stage_publish)
+    try:
+        generator._publish_output_directory(
+            _ddl_publish_manifest(generator, "new", "b_coerce/new.json"),
+            {"b_coerce/new.json": "new\n"},
+            output_dir=output_dir,
+        )
+    except OSError as exc:
+        assert str(exc) == "injected publication failure"
+    else:
+        raise AssertionError("injected publication failure must propagate")
+
+    assert _ddl_test_tree_bytes(output_dir) == before
+    assert not list(tmp_path.glob(".ddl-engine-test.staging-*"))
+    assert not (tmp_path / ".ddl-engine-test.previous").exists()
+
+
+def test_ddl_reference_publish_restores_interrupted_backup_before_new_staging(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    backup = tmp_path / ".ddl-engine-test.previous"
+    old_manifest = _ddl_publish_manifest(generator, "old", "a_expand/old.txt")
+    _write_complete_ddl_test_corpus(
+        generator, backup, old_manifest, {"a_expand/old.txt": "old\n"}
+    )
+    before = _ddl_test_tree_bytes(backup)
+
+    def fail_staging(stage, manifest, outputs):
+        raise OSError("stop after backup recovery")
+
+    monkeypatch.setattr(generator, "_write_output_directory", fail_staging)
+    try:
+        generator._publish_output_directory(
+            _ddl_publish_manifest(generator, "new", "b_coerce/new.json"),
+            {"b_coerce/new.json": "new\n"},
+            output_dir=output_dir,
+        )
+    except OSError as exc:
+        assert str(exc) == "stop after backup recovery"
+    else:
+        raise AssertionError("injected post-recovery failure must propagate")
+
+    assert _ddl_test_tree_bytes(output_dir) == before
+    assert not backup.exists()
+    assert not list(tmp_path.glob(".ddl-engine-test.staging-*"))
+
+
+def test_ddl_reference_publish_refuses_ambiguous_incomplete_trees(
+    tmp_path: pathlib.Path,
+) -> None:
+    generator = _generator()
+    output_dir = tmp_path / "ddl-engine-test"
+    backup = tmp_path / ".ddl-engine-test.previous"
+    output_dir.mkdir()
+    backup.mkdir()
+
+    try:
+        generator._publish_output_directory(
+            _ddl_publish_manifest(generator, "new", "b_coerce/new.json"),
+            {"b_coerce/new.json": "new\n"},
+            output_dir=output_dir,
+        )
+    except SystemExit as exc:
+        assert "cannot reconcile incomplete" in str(exc)
+    else:
+        raise AssertionError("ambiguous incomplete trees must stop")
+
+    assert output_dir.is_dir()
+    assert backup.is_dir()
+    assert not list(tmp_path.glob(".ddl-engine-test.staging-*"))

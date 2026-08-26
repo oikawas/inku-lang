@@ -9,7 +9,9 @@ import copy
 import hashlib
 import json
 import pathlib
+import shutil
 import subprocess
+import tempfile
 from typing import Any
 from inku_server.coerce import coerce_score
 from inku_server.ddl_expander import expand_intermediate_ddl
@@ -470,6 +472,94 @@ def _previous_manifest() -> dict[str, Any] | None:
         return None
     return json.loads(max(candidates)[1].read_text(encoding="utf-8"))
 
+
+_REQUIRED_PARTS = ("a_expand", "b_coerce", "c_plugin_expand")
+
+
+def _manifest_output_paths(manifest: dict[str, Any]) -> set[str]:
+    return {str(case["output_path"]) for case in manifest["cases"].values()}
+
+
+def _is_complete_output_directory(output_dir: pathlib.Path) -> bool:
+    manifest_path = output_dir / "manifest.json"
+    if not output_dir.is_dir() or not manifest_path.is_file():
+        return False
+    if any(not (output_dir / part).is_dir() for part in _REQUIRED_PARTS):
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        paths = _manifest_output_paths(manifest)
+    except (KeyError, TypeError, json.JSONDecodeError, OSError):
+        return False
+    return all((output_dir / path).is_file() for path in paths)
+
+
+def _write_output_directory(
+    output_dir: pathlib.Path,
+    manifest: dict[str, Any],
+    outputs: dict[str, str],
+) -> None:
+    """Write one complete DDL corpus directory without publishing it."""
+    expected = _manifest_output_paths(manifest)
+    if set(outputs) != expected:
+        raise ValueError("DDL manifest output paths do not match generated outputs")
+    output_dir.mkdir()
+    for part in _REQUIRED_PARTS:
+        (output_dir / part).mkdir()
+    for path, body in outputs.items():
+        (output_dir / path).write_text(body, encoding="utf-8")
+    (output_dir / "manifest.json").write_text(
+        _canonical_output(manifest), encoding="utf-8"
+    )
+
+
+def _publish_output_directory(
+    manifest: dict[str, Any],
+    outputs: dict[str, str],
+    *,
+    output_dir: pathlib.Path,
+) -> None:
+    """Stage one complete DDL corpus, then publish its parent directory."""
+    parent = output_dir.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    backup = parent / f".{output_dir.name}.previous"
+
+    if backup.exists():
+        if output_dir.exists():
+            if not _is_complete_output_directory(output_dir) or not backup.is_dir():
+                raise SystemExit(
+                    "cannot reconcile incomplete DDL corpus and fixed backup"
+                )
+            shutil.rmtree(backup)
+        else:
+            if not _is_complete_output_directory(backup):
+                raise SystemExit("cannot restore incomplete DDL corpus backup")
+            backup.rename(output_dir)
+
+    if output_dir.exists() and not _is_complete_output_directory(output_dir):
+        raise SystemExit("refusing to replace an incomplete DDL corpus")
+
+    staging = pathlib.Path(
+        tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=parent)
+    )
+    try:
+        staging.rmdir()
+        _write_output_directory(staging, manifest, outputs)
+        if not output_dir.exists():
+            staging.rename(output_dir)
+            return
+
+        output_dir.rename(backup)
+        try:
+            staging.rename(output_dir)
+        except BaseException:
+            backup.rename(output_dir)
+            raise
+        shutil.rmtree(backup)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")) if MANIFEST_PATH.exists() else None
     cases, outputs = _render_cases()
@@ -498,23 +588,13 @@ def generate() -> None:
     else:
         frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
     manifest = {**identity, **frozen, "cases": cases}
-    for directory in (OUTPUT_DIR, OUTPUT_DIR / "a_expand", OUTPUT_DIR / "b_coerce",
-                      OUTPUT_DIR / "c_plugin_expand"):
-        directory.mkdir(parents=True, exist_ok=True)
-    for path, text in outputs.items():
-        (OUTPUT_DIR / path).write_text(text, encoding="utf-8")
-    MANIFEST_PATH.write_text(_canonical_output(manifest), encoding="utf-8")
-
-    # The guard fires *after* writing, exactly as gen_render_reference.py does. A
-    # sanctioned rename moves the corpus without moving the engine, and the guard
-    # cannot tell that from an unsanctioned rewrite; it fires once, and the second
-    # run is clean and byte-identical, which is the property it defends. Raising
-    # before the write would leave no way to re-freeze a rename at all.
     if existing is not None and existing.get("cases") != manifest["cases"]:
         before = tuple(existing.get(field) for field in IDENTITY_FIELDS)
         after = tuple(manifest.get(field) for field in IDENTITY_FIELDS)
         if before == after:
             raise SystemExit("DDL corpus changed without an identity-field change; bump the appropriate version instead of rewriting a frozen corpus")
+
+    _publish_output_directory(manifest, outputs, output_dir=OUTPUT_DIR)
 
 if __name__ == "__main__":
     generate()

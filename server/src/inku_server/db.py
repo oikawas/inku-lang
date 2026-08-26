@@ -1790,6 +1790,15 @@ def update_user(
     )
 
 
+def _current_user_profile_updater() -> _accounts.CurrentUserProfileUpdater:
+    return _accounts.CurrentUserProfileUpdater(
+        SessionLocal,
+        verify_password,
+        _hash_password,
+        _user_to_dict,
+    )
+
+
 def update_current_user_profile(
     user_id: str,
     *,
@@ -1797,23 +1806,12 @@ def update_current_user_profile(
     password: str | None = None,
     current_password: str | None = None,
 ) -> dict | None:
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        if email is not None:
-            email = email.strip()
-            if not email:
-                raise ValueError("email is required")
-            row.email = email
-        if password is not None and password:
-            if not current_password or not verify_password(current_password, row.password_hash):
-                raise ValueError("current password is invalid")
-            row.password_hash = _hash_password(password)
-        session.commit()
-        session.refresh(row)
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _current_user_profile_updater().update_current_user_profile(
+        user_id,
+        email=email,
+        password=password,
+        current_password=current_password,
+    )
 
 
 def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None:

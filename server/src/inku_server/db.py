@@ -7,7 +7,6 @@ import os
 import secrets
 import uuid
 from contextlib import contextmanager, nullcontext
-from hashlib import sha256
 from pathlib import Path
 
 from sqlalchemy import inspect, or_, text
@@ -358,43 +357,12 @@ def _canvas_aspect_metadata(item: dict) -> tuple[str | None, float | None]:
     return normalized, ratio if ratio is not None else canvas_aspect_ratio_for_aspect(normalized)
 
 
-def _canonical_seed(value):
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return value
-
-
 def _legacy_render_hash_for_item(item: dict) -> str:
-    payload = {
-        "version": "rh2",
-        "score": item.get("score") or {},
-        "render_seed": _canonical_seed(item.get("render_seed")),
-        # Freeze the key as `vary_seed`: it is hash material, not a field label.
-        # Renaming it would change every persisted rh2. The value still comes
-        # from the renamed column; a v2.8.0 check caught this exact drift.
-        "vary_seed": _canonical_seed(item.get("composition_seed")),
-        "render_build_number": item.get("render_build_number"),
-        "render_engine_id": item.get("render_engine_id"),
-        "render_engine_version": item.get("render_engine_version"),
-        "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
-    }
-    return "rh2:" + sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+    return _history.HistoryRenderHashService(_canonical_json).legacy_render_hash_for_item(item)
 
 
 def render_hash_for_item(item: dict) -> str:
-    payload = {
-        "version": "rh3",
-        "score": item.get("score") or {},
-        "render_seed": _canonical_seed(item.get("render_seed")),
-        "render_wild": bool(item.get("render_wild")),
-        "render_engine_id": item.get("render_engine_id"),
-        "render_engine_version": item.get("render_engine_version"),
-        "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
-    }
-    return "rh3:" + sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+    return _history.HistoryRenderHashService(_canonical_json).render_hash_for_item(item)
 
 
 def render_hash_short(render_hash: str | None) -> str | None:

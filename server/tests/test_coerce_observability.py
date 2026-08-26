@@ -273,7 +273,7 @@ def test_t318_stage_a_registry_and_catalog_are_actual_and_stable():
         for site in SITE_REGISTRY
         if site["source_kind"] == "language_support.COERCE_MARKERS"
     ]
-    assert (SYNTAX_SITE_COUNT, SEMANTIC_LEAF_COUNT, LANGUAGE_SITE_COUNT) == (77, 89, 66)
+    assert (SYNTAX_SITE_COUNT, SEMANTIC_LEAF_COUNT, LANGUAGE_SITE_COUNT) == (81, 93, 70)
     assert DIRECT_SITE_COUNT == 11
     assert len(OUTPUT_EXCLUSIONS) == 5
     decision_sites = [site["decision_site"] for site in language_sites]
@@ -329,12 +329,12 @@ def test_t318_stage_a_registry_and_catalog_are_actual_and_stable():
 
     snapshot = catalog_snapshot()
     assert catalog_digest(snapshot) == (
-        "50723ba7c66ba1de9a91a5b36559464c825886ba37ef3c1849633aee26ddb6a6"
+        "cdb57692526fcf9dd5cbb08e49a3244837e6ab2f47ad8bae82d9f5757c524a80"
     )
     catalog = snapshot["markers"]
     direct_catalog = [event for event in catalog if event["system"].startswith("direct.")]
-    assert len({event["system"] for event in catalog}) == 73
-    assert len(catalog) == 1391
+    assert len({event["system"] for event in catalog}) == 77
+    assert len(catalog) == 1402
     assert len(direct_catalog) == 271
     assert len({(event["language"], event["marker"]) for event in catalog}) == 776
     assert {event["decision_site"] for event in direct_catalog} == direct_decision_sites
@@ -356,9 +356,9 @@ def test_t318_stage_a_declaration_inventory_is_separate_from_site_membership():
         for membership in declaration_memberships
         if membership[0] != "atmospheric_effect"
     }
-    assert len(declarations) == 964
-    assert len(declaration_memberships) == 963
-    assert len(actual_inputs) == 941
+    assert len(declarations) == 975
+    assert len(declaration_memberships) == 974
+    assert len(actual_inputs) == 952
     assert len({(language, marker) for _, language, marker in actual_inputs}) == 611
 
 

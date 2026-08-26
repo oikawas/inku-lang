@@ -58,6 +58,9 @@ def test_history_trash_state_writer_owns_transitions_and_db_delegates() -> None:
     source = inspect.getsource(owner)
     assert source.count("access._writable_by(actor, HistoryRow.user_id, HistoryRow.id)") == 2
     assert source.count("synchronize_session=False") == 2
+    restore_source = inspect.getsource(owner.restore_items)
+    assert "HistoryRow.trashed == 1" in restore_source
+    assert ".update({HistoryRow.trashed: 0}, synchronize_session=False)" in restore_source
     assert all(not (set(target.lstrip(".").split(".")) & _FORBIDDEN_HISTORY_IMPORT_PARTS) for target in _import_targets(inspect.getsource(history)))
 
 
@@ -114,6 +117,7 @@ def test_trash_writer_preserves_sqlalchemy_access_state_count_and_commit() -> No
     assert writer.trash_items("owner", ["owned", "owned-trash", "missing"]) == 1
     assert writer.trash_items("owner", ["owned"]) == 0
     assert writer.restore_items("owner", ["owned", "owned-trash"]) == 2
+    assert writer.restore_items("owner", ["owned", "owned-trash"]) == 0
     assert writer.trash_items("writer", ["write"]) == 1
     assert writer.trash_items("admin", ["other"]) == 1
     assert writer.trash_items("reader", ["read"]) == 0
@@ -148,11 +152,15 @@ def test_trash_writer_keeps_bulk_order_and_exceptions(monkeypatch: pytest.Monkey
             events.append("commit")
 
     monkeypatch.setattr(history.access, "_writable_by", lambda *arguments: events.append(("writable", arguments)) or True)
-    writer = history.HistoryTrashStateWriter(lambda: Session(), lambda user_id: events.append(("actor", user_id)) or {"id": user_id})
+    writer = history.HistoryTrashStateWriter(
+        lambda: events.append("session") or Session(),
+        lambda user_id: events.append(("actor", user_id)) or {"id": user_id},
+    )
     assert writer.trash_items("owner", ["item"]) == 7
-    assert events[0:4] == [("actor", "owner"), "query", ("writable", ({"id": "owner"}, HistoryRow.user_id, HistoryRow.id)), "filter"]
+    assert events[0:5] == [("actor", "owner"), "session", "query", ("writable", ({"id": "owner"}, HistoryRow.user_id, HistoryRow.id)), "filter"]
     assert events[-1] == "commit" and events[-2][0] == "update" and events[-2][2] is False
     events.clear()
+    assert writer.trash_items("owner", []) == 0 and events == []
     assert writer.restore_items("owner", []) == 0 and events == []
 
     class FailingSession(Session):

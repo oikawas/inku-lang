@@ -32,6 +32,7 @@ from .persistence import lineage as _lineage
 from .persistence import access as _access
 from .persistence import okugaki as _okugaki
 from .persistence import sessions as _sessions
+from .persistence import settings as _settings
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
 from .persistence.legacy_schema import (
@@ -105,19 +106,12 @@ _UNSET = object()
 # is what reaches the picker.
 _BATCH_PROMPT_HISTORY_LIMIT = 50
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
-_SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc", "logs", "limits"}
-_UI_MODES = {"simple", "full", "custom"}
-_UI_CUSTOM_KEYS = {
-    "input_modes", "drawing_settings", "ddl_tools", "detail_status",
-    "work_tools", "history", "auxiliary",
-}
-# What the history strip prints under each thumbnail. The order is the order the
-# strip reads them in, so it is a list here rather than a set; at most
-# _HISTORY_STRIP_FIELD_LIMIT of them, and an empty list is a choice, not an
-# absence. The web half of this pair is web/src/lib/historyStripFields.ts.
-_HISTORY_STRIP_FIELDS = ("generation", "model", "engine_version", "bytes")
-_HISTORY_STRIP_FIELD_LIMIT = 2
-_HISTORY_STRIP_FIELDS_DEFAULT = ["generation", "model"]
+_SETTINGS_TABS = _settings.SETTINGS_TABS
+_UI_MODES = _settings.UI_MODES
+_UI_CUSTOM_KEYS = _settings.UI_CUSTOM_KEYS
+_HISTORY_STRIP_FIELDS = _settings.HISTORY_STRIP_FIELDS
+_HISTORY_STRIP_FIELD_LIMIT = _settings.HISTORY_STRIP_FIELD_LIMIT
+_HISTORY_STRIP_FIELDS_DEFAULT = _settings.HISTORY_STRIP_FIELDS_DEFAULT
 
 
 def _loads_or_none(raw: str | None):
@@ -136,18 +130,7 @@ def _loads_or_none(raw: str | None):
 
 
 def normalize_history_strip_fields(value) -> list[str]:
-    """Which facts the strip prints, as a list this API can hand to the page.
-
-    Anything that is not a list is an absence and takes the default. A list is
-    taken at its word -- unknown names drop, repeats collapse, the declared
-    order is restored, and at most two survive -- so an empty list comes back
-    empty, which is how "print nothing under the picture" is stored at all.
-    """
-    if not isinstance(value, list):
-        return list(_HISTORY_STRIP_FIELDS_DEFAULT)
-    chosen = {item for item in value if item in _HISTORY_STRIP_FIELDS}
-    ordered = [field for field in _HISTORY_STRIP_FIELDS if field in chosen]
-    return ordered[:_HISTORY_STRIP_FIELD_LIMIT]
+    return _settings.normalize_history_strip_fields(value)
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
 _OUTPUT_SAVE_DEFAULT_SETTINGS = {
@@ -1822,18 +1805,12 @@ def increment_user_generation_count(user_id: str, amount: int = 1) -> int | None
     return _user_generation_counter().increment_user_generation_count(user_id, amount=amount)
 
 
+def _user_settings_updater() -> _settings.UserSettingsUpdater:
+    return _settings.UserSettingsUpdater(SessionLocal, _user_to_dict)
+
+
 def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
-    if ui_theme not in {"light", "dark"}:
-        raise ValueError("invalid ui theme")
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        row.ui_theme = ui_theme
-        session.commit()
-        session.refresh(row)
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _user_settings_updater().update_user_theme(user_id, ui_theme)
 
 
 def update_user_settings(
@@ -1848,73 +1825,18 @@ def update_user_settings(
     model_settings: dict | None = None,
     history_strip_fields: list | None = None,
 ) -> dict | None:
-    from .model_settings import update_user_model_settings
-
-    if ui_theme is not None and ui_theme not in {"light", "dark"}:
-        raise ValueError("invalid ui theme")
-    if ui_mode is not None and ui_mode not in _UI_MODES:
-        raise ValueError("invalid ui mode")
-    if ui_custom is not None and (
-        not isinstance(ui_custom, dict)
-        or any(key not in _UI_CUSTOM_KEYS or not isinstance(value, bool) for key, value in ui_custom.items())
-    ):
-        raise ValueError("invalid custom ui settings")
-    if tooltips_enabled is not None and not isinstance(tooltips_enabled, bool):
-        raise ValueError("invalid tooltips enabled setting")
-    if download_folder_enabled is not None and not isinstance(download_folder_enabled, bool):
-        raise ValueError("invalid download folder setting")
-    if download_folder_name is not None and len(download_folder_name) > 240:
-        raise ValueError("download folder name is too long")
-    if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
-        raise ValueError("invalid settings tab")
-    # Refused rather than quietly trimmed: a caller asking for a fifth field or
-    # for three at once has misread the control, and silently storing two of the
-    # three would put a choice on screen that nobody made.
-    if history_strip_fields is not None and (
-        not isinstance(history_strip_fields, list)
-        or any(field not in _HISTORY_STRIP_FIELDS for field in history_strip_fields)
-        or len(set(history_strip_fields)) != len(history_strip_fields)
-        or len(history_strip_fields) > _HISTORY_STRIP_FIELD_LIMIT
-    ):
-        raise ValueError("invalid history strip fields")
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        if ui_theme is not None:
-            row.ui_theme = ui_theme
-        if ui_mode is not None:
-            row.ui_mode = ui_mode
-        if ui_custom is not None:
-            row.ui_custom = json.dumps(ui_custom, ensure_ascii=False, sort_keys=True)
-        if history_strip_fields is not None:
-            # Stored in the declared order, not the order they were ticked, so
-            # the strip reads the same however the reader got there.
-            row.history_strip_fields = json.dumps(
-                normalize_history_strip_fields(history_strip_fields), ensure_ascii=False
-            )
-        if tooltips_enabled is not None:
-            row.tooltips_enabled = tooltips_enabled
-        if download_folder_enabled is not None:
-            row.download_folder_enabled = download_folder_enabled
-        if download_folder_name is not None:
-            # An empty name clears it: the user dropped the folder.
-            row.download_folder_name = download_folder_name.strip() or None
-        if settings_tab is not None:
-            row.settings_tab = settings_tab
-        if model_settings is not None:
-            try:
-                current_model_settings = json.loads(row.model_settings or "{}")
-            except json.JSONDecodeError:
-                current_model_settings = {}
-            row.model_settings = json.dumps(
-                update_user_model_settings(current_model_settings, model_settings),
-                ensure_ascii=False,
-            )
-        session.commit()
-        session.refresh(row)
-        group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
-        return _user_to_dict(row, group_name)
+    return _user_settings_updater().update_user_settings(
+        user_id,
+        ui_theme=ui_theme,
+        ui_mode=ui_mode,
+        ui_custom=ui_custom,
+        tooltips_enabled=tooltips_enabled,
+        download_folder_enabled=download_folder_enabled,
+        download_folder_name=download_folder_name,
+        settings_tab=settings_tab,
+        model_settings=model_settings,
+        history_strip_fields=history_strip_fields,
+    )
 
 
 def _normalize_batch_prompt_history(items: list[str]) -> list[str]:

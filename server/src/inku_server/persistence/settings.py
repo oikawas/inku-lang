@@ -79,6 +79,7 @@ EXPORT_TEMPLATE_DEFAULTS = [
         "y_px": 4320,
     },
 ]
+PLUGIN_STORAGE_MAX_BYTES = 20_000
 
 
 def normalize_history_strip_fields(value) -> list[str]:
@@ -314,6 +315,62 @@ class UserExportTemplateStore:
             row.export_templates = json.dumps(clean, ensure_ascii=False)
             session.commit()
             return clean
+
+
+def normalize_plugin_storage(storage: dict) -> dict:
+    if not isinstance(storage, dict):
+        raise ValueError("plugin storage must be an object")
+    normalized: dict[str, dict] = {}
+    for plugin_id, value in storage.items():
+        if not isinstance(plugin_id, str) or not plugin_id:
+            raise ValueError("plugin id must be a non-empty string")
+        if len(plugin_id) > 80 or not all(ch.isalnum() or ch in "-_." for ch in plugin_id):
+            raise ValueError("plugin id contains unsupported characters")
+        if not isinstance(value, dict):
+            raise ValueError("plugin storage values must be objects")
+        normalized[plugin_id] = value
+    raw = json.dumps(normalized, ensure_ascii=False)
+    if len(raw.encode("utf-8")) > PLUGIN_STORAGE_MAX_BYTES:
+        raise ValueError("plugin storage is too large")
+    return normalized
+
+
+@dataclass(frozen=True)
+class UserPluginStorageStore:
+    """Read and write one user's validated plugin storage."""
+
+    session_factory: Callable[[], Session]
+
+    def get(self, user_id: str) -> dict:
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return {}
+            try:
+                parsed = json.loads(row.plugin_storage or "{}")
+            except json.JSONDecodeError:
+                return {}
+            if not isinstance(parsed, dict):
+                return {}
+            try:
+                return normalize_plugin_storage(parsed)
+            except ValueError:
+                return {}
+
+    def update(self, user_id: str, storage: dict) -> dict | None:
+        clean = normalize_plugin_storage(storage)
+        with self.session_factory() as session:
+            row = session.get(UserAccountRow, user_id)
+            if not row:
+                return None
+            row.plugin_storage = json.dumps(clean, ensure_ascii=False)
+            session.commit()
+            return clean
+
+    def update_value(self, user_id: str, plugin_id: str, value: dict) -> dict | None:
+        current = self.get(user_id)
+        current[plugin_id] = value
+        return self.update(user_id, current)
 
 
 @dataclass(frozen=True)

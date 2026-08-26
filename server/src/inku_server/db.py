@@ -126,7 +126,7 @@ def _loads_or_none(raw: str | None):
 
 def normalize_history_strip_fields(value) -> list[str]:
     return _settings.normalize_history_strip_fields(value)
-_PLUGIN_STORAGE_MAX_BYTES = 20_000
+_PLUGIN_STORAGE_MAX_BYTES = _settings.PLUGIN_STORAGE_MAX_BYTES
 _OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
 _OUTPUT_SAVE_DEFAULT_SETTINGS = {
     "enabled": True,
@@ -1854,55 +1854,23 @@ def update_user_export_templates(user_id: str, items: list[dict]) -> list[dict] 
 
 
 def _normalize_plugin_storage(storage: dict) -> dict:
-    if not isinstance(storage, dict):
-        raise ValueError("plugin storage must be an object")
-    normalized: dict[str, dict] = {}
-    for plugin_id, value in storage.items():
-        if not isinstance(plugin_id, str) or not plugin_id:
-            raise ValueError("plugin id must be a non-empty string")
-        if len(plugin_id) > 80 or not all(ch.isalnum() or ch in "-_." for ch in plugin_id):
-            raise ValueError("plugin id contains unsupported characters")
-        if not isinstance(value, dict):
-            raise ValueError("plugin storage values must be objects")
-        normalized[plugin_id] = value
-    raw = json.dumps(normalized, ensure_ascii=False)
-    if len(raw.encode("utf-8")) > _PLUGIN_STORAGE_MAX_BYTES:
-        raise ValueError("plugin storage is too large")
-    return normalized
+    return _settings.normalize_plugin_storage(storage)
+
+
+def _user_plugin_storage_store() -> _settings.UserPluginStorageStore:
+    return _settings.UserPluginStorageStore(SessionLocal)
 
 
 def get_user_plugin_storage(user_id: str) -> dict:
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return {}
-        try:
-            parsed = json.loads(row.plugin_storage or "{}")
-        except json.JSONDecodeError:
-            return {}
-        if not isinstance(parsed, dict):
-            return {}
-        try:
-            return _normalize_plugin_storage(parsed)
-        except ValueError:
-            return {}
+    return _user_plugin_storage_store().get(user_id)
 
 
 def update_user_plugin_storage(user_id: str, storage: dict) -> dict | None:
-    clean = _normalize_plugin_storage(storage)
-    with SessionLocal() as session:
-        row = session.get(UserAccountRow, user_id)
-        if not row:
-            return None
-        row.plugin_storage = json.dumps(clean, ensure_ascii=False)
-        session.commit()
-        return clean
+    return _user_plugin_storage_store().update(user_id, storage)
 
 
 def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict | None:
-    current = get_user_plugin_storage(user_id)
-    current[plugin_id] = value
-    return update_user_plugin_storage(user_id, current)
+    return _user_plugin_storage_store().update_value(user_id, plugin_id, value)
 
 
 def _acl_to_dict(row: HistoryAclRow) -> dict:

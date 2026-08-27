@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -106,6 +106,38 @@ class MigrationOutcome:
     fts_enabled: bool
     fingerprint_name: str | None = None
     snapshot: SQLiteSnapshot | None = None
+
+
+@dataclass(frozen=True)
+class RenamedCatalogNameplateMigrator:
+    """Point the display column at the id a renamed catalog answers to today.
+
+    Only `catalog_id` moves. `render_color_catalog_id` is the id the work was
+    DRAWN with, and the renderer hashes it into the seed that assigns each
+    chromatic work color, so rewriting it would repaint the work out of its own
+    unchanged snapshot -- the very silence this whole change exists to end
+    (author's ruling 2026-08-09). `render_color_map` is never touched by
+    anything here.
+
+    Idempotent: after the first pass no row matches an old id any more.
+    """
+
+    renamed_catalog_ids: Mapping[str, str]
+    text_fn: Callable[[str], object]
+
+    def migrate(self, connection) -> None:
+        for old_id, new_id in self.renamed_catalog_ids.items():
+            try:
+                connection.execute(
+                    self.text_fn(
+                        "UPDATE history SET catalog_id = :new_id WHERE catalog_id = :old_id"
+                    ),
+                    {"new_id": new_id, "old_id": old_id},
+                )
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"failed to migrate renamed color catalog nameplate: {old_id} -> {new_id}"
+                ) from exc
 
 
 def _canonical_schema_objects(connection: Connection) -> list[dict[str, str]]:

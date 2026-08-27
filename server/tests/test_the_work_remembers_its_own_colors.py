@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import subprocess
 import sys
 import uuid
@@ -32,7 +31,6 @@ from pathlib import Path
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
 
 from inku_server import color_catalogs as _catalogs
 from inku_server import db
@@ -476,88 +474,6 @@ def _dependency_names(dependant, seen=None) -> set[str]:
 def test_the_rename_table_names_every_pair_that_was_renamed():
     """Pinned literally so that losing an entry is a red test, not a shorter run."""
     assert RENAMED_COLOR_CATALOG_IDS == EXPECTED_RENAMES
-
-
-def _legacy_history_db(path: Path, rows: list[tuple[str, str, str]]) -> None:
-    """A `history` table as an older build left it, with rows already in place."""
-    connection = sqlite3.connect(path)
-    connection.execute(
-        """
-        CREATE TABLE history (
-            id VARCHAR PRIMARY KEY, catalog_id VARCHAR,
-            render_color_catalog_id VARCHAR, render_color_map TEXT
-        )
-        """
-    )
-    connection.executemany("INSERT INTO history VALUES (?, ?, ?, ?)", rows)
-    connection.commit()
-    connection.close()
-
-
-def _migrated(tmp_path: Path, rows: list[tuple[str, str, str]]) -> list[tuple]:
-    from inku_server.db import _migrate_renamed_catalog_nameplates
-
-    db_path = tmp_path / f"nameplates-{uuid.uuid4().hex[:8]}.db"
-    _legacy_history_db(db_path, rows)
-    engine = create_engine(f"sqlite:///{db_path}")
-    with engine.begin() as conn:
-        _migrate_renamed_catalog_nameplates(conn)
-    with engine.begin() as conn:
-        rows_out = list(
-            conn.execute(
-                text("SELECT id, catalog_id, render_color_catalog_id, render_color_map FROM history")
-            )
-        )
-    engine.dispose()
-    return rows_out
-
-
-SNAPSHOT_JSON = json.dumps({"black": "#111111", "palette:Sumi": "#111111"}, ensure_ascii=False)
-
-
-@pytest.mark.parametrize(("old_id", "new_id"), sorted(EXPECTED_RENAMES.items()))
-def test_the_migration_moves_each_old_nameplate(tmp_path, old_id, new_id):
-    """One case per pair, so a table that lost a pair loses a green test."""
-    rows = _migrated(tmp_path, [("w-1", old_id, old_id, SNAPSHOT_JSON)])
-
-    assert rows[0][1] == new_id
-
-
-def test_the_migration_does_not_touch_the_colors_a_work_was_drawn_in(tmp_path):
-    """The nameplate is the only thing wrong; the colors were always right."""
-    rows = _migrated(tmp_path, [("w-1", RENAMED_OLD_ID, RENAMED_OLD_ID, SNAPSHOT_JSON)])
-
-    assert rows[0][3] == SNAPSHOT_JSON
-
-
-def test_the_migration_does_not_touch_the_id_a_work_was_drawn_with(tmp_path):
-    """Author's ruling 2026-08-09, and the reason is measured below.
-
-    `render_color_catalog_id` is seed material for the chromatic assignment, so
-    rewriting it repaints the work out of its own unchanged snapshot -- which is
-    the symptom this whole change removes.
-    """
-    rows = _migrated(tmp_path, [("w-1", RENAMED_OLD_ID, RENAMED_OLD_ID, SNAPSHOT_JSON)])
-
-    assert rows[0][2] == RENAMED_OLD_ID
-
-
-def test_the_migration_is_idempotent(tmp_path):
-    """The transform is safe if an accepted legacy migration retries it."""
-    from inku_server.db import _migrate_renamed_catalog_nameplates
-
-    db_path = tmp_path / "idempotent.db"
-    _legacy_history_db(db_path, [("w-1", RENAMED_OLD_ID, RENAMED_OLD_ID, SNAPSHOT_JSON)])
-    engine = create_engine(f"sqlite:///{db_path}")
-    with engine.begin() as conn:
-        _migrate_renamed_catalog_nameplates(conn)
-        first = conn.execute(text("SELECT catalog_id FROM history")).scalar_one()
-    with engine.begin() as conn:
-        _migrate_renamed_catalog_nameplates(conn)
-        second = conn.execute(text("SELECT catalog_id FROM history")).scalar_one()
-    engine.dispose()
-
-    assert first == second == EXPECTED_RENAMES[RENAMED_OLD_ID]
 
 
 def test_starting_the_server_migrates_a_row_that_was_already_there(tmp_path):

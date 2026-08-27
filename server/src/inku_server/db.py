@@ -9,7 +9,7 @@ import uuid
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
@@ -592,74 +592,11 @@ def _ensure_bootstrap_admin(session: Session | None = None) -> None:
 
 
 def _backfill_history_identity_and_lineage(session: Session | None = None) -> None:
-    with _session_scope(session) as (active_session, owns_session):
-        rows = active_session.query(HistoryRow).filter(
-            or_(
-                HistoryRow.source_text.is_(None),
-                HistoryRow.description_hash.is_(None),
-                HistoryRow.lineage_node_id.is_(None),
-            )
-        ).all()
-        changed = False
-        for row in rows:
-            source_text = row.source_text if row.source_text is not None else row.input
-            if row.source_text is None:
-                row.source_text = source_text
-                changed = True
-            expected_hash = description_hash(source_text)
-            if not row.description_hash:
-                row.description_hash = expected_hash
-                changed = True
-            if not row.history_visibility:
-                row.history_visibility = "normal"
-                changed = True
-            node = None
-            if row.lineage_node_id:
-                node = active_session.get(LineageNodeRow, row.lineage_node_id)
-            if node is None:
-                node = active_session.query(LineageNodeRow).filter(LineageNodeRow.history_id == row.id).first()
-            if node is None and row.user_id:
-                node = LineageNodeRow(
-                    id=str(uuid.uuid4()),
-                    user_id=row.user_id,
-                    history_id=row.id,
-                    state="lineage_only" if row.history_visibility == "lineage_only" else "active",
-                    description_hash=row.description_hash,
-                    render_hash=row.render_hash,
-                    at=row.at,
-                    root_node_id=None,
-                )
-                active_session.add(node)
-                changed = True
-            if node is not None and row.lineage_node_id != node.id:
-                row.lineage_node_id = node.id
-                changed = True
-        active_session.flush()
-        nodes = active_session.query(LineageNodeRow).all()
-        parent_by_child = {
-            edge.child_node_id: edge.parent_node_id
-            for edge in active_session.query(LineageEdgeRow).all()
-        }
-        node_by_id = {node.id: node for node in nodes}
-
-        def resolve_root(node_id: str) -> str:
-            seen: set[str] = set()
-            current = node_id
-            while current in parent_by_child and current not in seen:
-                seen.add(current)
-                parent_id = parent_by_child[current]
-                if parent_id not in node_by_id:
-                    break
-                current = parent_id
-            return current
-
-        for node in nodes:
-            expected_root = resolve_root(node.id)
-            if node.root_node_id != expected_root:
-                node.root_node_id = expected_root
-                changed = True
-        if changed:
-            _finish_session(active_session, owns_session)
+    return _lineage.HistoryIdentityLineageBackfill(
+        SessionLocal,
+        description_hash,
+        uuid.uuid4,
+    ).backfill(session)
 
 
 def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:

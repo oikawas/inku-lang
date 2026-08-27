@@ -129,6 +129,15 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
     engine.dispose()
 
 
+def test_release_compose_stage0_is_a_named_exact_legacy_state() -> None:
+    assert ACCEPTED_LEGACY_STATES.get(
+        (
+            "00182358802ef2a7b522dfff3263eae850d676eb7fc90d10bd0c27d23275de6c",
+            "complete",
+        )
+    ) == "release-compose-stage0"
+
+
 def test_registry_checksum_mismatch_fails_closed(tmp_path: Path) -> None:
     path = tmp_path / "checksum.db"
     engine = _engine(path)

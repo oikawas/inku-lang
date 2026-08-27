@@ -53,12 +53,16 @@ CREATE TABLE schema_migrations (
 """
 _EXCLUDED_PREFIXES = ("sqlite_", "history_fts")
 PRODUCTION_STAGE0_FINGERPRINT = "ae5bc3143a1e18c5b6b6f0aeb90254bacd009c052e58b7283f68f81c7f906b6f"
+RELEASE_COMPOSE_STAGE0_FINGERPRINT = (
+    "00182358802ef2a7b522dfff3263eae850d676eb7fc90d10bd0c27d23275de6c"
+)
 
 # Exact fixture fingerprints are added only when a supported init_db fixture is
 # characterized. Partial schemas used to test a transform helper do not belong
 # here. The production Stage 0 fingerprint is the first accepted legacy shape.
 ACCEPTED_LEGACY_STATES: dict[tuple[str, str], str] = {
     (PRODUCTION_STAGE0_FINGERPRINT, "complete"): "production-stage0",
+    (RELEASE_COMPOSE_STAGE0_FINGERPRINT, "complete"): "release-compose-stage0",
     (
         "929e05c6a0b86201b4d3fd607469e38329a8858943c64185e6f4cf9fab8c8790",
         "complete",

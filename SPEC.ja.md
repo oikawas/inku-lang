@@ -2140,7 +2140,9 @@ App rail のユーザーメニューは、ログイン中の利用者のプロ�
 
 設定の可視性は権限グループに応じる。**DB 設定とユーザー管理は `admins` グループに属する利用者にだけ見える。** プラグインタブはログイン中の全利用者に見えるが、**プラグイン設定の変更とプラグインストレージの更新 API は `admins` に制限する。**
 
-DB 設定タブは、バックエンドが SQLite のファイル DB のとき現在の DB ファイルサイズも示す。管理者は DB のレプリカバックアップを、日数の間隔・時刻・自動世代の最大数で設定できる。既定は 7 日・03:00・4 世代。手動バックアップは即座に作れ、自動世代の上限とは別に保存される。SQLite 以外の DB バックエンドでは、ファイルレプリカのバックアップは利用不可として報告する。
+Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`はSQLite URLだけを受け付け、非SQLite URLはengine作成前に拒否する。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
+
+DB 設定タブは現在のSQLite DBファイルサイズも示す。管理者はDBのレプリカバックアップを、日数の間隔・時刻・自動世代の最大数で設定できる。既定は7日・03:00・4世代。手動バックアップは即座に作れ、自動世代の上限とは別に保存される。backupとrestoreはSQLite file boundaryを使う。
 
 **間隔がどの日かを決め、時刻がその日のいつかを決める。** 次の期限は**最後に取ったバックアップから**導き、スケジューラがたまたま目を覚ました瞬間からは導かない。夜遅くに取ったバックアップが後続を引きずらないためである。
 

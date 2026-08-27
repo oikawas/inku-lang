@@ -118,7 +118,7 @@ export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
 inku にはセルフサインアップがなく、アカウントを作れるのは認証済みの管理者だけである。**この初期管理者なしで空の DB を起動すると、ログインする手段がない**。設定を忘れた場合は、パスワードを設定して再起動すれば作成される。既にユーザーがいる DB では何も起きないため、既存のパスワードが上書きされることはない。空文字は未指定と同じ扱いになる。
 このパスワードを失った場合、Web UI からは取り戻せず、`.env` も読まれない。`inku-admin reset-password` がサーバー自身の環境の中から再設定する —— コンテナなら `docker compose exec api inku-admin reset-password --username admin`、このディレクトリからなら `uv run inku-admin reset-password --username admin` である。新しいパスワードは2度尋ねられ、`--password-stdin` を付けると標準入力の1行目から読む。実行できるのはサーバーのコンテナかそのファイルを握っている者で、その者は既にDBを握っている。
 
-必要に応じてDB保存先を指定する。未指定の場合は、ユーザーのローカルデータディレクトリ配下にSQLite DBが作成される。
+必要に応じてSQLite DBの保存先を指定する。`INKU_DB_URL`が受け付けるのはSQLite URLだけで、非SQLite URLはengine作成前に拒否される。未指定の場合は、ユーザーのローカルデータディレクトリ配下にSQLite DBが作成される。
 
 ```sh
 export INKU_DB_URL='sqlite:///./inku.db'
@@ -263,7 +263,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 
 | 変数 | 用途 |
 | --- | --- |
-| `INKU_DB_URL` | DB接続先。未指定時はSQLite |
+| `INKU_DB_URL` | SQLite DB接続先。非SQLite URLはengine作成前に拒否。未指定時はローカルSQLite |
 | `INKU_BOOTSTRAP_ADMIN_PASSWORD` | 新規DB作成時の初期管理者パスワード。ログイン手段を得るために必須。空文字は未指定と同じ |
 | `INKU_BOOTSTRAP_ADMIN_USERNAME` | 初期管理者名。未指定時は `admin` |
 | `INKU_SECRET_KEY` | APIキー暗号化用秘密鍵 |

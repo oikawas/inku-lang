@@ -29,7 +29,7 @@ inku-lang/
 - Node.jsとnpm
 - Gitまたはrsyncなどの配置手段
 - （PNG出力に使う `resvg-py` はwheelで入るため、OSライブラリの追加導入は要らない）
-- 任意: PostgreSQL、reverse proxy、TLS証明書
+- 任意: reverse proxy、TLS証明書
 
 ```sh
 python3 --version

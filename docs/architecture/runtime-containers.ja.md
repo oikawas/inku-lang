@@ -57,9 +57,11 @@ flowchart LR
 | Web | Vite/SvelteKit process、`/api`をbackendへproxy | adapter-node buildをNodeで実行 | `vite.config.ts`; `web/Dockerfile` |
 | API | `inku-server` / uvicornとlocal buildしたnative render wheel | build済みCPython native wheelを持つPython imageの`inku-server` | `server/pyproject.toml`; `server/Dockerfile`; `core/crates/inku-render-python` |
 | native render artifact | pinned RustとmaturinがServer package backend外でwheelをbuild | 一時builderがwheelをbuild・監査し、runtime imageには受入済みwheelだけを入れてtoolchainを残さない | `rust-toolchain.toml`; `core/crates/inku-render-python/pyproject.toml`; `server/Dockerfile` |
-| DB | `INKU_DB_URL`、既定SQLite。PostgreSQL指定もコード上可能 | volume上のSQLiteを明示 | `db.py`; `server/Dockerfile` |
+| DB | `INKU_DB_URL`はSQLite URLだけを受理。非SQLiteはengine作成前に拒否 | volume上のSQLiteを明示 | `persistence/config.py`; `server/Dockerfile` |
 | 永続化 | 環境ごとのDB・出力先 | 1 persistent volume配下 | Dockerfileと`compose.yaml` |
 | 配備 | 環境固有のため本書の対象外 | release tagでimage build/publish | `.github/workflows/release.yml` |
+
+Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLiteであり、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通なのはfile名やtable名ではなく、[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)が定める言語非依存の論理契約である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであり、parity gapではない。
 
 ## 根拠対応
 

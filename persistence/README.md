@@ -25,6 +25,11 @@ The logical record names are `history`, `lineage_nodes`, and `lineage_edges`. Ph
 
 The mapping is deliberate. Portability requires equal meaning, NULL distinctions, encoding, and constraints at the adapter boundary; it does not require equal physical names.
 
+The Server owns a SQLAlchemy/SQLite schema, Android owns a Room/SQLite schema,
+and a possible future iOS client would own another physical adapter. Server-only
+authentication and administration tables, and device-only provider, model, and
+cache tables, are host extensions rather than portability gaps.
+
 `required_common` means both current hosts persist or deterministically expose the fact. `optional_common` reserves a shared meaning but allows a host without a producer to omit it. Host-only extensions remain outside the logical field list.
 
 Dedicated Android columns are authoritative for `render_seed`, `composition_seed`, and `render_wild`. Matching values inside `render_metadata_json` are integrity echoes used by render identity, not a second writable persistence authority. Metadata without a dedicated column, such as the rendered color map, is mapped directly from its existing JSON path.
@@ -42,7 +47,13 @@ Dedicated Android columns are authoritative for `render_seed`, `composition_seed
 
 The portable contract records these owners without moving them:
 
-- Server `init_db()` creates metadata, runs `_migrate_columns()`, seeds bootstrap/permission rows, assigns unowned history, and backfills history identity/lineage. Later migration stages must turn the unbounded repair work into named one-shot migrations.
+- Server `db.init_db()` is the composition façade. `MigrationBaselineCallbacks`
+  owns metadata and fresh/legacy callback order; `ensure_current_schema()` owns
+  the versioned registry, accepted legacy fingerprint, SQLite snapshot, writer
+  lock, and one-shot outcome. `LegacyColumnMigrator` consumes the frozen schema
+  manifest and delegates the established leaf work to extracted render-hash,
+  catalog-nameplate, FTS, role-membership, unowned-history, and
+  identity/lineage owners.
 - Android `InkuRepository.saveResult()` already wraps the history row, lineage node, and optional edge in one `database.withTransaction` block. Thumbnail generation runs after that canonical transaction.
 - Android Room v10 enforces the history/node one-to-one keys and one parent per child with unique indexes. The fresh-schema callback creates separate INSERT and UPDATE triggers that reject self-edges. The intentional one-time reset discards only Room v1–9 databases before creating this v10 schema; v10 and later databases are not a destructive fallback.
 

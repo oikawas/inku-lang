@@ -29,7 +29,7 @@ inku-lang/
 - Node.js and npm
 - Git or a deployment mechanism such as rsync
 - (No extra OS libraries: `resvg-py`, which rasterizes PNG output, ships as a wheel)
-- Optional: PostgreSQL, reverse proxy, and TLS certificate
+- Optional: reverse proxy and a TLS certificate
 
 ```sh
 python3 --version

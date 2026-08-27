@@ -6,7 +6,7 @@ import logging
 import os
 import secrets
 import uuid
-from contextlib import contextmanager, nullcontext
+from contextlib import nullcontext
 from pathlib import Path
 
 from sqlalchemy import inspect, text
@@ -159,23 +159,6 @@ def init_db() -> None:
         _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
         raise
     _HISTORY_FTS_ENABLED = outcome.fts_enabled
-
-
-@contextmanager
-def _session_scope(session: Session | None):
-    """Reuse the migration session or own a normal short-lived session."""
-    if session is not None:
-        yield session, False
-        return
-    with SessionLocal() as owned_session:
-        yield owned_session, True
-
-
-def _finish_session(session: Session, owns_session: bool) -> None:
-    if owns_session:
-        session.commit()
-    else:
-        session.flush()
 
 
 def _migrate_columns(connection=None, *, include_fts: bool = True) -> None:

@@ -150,17 +150,25 @@ Thumbnails do not go into the canonical database; they go into `thumbs.db` besid
 
 **At thumbnail widths (256px, and 512px for HiDPI) the texture of marks drawn in a row with one tool is folded into a single run before rasterizing** (v2.13.33). **The stored SVG does not change by a single byte** — the fold happens only at bake time. It cuts how many times the filter is applied and raises the area it covers, so it only pays while the width is small; the 2160px PNG export default and browser display widths are not folded. **⚠ Thumbnails already baked are not rebaked** — staleness is decided from the hash of the stored SVG, and that SVG does not move. What gets faster is what is baked from now on, plus an explicit rebuild from the admin UI.
 
-SQLite is the reference single-server setup. History search uses FTS5 when available and falls back to `LIKE` otherwise.
+SQLite is the Server's only supported canonical database. `INKU_DB_URL` accepts
+SQLite URLs only, and a non-SQLite URL is rejected before SQLAlchemy engine
+creation. History search uses FTS5 when available and falls back to `LIKE`
+otherwise.
 
-At backend startup, current code runs column, index, FTS, lineage-root, and related migrations and backfills. Create a DB backup before startup and do not run multiple backend versions against the same DB during migration.
+Startup checks the versioned `schema_migrations` registry. A fresh database gets
+the current metadata and required rows. A registered database only verifies its
+version, name, and checksum. A pre-registry database is migrated once, under a
+writer lock and after a SQLite-native snapshot, only when its schema fingerprint
+and FTS state match a known baseline. Unknown baselines, checksum mismatches, and
+partial FTS fail closed without modification.
 
-### 3.2 PostgreSQL
+### 3.2 Migration and Backup Boundary
 
-```sh
-INKU_DB_URL=postgresql://inku:<password>@127.0.0.1/inku
-```
-
-Restrict the environment file containing the DB URL to root and the service group. Use database-native backup procedures; SQLite-specific Web backup is not available for PostgreSQL.
+The pre-migration snapshot for an accepted legacy database and the manual or
+scheduled replicas configured by an administrator both use the SQLite file
+boundary. Registered databases do not repeat the same migration and backfill on
+every startup. Restrict the environment file containing the DB URL to root and
+the service group.
 
 ### 3.3 History, Lineage, and Identity
 

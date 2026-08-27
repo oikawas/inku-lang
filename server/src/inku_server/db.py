@@ -310,16 +310,11 @@ def _migrate_renamed_catalog_nameplates(conn) -> None:
 def _migrate_history_search(conn) -> None:
     global _HISTORY_FTS_ENABLED
 
-    required_columns = {"input", "ddl", "stage1_model", "stage2_model", "catalog_id"}
-    history_columns = {column["name"] for column in inspect(conn).get_columns("history")}
-    if not required_columns <= history_columns:
-        # Focused transform fixtures can predate columns that the historical
-        # init_db baseline always had. They exercise the column transform only;
-        # creating an unusable external-content FTS table would leave a partial
-        # installation for the next startup to reject.
-        _HISTORY_FTS_ENABLED = False
-        return
-    _HISTORY_FTS_ENABLED = install_history_fts(conn, rebuild=True)
+    _HISTORY_FTS_ENABLED = _migrations.LegacyHistoryFtsInstaller(
+        frozenset({"input", "ddl", "stage1_model", "stage2_model", "catalog_id"}),
+        inspect,
+        install_history_fts,
+    ).install(conn)
 
 
 def _now_ms() -> int:

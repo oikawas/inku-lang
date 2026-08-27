@@ -6,10 +6,100 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 
 from . import access
 from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow
+
+
+@dataclass(frozen=True)
+class HistoryIdentityLineageBackfill:
+    """Repair legacy history identity fields and lineage roots."""
+
+    session_factory: Callable[[], object]
+    description_hash_fn: Callable[[str], str]
+    uuid_fn: Callable[[], object]
+
+    def backfill(self, session=None) -> None:
+        if session is not None:
+            self._backfill(session, owns_session=False)
+            return
+        with self.session_factory() as owned_session:
+            self._backfill(owned_session, owns_session=True)
+
+    def _backfill(self, session, *, owns_session: bool) -> None:
+        rows = session.query(HistoryRow).filter(
+            or_(
+                HistoryRow.source_text.is_(None),
+                HistoryRow.description_hash.is_(None),
+                HistoryRow.lineage_node_id.is_(None),
+            )
+        ).all()
+        changed = False
+        for row in rows:
+            source_text = row.source_text if row.source_text is not None else row.input
+            if row.source_text is None:
+                row.source_text = source_text
+                changed = True
+            expected_hash = self.description_hash_fn(source_text)
+            if not row.description_hash:
+                row.description_hash = expected_hash
+                changed = True
+            if not row.history_visibility:
+                row.history_visibility = "normal"
+                changed = True
+            node = None
+            if row.lineage_node_id:
+                node = session.get(LineageNodeRow, row.lineage_node_id)
+            if node is None:
+                node = session.query(LineageNodeRow).filter(
+                    LineageNodeRow.history_id == row.id
+                ).first()
+            if node is None and row.user_id:
+                node = LineageNodeRow(
+                    id=str(self.uuid_fn()),
+                    user_id=row.user_id,
+                    history_id=row.id,
+                    state="lineage_only" if row.history_visibility == "lineage_only" else "active",
+                    description_hash=row.description_hash,
+                    render_hash=row.render_hash,
+                    at=row.at,
+                    root_node_id=None,
+                )
+                session.add(node)
+                changed = True
+            if node is not None and row.lineage_node_id != node.id:
+                row.lineage_node_id = node.id
+                changed = True
+        session.flush()
+        nodes = session.query(LineageNodeRow).all()
+        parent_by_child = {
+            edge.child_node_id: edge.parent_node_id
+            for edge in session.query(LineageEdgeRow).all()
+        }
+        node_by_id = {node.id: node for node in nodes}
+
+        def resolve_root(node_id: str) -> str:
+            seen: set[str] = set()
+            current = node_id
+            while current in parent_by_child and current not in seen:
+                seen.add(current)
+                parent_id = parent_by_child[current]
+                if parent_id not in node_by_id:
+                    break
+                current = parent_id
+            return current
+
+        for node in nodes:
+            expected_root = resolve_root(node.id)
+            if node.root_node_id != expected_root:
+                node.root_node_id = expected_root
+                changed = True
+        if changed:
+            if owns_session:
+                session.commit()
+            else:
+                session.flush()
 
 
 @dataclass(frozen=True)

@@ -140,6 +140,30 @@ class RenamedCatalogNameplateMigrator:
                 ) from exc
 
 
+@dataclass(frozen=True)
+class LegacyHistoryFtsInstaller:
+    """Install legacy history FTS only when its external content is usable.
+
+    Focused transform fixtures can predate columns that the historical init_db
+    baseline always had. They exercise the column transform only; creating an
+    unusable external-content FTS table would leave a partial installation for
+    the next startup to reject.
+    """
+
+    required_columns: frozenset[str]
+    inspect_fn: Callable[[object], object]
+    install_fn: Callable[..., bool]
+
+    def install(self, connection) -> bool:
+        history_columns = {
+            column["name"]
+            for column in self.inspect_fn(connection).get_columns("history")
+        }
+        if not self.required_columns <= history_columns:
+            return False
+        return self.install_fn(connection, rebuild=True)
+
+
 def _canonical_schema_objects(connection: Connection) -> list[dict[str, str]]:
     rows = connection.exec_driver_sql(
         "SELECT type, name, tbl_name, sql FROM sqlite_master "

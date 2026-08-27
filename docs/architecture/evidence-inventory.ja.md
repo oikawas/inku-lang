@@ -55,7 +55,7 @@
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |
 | TEST-SERVER | Server検査 | pytest、API surface、認可、route所在 | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context「検査面」 | 確認済み | 公開可 |
-| TEST-CORPUS | 凍結コーパス | 現行Render Engine 41の610件とDDL 20の49件を再生成照合し、Engine 40の610件は履歴根拠としてのみ保持 | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
+| TEST-CORPUS | 凍結コーパス | 現行Render Engine 41の610件とDDL 21の53件を再生成照合し、Engine 40の610件は履歴根拠としてのみ保持 | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-21/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
 | TEST-ANDROID | Android native受入 | canonical manifestから生成した少数assetを同梱JNIでSVG byte照合し、current / historical代表をraw pixel・stride・digestで照合する | `NativeRenderDeviceTest`; `syncNativeParityAssets`; `inku-svg-raster` digest tests | Android仕様 | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
 | CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、bilingual docsとportable persistence verifier、corpus再生成、共有Rust / raster / JNI / Android hostのpath-scoped native gate、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |

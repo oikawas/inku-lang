@@ -70,5 +70,13 @@ class CameraDevelopmentPresentationTest {
         assertTrue(nim.showCancel)
         assertFalse(local.showRetry)
         assertTrue(local.showCancel)
+
+        val picker = cameraDevelopmentPresentation(
+            CameraCaptureState.Failed(CameraFailure.PhotoPickerUnavailable),
+            isJapanese = false,
+            animationsEnabled = false,
+        ) ?: error("Photo Picker failure presentation missing")
+        assertEquals("Image processing failed", picker.message)
+        assertFalse(picker.showRetry)
     }
 }

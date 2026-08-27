@@ -11,6 +11,7 @@ private const val LOCAL_VISION_PROVIDER_ID = "local-litert-lm"
 
 enum class CameraInputOrigin(val wireValue: String) {
     Camera("camera"),
+    PhotoPicker("photo_picker"),
 }
 
 enum class CameraInputRoute(val wireValue: String) {
@@ -56,8 +57,9 @@ data class CameraInputProvenance(
         fun fromAnalysis(
             request: VisionAnalysisRequest,
             result: VisionAnalysisResult,
+            origin: CameraInputOrigin = CameraInputOrigin.Camera,
         ): CameraInputProvenance = CameraInputProvenance(
-            origin = CameraInputOrigin.Camera,
+            origin = origin,
             route = when (request.outputMode) {
                 VisionOutputMode.DESCRIPTION -> CameraInputRoute.LocalDescriptionToNim
                 VisionOutputMode.DDL -> CameraInputRoute.LocalDdlToNimStage2

@@ -23,6 +23,7 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.data.model.CameraInputOrigin
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -51,6 +52,7 @@ import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.ServerDdlText
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraCaptureState
+import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.ui.camera.CameraNimDrawRoute
 import app.inku.mobile.ui.camera.CameraNimDrawRouting
@@ -58,6 +60,7 @@ import app.inku.mobile.ui.camera.CameraNimProviderIssue
 import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
 import app.inku.mobile.ui.camera.CameraInstantPrintPhase
 import app.inku.mobile.ui.camera.CameraInstantPrintRoute
+import app.inku.mobile.ui.camera.SelectedImageFileStore
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.cameraNimProviderIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
@@ -401,12 +404,17 @@ class InkuViewModel @JvmOverloads constructor(
     private var litertWarmupJob: Job? = null
     private var cameraJob: Job? = null
     private val cameraFiles = CameraCaptureFileStore(application.applicationContext)
+    private val selectedImageFiles = SelectedImageFileStore(application.cacheDir)
     private var pendingCameraFile: java.io.File? = null
+    private var pendingCameraInputSource: CameraInputSource? = null
+    private var cameraStateBeforeSourceChooser: CameraCaptureState? = null
     private var cameraRunSerial: Long = 0L
     private var cameraComposeSnapshot: InkuUiState? = null
     private var cameraRetryInput: CameraNimRunInput? = null
     private val mutableCameraCaptureRequests = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
     val cameraCaptureRequests: SharedFlow<Uri> = mutableCameraCaptureRequests.asSharedFlow()
+    private val mutablePhotoPickerRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val photoPickerRequests: SharedFlow<Unit> = mutablePhotoPickerRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
     private var promptEditedByUser = false
@@ -495,7 +503,10 @@ class InkuViewModel @JvmOverloads constructor(
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
+        selectedImageFiles.cleanupStaleImages()
         pendingCameraFile = null
+        pendingCameraInputSource = null
+        cameraStateBeforeSourceChooser = null
         (getApplication() as InkuApplication).applicationScope.launch {
             repository.close()
         }
@@ -508,12 +519,41 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun requestCameraCapture() {
-        if (localState.value.cameraCaptureState.locksCameraInteraction) return
+        val captureState = localState.value.cameraCaptureState
+        if (
+            captureState.locksCameraInteraction ||
+            captureState == CameraCaptureState.ChoosingSource ||
+            captureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
+            captureState == CameraCaptureState.Capturing ||
+            captureState == CameraCaptureState.PickingPhoto
+        ) return
+        cameraStateBeforeSourceChooser = captureState
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.ChoosingSource,
+            message = null,
+        )
+    }
+
+    fun cancelCameraInputSource() {
+        if (localState.value.cameraCaptureState != CameraCaptureState.ChoosingSource) return
+        pendingCameraInputSource = null
+        localState.value = localState.value.copy(
+            cameraCaptureState = cameraStateBeforeSourceChooser ?: CameraCaptureState.Idle,
+        )
+        cameraStateBeforeSourceChooser = null
+    }
+
+    fun chooseCameraInputSource(source: CameraInputSource) {
+        if (localState.value.cameraCaptureState != CameraCaptureState.ChoosingSource) return
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
         pendingCameraFile = null
-        val current = localState.value
+        pendingCameraInputSource = source
+        val current = localState.value.copy(
+            cameraCaptureState = cameraStateBeforeSourceChooser ?: CameraCaptureState.Idle,
+        )
+        cameraStateBeforeSourceChooser = null
         cameraComposeSnapshot = current.copy(
             cameraCaptureState = CameraCaptureState.Idle,
             isDrawing = false,
@@ -538,6 +578,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (localState.value.cameraCaptureState != CameraCaptureState.AwaitingOverwriteConfirmation) return
         localState.value = localState.value.copy(cameraCaptureState = CameraCaptureState.Idle)
         cameraComposeSnapshot = null
+        pendingCameraInputSource = null
     }
 
     fun confirmCameraOverwrite() {
@@ -546,6 +587,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun startCameraCapture() {
+        val inputSource = pendingCameraInputSource ?: return
         cameraRunSerial += 1
         val serial = cameraRunSerial
         cameraJob?.cancel()
@@ -571,17 +613,29 @@ class InkuViewModel @JvmOverloads constructor(
                     }
                     return@launch
                 }
-                val file = withContext(Dispatchers.IO) { cameraFiles.createPendingCapture() }
-                if (serial != cameraRunSerial) {
-                    cameraFiles.delete(file)
-                    return@launch
+                when (inputSource) {
+                    CameraInputSource.Camera -> {
+                        val file = withContext(Dispatchers.IO) { cameraFiles.createPendingCapture() }
+                        if (serial != cameraRunSerial) {
+                            cameraFiles.delete(file)
+                            return@launch
+                        }
+                        pendingCameraFile = file
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.Capturing,
+                            message = null,
+                        )
+                        mutableCameraCaptureRequests.emit(cameraFiles.contentUri(file))
+                    }
+                    CameraInputSource.PhotoPicker -> {
+                        if (serial != cameraRunSerial) return@launch
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.PickingPhoto,
+                            message = null,
+                        )
+                        mutablePhotoPickerRequests.emit(Unit)
+                    }
                 }
-                pendingCameraFile = file
-                localState.value = localState.value.copy(
-                    cameraCaptureState = CameraCaptureState.Capturing,
-                    message = null,
-                )
-                mutableCameraCaptureRequests.emit(cameraFiles.contentUri(file))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
@@ -597,6 +651,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun onCameraCaptureResult(success: Boolean) {
+        pendingCameraInputSource = null
         val file = pendingCameraFile
         pendingCameraFile = null
         if (!success) {
@@ -618,11 +673,71 @@ class InkuViewModel @JvmOverloads constructor(
         val serial = cameraRunSerial
         cameraJob?.cancel()
         cameraJob = viewModelScope.launch {
-            runCameraInstantPrint(serial, file)
+            runCameraInstantPrint(
+                serial = serial,
+                file = file,
+                origin = CameraInputOrigin.Camera,
+                cleanup = { cameraFiles.delete(it) },
+            )
         }
     }
 
-    private suspend fun runCameraInstantPrint(serial: Long, file: java.io.File) {
+    fun onPhotoPickerResult(uri: Uri?) {
+        if (localState.value.cameraCaptureState != CameraCaptureState.PickingPhoto) return
+        pendingCameraInputSource = null
+        if (uri == null) {
+            restoreCameraComposeSnapshot()
+            return
+        }
+
+        cameraRunSerial += 1
+        val serial = cameraRunSerial
+        cameraJob?.cancel()
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.PreparingImage,
+            message = null,
+        )
+        cameraJob = viewModelScope.launch {
+            var file: java.io.File? = null
+            try {
+                file = withContext(Dispatchers.IO) {
+                    val stream = getApplication<Application>().contentResolver.openInputStream(uri)
+                        ?: throw IllegalArgumentException("The selected image is unavailable.")
+                    selectedImageFiles.importImage(stream)
+                }
+                if (serial != cameraRunSerial) {
+                    selectedImageFiles.delete(file)
+                    return@launch
+                }
+                runCameraInstantPrint(
+                    serial = serial,
+                    file = file,
+                    origin = CameraInputOrigin.PhotoPicker,
+                    cleanup = { selectedImageFiles.delete(it) },
+                )
+                file = null
+            } catch (error: CancellationException) {
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(
+                        cameraCaptureState = CameraCaptureState.Cancelled,
+                        isDrawing = false,
+                    )
+                }
+                throw error
+            } catch (_: Throwable) {
+                failCameraRun(serial, CameraFailure.DecodeFailed, canRetryNim = false)
+            } finally {
+                selectedImageFiles.delete(file)
+            }
+        }
+    }
+
+    private suspend fun runCameraInstantPrint(
+        serial: Long,
+        file: java.io.File,
+        origin: CameraInputOrigin,
+        cleanup: (java.io.File?) -> Unit,
+    ) {
         val coordinator = cameraCoordinator(serial)
         try {
             val outcome = coordinator.run(
@@ -642,11 +757,12 @@ class InkuViewModel @JvmOverloads constructor(
                 load = { repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID) },
                 analyze = { prepared ->
                     val current = localState.value
+                    val uiLanguageCode = cameraComposeSnapshot?.uiLanguage?.code ?: current.uiLanguage.code
                     val request = VisionAnalysisRequest(
                         normalizedJpeg = prepared.jpegBytes,
                         width = prepared.width,
                         height = prepared.height,
-                        languageCode = current.uiLanguage.code,
+                        languageCode = uiLanguageCode,
                         outputMode = cameraComposeSnapshot?.cameraVisionOutputMode ?: current.cameraVisionOutputMode,
                     )
                     val result = repository.analyzeLocalVision(request)
@@ -661,9 +777,9 @@ class InkuViewModel @JvmOverloads constructor(
                     CameraNimRunInput(
                         description = directDdl ?: result.text.trim(),
                         directDdl = directDdl,
-                        inputProvenance = CameraInputProvenance.fromAnalysis(request, result),
+                        inputProvenance = CameraInputProvenance.fromAnalysis(request, result, origin),
                         canvasAspect = cameraComposeSnapshot?.selectedCanvasAspect ?: current.selectedCanvasAspect,
-                        uiLanguageCode = current.uiLanguage.code,
+                        uiLanguageCode = uiLanguageCode,
                     )
                 },
                 onLocalReady = { input ->
@@ -699,7 +815,7 @@ class InkuViewModel @JvmOverloads constructor(
                 canRetryNim = cameraRetryInput != null,
             )
         } finally {
-            cameraFiles.delete(file)
+            cleanup(file)
         }
     }
 
@@ -888,6 +1004,7 @@ class InkuViewModel @JvmOverloads constructor(
         val snapshot = cameraComposeSnapshot
         cameraComposeSnapshot = null
         cameraRetryInput = null
+        pendingCameraInputSource = null
         localState.value = (snapshot ?: localState.value).copy(
             cameraCaptureState = CameraCaptureState.Idle,
             isDrawing = false,
@@ -917,6 +1034,15 @@ class InkuViewModel @JvmOverloads constructor(
         pendingCameraFile = null
         localState.value = localState.value.copy(
             cameraCaptureState = CameraCaptureState.Failed(CameraFailure.CaptureUnavailable),
+        )
+    }
+
+    fun onPhotoPickerLaunchFailed() {
+        cameraRunSerial += 1
+        cameraJob?.cancel()
+        pendingCameraInputSource = null
+        localState.value = localState.value.copy(
+            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.PhotoPickerUnavailable),
         )
     }
 
@@ -2838,7 +2964,8 @@ class InkuViewModel @JvmOverloads constructor(
 internal fun cameraVisionModeChangeLocked(state: CameraCaptureState): Boolean =
     state.locksCameraInteraction ||
         state == CameraCaptureState.AwaitingOverwriteConfirmation ||
-        state == CameraCaptureState.Capturing
+        state == CameraCaptureState.Capturing ||
+        state == CameraCaptureState.PickingPhoto
 
 private fun CameraNimRunInput.nimFailure(): CameraFailure =
     if (directDdl == null) CameraFailure.NimFailed else CameraFailure.NimFailedDirectDdl

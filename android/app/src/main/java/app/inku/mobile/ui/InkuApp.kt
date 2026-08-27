@@ -25,6 +25,7 @@ import android.provider.Settings
 import android.util.LruCache
 import android.view.OrientationEventListener
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
@@ -197,6 +198,7 @@ import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
+import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.pipeline.WebDdlSpec
@@ -433,12 +435,26 @@ fun InkuApp() {
     val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         viewModel.onCameraCaptureResult(success)
     }
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        viewModel.onPhotoPickerResult(uri)
+    }
     LaunchedEffect(viewModel) {
         viewModel.cameraCaptureRequests.collect { uri ->
             try {
                 cameraCaptureLauncher.launch(uri)
             } catch (_: Throwable) {
                 viewModel.onCameraCaptureLaunchFailed()
+            }
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.photoPickerRequests.collect {
+            try {
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            } catch (_: Throwable) {
+                viewModel.onPhotoPickerLaunchFailed()
             }
         }
     }
@@ -450,6 +466,7 @@ fun InkuApp() {
     val backTarget: (() -> Unit)? = when {
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
+        state.cameraCaptureState == CameraCaptureState.ChoosingSource -> viewModel::cancelCameraInputSource
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
         state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation -> viewModel::cancelCameraOverwrite
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
@@ -514,6 +531,9 @@ fun InkuApp() {
                 if (state.confirmDdlOverwrite) {
                     DdlOverwriteDialog(viewModel)
                 }
+                if (state.cameraCaptureState == CameraCaptureState.ChoosingSource) {
+                    CameraInputSourceDialog(viewModel)
+                }
                 if (state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation) {
                     CameraOverwriteDialog(viewModel)
                 }
@@ -534,6 +554,38 @@ fun InkuApp() {
         }
     }
     }
+}
+
+@Composable
+private fun CameraInputSourceDialog(viewModel: InkuViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::cancelCameraInputSource,
+        title = { Text(S.cameraInputSourceTitle) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                TextButton(
+                    onClick = { viewModel.chooseCameraInputSource(CameraInputSource.Camera) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
+                ) {
+                    Text(S.cameraTakePhoto)
+                }
+                TextButton(
+                    onClick = { viewModel.chooseCameraInputSource(CameraInputSource.PhotoPicker) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
+                ) {
+                    Text(S.cameraChoosePhoto)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = viewModel::cancelCameraInputSource,
+                modifier = Modifier.heightIn(min = Dimens.cameraControlMinHeight),
+            ) {
+                Text(S.cancel)
+            }
+        },
+    )
 }
 
 @Composable
@@ -2207,7 +2259,9 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 private fun cameraStatusText(state: CameraCaptureState): String? = when (state) {
     CameraCaptureState.Idle,
+    CameraCaptureState.ChoosingSource,
     CameraCaptureState.AwaitingOverwriteConfirmation,
+    CameraCaptureState.PickingPhoto,
     -> null
     CameraCaptureState.Capturing -> S.cameraCapturing
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
@@ -2229,6 +2283,7 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     is CameraCaptureState.Failed -> when (state.reason) {
         CameraFailure.ModelNotReady -> S.cameraModelNotReady
         CameraFailure.CaptureUnavailable -> S.cameraCaptureUnavailable
+        CameraFailure.PhotoPickerUnavailable -> S.cameraPhotoPickerUnavailable
         CameraFailure.EmptyImage -> S.cameraEmptyImage
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
@@ -5293,6 +5348,7 @@ private fun generationInfoDisplayValue(row: GenerationInfoRow): String =
 
 internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStrings): String = when {
     row.field == GenerationInfoField.InputOrigin && row.value == "camera" -> strings.generationInfoInputOriginCamera
+    row.field == GenerationInfoField.InputOrigin && row.value == "photo_picker" -> strings.generationInfoInputOriginPhotoPicker
     row.field == GenerationInfoField.InputRoute && row.value == "local_description_to_nim" -> strings.generationInfoInputRouteLocalDescriptionToNim
     row.field == GenerationInfoField.InputRoute && row.value == "local_ddl_to_nim_stage2" -> strings.generationInfoInputRouteLocalDdlToNimStage2
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription

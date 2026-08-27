@@ -287,6 +287,9 @@ interface InkuStrings {
     val miscSubtitle: String
     val description: String
     val camera: String
+    val cameraInputSourceTitle: String
+    val cameraTakePhoto: String
+    val cameraChoosePhoto: String
     val cameraOverwriteTitle: String
     val cameraOverwriteBody: String
     val cameraOverwriteAction: String
@@ -302,6 +305,7 @@ interface InkuStrings {
     val cameraCancelled: String
     val cameraModelNotReady: String
     val cameraCaptureUnavailable: String
+    val cameraPhotoPickerUnavailable: String
     val cameraEmptyImage: String
     val cameraDecodeFailed: String
     val cameraAnalysisFailed: String
@@ -336,6 +340,7 @@ interface InkuStrings {
     val generationInfoVisionOutputMode: String
     val generationInfoNormalizedImageDimensions: String
     val generationInfoInputOriginCamera: String
+    val generationInfoInputOriginPhotoPicker: String
     val generationInfoInputRouteLocalDescriptionToNim: String
     val generationInfoInputRouteLocalDdlToNimStage2: String
     val generationInfoVisionOutputModeDescription: String

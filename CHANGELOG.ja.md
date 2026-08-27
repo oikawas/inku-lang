@@ -8074,3 +8074,8 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **カメラ撮影とPhoto Pickerの画像を端末内Visionで解釈し、既存の描画・保存経路へ渡せるようにした。** 記述経路と検証済みlocal DDL直接経路を選べる。画像bytes、URI、file名、EXIF、位置、digestは外部送信も履歴保存もせず、取消やstale runは保存前に停止する。
 - **Androidの制作導線と安全境界を整えた。** 空のbatch行削除、自動color catalog、camera入口、canvas menu、launcher icon、real-device instrumentation guardを追加・改善した。
 - **DDL Engine 21の表現忠実度を広げた。** surfaceとprimitiveの節、retry時のcolor語彙、reference publicationのfail-closed境界を整備した。
+
+### v2.14.1 — persistent Composeの旧SQLite baselineを安全に認識する（Build 1061、2026-08-27）
+
+- **v2.14.0で正しくfail closedした配布版Composeの旧DBを、完全一致する既知baselineとして追加した。** schema fingerprint `001823…de6c`とFTS `complete`の1組だけを`release-compose-stage0`として認識し、他の未知schema、partial FTS、破損状態は従来どおりsnapshot作成やmutationより前に拒否する。
+- **移行処理やschemaは変更していない。** SQLite Backup APIで作った隔離copyだけを移行し、履歴42件とdigest、lineage 42件を保持したままregistry v1へ到達し、2回目の初期化がidempotentであること、quick checkとforeign key checkがgreenであることを確認した。Phase B本体はv2.13.47へ無損失rollbackした状態からfix-forwardする。

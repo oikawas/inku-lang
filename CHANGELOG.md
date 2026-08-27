@@ -8903,3 +8903,8 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **Camera captures and Photo Picker images can be interpreted by on-device Vision and routed into the existing render-and-save path.** Users can choose the description route or the validated local Direct DDL route. Image bytes, URIs, filenames, EXIF, location, and digests are neither sent remotely nor stored in history, and cancellation or stale runs stop before saving.
 - **Android creation flows and safety boundaries are improved.** This includes blank batch-row removal, automatic color catalogs, the camera entry, canvas menu, launcher icon, and the real-device instrumentation guard.
 - **DDL Engine 21 expands rendering fidelity.** Surface and primitive clauses, retry color vocabulary, and fail-closed reference publication boundaries are now in place.
+
+### v2.14.1 — safely recognize the persistent Compose legacy SQLite baseline (Build 1061, 2026-08-27)
+
+- **The distribution Compose database that v2.14.0 correctly failed closed on is now one exact named legacy baseline.** Only schema fingerprint `001823…de6c` with FTS `complete` is accepted as `release-compose-stage0`; every other unknown schema, partial FTS state, or inconsistent database still rejects before snapshot creation or mutation.
+- **No migration transform or schema changed.** A SQLite Backup API isolated copy migrated to registry v1 while preserving all 42 history rows and their digest and all 42 lineage nodes; the second initialization was idempotent, and quick and foreign-key checks passed. Phase B will fix-forward from its losslessly restored v2.13.47 state.

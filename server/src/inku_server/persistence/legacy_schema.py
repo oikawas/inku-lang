@@ -1,5 +1,8 @@
 """Legacy SQLite schema declarations used by the compatibility migration façade."""
 
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+
 # v2.8.0 rename table. `_migrate_columns` rewrites persisted rows through this
 # exact mapping; the private naming record preserves the historical rationale.
 LINEAGE_KIND_RENAMES = (
@@ -147,3 +150,166 @@ HISTORY_INDEX_MIGRATIONS = (
 LINEAGE_NODE_INDEX_MIGRATIONS = (
     ("ix_lineage_nodes_root_node_id", "CREATE INDEX IF NOT EXISTS ix_lineage_nodes_root_node_id ON lineage_nodes (root_node_id)"),
 )
+
+
+@dataclass(frozen=True)
+class LegacyColumnMigrationManifest:
+    """Exact declarations consumed by the legacy column coordinator."""
+
+    lineage_kind_renames: tuple[tuple[str, str], ...]
+    history_column_migrations: Mapping[str, str]
+    lineage_node_column_migrations: Mapping[str, str]
+    user_account_column_migrations: Mapping[str, str]
+    history_index_migrations: tuple[tuple[str, str], ...]
+    lineage_node_index_migrations: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class LegacyColumnMigrator:
+    """Apply the exact legacy column, row, and index transforms in order."""
+
+    engine: object
+    nullcontext_fn: Callable[[object], object]
+    inspect_fn: Callable[[object], object]
+    text_fn: Callable[[str], object]
+    coerce_trace_catalog_table: object
+    manifest: LegacyColumnMigrationManifest
+    backfill_render_hashes: Callable[[object], object]
+    migrate_renamed_catalog_nameplates: Callable[[object], object]
+    migrate_history_search: Callable[[object], object]
+
+    def migrate(self, connection=None, *, include_fts: bool = True) -> None:
+        manager = self.engine.begin() if connection is None else self.nullcontext_fn(connection)
+        with manager as conn:
+            try:
+                self.coerce_trace_catalog_table.create(bind=conn, checkfirst=True)
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError("failed to create coerce trace catalog table") from exc
+            try:
+                inspector = self.inspect_fn(conn)
+                existing_history_columns = {
+                    col["name"] for col in inspector.get_columns("history")
+                }
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError("failed to inspect history table columns for migration") from exc
+
+            # v2.8.0: `vary_seed` is the Stage 1.5 composition seed, not the
+            # variation seed. Rename the column before additions so persisted values
+            # move with it instead of becoming orphaned.
+            if (
+                "vary_seed" in existing_history_columns
+                and "composition_seed" not in existing_history_columns
+            ):
+                try:
+                    conn.execute(
+                        self.text_fn(
+                            "ALTER TABLE history RENAME COLUMN vary_seed TO composition_seed"
+                        )
+                    )
+                    existing_history_columns.discard("vary_seed")
+                    existing_history_columns.add("composition_seed")
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        "failed to rename history.vary_seed to composition_seed"
+                    ) from exc
+
+            adding_expanded_ddl = "expanded_ddl" not in existing_history_columns
+            for column, ddl in self.manifest.history_column_migrations.items():
+                if column in existing_history_columns:
+                    continue
+                try:
+                    conn.execute(self.text_fn(ddl))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"failed to migrate history.{column}") from exc
+
+            if adding_expanded_ddl:
+                # v1.98 redefined history.ddl as input-side DDL. Existing text is the
+                # expanded DDL that reached Stage 2, so move it and leave input-side
+                # DDL NULL because the original Stage 1 output was never persisted.
+                # A few direct-DDL works move their source text as expanded DDL; the
+                # author explicitly accepted that historical approximation on
+                # 2026-07-20.
+                try:
+                    conn.execute(
+                        self.text_fn(
+                            "UPDATE history SET expanded_ddl = ddl, ddl = NULL "
+                            "WHERE ddl IS NOT NULL"
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        "failed to move legacy history.ddl into expanded_ddl"
+                    ) from exc
+
+            try:
+                existing_user_columns = {
+                    col["name"] for col in inspector.get_columns("user_accounts")
+                }
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(
+                    "failed to inspect user_accounts table columns for migration"
+                ) from exc
+
+            has_lineage_nodes = inspector.has_table("lineage_nodes")
+            existing_lineage_node_columns = (
+                {col["name"] for col in inspector.get_columns("lineage_nodes")}
+                if has_lineage_nodes
+                else set()
+            )
+            if has_lineage_nodes:
+                for column, ddl in self.manifest.lineage_node_column_migrations.items():
+                    if column in existing_lineage_node_columns:
+                        continue
+                    try:
+                        conn.execute(self.text_fn(ddl))
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(
+                            f"failed to migrate lineage_nodes.{column}"
+                        ) from exc
+
+            for column, ddl in self.manifest.user_account_column_migrations.items():
+                if column in existing_user_columns:
+                    continue
+                try:
+                    conn.execute(self.text_fn(ddl))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"failed to migrate user_accounts.{column}") from exc
+
+            # v2.8.0 moves persisted derivation kinds to the canonical vocabulary.
+            # `variation` belongs only to the actual variation operation: four other
+            # operations lose that suffix and `hensou` becomes `variation`. Rows are
+            # rewritten in place and never removed.
+            if inspector.has_table("lineage_edges"):
+                for before, after in self.manifest.lineage_kind_renames:
+                    try:
+                        conn.execute(
+                            self.text_fn(
+                                "UPDATE lineage_edges SET derivation_kind = :after "
+                                "WHERE derivation_kind = :before"
+                            ),
+                            {"before": before, "after": after},
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(
+                            f"failed to rename derivation kind {before}"
+                        ) from exc
+
+            for index_name, ddl in self.manifest.history_index_migrations:
+                try:
+                    conn.execute(self.text_fn(ddl))
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        f"failed to create migration index {index_name}"
+                    ) from exc
+            if has_lineage_nodes:
+                for index_name, ddl in self.manifest.lineage_node_index_migrations:
+                    try:
+                        conn.execute(self.text_fn(ddl))
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(
+                            f"failed to create migration index {index_name}"
+                        ) from exc
+            self.backfill_render_hashes(conn)
+            self.migrate_renamed_catalog_nameplates(conn)
+            if include_fts:
+                self.migrate_history_search(conn)

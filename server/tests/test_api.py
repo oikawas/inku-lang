@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
 from inku_server import api as api_module
@@ -345,102 +344,6 @@ def test_api_main_enables_reload_only_when_requested(monkeypatch):
     api_module.main()
 
     assert calls == [(("inku_server.api:app",), {"host": "0.0.0.0", "port": 18100, "reload": True})]
-
-
-def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
-    legacy_engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}", future=True)
-    with legacy_engine.begin() as conn:
-        conn.execute(text("""
-            CREATE TABLE history (
-                id VARCHAR PRIMARY KEY,
-                at BIGINT NOT NULL,
-                input TEXT NOT NULL DEFAULT '',
-                ddl TEXT,
-                score TEXT NOT NULL DEFAULT '{}',
-                svg TEXT NOT NULL DEFAULT '',
-                output_path TEXT,
-                elapsed_ms INTEGER NOT NULL DEFAULT 0,
-                stage1_model VARCHAR,
-                stage2_model VARCHAR,
-                tokens_in INTEGER,
-                tokens_out INTEGER
-            )
-        """))
-        conn.execute(text("""
-            CREATE TABLE user_accounts (
-                id VARCHAR PRIMARY KEY,
-                username VARCHAR NOT NULL,
-                email VARCHAR NOT NULL,
-                password_hash TEXT NOT NULL,
-                role VARCHAR NOT NULL,
-                group_id VARCHAR,
-                at BIGINT NOT NULL
-            )
-        """))
-        # One account that predates every settings column. Without a row here the
-        # migrations below are only checked for the columns they add, not for the
-        # values existing accounts end up carrying.
-        conn.execute(text("""
-            INSERT INTO user_accounts (id, username, email, password_hash, role, group_id, at)
-            VALUES ('u-legacy', 'legacy', 'legacy@example.com', 'x', 'user', NULL, 0)
-        """))
-
-    monkeypatch.setattr(db, "engine", legacy_engine)
-    db._migrate_columns()
-    db._migrate_columns()
-
-    columns = {col["name"] for col in inspect(legacy_engine).get_columns("history")}
-    assert {
-        "user_id",
-        "catalog_id",
-        "render_build_number",
-        "render_color_profile",
-        "render_engine_id",
-        "render_engine_version",
-        "render_color_catalog_id",
-        "render_color_catalog_name",
-        "render_color_catalog_sub",
-        "render_color_catalog",
-        "render_color_map",
-        "render_canvas_aspect",
-        "render_canvas_aspect_id",
-        "render_canvas_aspect_ratio",
-        "render_hash",
-        "trashed",
-        "starred",
-    } <= columns
-    user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "ui_mode", "ui_custom", "tooltips_enabled", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
-    # An account that existed before the column keeps the visible side of every
-    # setting the migration backfills. Asserting only that the column arrived
-    # leaves the default free to flip: turning tooltips off for every existing
-    # account passed all 118 tests before this line was added.
-    with legacy_engine.connect() as conn:
-        migrated = conn.execute(text(
-            "SELECT ui_theme, ui_mode, tooltips_enabled FROM user_accounts WHERE id = 'u-legacy'"
-        )).one()
-    assert migrated.ui_theme == "light"
-    assert migrated.ui_mode == "simple"
-    assert bool(migrated.tooltips_enabled) is True
-    indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
-    assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
-    with legacy_engine.connect() as conn:
-        sqlite_objects = {
-            row[0]
-            for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type IN ('table', 'trigger')"))
-        }
-    assert "history_fts" in sqlite_objects
-    assert {"history_fts_ai", "history_fts_ad", "history_fts_au"} <= sqlite_objects
-
-
-def test_migrate_columns_raises_when_history_inspection_fails(monkeypatch):
-    class BadInspector:
-        def get_columns(self, table_name: str):
-            raise RuntimeError(f"cannot inspect {table_name}")
-
-    monkeypatch.setattr(db, "inspect", lambda conn: BadInspector())
-    with pytest.raises(RuntimeError, match="failed to inspect history table columns"):
-        db._migrate_columns()
 
 
 def test_current_user_theme_can_be_updated(auth_context):

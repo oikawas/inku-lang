@@ -8058,3 +8058,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 
 - **最初の作者実機確認では、画像準備とGPU engine初期化後、`camera-ddl-v1`の生成開始前に`LiteRtLmJniException`となった。** DDL直接modeだけが通常provider向けの表示用全文spec 7,912文字を画像と同時に渡していた。camera専用語彙は増やさず、`WebDdlSpec`の既存LiteRT compact Stage 1 authorityを参照するよう変更し、日英camera境界込みpromptを各4,096文字以下へ固定した。性能logは内容ではなく文字数だけを記録する。
 - **検証:** prompt-size testは旧7,912文字で計画どおりredになり、修正後はI-412関連12 classes、production Kotlin compileを含むdebug APK、日英docs gate、diff checkがgreen。当日分の検証済みbackupを再利用し、保持1世代のまま`.76` Build 148119をPixel 9へdata-preserving installした。端末上のversion／Build確認と529 msのcold startが成功した。作者がDDL直接経路の完成を確認し、最終traceは1,376文字の`camera-ddl-v1`でlocal Vision 1回成功（720×1280、94,800 bytes、54.719秒）、NIM Stage 1 0回、固定NIM Stage 2 1回（35.063秒）、`vivid_material` render 1回（12 ms）だった。I-412／M5の受入を完了した。DB全検査、raw SQLite query、real-device instrumentation、pentala、public GitHub pushは実行していない。
+
+### Android `2.1.4-android.77` — 端末の既存写真をlocal Vision入力へ選べる（Build 148120、2026-08-27・[I-456]）
+
+- **camera入口に「撮影する」／「写真を選ぶ」／取消を加え、Photo Pickerのimage-only 1件を既存one-touch経路へ合流した。** 選択content URIはapp-owned cacheへ一時copyし、成功、取消、失敗、stale run、`onCleared`でownership guard付き削除を行う。元写真を変更／削除せず、storage permissionや独自file browserは追加していない。画像bytes／URI／path／EXIF／file名はNIMへ送らず、local Vision後のtextだけを既存routeで送る。
+- **保存済みprovenanceは既存JSON内で`origin=photo_picker`へ後方互換拡張し、Generation Infoがcamera撮影と既存写真を日英で区別する。** Room schema／migration／backfill、新列、server／web／cli／shared、render／DDL／catalog、通常設定には変更がない。
+- **検証と展開:** production edit前fail-first、focused JVM 12 classes・45 tests、production Kotlin compile、debug APK、Android名義test 6件、日英docs gate、diff checkがgreen。作者受入済みhead `b7521dfe`をmainへmergeし、`.77` Build 148120 APKを生成した。安全helperは2026-08-27の検証済みbackupを新規作成し2世代を保持した後、Pixel 9へdata-preserving installした。端末上のversion／Build確認と530 msのcold startが成功した。実機Photo Picker操作、full JVM suite、release build、DB全検査、raw SQLite query、real-device instrumentation、pentala、public GitHub pushは実行していない。

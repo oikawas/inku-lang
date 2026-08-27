@@ -13,8 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 const PANEL = readFileSync(fileURLToPath(new URL('./BatchPanel.svelte', import.meta.url)), 'utf8');
 const OWNER = readFileSync(fileURLToPath(new URL('../features/batch/state.svelte.ts', import.meta.url)), 'utf8');
-const DB = readFileSync(
-	fileURLToPath(new URL('../../../../server/src/inku_server/db.py', import.meta.url)),
+const SERVER_SETTINGS = readFileSync(
+	fileURLToPath(new URL('../../../../server/src/inku_server/persistence/settings.py', import.meta.url)),
 	'utf8',
 );
 
@@ -23,7 +23,7 @@ test('T-58  both ends of the batch history keep the same number of prompts', () 
 	// the two numbers is what the picker shows. Raising one alone changes
 	// nothing, and the failure is silent: the picker simply stays as it was.
 	const web = OWNER.match(/const BATCH_PROMPT_HISTORY_LIMIT = (\d+);/);
-	const server = DB.match(/^_BATCH_PROMPT_HISTORY_LIMIT = (\d+)$/m);
+	const server = SERVER_SETTINGS.match(/^BATCH_PROMPT_HISTORY_LIMIT = (\d+)$/m);
 	assert.ok(web, 'the web client no longer names a batch history limit');
 	assert.ok(server, 'the server no longer names a batch history limit');
 	// Written down here rather than compared to each other: two constants read

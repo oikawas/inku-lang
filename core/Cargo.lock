@@ -433,10 +433,11 @@ dependencies = [
 
 [[package]]
 name = "resvg"
-version = "0.48.0"
+version = "0.48.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "319b4385052d39400e8f4a139978ccda917eb448a15e29d508c307fb5b72221b"
+checksum = "67e3803f97b999e80cbf7c6ecdd07a8102204d92e1633cf48783720c521196bd"
 dependencies = [
+ "bytemuck",
  "log",
  "pico-args",
  "rgb",

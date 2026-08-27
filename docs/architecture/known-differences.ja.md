@@ -41,7 +41,9 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ### C-02 `server/src/inku_server/db.py`
 
-schema、migration、auth、settings、backup、history、lineage、searchを1 moduleが持つ。transaction境界は明瞭だが、責任の集中が大きい。
+現在の`db.py`はpublic compatibility／composition façadeである。schema宣言、version付きstartup、legacy column coordination、baseline callback、backup、auth、settings、history、lineage、searchの実装ownerは`persistence/`配下へ分かれ、façadeはlive dependencyの組み立てと既存import名の委譲を担う。
+
+残る行数やcompatibility re-exportだけではowner違反を示さない。今後の縮小はreaderがゼロと証明されたwrapperだけを対象にし、公開importやcall-time compositionを行数目的で消さない。
 
 ### C-03 `api_core/routers/render.py`
 

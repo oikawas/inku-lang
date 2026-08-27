@@ -22,6 +22,18 @@ flowchart LR
 
 A DB row stores the input, Stage 1 DDL, effective DDL, JSON Score, Server SVG, model/version/seed/color/time/token metadata, marks, and display state. It also carries the sketch columns (`sketch_text` / `sketch_grain` / `sketch_state`) and each layer's fallback record (Stage 1 = `interpret_fallback`, Stage 2 = `compose_fallback`). `compose_fallback` has three readings — fell (a reason string), held (`none`), and unrecorded (works older than the column) — and unrecorded is never read as "not a fallback". Nothing is backfilled. Disabling automatic files or overflowing their queue does not remove DB history.
 
+## Portable persistence boundary
+
+The Server physically owns SQLAlchemy/SQLite, Android owns Room/SQLite, and a
+possible future iOS adapter would own its own physical schema. Canonical shared
+meaning and host mappings live in
+[`persistence/README.md`](../../persistence/README.md) and
+[`persistence/contract.json`](../../persistence/contract.json); they do not
+require one database file, table name, or column layout. Server-only
+authentication and administration tables and device-only provider, model, and
+cache tables are host extensions rather than parity gaps. This mapping does not
+change the meaning of stored SVG, Score, hashes, or NULL values.
+
 ## Identity values
 
 | ID | Identifies | May differ even when this is equal | Implementation |

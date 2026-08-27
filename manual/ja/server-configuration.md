@@ -150,17 +150,13 @@ INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 
 **サムネイルの幅（256pxとhidpiの512px）で焼くときは、同じ道具で続けて引かれた痕の質感を塊ひとつへ畳んでから焼きます**（v2.13.33）。**保存されているSVGは1バイトも変わりません。**畳むのは焼くときだけです。掛かる回数は減りますが掛かる面積は増えるので、得になるのは幅が小さいあいだだけで、PNG書き出しの既定2160pxやブラウザの表示幅では畳みません。**⚠ 既に焼かれているサムネイルは焼き直されません** —— 陳腐化の判定は保存済みSVGのhashで行っており、そのSVGが動かないためです。速くなるのはこれから焼くぶんと、管理UIからの明示的な再作成だけです。
 
-SQLiteは単一server向けの参照構成です。履歴検索はFTS5を使用し、利用できない環境では`LIKE`へfallbackします。
+SQLiteはServerが対応する唯一の正本DBです。`INKU_DB_URL`はSQLite URLだけを受け付け、非SQLite URLはSQLAlchemy engine作成前に拒否します。履歴検索はFTS5を使用し、利用できない環境では`LIKE`へfallbackします。
 
-backend起動時に、column追加、index、FTS、lineage rootなどのmigration／backfillを実行します。起動前にDB backupを作成し、migration中は複数versionのbackendを同時起動しないでください。
+起動時はversion付き`schema_migrations` registryを確認します。fresh DBではcurrent metadataと必須rowを作成し、registry済みDBではversion・name・checksumを検証するだけです。registry導入前のDBは、既知のschema fingerprintとFTS状態に一致する場合だけ、SQLite-native snapshotを作成してwriter lock内で一度だけmigrationします。未知のbaseline、checksum不一致、partial FTSは変更せずfail closedします。
 
-### 3.2 PostgreSQL
+### 3.2 Migrationとbackup境界
 
-```sh
-INKU_DB_URL=postgresql://inku:<password>@127.0.0.1/inku
-```
-
-DB URLを含む環境ファイルはrootとservice groupだけが読める権限にします。SQLite固有のWeb backup機能はPostgreSQLでは使わず、DB製品のbackup手段を使います。
+受入済みlegacy DBのmigration前snapshotと、管理設定から作るmanual／scheduled replicaはどちらもSQLite file boundaryを使います。registry済みDBに同じmigration／backfillを毎起動繰り返す仕組みではありません。DB URLを含む環境ファイルはrootとservice groupだけが読める権限にしてください。
 
 ### 3.3 履歴、系譜、同一性
 

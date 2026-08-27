@@ -117,7 +117,9 @@ export INKU_BOOTSTRAP_ADMIN_PASSWORD='change-this-password'
 inku has no self-service registration, and only an authenticated admin can create accounts. **An empty DB started without this initial admin offers no way to sign in.** If it was missed, set the password and restart: the account is created then. Nothing happens on a DB that already has users, so an existing password is never overwritten. A blank value counts as unset.
 If that password is lost, the web UI cannot hand it back and `.env` is no longer read. `inku-admin reset-password` sets it from inside the server's own environment — `docker compose exec api inku-admin reset-password --username admin` on the container route, or `uv run inku-admin reset-password --username admin` from this directory. It asks for the new password twice; `--password-stdin` reads it from the first line of standard input instead. Running it means holding the server's container or its files, which already means holding the database.
 
-Optionally set the DB location. If unset, the server creates a SQLite DB under the user's local data directory.
+Optionally set the SQLite DB location. `INKU_DB_URL` accepts SQLite URLs only;
+a non-SQLite URL is rejected before engine creation. If unset, the Server
+creates a SQLite DB under the user's local data directory.
 
 ```sh
 export INKU_DB_URL='sqlite:///./inku.db'
@@ -262,7 +264,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 
 | Variable | Purpose |
 | --- | --- |
-| `INKU_DB_URL` | DB connection URL. SQLite is used by default |
+| `INKU_DB_URL` | SQLite DB URL. Non-SQLite URLs are rejected before engine creation; local SQLite is the default |
 | `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial admin password for a new DB. Required to be able to sign in at all; blank counts as unset |
 | `INKU_BOOTSTRAP_ADMIN_USERNAME` | Initial admin username. Defaults to `admin` |
 | `INKU_SECRET_KEY` | Secret key used to encrypt saved API keys |

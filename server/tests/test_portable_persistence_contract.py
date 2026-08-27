@@ -119,3 +119,19 @@ def test_fingerprint_evidence_reports_only_digest_and_counts():
     assert len(evidence["fingerprint"]) == 64
     assert evidence["missing_tables"] == 0
     assert evidence["extra_tables"] == 0
+
+
+def test_docs_job_runs_the_portable_persistence_verifier():
+    lines = (ROOT / ".github/workflows/checks.yml").read_text(encoding="utf-8").splitlines()
+    start = lines.index("  docs:")
+    end = next(
+        (
+            index
+            for index, line in enumerate(lines[start + 1 :], start + 1)
+            if line.startswith("  ") and not line.startswith("    ") and line.endswith(":")
+        ),
+        len(lines),
+    )
+    docs_job = lines[start:end]
+
+    assert "        run: python3 server/scripts/check_portable_persistence_contract.py" in docs_job

@@ -41,7 +41,16 @@ Its remaining line count alone does not demonstrate an ownership violation. Anot
 
 ### C-02 `server/src/inku_server/db.py`
 
-One module holds schema, migration, auth, settings, backup, history, lineage, and search. Transactions are explicit, but responsibility is concentrated.
+`db.py` is now the public compatibility and composition façade. Implementation
+owners for schema declarations, versioned startup, legacy column coordination,
+baseline callbacks, backup, authentication, settings, history, lineage, and
+search live under `persistence/`; the façade assembles live dependencies and
+delegates existing import names.
+
+Remaining line count and compatibility re-exports alone do not demonstrate an
+ownership violation. Further shrinkage is limited to wrappers with proven-zero
+readers and must not remove public imports or call-time composition merely to
+reduce lines.
 
 ### C-03 `api_core/routers/render.py`
 

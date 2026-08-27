@@ -22,6 +22,10 @@ flowchart LR
 
 DB rowには入力、Stage 1側DDL、effective DDL、Score、server生成SVG、model/版/seed/色/時間/token、mark、表示状態が入る。さらに写生（`sketch_text` / `sketch_grain` / `sketch_state`）と、各層のfallbackの記録（Stage 1 = `interpret_fallback`、Stage 2 = `compose_fallback`）を列として持つ。`compose_fallback`は「fallbackだった（理由文字列）」「fallbackでない（`none`）」「記録なし（列導入前の作品）」の3値で、記録なしをfallbackでないと混同しない。backfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
 
+## 移植可能な永続化境界
+
+ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLiteを物理ownerとして持ち、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通意味とhost mappingの正本は[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)であり、同じDB file、table名、column配置を要求しない。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。保存済みSVG、Score、hash、NULLの意味はこのmappingによって変えない。
+
 ## 4種類のID
 
 | ID | 何を識別するか | 同じでも別になりうるもの | 実装 |

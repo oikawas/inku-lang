@@ -3536,13 +3536,24 @@ are visible only to members of the `admins` group.  The plugins tab is visible t
 signed-in users, but plugin setting changes and plugin-storage update APIs are
 restricted to `admins`.
 
-The DB settings tab also shows the current DB file size when the backend is a
-SQLite file database.  Admin users can configure DB replica backups with an
-interval in days, a time of day, and a maximum number of automatic generations.
-The defaults are seven days, 03:00, and four generations.  Manual backups can be
-created immediately and are stored separately from the automatic generation
-limit.  File-replica backups are reported as unavailable for non-SQLite DB
-backends.
+The Server's canonical persistence uses SQLite through SQLAlchemy only.
+`INKU_DB_URL` accepts SQLite URLs only and rejects a non-SQLite URL before
+engine creation. Server SQLAlchemy/SQLite and Android Room/SQLite each own a
+physical schema; a possible future iOS adapter would map another physical
+schema to the same logical contract. This does not mean sharing one database
+file, table names, or column layout. Canonical logical meaning and host mappings
+live in [`persistence/README.md`](persistence/README.md) and
+[`persistence/contract.json`](persistence/contract.json). Server-only
+authentication and administration tables and device-only provider, model, and
+cache tables are host extensions, not parity gaps. The mapping does not change
+the meaning of stored SVG, Score, hashes, or NULL values.
+
+The DB settings tab also shows the current SQLite DB file size. Admin users can
+configure DB replica backups with an interval in days, a time of day, and a
+maximum number of automatic generations. The defaults are seven days, 03:00,
+and four generations. Manual backups can be created immediately and are stored
+separately from the automatic generation limit. Backup and restore use the
+SQLite file boundary.
 
 **The interval decides which day and the time of day decides when on that day.**
 The next due moment is derived from the last backup taken, not from the moment

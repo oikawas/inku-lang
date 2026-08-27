@@ -57,9 +57,18 @@ flowchart LR
 | Web | Vite/SvelteKit process proxies `/api` | adapter-node build under Node | `vite.config.ts`; `web/Dockerfile` |
 | API | `inku-server` / uvicorn with the locally built native render wheel | Python service runs `inku-server` with a prebuilt CPython native wheel | `server/pyproject.toml`; `server/Dockerfile`; `core/crates/inku-render-python` |
 | Native render artifact | Pinned Rust and maturin build the wheel outside the Server package backend | An ephemeral builder creates and audits the wheel; the runtime image contains the accepted wheel, not the toolchain | `rust-toolchain.toml`; `core/crates/inku-render-python/pyproject.toml`; `server/Dockerfile` |
-| DB | `INKU_DB_URL`; SQLite by default, PostgreSQL supported in code | Explicit SQLite on the volume | `db.py`; `server/Dockerfile` |
+| DB | `INKU_DB_URL` accepts SQLite URLs only; non-SQLite is rejected before engine creation | Explicit SQLite on the volume | `persistence/config.py`; `server/Dockerfile` |
 | Persistence | Environment-specific DB and output paths | One persistent volume | Dockerfiles; `compose.yaml` |
 | Distribution | Environment-specific and outside this document | Release tag builds and publishes containers | `.github/workflows/release.yml` |
+
+The Server physically owns a SQLAlchemy/SQLite schema, Android owns a
+Room/SQLite schema, and a possible future iOS adapter would own its own physical
+schema. They share language-neutral meaning through
+[`persistence/README.md`](../../persistence/README.md) and
+[`persistence/contract.json`](../../persistence/contract.json), not file or
+table names. Server-only authentication and administration tables and
+device-only provider, model, and cache tables are host extensions, not parity
+gaps.
 
 ## Evidence map
 

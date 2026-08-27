@@ -136,22 +136,29 @@ def init_db() -> None:
     )
     if db_path is not None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
+    callbacks = _migrations.MigrationBaselineCallbacks(
+        Base.metadata,
+        Session,
+        _ensure_default_user_group,
+        _ensure_permission_groups,
+        _ensure_bootstrap_admin,
+        _migrate_columns,
+        _migrate_roles_to_permission_groups,
+        _assign_unowned_history_to_admin,
+        _backfill_history_identity_and_lineage,
+    )
     try:
         outcome = ensure_current_schema(
             engine=engine,
             database_path=db_path,
-            create_schema=lambda connection: Base.metadata.create_all(bind=connection),
-            seed_fresh=_seed_fresh_database,
-            apply_legacy=_apply_legacy_baseline,
+            create_schema=callbacks.create_schema,
+            seed_fresh=callbacks.seed_fresh,
+            apply_legacy=callbacks.apply_legacy,
         )
     except MigrationExecutionError as exc:
         _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
         raise
     _HISTORY_FTS_ENABLED = outcome.fts_enabled
-
-
-def _migration_session(connection) -> Session:
-    return Session(bind=connection, autocommit=False, autoflush=False)
 
 
 @contextmanager
@@ -168,30 +175,6 @@ def _finish_session(session: Session, owns_session: bool) -> None:
     if owns_session:
         session.commit()
     else:
-        session.flush()
-
-
-def _seed_fresh_database(connection) -> None:
-    """Seed only rows required by a new, already-current database."""
-    with _migration_session(connection) as session:
-        _ensure_default_user_group(session)
-        _ensure_permission_groups(session)
-        _ensure_bootstrap_admin(session)
-        session.flush()
-
-
-def _apply_legacy_baseline(connection) -> None:
-    """Run the reviewed legacy transforms inside the coordinator transaction."""
-    _migrate_columns(connection, include_fts=False)
-    with _migration_session(connection) as session:
-        _ensure_default_user_group(session)
-        _ensure_permission_groups(session)
-        _ensure_bootstrap_admin(session)
-        # The bootstrap account must exist before the legacy role mirror is
-        # converted and before orphaned works resolve their canonical owner.
-        _migrate_roles_to_permission_groups(session)
-        _assign_unowned_history_to_admin(session)
-        _backfill_history_identity_and_lineage(session)
         session.flush()
 
 

@@ -109,6 +109,54 @@ class MigrationOutcome:
 
 
 @dataclass(frozen=True)
+class MigrationBaselineCallbacks:
+    """Own the callbacks that create, seed, and migrate the startup baseline."""
+
+    metadata: object
+    session_factory: Callable[..., object]
+    ensure_default_user_group: Callable[[object], object]
+    ensure_permission_groups: Callable[[object], object]
+    ensure_bootstrap_admin: Callable[[object], object]
+    migrate_columns: Callable[..., object]
+    migrate_roles_to_permission_groups: Callable[[object], object]
+    assign_unowned_history_to_admin: Callable[[object], object]
+    backfill_history_identity_and_lineage: Callable[[object], object]
+
+    def create_schema(self, connection) -> None:
+        self.metadata.create_all(bind=connection)
+
+    def seed_fresh(self, connection) -> None:
+        """Seed only rows required by a new, already-current database."""
+        with self.session_factory(
+            bind=connection,
+            autocommit=False,
+            autoflush=False,
+        ) as session:
+            self.ensure_default_user_group(session)
+            self.ensure_permission_groups(session)
+            self.ensure_bootstrap_admin(session)
+            session.flush()
+
+    def apply_legacy(self, connection) -> None:
+        """Run the reviewed legacy transforms inside the coordinator transaction."""
+        self.migrate_columns(connection, include_fts=False)
+        with self.session_factory(
+            bind=connection,
+            autocommit=False,
+            autoflush=False,
+        ) as session:
+            self.ensure_default_user_group(session)
+            self.ensure_permission_groups(session)
+            self.ensure_bootstrap_admin(session)
+            # The bootstrap account must exist before the legacy role mirror is
+            # converted and before orphaned works resolve their canonical owner.
+            self.migrate_roles_to_permission_groups(session)
+            self.assign_unowned_history_to_admin(session)
+            self.backfill_history_identity_and_lineage(session)
+            session.flush()
+
+
+@dataclass(frozen=True)
 class RenamedCatalogNameplateMigrator:
     """Point the display column at the id a renamed catalog answers to today.
 

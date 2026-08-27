@@ -8064,3 +8064,13 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **camera入口に「撮影する」／「写真を選ぶ」／取消を加え、Photo Pickerのimage-only 1件を既存one-touch経路へ合流した。** 選択content URIはapp-owned cacheへ一時copyし、成功、取消、失敗、stale run、`onCleared`でownership guard付き削除を行う。元写真を変更／削除せず、storage permissionや独自file browserは追加していない。画像bytes／URI／path／EXIF／file名はNIMへ送らず、local Vision後のtextだけを既存routeで送る。
 - **保存済みprovenanceは既存JSON内で`origin=photo_picker`へ後方互換拡張し、Generation Infoがcamera撮影と既存写真を日英で区別する。** Room schema／migration／backfill、新列、server／web／cli／shared、render／DDL／catalog、通常設定には変更がない。
 - **検証と展開:** production edit前fail-first、focused JVM 12 classes・45 tests、production Kotlin compile、debug APK、Android名義test 6件、日英docs gate、diff checkがgreen。作者受入済みhead `b7521dfe`をmainへmergeし、`.77` Build 148120 APKを生成した。安全helperは2026-08-27の検証済みbackupを新規作成し2世代を保持した後、Pixel 9へdata-preserving installした。端末上のversion／Build確認と530 msのcold startが成功した。実機Photo Picker操作、full JVM suite、release build、DB全検査、raw SQLite query、real-device instrumentation、pentala、public GitHub pushは実行していない。
+
+### v2.14.0 — SQLite永続化を完了し、端末内画像からの描画を加える（Build 1060、2026-08-27）
+
+- **Serverの永続化をSQLite専用として完結させた。** 接続、transaction、migration、repositoryを小さなownerへ分割し、activeな設定・手順・support表現からPostgreSQL経路を廃止した。
+- **既存のServer SQLiteデータを保持したままversioned migrationする。** schema fingerprint、事前snapshot、単一writer lock、data-loss gateを備え、未知schemaや不整合は破壊的に修復せずfail closedする。
+- **portable persistence contractをServerとAndroidの論理schemaに通した。** field、NULL、identity、transaction、constraintを共通mappingで検証し、host固有adapterとの差を明示してCIへ登録した。
+- **Android Room schema 10への一回限りの境界を導入した。** v1–9のDBだけを意図的にresetし、model fileを保持する。v10以降や破損DBへ一般的な破壊fallbackは行わない。
+- **カメラ撮影とPhoto Pickerの画像を端末内Visionで解釈し、既存の描画・保存経路へ渡せるようにした。** 記述経路と検証済みlocal DDL直接経路を選べる。画像bytes、URI、file名、EXIF、位置、digestは外部送信も履歴保存もせず、取消やstale runは保存前に停止する。
+- **Androidの制作導線と安全境界を整えた。** 空のbatch行削除、自動color catalog、camera入口、canvas menu、launcher icon、real-device instrumentation guardを追加・改善した。
+- **DDL Engine 21の表現忠実度を広げた。** surfaceとprimitiveの節、retry時のcolor語彙、reference publicationのfail-closed境界を整備した。

@@ -28,6 +28,7 @@ from .persistence import groups as _groups
 from .persistence import history as _history
 from .persistence import identities as _identities
 from .persistence import lineage as _lineage
+from .persistence import legacy_schema as _legacy_schema
 from .persistence import migrations as _migrations
 from .persistence import access as _access
 from .persistence import okugaki as _okugaki
@@ -195,109 +196,25 @@ def _apply_legacy_baseline(connection) -> None:
 
 
 def _migrate_columns(connection=None, *, include_fts: bool = True) -> None:
-    manager = engine.begin() if connection is None else nullcontext(connection)
-    with manager as conn:
-        try:
-            CoerceTraceCatalogRow.__table__.create(bind=conn, checkfirst=True)
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError("failed to create coerce trace catalog table") from exc
-        try:
-            inspector = inspect(conn)
-            existing_history_columns = {col["name"] for col in inspector.get_columns("history")}
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError("failed to inspect history table columns for migration") from exc
-
-        # v2.8.0: `vary_seed` is the Stage 1.5 composition seed, not the
-        # variation seed. Rename the column before additions so persisted values
-        # move with it instead of becoming orphaned.
-        if (
-            "vary_seed" in existing_history_columns
-            and "composition_seed" not in existing_history_columns
-        ):
-            try:
-                conn.execute(text("ALTER TABLE history RENAME COLUMN vary_seed TO composition_seed"))
-                existing_history_columns.discard("vary_seed")
-                existing_history_columns.add("composition_seed")
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError("failed to rename history.vary_seed to composition_seed") from exc
-
-        adding_expanded_ddl = "expanded_ddl" not in existing_history_columns
-        for column, ddl in _HISTORY_COLUMN_MIGRATIONS.items():
-            if column in existing_history_columns:
-                continue
-            try:
-                conn.execute(text(ddl))
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(f"failed to migrate history.{column}") from exc
-
-        if adding_expanded_ddl:
-            # v1.98 redefined history.ddl as input-side DDL. Existing text is the
-            # expanded DDL that reached Stage 2, so move it and leave input-side
-            # DDL NULL because the original Stage 1 output was never persisted.
-            # A few direct-DDL works move their source text as expanded DDL; the
-            # author explicitly accepted that historical approximation on
-            # 2026-07-20.
-            try:
-                conn.execute(text("UPDATE history SET expanded_ddl = ddl, ddl = NULL WHERE ddl IS NOT NULL"))
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError("failed to move legacy history.ddl into expanded_ddl") from exc
-
-        try:
-            existing_user_columns = {col["name"] for col in inspector.get_columns("user_accounts")}
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError("failed to inspect user_accounts table columns for migration") from exc
-
-        has_lineage_nodes = inspector.has_table("lineage_nodes")
-        existing_lineage_node_columns = (
-            {col["name"] for col in inspector.get_columns("lineage_nodes")}
-            if has_lineage_nodes else set()
-        )
-        if has_lineage_nodes:
-            for column, ddl in _LINEAGE_NODE_COLUMN_MIGRATIONS.items():
-                if column in existing_lineage_node_columns:
-                    continue
-                try:
-                    conn.execute(text(ddl))
-                except Exception as exc:  # noqa: BLE001
-                    raise RuntimeError(f"failed to migrate lineage_nodes.{column}") from exc
-
-        for column, ddl in _USER_ACCOUNT_COLUMN_MIGRATIONS.items():
-            if column in existing_user_columns:
-                continue
-            try:
-                conn.execute(text(ddl))
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(f"failed to migrate user_accounts.{column}") from exc
-
-        # v2.8.0 moves persisted derivation kinds to the canonical vocabulary.
-        # `variation` belongs only to the actual variation operation: four other
-        # operations lose that suffix and `hensou` becomes `variation`. Rows are
-        # rewritten in place and never removed.
-        if inspector.has_table("lineage_edges"):
-            for before, after in _LINEAGE_KIND_RENAMES:
-                try:
-                    conn.execute(
-                        text("UPDATE lineage_edges SET derivation_kind = :after WHERE derivation_kind = :before"),
-                        {"before": before, "after": after},
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    raise RuntimeError(f"failed to rename derivation kind {before}") from exc
-
-        for index_name, ddl in _HISTORY_INDEX_MIGRATIONS:
-            try:
-                conn.execute(text(ddl))
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(f"failed to create migration index {index_name}") from exc
-        if has_lineage_nodes:
-            for index_name, ddl in _LINEAGE_NODE_INDEX_MIGRATIONS:
-                try:
-                    conn.execute(text(ddl))
-                except Exception as exc:  # noqa: BLE001
-                    raise RuntimeError(f"failed to create migration index {index_name}") from exc
-        _backfill_render_hashes(conn)
-        _migrate_renamed_catalog_nameplates(conn)
-        if include_fts:
-            _migrate_history_search(conn)
+    manifest = _legacy_schema.LegacyColumnMigrationManifest(
+        _LINEAGE_KIND_RENAMES,
+        _HISTORY_COLUMN_MIGRATIONS,
+        _LINEAGE_NODE_COLUMN_MIGRATIONS,
+        _USER_ACCOUNT_COLUMN_MIGRATIONS,
+        _HISTORY_INDEX_MIGRATIONS,
+        _LINEAGE_NODE_INDEX_MIGRATIONS,
+    )
+    return _legacy_schema.LegacyColumnMigrator(
+        engine,
+        nullcontext,
+        inspect,
+        text,
+        CoerceTraceCatalogRow.__table__,
+        manifest,
+        _backfill_render_hashes,
+        _migrate_renamed_catalog_nameplates,
+        _migrate_history_search,
+    ).migrate(connection, include_fts=include_fts)
 
 
 def _migrate_renamed_catalog_nameplates(conn) -> None:

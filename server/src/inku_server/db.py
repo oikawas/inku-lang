@@ -48,14 +48,17 @@ from .persistence.legacy_schema import (
 from .persistence.schema import (
     Base,
     CoerceTraceCatalogRow,
+    ExternalIdentityRow,  # noqa: F401 - compatibility re-export for direct identity readers
     HistoryAclRow,
     HistoryRow,
     LineageEdgeRow,
     LineageNodeRow,
     OkugakiRow,
+    PermissionGroupRow,  # noqa: F401 - compatibility re-export for direct integrity readers
     UnreadWordRow,  # noqa: F401 - compatibility re-export for direct integrity readers
     UserAccountRow,
     UserGroupRow,
+    UserPermissionGroupRow,  # noqa: F401 - compatibility re-export for direct integrity readers
     UserSessionRow,  # noqa: F401 - compatibility re-export for direct session readers
 )
 from .persistence.migrations import MigrationExecutionError, ensure_current_schema, install_history_fts

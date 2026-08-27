@@ -153,7 +153,7 @@ def test_persistence_lineage_owns_exact_imports_and_db_keeps_eight_facades() -> 
         ("import", 0, "", (("json", None),)),
         ("from", 0, "collections.abc", (("Callable", None),)),
         ("from", 0, "dataclasses", (("dataclass", None),)),
-        ("from", 0, "sqlalchemy", (("func", None), ("text", None))),
+        ("from", 0, "sqlalchemy", (("func", None), ("or_", None), ("text", None))),
         ("from", 1, "", (("access", None),)),
         (
             "from",
@@ -174,7 +174,11 @@ def test_persistence_lineage_owns_exact_imports_and_db_keeps_eight_facades() -> 
         "promote_lineage_node",
         "get_lineage_branch",
     )
-    store_tree = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+    store_tree = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "LineageStore"
+    )
     assert facade_names == tuple(
         node.name for node in store_tree.body if isinstance(node, ast.FunctionDef) and node.name != "__init__"
     )

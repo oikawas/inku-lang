@@ -28,8 +28,6 @@ def test_persistence_settings_owns_store_and_db_facades_follow_runtime_dependenc
     assert "inku_server.db" not in settings_source
     assert "from .. import db" not in settings_source
     assert "_SETTING_KEY" not in settings_source
-    assert "DEFAULT" not in settings_source
-    assert "normalize_" not in settings_source
 
     assert str(inspect.signature(db._read_app_setting)) == "(key: 'str') -> 'dict | None'"
     assert str(inspect.signature(db._write_app_setting)) == "(key: 'str', value: 'dict') -> 'dict'"

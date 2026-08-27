@@ -93,6 +93,74 @@ class HistoryRenderHashService:
 
 
 @dataclass(frozen=True)
+class HistoryRenderHashBackfill:
+    """Fill missing render identities on legacy SQLite history rows."""
+
+    engine: Any
+    text_fn: Callable[[str], Any]
+    logger: logging.Logger
+    render_hash_for_item_fn: Callable[[dict], str]
+
+    def backfill(self, conn: Any) -> None:
+        if self.engine.dialect.name != "sqlite":
+            return
+        rows = conn.execute(self.text_fn(
+            """
+            SELECT id, input, ddl, score, svg, catalog_id, render_build_number,
+                   render_engine_id, render_engine_version,
+                   render_color_catalog_id, render_color_catalog_name,
+                   render_color_catalog_sub, render_color_map, render_canvas_aspect,
+                   render_canvas_aspect_id, render_canvas_aspect_ratio, render_seed,
+                   composition_seed
+            FROM history
+            WHERE render_hash IS NULL OR render_hash = ''
+            """
+        ))
+        for row in rows.mappings():
+            try:
+                score = json.loads(row["score"]) if row["score"] else {}
+            except (json.JSONDecodeError, TypeError):
+                self.logger.error(
+                    "skipping render-hash backfill for corrupt score JSON: history_id=%s",
+                    row["id"],
+                )
+                continue
+            if not isinstance(score, dict):
+                self.logger.error(
+                    "skipping render-hash backfill for non-object score JSON: history_id=%s",
+                    row["id"],
+                )
+                continue
+            item = {
+                "input": row["input"],
+                "ddl": row["ddl"],
+                "score": score,
+                "svg": row["svg"],
+                "catalog_id": row["catalog_id"],
+                "render_build_number": row["render_build_number"],
+                "render_engine_id": row["render_engine_id"],
+                "render_engine_version": row["render_engine_version"],
+                "render_canvas_aspect": row["render_canvas_aspect"],
+                "render_canvas_aspect_id": row["render_canvas_aspect_id"],
+                "render_canvas_aspect_ratio": row["render_canvas_aspect_ratio"],
+                "render_color_catalog_id": row["render_color_catalog_id"],
+                "render_color_catalog_name": row["render_color_catalog_name"],
+                "render_color_catalog_sub": row["render_color_catalog_sub"],
+                "render_seed": row["render_seed"],
+                "composition_seed": row["composition_seed"],
+            }
+            if row["render_color_map"] is not None:
+                try:
+                    item["render_color_map"] = json.loads(row["render_color_map"])
+                except json.JSONDecodeError:
+                    item["render_color_map"] = None
+            conn.execute(
+                self.text_fn("UPDATE history SET render_hash = :render_hash WHERE id = :id"),
+                {"id": row["id"], "render_hash": self.render_hash_for_item_fn(item)},
+            )
+
+
+@dataclass(frozen=True)
 class UnownedHistoryOwnerBackfill:
     """Assign the canonical account only to legacy history rows without an owner."""
 

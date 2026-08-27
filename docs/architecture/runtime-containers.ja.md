@@ -76,5 +76,5 @@ FastAPIはversioned startupが完了するまで通常requestを受け付けな�
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | native render境界 | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Stage/save pool | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
-| Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_lifespan`, `logging_setup.py` |
+| Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_db.init_db`（migration）、`api.py:_lifespan`（backup scheduler）、`logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

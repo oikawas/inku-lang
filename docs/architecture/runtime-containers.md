@@ -87,5 +87,5 @@ failure prevents serving and retains the snapshot.
 | Web/API processes | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Native render boundary | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Stage/file pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
-| Migration/backups/logs | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_lifespan`, `logging_setup.py` |
+| Migration/backups/logs | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_db.init_db` (migration), `api.py:_lifespan` (backup scheduler), `logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

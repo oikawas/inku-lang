@@ -4,15 +4,15 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring and the Rust migration boundary reconciled with the current implementation 2026-08-24 |
-| Source branch / implementation commit | `main` / `3429864fe3605f9aaf5b392f3ea22a5602593357` (implementation baseline before this document update) |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring reconciled 2026-08-24; completed SQLite persistence refactoring reconciled 2026-08-27 |
+| Source branch / implementation commit | `main` / `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab` (implementation baseline before this document update) |
 | Source state | Clean at the implementation baseline; this update changes public documentation only |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.13.47 / Build 976` |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.14.1 / Build 1061` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`; `web/BUILD_NUMBER` = `976` |
+| Web / app | `web/APP_VERSION` = `v2.14.1`; `web/BUILD_NUMBER` = `1061` |
 | Render Engine | implementation `default / 41`; shared Rust core with a thin Python adapter |
-| DDL | `ddl_version=3`; `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.63`; shared Rust Render Engine `41`; DDL Engine `20` |
+| DDL | `ddl_version=3`; `ddl_engine_version=21` |
+| Android | `android/VERSION` = `2.1.4-android.77`; `android/BUILD_NUMBER` = `148120`; Room schema 10; shared Rust Render Engine `41`; DDL Engine `21` |
 
 Environment-variable names may appear, but values, credentials, production DB contents, and deployment-specific identifiers were outside the investigation.
 
@@ -26,10 +26,11 @@ Environment-variable names may appear, but values, credentials, production DB co
 | SYS-ANDROID | Android | Kotlin Stage 1 / 1.5 / 2, Room history and `rh3`; shared Rust SVG rendering and raster presentation | `InkuRepository`; `LocalFallbackPipeline`; `AndroidRenderHost`; `RustArtworkRasterizer`; `InkuDatabase` | `android/ANDROID_SPEC.ja.md` | Confirmed |
 | SYS-API | FastAPI app | Middleware, lifespan, and router assembly | `server/src/inku_server/api.py` (`app`, `_lifespan`, `include_router`) | §22; Project Context | Confirmed |
 | SYS-LLM | LLM providers | External inference for Stages 0.5, 1, and 2 | `model_settings.py`; `interpreter.py`; `composer.py` | §12.5–12.8 | Confirmed |
-| SYS-DB | Server DB | Canonical history, lineage, users, sessions, and settings | `db.py` (`HistoryRow`, `add_item`) | §21–22 | Confirmed |
+| SYS-DB | Server DB | Canonical SQLite and domain persistence; `db.py` is the compatibility/composition facade | `persistence/{config,engine,schema,access,accounts,groups,sessions,identities,settings,history,search,lineage,okugaki,feedback}.py`; `db.py` | §21–22 | Confirmed |
 | SYS-FILES | Work-file area | Optional description, DDL, JSON, SVG, and PNG derivatives | `api_core/rendering.py` (`_save_output_files`, `_submit_history_artifact_save`) | §21 | Confirmed |
 | SYS-LOG | Log area | stdout and rotating application file | `logging_setup.py:configure_logging` | §21 | Confirmed |
-| SYS-BACKUP | DB backup area | SQLite replicas and manual/scheduled generations | `db.py:create_db_backup`, `ensure_scheduled_db_backup` | §22 | Confirmed |
+| SYS-BACKUP | DB backup area | WAL-safe SQLite snapshots shared by migration, manual, and scheduled backups, plus generation policy | `persistence/backup.py`; thin delegates in `db.py` | §22 | Confirmed |
+| DATA-MIGRATION | Server schema lifecycle | SQLite-only preflight, versioned registry, allowlisted legacy fingerprint, single-writer migration, PK/canonical-history byte invariants, and fail-closed behavior | `persistence/{config,engine,migrations,legacy_schema,invariants,backup}.py`; portable persistence tests | §22 | Confirmed |
 | API-ROUTERS | Router set | 10 groups and 96 endpoints (the canonical count is `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py`) | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `test_route_authorization.py` | Project Context | Confirmed |
 | API-AUTH | Authentication and authorization | Bearer/cookie sessions, role guards, three public paths | `api_core/deps.py`; `routers/auth.py`; `test_route_authorization.py` | §22 | Confirmed |
 | API-LIMIT | Capacity boundaries | Body, request, render, Stage, and file-queue limits | `security.py`; `api_core/state.py`; `render.py:_run_with_hard_timeout` | §22 | Confirmed |
@@ -42,7 +43,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | PIPE-COERCE | Coerce/validation | Drop invalid values, deliver requests, enforce ceilings, and retain one explicitly named abstract color | `coerce/__init__.py`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | Confirmed |
 | PIPE-RENDER | Render Engine | JSON Score, seeds, and resolved host options to SVG and performance metadata through one coarse Python or Android-JNI native boundary | `render_engines/default/adapter.py`; `inku-render-python`; `inku-render-android`; `AndroidRenderHost`; `core/crates/inku-render`; `renderer.py:render` (SVG-only compatibility facade) | §12.14, §13.8 | Confirmed |
 | PIPE-RASTER | SVG raster presentation | Convert saved or newly generated canonical SVG into resource-independent premultiplied RGBA8 with explicit format, dimensions, and stride | `core/crates/inku-svg-raster`; `NativeRenderBridge`; `RustArtworkRasterizer` | Android specification | Confirmed |
-| PIPE-HISTORY | History persistence | Store Server Paint outputs in the DB | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | Confirmed |
+| PIPE-HISTORY | History persistence | Store Server Paint outputs in the DB | `render.py:_paint_events`; `rendering.py:_add_history_item`; `persistence/history.py`; `db.py:add_item` facade | §21 | Confirmed |
 | DATA-DH1 | `dh1` | Identity of a normalized description | `identity.py:description_hash` | Project Context | Confirmed |
 | DATA-RH3 | `rh3` | Edition identity from Score, render seed, Wild, engine, and color catalog | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context | Confirmed |
 | DATA-RH2 | Legacy `rh2` | Compatibility with the older edition hash | `db.py:_legacy_render_hash_for_item`; `test_render_hash.py` | Project Context | Confirmed |
@@ -57,7 +58,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | TEST-CORPUS | Frozen corpora | Rebuild and compare 610 current Render Engine 41 cases and 49 DDL Engine 20 cases; retain the 610 Engine 40 cases as historical evidence only | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | Confirmed |
 | TEST-ANDROID | Android native acceptance | Stage a bounded selection from the canonical manifest, compare packaged-JNI SVG bytes, and compare current/historical representatives by raw pixels, stride, and digest | `NativeRenderDeviceTest`; `syncNativeParityAssets`; `inku-svg-raster` digest tests | Android specification | Confirmed |
 | TEST-WEBCLI | Web/CLI checks | Svelte checks/unit/lint and CLI pytest | `web/package.json`; Web tests; `cli/tests/test_cli.py` | Project Context | Confirmed |
-| CI-GATES | Current CI | Server/CLI lint+pytest, Web check+unit+lint:i18n, document checks, corpus rebuild, a path-scoped shared-Rust/raster/JNI/Android-host native gate, and release-tag container build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android specification | Confirmed |
+| CI-GATES | Current CI | Server/CLI lint+pytest, Web check+unit+lint:i18n, bilingual documents and the portable persistence verifier, corpus rebuild, a path-scoped shared-Rust/raster/JNI/Android-host native gate, and release-tag container build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android specification | Confirmed |
 
 ## Confidence
 

@@ -13,8 +13,9 @@ flowchart TB
     STAGE_POOL["Stage executor / bounded queue"]
     SAVE_POOL["Artifact executor / bounded queue"]
     BACKUP_TASK["lifespan backup scheduler"]
+    MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
-    DB[("DB")]
+    DB[("canonical SQLite")]
     OUTPUTS[("作品ファイル")]
     BACKUPS[("DB replica")]
     LOGS[("app log files + stdout")]
@@ -25,6 +26,9 @@ flowchart TB
     API_PROC -->|"Stage 0.5/1/2 job"| STAGE_POOL
     STAGE_POOL -->|"provider call"| PROVIDERS
     API_PROC -->|"transaction"| DB
+    API_PROC -->|"serve前に1回"| MIGRATION
+    MIGRATION -->|"single writer"| DB
+    MIGRATION -->|"legacyだけsnapshot"| BACKUPS
     API_PROC -->|"best-effort job"| SAVE_POOL
     SAVE_POOL -->|"SVG/JSON/DDL/PNG"| OUTPUTS
     API_PROC -->|"owns"| BACKUP_TASK
@@ -63,6 +67,8 @@ flowchart LR
 
 Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLiteであり、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通なのはfile名やtable名ではなく、[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)が定める言語非依存の論理契約である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであり、parity gapではない。
 
+FastAPIはversioned startupが完了するまで通常requestを受け付けない。current registryは版とchecksumだけを検証し、legacy全件scanを通常起動へ戻さない。受け入れたpre-registry DBだけがWAL-safe snapshotとsingle-writer migrationを通り、失敗時はserveせずsnapshotを残す。
+
 ## 根拠対応
 
 | 図要素 | Evidence ID | 実装 |
@@ -70,5 +76,5 @@ Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLite�
 | Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | native render境界 | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Stage/save pool | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
-| Backup/log | `SYS-BACKUP`, `SYS-LOG` | `api.py:_lifespan`, `db.py`, `logging_setup.py` |
+| Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_lifespan`, `logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

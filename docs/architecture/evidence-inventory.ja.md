@@ -4,15 +4,15 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoringとRust移行境界を現行実装へ再照合 2026-08-24 |
-| source branch / 実装commit | `main` / `3429864fe3605f9aaf5b392f3ea22a5602593357`（本書更新前の実装baseline） |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoring再照合 2026-08-24、SQLite persistence refactoring完了を再照合 2026-08-27 |
+| source branch / 実装commit | `main` / `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab`（本書更新前の実装baseline） |
 | source状態 | 実装baselineではclean。本更新は公開文書だけを変更する |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.13.47 / Build 976` |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.14.1 / Build 1061` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.13.47`、`web/BUILD_NUMBER` = `976` |
+| Web / app | `web/APP_VERSION` = `v2.14.1`、`web/BUILD_NUMBER` = `1061` |
 | Render Engine | 実装 `default` / `41`、共有Rust coreと薄いPython adapter |
-| DDL | `ddl_version=3` / `ddl_engine_version=20` |
-| Android | `android/VERSION` = `2.1.4-android.63`、共有Rust Render Engine `41`、DDL Engine `20` |
+| DDL | `ddl_version=3` / `ddl_engine_version=21` |
+| Android | `android/VERSION` = `2.1.4-android.77`、`android/BUILD_NUMBER` = `148120`、Room schema 10、共有Rust Render Engine `41`、DDL Engine `21` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -26,10 +26,11 @@
 | SYS-ANDROID | Android | Kotlinによる端末内のStage 1 / 1.5 / 2、Room履歴と`rh3`、共有RustによるSVG描画とraster presentation | `InkuRepository`; `LocalFallbackPipeline`; `AndroidRenderHost`; `RustArtworkRasterizer`; `InkuDatabase` | `android/ANDROID_SPEC.ja.md` | 確認済み | 公開可 |
 | SYS-API | FastAPI app | middleware、lifespan、router組立て | `server/src/inku_server/api.py` (`app`, `_lifespan`, `include_router`) | §22; Project Context「server」 | 確認済み | 公開可 |
 | SYS-LLM | LLM providers | Stage 0.5/1/2等の外部推論 | `model_settings.py` (`provider_for_model`, `connection_for`); `interpreter.py`; `composer.py` | §12.5–12.8 | 確認済み | 抽象化すれば可 |
-| SYS-DB | Server DB | 履歴、系譜、利用者、session、設定の正本 | `db.py` (`HistoryRow`ほか、`add_item`) | §21–22 | 確認済み | 公開可 |
+| SYS-DB | Server DB | SQLite正本とdomain persistence。`db.py`は互換・composition façade | `persistence/{config,engine,schema,access,accounts,groups,sessions,identities,settings,history,search,lineage,okugaki,feedback}.py`; `db.py` | §21–22 | 確認済み | 公開可 |
 | SYS-FILES | 作品ファイル領域 | SVG/JSON/DDL/入力/PNGの任意派生保存 | `api_core/rendering.py` (`_save_output_files`, `_submit_history_artifact_save`) | §21 | 確認済み | 抽象化すれば可 |
 | SYS-LOG | ログ領域 | stdoutとアプリ内ローテーションファイル | `logging_setup.py` (`configure_logging`) | §21 | 確認済み | 抽象化すれば可 |
-| SYS-BACKUP | DBバックアップ領域 | SQLite replica、自動/手動世代 | `db.py` (`create_db_backup`, `ensure_scheduled_db_backup`) | §22 | 確認済み | 抽象化すれば可 |
+| SYS-BACKUP | DBバックアップ領域 | migration・手動・定時で共有するWAL-safe SQLite snapshotと世代管理 | `persistence/backup.py`; `db.py`の薄いdelegate | §22 | 確認済み | 抽象化すれば可 |
+| DATA-MIGRATION | Server schema lifecycle | SQLite-only事前検証、versioned registry、allowlisted legacy fingerprint、単一writer移行、PK/canonical history byte invariant、fail-closed | `persistence/{config,engine,migrations,legacy_schema,invariants,backup}.py`; portable persistence tests | §22 | 確認済み | 公開可 |
 | API-ROUTERS | Router群 | 10分類、96 endpoint（件数の正本は `test_route_authorization.py` の `EXPECTED_ROUTE_COUNT`） | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `test_route_authorization.py` | Project Context「server」 | 確認済み | 公開可 |
 | API-AUTH | 認証・認可 | Bearer/cookie session、role guard、公開3経路 | `api_core/deps.py`; `routers/auth.py`; `test_route_authorization.py` | §22 | 確認済み | 公開可 |
 | API-LIMIT | 容量境界 | body、request、render、Stage、保存queueの上限 | `security.py`; `api_core/state.py`; `render.py:_run_with_hard_timeout` | §22 | 確認済み | 公開可 |
@@ -42,7 +43,7 @@
 | PIPE-COERCE | coerce/validation | 不正値drop、要求配達、天井、描画可能性確保 | `coerce/__init__.py:coerce_score`; `coerce/normalize.py`; `coerce/compose.py` | §10, §12.12, §14.6 | 確認済み | 公開可 |
 | PIPE-RENDER | Render Engine | Score、seed、解決済みhost optionから、PythonまたはAndroid JNIの粗いnative 1-call境界を通してSVGと描画metadataを作る | `render_engines/default/adapter.py`; `inku-render-python`; `inku-render-android`; `AndroidRenderHost`; `core/crates/inku-render`; `renderer.py:render`（SVG-only互換facade） | §12.14, §13.8 | 確認済み | 公開可 |
 | PIPE-RASTER | SVG raster presentation | 保存済み／生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換し、pixel format・寸法・strideを明示する | `core/crates/inku-svg-raster`; `NativeRenderBridge`; `RustArtworkRasterizer` | Android仕様 | 確認済み | 公開可 |
-| PIPE-HISTORY | 履歴保存 | `/api/paint`のserver生成物をDBへ保存 | `render.py:_paint_events`; `rendering.py:_add_history_item`; `db.py:add_item` | §21 | 確認済み | 公開可 |
+| PIPE-HISTORY | 履歴保存 | `/api/paint`のserver生成物をDBへ保存 | `render.py:_paint_events`; `rendering.py:_add_history_item`; `persistence/history.py`; `db.py:add_item` façade | §21 | 確認済み | 公開可 |
 | DATA-DH1 | `dh1` | 正規化した記述の同一性 | `identity.py:description_hash` | Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-RH3 | `rh3` | Score、render seed、wild、engine、色カタログによるedition同一性 | `db.py:render_hash_for_item`; `test_render_hash.py` | Project Context「設計契約」 | 確認済み | 公開可 |
 | DATA-RH2 | legacy `rh2` | 旧edition hashの互換保持 | `db.py:_legacy_render_hash_for_item`; `test_render_hash.py` | Project Context「設計契約」 | 確認済み | 公開可 |
@@ -57,7 +58,7 @@
 | TEST-CORPUS | 凍結コーパス | 現行Render Engine 41の610件とDDL 20の49件を再生成照合し、Engine 40の610件は履歴根拠としてのみ保持 | `server/reference/render-engine-41/manifest.json`; `render-engine-40/manifest.json`; `ddl-engine-20/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
 | TEST-ANDROID | Android native受入 | canonical manifestから生成した少数assetを同梱JNIでSVG byte照合し、current / historical代表をraw pixel・stride・digestで照合する | `NativeRenderDeviceTest`; `syncNativeParityAssets`; `inku-svg-raster` digest tests | Android仕様 | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
-| CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、docs検査、corpus再生成、共有Rust / raster / JNI / Android hostのpath-scoped native gate、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
+| CI-GATES | 現在のCI | server/cli lint+pytest、web check+unit+lint:i18n、bilingual docsとportable persistence verifier、corpus再生成、共有Rust / raster / JNI / Android hostのpath-scoped native gate、tag時image build | `.github/workflows/checks.yml`; `reference-corpus.yml`; `android-native.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
 
 ## 信頼度の読み方
 

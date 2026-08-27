@@ -34,6 +34,51 @@ authentication and administration tables and device-only provider, model, and
 cache tables are host extensions rather than parity gaps. This mapping does not
 change the meaning of stored SVG, Score, hashes, or NULL values.
 
+## Server SQLite lifecycle
+
+```mermaid
+flowchart LR
+    CONFIG["config.py\nvalidate both SQLite URLs first"]
+    ENGINE["engine.py\nengines + connection PRAGMAs"]
+    FACADE["db.py\ncompatibility / composition facade"]
+    MIGRATION["migrations.py\nregistry / fingerprint / writer lock"]
+    SNAPSHOT["backup.py\nWAL-safe SQLite snapshot"]
+    INVARIANTS["invariants.py\nPK + canonical history digest"]
+    SCHEMA["schema.py / legacy_schema.py\nphysical schema / one-shot transforms"]
+    DOMAIN["domain owners\naccounts / settings / history / lineage / search …"]
+    DB[("canonical SQLite")]
+
+    CONFIG --> ENGINE
+    FACADE --> MIGRATION
+    MIGRATION --> SNAPSHOT
+    MIGRATION --> INVARIANTS
+    MIGRATION --> SCHEMA
+    MIGRATION --> DB
+    DOMAIN --> DB
+```
+
+`db.py` preserves existing imports and call shapes as a facade; it does not own
+direct SQL or migration behavior. Eighteen owner modules under `persistence/`,
+plus package initialization, separate
+configuration, engines, schema, migration, backup, and invariants from the
+change reasons for access, accounts, groups, sessions, identities, settings,
+history, search, lineage, colophons, and feedback.
+
+Startup has three paths. A fresh database creates schema and registry in one
+transaction. A registered database verifies its version and checksum and starts
+without repeating legacy repair scans. A pre-registry database migrates once,
+in a single-writer transaction after a verified snapshot, only when its schema
+fingerprint and FTS state are explicitly accepted. Unknown, partial, future, or
+checksum-mismatched states fail before mutation. Migration streams primary-key
+identity and canonical `id/input/score/svg` history bytes and also requires
+SQLite quick check and foreign-key check.
+
+Android Room v10 satisfies the same logical contract through a different
+physical schema. The v1–9-only reset discards the old database and derived
+thumbnails, retains model files and existing v10, and leaves future or
+unreadable databases untouched. That lifecycle difference is an explicit host
+adapter boundary, not a portable-contract gap.
+
 ## Identity values
 
 | ID | Identifies | May differ even when this is equal | Implementation |

@@ -19,7 +19,7 @@ flowchart TD
     FEEDBACK["feedback router"]
     DEPS["api_core/deps.py\nsession・role guards"]
     SHARED["api_core state/models/common/rendering"]
-    DB["db.py"]
+    DB["db.py\ncompatibility / composition façade"]
 
     API_PY -->|"include_router"| PUB
     API_PY -->|"include_router"| AUTH
@@ -69,7 +69,7 @@ flowchart LR
     CORE["inku-render Rust core\nplanning / geometry / marks / SVG / metadata"]
     REFERENCE["reference.py\n実装reference"]
     RENDERER["renderer.py\nSVG-only互換facade"]
-    DB["db.py"]
+    DB["db.py\ncompatibility / composition façade"]
     ANALYSIS["shared/inku_analysis"]
 
     RENDER_ROUTER --> SKETCH
@@ -97,6 +97,30 @@ flowchart LR
 正規経路は `api_core/rendering.py → render_engines` registry → `default/adapter.py` → 独立した `inku-render-python` wheel → platform-independentな `inku-render` core である。adapterはhost所有のcanvas/profileを解決し、正規requestを1回serializeして、SVGとmetadataを1回のcallで受け取る。`renderer.py` はSVG-only互換facadeとして残り、同じregistryへ委譲する。
 
 Stage 6でPython Engine 40の統率、planning、mark、surface、layer、SVG emission、stroke moduleを削除した。`default/` に残るのはpackage exportと薄いRust adapterだけである。`/api/reference` も第二のPython実装をimportせず、renderer所有の表をnative coreから読む。Androidも`inku-render-android`の薄いJNI adapterから同じcoreを呼ぶ。AndroidのSVG presentationは別crate `inku-svg-raster`が担い、Serverの既存PNG raster経路はこの境界では変更しない。
+
+## 永続化面
+
+```mermaid
+flowchart TD
+    CALLERS["routers / services / tests"]
+    FACADE["db.py\ncompatibility・composition"]
+    STARTUP["config / engine / schema\nmigrations / legacy_schema\ninvariants / backup"]
+    SECURITY["access / accounts / groups\nsessions / identities"]
+    PRODUCT["settings / history / search\nlineage / okugaki / feedback"]
+    SQLITE[("canonical SQLite")]
+
+    CALLERS --> FACADE
+    FACADE --> STARTUP
+    FACADE --> SECURITY
+    FACADE --> PRODUCT
+    STARTUP --> SQLITE
+    SECURITY --> SQLITE
+    PRODUCT --> SQLITE
+```
+
+`db.py`は既存callerを一度に書き換えないためのpublic compatibility façadeであり、同時にcall-time dependencyを組み立てるcomposition seamである。`persistence/schema.py`がORM schema、`config.py`と`engine.py`がSQLite-only設定とconnection PRAGMA、`migrations.py`がversioned registryと起動判定、`backup.py`と`invariants.py`がsnapshotとdata-loss guardを所有する。domain CRUDとqueryは変更理由ごとのmoduleが所有する。
+
+現在の`db.py`に直接SQL、transaction、migration session、metadata create、commit、flushの実装ownerは残らない。compatibility re-exportと薄いdelegateは意図したboundaryであり、readerがゼロと証明されたものだけを削除する。新しい永続化処理をfaçadeへ戻さないことは、単なる行数削減より優先する。
 
 ## Rust core内部
 
@@ -163,5 +187,5 @@ flowchart LR
 |---|---|---|
 | app/router/deps | `SYS-API`, `API-ROUTERS`, `API-AUTH` | `api.py`, `api_core/routers`, `deps.py` |
 | pipeline components | `PIPE-*` | `render.py:_call_compose_detail`, `_paint_events` |
-| persistence | `PIPE-HISTORY`, `SYS-FILES` | `rendering.py`, `db.py` |
+| persistence | `PIPE-HISTORY`, `SYS-DB`, `DATA-MIGRATION` | `rendering.py`, `db.py`, `persistence/*` |
 | shared rasterizer | `SYS-FILES` | `shared/src/inku_analysis/rasterizer.py` |

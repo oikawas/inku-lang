@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `3429864fe3605f9aaf5b392f3ea22a5602593357`、app `v2.13.47 / Build 976` である。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab`、app `v2.14.1 / Build 1061` である。
 
 ## 推奨閲覧順
 
@@ -16,6 +16,7 @@
 10. `change-impact-map.ja.md` — 変更時の波及
 11. `known-differences.ja.md` — 不一致・未確認
 12. `future-plan.ja.md` — 生成アーキテクチャの改修計画（裁定済みの範囲）
+13. `technology-stack.ja.md` — 付録：言語、framework、runtime component、build/test tool
 
 ## 図の読み方
 

@@ -2140,7 +2140,15 @@ App rail のユーザーメニューは、ログイン中の利用者のプロ�
 
 設定の可視性は権限グループに応じる。**DB 設定とユーザー管理は `admins` グループに属する利用者にだけ見える。** プラグインタブはログイン中の全利用者に見えるが、**プラグイン設定の変更とプラグインストレージの更新 API は `admins` に制限する。**
 
-Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`はSQLite URLだけを受け付け、非SQLite URLはengine作成前に拒否する。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
+Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
+
+Serverのschema lifecycleはversion付きmigration registryが所有する。fresh DBはschemaとregistryを同じ単一writer transactionで作る。registryを持つDBは版とchecksumを検証して通常起動し、旧schema用の全件repair scanを毎回は行わない。registry導入前のDBは、明示的に登録されたschema fingerprintと完全なFTS状態だけを受け入れる。未知のfingerprint、部分的なFTS、未来のregistry版、checksum不一致は、schemaやrowを変更する前にfail closedする。
+
+受け入れた旧DBを変更する前には、SQLite Backup APIでWALを含む読取可能なsnapshotを作る。その後に`BEGIN IMMEDIATE`相当の単一writer境界を取り、migration前後で各tableのprimary-key identityと、履歴の`id`・`input`・`score`・`svg`のcanonical byteをstreaming digestで照合する。`PRAGMA quick_check`とforeign-key検査も必須で、どれかが失敗すればtransactionをrollbackし、検証済みsnapshotを回復判断のため保持する。手動・定時backupも同じSQLite-native snapshot ownerを使い、WALを無視するmain fileだけのcopyへfallbackしない。
+
+`server/src/inku_server/db.py`は既存importとcall shapeを保つ互換・composition façadeである。物理schema、設定、engine、migration、invariant、backup、および認証・設定・履歴・検索・系譜などのdomain persistence ownerは`server/src/inku_server/persistence/`に分かれる。façadeの残存行数だけを理由に再分割せず、新しい永続化処理は対応するownerへ置く。
+
+Androidはこの論理契約を共有するがServer DBを開かない。Room v1–9からv10への移行では、通常のRoom singletonを開く前にv1–9だけを明示的に削除し、DB本体・journal・派生thumbnailを捨ててfresh v10を作る。SQLite外のdownload済みmodel fileは残す。既存v10は保持し、v11以上、non-empty v0、読めないDBはbyteを変更せずfail closedする。v10以後にgeneric destructive fallbackは設けず、明示的なRoom migrationまたは新しい作者裁定を要する。
 
 DB 設定タブは現在のSQLite DBファイルサイズも示す。管理者はDBのレプリカバックアップを、日数の間隔・時刻・自動世代の最大数で設定できる。既定は7日・03:00・4世代。手動バックアップは即座に作れ、自動世代の上限とは別に保存される。backupとrestoreはSQLite file boundaryを使う。
 

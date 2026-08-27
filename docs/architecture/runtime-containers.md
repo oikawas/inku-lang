@@ -13,8 +13,9 @@ flowchart TB
     STAGE_POOL["Stage executor / bounded queue"]
     SAVE_POOL["Work-file executor / bounded queue"]
     BACKUP_TASK["Lifespan backup scheduler"]
+    MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
-    DB[("DB")]
+    DB[("canonical SQLite")]
     OUTPUTS[("Work files")]
     BACKUPS[("DB replicas")]
     LOGS[("Application logs + stdout")]
@@ -25,6 +26,9 @@ flowchart TB
     API_PROC -->|"Stage 0.5 / 1 / 2 job"| STAGE_POOL
     STAGE_POOL -->|"provider call"| PROVIDERS
     API_PROC -->|"transaction"| DB
+    API_PROC -->|"once before serving"| MIGRATION
+    MIGRATION -->|"single writer"| DB
+    MIGRATION -->|"legacy-only snapshot"| BACKUPS
     API_PROC -->|"best-effort job"| SAVE_POOL
     SAVE_POOL -->|"SVG, JSON, DDL, PNG"| OUTPUTS
     API_PROC -->|"owns"| BACKUP_TASK
@@ -70,6 +74,12 @@ table names. Server-only authentication and administration tables and
 device-only provider, model, and cache tables are host extensions, not parity
 gaps.
 
+FastAPI accepts normal requests only after versioned startup completes. A
+current registry verifies only version and checksum; it does not bring legacy
+whole-database scans back into normal startup. Only an accepted pre-registry
+database passes through a WAL-safe snapshot and single-writer migration. A
+failure prevents serving and retains the snapshot.
+
 ## Evidence map
 
 | Diagram element | Evidence ID | Implementation |
@@ -77,5 +87,5 @@ gaps.
 | Web/API processes | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
 | Native render boundary | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
 | Stage/file pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
-| Backup/logs | `SYS-BACKUP`, `SYS-LOG` | `api.py:_lifespan`, `db.py`, `logging_setup.py` |
+| Migration/backups/logs | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_lifespan`, `logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

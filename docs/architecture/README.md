@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `3429864fe3605f9aaf5b392f3ea22a5602593357`, app `v2.13.47 / Build 976`.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab`, app `v2.14.1 / Build 1061`.
 
 ## Reading order
 
@@ -16,6 +16,7 @@ This documentation maps the DDL design stages to the current implementation and 
 10. `change-impact-map.md` — Change propagation
 11. `known-differences.md` — Differences and unknowns
 12. `future-plan.md` — The generation-architecture improvement plan (as far as it is ruled)
+13. `technology-stack.md` — Appendix: languages, frameworks, runtime components, and build/test tools
 
 Japanese counterparts use the same names with `.ja.md`.
 

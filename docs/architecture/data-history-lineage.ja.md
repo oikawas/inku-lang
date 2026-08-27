@@ -26,6 +26,35 @@ DB rowには入力、Stage 1側DDL、effective DDL、Score、server生成SVG、m
 
 ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLiteを物理ownerとして持ち、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通意味とhost mappingの正本は[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)であり、同じDB file、table名、column配置を要求しない。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。保存済みSVG、Score、hash、NULLの意味はこのmappingによって変えない。
 
+## Server SQLite lifecycle
+
+```mermaid
+flowchart LR
+    CONFIG["config.py\n両SQLite URLを先に検証"]
+    ENGINE["engine.py\nengine + connection PRAGMA"]
+    FACADE["db.py\ncompatibility / composition façade"]
+    MIGRATION["migrations.py\nregistry / fingerprint / writer lock"]
+    SNAPSHOT["backup.py\nWAL-safe SQLite snapshot"]
+    INVARIANTS["invariants.py\nPK + canonical history digest"]
+    SCHEMA["schema.py / legacy_schema.py\nphysical schema / one-shot transform"]
+    DOMAIN["domain owners\naccounts / settings / history / lineage / search …"]
+    DB[("canonical SQLite")]
+
+    CONFIG --> ENGINE
+    FACADE --> MIGRATION
+    MIGRATION --> SNAPSHOT
+    MIGRATION --> INVARIANTS
+    MIGRATION --> SCHEMA
+    MIGRATION --> DB
+    DOMAIN --> DB
+```
+
+`db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の18 owner module（これにpackage初期化を加える）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedbackの変更理由ごとに分かれる。
+
+起動時は3経路だけを取る。fresh DBはschemaとregistryを1 transactionで作る。registry済みDBは版とchecksumを検査して通常起動し、legacy repair scanを繰り返さない。registry導入前DBは、明示されたschema fingerprintとFTS状態を満たす場合だけ、検証済みsnapshot作成後に単一writer transactionで一度だけ移行する。未知・部分状態・未来版・checksum不一致は変更前に拒否する。移行中はprimary key identityと履歴の`id/input/score/svg` byteをstreamingで照合し、SQLite quick checkとforeign-key checkも要求する。
+
+Android Room v10は同じ論理契約を別の物理schemaで満たす。v1–9限定resetは旧DBと派生thumbnailを捨てるがmodel fileを残し、v10を保持する。未来版や読めないDBは変更しない。このlifecycle差はportable contractのgapではなくhost adapterの明示的な所有範囲である。
+
 ## 4種類のID
 
 | ID | 何を識別するか | 同じでも別になりうるもの | 実装 |

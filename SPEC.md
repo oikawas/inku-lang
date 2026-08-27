@@ -3537,8 +3537,10 @@ signed-in users, but plugin setting changes and plugin-storage update APIs are
 restricted to `admins`.
 
 The Server's canonical persistence uses SQLite through SQLAlchemy only.
-`INKU_DB_URL` accepts SQLite URLs only and rejects a non-SQLite URL before
-engine creation. Server SQLAlchemy/SQLite and Android Room/SQLite each own a
+`INKU_DB_URL` and the derived thumbnail-store setting accept SQLite URLs only;
+both are validated before either engine is created. Rejection of a non-SQLite
+URL never falls through to a new empty default database. Server
+SQLAlchemy/SQLite and Android Room/SQLite each own a
 physical schema; a possible future iOS adapter would map another physical
 schema to the same logical contract. This does not mean sharing one database
 file, table names, or column layout. Canonical logical meaning and host mappings
@@ -3547,6 +3549,40 @@ live in [`persistence/README.md`](persistence/README.md) and
 authentication and administration tables and device-only provider, model, and
 cache tables are host extensions, not parity gaps. The mapping does not change
 the meaning of stored SVG, Score, hashes, or NULL values.
+
+A versioned migration registry owns the Server schema lifecycle. A fresh
+database creates its schema and registry in one single-writer transaction. A
+registered database verifies its version and checksum and then starts without
+repeating legacy whole-database repair scans. A pre-registry database is
+accepted only when its schema fingerprint and complete FTS state are explicitly
+named. An unknown fingerprint, partial FTS installation, future registry
+version, or checksum mismatch fails before any schema or row is changed.
+
+Before an accepted legacy database is changed, the Server creates and opens a
+WAL-safe snapshot through SQLite's Backup API. It then takes a `BEGIN IMMEDIATE`
+or equivalent single-writer boundary and compares every table's primary-key
+identity plus the canonical `id`, `input`, `score`, and `svg` history bytes by
+streaming digest. SQLite quick check and foreign-key check must also pass. Any
+failure rolls back the transaction and retains the verified snapshot for an
+explicit recovery decision. Migration, manual, and scheduled backups share the
+same SQLite-native snapshot owner and never fall back to copying only the main
+file while ignoring WAL.
+
+`server/src/inku_server/db.py` is a compatibility and composition facade that
+preserves existing imports and call shapes. Physical schema, configuration,
+engine, migration, invariant, backup, and domain persistence owners for
+accounts, settings, history, search, lineage, and related data live under
+`server/src/inku_server/persistence/`. New persistence work belongs to the
+corresponding owner; facade line count alone is not a reason to split it again.
+
+Android shares this logical contract but never opens the Server database. For
+the Room v1–9 to v10 transition, a coordinator runs before the normal Room
+singleton, deletes only v1–9 database and journal files plus derived
+thumbnails, and creates a fresh v10 database. Downloaded model files outside
+SQLite remain. Existing v10 is kept; v11 or later, non-empty v0, and unreadable
+databases fail without changing database, thumbnail, or model bytes. There is
+no generic destructive fallback after v10: a later change needs an explicit
+Room migration or a new author ruling.
 
 The DB settings tab also shows the current SQLite DB file size. Admin users can
 configure DB replica backups with an interval in days, a time of day, and a

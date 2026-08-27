@@ -19,7 +19,7 @@ flowchart TD
     FEEDBACK["feedback router"]
     DEPS["api_core/deps.py\nsession and role guards"]
     SHARED["api_core state / models / common / rendering"]
-    DB["db.py"]
+    DB["db.py\ncompatibility / composition facade"]
 
     API_PY -->|"include_router"| PUB
     API_PY -->|"include_router"| AUTH
@@ -69,7 +69,7 @@ flowchart LR
     CORE["inku-render Rust core\nplanning / geometry / marks / SVG / metadata"]
     REFERENCE["reference.py\nimplementation reference"]
     RENDERER["renderer.py\nSVG-only compatibility facade"]
-    DB["db.py"]
+    DB["db.py\ncompatibility / composition facade"]
     ANALYSIS["shared/inku_analysis"]
 
     RENDER_ROUTER --> SKETCH
@@ -97,6 +97,40 @@ flowchart LR
 The canonical path is `api_core/rendering.py → render_engines` registry → `default/adapter.py` → the independent `inku-render-python` wheel → the platform-independent `inku-render` core. The adapter resolves host-owned canvas/profile data, serializes one canonical request, and receives SVG plus metadata in one call. `renderer.py` remains the SVG-only compatibility facade and delegates through the same registry.
 
 Stage 6 removed the Python Engine 40 orchestration, planning, mark, surface, layer, SVG-emission, and stroke modules. `default/` now contains only its package export and the thin Rust adapter. `/api/reference` obtains renderer-owned tables from the native core instead of importing a second Python implementation. Android now calls the same core through the thin `inku-render-android` JNI adapter. Its SVG presentation uses the separate `inku-svg-raster` crate; this boundary does not change the Server's existing PNG raster path.
+
+## Persistence surface
+
+```mermaid
+flowchart TD
+    CALLERS["routers / services / tests"]
+    FACADE["db.py\ncompatibility and composition"]
+    STARTUP["config / engine / schema\nmigrations / legacy_schema\ninvariants / backup"]
+    SECURITY["access / accounts / groups\nsessions / identities"]
+    PRODUCT["settings / history / search\nlineage / okugaki / feedback"]
+    SQLITE[("canonical SQLite")]
+
+    CALLERS --> FACADE
+    FACADE --> STARTUP
+    FACADE --> SECURITY
+    FACADE --> PRODUCT
+    STARTUP --> SQLITE
+    SECURITY --> SQLITE
+    PRODUCT --> SQLITE
+```
+
+`db.py` is the public compatibility facade that avoids rewriting every caller
+at once and the composition seam that supplies call-time dependencies.
+`persistence/schema.py` owns the ORM schema; `config.py` and `engine.py` own
+SQLite-only configuration and connection PRAGMAs; `migrations.py` owns the
+versioned registry and startup decision; and `backup.py` plus `invariants.py`
+own snapshots and the data-loss guard. Domain CRUD and queries belong to
+modules separated by their reasons to change.
+
+No direct SQL, transaction, migration Session, metadata-create, commit, or
+flush implementation owner remains in `db.py`. Compatibility re-exports and
+thin delegates are intentional. Only a wrapper with proven-zero readers is
+removed; keeping new persistence behavior out of the facade matters more than
+reducing its line count.
 
 ## Rust core internals
 
@@ -159,4 +193,4 @@ Total: 96. The three-path public allowlist is `/health`, `/api/info`, and `/api/
 
 ## Evidence map
 
-Evidence: `SYS-API`, `API-ROUTERS`, `API-AUTH`, `PIPE-*`, `PIPE-HISTORY`, `SYS-FILES`.
+Evidence: `SYS-API`, `API-ROUTERS`, `API-AUTH`, `PIPE-*`, `PIPE-HISTORY`, `SYS-DB`, `DATA-MIGRATION`, `SYS-FILES`.

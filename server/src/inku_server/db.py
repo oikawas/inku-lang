@@ -28,6 +28,7 @@ from .persistence import groups as _groups
 from .persistence import history as _history
 from .persistence import identities as _identities
 from .persistence import lineage as _lineage
+from .persistence import migrations as _migrations
 from .persistence import access as _access
 from .persistence import okugaki as _okugaki
 from .persistence import sessions as _sessions
@@ -300,27 +301,10 @@ def _migrate_columns(connection=None, *, include_fts: bool = True) -> None:
 
 
 def _migrate_renamed_catalog_nameplates(conn) -> None:
-    """Point the display column at the id a renamed catalog answers to today.
-
-    Only `catalog_id` moves. `render_color_catalog_id` is the id the work was
-    DRAWN with, and the renderer hashes it into the seed that assigns each
-    chromatic work color, so rewriting it would repaint the work out of its own
-    unchanged snapshot -- the very silence this whole change exists to end
-    (author's ruling 2026-08-09). `render_color_map` is never touched by
-    anything here.
-
-    Idempotent: after the first pass no row matches an old id any more.
-    """
-    for old_id, new_id in RENAMED_COLOR_CATALOG_IDS.items():
-        try:
-            conn.execute(
-                text("UPDATE history SET catalog_id = :new_id WHERE catalog_id = :old_id"),
-                {"new_id": new_id, "old_id": old_id},
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(
-                f"failed to migrate renamed color catalog nameplate: {old_id} -> {new_id}"
-            ) from exc
+    return _migrations.RenamedCatalogNameplateMigrator(
+        RENAMED_COLOR_CATALOG_IDS,
+        text,
+    ).migrate(conn)
 
 
 def _migrate_history_search(conn) -> None:

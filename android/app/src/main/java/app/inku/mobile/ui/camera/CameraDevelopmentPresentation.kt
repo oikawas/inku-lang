@@ -51,8 +51,8 @@ internal fun cameraDevelopmentPresentation(
             CameraDevelopmentEffect.PaperExposure,
         )
         is CameraCaptureState.Failed -> Triple(
-            if (state.reason.isNimFailure) "現像に失敗しました" else "撮影処理に失敗しました",
-            if (state.reason.isNimFailure) "Development failed" else "Camera processing failed",
+            if (state.reason.isNimFailure) "現像に失敗しました" else "画像処理に失敗しました",
+            if (state.reason.isNimFailure) "Development failed" else "Image processing failed",
             if (state.reason.isNimFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PaperExposure,
         )
         else -> return null

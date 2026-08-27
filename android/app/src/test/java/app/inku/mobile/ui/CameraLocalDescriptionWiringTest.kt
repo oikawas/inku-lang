@@ -44,7 +44,7 @@ class CameraLocalDescriptionWiringTest {
         assertTrue(cameraBoundary.contains("runCameraInstantPrint"))
         assertTrue(cameraBoundary.contains("analyzeLocalVision"))
         assertTrue(cameraBoundary.contains("val request = VisionAnalysisRequest("))
-        assertTrue(cameraBoundary.contains("CameraInputProvenance.fromAnalysis(request, result)"))
+        assertTrue(cameraBoundary.contains("CameraInputProvenance.fromAnalysis(request, result, origin)"))
         assertTrue(cameraBoundary.contains("outputMode = cameraComposeSnapshot?.cameraVisionOutputMode"))
         assertTrue(cameraBoundary.contains("ServerDdlText.validateLocalVisionDdl(result.text)"))
         assertTrue(cameraBoundary.contains("description = directDdl ?: result.text.trim()"))

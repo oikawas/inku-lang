@@ -141,7 +141,7 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
-  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは full-image resultを端末内Gemmaで既定の記述または明示選択した上級DDLへ変換し、固定NIM／`vivid_material`描画・保存までone-touchで進める
+  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは撮影またはPhoto Pickerの1枚を選び、端末内Gemmaで既定の記述または明示選択した上級DDLへ変換し、固定NIM／`vivid_material`描画・保存までone-touchで進める
   - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
   - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
   - canvas 下の prompt と DDL interpretation
@@ -2279,3 +2279,11 @@ DDL promptはAndroidの`WebDdlSpec`と`ServerDdlText`をauthorityにし、撮影
 有効なdirect DDLは、local Vision 1回、NIM Stage 1 0回、固定`nvidia:google/gemma-4-31b-it` Stage 2 1回、`vivid_material`、写生off、catalog自動選択0、`autoRepair=false`で既存`composeFromDdl`／root save transactionへ進む。現像表示はlocal解析後に「かたちを起こしています」を通らず、「色と配置を定着させています」へ進む。Stage 2／render失敗時は保持したDDLからStage 2だけを再試行し、local VisionとStage 1を繰り返さない。Cancel、system Back、late-result拒否、save直前fenceはM4と同じjob ownerを使う。
 
 保存作品は`route=local_ddl_to_nim_stage2`、`vision_output_mode=ddl`、`camera-ddl-v1`を既存camera provenanceへ後方互換で記録する。`stage1_model`はDDLを実際に生成した`local-litert-lm:gemma-4-e2b`、`stage2_model`は固定NIMである。`original_input`と`normalized_ddl`は検証済みDDLを持ち、写真、URI、EXIF、location、digestは保存しない。Room schema／migration、新列、写真保存、Photo Picker、E4B、NIM以外のfallback、既定mode変更は行わない。
+
+## 2026-08-27 Photo Pickerからの端末内画像入力（[I-456]）
+
+Abstract Instant PrintのM6-1では、下部「カメラ」を押すと「撮影する」「写真を選ぶ」「キャンセル」のsource chooserを表示する。撮影は既存`ActivityResultContracts.TakePicture`を維持し、既存写真はimage-onlyの`ActivityResultContracts.PickVisualMedia`で1枚だけを受ける。storage permission、persistable URI permission、独自file browser、複数選択は追加しない。どちらも現在の記述／解釈の上書き確認とlocal E2B／固定NIM preflightを通り、source、Vision output mode、canvas、UI languageをrun開始時に固定する。
+
+選択されたcontent URIは読取可能な間だけapp-owned cacheへ一時copyし、撮影画像と同じorientation反映、long edge 1280以下、JPEG quality 85のnormalizationから既存one-touch coordinatorへ渡す。description modeはlocal Vision →固定NIM Stage 1／2、DDL direct modeは検証済みlocal DDL →固定NIM Stage 2を維持する。NIMが受けるのはtextだけであり、画像bytes、URI、path、display name、EXIF、location、digestをremote request、history、metadataへ入れない。Photo Picker自身が利用者選択によりcloud-backed mediaを取得しても、remote modelへの画像送信を許可したことにはならない。
+
+Photo Pickerの取消またはnull resultはerrorにせず開始前Compose状態へ戻り、local Vision、NIM、render、saveを起動しない。読取不能、空、unsupported、decode不能は画像準備failureとしてremote callと保存を行わない。app-owned一時copyは成功、失敗、Cancel、system Back、stale run、ViewModel終了で削除し、元写真は変更／削除しない。保存作品の既存`input_provenance.origin`は撮影で`camera`、Photo Pickerで`photo_picker`とし、Generation Infoは後者を「既存の写真」と表示する。Room schema／migration／backfill／新列、段別resume、background復帰、独自reduce-motion、E4B、CameraXは追加しない。

@@ -221,6 +221,14 @@ class GenerationInfoSheetTest {
         )
     }
 
+    @Test
+    fun photoPickerOriginIsNamedAsAnExistingPhotoInBothLanguages() {
+        val row = GenerationInfoRow(GenerationInfoField.InputOrigin, "photo_picker")
+
+        assertEquals("既存の写真", generationInfoDisplayValue(row, InkuStringsJa))
+        assertEquals("Existing photo", generationInfoDisplayValue(row, InkuStringsEn))
+    }
+
     private fun historyItem(
         renderMetadataJson: String,
         stage1Model: String? = "stage-1-model",

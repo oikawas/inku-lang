@@ -37,6 +37,7 @@ class CameraVisionModeSettingTest {
 
         assertTrue(cameraVisionModeChangeLocked(CameraCaptureState.AwaitingOverwriteConfirmation))
         assertTrue(cameraVisionModeChangeLocked(CameraCaptureState.Capturing))
+        assertTrue(cameraVisionModeChangeLocked(CameraCaptureState.PickingPhoto))
         assertTrue(cameraVisionModeChangeLocked(CameraCaptureState.AnalyzingLocally))
         assertEquals(false, cameraVisionModeChangeLocked(CameraCaptureState.Idle))
         assertEquals(false, cameraVisionModeChangeLocked(CameraCaptureState.Completed("history")))

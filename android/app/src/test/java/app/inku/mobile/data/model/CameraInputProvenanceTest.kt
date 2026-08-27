@@ -55,6 +55,21 @@ class CameraInputProvenanceTest {
     }
 
     @Test
+    fun photoPickerOriginRoundTripsWithoutChangingExistingCameraOrigin() {
+        val photo = CameraInputProvenance.fromAnalysis(
+            request = request(),
+            result = result(),
+            origin = CameraInputOrigin.PhotoPicker,
+        )
+        val parsed = cameraInputProvenance(mergeInputProvenance("{}", photo))
+
+        assertEquals(CameraInputOrigin.PhotoPicker, parsed?.origin)
+        assertEquals("photo_picker", JSONObject(mergeInputProvenance("{}", photo))
+            .getJSONObject("input_provenance").getString("origin"))
+        assertEquals(CameraInputOrigin.Camera, CameraInputProvenance.fromAnalysis(request(), result()).origin)
+    }
+
+    @Test
     fun existingInputProvenanceFailsClosedWithoutOverwritingRendererMetadata() {
         val failure = runCatching {
             mergeInputProvenance(

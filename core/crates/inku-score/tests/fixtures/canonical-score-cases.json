@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "minimal-defaults",
+      "input": {"instructions": [{"primitive": "line"}]},
+      "canonical_json": "{\"background\":\"white\",\"canvas\":\"square\",\"instructions\":[{\"angle_end\":null,\"angle_start\":null,\"arrangement\":null,\"at\":null,\"carve_depth\":null,\"center\":null,\"color\":\"black\",\"color_hint\":null,\"filled\":false,\"from\":null,\"mode\":\"additive\",\"note\":null,\"position\":null,\"primitive\":\"line\",\"radius\":null,\"relation\":null,\"rotation\":null,\"sides\":null,\"size\":null,\"style\":\"solid\",\"surface\":null,\"thinness\":null,\"to\":null,\"variation\":null,\"weight\":\"pen\"}],\"presence\":null,\"version\":\"0.1.0\"}",
+      "digest": "94d2cc9a680fc4bc32615405cf4cf02d8fca5090f2ecbf431fa033f5e4b04e56"
+    },
+    {
+      "id": "explicit-nested-score",
+      "input": {
+        "instructions": [
+          {
+            "surface": {"seed": -7, "tone_steps": 4, "spacing_gradient": "dense_to_coarse", "direction": "diagonal_rising", "bleed": 0.0, "opacity": 0.3, "scale": 0.5, "density": 0.4, "texture": "grain"},
+            "arrangement": {"rhythm_spacing": "loose", "preserve_space": true, "fade": "outward", "cluster_count": 2, "density": "high", "radius": 0.4, "center": [0.5, 0.5], "margin": 0.2, "color_cycle": ["blue", "red"], "path": "wave", "jitter": 0.1, "cols": 2, "rows": 1, "layout": "radial", "group_size": 2, "count": 2},
+            "color": "blue",
+            "weight": "brush_thick",
+            "style": "dashed",
+            "filled": true,
+            "radius": 0.27,
+            "center": [0.5, 0.5],
+            "primitive": "circle"
+          }
+        ],
+        "presence": {"contour_density": "high", "gaze_pressure": "medium", "symmetry": "radial", "center": [0.2, 0.8], "intensity": "high", "kind": "group_like"},
+        "background": "gray",
+        "canvas": {"ground": {"seed": 13579, "opacity": 0.16, "density": 0.45, "grain": "fine", "tone": "warm", "material": "paper"}, "aspect": "portrait"},
+        "version": "0.1.0"
+      },
+      "canonical_json": "{\"background\":\"gray\",\"canvas\":{\"aspect\":\"portrait\",\"ground\":{\"density\":0.45,\"grain\":\"fine\",\"material\":\"paper\",\"opacity\":0.16,\"seed\":13579,\"tone\":\"warm\"}},\"instructions\":[{\"angle_end\":null,\"angle_start\":null,\"arrangement\":{\"center\":[0.5,0.5],\"cluster_count\":2,\"color_cycle\":[\"blue\",\"red\"],\"cols\":2,\"count\":2,\"density\":\"high\",\"fade\":\"outward\",\"group_size\":2,\"jitter\":0.1,\"layout\":\"radial\",\"margin\":0.2,\"path\":\"wave\",\"preserve_space\":true,\"radius\":0.4,\"rhythm_spacing\":\"loose\",\"rows\":1},\"at\":null,\"carve_depth\":null,\"center\":[0.5,0.5],\"color\":\"blue\",\"color_hint\":null,\"filled\":true,\"from\":null,\"mode\":\"additive\",\"note\":null,\"position\":null,\"primitive\":\"circle\",\"radius\":0.27,\"relation\":null,\"rotation\":null,\"sides\":null,\"size\":null,\"style\":\"dashed\",\"surface\":{\"bleed\":0.0,\"density\":0.4,\"direction\":\"diagonal_rising\",\"opacity\":0.3,\"scale\":0.5,\"seed\":-7,\"spacing_gradient\":\"dense_to_coarse\",\"texture\":\"grain\",\"tone_steps\":4},\"thinness\":null,\"to\":null,\"variation\":null,\"weight\":\"brush_thick\"}],\"presence\":{\"center\":[0.2,0.8],\"contour_density\":\"high\",\"gaze_pressure\":\"medium\",\"intensity\":\"high\",\"kind\":\"group_like\",\"symmetry\":\"radial\"},\"version\":\"0.1.0\"}",
+      "digest": "7a41c7413f3c94701949263002394f2eabd194ddc9b1ffc1bfe0d9503dff58ba"
+    }
+  ]
+}

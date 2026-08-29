@@ -1,0 +1,27 @@
+{
+  "schema": "inku.instruction-language-resolution-fixture.v1",
+  "version": 1,
+  "cases": [
+    {"id": "normalize-none-default-ja", "operation": "normalize", "input": {"value": null, "default": "ja"}, "expected": {"result": "ja"}},
+    {"id": "normalize-empty-default-en", "operation": "normalize", "input": {"value": "", "default": "en"}, "expected": {"result": "en"}},
+    {"id": "normalize-space-only-error", "operation": "normalize", "input": {"value": "   ", "default": "ja"}, "expected": {"error_kind": "unsupported_code"}},
+    {"id": "normalize-case-and-whitespace", "operation": "normalize", "input": {"value": " EN ", "default": "ja"}, "expected": {"result": "en"}},
+    {"id": "normalize-unsupported-code", "operation": "normalize", "input": {"value": "fr", "default": "ja"}, "expected": {"error_kind": "unsupported_code"}},
+    {"id": "normalize-non-default-default", "operation": "normalize", "input": {"value": null, "default": "en"}, "expected": {"result": "en"}},
+    {"id": "resolve-explicit-ja", "operation": "resolve", "input": {"text": "one black line", "requested": "ja", "fallback": "en"}, "expected": {"result": "ja"}},
+    {"id": "resolve-explicit-en", "operation": "resolve", "input": {"text": "一滴の墨", "requested": "en", "fallback": "ja"}, "expected": {"result": "en"}},
+    {"id": "resolve-auto-japanese", "operation": "resolve", "input": {"text": "一滴の墨", "requested": "auto", "fallback": "en"}, "expected": {"result": "ja"}},
+    {"id": "resolve-auto-latin", "operation": "resolve", "input": {"text": "one black line", "requested": "auto", "fallback": "ja"}, "expected": {"result": "en"}},
+    {"id": "resolve-auto-mixed-japanese-first", "operation": "resolve", "input": {"text": "black 墨", "requested": "auto", "fallback": "en"}, "expected": {"result": "ja"}},
+    {"id": "resolve-digit-punctuation-fallback-ja", "operation": "resolve", "input": {"text": "12345!?", "requested": "auto", "fallback": "ja"}, "expected": {"result": "ja"}},
+    {"id": "resolve-empty-fallback-en", "operation": "resolve", "input": {"text": "", "requested": "auto", "fallback": "en"}, "expected": {"result": "en"}},
+    {"id": "resolve-fallback-auto", "operation": "resolve", "input": {"text": "…", "requested": "auto", "fallback": "auto"}, "expected": {"result": "ja"}},
+    {"id": "resolve-fallback-normalized-spelling", "operation": "resolve", "input": {"text": "…", "requested": "auto", "fallback": " EN "}, "expected": {"result": "en"}},
+    {"id": "resolve-fallback-unsupported", "operation": "resolve", "input": {"text": "…", "requested": "auto", "fallback": "fr"}, "expected": {"error_kind": "unsupported_code"}},
+    {"id": "ui-fallback-ja", "operation": "ui_fallback", "input": {"text": "…", "requested": "auto", "ui_lang": "ja"}, "expected": {"result": "ja"}},
+    {"id": "ui-fallback-en", "operation": "ui_fallback", "input": {"text": "…", "requested": "auto", "ui_lang": "en"}, "expected": {"result": "en"}},
+    {"id": "ui-fallback-none", "operation": "ui_fallback", "input": {"text": "…", "requested": "auto", "ui_lang": null}, "expected": {"result": "ja"}},
+    {"id": "ui-fallback-auto", "operation": "ui_fallback", "input": {"text": "…", "requested": "auto", "ui_lang": "auto"}, "expected": {"result": "ja"}},
+    {"id": "ui-fallback-unknown", "operation": "ui_fallback", "input": {"text": "…", "requested": "auto", "ui_lang": "fr"}, "expected": {"result": "ja"}}
+  ]
+}

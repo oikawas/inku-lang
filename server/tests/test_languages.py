@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+
+from inku_server.api_core.common import _resolve_instruction_lang
 from inku_server.composer import SYSTEM_PROMPT as STAGE2_PROMPT_JA
 from inku_server.composer import SYSTEM_PROMPT_EN as STAGE2_PROMPT_EN
 from inku_server.ddl_expander import expand_intermediate_ddl
@@ -6,8 +10,15 @@ from inku_server.interpreter import SYSTEM_PROMPT_EN as STAGE1_PROMPT_EN
 from inku_server.languages import (
     INSTRUCTION_LANGUAGE_REGISTRY,
     expand_intermediate_for_lang,
+    normalize_instruction_lang,
     resolve_instruction_lang,
     stage_prompts_for_lang,
+)
+
+
+INSTRUCTION_LANGUAGE_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "core/crates/inku-ddl/tests/fixtures/instruction-language-resolution-v1.json"
 )
 
 
@@ -59,3 +70,40 @@ def test_auto_instruction_language_resolution_remains_stable():
     assert resolve_instruction_lang("one black line", "auto") == "en"
     assert resolve_instruction_lang("12345", "auto") == "ja"
     assert resolve_instruction_lang("12345", "auto", fallback="en") == "en"
+
+
+def test_instruction_language_resolution_matches_shared_registry_fixture():
+    fixture = json.loads(INSTRUCTION_LANGUAGE_FIXTURE.read_text(encoding="utf-8"))
+    assert fixture["schema"] == "inku.instruction-language-resolution-fixture.v1"
+    assert fixture["version"] == 1
+
+    case_ids = set()
+    for case in fixture["cases"]:
+        assert case["id"] not in case_ids
+        case_ids.add(case["id"])
+        expected = case["expected"]
+        assert ("result" in expected) != ("error_kind" in expected)
+
+        try:
+            if case["operation"] == "normalize":
+                actual = normalize_instruction_lang(
+                    case["input"]["value"], default=case["input"]["default"]
+                )
+            elif case["operation"] == "resolve":
+                actual = resolve_instruction_lang(
+                    case["input"]["text"],
+                    case["input"]["requested"],
+                    fallback=case["input"]["fallback"],
+                )
+            elif case["operation"] == "ui_fallback":
+                actual = _resolve_instruction_lang(
+                    case["input"]["text"],
+                    case["input"]["requested"],
+                    ui_lang=case["input"]["ui_lang"],
+                )
+            else:
+                raise AssertionError(f"unknown fixture operation: {case['operation']}")
+        except ValueError:
+            assert expected == {"error_kind": "unsupported_code"}
+        else:
+            assert expected == {"result": actual}

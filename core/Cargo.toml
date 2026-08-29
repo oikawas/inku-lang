@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/inku-ddl",
     "crates/inku-score",
     "crates/inku-render",
     "crates/inku-render-android",

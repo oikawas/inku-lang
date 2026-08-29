@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod language;
+pub mod macro_definition;
 pub mod macro_seed;
 pub mod prompt;
 pub mod saijiki;
@@ -13,6 +14,13 @@ pub use language::{
     ResolvedInstructionLanguage, SUPPORTED_INSTRUCTION_LANGUAGE_CODES,
     normalize_instruction_language, resolve_instruction_language,
     resolve_instruction_language_for_ui,
+};
+pub use macro_definition::{
+    ComponentDefinition, Expression, LEGACY_PLUGIN_FORMAT_WARNING, LegacyImportOutcome,
+    LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
+    MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
+    MacroDefinitionValidation, NumericRange, ParameterSchema, SemanticMap, Statement,
+    TransformExpression,
 };
 pub use macro_seed::{
     MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,

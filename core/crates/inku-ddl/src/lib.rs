@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod language;
+pub mod macro_seed;
 pub mod prompt;
 pub mod saijiki;
 
@@ -12,6 +13,10 @@ pub use language::{
     ResolvedInstructionLanguage, SUPPORTED_INSTRUCTION_LANGUAGE_CODES,
     normalize_instruction_language, resolve_instruction_language,
     resolve_instruction_language_for_ui,
+};
+pub use macro_seed::{
+    MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,
+    derive_macro_seed, macro_seed_hash_input,
 };
 pub use prompt::{
     PROMPT_BODY_TEMPLATE_ASSET_BYTES, PROMPT_BODY_TEMPLATE_ASSET_ID, PromptBodyTemplate,

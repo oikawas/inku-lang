@@ -2,11 +2,18 @@
 
 #![forbid(unsafe_code)]
 
+pub mod document;
 pub mod language;
 pub mod macro_definition;
 pub mod macro_seed;
 pub mod prompt;
 pub mod saijiki;
+
+pub use document::{
+    DdlDocumentBodyNode, DdlDocumentDiagnostic, DdlDocumentParseOutcome, LegacyProse,
+    MacroArgumentValue, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,
+    NormalizedDdlInvocation, parse_normalized_ddl_document, wrap_legacy_prose,
+};
 
 pub use language::{
     DEFAULT_RESOLVED_INSTRUCTION_LANGUAGE, INSTRUCTION_LANGUAGE_REGISTRY_ID,
@@ -20,7 +27,7 @@ pub use macro_definition::{
     LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
     MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
     MacroDefinitionValidation, NumericRange, ParameterSchema, SemanticMap, Statement,
-    TransformExpression,
+    TransformExpression, validate_macro_definition_semantic_version,
 };
 pub use macro_seed::{
     MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,

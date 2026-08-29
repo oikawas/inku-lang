@@ -10,9 +10,7 @@ pub mod prompt;
 pub mod saijiki;
 
 pub use document::{
-    DdlDocumentBodyNode, DdlDocumentDiagnostic, DdlDocumentParseOutcome, LegacyProse,
-    MacroArgumentValue, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,
-    NormalizedDdlInvocation, parse_normalized_ddl_document, wrap_legacy_prose,
+    DdlDocumentDiagnostic, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,
 };
 
 pub use language::{

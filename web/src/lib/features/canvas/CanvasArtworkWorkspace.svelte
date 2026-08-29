@@ -8,6 +8,7 @@
 	import type { SvgProfile } from '$lib/features/export/download';
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import CaptionText from '$lib/components/CaptionText.svelte';
 
 	type Props = {
 		result: PaintResult | null;
@@ -421,7 +422,7 @@
 					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
-					<div class="instruction-caption" aria-live="polite">{displayInstructionText}</div>
+					<div class="instruction-caption" aria-live="polite"><CaptionText text={displayInstructionText} /></div>
 				{/if}
 </div>
 			<div class="zoom-controls">

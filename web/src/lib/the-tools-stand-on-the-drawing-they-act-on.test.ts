@@ -145,6 +145,11 @@ test('T-101: the two marks are the two flags a work carries', () => {
 	assert.match(call, /onToggleForRevision=\{toggleHistoryForRevision\}/);
 	assert.match(PAGE, /const toggleHistoryStar = historyMutations\.toggleStar/);
 	assert.match(PAGE, /const toggleHistoryForRevision = historyMutations\.toggleForRevision/);
+	// A newly saved result can be on the canvas before it appears in the history
+	// strip. Its mark still needs a reactive projection or the PATCH succeeds
+	// while this button redraws itself as unstarred.
+	assert.match(PAGE, /applyCurrentResultStarState: \(item\) =>/);
+	assert.match(PAGE, /currentResultStarState\?\.id === historyId/);
 	// The canvas has to be able to read the flag it draws, or the mark would
 	// never come back on for a work that already carries it.
 	assert.match(HISTORY_STATE, /for_revision\?: boolean;/);

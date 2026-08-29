@@ -355,7 +355,10 @@
 				class="input-ta"
 			></textarea>
 		</div>
-		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
+		<div class="input-meta-row">
+			<span class="input-comment-hint">{t().inputCommentHint}</span>
+			<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
+		</div>
 
 		{@render inputSettings()}
 
@@ -594,11 +597,22 @@
 		resize: vertical; outline: none;
 	}
 	.input-ta:focus { border-color: var(--accent); }
+	.input-meta-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+		margin-top: -3px;
+	}
+	.input-comment-hint {
+		min-height: 16px;
+		font-size: 10px;
+		line-height: 16px;
+		color: color-mix(in srgb, var(--fg3) 68%, transparent);
+	}
 	.input-meter {
-		align-self: flex-end;
 		min-width: 54px;
 		min-height: 16px;
-		margin-top: -3px;
 		font-size: 10px;
 		line-height: 16px;
 		font-variant-numeric: tabular-nums;

@@ -64,6 +64,7 @@ export const ja: LangPack = {
 	inputSectionHint: '：短い文章で、表現したいものを入力。',
 	inputMeterChars: (count, guide) => `文字数 ${count} / ${guide}字（短歌）`,
 	inputMeterWords: (count, guide) => `語数 ${count} / ${guide}語（短歌）`,
+	inputCommentHint: '[括弧内文字列はコメント扱い]',
 	interpretationFeedbackLabel: '解釈フィードバック',
 	canvasAspectButton: 'キャンバス',
 	canvasAspectTitle: 'キャンバス比率',

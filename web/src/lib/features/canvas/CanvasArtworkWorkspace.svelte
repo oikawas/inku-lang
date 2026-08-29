@@ -169,7 +169,9 @@
 			<div class="interpret-fallback-badge" title={t().interpretFallbackHint(interpretFallbackReason)}>{t().interpretFallbackBadge}</div>
 		{/if}
 		{#if composeFallbackDrawnReason}
-			<div class="compose-fallback-badge" title={t().composeFallbackHint(composeFallbackDrawnReason)}>{t().composeFallbackBadge}</div>
+			<Tooltip placement="bottom-left" text={t().composeFallbackHint(composeFallbackDrawnReason)} wide>
+				<span class="compose-fallback-badge">{t().composeFallbackBadge}</span>
+			</Tooltip>
 		{/if}
 	</div>
 {/if}
@@ -567,7 +569,7 @@
 		color: #fffdf8;
 		font-size: 14px;
 		line-height: 1.55;
-		text-align: center;
+		text-align: left;
 		box-shadow: 0 4px 18px rgba(0,0,0,0.22);
 		max-height: 5.1em;
 		overflow: hidden;

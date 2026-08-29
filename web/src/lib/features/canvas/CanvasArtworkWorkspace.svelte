@@ -494,7 +494,9 @@
 	.canvas-corner-controls {
 		position: absolute;
 		bottom: 14px;
-		z-index: 11;
+		/* A Tooltip cannot escape its parent's stacking context. Keep the whole
+		   button row above the caption so its bubbles do not pass behind it. */
+		z-index: 13;
 		display: flex;
 		align-items: center;
 		gap: 6px;

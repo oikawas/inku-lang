@@ -6,6 +6,7 @@ import hashlib
 import inspect
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +17,66 @@ from inku_server.schema import Score
 
 def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def test_rust_prompt_body_template_asset_matches_python_authority():
+    asset_path = (
+        Path(__file__).resolve().parents[2]
+        / "core/crates/inku-ddl/assets/prompt-body-templates-v1.json"
+    )
+    raw = asset_path.read_bytes()
+    assert not raw.startswith(b"\xef\xbb\xbf")
+    assert raw.endswith(b"\n") and not raw.endswith(b"\n\n")
+    asset = json.loads(raw)
+    assert asset["schema_version"] == 1
+    assert asset["asset_id"] == "inku.prompt-body-templates.v1"
+    assert asset["languages"] == ["ja", "en"]
+    assert [stage["stage"] for stage in asset["stages"]] == ["stage1", "stage2"]
+    rows = {
+        (stage["stage"], template["language"]): template
+        for stage in asset["stages"]
+        for template in stage["templates"]
+    }
+    assert set(rows) == {
+        ("stage1", "ja"),
+        ("stage1", "en"),
+        ("stage2", "ja"),
+        ("stage2", "en"),
+    }
+
+    for language, template in (
+        ("ja", interpreter._SYSTEM_PROMPT_PREFIX_TEMPLATE),
+        ("en", interpreter._SYSTEM_PROMPT_PREFIX_EN_TEMPLATE),
+    ):
+        enumeration = saijiki.texture_material_enumeration(language)
+        prompt_block = saijiki.prompt_block(language)
+        assert template.count(enumeration) == 1
+        assert template.count(prompt_block) == 1
+        canonical_body = template.replace(
+            enumeration, "%%TEXTURE_MATERIAL_ENUMERATION%%", 1
+        ).replace(prompt_block, "%%SAIJIKI_PROMPT_BLOCK%%", 1)
+        assert rows[("stage1", language)]["body"] == canonical_body
+        assert rows[("stage1", language)]["required_slots"] == [
+            "TEXTURE_MATERIAL_ENUMERATION",
+            "COUNT_CLAMP",
+            "COUNT_RANGE_HEADING",
+            "COUNT_BANDS",
+            "TILE_COUNT",
+            "SAIJIKI_PROMPT_BLOCK",
+        ]
+
+    assert rows[("stage2", "ja")]["body"] == composer._SYSTEM_PROMPT_TEMPLATE
+    assert rows[("stage2", "en")]["body"] == composer._SYSTEM_PROMPT_EN_TEMPLATE
+    assert rows[("stage2", "ja")]["required_slots"] == [
+        "CANVAS",
+        "COUNT_DENSITY",
+        "GRID_COUNT",
+    ]
+    assert rows[("stage2", "en")]["required_slots"] == [
+        "CANVAS",
+        "COUNT_DENSITY",
+        "GRID_COUNT",
+    ]
 
 
 @pytest.fixture

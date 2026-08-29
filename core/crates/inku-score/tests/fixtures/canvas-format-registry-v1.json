@@ -1,0 +1,39 @@
+{
+  "schema": "inku.canvas-format-registry-fixture.v1",
+  "version": 1,
+  "registry_id": "inku.canvas-format-registry.v1",
+  "default": "square",
+  "formats": [
+    {"id": "square", "width_units": 1, "height_units": 1},
+    {"id": "golden", "width_units": 809, "height_units": 500},
+    {"id": "a4", "width_units": 500, "height_units": 707},
+    {"id": "b4", "width_units": 500, "height_units": 707},
+    {"id": "pillar", "width_units": 1, "height_units": 5},
+    {"id": "oban", "width_units": 2, "height_units": 3},
+    {"id": "wide", "width_units": 47, "height_units": 20},
+    {"id": "byobu", "width_units": 11, "height_units": 5},
+    {"id": "vertical", "width_units": 9, "height_units": 16},
+    {"id": "sd_monitor", "width_units": 4, "height_units": 3},
+    {"id": "hd_monitor", "width_units": 16, "height_units": 9}
+  ],
+  "expected_canonical_json": "{\"schema\":\"inku.canvas-format-registry.v1\",\"formats\":[{\"id\":\"square\",\"width_units\":1,\"height_units\":1},{\"id\":\"golden\",\"width_units\":809,\"height_units\":500},{\"id\":\"a4\",\"width_units\":500,\"height_units\":707},{\"id\":\"b4\",\"width_units\":500,\"height_units\":707},{\"id\":\"pillar\",\"width_units\":1,\"height_units\":5},{\"id\":\"oban\",\"width_units\":2,\"height_units\":3},{\"id\":\"wide\",\"width_units\":47,\"height_units\":20},{\"id\":\"byobu\",\"width_units\":11,\"height_units\":5},{\"id\":\"vertical\",\"width_units\":9,\"height_units\":16},{\"id\":\"sd_monitor\",\"width_units\":4,\"height_units\":3},{\"id\":\"hd_monitor\",\"width_units\":16,\"height_units\":9}]}",
+  "expected_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+  "legacy_server_projection": {
+    "base_px": 1000,
+    "formats": [
+      {"id": "square", "ratio_w": 1.0, "ratio_h": 1.0, "expected_width_px": 1000, "expected_height_px": 1000},
+      {"id": "golden", "ratio_w": 1.618, "ratio_h": 1.0, "expected_width_px": 1618, "expected_height_px": 1000},
+      {"id": "a4", "ratio_w": 1.0, "ratio_h": 1.414, "expected_width_px": 707, "expected_height_px": 1000},
+      {"id": "b4", "ratio_w": 1.0, "ratio_h": 1.414, "expected_width_px": 707, "expected_height_px": 1000},
+      {"id": "pillar", "ratio_w": 1.0, "ratio_h": 5.0, "expected_width_px": 200, "expected_height_px": 1000},
+      {"id": "oban", "ratio_w": 2.0, "ratio_h": 3.0, "expected_width_px": 667, "expected_height_px": 1000},
+      {"id": "wide", "ratio_w": 2.35, "ratio_h": 1.0, "expected_width_px": 2350, "expected_height_px": 1000},
+      {"id": "byobu", "ratio_w": 2.2, "ratio_h": 1.0, "expected_width_px": 2200, "expected_height_px": 1000},
+      {"id": "vertical", "ratio_w": 9.0, "ratio_h": 16.0, "expected_width_px": 562, "expected_height_px": 1000}
+    ]
+  },
+  "new_presentations": [
+    {"id": "sd_monitor", "label": "4:3 SD Monitor"},
+    {"id": "hd_monitor", "label": "16:9 HD Monitor"}
+  ]
+}

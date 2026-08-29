@@ -1263,6 +1263,14 @@ fn is_ascii_identifier(value: &str) -> bool {
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, b'_' | b'-'))
 }
 
+/// Validate a semantic version with the exact grammar used by [`MacroDefinition`].
+///
+/// This public wrapper lets document locks reuse the definition identity grammar
+/// without copying or widening it.
+pub fn validate_macro_definition_semantic_version(value: &str) -> bool {
+    is_semantic_version(value)
+}
+
 fn is_semantic_version(value: &str) -> bool {
     if value.is_empty() || !value.is_ascii() {
         return false;

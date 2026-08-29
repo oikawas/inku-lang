@@ -1,0 +1,256 @@
+{
+  "schema": "inku.normalized-ddl-document-v1-fixture.v1",
+  "version": 1,
+  "valid_cases": [
+    {
+      "id": "ja-sd-monitor-no-macro",
+      "input": "@inku-ddl v1\n@language ja\n@canvas sd_monitor\n\n背景を白で埋める。  \n",
+      "expected": {
+        "language": "ja",
+        "canvas_id": "sd_monitor",
+        "locks": [],
+        "body": [
+          {"kind": "text", "text": "背景を白で埋める。"}
+        ],
+        "canonical": "@inku-ddl v1\n@language ja\n@canvas sd_monitor\n\n背景を白で埋める。"
+      }
+    },
+    {
+      "id": "en-hd-monitor-crlf-no-macro",
+      "input": "@inku-ddl v1\r\n@language en\r\n@canvas hd_monitor\r\n\r\n\r\nDraw one fine line at center.\t \r\n\r\n",
+      "expected": {
+        "language": "en",
+        "canvas_id": "hd_monitor",
+        "locks": [],
+        "body": [
+          {"kind": "text", "text": "Draw one fine line at center."}
+        ],
+        "canonical": "@inku-ddl v1\n@language en\n@canvas hd_monitor\n\nDraw one fine line at center."
+      }
+    },
+    {
+      "id": "unicode-space-dot-lock-sort-repeat-invoke-arguments",
+      "input": "@inku-ddl v1\r\n@language ja\r\n@canvas hd_monitor\r\n@macro-lock \"nature.青 葉.春\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\r\n@macro-lock \"alpha.pond\" 2.1.0-beta.1 sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\r\n\r\n葉を置く。 \r\n@invoke \"nature.青 葉.春\" {\"touch\": \"crayon\", \"count\": 8, \"flags\": [true, \"青\", 2.5]}\r\n@invoke \"nature.青 葉.春\" { \"count\" : 2 }\r\n\r\n@invoke \"alpha.pond\" {\"enabled\":true}\r\n",
+      "expected": {
+        "language": "ja",
+        "canvas_id": "hd_monitor",
+        "locks": [
+          {
+            "qualified_name": "alpha.pond",
+            "version": "2.1.0-beta.1",
+            "digest": "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+          },
+          {
+            "qualified_name": "nature.青 葉.春",
+            "version": "1.0.0",
+            "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
+        ],
+        "body": [
+          {"kind": "text", "text": "葉を置く。"},
+          {
+            "kind": "invoke",
+            "qualified_name": "nature.青 葉.春",
+            "ordinal": 0,
+            "arguments": {"count": 8, "flags": [true, "青", 2.5], "touch": "crayon"}
+          },
+          {
+            "kind": "invoke",
+            "qualified_name": "nature.青 葉.春",
+            "ordinal": 1,
+            "arguments": {"count": 2}
+          },
+          {"kind": "text", "text": ""},
+          {
+            "kind": "invoke",
+            "qualified_name": "alpha.pond",
+            "ordinal": 2,
+            "arguments": {"enabled": true}
+          }
+        ],
+        "canonical": "@inku-ddl v1\n@language ja\n@canvas hd_monitor\n@macro-lock \"alpha.pond\" 2.1.0-beta.1 sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\n@macro-lock \"nature.青 葉.春\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n葉を置く。\n@invoke \"nature.青 葉.春\" {\"count\":8,\"flags\":[true,\"青\",2.5],\"touch\":\"crayon\"}\n@invoke \"nature.青 葉.春\" {\"count\":2}\n\n@invoke \"alpha.pond\" {\"enabled\":true}"
+      }
+    }
+  ],
+  "legacy_cases": [
+    {
+      "id": "legacy-ja-explicit-wrap",
+      "input": "\n背景を白で埋める。  \r\n円を中央に置く。\r\n\n",
+      "language": "ja",
+      "canvas_id": "square",
+      "expected_prose": "背景を白で埋める。\n円を中央に置く。",
+      "expected_canonical": "@inku-ddl v1\n@language ja\n@canvas square\n\n背景を白で埋める。\n円を中央に置く。"
+    },
+    {
+      "id": "legacy-en-explicit-wrap",
+      "input": "\r\nDraw a blue line.\t\r\nKeep the center open.  \r\n",
+      "language": "en",
+      "canvas_id": "hd_monitor",
+      "expected_prose": "Draw a blue line.\nKeep the center open.",
+      "expected_canonical": "@inku-ddl v1\n@language en\n@canvas hd_monitor\n\nDraw a blue line.\nKeep the center open."
+    }
+  ],
+  "invalid_cases": [
+    {
+      "id": "language-auto",
+      "input": "@inku-ddl v1\n@language auto\n@canvas square\n\nbody",
+      "expected_code": "invalid_language",
+      "line": 2,
+      "column": 1
+    },
+    {
+      "id": "language-unknown",
+      "input": "@inku-ddl v1\n@language fr\n@canvas square\n\nbody",
+      "expected_code": "invalid_language",
+      "line": 2,
+      "column": 1
+    },
+    {
+      "id": "canvas-unknown",
+      "input": "@inku-ddl v1\n@language ja\n@canvas HD Monitor\n\nbody",
+      "expected_code": "invalid_canvas",
+      "line": 3,
+      "column": 1
+    },
+    {
+      "id": "document-version-unknown",
+      "input": "@inku-ddl v2\n@language ja\n@canvas square\n\nbody",
+      "expected_code": "unknown_document_version",
+      "line": 1,
+      "column": 1
+    },
+    {
+      "id": "semantic-version-invalid",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 01.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "invalid_semantic_version",
+      "line": 4,
+      "column": 1
+    },
+    {
+      "id": "digest-short",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "invalid_digest",
+      "line": 4,
+      "column": 1
+    },
+    {
+      "id": "digest-uppercase",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "invalid_digest",
+      "line": 4,
+      "column": 1
+    },
+    {
+      "id": "lock-identical-duplicate",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "duplicate_macro_lock",
+      "line": 5,
+      "column": 1
+    },
+    {
+      "id": "lock-conflicting-duplicate",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n@macro-lock \"nature.aoba\" 1.0.1 sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "conflicting_macro_lock",
+      "line": 5,
+      "column": 1
+    },
+    {
+      "id": "lock-unused",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\nbody",
+      "expected_code": "unused_macro_lock",
+      "line": 4,
+      "column": 1
+    },
+    {
+      "id": "lock-missing",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n\n@invoke \"nature.aoba\" {}",
+      "expected_code": "missing_macro_lock",
+      "line": 5,
+      "column": 1
+    },
+    {
+      "id": "unknown-body-directive",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n\n@future value",
+      "expected_code": "unknown_body_directive",
+      "line": 5,
+      "column": 1
+    },
+    {
+      "id": "lock-qualified-name-malformed",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"missing-dot\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\nbody",
+      "expected_code": "invalid_qualified_name",
+      "line": 4,
+      "column": 13
+    },
+    {
+      "id": "invoke-qualified-name-malformed",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \".aoba\" {}",
+      "expected_code": "invalid_qualified_name",
+      "line": 6,
+      "column": 9
+    },
+    {
+      "id": "arguments-malformed-json",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {\"count\":}",
+      "expected_code": "invalid_arguments",
+      "line": 6,
+      "column": 1
+    },
+    {
+      "id": "arguments-nested-object",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {\"nested\":{\"count\":1}}",
+      "expected_code": "nested_argument_object",
+      "line": 6,
+      "column": 1
+    },
+    {
+      "id": "arguments-null",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {\"count\":null}",
+      "expected_code": "null_argument",
+      "line": 6,
+      "column": 1
+    },
+    {
+      "id": "arguments-duplicate-key",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n@macro-lock \"nature.aoba\" 1.0.0 sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\n@invoke \"nature.aoba\" {\"count\":1,\"count\":2}",
+      "expected_code": "duplicate_argument_key",
+      "line": 6,
+      "column": 1
+    },
+    {
+      "id": "body-blank",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\n\n \t\n",
+      "expected_code": "blank_body",
+      "line": 5,
+      "column": 1
+    },
+    {
+      "id": "body-separator-missing",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\nbody",
+      "expected_code": "missing_body_separator",
+      "line": 4,
+      "column": 1
+    },
+    {
+      "id": "bare-carriage-return",
+      "input": "@inku-ddl v1\n@language ja\n@canvas square\rbody",
+      "expected_code": "bare_carriage_return",
+      "line": 3,
+      "column": 15
+    },
+    {
+      "id": "language-directive-missing",
+      "input": "@inku-ddl v1\nbody",
+      "expected_code": "missing_language_directive",
+      "line": 2,
+      "column": 1
+    },
+    {
+      "id": "directive-order-invalid",
+      "input": "@inku-ddl v1\n@canvas square\n@language ja\n\nbody",
+      "expected_code": "missing_language_directive",
+      "line": 2,
+      "column": 1
+    }
+  ]
+}

@@ -13,6 +13,10 @@ pub use language::{
     resolve_instruction_language_for_ui,
 };
 pub use saijiki::{
-    MarkerOrder, RelationAsset, SAIJIKI_ASSET_BYTES, SAIJIKI_ASSET_ID, SaijikiAsset,
-    SaijikiCategoryAsset, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
+    DisplayCategoryProjection, MarkerClassProjection, MarkerOrder, ReferenceCategoryProjection,
+    RelationAsset, RelationLiteralProjection, SAIJIKI_ASSET_BYTES, SAIJIKI_ASSET_ID, SaijikiAsset,
+    SaijikiCategoryAsset, SaijikiDerivedProjection, SaijikiProjectionError, SaijikiScoreWireMaps,
+    SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
+    saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
+    saijiki_relation_literal_table, saijiki_score_wire_maps,
 };

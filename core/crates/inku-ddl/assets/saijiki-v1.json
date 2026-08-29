@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "asset_id": "inku.saijiki.v1",
+  "languages": ["ja", "en"],
+  "categories": [
+    {
+      "key": "katachi",
+      "name_ja": "かたち",
+      "name_en": "forms",
+      "marker_class": "shape",
+      "words": [
+        {"surface_ja": "円", "surface_en": "circle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "楕円", "surface_en": "ellipse", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "三角", "surface_en": "triangle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "四角", "surface_en": "square", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "線", "surface_en": "line", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "弧", "surface_en": "arc", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "雲形", "surface_en": "cloudform", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "多角形", "surface_en": "polygon", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"],
+      "marker_order_en": ["line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"]
+    },
+    {
+      "key": "katamuki",
+      "name_ja": "かたむき",
+      "name_en": "angles",
+      "marker_class": "angle",
+      "words": [
+        {"surface_ja": "水平", "surface_en": "horizontal", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "垂直", "surface_en": "vertical", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "斜め", "surface_en": "diagonal", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "右上がり", "surface_en": "rising", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "右下がり", "surface_en": "falling", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "回転", "surface_en": "rotated", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "tezawari",
+      "name_ja": "てざわり",
+      "name_en": "touches",
+      "marker_class": "material",
+      "words": [
+        {"surface_ja": "銀筆", "surface_en": "silverpoint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "silverpoint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "鉛筆", "surface_en": "pencil", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "pencil", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "ペン", "surface_en": "pen", "default": true, "prompt": true, "display": true, "marker": null, "score_value": "pen", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "ロットリング", "surface_en": "rotring", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "rotring", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "クレヨン", "surface_en": "crayon", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "crayon", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "チョーク", "surface_en": "chalk", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "chalk", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "細筆", "surface_en": "fine-brush", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "brush_thin", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "太筆", "surface_en": "thick-brush", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "brush_thick", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "ビュラン", "surface_en": "burin", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "burin", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "ドライポイント", "surface_en": "drypoint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "drypoint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "コンピュータ", "surface_en": "computer", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "computer", "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "tsuranari",
+      "name_ja": "つらなり",
+      "name_en": "continuity",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "実線", "surface_en": "solid", "default": true, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "破線", "surface_en": "dashed", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "点線", "surface_en": "dotted", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "一点鎖線", "surface_en": "dash-dot", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "omote",
+      "name_ja": "おもて",
+      "name_en": "surfaces",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "空", "surface_en": "empty", "default": true, "prompt": true, "display": true, "marker": null, "score_value": "none", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "塗り", "surface_en": "flat", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "solid", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "薄墨", "surface_en": "pale ink wash", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "wash", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "粒", "surface_en": "grain", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "grain", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "点", "surface_en": "stipple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "stipple", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "平行線", "surface_en": "hatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "hatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "交差線", "surface_en": "crosshatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "crosshatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "にじみ", "surface_en": "bleeding", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "bleed", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "アクアチント", "surface_en": "aquatint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "aquatint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "濃い", "surface_en": "dense", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "薄い", "surface_en": "faint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "ji",
+      "name_ja": "じ",
+      "name_en": "grounds",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "紙", "surface_en": "paper", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "paper", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "和紙", "surface_en": "washi", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "washi", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "薄墨地", "surface_en": "ink wash ground", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "ink_wash", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "木炭地", "surface_en": "charcoal ground", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "charcoal_ground", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "カンバス", "surface_en": "canvas", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "canvas", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "画用紙", "surface_en": "drawing paper", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "drawing_paper", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "メゾチント", "surface_en": "mezzotint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "mezzotint", "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "iro",
+      "name_ja": "いろ",
+      "name_en": "colors",
+      "marker_class": "color",
+      "words": [
+        {"surface_ja": "白", "surface_en": "white", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "white", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "黒", "surface_en": "black", "default": true, "prompt": true, "display": true, "marker": null, "score_value": "black", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "青", "surface_en": "blue", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "blue", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "赤", "surface_en": "red", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "red", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "緑", "surface_en": "green", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "green", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "灰", "surface_en": "gray", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "gray", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "黄", "surface_en": "yellow", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "yellow", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "橙", "surface_en": "orange", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "orange", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "紫", "surface_en": "purple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "purple", "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "yuragi",
+      "name_ja": "ゆらぎ",
+      "name_en": "movements",
+      "marker_class": "variation",
+      "words": [
+        {"surface_ja": "細かく", "surface_en": "fine", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "大きく", "surface_en": "large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "ゆっくり", "surface_en": "slowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "速く", "surface_en": "quickly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "揺れる", "surface_en": "swaying", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "波打つ", "surface_en": "undulating", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "震える", "surface_en": "trembling", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "滲む", "surface_en": "blurring", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "basho",
+      "name_ja": "ばしょ",
+      "name_en": "places",
+      "marker_class": "place",
+      "words": [
+        {"surface_ja": "上", "surface_en": "top", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "下", "surface_en": "bottom", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "中央", "surface_en": "center", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "左端", "surface_en": "left-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "右端", "surface_en": "right-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "上端", "surface_en": "top-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "下端", "surface_en": "bottom-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "中心", "surface_en": "middle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "隅", "surface_en": "corner", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
+      "key": "ugoki",
+      "name_ja": "うごき",
+      "name_en": "motions",
+      "marker_class": "operation",
+      "words": [
+        {"surface_ja": "置く", "surface_en": "place", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "並べる", "surface_en": "line-up", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": ["arrange"]},
+        {"surface_ja": "引く", "surface_en": "draw", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "描く", "surface_en": null, "default": false, "prompt": false, "display": false, "marker": false, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "散らす", "surface_en": "scatter", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "埋める", "surface_en": "fill", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "敷き詰める", "surface_en": "tile", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": ["置く", "引く", "並べる", "散らす", "敷き詰める", "描く", "埋める"],
+      "marker_order_en": ["place", "draw", "arrange", "scatter", "tile", "fill"]
+    },
+    {
+      "key": "wariai",
+      "name_ja": "わりあい",
+      "name_en": "proportions",
+      "marker_class": "ratio",
+      "words": [
+        {"surface_ja": "縦長", "surface_en": "tall", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "横長", "surface_en": "wide", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "全幅", "surface_en": "full-width", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "半幅", "surface_en": "half-width", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "半円", "surface_en": "semicircle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "上弦", "surface_en": "waxing", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "下弦", "surface_en": "waning", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "三日月", "surface_en": "crescent", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    }
+  ],
+  "relations": [
+    {"relation_type": "along", "surface_ja": "沿う", "surface_en": "along", "literals_ja": ["前の線に沿って"], "literals_en": ["along the previous line"]},
+    {"relation_type": "not_touching", "surface_ja": "触れない", "surface_en": "not touching", "literals_ja": ["前の形に触れない"], "literals_en": ["not touching the previous shape"]},
+    {"relation_type": "touching", "surface_ja": "触れる", "surface_en": "touching", "literals_ja": ["前の線に触れる", "前の弧に両端で触れる"], "literals_en": ["touching the previous line", "touching the previous arc at both ends"]},
+    {"relation_type": "cutting", "surface_ja": "切る", "surface_en": "cutting", "literals_ja": ["前の線を切る"], "literals_en": ["cutting the previous line"]},
+    {"relation_type": "between", "surface_ja": "間に", "surface_en": "between", "literals_ja": ["前の二つの間に"], "literals_en": ["between the previous two"]}
+  ],
+  "relation_marker_order": {
+    "ja": ["触れる", "沿う", "切る", "触れない", "間に"],
+    "en": ["touching", "along", "cutting", "not touching", "between"]
+  },
+  "relation_display_order": ["along", "not_touching", "cutting", "between", "touching"],
+  "marker_class_order": ["material", "color", "variation", "angle", "ratio", "place"]
+}

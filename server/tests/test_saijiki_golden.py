@@ -30,6 +30,7 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
 
+import json
 from pathlib import Path
 
 from inku_server import saijiki
@@ -433,3 +434,55 @@ def test_display_categories_exclude_pruned_and_hidden_words() -> None:
     aida = saijiki.display_categories("ja")[-1]
     assert aida["key"] == "aida"
     assert aida["words"] == ("沿う", "触れない", "切る", "間に", "触れる")
+
+
+def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
+    return {
+        "surface_ja": word.surface_ja,
+        "surface_en": word.surface_en,
+        "default": word.default,
+        "prompt": word.prompt,
+        "display": word.display,
+        "marker": word.marker,
+        "score_value": word.score_value,
+        "marker_surfaces_ja": list(word.marker_surfaces_ja) if word.marker_surfaces_ja else None,
+        "marker_surfaces_en": list(word.marker_surfaces_en) if word.marker_surfaces_en else None,
+    }
+
+
+def test_rust_saijiki_asset_matches_python_authority() -> None:
+    asset_path = Path(__file__).resolve().parents[2] / "core/crates/inku-ddl/assets/saijiki-v1.json"
+    actual = json.loads(asset_path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version": 1,
+        "asset_id": "inku.saijiki.v1",
+        "languages": list(saijiki._LANGS),
+        "categories": [
+            {
+                "key": category.key,
+                "name_ja": category.name_ja,
+                "name_en": category.name_en,
+                "marker_class": category.marker_class,
+                "words": [_saijiki_word_asset_object(word) for word in category.words],
+                "marker_order_ja": list(category.marker_order_ja) if category.marker_order_ja else None,
+                "marker_order_en": list(category.marker_order_en) if category.marker_order_en else None,
+            }
+            for category in saijiki.SAIJIKI
+        ],
+        "relations": [
+            {
+                "relation_type": relation.relation_type,
+                "surface_ja": relation.surface_ja,
+                "surface_en": relation.surface_en,
+                "literals_ja": list(relation.literals_ja),
+                "literals_en": list(relation.literals_en),
+            }
+            for relation in saijiki.RELATIONS
+        ],
+        "relation_marker_order": {
+            lang: list(order) for lang, order in saijiki._RELATION_MARKER_ORDER.items()
+        },
+        "relation_display_order": list(saijiki._RELATION_DISPLAY_ORDER),
+        "marker_class_order": list(saijiki._MARKER_CLASS_ORDER),
+    }
+    assert actual == expected

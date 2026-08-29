@@ -1,0 +1,14 @@
+{
+  "schema": "inku.macro-seed-ddl-v1-fixture.v1",
+  "version": 1,
+  "cases": [
+    {"id": "ja-omitted-composition", "canonical_ddl": "中央に雲を置く", "namespace": "kigo", "heading": "雲.輪", "ordinal": "0", "composition_seed": null, "expected": {"digest": "ef9bc0e13a8b2113ba0ebd981111ad75dc3bb818e5945b658d37473821273a66", "resolved_seed": "17265605670037299475"}},
+    {"id": "ja-explicit-zero-composition", "canonical_ddl": "中央に雲を置く", "namespace": "kigo", "heading": "雲.輪", "ordinal": "0", "composition_seed": "0", "expected": {"digest": "ef9bc0e13a8b2113ba0ebd981111ad75dc3bb818e5945b658d37473821273a66", "resolved_seed": "17265605670037299475"}},
+    {"id": "en-nonzero-composition", "canonical_ddl": "place a halo at center", "namespace": "weather", "heading": "halo", "ordinal": "2", "composition_seed": "42", "expected": {"digest": "9f4b8689bd67d701347b390704f551e2e8dc7d3f802c693fec49748e69dba079", "resolved_seed": "11478416001430181633"}},
+    {"id": "same-macro-different-ordinal", "canonical_ddl": "place a halo at center", "namespace": "weather", "heading": "halo", "ordinal": "3", "composition_seed": "42", "expected": {"digest": "0bd54893969d919c90b475470f366abfde1be0219f87c04d99e904baac12d39d", "resolved_seed": "852667503180878236"}},
+    {"id": "different-qualified-macro", "canonical_ddl": "place a halo at center", "namespace": "sky", "heading": "halo", "ordinal": "2", "composition_seed": "42", "expected": {"digest": "eb707ffe91c14e0d73e2a6db13ebebccbfc0471c2c841afb7c76621194cec996", "resolved_seed": "16965200527648443917"}},
+    {"id": "unicode-exact-bytes", "canonical_ddl": "円と🖋️", "namespace": "kigo", "heading": "墨", "ordinal": "1", "composition_seed": "7", "expected": {"digest": "255bf5cd97161b61b1a858b8705f26434a08a4595f90d4336228bfd1e6e4f389", "resolved_seed": "2692015465635912545"}},
+    {"id": "newline-exact-bytes", "canonical_ddl": "first line\nsecond line", "namespace": "layout", "heading": "pair", "ordinal": "1", "composition_seed": "7", "expected": {"digest": "5e378e993b7f2866fc1a4e4465bc3779c4d48164edde6b381dc4f9fd4fa83ff7", "resolved_seed": "6789051752063641702"}},
+    {"id": "u64-boundary", "canonical_ddl": "maximum", "namespace": "limit", "heading": "edge", "ordinal": "18446744073709551615", "composition_seed": "18446744073709551615", "expected": {"digest": "8c352f5fd10491397345868312ff50d82ef1635c18c9bd2565434f6b5a707a97", "resolved_seed": "10103033427650711865"}}
+  ]
+}

@@ -32,6 +32,7 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
 
 import json
 from pathlib import Path
+import subprocess
 
 from inku_server import saijiki
 from inku_server.composer import _RELATION_LITERAL_MARKERS
@@ -484,5 +485,79 @@ def test_rust_saijiki_asset_matches_python_authority() -> None:
         },
         "relation_display_order": list(saijiki._RELATION_DISPLAY_ORDER),
         "marker_class_order": list(saijiki._MARKER_CLASS_ORDER),
+    }
+    assert actual == expected
+
+
+def _rust_saijiki_projection_language(lang: str) -> dict[str, object]:
+    return {
+        "prompt_block": saijiki.prompt_block(lang),
+        "texture_material_enumeration": saijiki.texture_material_enumeration(lang),
+        "shape_markers": list(saijiki.shape_markers(lang)),
+        "core_grammar_markers": list(saijiki.core_grammar_markers(lang)),
+        "reference_categories": [
+            {"name": name, "words": list(words)}
+            for name, words in saijiki.reference_categories(lang)
+        ],
+        "display_categories": [
+            {
+                "key": category["key"],
+                "name_ja": category["name_ja"],
+                "name_en": category["name_en"],
+                "words": list(category["words"]),
+            }
+            for category in saijiki.display_categories(lang)
+        ],
+    }
+
+
+def _rust_saijiki_marker_class_table() -> dict[str, list[dict[str, object]]]:
+    table = saijiki.saijiki_marker_table()
+    return {
+        lang: [
+            {"marker_class": marker_class, "markers": list(table[marker_class][lang])}
+            for marker_class in table
+        ]
+        for lang in ("ja", "en")
+    }
+
+
+def _rust_saijiki_score_pairs(mapping: dict[str, str]) -> list[dict[str, str]]:
+    return [{"surface": surface, "score_value": score_value} for surface, score_value in mapping.items()]
+
+
+def test_rust_saijiki_derived_projection_matches_python_authority() -> None:
+    root = Path(__file__).resolve().parents[2]
+    completed = subprocess.run(
+        [
+            str(root / "scripts/rust-toolchain.sh"),
+            "run",
+            "-p",
+            "inku-ddl",
+            "--example",
+            "saijiki-derived-projection",
+            "--quiet",
+        ],
+        cwd=root / "core",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    actual = json.loads(completed.stdout)
+    expected = {
+        "languages": {
+            lang: _rust_saijiki_projection_language(lang)
+            for lang in ("ja", "en")
+        },
+        "marker_class_table": _rust_saijiki_marker_class_table(),
+        "relation_literal_table": [
+            {"relation_type": relation_type, "literals": list(literals)}
+            for relation_type, literals in saijiki.relation_literal_markers().items()
+        ],
+        "score_wire_maps": {
+            "weight": _rust_saijiki_score_pairs(saijiki.weight_for_surface()),
+            "color": _rust_saijiki_score_pairs(saijiki.color_for_surface()),
+            "surface_texture": _rust_saijiki_score_pairs(saijiki.texture_for_surface()),
+        },
     }
     assert actual == expected

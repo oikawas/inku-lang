@@ -481,7 +481,6 @@ export interface LangPack {
 	uiModeSaveFailed: string;
 	historyStripFieldsLabel: string;
 	historyStripFieldsDescription: string;
-	historyStripFieldsFull: string;
 	historyStripFieldGeneration: string;
 	historyStripFieldModel: string;
 	historyStripFieldEngineVersion: string;

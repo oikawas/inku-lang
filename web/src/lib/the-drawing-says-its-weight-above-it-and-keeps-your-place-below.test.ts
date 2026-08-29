@@ -30,7 +30,7 @@ import {
 	emptyDrawerScrollMemory,
 	rememberDrawerScroll
 } from './drawerScroll.ts';
-import { formatByteSize, groupDigits } from './formatNumber.ts';
+import { formatByteSize, formatCanvasCapacity, groupDigits } from './formatNumber.ts';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'utf8');
@@ -52,7 +52,8 @@ function metaStrip(): string {
 test('T-95: the strip says how heavy the drawing is', () => {
 	const strip = metaStrip();
 	assert.match(strip, /class="render-meta-item render-meta-svg-size"/);
-	assert.match(strip, /formatByteSize\(detailSvgBytes\)/);
+	assert.match(strip, /formatCanvasCapacity\(detailSvgBytes\)/);
+	assert.doesNotMatch(strip, /SVG (?:\\u30b5\\u30a4\\u30ba|size)/);
 });
 
 test('T-95: it stands to the left of the time the work was made', () => {
@@ -63,13 +64,13 @@ test('T-95: it stands to the left of the time the work was made', () => {
 	assert.ok(size < created, 'the size is written after the created time, not before it');
 });
 
-test('T-95: it is the drawer\'s own measurement, not a second one', () => {
+test('T-95: it is the drawer\'s own measurement with a compact formatter', () => {
 	// `detailSvgBytes` is the derivation the drawer reads. Measuring again here
 	// would be a second count of the same drawing, and two counts drift.
 	assert.equal((PANEL.match(/measureSvgWeight\(/g) ?? []).length, 1);
-	assert.equal((PANEL.match(/formatByteSize\(detailSvgBytes\)/g) ?? []).length, 1);
+	assert.equal((PANEL.match(/formatCanvasCapacity\(detailSvgBytes\)/g) ?? []).length, 1);
 	assert.equal((INFO.match(/formatByteSize\(detailSvgBytes\)/g) ?? []).length, 1,
-		'the strip and the drawer do not share one formatted value');
+		'the provenance drawer lost its detailed byte formatter');
 });
 
 // ------------------------------------------------ T-96 (thousands separated)
@@ -94,6 +95,16 @@ test('T-96: a size is kilobytes above a kilobyte and bytes below one', () => {
 	assert.equal(formatByteSize(1024), '1.0 KB');
 	// The case this came from: 2.3 MB of SVG reads as four digits, grouped.
 	assert.equal(formatByteSize(2_300_000), '2,246.1 KB');
+});
+
+test('the canvas capacity is rounded to whole kilobytes with a one-kilobyte floor', () => {
+	assert.equal(formatCanvasCapacity(null), '-');
+	assert.equal(formatCanvasCapacity(undefined), '-');
+	assert.equal(formatCanvasCapacity(0), '1 KB');
+	assert.equal(formatCanvasCapacity(410), '1 KB');
+	assert.equal(formatCanvasCapacity(1024), '1 KB');
+	assert.equal(formatCanvasCapacity(1536), '2 KB');
+	assert.equal(formatCanvasCapacity(2_300_000), '2,246 KB');
 });
 
 test('T-96: the separator does not follow the interface language', () => {

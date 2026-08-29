@@ -10,7 +10,7 @@
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
 	import { measureSvgWeight } from '$lib/svgWeight';
-	import { formatByteSize } from '$lib/formatNumber';
+	import { formatCanvasCapacity } from '$lib/formatNumber';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 
@@ -539,11 +539,11 @@
 					<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
 					<strong title={statusCanvasName}>{statusCanvasName}</strong>
 				</span>
-				<!-- The same measurement the drawer shows, formatted by the same
-				     function: one quantity, said in two places. -->
+				<!-- The same byte measurement the drawer shows, rounded to a compact
+				     whole-kilobyte capacity in this narrow strip. -->
 				<span class="render-meta-item render-meta-svg-size">
-					<span class="render-meta-label">{isJapanese ? 'SVG \u30b5\u30a4\u30ba' : 'SVG size'}</span>
-					<strong>{formatByteSize(detailSvgBytes)}</strong>
+					<span class="render-meta-label">{isJapanese ? '\u30b5\u30a4\u30ba' : 'Size'}</span>
+					<strong>{formatCanvasCapacity(detailSvgBytes)}</strong>
 				</span>
 				<span class="render-meta-item render-meta-created">
 					<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>

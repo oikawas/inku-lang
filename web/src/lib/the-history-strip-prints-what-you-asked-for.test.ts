@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import {
 	canAddHistoryStripField,
 	DEFAULT_HISTORY_STRIP_FIELDS,
+	formatHistoryStripEngineVersion,
 	HISTORY_STRIP_FIELD_LIMIT,
 	HISTORY_STRIP_FIELDS,
 	normalizeHistoryStripFields,
@@ -87,6 +88,16 @@ test('T-151  the panel offers exactly the four, and each one is named in both la
 test('T-152  a box that cannot be ticked is disabled, so the limit is visible', () => {
 	// Without this the third click is simply inert, which reads as a bug.
 	assert.match(PANEL, /disabled=\{historyStripFieldsSaving \|\| \(!checked && !canAddHistoryStripField\(historyStripFields\)\)\}/);
+	assert.doesNotMatch(PANEL, /historyStripFieldsFull/);
+	assert.doesNotMatch(JA, /historyStripFieldsFull/);
+	assert.doesNotMatch(EN, /historyStripFieldsFull/);
+});
+
+test('the engine version printed under a thumbnail uses the Ver. prefix', () => {
+	assert.equal(formatHistoryStripEngineVersion('41', 'not recorded'), 'Ver.41');
+	assert.equal(formatHistoryStripEngineVersion('Ver.41', 'not recorded'), 'Ver.41');
+	assert.equal(formatHistoryStripEngineVersion(null, 'not recorded'), 'not recorded');
+	assert.match(STRIP, /formatHistoryStripEngineVersion\(item\.render_engine_version, t\(\)\.historyVersionNotRecorded\)/);
 });
 
 test('T-163  the file size is read from the server, not counted from what arrived', () => {

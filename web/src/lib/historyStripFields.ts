@@ -21,6 +21,12 @@ export const HISTORY_STRIP_FIELDS = ['generation', 'model', 'engine_version', 'b
 
 export type HistoryStripField = (typeof HISTORY_STRIP_FIELDS)[number];
 
+export function formatHistoryStripEngineVersion(value: string | null | undefined, notRecorded: string): string {
+	const version = String(value ?? '').trim();
+	if (!version) return notRecorded;
+	return `Ver.${version.replace(/^Ver\.\s*/i, '')}`;
+}
+
 /** At most this many at once. Two lines is what the tile has room for. */
 export const HISTORY_STRIP_FIELD_LIMIT = 2;
 

@@ -8,8 +8,7 @@ import { type Score } from '$lib/historyManagerState.svelte';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 
 /**
- * Model comparison and language comparison: draw the same description with
- * several models (or several Stage 1 x Stage 2 language pairs) and let the
+ * Model comparison: draw the same description with several models and let the
  * author adopt the ones worth keeping.
  *
  * A factory rather than a class so the function bodies move across unchanged --
@@ -123,9 +122,6 @@ type ModelInspectionResult = {
 	elapsedMs: number;
 	lineageParentNodeId?: string | null;
 	compareMode: ModelCompareMode;
-	comparisonKind?: 'model' | 'language';
-	stage1Lang?: 'ja' | 'en';
-	stage2Lang?: 'ja' | 'en';
 	savedHistoryId?: string | null;
 	starred?: boolean;
 	saving?: boolean;
@@ -156,22 +152,9 @@ let modelInspectionFailedModels = $state<Record<string, string>>({});
 let modelInspectionRunId = 0;
 let modelInspectionAbortController: AbortController | null = null;
 let modelInspectionCurrentModel = $state('');
-// Language comparison selects (Stage 1 × Stage 2) language combinations directly,
-// each id is `${stage1}:${stage2}` (e.g. 'ja:en').
-let languageInspectionSelectedCombos = $state<string[]>([]);
-let languageInspectionBusy = $state(false);
-let languageInspectionStatus = $state<string | null>(null);
-let languageInspectionResults = $state<ModelInspectionResult[]>([]);
-let languageInspectionRunId = 0;
-let languageInspectionAbortController: AbortController | null = null;
-let languageInspectionCurrentLabel = $state('');
-
 let modelInspectionTokensIn = $state<number | null>(null);
 let modelInspectionTokensOut = $state<number | null>(null);
-let languageInspectionTokensIn = $state<number | null>(null);
-let languageInspectionTokensOut = $state<number | null>(null);
 const modelInspectionElapsed = createElapsed();
-	const languageInspectionElapsed = createElapsed();
 
 
 function modelInspectionModelChoices(): ModelInspectionChoice[] {
@@ -365,135 +348,8 @@ function abortModelInspection() {
 	modelInspectionAbortController?.abort();
 }
 
-const languageInspectionTargetLang = $derived(
-	(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
-);
-
-// The target artwork's combination (Stage 1 lang == Stage 2 lang == target).
-function isLanguageComboBlocked(stage1: 'ja' | 'en', stage2: 'ja' | 'en') {
-	return stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang;
-}
-
-function toggleLanguageCombo(id: string) {
-	if (languageInspectionBusy) return;
-	const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-	if (isLanguageComboBlocked(s1, s2)) return;
-	languageInspectionSelectedCombos = languageInspectionSelectedCombos.includes(id)
-		? languageInspectionSelectedCombos.filter((value) => value !== id)
-		: [...languageInspectionSelectedCombos, id];
-	languageInspectionStatus = null;
-}
-
-function abortLanguageInspection() {
-	languageInspectionAbortController?.abort();
-}
-
-async function runLanguageInspection() {
-	if (languageInspectionBusy || loading) return;
-	const source = input.trim();
-	if (!source) return;
-	const selected = languageInspectionSelectedCombos.filter((id) => {
-		const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-		return !isLanguageComboBlocked(s1, s2);
-	});
-	if (selected.length === 0) {
-		languageInspectionStatus = getLang() === 'ja' ? '比較する組み合わせを1つ以上選択してください。' : 'Select at least one combination to compare.';
-		return;
-	}
-	const contextVersion = deps.targetContextVersion();
-	const parentNodeId = await ensureVisibleLineageParentId();
-	if (contextVersion !== deps.targetContextVersion()) return;
-	const jobs = selected.map((id) => {
-		const [stage1Lang, stage2Lang] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-		return { lang: stage2Lang, stage1Lang, stage2Lang, id };
-	});
-	const rendered = new Set(languageInspectionResults.map((item) => item.id));
-	const pending = jobs.filter((job) => !rendered.has(job.id));
-	if (pending.length === 0) {
-		languageInspectionStatus = getLang() === 'ja' ? '選択済みの言語構成はすべて描画済みです。' : 'All chosen language combinations have been painted.';
-		return;
-	}
-	const runId = ++languageInspectionRunId;
-	const abortController = new AbortController();
-	languageInspectionAbortController = abortController;
-	languageInspectionBusy = true;
-	languageInspectionStatus = null;
-	languageInspectionTokensIn = null;
-	languageInspectionTokensOut = null;
-	languageInspectionElapsed.start();
-	const successful = [...languageInspectionResults];
-	const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
-	try {
-		for (const job of pending) {
-			if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-			languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
-			try {
-				const started = Date.now();
-				const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
-				languageInspectionTokensIn = addTokens(languageInspectionTokensIn, interpreted.tokens_in);
-				languageInspectionTokensOut = addTokens(languageInspectionTokensOut, interpreted.tokens_out);
-				const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { lineageParentNodeId: parentNodeId });
-				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-				languageInspectionTokensIn = addTokens(languageInspectionTokensIn, composed.tokens_in);
-				languageInspectionTokensOut = addTokens(languageInspectionTokensOut, composed.tokens_out);
-				successful.push({
-					id: job.id,
-					model: qualifiedModelId(stage1Provider, stage1Model),
-					stage1Model: qualifiedModelId(stage1Provider, stage1Model),
-					stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-					label: `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`,
-					input: source,
-					ddl: interpreted.ddl,
-					svg: composed.svg,
-					score: composed.score,
-					renderBuildNumber: composed.render_build_number ?? null,
-					renderColorProfile: composed.render_color_profile ?? null,
-					renderEngineId: composed.render_engine_id ?? null,
-					renderEngineVersion: composed.render_engine_version ?? null,
-					renderColorCatalogId: composed.render_color_catalog_id ?? null,
-					renderColorCatalogName: composed.render_color_catalog_name ?? null,
-					renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-					renderColorMap: composed.render_color_map ?? null,
-					renderCanvasAspect: composed.render_canvas_aspect ?? null,
-					renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-					renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-					renderSeed: composed.render_seed ?? null,
-					renderWild: composed.render_wild ?? null,
-					compositionSeed: composed.composition_seed ?? null,
-					tokensIn: interpreted.tokens_in,
-					tokensOut: interpreted.tokens_out,
-					tokensInStage2: composed.tokens_in,
-					tokensOutStage2: composed.tokens_out,
-					elapsedMs: Date.now() - started,
-					lineageParentNodeId: parentNodeId,
-					compareMode: 'common',
-					comparisonKind: 'language',
-					stage1Lang: job.stage1Lang,
-					stage2Lang: job.stage2Lang,
-					savedHistoryId: null,
-					starred: false,
-					saving: false,
-				});
-				languageInspectionResults = [...successful];
-			} catch (cause) {
-				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-				languageInspectionStatus = cause instanceof Error ? cause.message : String(cause);
-			}
-		}
-	} finally {
-		if (languageInspectionRunId === runId) {
-			languageInspectionAbortController = null;
-			languageInspectionBusy = false;
-			languageInspectionCurrentLabel = '';
-			languageInspectionElapsed.stop();
-		}
-	}
-}
-
-
 function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
 	modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
-	languageInspectionResults = languageInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
 }
 
 async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
@@ -507,8 +363,7 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		return;
 	}
 	updateModelInspectionResult(item.id, { saving: true });
-	if (item.comparisonKind === 'language') languageInspectionStatus = null;
-	else modelInspectionStatus = null;
+	modelInspectionStatus = null;
 	try {
 		const saved = await pushHistory({
 			input: item.input,
@@ -536,17 +391,13 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 			render_seed: item.renderSeed ?? null,
 			render_wild: item.renderWild ?? null,
 			composition_seed: item.compositionSeed ?? null,
-			instruction_lang_requested: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
-			instruction_lang_resolved: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
 			ui_lang: getLang(),
 		}, {
 			countGeneration: true,
 			sourceText: item.input,
 			lineageParentNodeId: item.lineageParentNodeId ?? null,
-			derivationKind: item.lineageParentNodeId ? (item.comparisonKind === 'language' ? 'language_comparison' : 'model_comparison') : null,
-			derivationMetadata: item.comparisonKind === 'language'
-				? { comparison_mode: item.compareMode, stage1_language: item.stage1Lang, stage2_language: item.stage2Lang }
-				: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
+			derivationKind: item.lineageParentNodeId ? 'model_comparison' : null,
+			derivationMetadata: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
 		});
 		if (!saved?.id) throw new Error('failed to save comparison result');
 		if (contextVersion !== deps.targetContextVersion()) return;
@@ -558,13 +409,12 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 	} catch (e) {
 		if (contextVersion === deps.targetContextVersion()) {
 			updateModelInspectionResult(item.id, { saving: false });
-			if (item.comparisonKind === 'language') languageInspectionStatus = e instanceof Error ? e.message : String(e);
-			else modelInspectionStatus = e instanceof Error ? e.message : String(e);
+			modelInspectionStatus = e instanceof Error ? e.message : String(e);
 		}
 	}
 }
 
-	/** Abort both runs and drop their results: the target artwork changed. */
+	/** Abort the comparison run and drop its results: the target artwork changed. */
 	function reset() {
 		if (modelInspectionAbortController) modelInspectionAbortController.abort();
 		modelInspectionAbortController = null;
@@ -573,12 +423,6 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		modelInspectionResults = [];
 		modelInspectionFailedModels = {};
 		modelInspectionStatus = null;
-		if (languageInspectionAbortController) languageInspectionAbortController.abort();
-		languageInspectionAbortController = null;
-		languageInspectionRunId += 1;
-		languageInspectionBusy = false;
-		languageInspectionResults = [];
-		languageInspectionStatus = null;
 	}
 
 	return {
@@ -600,25 +444,12 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		get elapsedMs() { return modelInspectionElapsed.ms; },
 		get tokensIn() { return modelInspectionTokensIn; },
 		get tokensOut() { return modelInspectionTokensOut; },
-		get languageSelectedCombos() { return languageInspectionSelectedCombos; },
-		get languageBusy() { return languageInspectionBusy; },
-		get languageStatus() { return languageInspectionStatus; },
-		get languageResults() { return languageInspectionResults; },
-		get languageCurrentLabel() { return languageInspectionCurrentLabel; },
-		get languageTargetLang() { return languageInspectionTargetLang; },
-		get languageElapsedMs() { return languageInspectionElapsed.ms; },
-		get languageTokensIn() { return languageInspectionTokensIn; },
-		get languageTokensOut() { return languageInspectionTokensOut; },
 		setCompareMode: setModelCompareMode,
 		setCompareFixedModel: setModelCompareFixedModel,
 		isChoiceBlocked: isModelInspectionChoiceBlocked,
 		toggleModel: toggleModelInspectionModel,
 		run: runModelInspection,
 		abort: abortModelInspection,
-		isLanguageComboBlocked,
-		toggleLanguageCombo,
-		runLanguage: runLanguageInspection,
-		abortLanguage: abortLanguageInspection,
 		saveResult: saveModelInspectionResult,
 		reset,
 	};

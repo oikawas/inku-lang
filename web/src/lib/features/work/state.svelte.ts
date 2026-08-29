@@ -142,7 +142,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	/** The prose to send for this description, or null to let the layer write it.
 	 *  Used by the paths that re-run one stage over a description already on
-	 *  screen (model and language comparison): holding the prose fixed is what
+	 *  screen (model comparison): holding the prose fixed is what
 	 *  makes those a comparison of models rather than of two different texts. */
 	function sketchTextFor(text: string): string | null {
 		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()

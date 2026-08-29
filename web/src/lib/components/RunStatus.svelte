@@ -3,7 +3,7 @@
 	 * The single "drawing in progress" indicator.
 	 *
 	 * Every running operation (single draw, batch, demo, DDL editor, lineage
-	 * edit, variations, model/language comparison, AI refinement) renders this
+	 * edit, variations, model comparison, AI refinement) renders this
 	 * component, so the mascot, the model line, the elapsed/token line and the
 	 * stop button keep one shape and one set of dimensions.
 	 *

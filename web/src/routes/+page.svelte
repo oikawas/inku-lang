@@ -1316,7 +1316,7 @@
 	const activeComparisonItem = $derived(currentComparisonItem());
 
 
-	// Model comparison and language comparison own their selection, their results
+	// Model comparison owns its selection, its results
 	// and their run state; the page lends the artwork, the two paint stages and
 	// the history writes.
 	const refinement = createRefinementCoordinator({

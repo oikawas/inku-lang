@@ -644,10 +644,10 @@ The UI display language and the instruction language are separate metadata.
 The writing tab does not ask users to choose a language: normal generation
 always sends `instruction_lang: auto`. Users may run the Japanese UI while
 writing English instructions, or use the English UI while writing Japanese
-instructions. API requests retain explicit `ja` and `en` values for compatibility
-and comparison runs, while `ui_lang` provides display context. With `auto`, the
-server lightly detects Japanese or English from the input text and uses the UI
-language only when the text itself has no language signal. The resolved language
+instructions. API requests retain explicit `ja` and `en` values for compatibility,
+replay, and developer diagnostics, while `ui_lang` provides display context.
+With `auto`, the server lightly detects Japanese or English from the input text
+and uses the UI language only when the text itself has no language signal. The resolved language
 is passed to Stage 1, Stage 1.5, Stage 2, and demo-instruction generation. Render metadata
 records `instruction_lang_requested`, `instruction_lang_resolved`, and
 `ui_lang` for audit and replay context.  These language metadata fields are not
@@ -981,7 +981,7 @@ Adjustment candidates are temporary state owned by their source work: explicitly
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
-Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: drawing elements, description, DDL, model, language, autonomous refinement, and moving the work to trash (item labels are shortened to the target noun). The dialogs opened by the three comparison actions are titled "Edit drawing elements", "Edit models", and "Edit languages". Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The three comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
+Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: drawing elements, description, DDL, model, autonomous refinement, and moving the work to trash (item labels are shortened to the target noun). The dialogs opened by the two comparison actions are titled "Edit drawing elements" and "Edit models". Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The two comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
 
 Major UI areas:
 
@@ -1120,8 +1120,8 @@ musical figure — description, score, performance.  The main action buttons
 replace those figures with plain operational words, so that someone touching the
 app for the first time can predict what a button does: performance is shown as
 touch, composition as layout, and interpretation as reading.  How the Refine tab
-realizes this — the five refinement kinds, model comparison, language
-comparison, and the Lineage card menu — is in §7.8, "The Reference Web
+realizes this — the five refinement kinds, model comparison, and the Lineage
+card menu — is in §7.8, "The Reference Web
 Application."
 
 ---

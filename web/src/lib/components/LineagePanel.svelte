@@ -35,7 +35,7 @@
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
+		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
@@ -902,9 +902,6 @@ $effect(() => {
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
 					{isJapanese ? '使用モデル変更' : 'Change models'}
-				</button>
-				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'language'); activeMenuNodeId = null; }}>
-					{isJapanese ? '使用言語変更' : 'Change languages'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>

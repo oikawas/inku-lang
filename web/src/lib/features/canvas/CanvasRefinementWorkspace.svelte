@@ -1,6 +1,5 @@
 <script lang="ts">
 	import RefinementAdjustView from './RefinementAdjustView.svelte';
-	import RefinementLanguageCompareView from './RefinementLanguageCompareView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
 	import './refinement-workspace.css';
 	import type { Provider, ProviderGroup } from '$lib/models';
@@ -13,7 +12,7 @@
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
-	type RefinementView = 'adjust' | 'compare' | 'language';
+	type RefinementView = 'adjust' | 'compare';
 
 	type Props = {
 		view: RefinementView;
@@ -80,9 +79,7 @@
 	const dialogTitle = $derived(
 		view === 'adjust'
 			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
-			: view === 'compare'
-				? (isJapanese ? 'モデルを編集' : 'Edit models')
-				: (isJapanese ? '言語を編集' : 'Edit languages')
+			: (isJapanese ? 'モデルを編集' : 'Edit models')
 	);
 </script>
 
@@ -122,21 +119,8 @@
 			{onSelectRefineDrawingModel}
 			{onSetRefineWild}
 		/>
-	{:else if view === 'compare'}
-		<RefinementModelCompareView
-			{isJapanese}
-			{resultAvailable}
-			{canvasAspectWidth}
-			{canvasAspectHeight}
-			{refinementSession}
-			{modelInspection}
-			{activeComparisonItem}
-			{refineWildValue}
-			{refineWildInherited}
-			{onSetRefineWild}
-		/>
 	{:else}
-		<RefinementLanguageCompareView
+		<RefinementModelCompareView
 			{isJapanese}
 			{resultAvailable}
 			{canvasAspectWidth}

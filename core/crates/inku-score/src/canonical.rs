@@ -24,18 +24,25 @@ pub fn canonical_json_bytes(score: &Score) -> serde_json::Result<Vec<u8>> {
 /// length as an unsigned 64-bit big-endian integer, then the canonical bytes.
 pub fn canonical_score_digest(score: &Score) -> serde_json::Result<String> {
     let canonical_json = canonical_json_bytes(score)?;
+    Ok(domain_separated_sha256_digest(
+        CANONICAL_SCORE_DIGEST_DOMAIN,
+        &canonical_json,
+    ))
+}
+
+pub(crate) fn domain_separated_sha256_digest(domain: &str, bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(CANONICAL_SCORE_DIGEST_DOMAIN.as_bytes());
+    hasher.update(domain.as_bytes());
     hasher.update([0]);
-    hasher.update((canonical_json.len() as u64).to_be_bytes());
-    hasher.update(canonical_json);
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
     let digest = hasher.finalize();
     let mut hexadecimal = String::with_capacity(digest.len() * 2);
     for byte in digest {
         hexadecimal.push(hexadecimal_digit(byte >> 4));
         hexadecimal.push(hexadecimal_digit(byte & 0x0f));
     }
-    Ok(hexadecimal)
+    hexadecimal
 }
 
 const fn hexadecimal_digit(value: u8) -> char {

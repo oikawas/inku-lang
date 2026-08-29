@@ -21,6 +21,7 @@ export interface LangPack {
 	inputSectionHint: string;
 	inputMeterChars: (count: number, guide: number) => string;
 	inputMeterWords: (count: number, guide: number) => string;
+	inputCommentHint: string;
 	appInfoVocabTitle: string;
 	appInfoVocabIntro: string;
 	appInfoVocabColTerm: string;

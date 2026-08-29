@@ -168,18 +168,12 @@
 {#if historyTotal > 0}
 	<div class="history-strip" class:collapsed={historyCollapsed} class:locked={interactionLocked}>
 		<div class="history-head">
-			<button class="history-title-btn" onclick={onOpenManager} disabled={interactionLocked}>
-				{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
-			</button>
-			{#if interactionLocked}
-				<div class="history-lock-badge" role="status" aria-live="polite">
-					<span class="lock-icon" aria-hidden="true">◇</span>
-					<span>{t().historyLockedDuringDemo}</span>
-				</div>
-			{/if}
-			<div class="history-head-actions">
+			<div class="history-head-left">
+				<button class="history-title-btn" onclick={onOpenManager} disabled={interactionLocked}>
+					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
+				</button>
 				{#if !historyCollapsed}
-					<div class="history-page-nav">
+					<div class="history-filter-group">
 						<button
 							class="ghost-btn history-filter-btn"
 							class:ghost-active={historyStarredOnly}
@@ -195,6 +189,18 @@
 							class:ghost-active={historyForShareOnly}
 							onclick={() => onSetForShareOnly(!historyForShareOnly)}
 						>{t().historyForShareOnly}</button>
+					</div>
+				{/if}
+				{#if interactionLocked}
+					<div class="history-lock-badge" role="status" aria-live="polite">
+						<span class="lock-icon" aria-hidden="true">◇</span>
+						<span>{t().historyLockedDuringDemo}</span>
+					</div>
+				{/if}
+			</div>
+			<div class="history-head-actions">
+				{#if !historyCollapsed}
+					<div class="history-page-nav">
 						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
@@ -290,6 +296,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		gap: 8px;
 		margin-bottom: 7px;
 	}
 	.history-strip.collapsed .history-head {
@@ -316,6 +323,8 @@
 		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
 	}
 	.history-count { color: var(--fg3); font-weight: 400; }
+	.history-head-left { display: flex; align-items: center; min-width: 0; }
+	.history-filter-group { display: flex; align-items: center; gap: 6px; margin-left: 1em; }
 	.history-lock-badge {
 		display: inline-flex;
 		align-items: center;

@@ -38,6 +38,7 @@
 		DEFAULT_MODEL,
 		modelsForProvider,
 		modelDisplayName,
+		modelShortName,
 		providerLabel,
 		providerOfModel,
 		qualifiedModelId,
@@ -1808,7 +1809,13 @@ $effect(() => {
 
 	const currentRenderedAt = $derived.by(() => {
 		const at = work.displayedHistoryItem?.at ?? work.result?.history_at ?? null;
-		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
+		return at == null ? null : new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', {
+			year: 'numeric',
+			month: 'numeric',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 	});
 
 
@@ -2190,6 +2197,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusStage2Model = $derived(work.displayedHistoryItem
 		? (work.displayedHistoryItem.stage2_model ? statusModelName(work.displayedHistoryItem.stage2_model) : '-')
 		: (work.result?.stage2_model ? statusModelName(work.result.stage2_model) : '-'));
+	const statusStage1ModelOnly = $derived(work.displayedHistoryItem
+		? (work.displayedHistoryItem.stage1_model ? modelShortName(work.displayedHistoryItem.stage1_model) : '-')
+		: (work.result?.stage1_model ? modelShortName(work.result.stage1_model) : '-'));
+	const statusStage2ModelOnly = $derived(work.displayedHistoryItem
+		? (work.displayedHistoryItem.stage2_model ? modelShortName(work.displayedHistoryItem.stage2_model) : '-')
+		: (work.result?.stage2_model ? modelShortName(work.result.stage2_model) : '-'));
 	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
 	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
 	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? t().colorCatalogAuto : currentCatalog.name);
@@ -2841,6 +2854,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{scoreJsonSeparatorLine}
 				{statusStage1Model}
 				{statusStage2Model}
+				{statusStage1ModelOnly}
+				{statusStage2ModelOnly}
 				visionModel={qualifiedModelId(visionProvider, visionModel)}
 				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}

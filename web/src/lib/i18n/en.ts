@@ -64,6 +64,7 @@ export const en: LangPack = {
 	inputSectionHint: ': Write what you want to express, in a short line.',
 	inputMeterChars: (count, guide) => `Characters ${count} / ${guide} (tanka)`,
 	inputMeterWords: (count, guide) => `Words ${count} / ${guide} (tanka)`,
+	inputCommentHint: '[Text in brackets is treated as a comment]',
 	interpretationFeedbackLabel: 'Interpretation feedback',
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas aspect',

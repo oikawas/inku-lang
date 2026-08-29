@@ -132,6 +132,16 @@ test('T-100: the rest stand at the right, and fullscreen is still last', () => {
 	assert.equal(order[order.length - 1], Math.max(...order));
 });
 
+test('T-100: the lower button tooltips stand in front of the caption', () => {
+	// Tooltip raises its own wrapper, but that value stays inside the row's
+	// stacking context. The row itself must therefore outrank the caption.
+	const controls = ARTWORK.match(/\.canvas-corner-controls \{[\s\S]*?\}/)?.[0] ?? '';
+	const caption = ARTWORK.match(/\.instruction-caption \{[\s\S]*?\}/)?.[0] ?? '';
+	const controlsLayer = Number(controls.match(/z-index:\s*(\d+)/)?.[1]);
+	const captionLayer = Number(caption.match(/z-index:\s*(\d+)/)?.[1]);
+	assert.ok(controlsLayer > captionLayer, 'the caption still paints over a lower button tooltip');
+});
+
 // ------------------------------------------------ T-101 (the marks are real)
 
 test('T-101: the two marks are the two flags a work carries', () => {

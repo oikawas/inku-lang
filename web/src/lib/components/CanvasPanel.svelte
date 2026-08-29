@@ -367,7 +367,7 @@
 		});
 	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
-	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
+	let refineView = $state<'adjust' | 'compare'>('adjust');
 	let refineModalOpen = $state(false);
 	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
@@ -393,7 +393,7 @@
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
-	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
+	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare'): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
 		refineModalOpen = true;

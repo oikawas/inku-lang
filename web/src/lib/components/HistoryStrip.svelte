@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import type { HistoryStripField } from '$lib/historyStripFields';
+	import { formatHistoryStripEngineVersion, type HistoryStripField } from '$lib/historyStripFields';
 
 	type HistoryItem = {
 		id?: string;
@@ -141,7 +141,7 @@
 			return { short: historyModelStage1Short(item), full: historyModelStage1Full(item) };
 		}
 		if (field === 'engine_version') {
-			const version = item.render_engine_version || t().historyVersionNotRecorded;
+			const version = formatHistoryStripEngineVersion(item.render_engine_version, t().historyVersionNotRecorded);
 			return { short: version, full: version };
 		}
 		const size = fileSizeLabel(item);

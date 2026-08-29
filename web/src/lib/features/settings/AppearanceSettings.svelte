@@ -78,9 +78,7 @@
 				{#if uiModeSaveError}<div class="inline-message error-text">{t().uiModeSaveFailed}</div>{/if}
 			</div>
 			<!-- Two at most, and the unticked boxes go disabled at that point
-			     rather than the third click evicting an earlier choice: the
-			     reader can see why the box will not take, and the two they
-			     picked stay where they put them. -->
+			     rather than the third click evicting an earlier choice. -->
 			<div class="popover-group history-strip-fields">
 				<div class="popover-group-label">{t().historyStripFieldsLabel}</div>
 				<div class="db-test-result">{t().historyStripFieldsDescription}</div>
@@ -98,7 +96,6 @@
 						</label>
 					{/each}
 				</div>
-				{#if !canAddHistoryStripField(historyStripFields)}<div class="db-test-result">{t().historyStripFieldsFull}</div>{/if}
 				{#if historyStripFieldsSaving}<div class="inline-message">{t().uiModeSaving}</div>{/if}
 				{#if historyStripFieldsSaveError}<div class="inline-message error-text">{t().historyStripFieldsSaveFailed}</div>{/if}
 			</div>

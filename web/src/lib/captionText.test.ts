@@ -10,13 +10,11 @@ const emphasized = (text: string) => captionParts(text).filter((part) => part.it
 const here = path.dirname(new URL(import.meta.url).pathname);
 const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'utf8');
 
-test('only the contents of square-bracket comments are italic', () => {
+test('square-bracket comments are italic including their brackets', () => {
 	const text = '霧[季節の補足]と［作者のメモ］';
 	const parts = captionParts(text);
 	assert.equal(parts.map((part) => part.text).join(''), text);
-	assert.deepEqual(emphasized(text), ['季節の補足', '作者のメモ']);
-	assert.ok(parts.some((part) => !part.italic && part.text.includes('[', 0)));
-	assert.ok(parts.some((part) => !part.italic && part.text.includes('］')));
+	assert.deepEqual(emphasized(text), ['[季節の補足]', '［作者のメモ］']);
 });
 
 test('an unclosed bracket remains ordinary text', () => {
@@ -27,7 +25,7 @@ test('the complete refinement-direction line is italic in both languages', () =>
 	const text = '霧[補足]\n推敲方針: 青を強く\nRefinement direction: quieter';
 	const parts = captionParts(text);
 	assert.equal(parts.map((part) => part.text).join(''), text);
-	assert.deepEqual(emphasized(text), ['補足', '推敲方針: 青を強く', 'Refinement direction: quieter']);
+	assert.deepEqual(emphasized(text), ['[補足]', '推敲方針: 青を強く', 'Refinement direction: quieter']);
 });
 
 test('the normal canvas and presentation render headnotes through the same formatter', () => {

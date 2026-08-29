@@ -17,15 +17,24 @@ export function groupDigits(value: number, fractionDigits = 0): string {
 }
 
 /**
- * A count of bytes, as the canvas strip and the provenance drawer both say it.
+ * A detailed count of bytes for the provenance drawer.
  *
- * One function for the two so the number above the drawing and the number
- * inside the drawer cannot drift apart -- they are the same quantity, measured
- * once. Below a kilobyte the bytes are shown as they are: rounding 300 bytes to
- * `0.3 KB` says less than `300 B` does.
+ * Below a kilobyte the bytes are shown as they are: rounding 300 bytes to
+ * `0.3 KB` says less than `300 B` does. The compact canvas strip deliberately
+ * uses formatCanvasCapacity instead.
  */
 export function formatByteSize(bytes: number | null | undefined): string {
 	if (bytes == null) return '-';
 	if (bytes < 1024) return `${groupDigits(bytes)} B`;
 	return `${groupDigits(bytes / 1024, 1)} KB`;
+}
+
+/** The compact capacity printed above the canvas.
+ *
+ * It is always whole kilobytes. A positive SVG cannot disappear as `0 KB`, so
+ * the rounded value has a floor of one; this also makes 0.4 KB read as 1 KB.
+ */
+export function formatCanvasCapacity(bytes: number | null | undefined): string {
+	if (bytes == null) return '-';
+	return `${groupDigits(Math.max(1, Math.round(Math.max(0, bytes) / 1024)))} KB`;
 }

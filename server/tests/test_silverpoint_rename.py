@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import get_args
 
-import inku_render
 import pytest
 from pydantic import ValidationError
 
@@ -43,6 +42,8 @@ def test_only_the_compatibility_spelling_is_replaced() -> None:
 
 
 def test_silverpoint_keeps_its_rust_render_properties() -> None:
+    import inku_render
+
     reference = json.loads(inku_render.renderer_reference_json())
     silverpoint = next(
         item

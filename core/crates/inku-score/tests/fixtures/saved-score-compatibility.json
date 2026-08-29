@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "current-valid",
+      "input": {"instructions": [{"primitive": "line"}]},
+      "canonical_json": "{\"background\":\"white\",\"canvas\":\"square\",\"instructions\":[{\"angle_end\":null,\"angle_start\":null,\"arrangement\":null,\"at\":null,\"carve_depth\":null,\"center\":null,\"color\":\"black\",\"color_hint\":null,\"filled\":false,\"from\":null,\"mode\":\"additive\",\"note\":null,\"position\":null,\"primitive\":\"line\",\"radius\":null,\"relation\":null,\"rotation\":null,\"sides\":null,\"size\":null,\"style\":\"solid\",\"surface\":null,\"thinness\":null,\"to\":null,\"variation\":null,\"weight\":\"pen\"}],\"presence\":null,\"version\":\"0.1.0\"}",
+      "digest": "94d2cc9a680fc4bc32615405cf4cf02d8fca5090f2ecbf431fa033f5e4b04e56"
+    },
+    {
+      "id": "legacy-exact-six",
+      "input": {
+        "canvas": {"aspect": "portrait", "ground": {"material": "paper", "tone": "warm", "grain": "fine", "density": 0.5, "opacity": 0.25, "seed": 8, "absorbency": 0.7}},
+        "background": "gray",
+        "instructions": [{"primitive": "line", "from": [0.1, 0.2], "to": [0.8, 0.9], "style": "dotted", "weight": "hair", "color": "red", "variation": {"amplitude": "fine", "frequency": "high", "quality": "wave", "dimensions": ["position_x", "thickness", "radius"]}, "relation": {"type": "touching", "gap": "narrow", "contact": "both_ends"}}]
+      },
+      "canonical_json": "{\"background\":\"gray\",\"canvas\":{\"aspect\":\"portrait\",\"ground\":{\"density\":0.5,\"grain\":\"fine\",\"material\":\"paper\",\"opacity\":0.25,\"seed\":8,\"tone\":\"warm\"}},\"instructions\":[{\"angle_end\":null,\"angle_start\":null,\"arrangement\":null,\"at\":null,\"carve_depth\":null,\"center\":null,\"color\":\"red\",\"color_hint\":null,\"filled\":false,\"from\":[0.1,0.2],\"mode\":\"additive\",\"note\":null,\"position\":null,\"primitive\":\"line\",\"radius\":null,\"relation\":{\"gap\":\"narrow\",\"type\":\"touching\"},\"rotation\":null,\"sides\":null,\"size\":null,\"style\":\"dotted\",\"surface\":null,\"thinness\":null,\"to\":[0.8,0.9],\"variation\":{\"amplitude\":\"fine\",\"dimensions\":[\"position_x\",\"radius\"],\"frequency\":\"high\",\"quality\":\"wave\"},\"weight\":\"silverpoint\"}],\"presence\":null,\"version\":\"0.1.0\"}",
+      "digest": "64955f7d3ee73346458dade470c28cd697b2c8256f8eda0eae29405106443e75"
+    }
+  ],
+  "invalid_cases": [
+    {
+      "id": "near-hair-spelling",
+      "input": {"version": "0.1.0", "instructions": [{"primitive": "line", "weight": "Hair"}]}
+    },
+    {
+      "id": "unsupported-version",
+      "input": {"version": "0.2.0", "instructions": []}
+    },
+    {
+      "id": "non-object-root",
+      "input": []
+    }
+  ]
+}

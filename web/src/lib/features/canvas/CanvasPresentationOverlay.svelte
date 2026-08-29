@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import CaptionText from '$lib/components/CaptionText.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	export type PresentationWorkMark = {
@@ -57,7 +58,7 @@
 			{/if}
 		</div>
 		{#if instructionCaptionVisible && canShowInstructionCaption}
-			<div class="presentation-caption">{displayInstructionText}</div>
+			<div class="presentation-caption"><CaptionText text={displayInstructionText} /></div>
 		{/if}
 	</div>
 	<div class="presentation-controls" aria-label={t().canvasPresentationControls}>

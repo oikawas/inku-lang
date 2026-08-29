@@ -81,6 +81,7 @@ function harness(responder: (path: string, init?: RequestInit) => Promise<Respon
 			current = item;
 			projections.push(`current:${item?.id ?? 'none'}:${String(item?.starred)}:${String(item?.for_revision)}:${String(item?.for_share)}:${String(item?.trashed)}`);
 		},
+		applyCurrentResultStarState: (item) => projections.push(`result:star:${String(item.starred)}:${String(item.note)}`),
 		applyLineageStarState: (item) => projections.push(`lineage:star:${String(item.starred)}:${String(item.note)}`),
 		applyLineageForRevisionState: (item) => projections.push(`lineage:revision:${String(item.for_revision)}`),
 		applyLineageForShareState: (item) => projections.push(`lineage:share:${String(item.for_share)}:${String(item.share_group_id)}`),
@@ -159,6 +160,24 @@ test('T-286: leaving an active mark filter clears it and refreshes only the affe
 	await h.mutations.toggleStar(work({ starred: true }));
 	assert.ok(h.projections.includes('filter:star:clear'));
 	assert.deepEqual(h.refreshes, ['strip:0:work-1', 'manager']);
+});
+
+test('the current saved result receives optimistic, server, and rollback star projections', async () => {
+	const success = harness(async () => jsonResponse(work({ starred: true, note: 'saved' })));
+	success.setCurrent(null);
+	await success.mutations.toggleStar(work({ starred: false }));
+	assert.deepEqual(
+		success.projections.filter((entry) => entry.startsWith('result:star:')),
+		['result:star:true:undefined', 'result:star:true:saved']
+	);
+
+	const failure = harness(async () => { throw new Error('offline'); });
+	failure.setCurrent(null);
+	await failure.mutations.toggleStar(work({ starred: false }));
+	assert.deepEqual(
+		failure.projections.filter((entry) => entry.startsWith('result:star:')),
+		['result:star:true:undefined', 'result:star:false:undefined']
+	);
 });
 
 test('T-288: bulk lifecycle mutations keep endpoint, refresh, and displayed-work outcomes together', async () => {

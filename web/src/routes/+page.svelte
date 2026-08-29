@@ -98,7 +98,8 @@
 	} from '$lib/historyManagerState.svelte';
 	import {
 		HISTORY_EXTERNAL_REFRESH_MS,
-		HistoryBrowsingState
+		HistoryBrowsingState,
+		type HistoryStarProjection
 	} from '$lib/features/history/browsing-state.svelte';
 	import { HistoryMutations } from '$lib/features/history/mutations';
 	import { saveHistoryItem, type SaveHistoryOptions } from '$lib/features/history/save';
@@ -1129,6 +1130,7 @@
 	let visionModel     = $state<string>(DEFAULT_VISION_MODEL);
 	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
 	let includeThinking = $state(false);
+	let currentResultStarState = $state<HistoryStarProjection | null>(null);
 	$effect(() => {
 		const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id ?? null;
 		void lineageState.loadNearby(historyId);
@@ -1153,6 +1155,12 @@
 		browsing: history,
 		currentItem: () => work.displayedHistoryItem,
 		setCurrentItem: (item) => { work.displayedHistoryItem = item; },
+		applyCurrentResultStarState: (item) => {
+			const historyId = work.result?.history_id ?? null;
+			if (!work.displayedHistoryItem && historyId && item.id === historyId) {
+				currentResultStarState = { id: historyId, starred: item.starred, note: item.note };
+			}
+		},
 		applyLineageStarState: (item) => lineageState.applyStarState(item),
 		applyLineageForRevisionState: (item) => lineageState.applyForRevisionState(item),
 		applyLineageForShareState: (item) => lineageState.applyForShareState(item),
@@ -2250,9 +2258,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const statusHistoryItem = $derived.by(() => {
 		if (work.displayedHistoryItem) return work.displayedHistoryItem;
 		if (work.result?.history_id) {
-			return historyItems.find((item) => item.id === work.result?.history_id) ?? {
-				id: work.result.history_id,
-				starred: false,
+			const historyId = work.result.history_id;
+			const projected = currentResultStarState?.id === historyId ? currentResultStarState : null;
+			return historyItems.find((item) => item.id === historyId) ?? {
+				id: historyId,
+				starred: projected?.starred ?? false,
+				note: projected?.note ?? null,
 			};
 		}
 		if (work.inputMode === 'demo' || work.activeRunMode === 'demo') return null;

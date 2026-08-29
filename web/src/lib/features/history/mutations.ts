@@ -47,6 +47,7 @@ export type HistoryMutationDependencies = {
 	browsing: HistoryMutationBrowsing;
 	currentItem: () => HistoryItem | null;
 	setCurrentItem: (item: HistoryItem | null) => void;
+	applyCurrentResultStarState: (item: HistoryStarProjection) => void;
 	applyLineageStarState: (item: HistoryStarProjection) => void;
 	applyLineageForRevisionState: (item: HistoryForRevisionProjection) => void;
 	applyLineageForShareState: (item: HistoryForShareProjection) => void;
@@ -232,6 +233,7 @@ export class HistoryMutations {
 				note: hasNote ? item.note : current.note
 			});
 		}
+		this.deps.applyCurrentResultStarState(item);
 		this.deps.applyLineageStarState(item);
 	}
 

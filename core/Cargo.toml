@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/inku-score",
     "crates/inku-render",
     "crates/inku-render-android",
     "crates/inku-render-python",
@@ -14,6 +15,7 @@ rust-version = "1.95"
 license = "MIT"
 
 [workspace.dependencies]
+inku-score = { path = "crates/inku-score" }
 inku-render = { path = "crates/inku-render" }
 inku-svg-raster = { path = "crates/inku-svg-raster" }
 jni = "=0.21.1"

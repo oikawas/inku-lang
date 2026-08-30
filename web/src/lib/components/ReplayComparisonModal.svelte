@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { svgImage } from '$lib/svgImage';
 
 	type Props = {
 		originalSvg: string;
@@ -52,14 +53,14 @@
 					<strong>{t().replayComparisonOriginal}</strong>
 					<span>engine {recordedVersion ?? t().historyVersionNotRecorded}</span>
 				</header>
-				<div class="artwork-frame">{@html originalSvg}</div>
+				<div class="artwork-frame"><img use:svgImage={originalSvg} alt="" /></div>
 			</article>
 			<article class="artwork-card">
 				<header class="artwork-heading">
 					<strong>{t().replayComparisonCurrent}</strong>
 					<span>engine {currentVersion ?? t().historyVersionUnknown}</span>
 				</header>
-				<div class="artwork-frame">{@html replayedSvg}</div>
+				<div class="artwork-frame"><img use:svgImage={replayedSvg} alt="" /></div>
 			</article>
 		</div>
 	</div>
@@ -97,7 +98,7 @@
 	.artwork-heading strong { font-size: 13px; }
 	.artwork-heading span { color: var(--fg2); font-size: 12px; font-variant-numeric: tabular-nums; }
 	.artwork-frame { display: grid; min-height: 360px; place-items: center; padding: 12px; overflow: auto; background: var(--canvas-paper); }
-	.artwork-frame :global(svg) { display: block; width: auto; max-width: 100%; height: auto; max-height: min(62vh, 620px); }
+	.artwork-frame img { display: block; width: auto; max-width: 100%; height: auto; max-height: min(62vh, 620px); }
 	@media (max-width: 760px) {
 		.replay-layer { padding: 10px; }
 		.replay-dialog { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 14px; }

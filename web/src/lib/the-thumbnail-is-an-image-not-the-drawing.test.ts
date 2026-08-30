@@ -71,8 +71,9 @@ const THUMBNAIL_SOURCE = readFileSync(
 test('a thumbnail that fails to load falls back to the drawing', () => {
 	// The <img> must report its failure...
 	assert.match(THUMBNAIL_SOURCE, /onerror=\{\(\) => \(thumbMissing = true\)\}/);
-	// ...and the branch it falls back to must still draw the SVG.
-	assert.match(THUMBNAIL_SOURCE, /\{:else\}\s*\{@html clippedSvg\}/);
+	// ...and the fallback stays an image document instead of joining the app DOM.
+	assert.match(THUMBNAIL_SOURCE, /\{:else\}\s*<img use:svgImage=\{item\.svg\}/);
+	assert.doesNotMatch(THUMBNAIL_SOURCE, /\{@html\s+clippedSvg\}/);
 	// The flag has to reach the decision, or reporting the failure changes
 	// nothing and the work stays blank.
 	assert.match(THUMBNAIL_SOURCE, /thumbMissing \? null : thumbnailSrc\(/);

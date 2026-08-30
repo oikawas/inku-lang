@@ -82,30 +82,39 @@ export async function readPaintStream<T>(
 	const decoder = new TextDecoder();
 	let buffer = '';
 	let done: T | null = null;
+	const consumeLine = (line: string): void => {
+		if (!line) return;
+		const event = JSON.parse(line) as { event: string } & Record<string, unknown>;
+		if (event.event === 'sketch') {
+			handlers.onSketch?.(event as unknown as PaintSketchEvent);
+		} else if (event.event === 'stage1') {
+			handlers.onStage1?.(event as unknown as PaintStage1Event);
+		} else if (event.event === 'score') {
+			handlers.onScore?.(event as unknown as PaintScoreEvent);
+		} else if (event.event === 'error') {
+			throw new Error(handlers.describeError(event.detail, Number(event.status ?? 500)));
+		} else if (event.event === 'done') {
+			done = event as unknown as T;
+		}
+	};
 
 	for (;;) {
 		const chunk = await reader.read();
 		if (chunk.value) buffer += decoder.decode(chunk.value, { stream: true });
+		// TextDecoder can retain an incomplete multibyte sequence. Flush it before
+		// consuming the final unterminated NDJSON record at EOF.
+		if (chunk.done) buffer += decoder.decode();
 		let newline = buffer.indexOf('\n');
 		while (newline >= 0) {
 			const line = buffer.slice(0, newline).trim();
 			buffer = buffer.slice(newline + 1);
 			newline = buffer.indexOf('\n');
-			if (!line) continue;
-			const event = JSON.parse(line) as { event: string } & Record<string, unknown>;
-			if (event.event === 'sketch') {
-				handlers.onSketch?.(event as unknown as PaintSketchEvent);
-			} else if (event.event === 'stage1') {
-				handlers.onStage1?.(event as unknown as PaintStage1Event);
-			} else if (event.event === 'score') {
-				handlers.onScore?.(event as unknown as PaintScoreEvent);
-			} else if (event.event === 'error') {
-				throw new Error(handlers.describeError(event.detail, Number(event.status ?? 500)));
-			} else if (event.event === 'done') {
-				done = event as unknown as T;
-			}
+			consumeLine(line);
 		}
-		if (chunk.done) break;
+		if (chunk.done) {
+			consumeLine(buffer.trim());
+			break;
+		}
 	}
 	if (!done) throw new Error('paint stream ended before completion');
 	return done;

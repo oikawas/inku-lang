@@ -10,18 +10,18 @@ export function modelPurposes(model: ModelOption): string {
 
 export type ModelPurpose = 'llm' | 'vision';
 
-// どの段のために選んでいるか。'both' は 1 つのモデルを両方の段へ充てる場合。
+// Which stage is choosing the model. 'both' assigns one model to both stages.
 export type ModelStage = 'stage1' | 'stage2' | 'both';
 
-// v1.98: 推奨度は用途ごとに測る。LLM は「3 回成功したか・スキーマを壊さないか・補正発火が
-// 少ないか」、Vision は画像特徴の再現率で決まり、同じ尺度に乗らないため。
-// purpose を渡さない呼び出しは、そのモデルが持つ最も高い推奨度を見る。
+// v1.98: Recommendations are measured per purpose because LLM evaluation uses
+// three successful runs, schema validity, and correction frequency, while Vision
+// uses visual-feature recall. Calls without purpose use the model's highest score.
 //
-// stage は LLM の値をさらに狭める。段ごとの値を持たないモデル (通しで測った NVIDIA と
-// Ollama Cloud の全部) は recommendation_llm へ落ちるので、段を渡しても答えは変わらない。
-// 'both' は 2 つの低い方を採る — 両方の段をこなす必要があるモデルは、苦手な段のほうで
-// 律速される。ここを max にすると、第一段階の推奨 (qwen3.5:4b) が第二段階の被覆 32% を
-// 隠して★5 に見える。
+// stage narrows the LLM score further. Models measured end to end (all NVIDIA
+// and Ollama Cloud models) fall back to recommendation_llm, so a stage argument
+// does not change their result. 'both' takes the lower stage score because a
+// model assigned to both stages is limited by its weaker one. Using max would
+// let qwen3.5:4b's Stage 1 result hide its 32% Stage 2 coverage and appear as ★5.
 function stageLevel(model: ModelOption, llm: number, stage?: ModelStage): number {
 	const s1 = model.recommendation_stage1;
 	const s2 = model.recommendation_stage2;
@@ -84,8 +84,8 @@ export function modelStageRecommendations(
 	};
 }
 
-// 一覧の並び。提供終了を末尾へ送り、その中で推奨度の高い順に見せる。取得ボタンは提供元の
-// 順序で配列を作り直すため、カタログの配列順では順序を維持できない (v1.98)。
+// Listing order: retired models last, then highest recommendation first. Fetch
+// controls rebuild arrays in provider order, so catalog order cannot preserve it.
 export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?: ModelStage): ModelOption[] {
 	return [...models].sort((a, b) => {
 		const unselectable = Number(isModelUnselectable(a)) - Number(isModelUnselectable(b));
@@ -110,8 +110,8 @@ export function modelEolLabel(model: ModelOption, isJapanese: boolean): string |
 	return isJapanese ? `提供終了${date}` : `End of life${date}`;
 }
 
-// 選べない理由は 2 つある。退役 (EOL) と、有料プラン限定。どちらも一覧には残す
-// ので、無効化と並べ替えは 1 つの述語を通す。
+// Two conditions make a listed model unselectable: retirement (EOL) and a paid
+// tier requirement. Disabling and sorting share this predicate.
 export function isModelUnselectable(model: ModelOption): boolean {
 	return !!model.eol || !!model.requires_subscription;
 }

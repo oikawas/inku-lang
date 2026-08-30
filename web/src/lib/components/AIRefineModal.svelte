@@ -186,10 +186,14 @@
   function stopRefinement() {
     abortController?.abort();
   }
+
+  function handleBackdropClick(event: MouseEvent) {
+    if (!running && event.target === event.currentTarget) onClose();
+  }
 </script>
 
-<div class="modal-backdrop" onclick={!running ? onClose : undefined} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
-  <div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+<div class="modal-backdrop" onclick={handleBackdropClick} onkeydown={(e) => { if (e.key === 'Escape' && !running) onClose(); }} role="presentation">
+  <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
     <header><h3 id="modal-title">{t().aiRefineTitle}</h3>{#if !running}<button class="close-btn" type="button" onclick={onClose} aria-label={t().closeLabel}>&times;</button>{/if}</header>
     <div class="modal-body">
       {#if running}

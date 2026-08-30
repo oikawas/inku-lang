@@ -119,13 +119,49 @@ async function ensureWritable(handle: FileSystemDirectoryHandle): Promise<boolea
 	}
 }
 
-function triggerBrowserDownload(blob: Blob, filename: string): void {
-	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement('a');
+export type DownloadAnchor = {
+	href: string;
+	download: string;
+	hidden: boolean | string;
+	click: () => void;
+	remove: () => void;
+};
+
+export type BrowserDownloadEnvironment = {
+	createObjectURL: (blob: Blob) => string;
+	revokeObjectURL: (url: string) => void;
+	createAnchor: () => DownloadAnchor;
+	appendAnchor: (anchor: DownloadAnchor) => void;
+	defer: (callback: () => void) => void;
+};
+
+const browserDownloadEnvironment: BrowserDownloadEnvironment = {
+	createObjectURL: (blob) => URL.createObjectURL(blob),
+	revokeObjectURL: (url) => URL.revokeObjectURL(url),
+	createAnchor: () => document.createElement('a'),
+	appendAnchor: (anchor) => document.body.append(anchor as HTMLAnchorElement),
+	defer: (callback) => { setTimeout(callback, 0); }
+};
+
+export function triggerBrowserDownload(
+	blob: Blob,
+	filename: string,
+	environment: BrowserDownloadEnvironment = browserDownloadEnvironment
+): void {
+	const anchor = environment.createAnchor();
+	const url = environment.createObjectURL(blob);
 	anchor.href = url;
 	anchor.download = filename;
-	anchor.click();
-	URL.revokeObjectURL(url);
+	anchor.hidden = true;
+	try {
+		environment.appendAnchor(anchor);
+		anchor.click();
+	} finally {
+		anchor.remove();
+		// The navigation starts asynchronously. Revoking in the click stack can
+		// invalidate the URL before the browser has accepted the download.
+		environment.defer(() => environment.revokeObjectURL(url));
+	}
 }
 
 /**

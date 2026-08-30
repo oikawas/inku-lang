@@ -85,7 +85,7 @@
 		canvasAspectMenuOpen: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
-		/** 写生 (Stage 0.5). Chosen per draw, not stored as a user setting. */
+		/** Sketch from life (Stage 0.5). Chosen per draw, not stored as a user setting. */
 		sketchMode: SketchMode;
 		onSelectSketchMode: (mode: SketchMode) => void;
 		nextStage1Model: string;
@@ -252,7 +252,7 @@
 
 <section class="panel-section">
 	<!-- The button row and the settings readout are the same for every input
-	     mode, but the 記述 tab puts them below the input box: the description is
+	     mode, but the description tab puts them below the input box: the description is
 	     written first, the settings are confirmed just before painting. -->
 	{#snippet inputSettings()}
 	<div class="section-head">
@@ -287,7 +287,7 @@
 					/>
 				</Tooltip>
 			{/if}
-			<!-- On the 記述 tab this button lives at the right end of the label row
+			<!-- On the description tab this button lives at the right end of the label row
 			     instead, next to the text it clears. -->
 			{#if inputMode === 'batch'}
 				<Tooltip placement="left" text={t().tooltipInputClear}>

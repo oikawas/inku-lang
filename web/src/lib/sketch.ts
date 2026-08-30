@@ -1,4 +1,4 @@
-// 写生 (Stage 0.5, v2.10). Single source for the values and labels.
+// Sketch from life (Stage 0.5, v2.10). Single source for the values and labels.
 //
 // The layer rewrites the description as prose in the language of things before
 // Stage 1 reads it. One control carries three states: off (the plain path, the

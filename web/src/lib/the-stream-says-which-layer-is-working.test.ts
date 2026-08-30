@@ -1,6 +1,6 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// 待っているあいだ、どの層が働いているかが画面に出る -- contract
+// The screen identifies the active layer while the reader waits -- contract
 // tasks/the-stream-says-which-layer-is-working.md ([I-302]), web side.
 // T-248 (an event this build does not know is dropped) and T-252 (the
 // indicator says four different things at the four moments, in both languages).
@@ -16,6 +16,14 @@ const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/
 
 const streamOf = (events: object[]) =>
 	new Response(events.map((e) => `${JSON.stringify(e)}\n`).join(''));
+
+const streamFromBytes = (chunks: Uint8Array[]) =>
+	new Response(new ReadableStream({
+		start(controller) {
+			for (const chunk of chunks) controller.enqueue(chunk);
+			controller.close();
+		}
+	}));
 
 const describeError = (detail: unknown, status: number) => `HTTP ${status}: ${String(detail)}`;
 
@@ -57,6 +65,22 @@ test('T-248  an error event is still an error, not another unknown line', async 
 		}),
 		/HTTP 502: interpret failed/
 	);
+});
+
+test('a terminal event without a final newline is still consumed', async () => {
+	const done = await readPaintStream<typeof DONE>(new Response(JSON.stringify(DONE)), { describeError });
+	assert.deepEqual(done, DONE);
+});
+
+test('a multibyte event split between chunks is flushed without corruption', async () => {
+	const bytes = new TextEncoder().encode(JSON.stringify(DONE));
+	const multibyteStart = bytes.indexOf(0xe9);
+	assert.ok(multibyteStart >= 0, 'fixture must contain a three-byte UTF-8 character');
+	const done = await readPaintStream<typeof DONE>(
+		streamFromBytes([bytes.slice(0, multibyteStart + 1), bytes.slice(multibyteStart + 1)]),
+		{ describeError }
+	);
+	assert.deepEqual(done, DONE);
 });
 
 // ---------------------------------------------------------------- T-252

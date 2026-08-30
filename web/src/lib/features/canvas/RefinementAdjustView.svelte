@@ -7,6 +7,7 @@
 	import VariationLanes from '$lib/components/VariationLanes.svelte';
 	import WildToggle from '$lib/components/WildToggle.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
+	import { svgImage } from '$lib/svgImage';
 	import type {
 		RefinementSession,
 		RefineKind,
@@ -246,7 +247,7 @@
 						{#each refinementSession.candidates as candidate (candidate.id)}
 							<div class="variation-card-wrap">
 								<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => onShowVariationCandidate(candidate)} type="button">
-									<span class="variation-card-art">{@html candidate.result.svg}</span>
+									<span class="variation-card-art"><img use:svgImage={candidate.result.svg} alt="" /></span>
 									<span class="variation-card-meta">
 										<span>{candidate.label}</span>
 										<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>

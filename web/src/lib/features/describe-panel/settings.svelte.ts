@@ -1,5 +1,5 @@
-// Whether each foldable section of the describe panel is open: 写生 (Stage 0.5)
-// and 展開後 (Stage 2 input).  Key, default, state and both sides of the round
+// Whether each foldable section of the describe panel is open: sketch from life
+// (Stage 0.5) and expanded DDL (Stage 2 input). Key, default, state and both sides of the round
 // trip live together -- see features/color-catalog/settings.svelte.ts for why.
 //
 // These ride in the user's `model_settings` on the server rather than in

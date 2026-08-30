@@ -6,24 +6,24 @@ export type ModelOption = {
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
-	// v1.98: 推奨度は用途ごとに持つ。recommendation_level は旧形式の読み取り用。
+	// v1.98: Recommendations are per purpose; recommendation_level reads the legacy format.
 	recommendation_llm?: number;
 	recommendation_vision?: number;
 	recommendation_level?: number;
-	// 段ごとの推奨度。recommendation_llm を置き換えるのではなく狭める。通しで測った
-	// モデル (NVIDIA と Ollama Cloud の全部) は 1 数値しか持たず、両方の段がそれを読む。
-	// ローカルの Ollama は段ごとに測ってあり、二つの段が食い違う。
+	// Stage-specific recommendations narrow recommendation_llm rather than replace it.
+	// End-to-end measurements (all NVIDIA and Ollama Cloud models) have one value
+	// read by both stages; local Ollama models are measured separately per stage.
 	recommendation_stage1?: number;
 	recommendation_stage2?: number;
 	speed_class?: string;
 	speed_label?: string;
 	comment_ja?: string;
 	comment_en?: string;
-	// v1.98: 提供元が提供終了したモデル。一覧には残すが新規描画では選べない。
+	// v1.98: A provider-retired model remains listed but cannot start a new drawing.
 	eol?: boolean;
 	eol_date?: string;
-	// 提供元の有料プランでしか叩けないモデル。EOL と同じく選べないが、理由が違う
-	// (退役したのではなく、こちらの契約が届いていない)。
+	// A model limited to the provider's paid tier. It is unselectable like EOL,
+	// but the reason is subscription access rather than retirement.
 	requires_subscription?: boolean;
 };
 
@@ -81,10 +81,10 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'ollama',
 		label: 'Ollama',
-		// API のカタログが届くまでの控え。verified_model_catalog.py の
-		// VERIFIED_OLLAMA_LOCAL_MODELS と同じ並び・同じ id を保つこと。
-		// 実測のコメントと速度は API 側から来るのでここには持たない。
-		// 量子化までタグに書くのは、素タグが上流で差し替わり計測と結びつかなくなるため。
+		// Fallback until the API catalog arrives. Keep its order and ids aligned with
+		// VERIFIED_OLLAMA_LOCAL_MODELS in verified_model_catalog.py. Measured comments
+		// and speeds come from the API. Quantization stays in each tag because an
+		// upstream replacement of a bare tag would detach it from its measurement.
 		models: [
 			{ id: 'qwen3.5:4b-q4_K_M', label: 'qwen3.5:4b-q4_K_M (3.4GB)' },
 			{

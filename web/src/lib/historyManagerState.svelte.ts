@@ -26,12 +26,12 @@ export type HistoryItem = {
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;
 	ddl: string | null;
-	// v1.98: 展開後 DDL (Stage 2 入力)。v1.98 以前の作品は持たない。
+	// v1.98: Expanded DDL (Stage 2 input). Works before v1.98 do not have it.
 	expanded_ddl?: string | null;
 	focus?: string | null;
 	variation_amplitude?: string | null;
 	variation_seed?: number | string | null;
-	// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
+	// v1.98: Why Stage 1 used its fallback. null means ordinary interpretation.
 	interpret_fallback?: string | null;
 	// Stage 2's counterpart, with a third reading the field above cannot make:
 	// 'none' means a writer said the stage held, and an absent value means the
@@ -82,7 +82,7 @@ export type HistoryItem = {
 	tenkei?: string | null;
 	composition_seed?: number | string | null;
 	interpretation_seed?: string | null;
-	// 写生 (Stage 0.5, v2.10). Absent on every work made before the layer.
+	// Sketch from life (Stage 0.5, v2.10). Absent on works made before the layer.
 	sketch_text?: string | null;
 	sketch_grain?: string | null;
 	// What the layer did. Absent means the work predates the record, which is a

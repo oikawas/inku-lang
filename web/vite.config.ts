@@ -1,9 +1,17 @@
-// @ts-nocheck
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
-import { readFileSync, statSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { resolve, dirname } from 'path';
+import { defineConfig, type Plugin } from 'vite';
+// This package intentionally has no @types/node dependency. Keep the Node-only
+// Vite boundary explicit instead of disabling type checking for this whole file.
+// @ts-expect-error Node built-in types are unavailable in the browser package.
+import { readFileSync, statSync } from 'node:fs';
+// @ts-expect-error Node built-in types are unavailable in the browser package.
+import { fileURLToPath } from 'node:url';
+// @ts-expect-error Node built-in types are unavailable in the browser package.
+import { resolve, dirname } from 'node:path';
+
+const nodeRuntime = (globalThis as typeof globalThis & {
+	process: { version: string; platform: string; arch: string };
+}).process;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const buildNumberFile = resolve(__dirname, 'BUILD_NUMBER');
@@ -28,7 +36,7 @@ try {
 	appVersion = readFileSync(appVersionFile, 'utf-8').trim() || appVersion;
 } catch { /* first run */ }
 
-function startupBannerPlugin() {
+function startupBannerPlugin(): Plugin {
 	return {
 		name: 'inku-startup-banner',
 		configureServer() {
@@ -41,7 +49,7 @@ function startupBannerPlugin() {
 				'service: SvelteKit web UI',
 				'mode: development',
 				`listen: ${host}:${port}`,
-				`runtime: ${process.version} / ${process.platform} ${process.arch}`,
+				`runtime: ${nodeRuntime.version} / ${nodeRuntime.platform} ${nodeRuntime.arch}`,
 				'log: journal + /var/log/inku/inku-server.log',
 				`version: ${appVersion}`,
 				`build: ${buildNumber} (${buildDate})`,

@@ -14,6 +14,7 @@
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { saveBlob } from '$lib/features/export/save-target';
+	import { svgImage } from '$lib/svgImage';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import type { SheetVariant } from '$lib/contactSheet';
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
@@ -789,7 +790,7 @@ $effect(() => {
 					aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
 					disabled={!item.id}
 					onclick={() => { if (item.id) onOpenNearbyHistory?.(item.id); }}
-				>{@html item.svg}</button>
+				><img use:svgImage={item.svg} alt="" /></button>
 			{/each}
 		</div>
 	{/if}
@@ -1113,7 +1114,7 @@ $effect(() => {
 	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
 	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
-	.nearby-thumb :global(svg) { width: 100%; height: 100%; }
+	.nearby-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
 	.sketch-parent-prose { margin: 0; font-size: 12px; line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
 	.sketch-parent-prose.empty { color: var(--fg3); }
 	.sketch-dialog-current { font-size: 11px; color: var(--fg3); margin-right: auto; }

@@ -1,4 +1,5 @@
-// 暴れる (engine 12): OFF = 予想のつく標準、ON = 天井を外した奔放なストローク。
+// Wild (engine 12): OFF is predictable and standard; ON removes the ceiling
+// for uninhibited strokes.
 // One switch for the whole artwork, persisted.  Key, default and state stay
 // together -- see features/color-catalog/settings.svelte.ts for why.
 import { bindWildRenderState } from '$lib/features/wild/render';

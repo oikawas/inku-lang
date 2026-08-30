@@ -7,6 +7,7 @@
 	import WildToggle from '$lib/components/WildToggle.svelte';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
+	import { svgImage } from '$lib/svgImage';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	type Props = {
@@ -83,7 +84,7 @@
 	<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspection.selectedModels.length, 4)}</div>
 	{#if modelInspection.status}<div class="variation-grid-status">{modelInspection.status}</div>{/if}
 	<div class="model-compare-stage" class:busy={modelInspection.busy}>
-		<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspection.targetStage1Model}<br />Stage 2: {modelInspection.targetStage2Model}</div></div>
+		<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}<img use:svgImage={activeComparisonItem.svg} alt="" />{/if}</div><div class="model-target-meta">Stage 1: {modelInspection.targetStage1Model}<br />Stage 2: {modelInspection.targetStage2Model}</div></div>
 		<div class="model-results-column">
 			{#if modelInspection.results.length > 0}
 				<div class="model-inspection-grid">
@@ -91,7 +92,7 @@
 						<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
 							<div class="comparison-label">{item.label}</div>
 							<div class="model-comparison-art-wrap">
-								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div>
+								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};"><img use:svgImage={item.svg} alt="" /></div>
 								<button
 									class="variation-select model-adopt-select"
 									class:selected={!!item.savedHistoryId}

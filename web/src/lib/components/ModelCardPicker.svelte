@@ -85,7 +85,7 @@
 
 <style>
 	.model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
-	/* 取り消し線は退役にだけ引く。有料プラン限定は「消えた」のではない */
+	/* Strike through retired models only; a paid-tier model has not disappeared. */
 	.model-grid button.eol strong { text-decoration: line-through; }
 	.eol-mark { color: var(--danger); font-weight: 600; }
 	.context-model-picker { display: grid; gap: 4px; min-width: 0; }

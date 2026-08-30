@@ -22,6 +22,7 @@ type SaijikiEntry = { word: string; lower: string; category: string; categoryKey
 let entriesJaRef: SaijikiCategory[] | null = null;
 let entriesEnRef: SaijikiCategory[] | null = null;
 let entriesCache: SaijikiEntry[] = [];
+let entriesByFirstCharacter = new Map<string, SaijikiEntry[]>();
 
 // ASCII surfaces ("line", "pen", "dash-dot") must not match inside a longer
 // word ("outline", "open"). Japanese surfaces have no such boundary.
@@ -39,7 +40,7 @@ function categoryEntries(categories: SaijikiCategory[], label: (cat: SaijikiCate
 	);
 }
 
-function saijikiEntries(): SaijikiEntry[] {
+function saijikiEntriesAt(text: string, index: number): SaijikiEntry[] {
 	if (entriesJaRef !== SAIJIKI || entriesEnRef !== SAIJIKI_EN) {
 		entriesJaRef = SAIJIKI;
 		entriesEnRef = SAIJIKI_EN;
@@ -47,8 +48,19 @@ function saijikiEntries(): SaijikiEntry[] {
 			...categoryEntries(SAIJIKI, (cat) => cat.label),
 			...categoryEntries(SAIJIKI_EN, (cat) => cat.en)
 		].sort((a, b) => b.word.length - a.word.length);
+		// Preserve global longest-first order inside each bucket. annotate() then
+		// tests only words that can start at this character instead of scanning the
+		// complete hydrated vocabulary at every text position.
+		entriesByFirstCharacter = new Map();
+		for (const entry of entriesCache) {
+			const key = (entry.ascii ? entry.lower : entry.word)[0];
+			if (!key) continue;
+			const bucket = entriesByFirstCharacter.get(key);
+			if (bucket) bucket.push(entry);
+			else entriesByFirstCharacter.set(key, [entry]);
+		}
 	}
-	return entriesCache;
+	return entriesByFirstCharacter.get(text[index]?.toLowerCase() ?? '') ?? [];
 }
 
 function matchesAt(text: string, index: number, entry: SaijikiEntry): boolean {
@@ -80,8 +92,8 @@ const EMOTION_WORDS = [
 ].sort((a, b) => b.length - a.length);
 
 /**
- * 文字列を Saijiki / 感情語 / 地 の 3 種に分割。
- * 貪欲な最長一致で走査する。
+ * Split text into Saijiki, emotion, and plain-text parts using greedy
+ * longest-first matching.
  *
  * With a plugin name index, namespaced references are cut out first: they are
  * one word to the server, and letting the greedy saijiki match run inside them
@@ -112,7 +124,7 @@ export function annotate(text: string, pluginNames: PluginNameIndex | null = nul
 			continue;
 		}
 
-		for (const entry of saijikiEntries()) {
+		for (const entry of saijikiEntriesAt(text, i)) {
 			if (matchesAt(text, i, entry)) {
 				parts.push({
 					text: text.slice(i, i + entry.word.length),
@@ -213,8 +225,8 @@ function renderDDLPart(part: Part, caretOffset: number | null): string {
 }
 
 /**
- * DDL テキストを Saijiki / 感情語 で色分けした HTML を返す。
- * caretIndex を渡すとその位置にカスタムキャレット span を差し込む。
+ * Return HTML that colors DDL text by Saijiki and emotion terms. When given,
+ * caretIndex inserts a custom caret span at that position.
  *
  * `pluginNames` is optional on purpose: the viewers and the batch/demo
  * observers call this without one and must keep the output they had.

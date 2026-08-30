@@ -1,4 +1,4 @@
-// 作曲フォールバック (Stage 2). Single source for what the record means and for
+// Composition fallback (Stage 2). Single source for what the record means and for
 // what a sender writes into it.
 //
 // Stage 2 turns the DDL into a Score. When it cannot, a deterministic fallback

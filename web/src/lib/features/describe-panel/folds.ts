@@ -1,6 +1,6 @@
 /**
  * The field names, defaults and parsing for the describe panel's two folds:
- * 写生 (Stage 0.5) and 展開後 (Stage 2 input).
+ * sketch from life (Stage 0.5) and expanded DDL (Stage 2 input).
  *
  * Plain .ts (no runes), so both sides of the round trip are testable without
  * the compiler -- the same split features/color-catalog/render.ts uses.

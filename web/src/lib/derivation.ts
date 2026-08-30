@@ -13,7 +13,7 @@ export type DerivationKind =
 	| 'replay'
 	| 'canvas_aspect_change'
 	| 'variation'
-	// 写生 (Stage 0.5, v2.10): redrawn at a different grain.
+	// Sketch from life (Stage 0.5, v2.10): redrawn at a different grain.
 	| 'sketch_grain_change';
 
 const JA: Record<string, string> = {
@@ -54,7 +54,7 @@ export function derivationKindLabel(kind: string | null | undefined, isJapanese:
  *
  *  One edge, one cause (SPEC section 7): a changed description is a description
  *  edit even if the grain moved with it, and a redraw that changed nothing at
- *  all stays a replay. The 写生 (Stage 0.5) grain fires its own kind only when
+ *  all stays a replay. The sketch-from-life (Stage 0.5) grain gets its own kind only when
  *  it is the thing that differs from the parent -- the same shape
  *  description_edit has always had.
  *

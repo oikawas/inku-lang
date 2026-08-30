@@ -233,7 +233,7 @@
 		display: flex;
 		align-items: center;
 	}
-	/* 折りたたみボタンと inku ボタンは別の役目なので、隣り合わせず一息あける。 */
+	/* Separate the collapse and inku buttons because they serve different roles. */
 	.rail-logo-row {
 		margin-top: 6px;
 	}
@@ -256,7 +256,7 @@
 		background: var(--bg2);
 		color: var(--fg);
 	}
-	/* 作品情報への入口。押せることが見えるよう、rail-toggle と同じ器に載せる。 */
+	/* Match rail-toggle's container so the artwork-information entry looks actionable. */
 	.rail-logo {
 		width: auto;
 		height: 30px;

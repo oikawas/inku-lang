@@ -248,7 +248,7 @@
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
-<!-- 写生 (Stage 0.5), read-only here. Above the instructions because it comes
+<!-- Sketch from life (Stage 0.5), read-only here. Above the instructions because it comes
      before them, the same order the describe tab keeps. Written when a line
      returns, so it is the prose of the work the observer below is showing. -->
 {#if batchRunning && batchSketchText !== null}

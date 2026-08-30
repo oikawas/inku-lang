@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import os
 import sqlite3
+import stat
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -69,6 +70,23 @@ def _defaults(**overrides: int) -> dict:
     }
     value.update(overrides)
     return value
+
+
+def test_snapshot_is_owner_only_and_never_replaces_an_existing_destination(
+    tmp_path: Path,
+) -> None:
+    source = _sqlite_database(tmp_path / "source.sqlite")
+    destination = tmp_path / "snapshot.sqlite"
+
+    snapshot = backup.create_sqlite_snapshot(source, destination)
+
+    assert snapshot.path == destination
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+    occupied = tmp_path / "occupied.sqlite"
+    occupied.write_bytes(b"keep")
+    with pytest.raises(backup.SQLiteSnapshotError, match="already exists"):
+        backup.create_sqlite_snapshot(source, occupied)
+    assert occupied.read_bytes() == b"keep"
 
 
 def test_persistence_backup_owns_policy_without_importing_db(tmp_path: Path) -> None:

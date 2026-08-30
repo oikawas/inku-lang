@@ -31,8 +31,9 @@ CANONICAL_SQLITE_PRAGMAS = SQLitePragmas(
     wal=True,
 )
 # Thumbnail rebuilds write from a worker pool while listings read. WAL lets
-# those overlap instead of serializing every reader behind the writer.
-THUMBNAIL_SQLITE_PRAGMAS = SQLitePragmas(wal=True)
+# those overlap instead of serializing every reader behind the writer. The
+# timeout absorbs short writer collisions instead of discarding a rebuild.
+THUMBNAIL_SQLITE_PRAGMAS = SQLitePragmas(busy_timeout_ms=10_000, wal=True)
 
 
 @dataclass(frozen=True)

@@ -17,6 +17,7 @@ from __future__ import annotations
 import time
 
 from sqlalchemy import BigInteger, Column, Integer, LargeBinary, String, func, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .persistence.config import PERSISTENCE_CONFIG, THUMBNAIL_DB_ENV, sqlite_database_path
@@ -107,20 +108,25 @@ def put_thumb(history_id: str, scale: int, png: bytes, source_render_hash: str |
     row is absent.
     """
     now = int(time.time() * 1000)
+    statement = sqlite_insert(ThumbRow).values(
+        history_id=history_id,
+        scale=scale,
+        png=png,
+        source_render_hash=source_render_hash,
+        built_at=now,
+    )
+    # SQLite owns this derived store. Its native upsert avoids both a SELECT
+    # round trip and the insert race between thumbnail bake workers.
+    statement = statement.on_conflict_do_update(
+        index_elements=[ThumbRow.history_id, ThumbRow.scale],
+        set_={
+            "png": statement.excluded.png,
+            "source_render_hash": statement.excluded.source_render_hash,
+            "built_at": statement.excluded.built_at,
+        },
+    )
     with SessionLocal() as session:
-        row = session.get(ThumbRow, (history_id, scale))
-        if row is None:
-            session.add(ThumbRow(
-                history_id=history_id,
-                scale=scale,
-                png=png,
-                source_render_hash=source_render_hash,
-                built_at=now,
-            ))
-        else:
-            row.png = png
-            row.source_render_hash = source_render_hash
-            row.built_at = now
+        session.execute(statement)
         session.commit()
 
 

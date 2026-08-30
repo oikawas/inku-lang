@@ -139,7 +139,7 @@ class HistorySearchService:
                       {for_revision_clause}
                       {for_share_clause}
                       AND history_fts MATCH :match
-                    ORDER BY h.at DESC
+                    ORDER BY h.at DESC, h.id ASC
                     LIMIT :limit OFFSET :offset
                     """
                 ),

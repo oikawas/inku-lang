@@ -558,7 +558,9 @@ class UserAccountCreator:
             if group_id and not session.get(UserGroupRow, group_id):
                 raise ValueError("group not found")
             session.add(row)
-            session.commit()
+            # Keep the account and its permission memberships in one transaction.
+            # The flush validates the account row without making a partial user visible.
+            session.flush()
             self.set_permission_groups_fn(session, row, wanted)
             session.commit()
             session.refresh(row)

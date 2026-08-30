@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -62,15 +63,25 @@ def create_sqlite_snapshot(source: Path, destination: Path) -> SQLiteSnapshot:
         raise SQLiteSnapshotError("SQLite snapshot destination equals its source")
     if not source.is_file():
         raise SQLiteSnapshotError("SQLite snapshot source is not available")
-    if destination.exists():
-        raise SQLiteSnapshotError("SQLite snapshot destination already exists")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    created = False
+    # Reserve the exact path atomically and keep credential-bearing backups
+    # owner-only from their first byte. O_EXCL also refuses symlink replacement.
     try:
+        descriptor = os.open(
+            destination,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+    except FileExistsError as exc:
+        raise SQLiteSnapshotError("SQLite snapshot destination already exists") from exc
+    except OSError as exc:
+        raise SQLiteSnapshotError("SQLite snapshot destination could not be created") from exc
+    created = True
+    try:
+        os.close(descriptor)
         with sqlite3.connect(_read_only_uri(source), uri=True) as source_connection:
             with sqlite3.connect(destination) as destination_connection:
-                created = True
                 source_connection.backup(destination_connection)
         verify_sqlite_snapshot(destination)
     except Exception as exc:

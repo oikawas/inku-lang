@@ -8,9 +8,12 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
 from inku_server.persistence import accounts
+from inku_server.persistence.schema import Base, UserAccountRow
 
 
 def _creator_or_skip():
@@ -84,7 +87,7 @@ def test_creator_validates_before_session_and_builds_exact_row() -> None:
     assert events == []
 
 
-def test_creator_preserves_group_check_two_commits_refresh_and_projection() -> None:
+def test_creator_preserves_group_check_single_commit_refresh_and_projection() -> None:
     creator_type = _creator_or_skip()
     group = SimpleNamespace(name="Group")
 
@@ -105,6 +108,9 @@ def test_creator_preserves_group_check_two_commits_refresh_and_projection() -> N
 
         def add(self, row: object) -> None:
             self.events.append(("add", row))
+
+        def flush(self) -> None:
+            self.events.append("flush")
 
         def commit(self) -> None:
             self.events.append("commit")
@@ -148,7 +154,7 @@ def test_creator_preserves_group_check_two_commits_refresh_and_projection() -> N
     assert present.events == [
         ("get", "user_groups", "g"),
         ("add", row),
-        "commit",
+        "flush",
         ("set-groups", row, ["admins"]),
         "commit",
         ("refresh", row),
@@ -161,6 +167,34 @@ def test_creator_preserves_group_check_two_commits_refresh_and_projection() -> N
     result = build(no_group).add_user("Name", "mail@example.test", "secret", ["users"], None)
     assert all(not (isinstance(event, tuple) and event[0] == "get") for event in no_group.events)
     assert result == {"id": "uuid-1", "group_name": None}
+
+
+def test_creator_rolls_back_the_account_when_permission_assignment_fails(tmp_path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'accounts.db'}", future=True)
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+    def fail_permission_assignment(*_args: object) -> None:
+        raise RuntimeError("permission assignment failed")
+
+    creator = _creator_or_skip()(
+        session_factory,
+        lambda: "user-1",
+        lambda: 123,
+        lambda password: f"hash:{password}",
+        lambda _groups: ["users"],
+        lambda _groups: "user",
+        fail_permission_assignment,
+        lambda *_args: {},
+    )
+    try:
+        with pytest.raises(RuntimeError, match="permission assignment failed"):
+            creator.add_user("name", "mail@example.test", "secret", ["users"], None)
+
+        with session_factory() as session:
+            assert session.query(UserAccountRow).count() == 0
+    finally:
+        engine.dispose()
 
 
 def test_creator_exceptions_propagate() -> None:

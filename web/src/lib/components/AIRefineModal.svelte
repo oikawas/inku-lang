@@ -75,7 +75,12 @@
   const paintModelOverride = $derived(
     refineMode === 'vision' && selectedVisionModel ? selectedVisionModel : null
   );
-  onDestroy(() => abortController?.abort());
+  onDestroy(() => {
+    abortController?.abort();
+    // Abort-aware work normally stops this in finally, but a collaborator may
+    // still be awaiting an operation that cannot settle during destruction.
+    refineElapsed.stop();
+  });
 
   const activeKinds = $derived.by(() => {
     const kinds: string[] = [];

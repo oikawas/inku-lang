@@ -37,12 +37,18 @@
 	let pluginEditorLoading = $state(false);
 	let pluginEditorSaving = $state(false);
 	let pluginEditorReasons = $state<string[]>([]);
+	// A closed editor can be followed immediately by another one. Request
+	// identity keeps the first plugin's late content out of the second editor.
+	let pluginEditorLoadRequestId = 0;
 
 	function pluginId(plugin: PluginItem): string {
 		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
 	}
 	function pluginIsEnabled(plugin: PluginItem): boolean {
 		return plugin.enabled ?? plugin.status === 'enabled';
+	}
+	function errorMessage(cause: unknown): string {
+		return cause instanceof Error ? cause.message : String(cause);
 	}
 
 	async function togglePluginEnabled(plugin: PluginItem): Promise<void> {
@@ -71,27 +77,40 @@
 		input.value = '';
 		if (!file) return;
 		pluginBusy = true;
-		const content = await file.text();
-		const reasons = await onCreatePlugin(content, file.name);
-		pluginBusy = false;
-		pluginSectionReasons = reasons ?? [];
+		try {
+			const content = await file.text();
+			const reasons = await onCreatePlugin(content, file.name);
+			pluginSectionReasons = reasons ?? [];
+		} catch (cause) {
+			pluginSectionReasons = [errorMessage(cause)];
+		} finally {
+			pluginBusy = false;
+		}
 	}
 
 	async function openPluginEditor(plugin: PluginItem): Promise<void> {
-		pluginEditorId = pluginId(plugin);
+		const id = pluginId(plugin);
+		const requestId = ++pluginEditorLoadRequestId;
+		pluginEditorId = id;
 		pluginEditorTitle = plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name;
 		pluginEditorReasons = [];
 		pluginEditorContent = '';
 		pluginEditorOpen = true;
 		pluginEditorLoading = true;
-		const content = await onLoadPluginContent(pluginEditorId);
-		pluginEditorLoading = false;
-		if (content === null) { pluginEditorOpen = false; pluginEditorId = null; return; }
-		pluginEditorContent = content;
+		try {
+			const content = await onLoadPluginContent(id);
+			if (requestId !== pluginEditorLoadRequestId) return;
+			if (content === null) { pluginEditorOpen = false; pluginEditorId = null; return; }
+			pluginEditorContent = content;
+		} finally {
+			if (requestId === pluginEditorLoadRequestId) pluginEditorLoading = false;
+		}
 	}
 
 	function closePluginEditor(): void {
 		if (pluginEditorSaving) return;
+		pluginEditorLoadRequestId += 1;
+		pluginEditorLoading = false;
 		pluginEditorOpen = false;
 		pluginEditorId = null;
 	}

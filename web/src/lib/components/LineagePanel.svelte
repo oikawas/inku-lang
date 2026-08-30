@@ -706,6 +706,9 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		window.addEventListener('click', handleGlobalClick);
 		scheduleArrowUpdate();
 		return () => {
+			sketchDrawController?.abort();
+			editDrawController?.abort();
+			if (copiedHashTimer !== null) clearTimeout(copiedHashTimer);
 			resizeObserver?.disconnect();
 			resizeObserver = null;
 			window.removeEventListener('resize', scheduleArrowUpdate);

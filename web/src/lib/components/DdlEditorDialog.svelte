@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
 	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
@@ -79,6 +79,7 @@
 	let lastOpen = false;
 	let elapsedMs = $state(0);
 	let drawController: AbortController | null = null;
+	onDestroy(() => drawController?.abort());
 
 	// While drawing, tick an elapsed timer for the on-dialog status element.
 	$effect(() => {

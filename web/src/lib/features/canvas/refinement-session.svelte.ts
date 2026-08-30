@@ -183,11 +183,14 @@ export class RefinementSessionState implements RefinementSession {
 	reset(options: ResetOptions = {}): void {
 		if (options.preserveCandidates) return;
 		// Target changes invalidate the controller before clearing projections;
-		// late slot or completion callbacks then fail the identity checks above.
+		// late callbacks then fail the identity checks above and cannot perform
+		// their usual lock or elapsed cleanup, so reset owns both here.
 		this.activeController?.abort();
 		this.activeController = null;
+		this.busy = false;
 		this.gridBusy = false;
 		this.gridCanAbort = false;
+		this.elapsed.stop();
 		this.candidates = [];
 		this.gridIncludesReading = false;
 		this.gridTaskLabel = '';

@@ -81,7 +81,8 @@ test('T-309/T-310: only the active controller can move slots or settle the grid'
 });
 
 test('T-309: target reset aborts and invalidates the active grid', () => {
-	const session = new RefinementSessionState(fakeElapsed());
+	const elapsed = fakeElapsed();
+	const session = new RefinementSessionState(elapsed);
 	const controller = session.beginGrid({ includesReading: false, taskLabel: 'color', count: 1 });
 	session.enableAbort(controller);
 	session.reset();
@@ -92,6 +93,18 @@ test('T-309: target reset aborts and invalidates the active grid', () => {
 	assert.deepEqual(session.candidates, []);
 	assert.deepEqual(session.gridSlots, []);
 	assert.equal(session.status, null);
+	assert.equal(elapsed.stops, 1);
+	assert.equal(session.finishGrid(controller), false);
+	assert.equal(elapsed.stops, 1);
+});
+
+test('T-309: target reset releases a single-operation lock and its elapsed owner', () => {
+	const elapsed = fakeElapsed();
+	const session = new RefinementSessionState(elapsed);
+	session.beginSingle();
+	session.reset();
+	assert.equal(session.busy, false);
+	assert.equal(elapsed.stops, 1);
 });
 
 test('T-311: selection, saved projection, and save lock stay in the session owner', () => {

@@ -420,6 +420,9 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		modelInspectionAbortController = null;
 		modelInspectionRunId += 1;
 		modelInspectionBusy = false;
+		// Incrementing the identity makes the stale run's finally block a no-op,
+		// so target reset must release the interval itself.
+		modelInspectionElapsed.stop();
 		modelInspectionResults = [];
 		modelInspectionFailedModels = {};
 		modelInspectionStatus = null;

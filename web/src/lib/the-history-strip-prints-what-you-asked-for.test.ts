@@ -100,6 +100,11 @@ test('the engine version printed under a thumbnail uses the Ver. prefix', () => 
 	assert.match(STRIP, /formatHistoryStripEngineVersion\(item\.render_engine_version, t\(\)\.historyVersionNotRecorded\)/);
 });
 
+test('the history work tooltip labels the render version compactly', () => {
+	assert.match(STRIP, /<span>Render<\/span><strong>\{it\.render_engine_version/);
+	assert.doesNotMatch(STRIP, />Render engine version</);
+});
+
 test('T-163  the file size is read from the server, not counted from what arrived', () => {
 	// The listing that fills the strip asks for include_svg=false, so `svg` is an
 	// empty string by the time it gets here. Counting it reported every work but

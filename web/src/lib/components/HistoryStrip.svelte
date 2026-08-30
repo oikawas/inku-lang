@@ -243,7 +243,7 @@
 							{#if developerMode && it.tenkei}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{it.tenkei}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
-							<div class="tooltip-row"><span>Render engine version</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
+							<div class="tooltip-row"><span>Render</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />

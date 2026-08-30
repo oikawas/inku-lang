@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod composition;
 pub mod document;
 pub mod language;
 pub mod macro_definition;
@@ -9,6 +10,11 @@ pub mod macro_seed;
 pub mod parser;
 pub mod prompt;
 pub mod saijiki;
+
+pub use composition::{
+    CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,
+    compose_core_roles,
+};
 
 pub use document::{
     DdlDocumentDiagnostic, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,

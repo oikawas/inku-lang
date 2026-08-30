@@ -167,7 +167,9 @@
 	     say it once. The wording names the layer for the same reason. -->
 	<div class="fallback-badges" role="status">
 		{#if interpretFallbackReason}
-			<div class="interpret-fallback-badge" title={t().interpretFallbackHint(interpretFallbackReason)}>{t().interpretFallbackBadge}</div>
+			<Tooltip placement="bottom-left" text={t().interpretFallbackHint(interpretFallbackReason)} wide>
+				<span class="interpret-fallback-badge">{t().interpretFallbackBadge}</span>
+			</Tooltip>
 		{/if}
 		{#if composeFallbackDrawnReason}
 			<Tooltip placement="bottom-left" text={t().composeFallbackHint(composeFallbackDrawnReason)} wide>

@@ -28,9 +28,11 @@ test('the canvas creation time explicitly stops at minutes', () => {
 	assert.doesNotMatch(dateBlock, /second:/);
 });
 
-test('the caption is left aligned and the compose fallback uses the explanatory tooltip', () => {
+test('the caption is left aligned and both fallbacks use explanatory tooltips', () => {
 	assert.match(ARTWORK, /\.instruction-caption \{[\s\S]*?text-align: left;/);
+	assert.match(ARTWORK, /<Tooltip placement="bottom-left" text=\{t\(\)\.interpretFallbackHint\(interpretFallbackReason\)\} wide>/);
 	assert.match(ARTWORK, /<Tooltip placement="bottom-left" text=\{t\(\)\.composeFallbackHint\(composeFallbackDrawnReason\)\} wide>/);
+	assert.doesNotMatch(ARTWORK, /title=\{t\(\)\.interpretFallbackHint/);
 });
 
 test('the three history filters follow the history button with one-em spacing', () => {

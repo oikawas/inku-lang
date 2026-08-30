@@ -44,6 +44,8 @@ export type HistoryItem = {
 	thinking?: string | null;
 	score: Score;
 	svg: string;
+	/** Stored SVG byte length, present even when list requests omit the SVG text. */
+	svg_bytes?: number;
 	at: number;
 	elapsed_ms?: number;
 	stage1_model?: string | null;

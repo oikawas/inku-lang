@@ -896,9 +896,11 @@ export interface LangPack {
 	provenanceHintElapsed: string;
 	provenanceHintTokens: string;
 	historyCreatedAtHeader: string;
+	historyDescriptionHeader: string;
 	historyCanvasHeader: string;
 	historyModelHeader: string;
 	historySecondsHeader: string;
+	historySvgSizeHeader: string;
 	historyCatalogHeader: string;
 	historyActionHeader: string;
 	okugakiRead: string;

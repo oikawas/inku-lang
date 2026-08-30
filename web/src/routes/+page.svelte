@@ -2284,10 +2284,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	}
 
-	function formatElapsed(ms: number | null | undefined): string {
-		return ms ? `${(ms / 1000).toFixed(1)}s` : '-';
-	}
-
 	function historyModelSummary(it: Iteration): string {
 		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
 		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
@@ -3224,7 +3220,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onToggleStar={toggleHistoryStar}
 			{historyModelSummary}
 			{formatHistoryDate}
-			{formatElapsed}
 			{catalogName}
 			{historyPreviewText}
 			{shortModel}

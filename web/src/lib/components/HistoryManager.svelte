@@ -10,6 +10,8 @@
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 	import { downloadCard, type CardExportSettings } from '$lib/cardExport';
+	import { formatByteSize } from '$lib/formatNumber';
+	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -24,6 +26,7 @@
 		thinking?: string | null;
 		score: { instructions: unknown[] };
 		svg: string;
+		svg_bytes?: number;
 		at: number;
 		elapsed_ms?: number;
 		stage1_model?: string | null;
@@ -102,7 +105,6 @@
 		isJapanese?: boolean;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
-		formatElapsed: (ms: number | null | undefined) => string;
 		catalogName: (id: string | null | undefined) => string;
 		historyPreviewText: (text: string) => string;
 		shortModel: (model: string | null | undefined) => string;
@@ -150,7 +152,6 @@
 		isJapanese = false,
 		historyModelSummary,
 		formatHistoryDate,
-		formatElapsed,
 		catalogName,
 		historyPreviewText,
 		shortModel,
@@ -847,7 +848,7 @@
 		<div class="history-table-wrap">
 			<table class="history-table">
 				<thead>
-					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySecondsHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
+					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyDescriptionHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySvgSizeHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
 				</thead>
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
@@ -870,23 +871,24 @@
 									title={it.starred ? t().starOn : t().starOff}
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
-								<button
-									class="thumb-star mini-star mini-mark"
-									class:marked={!!it.for_revision}
-									onclick={(event) => onToggleForRevision(it, event)}
-									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
-									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
-								>✎</button>
 							</td>
 							<td>
 								{#if it.shared}<span class="shared-mark" title={isJapanese ? '他の利用者から共有された作品' : 'Shared with you by another member'}>{isJapanese ? '共有' : 'Shared'}</span>{/if}
 								{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}
 							</td>
-							<td>{formatHistoryDate(it.at)}</td>
+							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
+							<td class="table-description" title={it.source_text ?? it.input}>{historyListDescription(it.source_text ?? it.input)}</td>
 							<td>{historyModelSummary(it)}</td>
-							<td>{formatElapsed(it.elapsed_ms)}</td>
+							<td class="table-svg-size">{formatByteSize(it.svg_bytes)}</td>
 							<td>{catalogName(it.catalog_id)}</td>
-							<td>
+							<td class="table-actions">
+								<button
+									class="hash-row-mark"
+									class:marked={!!it.for_revision}
+									onclick={(event) => onToggleForRevision(it, event)}
+									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+								>✎</button>
 								{#if historyManagerView === 'active' && onShareItem && !it.shared}
 									<button class="ghost-btn" onclick={() => onShareItem?.(it)} title={isJapanese ? 'この作品を共有する' : 'Share this work'}>{isJapanese ? '共有' : 'Share'}</button>
 								{/if}
@@ -1292,11 +1294,6 @@
 		background: var(--accent-light);
 		color: var(--accent);
 	}
-	.mini-mark.marked {
-		border-color: var(--accent);
-		background: var(--accent-light);
-		color: var(--accent);
-	}
 	.hash-row-star.starred {
 		color: var(--star-fg);
 		background: var(--star-bg);
@@ -1369,6 +1366,14 @@
 		vertical-align: middle;
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
+	.table-description {
+		max-width: 20ch;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.table-svg-size { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+	.table-actions { white-space: nowrap; }
 	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
 	   white label collapses to white-on-white in the dark theme. */
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }

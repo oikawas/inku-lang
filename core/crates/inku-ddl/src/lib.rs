@@ -13,7 +13,8 @@ pub mod saijiki;
 
 pub use composition::{
     CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,
-    compose_core_roles,
+    REMAINING_ROLE_COMPOSITION_SCHEMA_ID, RemainingRoleComposition, RemainingRoleKind,
+    RemainingRoleTerm, UnattachedExactNumber, compose_core_roles, compose_remaining_roles,
 };
 
 pub use document::{

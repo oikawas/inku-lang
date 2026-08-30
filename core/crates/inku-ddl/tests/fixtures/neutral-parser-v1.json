@@ -1,0 +1,150 @@
+{
+  "schema": "inku.neutral-lexeme-parser-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-longest-source-and-hole",
+      "language": "ja",
+      "source": " 画用紙に一点鎖線を八つ、薄墨地で少し。\r\n",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "画用紙", "start_byte": 1, "end_byte": 10, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "画用紙"},
+        {"kind": "function_word", "surface": "に", "start_byte": 10, "end_byte": 13},
+        {"kind": "saijiki_word", "surface": "一点鎖線", "start_byte": 13, "end_byte": 25, "asset_id": "inku.saijiki.v1", "category_key": "tsuranari", "canonical_surface_ja": "一点鎖線"},
+        {"kind": "function_word", "surface": "を", "start_byte": 25, "end_byte": 28},
+        {"kind": "exact_number", "surface": "八つ", "start_byte": 28, "end_byte": 34, "value": 8},
+        {"kind": "saijiki_word", "surface": "薄墨地", "start_byte": 37, "end_byte": 46, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "薄墨地"},
+        {"kind": "function_word", "surface": "で", "start_byte": 46, "end_byte": 49}
+      ],
+      "expected_diagnostics": [
+        {"kind": "hole", "surface": "少し", "start_byte": 49, "end_byte": 55, "recognized": true}
+      ],
+      "recognized_delivery_count": 8
+    },
+    {
+      "id": "en-case-longest-source-and-hole",
+      "language": "en",
+      "source": "\r\nDrawing Paper with DASH-DOT and twelve, in ink wash ground; a few. ",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "Drawing Paper", "start_byte": 2, "end_byte": 15, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "画用紙"},
+        {"kind": "function_word", "surface": "with", "start_byte": 16, "end_byte": 20},
+        {"kind": "saijiki_word", "surface": "DASH-DOT", "start_byte": 21, "end_byte": 29, "asset_id": "inku.saijiki.v1", "category_key": "tsuranari", "canonical_surface_ja": "一点鎖線"},
+        {"kind": "function_word", "surface": "and", "start_byte": 30, "end_byte": 33},
+        {"kind": "exact_number", "surface": "twelve", "start_byte": 34, "end_byte": 40, "value": 12},
+        {"kind": "function_word", "surface": "in", "start_byte": 42, "end_byte": 44},
+        {"kind": "saijiki_word", "surface": "ink wash ground", "start_byte": 45, "end_byte": 60, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "薄墨地"}
+      ],
+      "expected_diagnostics": [
+        {"kind": "hole", "surface": "a few", "start_byte": 62, "end_byte": 67, "recognized": true}
+      ],
+      "recognized_delivery_count": 8
+    },
+    {
+      "id": "ja-relation-longest",
+      "language": "ja",
+      "source": "紙に触れない",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "紙", "start_byte": 0, "end_byte": 3, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙"},
+        {"kind": "function_word", "surface": "に", "start_byte": 3, "end_byte": 6},
+        {"kind": "saijiki_relation", "surface": "触れない", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 3
+    },
+    {
+      "id": "en-relation-longest",
+      "language": "en",
+      "source": "paper not touching",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "paper", "start_byte": 0, "end_byte": 5, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙"},
+        {"kind": "saijiki_relation", "surface": "not touching", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
+    },
+    {
+      "id": "ja-exact-number-equivalence",
+      "language": "ja",
+      "source": "8 八つ 12 十二",
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "8", "start_byte": 0, "end_byte": 1, "value": 8},
+        {"kind": "exact_number", "surface": "八つ", "start_byte": 2, "end_byte": 8, "value": 8},
+        {"kind": "exact_number", "surface": "12", "start_byte": 9, "end_byte": 11, "value": 12},
+        {"kind": "exact_number", "surface": "十二", "start_byte": 12, "end_byte": 18, "value": 12}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
+    },
+    {
+      "id": "en-exact-number-equivalence",
+      "language": "en",
+      "source": "8 eight 12 twelve",
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "8", "start_byte": 0, "end_byte": 1, "value": 8},
+        {"kind": "exact_number", "surface": "eight", "start_byte": 2, "end_byte": 7, "value": 8},
+        {"kind": "exact_number", "surface": "12", "start_byte": 8, "end_byte": 10, "value": 12},
+        {"kind": "exact_number", "surface": "twelve", "start_byte": 11, "end_byte": 17, "value": 12}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
+    },
+    {
+      "id": "ja-qualitative-quantities-remain-holes",
+      "language": "ja",
+      "source": "少し 数個 いくつか たくさん 多数 無数",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "hole", "surface": "少し", "start_byte": 0, "end_byte": 6, "recognized": true},
+        {"kind": "hole", "surface": "数個", "start_byte": 7, "end_byte": 13, "recognized": true},
+        {"kind": "hole", "surface": "いくつか", "start_byte": 14, "end_byte": 26, "recognized": true},
+        {"kind": "hole", "surface": "たくさん", "start_byte": 27, "end_byte": 39, "recognized": true},
+        {"kind": "hole", "surface": "多数", "start_byte": 40, "end_byte": 46, "recognized": true},
+        {"kind": "hole", "surface": "無数", "start_byte": 47, "end_byte": 53, "recognized": true}
+      ],
+      "recognized_delivery_count": 6
+    },
+    {
+      "id": "en-qualitative-quantities-remain-holes",
+      "language": "en",
+      "source": "a few several many numerous countless",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "hole", "surface": "a few", "start_byte": 0, "end_byte": 5, "recognized": true},
+        {"kind": "hole", "surface": "several", "start_byte": 6, "end_byte": 13, "recognized": true},
+        {"kind": "hole", "surface": "many", "start_byte": 14, "end_byte": 18, "recognized": true},
+        {"kind": "hole", "surface": "numerous", "start_byte": 19, "end_byte": 27, "recognized": true},
+        {"kind": "hole", "surface": "countless", "start_byte": 28, "end_byte": 37, "recognized": true}
+      ],
+      "recognized_delivery_count": 5
+    },
+    {
+      "id": "en-substring-false-positives",
+      "language": "en",
+      "source": "paperwork centerpiece",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "paperwork", "start_byte": 0, "end_byte": 9, "recognized": false},
+        {"kind": "unknown", "surface": "centerpiece", "start_byte": 10, "end_byte": 21, "recognized": false}
+      ],
+      "recognized_delivery_count": 0
+    },
+    {
+      "id": "ja-substring-and-qualified-macro-unknown",
+      "language": "ja",
+      "source": "白樺 Nature.青葉",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "白樺", "start_byte": 0, "end_byte": 6, "recognized": false},
+        {"kind": "unknown", "surface": "Nature.青葉", "start_byte": 7, "end_byte": 20, "recognized": false}
+      ],
+      "recognized_delivery_count": 0
+    },
+    {
+      "id": "separator-only-source",
+      "language": "ja",
+      "source": " \t、。\r\n",
+      "expected_tokens": [],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 0
+    }
+  ]
+}

@@ -6,6 +6,7 @@ pub mod document;
 pub mod language;
 pub mod macro_definition;
 pub mod macro_seed;
+pub mod parser;
 pub mod prompt;
 pub mod saijiki;
 
@@ -30,6 +31,10 @@ pub use macro_definition::{
 pub use macro_seed::{
     MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,
     derive_macro_seed, macro_seed_hash_input,
+};
+pub use parser::{
+    NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
+    NeutralToken, NeutralTokenKind, SourceSpan, parse_neutral_lexemes,
 };
 pub use prompt::{
     PROMPT_BODY_TEMPLATE_ASSET_BYTES, PROMPT_BODY_TEMPLATE_ASSET_ID, PromptBodyTemplate,

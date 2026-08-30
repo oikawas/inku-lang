@@ -88,3 +88,22 @@ test('T-1  one canonical palette supplies distinct accessible tooltip themes', (
 		assert.doesNotMatch(source, /#111820|#f8fafc|#cbd5e1|#64748b/i);
 	}
 });
+
+test('T-2  light artwork paper keeps accessible ink in either application theme', () => {
+	const theme = read(THEME_PATH);
+	const invariant = tokenValues(blockAfter(theme, ':global(:root) {'));
+	const paperTokens = ['--paper-surface-bg', '--paper-surface-fg', '--paper-surface-muted', '--paper-surface-subtle'];
+	for (const token of paperTokens) {
+		assert.match(invariant.get(token) ?? '', /^#[0-9a-f]{6}$/i, `${token} is not a canonical hex color`);
+	}
+	const paperBg = invariant.get('--paper-surface-bg')!;
+	for (const token of paperTokens.slice(1)) {
+		assert.ok(contrast(paperBg, invariant.get(token)!) >= 4.5, `${token} is below 4.5:1 on artwork paper`);
+	}
+
+	const drawer = read(join(LIB_DIR, 'components', 'SaijikiDrawer.svelte'));
+	assert.match(drawer, /\.saijiki-preview \{[\s\S]*?background: var\(--paper-surface-bg\);/);
+	assert.match(drawer, /\.saijiki-preview-title \{[\s\S]*?color: var\(--paper-surface-fg\);/);
+	assert.match(drawer, /\.saijiki-preview-effect \{[\s\S]*?color: var\(--paper-surface-muted\);/);
+	assert.match(drawer, /\.saijiki-preview-example \{[\s\S]*?color: var\(--paper-surface-subtle\);/);
+});

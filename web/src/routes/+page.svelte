@@ -3302,6 +3302,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--thumb-plate-fg: rgba(40, 36, 30, 0.42);
 		--thumb-plate-border: rgba(0, 0, 0, 0.12);
 		--thumb-plate-fg-read: rgba(40, 36, 30, 0.72);
+		/* Preview paper stays light in either app theme, so its ink does too. */
+		--paper-surface-bg: #fffdf8;
+		--paper-surface-fg: #1a1917;
+		--paper-surface-muted: #5a5751;
+		--paper-surface-subtle: #6d6860;
 	}
 
 	:global(:root),

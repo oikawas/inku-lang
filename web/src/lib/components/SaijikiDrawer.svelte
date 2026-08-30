@@ -194,13 +194,13 @@
 		padding: 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		background: rgba(255, 253, 248, 0.96);
+		background: var(--paper-surface-bg);
 		box-shadow: 0 6px 18px rgba(37, 34, 26, 0.08);
 		backdrop-filter: blur(4px);
 	}
 	.saijiki-preview.empty {
 		box-shadow: none;
-		background: rgba(255, 255, 255, 0.72);
+		background: var(--paper-surface-bg);
 	}
 	/* Sized to the artwork rather than to the panel: a plugin preview is a
 	   raster, and it is baked at exactly these pixels so it is never
@@ -232,22 +232,22 @@
 	.saijiki-preview-title {
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--fg);
+		color: var(--paper-surface-fg);
 	}
 	.saijiki-preview-effect {
 		font-size: 11px;
 		line-height: 1.45;
-		color: var(--fg2);
+		color: var(--paper-surface-muted);
 	}
 	.saijiki-preview-example {
 		font-size: 10px;
 		line-height: 1.4;
-		color: var(--fg3);
+		color: var(--paper-surface-subtle);
 	}
 	.saijiki-preview-placeholder {
 		font-size: 11px;
 		line-height: 1.5;
-		color: var(--fg3);
+		color: var(--paper-surface-subtle);
 	}
 	.saijiki-cat { padding: 10px 18px; }
 	.saijiki-cat-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; }

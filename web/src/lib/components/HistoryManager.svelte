@@ -172,6 +172,8 @@
 	let lineageRequestId = 0;
 	let lineageGroupController: AbortController | null = null;
 	const lineageMemberControllers = new Map<string, AbortController>();
+	let copiedHistoryHash = $state<string | null>(null);
+	let copiedHistoryHashTimer: number | null = null;
 	const lineageGroupPageSize = 8;
 	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil(lineageGroupTotal / lineageGroupPageSize)));
 
@@ -182,6 +184,7 @@
 		return () => {
 			lineageGroupController?.abort();
 			for (const controller of lineageMemberControllers.values()) controller.abort();
+			if (copiedHistoryHashTimer !== null) window.clearTimeout(copiedHistoryHashTimer);
 		};
 	});
 
@@ -456,20 +459,23 @@
 		loadItemAndClose(item);
 	}
 
-	function hashLabel(item: HistoryItem): string {
-		return (item.render_hash_short || item.render_hash?.slice(-4) || '').toUpperCase();
-	}
-
-	function copyHash(item: HistoryItem, event: MouseEvent) {
+	async function copyHash(item: HistoryItem, event: MouseEvent): Promise<void> {
 		event.stopPropagation();
 		event.preventDefault();
-		const hash = item.render_hash || hashLabel(item);
+		const hash = item.render_hash;
 		if (!hash) return;
-		if (navigator.clipboard?.writeText) {
-			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
-			return;
+		try {
+			if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(hash);
+			else fallbackCopy(hash);
+			copiedHistoryHash = hash;
+			if (copiedHistoryHashTimer !== null) window.clearTimeout(copiedHistoryHashTimer);
+			copiedHistoryHashTimer = window.setTimeout(() => {
+				if (copiedHistoryHash === hash) copiedHistoryHash = null;
+				copiedHistoryHashTimer = null;
+			}, 1200);
+		} catch {
+			copiedHistoryHash = null;
 		}
-		fallbackCopy(hash);
 	}
 
 	function fallbackCopy(text: string) {
@@ -836,7 +842,11 @@
 									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 								>✎</button>
-								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
+								{#if it.render_hash}
+									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
+										<button type="button" class="hash-chip hash-icon" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
+									</Tooltip>
+								{/if}
 								<span class="thumb-model" title={historyModelSummary(it)}>{historyModelSummary(it)}</span>
 							</div>
 						</div>
@@ -874,7 +884,11 @@
 							</td>
 							<td>
 								{#if it.shared}<span class="shared-mark" title={isJapanese ? '他の利用者から共有された作品' : 'Shared with you by another member'}>{isJapanese ? '共有' : 'Shared'}</span>{/if}
-								{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}
+								{#if it.render_hash}
+									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
+										<button type="button" class="hash-chip hash-icon table-hash" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
+									</Tooltip>
+								{/if}
 							</td>
 							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
 							<td class="table-description" title={it.source_text ?? it.input}>{historyListDescription(it.source_text ?? it.input)}</td>
@@ -1319,6 +1333,20 @@
 	.hash-chip:hover {
 		border-color: var(--accent);
 		color: var(--fg);
+	}
+	.hash-chip.marked {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
+	}
+	.hash-icon {
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		align-items: center;
+		justify-content: center;
+		font-size: 13px;
+		font-weight: 600;
 	}
 	.table-hash {
 		font-size: 11px;

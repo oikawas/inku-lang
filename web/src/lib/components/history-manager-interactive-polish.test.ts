@@ -49,3 +49,14 @@ test('the timeline revision control belongs to the actions column, not the thumb
 	const actionCell = MANAGER.slice(actionCellAt, MANAGER.indexOf('</td>', actionCellAt));
 	assert.match(actionCell, /onToggleForRevision\(it, event\)/);
 });
+
+test('list and thumbnail hash buttons match the canvas full-hash copy feedback', () => {
+	assert.doesNotMatch(MANAGER, /function hashLabel/);
+	assert.match(MANAGER, /const hash = item\.render_hash;/);
+	assert.doesNotMatch(MANAGER, /render_hash \|\|/);
+	assert.equal(MANAGER.match(/aria-label=\{t\(\)\.historyHashCopyTitle\}>#<\/button>/g)?.length, 2);
+	assert.match(MANAGER, /copiedHistoryHash === it\.render_hash \? t\(\)\.historyHashCopied : t\(\)\.historyHashCopyTitle/g);
+	assert.match(MANAGER, /\}, 1200\);/);
+	for (const pack of [JA, EN]) assert.match(pack, /historyHashCopied:/);
+	assert.match(TYPES, /historyHashCopied: string;/);
+});

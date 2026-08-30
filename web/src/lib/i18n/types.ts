@@ -812,6 +812,7 @@ export interface LangPack {
 	historyLineageExpandTitle: string;
 	historySelectLineageTitle: string;
 	historyHashCopyTitle: string;
+	historyHashCopied: string;
 	historyGenerationTitle: string;
 	historyReplay: string;
 	historyReplayTitle: string;

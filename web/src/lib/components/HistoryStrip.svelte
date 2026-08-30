@@ -464,7 +464,7 @@
 		gap: 8px;
 		align-items: baseline;
 	}
-	.tooltip-row span { color: rgba(255,255,255,0.62); }
+	.tooltip-row span { color: var(--tooltip-muted); }
 	.tooltip-row strong {
 		font-weight: 500;
 		color: var(--tooltip-fg);

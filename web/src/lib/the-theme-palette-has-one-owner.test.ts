@@ -65,12 +65,16 @@ test('T-1  one canonical palette supplies distinct accessible tooltip themes', (
 	}
 	const lightBg = light.get('--tooltip-bg')!;
 	const lightFg = light.get('--tooltip-fg')!;
+	const lightMuted = light.get('--tooltip-muted')!;
 	const darkBg = dark.get('--tooltip-bg')!;
 	const darkFg = dark.get('--tooltip-fg')!;
-	for (const value of [lightBg, lightFg, darkBg, darkFg]) assert.match(value, /^#[0-9a-f]{6}$/i);
+	const darkMuted = dark.get('--tooltip-muted')!;
+	for (const value of [lightBg, lightFg, lightMuted, darkBg, darkFg, darkMuted]) assert.match(value, /^#[0-9a-f]{6}$/i);
 	assert.ok(luminance(lightBg) > luminance(darkBg), 'light and dark tooltips still use the same dark plate');
 	assert.ok(contrast(lightBg, lightFg) >= 4.5, 'light tooltip contrast is below 4.5:1');
+	assert.ok(contrast(lightBg, lightMuted) >= 4.5, 'light tooltip label contrast is below 4.5:1');
 	assert.ok(contrast(darkBg, darkFg) >= 4.5, 'dark tooltip contrast is below 4.5:1');
+	assert.ok(contrast(darkBg, darkMuted) >= 4.5, 'dark tooltip label contrast is below 4.5:1');
 
 	for (const token of light.keys()) {
 		const definition = new RegExp(`${token.replaceAll('-', '\\-')}\\s*:`);
@@ -87,6 +91,11 @@ test('T-1  one canonical palette supplies distinct accessible tooltip themes', (
 		assert.match(source, /var\(--tooltip-shadow\)/);
 		assert.doesNotMatch(source, /#111820|#f8fafc|#cbd5e1|#64748b/i);
 	}
+
+	const historyStrip = read(join(LIB_DIR, 'components', 'HistoryStrip.svelte'));
+	assert.match(historyStrip, /\.thumb-tooltip \{[\s\S]*?background: var\(--tooltip-bg\);/);
+	assert.match(historyStrip, /\.tooltip-row span \{ color: var\(--tooltip-muted\); \}/);
+	assert.doesNotMatch(historyStrip, /\.tooltip-row span \{ color: rgba\(255,255,255,/);
 });
 
 test('T-2  light artwork paper keeps accessible ink in either application theme', () => {

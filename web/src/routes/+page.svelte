@@ -3510,6 +3510,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-direction: row;
 		height: 100vh;
 		overflow: hidden;
+		background: var(--bg);
+		color: var(--fg);
 	}
 
 	/* ── Body ───────────────────────────────────────────────── */

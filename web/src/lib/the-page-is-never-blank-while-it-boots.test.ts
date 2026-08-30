@@ -16,6 +16,12 @@ function ruleFor(selectorPattern: string): string {
 	return match[1];
 }
 
+function pageRuleFor(selectorPattern: string): string {
+	const match = page.match(new RegExp(`${selectorPattern}\\s*\\{([^}]*)\\}`));
+	assert.ok(match, `missing page CSS rule for ${selectorPattern}`);
+	return match[1];
+}
+
 /**
  * The ground colour the app itself declares for the dark theme.  Read it rather
  * than restating it: a copy here would have to be edited by hand every time the
@@ -63,4 +69,11 @@ test('T-32  main dismisses the boot curtain without JavaScript', () => {
 // ── T-33 ────────────────────────────────────────────────────────────────────
 test('T-33  the boot curtain uses the canonical dark background', () => {
 	assert.equal(backgroundOf('#boot-curtain'), canonicalDarkBackground());
+});
+
+// ── T-34 ────────────────────────────────────────────────────────────────────
+test('T-34  the mounted app paints over the dark boot ground with the active theme', () => {
+	const rootRule = pageRuleFor('\\.root');
+	assert.match(rootRule, /(?:^|;)\s*background:\s*var\(--bg\)\s*;/);
+	assert.match(rootRule, /(?:^|;)\s*color:\s*var\(--fg\)\s*;/);
 });

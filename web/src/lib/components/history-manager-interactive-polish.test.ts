@@ -60,3 +60,14 @@ test('list and thumbnail hash buttons match the canvas full-hash copy feedback',
 	for (const pack of [JA, EN]) assert.match(pack, /historyHashCopied:/);
 	assert.match(TYPES, /historyHashCopied: string;/);
 });
+
+test('lineage thumbnails form a parent-first horizontal generation lane', () => {
+	assert.match(MANAGER, /function lineageLaneItems\(group: LineageHistoryGroup\)/);
+	assert.match(MANAGER, /item\.lineage_node_id === group\.root_node_id/);
+	assert.match(MANAGER, /\{#if !lineageThumbsMode\}\s*<button class="lineage-representative"/);
+	assert.match(MANAGER, /\{#if lineageThumbsMode \|\| expandedRootIds\.includes\(group\.root_node_id\)\}/);
+	assert.match(MANAGER, /lineageThumbsMode \? lineageLaneItems\(group\) : membersInGenerationOrder/);
+	assert.match(MANAGER, /\.lineage-history-list\.thumbs-mode \.lineage-member-grid \{[^}]*display: flex;[^}]*overflow-x: auto;/s);
+	assert.match(MANAGER, /\.lineage-history-list\.thumbs-mode \.lineage-member \{[^}]*flex: 0 0 142px;[^}]*scroll-snap-align: start;/);
+	assert.doesNotMatch(MANAGER, /thumbs-mode \.lineage-member-grid \{ grid-template-columns: 1fr; \}/);
+});

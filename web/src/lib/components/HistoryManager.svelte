@@ -224,6 +224,13 @@
 		);
 	}
 
+	function lineageLaneItems(group: LineageHistoryGroup): HistoryItem[] {
+		const ordered = membersInGenerationOrder(lineageGroupItems[group.root_node_id]);
+		const rootIndex = ordered.findIndex((item) => item.lineage_node_id === group.root_node_id);
+		if (rootIndex <= 0) return ordered;
+		return [ordered[rootIndex], ...ordered.slice(0, rootIndex), ...ordered.slice(rootIndex + 1)];
+	}
+
 	async function fetchLineageGroups(): Promise<void> {
 		const requestId = ++lineageRequestId;
 		lineageGroupController?.abort();
@@ -751,25 +758,29 @@
 				{#each lineageGroups as group (group.root_node_id)}
 					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
 						<div class="lineage-group-head">
-							<button class="lineage-representative" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(group.representative)}>
-								<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
-							</button>
+							{#if !lineageThumbsMode}
+								<button class="lineage-representative" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(group.representative)}>
+									<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
+								</button>
+							{/if}
 							<div class="lineage-group-summary">
 								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
-							<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
-								{expandedRootIds.includes(group.root_node_id) ? t().historyLineageCollapse : t().historyLineageExpand}
-							</button>
+							{#if !lineageThumbsMode}
+								<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
+									{expandedRootIds.includes(group.root_node_id) ? t().historyLineageCollapse : t().historyLineageExpand}
+								</button>
+							{/if}
 						</div>
-						{#if expandedRootIds.includes(group.root_node_id)}
+						{#if lineageThumbsMode || expandedRootIds.includes(group.root_node_id)}
 							<div class="lineage-group-tools"><button class="ghost-btn" type="button" title={t().historySelectLineageTitle} disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{t().historySelectLineage}</button></div>
 							{#if lineageMemberLoadingIds.includes(group.root_node_id)}
 								<div class="lineage-history-message">{t().historyLoading}</div>
 							{:else}
 								<div class="lineage-member-grid">
-									{#each membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
+									{#each lineageThumbsMode ? lineageLaneItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
@@ -970,16 +981,20 @@
 	.lineage-history-list.list-mode .lineage-member-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member-main :global(svg) { width: 48px; height: 48px; }
 	.lineage-history-list.list-mode .lineage-member-main span { margin-top: 0; }
-	/* Thumbnail tab, lineage mode: the works of one lineage have to read as one
-	   run. A connector drawn between cards would break the moment the grid wraps,
-	   so the run is carried by an enclosure instead -- a spine down the group's
-	   left edge and one tinted shelf under its works -- plus the generation number
-	   on each card, which survives any wrap. */
+	/* Thumbnail tab, lineage mode: the root begins one horizontal lane and its
+	   descendants continue to the right in generation order. Horizontal overflow
+	   preserves that relationship in narrow windows instead of wrapping a child
+	   below an unrelated sibling. */
 	.lineage-history-list.thumbs-mode .lineage-history-group { border-left: 3px solid var(--border); }
 	.lineage-history-list.thumbs-mode .lineage-history-group.current-lineage { border-left-color: var(--accent); }
 	.lineage-history-list.thumbs-mode .lineage-member-grid {
+		display: flex;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		scroll-snap-type: x proximity;
 		background: color-mix(in srgb, var(--accent) 5%, var(--bg));
 	}
+	.lineage-history-list.thumbs-mode .lineage-member { flex: 0 0 142px; scroll-snap-align: start; }
 	.lineage-generation-badge {
 		position: absolute; top: 8px; right: 8px; z-index: 5;
 		min-width: 16px; padding: 1px 5px;
@@ -988,10 +1003,7 @@
 		font-size: 9px; line-height: 1.5; text-align: center;
 		font-variant-numeric: tabular-nums;
 	}
-	/* A narrow window drops the works to one column; the spine and the shelf keep
-	   the grouping legible when the grid can no longer show a row. */
 	@media (max-width: 640px) {
-		.lineage-history-list.thumbs-mode .lineage-member-grid { grid-template-columns: 1fr; }
 		.lineage-history-list.thumbs-mode .lineage-group-head { flex-wrap: wrap; }
 	}
 	.history-group-tabs { flex-shrink: 0; }

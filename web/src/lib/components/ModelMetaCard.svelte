@@ -49,16 +49,16 @@
 		width: min(340px, 75vw);
 		box-sizing: border-box;
 		padding: 10px 12px;
-		border: 1px solid #64748b;
+		border: 1px solid var(--tooltip-border);
 		border-radius: var(--r);
-		background: #111820;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, .32);
-		color: #f8fafc;
+		background: var(--tooltip-bg);
+		box-shadow: var(--tooltip-shadow);
+		color: var(--tooltip-fg);
 		text-align: left;
 		pointer-events: none;
 		white-space: normal;
 	}
-	.model-hover-card > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.45; }
+	.model-hover-card > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: 11px; line-height: 1.45; }
 	.model-hover-card > span + span { margin-top: 6px; }
-	.model-hover-card strong { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	.model-hover-card strong { color: var(--tooltip-muted); font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
 </style>

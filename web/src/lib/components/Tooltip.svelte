@@ -48,6 +48,7 @@
 		max-width: min(260px, calc(100vw - 32px));
 		width: max-content;
 		padding: 6px 8px;
+		border: 1px solid var(--tooltip-border);
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
 		color: var(--tooltip-fg);
@@ -58,7 +59,7 @@
 		text-align: left;
 		white-space: normal;
 		overflow-wrap: anywhere;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+		box-shadow: var(--tooltip-shadow);
 		opacity: 0;
 		pointer-events: none;
 		transform: translate(-50%, 2px);

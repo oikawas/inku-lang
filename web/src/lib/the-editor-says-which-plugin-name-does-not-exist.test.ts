@@ -203,17 +203,17 @@ function tokenValues(block: string): Record<string, string> {
 }
 
 function themeBlocks(): { light: string; dark: string } {
-	const page = read('../routes/+page.svelte');
-	const lightAt = page.indexOf(':global(:root) {');
-	const darkAt = page.indexOf(":global(html[data-theme='dark']) {");
+	const theme = read('../routes/+page.svelte');
+	const lightAt = theme.indexOf("html[data-theme='light']");
+	const darkAt = theme.indexOf("html[data-theme='dark']");
 	assert.ok(lightAt >= 0 && darkAt > lightAt);
 	return {
-		light: page.slice(lightAt, darkAt),
-		dark: page.slice(darkAt, page.indexOf('\n\t}', darkAt))
+		light: theme.slice(lightAt, darkAt),
+		dark: theme.slice(darkAt, theme.indexOf('\n\t}', darkAt))
 	};
 }
 
-test('T-10: the new colour is a :root token, not a literal in the rule', () => {
+test('T-10: the new colour is a theme token, not a literal in the rule', () => {
 	const page = read('../routes/+page.svelte');
 	const rule = page.slice(page.indexOf(':global(.ddl-token-unknown)'));
 	const body = rule.slice(0, rule.indexOf('}') + 1);

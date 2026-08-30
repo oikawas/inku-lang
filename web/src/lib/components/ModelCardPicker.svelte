@@ -109,9 +109,9 @@
 	.model-grid > button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
 	.model-grid > button > strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 	.model-grid > button > small { color: var(--fg3); font-size: 10px; }
-	.metadata { display: none; position: fixed; left: 0; top: 0; z-index: 1610; width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px; border: 1px solid #64748b; border-radius: var(--r); background: #111820; box-shadow: 0 8px 24px rgba(0,0,0,.32); pointer-events: none; }
+	.metadata { display: none; position: fixed; left: 0; top: 0; z-index: 1610; width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); box-shadow: var(--tooltip-shadow); pointer-events: none; }
 	.model-grid > button:hover .metadata, .model-grid > button:focus-visible .metadata { display: grid; gap: 6px; }
-	.metadata > span { display: grid; gap: 2px; color: #f8fafc; font-size: 11px; line-height: 1.4; }
-	.metadata b { color: #cbd5e1; font-size: 9px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
+	.metadata > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: 11px; line-height: 1.4; }
+	.metadata b { color: var(--tooltip-muted); font-size: 9px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
 	@media (max-width: 640px) { .picker-dialog { inset: 4vh 3vw; } .model-grid { grid-template-columns: 1fr; } }
 </style>

@@ -3274,80 +3274,120 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 <style>
-	/* ── CSS Variables ──────────────────────────────────────── */
+	/* ── Application color contract ────────────────────────────
+	   Theme-dependent tokens have the same names in both explicit theme
+	   blocks. Shared cross-component surfaces consume semantic tokens here;
+	   component-specific theme branches remain local when no shared semantic
+	   exists. */
 	:global(:root) {
-		--bg:           #f5f3ef;
-		--bg2:          #eceae4;
-		--bg3:          #e2dfd8;
-		--fg:           #1a1917;
-		--fg2:          #5a5751;
-		--fg3:          #9a9690;
-		--panel:        #ffffff;
-		--panel2:       #faf9f6;
+		/* Destructive fills stay saturated in both themes; --danger is text. */
+		--danger-bg: #c0392b;
+		--danger-fg: #ffffff;
+		--r: 4px;
+		--r-lg: 8px;
+		/* Small control dimensions are theme-independent. */
+		--btn-sm-font-size: 11px;
+		--btn-sm-padding: 4px 10px;
+		--btn-sm-radius: var(--r);
+		/* Amber DDL controls intentionally keep one palette in both themes. */
+		--ddl-btn-bg: #fff7e8;
+		--ddl-btn-border: #d8b36a;
+		--ddl-btn-fg: #6c4a10;
+		--ddl-btn-bg-hover: #ffefd0;
+		--ddl-btn-border-hover: #bd8f34;
+		--ddl-btn-fg-hover: #4f360b;
+		--ddl-btn-shadow: 0 1px 3px rgba(108, 74, 16, 0.12);
+		/* Thumbnail plates sit on artwork paper, not application chrome. */
+		--thumb-plate-bg: rgba(255, 255, 255, 0.86);
+		--thumb-plate-fg: rgba(40, 36, 30, 0.42);
+		--thumb-plate-border: rgba(0, 0, 0, 0.12);
+		--thumb-plate-fg-read: rgba(40, 36, 30, 0.72);
+	}
+
+	:global(:root),
+	:global(html[data-theme='light']) {
+		color-scheme: light;
+		--bg: #f5f3ef;
+		--bg2: #eceae4;
+		--bg3: #e2dfd8;
+		--fg: #1a1917;
+		--fg2: #5a5751;
+		--fg3: #9a9690;
+		--panel: #ffffff;
+		--panel2: #faf9f6;
 		--canvas-paper: #fffdf8;
-		--tooltip-bg:   rgba(26,25,23,0.92);
-		/* Tooltips keep a dark plate in both themes, so their label is one value. */
-		--tooltip-fg:   #ffffff;
-		--floating-control-bg: rgba(255,255,255,0.9);
-		--floating-control-hover: #fff;
-		--floating-control-disabled-bg: rgba(255,255,255,0.72);
+		--tooltip-bg: #ffffff;
+		--tooltip-fg: #1a1917;
+		--tooltip-muted: #5a5751;
+		--tooltip-border: #c4c0b8;
+		--tooltip-shadow: 0 8px 24px rgba(26, 25, 23, 0.18);
+		--floating-control-bg: rgba(255, 255, 255, 0.9);
+		--floating-control-hover: #ffffff;
+		--floating-control-disabled-bg: rgba(255, 255, 255, 0.72);
 		--floating-control-fg: #1a1917;
 		--floating-control-muted: #6d6860;
-		--action-bg:    #1a1917;
+		--action-bg: #1a1917;
 		--action-hover: #33302b;
-		--action-fg:    #fff;
+		--action-fg: #ffffff;
 		--action-disabled-bg: #807a70;
 		--action-disabled-fg: #f7f3eb;
-		--accent:       #2a4a72;
-		/* Label colour for anything filled with --accent. The accent flips from a
-		   dark navy to a light blue between themes, so the label has to flip too. */
-		--accent-fg:    #ffffff;
+		--accent: #2a4a72;
+		/* --accent flips from dark navy to light blue, so its label flips too. */
+		--accent-fg: #ffffff;
 		--accent-light: #e8eef5;
-		--border:       #d4d0c8;
-		--border2:      #c4c0b8;
-		--danger:       #a2342a;
-		/* Fill pair for destructive buttons. --danger itself is a text colour and
-		   flips to a pale red in dark, so a filled control cannot borrow it. The
-		   saturated red carries enough contrast on both themes, so — like
-		   --ddl-btn-* — this pair has one value (author's ruling, 2026-07-28). */
-		--danger-bg:    #c0392b;
-		--danger-fg:    #ffffff;
-		--r:            4px;
-		--r-lg:         8px;
-		/* Small-button dimensions for ghost and toolbar controls. They are
-		   theme-independent, so define them once here and reference the tokens. */
-		--btn-sm-font-size: 11px;
-		--btn-sm-padding:   4px 10px;
-		--btn-sm-radius:    var(--r);
-		/* Amber colors for DDL controls. Build 739 replaced literals duplicated
-		   across three components with these tokens, shared by both themes. */
-		--ddl-btn-bg:           #fff7e8;
-		--ddl-btn-border:       #d8b36a;
-		--ddl-btn-fg:           #6c4a10;
-		--ddl-btn-bg-hover:     #ffefd0;
-		--ddl-btn-border-hover: #bd8f34;
-		--ddl-btn-fg-hover:     #4f360b;
-		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
-		/* A namespaced reference that this Server does not currently provide.
-		   Avoid danger red: a later plugin may make the name valid. Amber says
-		   "not available yet", rather than "incorrect". */
-		--ddl-token-unknown-fg:     #8a5a12;
-		--ddl-token-unknown-bg:     rgba(191, 136, 32, 0.12);
+		--border: #d4d0c8;
+		--border2: #c4c0b8;
+		--danger: #a2342a;
+		/* An unavailable namespaced word is amber, not error red. */
+		--ddl-token-unknown-fg: #8a5a12;
+		--ddl-token-unknown-bg: rgba(191, 136, 32, 0.12);
 		--ddl-token-unknown-border: rgba(191, 136, 32, 0.42);
-		/* Lineage path from the origin to a starred work. */
-		--star-path:    #d97a1f;
-		/* Starred-button colors. Five components duplicated the literals, while
-		   only History Manager had dark-theme values; those values became canonical. */
-		--star-fg:      #d59b21;
-		--star-bg:      #fff6ce;
-		--star-border:  rgba(213,155,33,0.45);
-		/* Plate behind a star over a thumbnail. Its ground is the artwork's paper
-		   in either theme, so it does not invert like --floating-control-*. */
-		--thumb-plate-bg:     rgba(255,255,255,0.86);
-		--thumb-plate-fg:     rgba(40,36,30,0.42);
-		--thumb-plate-border: rgba(0,0,0,0.12);
-		/* Numbers on the same plate need a darker foreground than the star. */
-		--thumb-plate-fg-read: rgba(40,36,30,0.72);
+		/* Lineage path and starred-button colors. */
+		--star-path: #d97a1f;
+		--star-fg: #d59b21;
+		--star-bg: #fff6ce;
+		--star-border: rgba(213, 155, 33, 0.45);
+	}
+
+	:global(html[data-theme='dark']) {
+		color-scheme: dark;
+		--bg: #171716;
+		--bg2: #20201f;
+		--bg3: #2b2926;
+		--fg: #eee9df;
+		--fg2: #c8c0b3;
+		--fg3: #90877a;
+		--panel: #242321;
+		--panel2: #1d1c1b;
+		--canvas-paper: #f5f1e9;
+		--tooltip-bg: #0c0c0b;
+		--tooltip-fg: #ffffff;
+		--tooltip-muted: #cbd5e1;
+		--tooltip-border: #64748b;
+		--tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+		--floating-control-bg: rgba(45, 43, 39, 0.96);
+		--floating-control-hover: #38342f;
+		--floating-control-disabled-bg: rgba(58, 54, 49, 0.92);
+		--floating-control-fg: #eee9df;
+		--floating-control-muted: #b8afa1;
+		--action-bg: #6f92bd;
+		--action-hover: #83a5ce;
+		--action-fg: #11151a;
+		--action-disabled-bg: #4c5258;
+		--action-disabled-fg: #d2d7dc;
+		--accent: #9ab7dc;
+		--accent-fg: #11151a;
+		--accent-light: #253246;
+		--border: #38342f;
+		--border2: #514b43;
+		--danger: #ff9a86;
+		--ddl-token-unknown-fg: #f0c368;
+		--ddl-token-unknown-bg: rgba(191, 136, 32, 0.26);
+		--ddl-token-unknown-border: rgba(240, 195, 104, 0.48);
+		--star-path: #f0a44f;
+		--star-fg: #ffd166;
+		--star-bg: rgba(213, 155, 33, 0.18);
+		--star-border: rgba(255, 209, 102, 0.55);
 	}
 
 	/* Shared controls are global because Svelte scopes component styles. */
@@ -3372,43 +3412,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		color: var(--accent);
 		border-color: var(--accent);
 		background: var(--accent-light);
-	}
-
-	:global(html[data-theme='dark']) {
-		color-scheme: dark;
-		--bg:           #171716;
-		--bg2:          #20201f;
-		--bg3:          #2b2926;
-		--fg:           #eee9df;
-		--fg2:          #c8c0b3;
-		--fg3:          #90877a;
-		--panel:        #242321;
-		--panel2:       #1d1c1b;
-		--canvas-paper: #f5f1e9;
-		--tooltip-bg:   rgba(12,12,11,0.94);
-		--floating-control-bg: rgba(45,43,39,0.96);
-		--floating-control-hover: #38342f;
-		--floating-control-disabled-bg: rgba(58,54,49,0.92);
-		--floating-control-fg: #eee9df;
-		--floating-control-muted: #b8afa1;
-		--action-bg:    #6f92bd;
-		--action-hover: #83a5ce;
-		--action-fg:    #11151a;
-		--action-disabled-bg: #4c5258;
-		--action-disabled-fg: #d2d7dc;
-		--accent:       #9ab7dc;
-		--accent-fg:    #11151a;
-		--accent-light: #253246;
-		--border:       #38342f;
-		--border2:      #514b43;
-		--danger:       #ff9a86;
-		--ddl-token-unknown-fg:     #f0c368;
-		--ddl-token-unknown-bg:     rgba(191, 136, 32, 0.26);
-		--ddl-token-unknown-border: rgba(240, 195, 104, 0.48);
-		--star-path:    #f0a44f;
-		--star-fg:      #ffd166;
-		--star-bg:      rgba(213,155,33,0.18);
-		--star-border:  rgba(255,209,102,0.55);
 	}
 
 	/* UI modes change visibility only. The underlying features and saved work stay intact. */

@@ -1,0 +1,135 @@
+{
+  "schema": "inku.clause-stream-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-all-atom-kinds",
+      "language": "ja",
+      "source": "円 を 八つ 沿う 未知。水平 たくさん\n紙",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 28,
+          "atoms": [
+            {"kind": "core:primitive", "surface": "円", "start_byte": 0, "end_byte": 3},
+            {"kind": "function_word", "surface": "を", "start_byte": 4, "end_byte": 7},
+            {"kind": "exact_number:8", "surface": "八つ", "start_byte": 8, "end_byte": 14},
+            {"kind": "relation:along", "surface": "沿う", "start_byte": 15, "end_byte": 21},
+            {"kind": "diagnostic:unknown:false", "surface": "未知", "start_byte": 22, "end_byte": 28}
+          ]
+        },
+        {
+          "start_byte": 31,
+          "end_byte": 50,
+          "atoms": [
+            {"kind": "remaining:angle", "surface": "水平", "start_byte": 31, "end_byte": 37},
+            {"kind": "diagnostic:hole:true", "surface": "たくさん", "start_byte": 38, "end_byte": 50}
+          ]
+        },
+        {
+          "start_byte": 51,
+          "end_byte": 54,
+          "atoms": [
+            {"kind": "core:ground", "surface": "紙", "start_byte": 51, "end_byte": 54}
+          ]
+        }
+      ],
+      "expected_separators": [
+        {"kind": "sentence_end", "surface": "。", "start_byte": 28, "end_byte": 31},
+        {"kind": "line_break", "surface": "\n", "start_byte": 50, "end_byte": 51}
+      ],
+      "delivery_conservation_count": 7
+    },
+    {
+      "id": "en-leading-trailing-mixed-line-endings",
+      "language": "en",
+      "source": "\ncircle, blue! horizontal? paper\r\n",
+      "expected_clauses": [
+        {
+          "start_byte": 1,
+          "end_byte": 13,
+          "atoms": [
+            {"kind": "core:primitive", "surface": "circle", "start_byte": 1, "end_byte": 7},
+            {"kind": "core:color", "surface": "blue", "start_byte": 9, "end_byte": 13}
+          ]
+        },
+        {
+          "start_byte": 14,
+          "end_byte": 25,
+          "atoms": [
+            {"kind": "remaining:angle", "surface": "horizontal", "start_byte": 15, "end_byte": 25}
+          ]
+        },
+        {
+          "start_byte": 26,
+          "end_byte": 32,
+          "atoms": [
+            {"kind": "core:ground", "surface": "paper", "start_byte": 27, "end_byte": 32}
+          ]
+        }
+      ],
+      "expected_separators": [
+        {"kind": "line_break", "surface": "\n", "start_byte": 0, "end_byte": 1},
+        {"kind": "sentence_end", "surface": "!", "start_byte": 13, "end_byte": 14},
+        {"kind": "sentence_end", "surface": "?", "start_byte": 25, "end_byte": 26},
+        {"kind": "line_break", "surface": "\r\n", "start_byte": 32, "end_byte": 34}
+      ],
+      "delivery_conservation_count": 4
+    },
+    {
+      "id": "en-all-sentence-endings",
+      "language": "en",
+      "source": "circle. blue！ paper? red？ square! black。",
+      "expected_clauses": [
+        {"start_byte": 0, "end_byte": 6, "atoms": [{"kind": "core:primitive", "surface": "circle", "start_byte": 0, "end_byte": 6}]},
+        {"start_byte": 7, "end_byte": 12, "atoms": [{"kind": "core:color", "surface": "blue", "start_byte": 8, "end_byte": 12}]},
+        {"start_byte": 15, "end_byte": 21, "atoms": [{"kind": "core:ground", "surface": "paper", "start_byte": 16, "end_byte": 21}]},
+        {"start_byte": 22, "end_byte": 26, "atoms": [{"kind": "core:color", "surface": "red", "start_byte": 23, "end_byte": 26}]},
+        {"start_byte": 29, "end_byte": 36, "atoms": [{"kind": "core:primitive", "surface": "square", "start_byte": 30, "end_byte": 36}]},
+        {"start_byte": 37, "end_byte": 43, "atoms": [{"kind": "core:color", "surface": "black", "start_byte": 38, "end_byte": 43}]}
+      ],
+      "expected_separators": [
+        {"kind": "sentence_end", "surface": ".", "start_byte": 6, "end_byte": 7},
+        {"kind": "sentence_end", "surface": "！", "start_byte": 12, "end_byte": 15},
+        {"kind": "sentence_end", "surface": "?", "start_byte": 21, "end_byte": 22},
+        {"kind": "sentence_end", "surface": "？", "start_byte": 26, "end_byte": 29},
+        {"kind": "sentence_end", "surface": "!", "start_byte": 36, "end_byte": 37},
+        {"kind": "sentence_end", "surface": "。", "start_byte": 43, "end_byte": 46}
+      ],
+      "delivery_conservation_count": 6
+    },
+    {
+      "id": "en-punctuation-does-not-split",
+      "language": "en",
+      "source": "circle, blue: paper; black (square)",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 35,
+          "atoms": [
+            {"kind": "core:primitive", "surface": "circle", "start_byte": 0, "end_byte": 6},
+            {"kind": "core:color", "surface": "blue", "start_byte": 8, "end_byte": 12},
+            {"kind": "core:ground", "surface": "paper", "start_byte": 14, "end_byte": 19},
+            {"kind": "core:color", "surface": "black", "start_byte": 21, "end_byte": 26},
+            {"kind": "core:primitive", "surface": "square", "start_byte": 28, "end_byte": 34}
+          ]
+        }
+      ],
+      "expected_separators": [],
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "separator-only",
+      "language": "ja",
+      "source": "。!?\r\n",
+      "expected_clauses": [],
+      "expected_separators": [
+        {"kind": "sentence_end", "surface": "。", "start_byte": 0, "end_byte": 3},
+        {"kind": "sentence_end", "surface": "!", "start_byte": 3, "end_byte": 4},
+        {"kind": "sentence_end", "surface": "?", "start_byte": 4, "end_byte": 5},
+        {"kind": "line_break", "surface": "\r\n", "start_byte": 5, "end_byte": 7}
+      ],
+      "delivery_conservation_count": 0
+    }
+  ]
+}

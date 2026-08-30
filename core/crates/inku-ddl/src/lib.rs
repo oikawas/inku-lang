@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod clause;
 pub mod composition;
 pub mod document;
 pub mod language;
@@ -10,6 +11,11 @@ pub mod macro_seed;
 pub mod parser;
 pub mod prompt;
 pub mod saijiki;
+
+pub use clause::{
+    CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,
+    ClauseStream, ClauseStreamError, parse_clause_stream,
+};
 
 pub use composition::{
     CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,

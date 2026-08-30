@@ -56,12 +56,10 @@ test('render-limit rationale and scoped styles move with the view', () => {
 		'A div, not a label',
 		'may only be the immediate child of a block',
 		'The hint sets the card width',
-		'The conversion answers a different question',
-		'The largest value that can be typed'
+		'The conversion answers a different question'
 	]) {
 		assert.ok(VIEW.includes(rationale), rationale);
 	}
-	assert.equal((VIEW.match(/:global\(/g) ?? []).length, 1);
-	assert.match(VIEW, /\.limits-field :global\(\.number-stepper\)/);
+	assert.equal((VIEW.match(/:global\(/g) ?? []).length, 0);
 	assert.doesNotMatch(VIEW, /^[\t ]*(?:\/\/|\/\*|\*|<!--).*[぀-ヿ㐀-鿿]/m);
 });

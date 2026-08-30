@@ -188,7 +188,4 @@
 	   this number costs, rather than what it governs -- so it is set apart
 	   rather than reading as a second sentence of the same line. */
 	.limits-field > small.limits-weight { color: var(--fg2); }
-	/* The largest value that can be typed is the absolute ceiling, 100000 -- six
-	   digits. The stepper is sized for that and does not stretch to the card. */
-	.limits-field :global(.number-stepper) { width: min(136px, 100%); }
 </style>

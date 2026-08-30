@@ -263,7 +263,7 @@
 		gap: 4px;
 		min-width: 0;
 	}
-	.db-backup-time-fields :global(.number-stepper) { flex: 1 1 0; }
+	.db-backup-time-fields :global(.number-stepper) { flex: 0 1 136px; }
 	.db-backup-time-unit {
 		flex: 0 0 auto;
 		color: var(--fg2);

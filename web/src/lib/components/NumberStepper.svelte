@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatGroupedNumber, parseGroupedNumber } from '$lib/groupedNumber';
+
 	type Props = {
 		value: number;
 		min: number;
@@ -28,16 +30,39 @@
 	}
 
 	function commit(event: Event): void {
-		const next = Number((event.currentTarget as HTMLInputElement).value);
-		if (!Number.isFinite(next)) return;
+		const input = event.currentTarget as HTMLInputElement;
+		const next = parseGroupedNumber(input.value);
+		if (next === null) {
+			input.value = formatGroupedNumber(current, step);
+			return;
+		}
 		current = normalize(next);
+		input.value = formatGroupedNumber(current, step);
 		void onChange(current);
+	}
+
+	function handleKeydown(event: KeyboardEvent): void {
+		if (disabled || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
+		event.preventDefault();
+		changeBy(event.key === 'ArrowDown' ? -1 : 1);
 	}
 </script>
 
 <div class="number-stepper">
 	<button type="button" aria-label={`${label} −`} disabled={disabled || current <= min} onclick={() => changeBy(-1)}>−</button>
-	<input type="number" {min} {max} {step} value={current} aria-label={label} {disabled} onchange={commit} />
+	<input
+		type="text"
+		role="spinbutton"
+		inputmode="decimal"
+		aria-label={label}
+		aria-valuemin={min}
+		aria-valuemax={max}
+		aria-valuenow={current}
+		value={formatGroupedNumber(current, step)}
+		{disabled}
+		onchange={commit}
+		onkeydown={handleKeydown}
+	/>
 	<button type="button" aria-label={`${label} +`} disabled={disabled || current >= max} onclick={() => changeBy(1)}>+</button>
 </div>
 
@@ -47,7 +72,7 @@
 		grid-template-columns: auto minmax(0, 1fr) auto;
 		align-items: stretch;
 		gap: 4px;
-		width: 100%;
+		width: min(136px, 100%);
 		min-width: 0;
 	}
 	button {
@@ -77,10 +102,5 @@
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
 		text-align: center;
-	}
-	input::-webkit-inner-spin-button,
-	input::-webkit-outer-spin-button {
-		margin: 0;
-		appearance: none;
 	}
 </style>

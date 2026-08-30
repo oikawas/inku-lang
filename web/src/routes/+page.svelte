@@ -3545,6 +3545,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		background: var(--bg);
+		color: var(--fg);
 	}
 
 	.left-rail-toggle {

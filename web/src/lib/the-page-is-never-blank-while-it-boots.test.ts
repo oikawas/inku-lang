@@ -77,3 +77,10 @@ test('T-34  the mounted app paints over the dark boot ground with the active the
 	assert.match(rootRule, /(?:^|;)\s*background:\s*var\(--bg\)\s*;/);
 	assert.match(rootRule, /(?:^|;)\s*color:\s*var\(--fg\)\s*;/);
 });
+
+// ── T-35 ────────────────────────────────────────────────────────────────────
+test('T-35  the input-mode panel paints its own active-theme surface', () => {
+	const panelRule = pageRuleFor('\\.left-panel');
+	assert.match(panelRule, /(?:^|;)\s*background:\s*var\(--bg\)\s*;/);
+	assert.match(panelRule, /(?:^|;)\s*color:\s*var\(--fg\)\s*;/);
+});

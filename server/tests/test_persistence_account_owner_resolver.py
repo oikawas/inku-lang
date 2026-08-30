@@ -35,7 +35,9 @@ class _Query:
         return self
 
     def order_by(self, *_args):
-        self.operations.append("order_by")
+        self.operations.append(
+            ("order_by", tuple(str(value) for value in _args))
+        )
         return self
 
     def first(self):
@@ -115,7 +117,16 @@ def test_oldest_admin_preserves_membership_query_and_none() -> None:
     session = _Session([SimpleNamespace(id="admin-id")])
     assert resolver.oldest_admin_id(session) == "admin-id"
     assert session.models == [UserAccountRow]
-    assert session.operations == ["join", "join", "filter", "order_by", "first"]
+    assert session.operations == [
+        "join",
+        "join",
+        "filter",
+        (
+            "order_by",
+            ("user_accounts.at ASC", "user_accounts.id ASC"),
+        ),
+        "first",
+    ]
 
     empty = _Session([None])
     assert resolver.oldest_admin_id(empty) is None
@@ -127,7 +138,13 @@ def test_history_owner_preserves_admin_fallback_and_owned_session() -> None:
     resolver = resolver_type(lambda: pytest.fail("borrowed session must be reused"))
     assert resolver.history_owner_user_id(borrowed) == "oldest-user"
     assert borrowed.models == [UserAccountRow, UserAccountRow]
-    assert borrowed.operations[-2:] == ["order_by", "first"]
+    assert borrowed.operations[-2:] == [
+        (
+            "order_by",
+            ("user_accounts.at ASC", "user_accounts.id ASC"),
+        ),
+        "first",
+    ]
 
     owned_session = _Session([SimpleNamespace(id="admin-id")])
     owned = resolver_type(lambda: _OwnedSession(owned_session))

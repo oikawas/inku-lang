@@ -58,8 +58,10 @@ def create_sqlite_snapshot(source: Path, destination: Path) -> SQLiteSnapshot:
     committed WAL pages and look successful while silently losing data.
     """
     source = source.expanduser().resolve()
-    destination = destination.expanduser().resolve()
-    if source == destination:
+    # Keep the destination leaf unresolved so O_EXCL sees and refuses even a
+    # dangling symlink instead of following it to an attacker-selected target.
+    destination = Path(os.path.abspath(destination.expanduser()))
+    if source == destination.resolve(strict=False):
         raise SQLiteSnapshotError("SQLite snapshot destination equals its source")
     if not source.is_file():
         raise SQLiteSnapshotError("SQLite snapshot source is not available")

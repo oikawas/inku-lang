@@ -8,6 +8,8 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
 from inku_server.persistence import accounts
@@ -69,6 +71,9 @@ class _Session:
     def add(self, row):
         self.events.append("add")
         self.added.append(row)
+
+    def flush(self):
+        self.events.append("flush")
 
     def commit(self):
         self.events.append("commit")
@@ -180,7 +185,7 @@ def test_single_user_account_preserves_password_row_membership_and_commit_order(
             "default-group",
             "permission-groups",
             "add",
-            "commit",
+            "flush",
             "groups",
             "commit",
         ]
@@ -192,3 +197,27 @@ def test_single_user_account_preserves_password_row_membership_and_commit_order(
         assert row.role == "admins"
         assert row.group_id == "group-id"
         assert row.at == 1234
+
+
+def test_single_user_account_rolls_back_when_admin_membership_fails(tmp_path) -> None:
+    creator_type = _creator_or_skip()
+    engine = create_engine(f"sqlite:///{tmp_path / 'single-user.sqlite'}")
+    UserGroupRow.__table__.create(engine)
+    UserAccountRow.__table__.create(engine)
+    factory = sessionmaker(bind=engine)
+
+    def fail_membership(_session, _row, _names):
+        raise RuntimeError("membership failed")
+
+    creator = creator_type(
+        **_dependencies(
+            session_factory=factory,
+            set_permission_groups_fn=fail_membership,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="membership failed"):
+        creator.create()
+
+    with factory() as session:
+        assert session.get(UserAccountRow, "account-id") is None

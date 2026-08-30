@@ -6,7 +6,12 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
 from .schema import UnreadWordRow
+
+
+UNREAD_WORD_UPSERT_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -28,20 +33,37 @@ class UnreadWordStore:
         if not clean_words:
             return
         with self.session_factory() as session:
-            for word in clean_words:
-                row = session.query(UnreadWordRow).filter(
-                    UnreadWordRow.user_id == user_id,
-                    UnreadWordRow.word == word,
-                    UnreadWordRow.context == clean_context,
-                ).first()
-                if row is None:
-                    session.add(UnreadWordRow(
-                        id=str(uuid.uuid4()), user_id=user_id, word=word, context=clean_context,
-                        frequency=1, first_at=at, last_at=at,
-                    ))
-                else:
-                    row.frequency += 1
-                    row.last_at = at
+            # Conflict handling must happen under SQLite's writer lock. A preceding
+            # SELECT lets concurrent requests both observe absence and makes one
+            # INSERT fail. Seven values per row keep each batch below SQLite's
+            # conservative variable limit while preserving one transaction.
+            for start in range(0, len(clean_words), UNREAD_WORD_UPSERT_BATCH_SIZE):
+                values = [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "user_id": user_id,
+                        "word": word,
+                        "context": clean_context,
+                        "frequency": 1,
+                        "first_at": at,
+                        "last_at": at,
+                    }
+                    for word in clean_words[start : start + UNREAD_WORD_UPSERT_BATCH_SIZE]
+                ]
+                statement = sqlite_insert(UnreadWordRow).values(values)
+                session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[
+                            UnreadWordRow.user_id,
+                            UnreadWordRow.word,
+                            UnreadWordRow.context,
+                        ],
+                        set_={
+                            "frequency": UnreadWordRow.frequency + 1,
+                            "last_at": statement.excluded.last_at,
+                        },
+                    )
+                )
             session.commit()
 
     def list_unread_words(

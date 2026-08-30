@@ -89,6 +89,19 @@ def test_snapshot_is_owner_only_and_never_replaces_an_existing_destination(
     assert occupied.read_bytes() == b"keep"
 
 
+def test_snapshot_refuses_a_dangling_destination_symlink(tmp_path: Path) -> None:
+    source = _sqlite_database(tmp_path / "source.sqlite")
+    outside = tmp_path / "outside.sqlite"
+    destination = tmp_path / "snapshot.sqlite"
+    destination.symlink_to(outside)
+
+    with pytest.raises(backup.SQLiteSnapshotError, match="already exists"):
+        backup.create_sqlite_snapshot(source, destination)
+
+    assert destination.is_symlink()
+    assert not outside.exists()
+
+
 def test_persistence_backup_owns_policy_without_importing_db(tmp_path: Path) -> None:
     source = inspect.getsource(backup)
     assert "inku_server.db" not in source

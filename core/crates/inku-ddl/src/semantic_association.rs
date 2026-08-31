@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v3";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v4";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -61,6 +61,14 @@ pub struct SemanticSurface {
     pub intensity: Option<SemanticTerm>,
 }
 
+/// Three independent explicit Fluctuation dimensions. Missing values remain unspecified.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SemanticFluctuation {
+    pub amplitude: Option<SemanticTerm>,
+    pub frequency: Option<SemanticTerm>,
+    pub quality: Option<SemanticTerm>,
+}
+
 /// One single-head entity. A field is absent only when it was not explicitly and uniquely stated.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticEntity {
@@ -71,6 +79,7 @@ pub struct SemanticEntity {
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
     pub surface: SemanticSurface,
+    pub fluctuation: SemanticFluctuation,
 }
 
 /// Partial or complete semantic entity sequence in sentence-region source order.
@@ -90,6 +99,7 @@ pub enum OwnedSemanticOccurrence {
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
     Surface(SemanticTerm),
+    Fluctuation(SemanticTerm),
 }
 
 impl OwnedSemanticOccurrence {
@@ -101,7 +111,8 @@ impl OwnedSemanticOccurrence {
             | Self::Touch(term)
             | Self::Continuity(term)
             | Self::Angle(term)
-            | Self::Surface(term) => &term.provenance.source,
+            | Self::Surface(term)
+            | Self::Fluctuation(term) => &term.provenance.source,
             Self::Quantity(quantity) => &quantity.provenance,
         }
     }
@@ -120,6 +131,10 @@ pub enum SemanticAssociationIssueKind {
     ConflictingSurfaceQualities,
     ConflictingSurfaceIntensities,
     UnknownSurfaceDimension,
+    ConflictingFluctuationAmplitudes,
+    ConflictingFluctuationFrequencies,
+    ConflictingFluctuationQualities,
+    UnknownFluctuationDimension,
     UpstreamHole,
     UpstreamConflict,
     UpstreamUnknown,
@@ -138,6 +153,10 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingSurfaceQualities => "conflicting_surface_qualities",
             Self::ConflictingSurfaceIntensities => "conflicting_surface_intensities",
             Self::UnknownSurfaceDimension => "unknown_surface_dimension",
+            Self::ConflictingFluctuationAmplitudes => "conflicting_fluctuation_amplitudes",
+            Self::ConflictingFluctuationFrequencies => "conflicting_fluctuation_frequencies",
+            Self::ConflictingFluctuationQualities => "conflicting_fluctuation_qualities",
+            Self::UnknownFluctuationDimension => "unknown_fluctuation_dimension",
             Self::UpstreamHole => "upstream_hole",
             Self::UpstreamConflict => "upstream_conflict",
             Self::UpstreamUnknown => "upstream_unknown",
@@ -178,6 +197,10 @@ struct AssociationRegion {
     surface_qualities: Vec<SemanticTerm>,
     surface_intensities: Vec<SemanticTerm>,
     unclassified_surfaces: Vec<SemanticTerm>,
+    fluctuation_amplitudes: Vec<SemanticTerm>,
+    fluctuation_frequencies: Vec<SemanticTerm>,
+    fluctuation_qualities: Vec<SemanticTerm>,
+    unclassified_fluctuations: Vec<SemanticTerm>,
     diagnostics: Vec<NeutralDiagnostic>,
 }
 
@@ -192,6 +215,22 @@ fn classify_surface_dimension(canonical_id: &str) -> Option<SurfaceDimension> {
         "none" | "solid" | "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
         | "aquatint" => Some(SurfaceDimension::Quality),
         "dense" | "faint" => Some(SurfaceDimension::Intensity),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FluctuationDimension {
+    Amplitude,
+    Frequency,
+    Quality,
+}
+
+fn classify_fluctuation_dimension(canonical_id: &str) -> Option<FluctuationDimension> {
+    match canonical_id {
+        "fine" | "large" => Some(FluctuationDimension::Amplitude),
+        "quickly" | "slowly" => Some(FluctuationDimension::Frequency),
+        "swaying" | "undulating" | "trembling" | "blurring" => Some(FluctuationDimension::Quality),
         _ => None,
     }
 }
@@ -269,6 +308,28 @@ pub fn associate_semantic_entities(
                         clause_index,
                         atom_index,
                     ));
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Fluctuation => {
+                    let term = project_remaining_term(
+                        document,
+                        term,
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    );
+                    match classify_fluctuation_dimension(&term.identity.id) {
+                        Some(FluctuationDimension::Amplitude) => {
+                            region.fluctuation_amplitudes.push(term)
+                        }
+                        Some(FluctuationDimension::Frequency) => {
+                            region.fluctuation_frequencies.push(term)
+                        }
+                        Some(FluctuationDimension::Quality) => {
+                            region.fluctuation_qualities.push(term)
+                        }
+                        None => region.unclassified_fluctuations.push(term),
+                    }
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::UnattachedExactNumber(quantity) => {
@@ -410,6 +471,7 @@ fn associate_region(
 ) {
     if region.heads.len() > 1 {
         let surface_occurrences = take_surface_occurrences(&mut region);
+        let fluctuation_occurrences = take_fluctuation_occurrences(&mut region);
         let mut occurrences = region
             .heads
             .drain(..)
@@ -430,6 +492,7 @@ fn associate_region(
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
             .chain(surface_occurrences)
+            .chain(fluctuation_occurrences)
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         issues.push(SemanticAssociationIssue {
@@ -444,6 +507,7 @@ fn associate_region(
 
     if region.heads.is_empty() {
         let surface_occurrences = take_surface_occurrences(&mut region);
+        let fluctuation_occurrences = take_fluctuation_occurrences(&mut region);
         let mut occurrences = region
             .colors
             .drain(..)
@@ -463,6 +527,7 @@ fn associate_region(
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
             .chain(surface_occurrences)
+            .chain(fluctuation_occurrences)
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         if !occurrences.is_empty() {
@@ -550,6 +615,39 @@ fn associate_region(
             upstream_diagnostic: None,
         });
     }
+    let amplitude = select_term(
+        region.fluctuation_amplitudes,
+        OwnedSemanticOccurrence::Fluctuation,
+        SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes,
+        region_index,
+        issues,
+    );
+    let frequency = select_term(
+        region.fluctuation_frequencies,
+        OwnedSemanticOccurrence::Fluctuation,
+        SemanticAssociationIssueKind::ConflictingFluctuationFrequencies,
+        region_index,
+        issues,
+    );
+    let fluctuation_quality = select_term(
+        region.fluctuation_qualities,
+        OwnedSemanticOccurrence::Fluctuation,
+        SemanticAssociationIssueKind::ConflictingFluctuationQualities,
+        region_index,
+        issues,
+    );
+    if !region.unclassified_fluctuations.is_empty() {
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::UnknownFluctuationDimension,
+            region_index,
+            occurrences: region
+                .unclassified_fluctuations
+                .into_iter()
+                .map(OwnedSemanticOccurrence::Fluctuation)
+                .collect(),
+            upstream_diagnostic: None,
+        });
+    }
     entities.push(SemanticEntity {
         head,
         color,
@@ -558,6 +656,11 @@ fn associate_region(
         continuity,
         angle,
         surface: SemanticSurface { quality, intensity },
+        fluctuation: SemanticFluctuation {
+            amplitude,
+            frequency,
+            quality: fluctuation_quality,
+        },
     });
     append_upstream_issues(region_index, region.diagnostics, issues);
 }
@@ -569,6 +672,17 @@ fn take_surface_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemantic
         .chain(region.surface_intensities.drain(..))
         .chain(region.unclassified_surfaces.drain(..))
         .map(OwnedSemanticOccurrence::Surface)
+        .collect()
+}
+
+fn take_fluctuation_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemanticOccurrence> {
+    region
+        .fluctuation_amplitudes
+        .drain(..)
+        .chain(region.fluctuation_frequencies.drain(..))
+        .chain(region.fluctuation_qualities.drain(..))
+        .chain(region.unclassified_fluctuations.drain(..))
+        .map(OwnedSemanticOccurrence::Fluctuation)
         .collect()
 }
 
@@ -626,6 +740,9 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.angle.is_some())
         + usize::from(entity.surface.quality.is_some())
         + usize::from(entity.surface.intensity.is_some())
+        + usize::from(entity.fluctuation.amplitude.is_some())
+        + usize::from(entity.fluctuation.frequency.is_some())
+        + usize::from(entity.fluctuation.quality.is_some())
 }
 
 fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
@@ -670,6 +787,10 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .unwrap_or(Value::Null),
     );
     record.insert(
+        "fluctuation".to_owned(),
+        semantic_fluctuation_value(&entity.fluctuation),
+    );
+    record.insert(
         "head".to_owned(),
         semantic_identity_value(&entity.head.identity),
     );
@@ -709,6 +830,35 @@ fn semantic_surface_value(surface: &SemanticSurface) -> Value {
     record.insert(
         "quality".to_owned(),
         surface
+            .quality
+            .as_ref()
+            .map(|term| semantic_identity_value(&term.identity))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_fluctuation_value(fluctuation: &SemanticFluctuation) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "amplitude".to_owned(),
+        fluctuation
+            .amplitude
+            .as_ref()
+            .map(|term| semantic_identity_value(&term.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "frequency".to_owned(),
+        fluctuation
+            .frequency
+            .as_ref()
+            .map(|term| semantic_identity_value(&term.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "quality".to_owned(),
+        fluctuation
             .quality
             .as_ref()
             .map(|term| semantic_identity_value(&term.identity))

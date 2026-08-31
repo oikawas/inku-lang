@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v3.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v4.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -38,6 +38,12 @@ struct Case {
     surface_qualities: Vec<String>,
     #[serde(default)]
     surface_intensities: Vec<String>,
+    #[serde(default)]
+    fluctuation_amplitudes: Vec<String>,
+    #[serde(default)]
+    fluctuation_frequencies: Vec<String>,
+    #[serde(default)]
+    fluctuation_qualities: Vec<String>,
 }
 
 #[test]
@@ -108,6 +114,66 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
             "{}: explicit Touch fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| {
+                    entity
+                        .fluctuation
+                        .amplitude
+                        .as_ref()
+                        .map(|term| term.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.fluctuation_amplitudes
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Fluctuation amplitude fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| {
+                    entity
+                        .fluctuation
+                        .frequency
+                        .as_ref()
+                        .map(|term| term.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.fluctuation_frequencies
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Fluctuation frequency fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| {
+                    entity
+                        .fluctuation
+                        .quality
+                        .as_ref()
+                        .map(|term| term.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.fluctuation_qualities
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Fluctuation quality fields",
             case.id
         );
         assert_eq!(
@@ -240,6 +306,31 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
         canonical_by_case["en-surface-order-one"],
         canonical_by_case["surface-intensity-contrast"]
     );
+    let fluctuation_equivalent = [
+        "ja-fluctuation-order-one",
+        "ja-fluctuation-order-two",
+        "en-fluctuation-order-one",
+        "en-fluctuation-order-two",
+        "fluctuation-soft-line-break",
+    ]
+    .map(|id| canonical_by_case[id]);
+    assert!(
+        fluctuation_equivalent
+            .windows(2)
+            .all(|pair| pair[0] == pair[1])
+    );
+    assert_ne!(
+        canonical_by_case["en-fluctuation-order-one"],
+        canonical_by_case["fluctuation-amplitude-contrast"]
+    );
+    assert_ne!(
+        canonical_by_case["en-fluctuation-order-one"],
+        canonical_by_case["fluctuation-frequency-contrast"]
+    );
+    assert_ne!(
+        canonical_by_case["en-fluctuation-order-one"],
+        canonical_by_case["fluctuation-quality-contrast"]
+    );
 }
 
 #[test]
@@ -247,13 +338,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v3"
+        "inku.semantic-entity-association.v4"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v3"
+        "inku.semantic-entity-association-fixture.v4"
     );
-    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.version, 4);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -313,6 +404,26 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
         "surface-upstream-issue-retained",
         "unobserved-line-surface-combination",
         "unobserved-arc-surface-combination",
+        "ja-fluctuation-order-one",
+        "ja-fluctuation-order-two",
+        "en-fluctuation-order-one",
+        "en-fluctuation-order-two",
+        "fluctuation-amplitude-only",
+        "fluctuation-frequency-only",
+        "fluctuation-quality-only",
+        "fluctuation-amplitude-contrast",
+        "fluctuation-frequency-contrast",
+        "fluctuation-quality-contrast",
+        "conflicting-fluctuation-amplitudes",
+        "conflicting-fluctuation-frequencies",
+        "conflicting-fluctuation-qualities",
+        "orphan-fluctuation-terms",
+        "multi-head-fluctuation-ambiguity",
+        "regional-fluctuation-ownership",
+        "fluctuation-soft-line-break",
+        "fluctuation-upstream-issue-retained",
+        "blurring-and-surface-bleed-coexist",
+        "unobserved-primitive-fluctuation-combination",
     ] {
         assert!(
             ids.contains(required),
@@ -389,6 +500,81 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
     );
 }
 
+#[test]
+fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
+    let category = saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == "yuragi")
+        .expect("accepted asset has the Fluctuation category");
+    assert_eq!(category.words.len(), 8);
+
+    let mut amplitude_ids = HashSet::new();
+    let mut frequency_ids = HashSet::new();
+    let mut quality_ids = HashSet::new();
+    for word in &category.words {
+        let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
+            .expect("accepted Fluctuation row has canonical identity");
+        let source = format!(
+            "circle {}.",
+            word.surface_en
+                .as_deref()
+                .expect("accepted Fluctuation row has English source surface")
+        );
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .expect("accepted Fluctuation row forms a normalized document");
+        let result = associate_semantic_entities(&document)
+            .expect("accepted Fluctuation row forms a clause stream");
+        assert!(result.issues.is_empty(), "{}", projection.canonical_id);
+        let entity = result.ast.entities.first().expect("one entity");
+        match (
+            &entity.fluctuation.amplitude,
+            &entity.fluctuation.frequency,
+            &entity.fluctuation.quality,
+        ) {
+            (Some(term), None, None) => {
+                assert_eq!(term.identity.category, "variation");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(amplitude_ids.insert(term.identity.id.clone()));
+            }
+            (None, Some(term), None) => {
+                assert_eq!(term.identity.category, "variation");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(frequency_ids.insert(term.identity.id.clone()));
+            }
+            (None, None, Some(term)) => {
+                assert_eq!(term.identity.category, "variation");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(quality_ids.insert(term.identity.id.clone()));
+            }
+            _ => panic!(
+                "{} must belong to exactly one Fluctuation dimension",
+                projection.canonical_id
+            ),
+        }
+    }
+
+    assert_eq!(
+        amplitude_ids,
+        ["fine", "large"].map(str::to_owned).into_iter().collect()
+    );
+    assert_eq!(
+        frequency_ids,
+        ["quickly", "slowly"]
+            .map(str::to_owned)
+            .into_iter()
+            .collect()
+    );
+    assert_eq!(
+        quality_ids,
+        ["swaying", "undulating", "trembling", "blurring"]
+            .map(str::to_owned)
+            .into_iter()
+            .collect()
+    );
+}
+
 fn load_fixture() -> Fixture {
     serde_json::from_str(FIXTURE).expect("fixture must be valid JSON")
 }
@@ -429,6 +615,21 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
             assert_eq!(
                 entity.head.provenance.source.region_index, term.provenance.source.region_index,
                 "{}: Surface dimension must remain in its sentence region",
+                case.id
+            );
+        }
+        for term in [
+            &entity.fluctuation.amplitude,
+            &entity.fluctuation.frequency,
+            &entity.fluctuation.quality,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
+            assert_eq!(
+                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                "{}: Fluctuation dimension must remain in its sentence region",
                 case.id
             );
         }
@@ -536,7 +737,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             ClauseAtom::RemainingRole(term)
                 if matches!(
                     term.role,
-                    RemainingRoleKind::Continuity | RemainingRoleKind::Angle
+                    RemainingRoleKind::Continuity
+                        | RemainingRoleKind::Angle
+                        | RemainingRoleKind::Fluctuation
                 ) =>
             {
                 Some(term.span)
@@ -567,6 +770,16 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         {
             output_spans.push(term.provenance.source.span);
         }
+        for term in [
+            &entity.fluctuation.amplitude,
+            &entity.fluctuation.frequency,
+            &entity.fluctuation.quality,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            output_spans.push(term.provenance.source.span);
+        }
     }
     for occurrence in result.issues.iter().flat_map(|issue| &issue.occurrences) {
         output_spans.push(match occurrence {
@@ -577,7 +790,8 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)
-            | OwnedSemanticOccurrence::Surface(term) => term.provenance.source.span,
+            | OwnedSemanticOccurrence::Surface(term)
+            | OwnedSemanticOccurrence::Fluctuation(term) => term.provenance.source.span,
         });
     }
 

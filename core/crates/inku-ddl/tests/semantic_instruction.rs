@@ -9,7 +9,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v4.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v5.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -39,6 +39,12 @@ struct Case {
     instruction_surface_qualities: Vec<Option<String>>,
     #[serde(default)]
     instruction_surface_intensities: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_fluctuation_amplitudes: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_fluctuation_frequencies: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_fluctuation_qualities: Vec<Option<String>>,
     association_issue_kinds: Vec<String>,
     instruction_issues: Vec<String>,
     canonical: Option<String>,
@@ -209,6 +215,71 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
                 case.id
             );
         }
+        if !case.instruction_fluctuation_amplitudes.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .fluctuation
+                            .amplitude
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_fluctuation_amplitudes
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Fluctuation amplitude",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .fluctuation
+                            .frequency
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_fluctuation_frequencies
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Fluctuation frequency",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .fluctuation
+                            .quality
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_fluctuation_qualities
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Fluctuation quality",
+                case.id
+            );
+        }
         assert_eq!(
             result
                 .ast
@@ -314,13 +385,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v4"
+        "inku.semantic-instruction-association.v5"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v4"
+        "inku.semantic-instruction-association-fixture.v5"
     );
-    assert_eq!(fixture.version, 4);
+    assert_eq!(fixture.version, 5);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -350,6 +421,8 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         "style-conflict-preserves-action-position",
         "surface-fields-preserve-i588-and-action-position",
         "surface-conflict-preserves-action-position",
+        "fluctuation-fields-preserve-i589-and-action-position",
+        "fluctuation-conflict-preserves-action-position",
     ] {
         assert!(
             ids.contains(required),

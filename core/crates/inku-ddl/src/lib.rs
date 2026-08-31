@@ -139,8 +139,9 @@ pub use saijiki::{
 pub use semantic_association::{
     OwnedSemanticOccurrence, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue,
     SemanticAssociationIssueKind, SemanticAssociationResult, SemanticEntity,
-    SemanticEntityAssociationAst, SemanticIdentity, SemanticQuantity, SemanticSurface,
-    SemanticTerm, SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
+    SemanticEntityAssociationAst, SemanticFluctuation, SemanticIdentity, SemanticQuantity,
+    SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
+    associate_semantic_entities,
 };
 pub use semantic_instruction::{
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,

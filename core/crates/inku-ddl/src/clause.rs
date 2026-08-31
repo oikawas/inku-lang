@@ -217,7 +217,14 @@ pub fn parse_clause_stream(
         }
     }
 
-    let separators = collect_separators(source);
+    let separators = collect_separators(source)
+        .into_iter()
+        .filter(|separator| {
+            !atoms
+                .iter()
+                .any(|atom| contains(atom.span(), separator.span))
+        })
+        .collect::<Vec<_>>();
     for atom in &atoms {
         let atom_span = atom.span();
         if let Some(separator) = separators

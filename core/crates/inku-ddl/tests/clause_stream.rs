@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSeparatorKind, ClauseStreamError, CoreRoleKind,
+    CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind,
     NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
     SourceSpan, parse_clause_stream,
 };
@@ -164,24 +164,94 @@ fn fixture_preserves_source_order_clauses_separators_and_all_atom_kinds() {
 }
 
 #[test]
-fn a_diagnostic_crossing_a_required_separator_is_a_stable_error() {
+fn atom_owned_punctuation_is_not_also_a_qualified_macro_separator() {
+    let source = "namespace.heading!";
     let document =
-        NormalizedDdlDocument::new("alpha.beta", ResolvedInstructionLanguage::En, Vec::new())
-            .unwrap();
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let Ok(stream) = parse_clause_stream(&document) else {
+        panic!("qualified macro punctuation should be atom-owned");
+    };
 
+    assert_eq!(stream.clauses.len(), 1);
+    assert_eq!(stream.clauses[0].atoms.len(), 1);
+    assert!(matches!(
+        &stream.clauses[0].atoms[0],
+        ClauseAtom::UnresolvedDiagnostic(diagnostic)
+            if diagnostic.kind == NeutralDiagnosticKind::Unknown && !diagnostic.recognized
+    ));
+    assert_eq!(stream.separators.len(), 1);
+    assert_eq!(stream.separators[0].kind, ClauseSeparatorKind::SentenceEnd);
+    assert_eq!(stream.delivery_conservation_count, 0);
+    assert_stream_integrity(source, &stream);
+}
+
+#[test]
+fn atom_owned_punctuation_is_not_also_an_unsupported_decimal_separator() {
+    let source = "1.5.";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let Ok(stream) = parse_clause_stream(&document) else {
+        panic!("unsupported decimal punctuation should be atom-owned");
+    };
+
+    assert_eq!(stream.clauses.len(), 1);
+    assert_eq!(stream.clauses[0].atoms.len(), 1);
+    assert!(matches!(
+        &stream.clauses[0].atoms[0],
+        ClauseAtom::UnresolvedDiagnostic(diagnostic)
+            if diagnostic.kind == NeutralDiagnosticKind::Hole && diagnostic.recognized
+    ));
+    assert_eq!(stream.separators.len(), 1);
+    assert_eq!(stream.separators[0].kind, ClauseSeparatorKind::SentenceEnd);
+    assert_eq!(stream.delivery_conservation_count, 1);
+    assert_stream_integrity(source, &stream);
+}
+
+#[test]
+fn sentence_ends_and_lf_crlf_outside_atoms_remain_separators() {
+    let source = "8。\n12!\r\n";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let Ok(stream) = parse_clause_stream(&document) else {
+        panic!("ordinary sentence and line separators should remain valid");
+    };
+
+    assert_eq!(stream.clauses.len(), 2);
+    assert_eq!(stream.separators.len(), 4);
     assert_eq!(
-        parse_clause_stream(&document),
-        Err(ClauseStreamError::AtomCrossesSeparator {
-            atom_span: SourceSpan {
-                start_byte: 0,
-                end_byte: 10,
-            },
-            separator_span: SourceSpan {
-                start_byte: 5,
-                end_byte: 6,
-            },
-        })
+        stream
+            .separators
+            .iter()
+            .filter(|separator| separator.kind == ClauseSeparatorKind::SentenceEnd)
+            .count(),
+        2
     );
+    assert_eq!(
+        stream
+            .separators
+            .iter()
+            .filter(|separator| separator.kind == ClauseSeparatorKind::LineBreak)
+            .count(),
+        2
+    );
+    assert_eq!(stream.delivery_conservation_count, 2);
+    assert_stream_integrity(source, &stream);
+}
+
+#[test]
+fn sentence_end_without_atoms_remains_a_separator() {
+    let source = ".";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let Ok(stream) = parse_clause_stream(&document) else {
+        panic!("a standalone sentence end should remain valid");
+    };
+
+    assert!(stream.clauses.is_empty());
+    assert_eq!(stream.separators.len(), 1);
+    assert_eq!(stream.separators[0].kind, ClauseSeparatorKind::SentenceEnd);
+    assert_eq!(stream.delivery_conservation_count, 0);
+    assert_stream_integrity(source, &stream);
 }
 
 #[test]
@@ -293,6 +363,36 @@ fn contributes_to_delivery_count(atom: &ClauseAtom) -> bool {
         atom,
         ClauseAtom::UnresolvedDiagnostic(diagnostic) if !diagnostic.recognized
     )
+}
+
+fn assert_stream_integrity(source: &str, stream: &ClauseStream) {
+    let atoms = stream
+        .clauses
+        .iter()
+        .flat_map(|clause| clause.atoms.iter())
+        .collect::<Vec<_>>();
+
+    for atom in &atoms {
+        assert_span("focused ownership case", source, atom.span());
+    }
+    for separator in &stream.separators {
+        assert_span("focused ownership case", source, separator.span);
+    }
+    for atom in &atoms {
+        for separator in &stream.separators {
+            assert!(
+                atom.span().end_byte <= separator.span.start_byte
+                    || separator.span.end_byte <= atom.span().start_byte
+            );
+        }
+    }
+    assert_eq!(
+        atoms
+            .iter()
+            .filter(|atom| contributes_to_delivery_count(atom))
+            .count(),
+        stream.delivery_conservation_count
+    );
 }
 
 fn assert_span(case_id: &str, source: &str, span: SourceSpan) {

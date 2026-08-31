@@ -8,6 +8,7 @@ pub mod composition;
 pub mod document;
 pub mod language;
 pub mod macro_definition;
+pub mod macro_resolution;
 pub mod macro_seed;
 pub mod noun_phrase;
 pub mod opaque_head;
@@ -51,6 +52,11 @@ pub use macro_definition::{
     MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
     MacroDefinitionValidation, NumericRange, ParameterSchema, SemanticMap, Statement,
     TransformExpression, validate_macro_definition_semantic_version,
+};
+pub use macro_resolution::{
+    MACRO_INVOCATION_LOCK_RESOLUTION_SCHEMA_ID, MacroInvocationLockResolutionResult,
+    MacroInvocationResolutionDiagnostic, MacroInvocationResolutionDiagnosticKind,
+    MacroLockResolutionIdentity, ResolvedMacroInvocation, resolve_macro_invocations,
 };
 pub use macro_seed::{
     MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,

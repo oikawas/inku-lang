@@ -1,0 +1,104 @@
+{
+  "schema": "inku.macro-invocation-lock-resolution-v1-fixture.v1",
+  "version": 1,
+  "definitions": {
+    "leaf": {"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"1.0.0","parameters":{},"components":{},"body":[]},
+    "leaf-morning": {"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉.朝","version":"1.0.0","parameters":{},"components":{},"body":[]},
+    "cloud": {"schema":"inku.macro-definition.v1","namespace":"Sky","heading":"雲","version":"2.1.0","parameters":{},"components":{},"body":[]},
+    "leaf-other-name": {"schema":"inku.macro-definition.v1","namespace":"Other","heading":"若葉","version":"1.0.0","parameters":{},"components":{},"body":[]},
+    "leaf-other-version": {"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"2.0.0","parameters":{},"components":{},"body":[]},
+    "leaf-other-digest": {"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"anchor","name":"root"}]},
+    "leaf-invalid": {"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"repeat","count":{"expr":"integer","value":1},"maximum":0,"index":"i","body":[]}]}
+  },
+  "valid_cases": [
+    {
+      "id": "ja-no-whitespace-suffix",
+      "source": "Nature.若葉を右下にひとつ置く",
+      "language": "ja",
+      "locks": [{"definition": "leaf"}],
+      "definition_inputs": ["leaf"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf"}
+      ]
+    },
+    {
+      "id": "en-whitespace-suffix",
+      "source": "line with Nature.若葉",
+      "language": "en",
+      "locks": [{"definition": "leaf"}],
+      "definition_inputs": ["leaf"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 2, "definition": "leaf"}
+      ]
+    },
+    {
+      "id": "ja-typed-suffix-evidence",
+      "source": "Nature.若葉を上に八つ置く",
+      "language": "ja",
+      "locks": [{"definition": "leaf"}],
+      "definition_inputs": ["leaf"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf"}
+      ]
+    },
+    {
+      "id": "same-macro-repeated-ordinal",
+      "source": "Nature.若葉、Nature.若葉",
+      "language": "ja",
+      "locks": [{"definition": "leaf"}],
+      "definition_inputs": ["leaf"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf"},
+        {"surface": "Nature.若葉", "ordinal": 1, "clause_index": 0, "atom_index": 1, "definition": "leaf"}
+      ]
+    },
+    {
+      "id": "multiple-macro-source-order",
+      "source": "Nature.若葉とSky.雲",
+      "language": "ja",
+      "locks": [{"definition": "cloud"}, {"definition": "leaf"}],
+      "definition_inputs": ["cloud", "leaf"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf"},
+        {"surface": "Sky.雲", "ordinal": 1, "clause_index": 0, "atom_index": 2, "definition": "cloud"}
+      ]
+    },
+    {
+      "id": "unicode-heading-internal-dot",
+      "source": "Nature.若葉.朝を置く",
+      "language": "ja",
+      "locks": [{"definition": "leaf-morning"}],
+      "definition_inputs": ["leaf-morning"],
+      "expected": [
+        {"surface": "Nature.若葉.朝", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf-morning"}
+      ]
+    },
+    {
+      "id": "punctuation-and-line-break",
+      "source": "Nature.若葉。\nSky.雲",
+      "language": "ja",
+      "locks": [{"definition": "leaf"}, {"definition": "cloud"}],
+      "definition_inputs": ["leaf", "cloud"],
+      "expected": [
+        {"surface": "Nature.若葉", "ordinal": 0, "clause_index": 0, "atom_index": 0, "definition": "leaf"},
+        {"surface": "Sky.雲", "ordinal": 1, "clause_index": 1, "atom_index": 0, "definition": "cloud"}
+      ]
+    }
+  ],
+  "diagnostic_cases": [
+    {"id":"missing-lock","source":"Nature.若葉 を置く","language":"ja","locks":[],"definition_inputs":["leaf"],"expected_kind":"missing_lock","expected_surface":"Nature.若葉"},
+    {"id":"ambiguous-lock-prefix","source":"Nature.若葉.朝 を置く","language":"ja","locks":[{"definition":"leaf"},{"definition":"leaf-morning"}],"definition_inputs":["leaf","leaf-morning"],"expected_kind":"ambiguous_lock_prefix","expected_surface":"Nature.若葉.朝"},
+    {"id":"missing-definition","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":[],"expected_kind":"missing_definition","expected_surface":"Nature.若葉"},
+    {"id":"duplicate-matching-definition","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf","leaf"],"expected_kind":"duplicate_matching_definition","expected_surface":"Nature.若葉"},
+    {"id":"invalid-definition","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf-invalid"],"expected_kind":"invalid_definition","expected_surface":"Nature.若葉"},
+    {"id":"qualified-name-mismatch","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf-other-name"],"expected_kind":"qualified_name_mismatch","expected_surface":"Nature.若葉"},
+    {"id":"version-mismatch","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf-other-version"],"expected_kind":"version_mismatch","expected_surface":"Nature.若葉"},
+    {"id":"digest-mismatch","source":"Nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf-other-digest"],"expected_kind":"digest_mismatch","expected_surface":"Nature.若葉"},
+    {"id":"case-fold-is-not-a-match","source":"nature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf"],"expected_kind":"missing_lock","expected_surface":"nature.若葉"},
+    {"id":"substring-is-not-a-match","source":"xNature.若葉 を置く","language":"ja","locks":[{"definition":"leaf"}],"definition_inputs":["leaf"],"expected_kind":"missing_lock","expected_surface":"xNature.若葉"}
+  ],
+  "invalid_document_cases": [
+    {"id":"uppercase-digest","qualified_name":"Nature.若葉","version":"1.0.0","digest":"sha256:FD7C1FEF0612E04CA55A03EE44128C33D70DB74BB77F7B1AB6360E95EE197C00","expected_code":"invalid_digest"},
+    {"id":"short-digest","qualified_name":"Nature.若葉","version":"1.0.0","digest":"sha256:fd7c1fef","expected_code":"invalid_digest"}
+  ]
+}

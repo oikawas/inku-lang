@@ -103,19 +103,25 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
             continue;
         }
 
-        if let Some(end_byte) = qualified_macro_end(source, cursor) {
-            diagnostics.push(diagnostic(
-                source,
-                cursor,
-                end_byte,
-                NeutralDiagnosticKind::Unknown,
-                false,
-            ));
+        if let Some(macro_match) = qualified_macro_match(document, cursor) {
+            let (end_byte, kind, recognized) = match macro_match {
+                QualifiedMacroMatch::Unlocked { end_byte }
+                | QualifiedMacroMatch::ExactLock { end_byte, .. } => {
+                    (end_byte, NeutralDiagnosticKind::Unknown, false)
+                }
+                QualifiedMacroMatch::AmbiguousLocks { end_byte, .. } => {
+                    (end_byte, NeutralDiagnosticKind::Conflict, true)
+                }
+            };
+            diagnostics.push(diagnostic(source, cursor, end_byte, kind, recognized));
+            recognized_delivery_count += usize::from(recognized);
             cursor = end_byte;
             continue;
         }
 
-        match select_candidate(candidates_at(source, cursor, language, true)) {
+        match select_candidate(candidates_at_with_locked_macro_boundary(
+            document, cursor, language,
+        )) {
             Some(Selection::Token { end_byte, kind }) => {
                 tokens.push(NeutralToken {
                     span: SourceSpan {
@@ -180,6 +186,27 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
     }
 }
 
+fn candidates_at_with_locked_macro_boundary(
+    document: &NormalizedDdlDocument,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> Vec<Candidate> {
+    let source = document.source();
+    let mut candidates = candidates_at(source, start_byte, language, true);
+    for candidate in candidates_at(source, start_byte, language, false) {
+        let followed_by_locked_macro = matches!(
+            qualified_macro_match(document, candidate.end_byte),
+            Some(QualifiedMacroMatch::ExactLock { .. })
+                | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
+        );
+        let already_present = candidates.iter().any(|existing| existing == &candidate);
+        if followed_by_locked_macro && !already_present {
+            candidates.push(candidate);
+        }
+    }
+    candidates
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum CandidateDelivery {
     Token(NeutralTokenKind),
@@ -206,6 +233,56 @@ enum Selection {
     Conflict {
         end_byte: usize,
     },
+}
+
+/// A visible qualified term and the byte-exact sidecar locks that start at its cursor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum QualifiedMacroMatch {
+    Unlocked {
+        end_byte: usize,
+    },
+    ExactLock {
+        end_byte: usize,
+        lock_index: usize,
+    },
+    AmbiguousLocks {
+        end_byte: usize,
+        lock_indices: Vec<usize>,
+    },
+}
+
+/// Return only current-cursor, byte-exact lock prefixes without normalization or precedence.
+pub(crate) fn qualified_macro_match(
+    document: &NormalizedDdlDocument,
+    start_byte: usize,
+) -> Option<QualifiedMacroMatch> {
+    let source = document.source();
+    let unlocked_end = qualified_macro_end(source, start_byte)?;
+    let lock_indices = document
+        .macro_locks()
+        .iter()
+        .enumerate()
+        .filter(|(_, macro_lock)| {
+            let qualified_name = macro_lock.qualified_name();
+            is_visible_qualified_name(qualified_name)
+                && source.get(start_byte..start_byte + qualified_name.len()) == Some(qualified_name)
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+
+    match lock_indices.as_slice() {
+        [] => Some(QualifiedMacroMatch::Unlocked {
+            end_byte: unlocked_end,
+        }),
+        [lock_index] => Some(QualifiedMacroMatch::ExactLock {
+            end_byte: start_byte + document.macro_locks()[*lock_index].qualified_name().len(),
+            lock_index: *lock_index,
+        }),
+        _ => Some(QualifiedMacroMatch::AmbiguousLocks {
+            end_byte: unlocked_end,
+            lock_indices,
+        }),
+    }
 }
 
 fn candidates_at(
@@ -512,20 +589,22 @@ fn qualified_macro_end(source: &str, start_byte: usize) -> Option<usize> {
         return None;
     }
     let candidate = &source[start_byte..end_byte];
-    let (namespace, heading) = candidate.split_once('.')?;
-    if namespace.is_empty()
-        || heading.is_empty()
-        || heading.contains('.')
-        || !namespace
+    is_visible_qualified_name(candidate).then_some(end_byte)
+}
+
+fn is_visible_qualified_name(candidate: &str) -> bool {
+    let Some((namespace, heading)) = candidate.split_once('.') else {
+        return false;
+    };
+    !namespace.is_empty()
+        && namespace
             .chars()
             .next()
             .is_some_and(|character| character.is_ascii_alphabetic())
-        || !namespace.chars().all(is_macro_namespace_character)
-        || !heading.chars().all(is_macro_segment_character)
-    {
-        return None;
-    }
-    Some(end_byte)
+        && namespace.chars().all(is_macro_namespace_character)
+        && heading
+            .split('.')
+            .all(|segment| !segment.is_empty() && segment.chars().all(is_macro_segment_character))
 }
 
 fn is_macro_namespace_character(character: char) -> bool {

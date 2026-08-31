@@ -4,11 +4,11 @@ use inku_ddl::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind, NormalizedDdlDocument,
     OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SourceOccurrence,
-    associate_semantic_entities,
+    associate_semantic_entities, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v2.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +34,10 @@ struct Case {
     explicit_continuities: Vec<String>,
     #[serde(default)]
     explicit_angles: Vec<String>,
+    #[serde(default)]
+    surface_qualities: Vec<String>,
+    #[serde(default)]
+    surface_intensities: Vec<String>,
 }
 
 #[test]
@@ -111,6 +115,46 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
                 .ast
                 .entities
                 .iter()
+                .filter_map(|entity| {
+                    entity
+                        .surface
+                        .quality
+                        .as_ref()
+                        .map(|term| term.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.surface_qualities
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Surface quality fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| {
+                    entity
+                        .surface
+                        .intensity
+                        .as_ref()
+                        .map(|term| term.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.surface_intensities
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Surface intensity fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
                 .filter_map(|entity| entity
                     .continuity
                     .as_ref()
@@ -179,6 +223,23 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
         canonical_by_case["en-style-order-one"],
         canonical_by_case["style-angle-contrast"]
     );
+    let surface_equivalent = [
+        "ja-surface-order-one",
+        "ja-surface-order-two",
+        "en-surface-order-one",
+        "en-surface-order-two",
+        "surface-soft-line-break",
+    ]
+    .map(|id| canonical_by_case[id]);
+    assert!(surface_equivalent.windows(2).all(|pair| pair[0] == pair[1]));
+    assert_ne!(
+        canonical_by_case["en-surface-order-one"],
+        canonical_by_case["surface-quality-contrast"]
+    );
+    assert_ne!(
+        canonical_by_case["en-surface-order-one"],
+        canonical_by_case["surface-intensity-contrast"]
+    );
 }
 
 #[test]
@@ -186,13 +247,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v2"
+        "inku.semantic-entity-association.v3"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v2"
+        "inku.semantic-entity-association-fixture.v3"
     );
-    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.version, 3);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -235,12 +296,97 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
         "style-soft-line-break",
         "style-upstream-issue-retained",
         "unobserved-primitive-style-combination",
+        "ja-surface-order-one",
+        "ja-surface-order-two",
+        "en-surface-order-one",
+        "en-surface-order-two",
+        "surface-quality-only",
+        "surface-intensity-only",
+        "surface-quality-contrast",
+        "surface-intensity-contrast",
+        "conflicting-surface-qualities",
+        "conflicting-surface-intensities",
+        "orphan-surface-terms",
+        "multi-head-surface-ambiguity",
+        "regional-surface-ownership",
+        "surface-soft-line-break",
+        "surface-upstream-issue-retained",
+        "unobserved-line-surface-combination",
+        "unobserved-arc-surface-combination",
     ] {
         assert!(
             ids.contains(required),
             "missing required fixture case: {required}"
         );
     }
+}
+
+#[test]
+fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
+    let category = saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == "omote")
+        .expect("accepted asset has the Surface category");
+    assert_eq!(category.words.len(), 11);
+
+    let mut quality_ids = HashSet::new();
+    let mut intensity_ids = HashSet::new();
+    for word in &category.words {
+        let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
+            .expect("accepted Surface row has canonical identity");
+        let source = format!(
+            "circle {}.",
+            word.surface_en
+                .as_deref()
+                .expect("accepted Surface row has English source surface")
+        );
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .expect("accepted Surface row forms a normalized document");
+        let result = associate_semantic_entities(&document)
+            .expect("accepted Surface row forms a clause stream");
+        assert!(result.issues.is_empty(), "{}", projection.canonical_id);
+        let entity = result.ast.entities.first().expect("one entity");
+        match (&entity.surface.quality, &entity.surface.intensity) {
+            (Some(term), None) => {
+                assert_eq!(term.identity.category, "surface");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(quality_ids.insert(term.identity.id.clone()));
+            }
+            (None, Some(term)) => {
+                assert_eq!(term.identity.category, "surface");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(intensity_ids.insert(term.identity.id.clone()));
+            }
+            _ => panic!(
+                "{} must belong to exactly one Surface dimension",
+                projection.canonical_id
+            ),
+        }
+    }
+
+    assert_eq!(
+        quality_ids,
+        [
+            "none",
+            "solid",
+            "wash",
+            "grain",
+            "stipple",
+            "hatch",
+            "crosshatch",
+            "bleed",
+            "aquatint",
+        ]
+        .map(str::to_owned)
+        .into_iter()
+        .collect()
+    );
+    assert_eq!(
+        intensity_ids,
+        ["dense", "faint"].map(str::to_owned).into_iter().collect()
+    );
 }
 
 fn load_fixture() -> Fixture {
@@ -272,6 +418,17 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
             assert_eq!(
                 entity.head.provenance.source.region_index, term.provenance.source.region_index,
                 "{}: entity attribute must remain in its sentence region",
+                case.id
+            );
+        }
+        for term in [&entity.surface.quality, &entity.surface.intensity]
+            .into_iter()
+            .flatten()
+        {
+            assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
+            assert_eq!(
+                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                "{}: Surface dimension must remain in its sentence region",
                 case.id
             );
         }
@@ -368,7 +525,10 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             ClauseAtom::CoreRole(term)
                 if matches!(
                     term.role,
-                    CoreRoleKind::Primitive | CoreRoleKind::Color | CoreRoleKind::Touch
+                    CoreRoleKind::Primitive
+                        | CoreRoleKind::Color
+                        | CoreRoleKind::Touch
+                        | CoreRoleKind::Surface
                 ) =>
             {
                 Some(term.span)
@@ -401,6 +561,12 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         {
             output_spans.push(term.provenance.source.span);
         }
+        for term in [&entity.surface.quality, &entity.surface.intensity]
+            .into_iter()
+            .flatten()
+        {
+            output_spans.push(term.provenance.source.span);
+        }
     }
     for occurrence in result.issues.iter().flat_map(|issue| &issue.occurrences) {
         output_spans.push(match occurrence {
@@ -410,7 +576,8 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::Quantity(quantity) => quantity.provenance.span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
-            | OwnedSemanticOccurrence::Angle(term) => term.provenance.source.span,
+            | OwnedSemanticOccurrence::Angle(term)
+            | OwnedSemanticOccurrence::Surface(term) => term.provenance.source.span,
         });
     }
 

@@ -14,7 +14,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v3";
+    "inku.semantic-instruction-association.v4";
 
 /// One single-head entity and its independently optional explicit Action and Position.
 ///

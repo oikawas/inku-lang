@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v2";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v3";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,6 +54,13 @@ pub struct SemanticQuantity {
     pub provenance: SourceOccurrence,
 }
 
+/// Two independent explicit Surface dimensions. Missing values remain unspecified.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SemanticSurface {
+    pub quality: Option<SemanticTerm>,
+    pub intensity: Option<SemanticTerm>,
+}
+
 /// One single-head entity. A field is absent only when it was not explicitly and uniquely stated.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticEntity {
@@ -63,6 +70,7 @@ pub struct SemanticEntity {
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
+    pub surface: SemanticSurface,
 }
 
 /// Partial or complete semantic entity sequence in sentence-region source order.
@@ -81,6 +89,7 @@ pub enum OwnedSemanticOccurrence {
     Touch(SemanticTerm),
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
+    Surface(SemanticTerm),
 }
 
 impl OwnedSemanticOccurrence {
@@ -91,7 +100,8 @@ impl OwnedSemanticOccurrence {
             | Self::Color(term)
             | Self::Touch(term)
             | Self::Continuity(term)
-            | Self::Angle(term) => &term.provenance.source,
+            | Self::Angle(term)
+            | Self::Surface(term) => &term.provenance.source,
             Self::Quantity(quantity) => &quantity.provenance,
         }
     }
@@ -107,6 +117,9 @@ pub enum SemanticAssociationIssueKind {
     ConflictingTouches,
     ConflictingContinuities,
     ConflictingAngles,
+    ConflictingSurfaceQualities,
+    ConflictingSurfaceIntensities,
+    UnknownSurfaceDimension,
     UpstreamHole,
     UpstreamConflict,
     UpstreamUnknown,
@@ -122,6 +135,9 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
             Self::ConflictingAngles => "conflicting_angles",
+            Self::ConflictingSurfaceQualities => "conflicting_surface_qualities",
+            Self::ConflictingSurfaceIntensities => "conflicting_surface_intensities",
+            Self::UnknownSurfaceDimension => "unknown_surface_dimension",
             Self::UpstreamHole => "upstream_hole",
             Self::UpstreamConflict => "upstream_conflict",
             Self::UpstreamUnknown => "upstream_unknown",
@@ -159,7 +175,25 @@ struct AssociationRegion {
     touches: Vec<SemanticTerm>,
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
+    surface_qualities: Vec<SemanticTerm>,
+    surface_intensities: Vec<SemanticTerm>,
+    unclassified_surfaces: Vec<SemanticTerm>,
     diagnostics: Vec<NeutralDiagnostic>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SurfaceDimension {
+    Quality,
+    Intensity,
+}
+
+fn classify_surface_dimension(canonical_id: &str) -> Option<SurfaceDimension> {
+    match canonical_id {
+        "none" | "solid" | "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
+        | "aquatint" => Some(SurfaceDimension::Quality),
+        "dense" | "faint" => Some(SurfaceDimension::Intensity),
+        _ => None,
+    }
 }
 
 /// Associate the closed single-entity roles and explicit numeric quantity within sentence regions.
@@ -206,6 +240,15 @@ pub fn associate_semantic_entities(
                         clause_index,
                         atom_index,
                     ));
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Surface => {
+                    let term = project_term(document, term, region_index, clause_index, atom_index);
+                    match classify_surface_dimension(&term.identity.id) {
+                        Some(SurfaceDimension::Quality) => region.surface_qualities.push(term),
+                        Some(SurfaceDimension::Intensity) => region.surface_intensities.push(term),
+                        None => region.unclassified_surfaces.push(term),
+                    }
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Continuity => {
@@ -366,6 +409,7 @@ fn associate_region(
     issues: &mut Vec<SemanticAssociationIssue>,
 ) {
     if region.heads.len() > 1 {
+        let surface_occurrences = take_surface_occurrences(&mut region);
         let mut occurrences = region
             .heads
             .drain(..)
@@ -385,6 +429,7 @@ fn associate_region(
                     .map(OwnedSemanticOccurrence::Continuity),
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+            .chain(surface_occurrences)
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         issues.push(SemanticAssociationIssue {
@@ -398,6 +443,7 @@ fn associate_region(
     }
 
     if region.heads.is_empty() {
+        let surface_occurrences = take_surface_occurrences(&mut region);
         let mut occurrences = region
             .colors
             .drain(..)
@@ -416,6 +462,7 @@ fn associate_region(
                     .map(OwnedSemanticOccurrence::Continuity),
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+            .chain(surface_occurrences)
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         if !occurrences.is_empty() {
@@ -477,6 +524,32 @@ fn associate_region(
         region_index,
         issues,
     );
+    let quality = select_term(
+        region.surface_qualities,
+        OwnedSemanticOccurrence::Surface,
+        SemanticAssociationIssueKind::ConflictingSurfaceQualities,
+        region_index,
+        issues,
+    );
+    let intensity = select_term(
+        region.surface_intensities,
+        OwnedSemanticOccurrence::Surface,
+        SemanticAssociationIssueKind::ConflictingSurfaceIntensities,
+        region_index,
+        issues,
+    );
+    if !region.unclassified_surfaces.is_empty() {
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::UnknownSurfaceDimension,
+            region_index,
+            occurrences: region
+                .unclassified_surfaces
+                .into_iter()
+                .map(OwnedSemanticOccurrence::Surface)
+                .collect(),
+            upstream_diagnostic: None,
+        });
+    }
     entities.push(SemanticEntity {
         head,
         color,
@@ -484,8 +557,19 @@ fn associate_region(
         touch,
         continuity,
         angle,
+        surface: SemanticSurface { quality, intensity },
     });
     append_upstream_issues(region_index, region.diagnostics, issues);
+}
+
+fn take_surface_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemanticOccurrence> {
+    region
+        .surface_qualities
+        .drain(..)
+        .chain(region.surface_intensities.drain(..))
+        .chain(region.unclassified_surfaces.drain(..))
+        .map(OwnedSemanticOccurrence::Surface)
+        .collect()
 }
 
 fn select_term(
@@ -540,6 +624,8 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
+        + usize::from(entity.surface.quality.is_some())
+        + usize::from(entity.surface.intensity.is_some())
 }
 
 fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
@@ -588,6 +674,10 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
         semantic_identity_value(&entity.head.identity),
     );
     record.insert(
+        "surface".to_owned(),
+        semantic_surface_value(&entity.surface),
+    );
+    record.insert(
         "touch".to_owned(),
         entity
             .touch
@@ -601,6 +691,27 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .quantity
             .as_ref()
             .map(|quantity| Value::Number(Number::from(quantity.value)))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_surface_value(surface: &SemanticSurface) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "intensity".to_owned(),
+        surface
+            .intensity
+            .as_ref()
+            .map(|term| semantic_identity_value(&term.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "quality".to_owned(),
+        surface
+            .quality
+            .as_ref()
+            .map(|term| semantic_identity_value(&term.identity))
             .unwrap_or(Value::Null),
     );
     Value::Object(record.into_iter().collect())

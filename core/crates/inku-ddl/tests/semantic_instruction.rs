@@ -9,7 +9,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v3.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v4.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,6 +35,10 @@ struct Case {
     instruction_continuities: Vec<Option<String>>,
     #[serde(default)]
     instruction_angles: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_surface_qualities: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_surface_intensities: Vec<Option<String>>,
     association_issue_kinds: Vec<String>,
     instruction_issues: Vec<String>,
     canonical: Option<String>,
@@ -161,6 +165,50 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
                 case.id
             );
         }
+        if !case.instruction_surface_qualities.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .surface
+                            .quality
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_surface_qualities
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Surface quality",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .surface
+                            .intensity
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_surface_intensities
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Surface intensity",
+                case.id
+            );
+        }
         assert_eq!(
             result
                 .ast
@@ -266,13 +314,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v3"
+        "inku.semantic-instruction-association.v4"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v3"
+        "inku.semantic-instruction-association-fixture.v4"
     );
-    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.version, 4);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -300,6 +348,8 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         "unobserved-primitive-action-position-combination",
         "style-fields-preserve-action-position",
         "style-conflict-preserves-action-position",
+        "surface-fields-preserve-i588-and-action-position",
+        "surface-conflict-preserves-action-position",
     ] {
         assert!(
             ids.contains(required),

@@ -11,6 +11,7 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
+import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -1973,7 +1974,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
-                    failures = (failures + BatchFailure(lineNumber, prompt, error.message ?: "Draw failed.")).take(30)
+                    failures = (failures + BatchFailure(lineNumber, prompt, safeErrorMessage(error, "Draw failed."))).take(30)
                     localState.value = localState.value.copy(
                         batchSuccess = success,
                         batchFailures = failures,
@@ -2099,7 +2100,7 @@ class InkuViewModel @JvmOverloads constructor(
                         if (!isCurrentDrawingRun(runId)) return@onFailure
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
-                            message = error.message ?: "Demo failed.",
+                            message = safeErrorMessage(error, "Demo failed."),
                         )
                         delay(1000)
                     }
@@ -2636,7 +2637,7 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.acceptModelLicense(modelId)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "License update failed.")
+                localState.value = localState.value.copy(message = safeErrorMessage(error, "License update failed."))
             }
         }
     }

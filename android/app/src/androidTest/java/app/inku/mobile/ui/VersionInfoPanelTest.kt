@@ -21,8 +21,8 @@ class VersionInfoPanelTest {
     @Test
     fun versionInfoPanel_displaysRenderEngineVersion() {
         val application = ApplicationProvider.getApplicationContext<Application>()
+        val viewModel = InkuViewModel(application)
         composeTestRule.setContent {
-            val viewModel = InkuViewModel(application)
             VersionInfoPanel(viewModel = viewModel)
         }
 

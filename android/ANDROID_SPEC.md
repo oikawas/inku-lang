@@ -4,13 +4,14 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-26.
+Last updated: 2026-08-31.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.72` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.77` with **render engine
 `default / 41`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
 `ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `41`
-and DDL engine `20`, so server and Android now share one Rust drawing implementation. The Stage 1.5 expander followed the staffage level being folded away on
+and DDL engine `21`, so server and Android share one Rust drawing implementation while their DDL
+engine versions remain independently declared. The Stage 1.5 expander followed the staffage level being folded away on
 2026-08-05 (see the 2026-08-05 section at the end of this document).
 
 **The shared-Rust cutover is complete**: production Score-to-SVG/metadata calls
@@ -100,6 +101,8 @@ Implemented:
   - SHA256 verification before finalizing the model file
   - recovery of a complete, already verified `.part` file without re-downloading
   - interrupted in-progress downloads are resumable from their `.part` files
+  - resumed HTTP responses must return a valid `Content-Range` whose start byte matches the retained `.part` length
+  - free-space reservation subtracts only the current download's retained `.part` bytes, not unrelated model files
   - app-sandbox final storage under `files/models/`
 - Deterministic local fallback pipeline for:
   - natural language description to normalized DDL
@@ -1325,6 +1328,8 @@ rules.
   disconnected in `finally`.
 - Headless results and remote-provider error display share redaction for API
   keys, Bearer tokens, and internal device data paths.
+- Provider and platform exception text crosses the same final redaction boundary
+  before it is surfaced in interactive status or export errors.
 - The LiteRT-LM provider exposes an explicit `close()` and closes the cached
   Engine when the ViewModel is destroyed and after headless rendering finishes.
   ViewModel destruction must not block the UI thread with `runBlocking`; close
@@ -2813,6 +2818,6 @@ The saved work records `route=local_ddl_to_nim_stage2`, `vision_output_mode=ddl`
 
 M6-1 of Abstract Instant Print makes the bottom Camera action open a source chooser with Take a photo, Choose a photo, and Cancel. Capture retains the existing `ActivityResultContracts.TakePicture`; an existing photo uses image-only `ActivityResultContracts.PickVisualMedia` and accepts one item. The app adds no storage permission, persistable URI permission, custom file browser, or multi-selection. Both inputs use the existing replacement confirmation and local-E2B/fixed-NIM preflight, then snapshot the source, Vision output mode, canvas, and UI language for the run.
 
-While the selected content URI is readable, the app copies it into app-owned cache and sends it through the capture path's existing orientation handling, long-edge limit of 1280, and JPEG quality 85 normalization. Description mode retains local Vision followed by fixed-NIM Stages 1 and 2; Direct DDL retains validated local DDL followed by fixed-NIM Stage 2. NIM receives text alone. Image bytes, URI, path, display name, EXIF, location, and digest enter neither a remote request nor history or metadata. A user-selected cloud-backed item may be materialized by Photo Picker itself; that does not authorize sending the image to a remote model.
+While the selected content URI is readable, the app copies it into app-owned cache with a fail-closed 64 MiB input cap before decoding, then sends it through the capture path's existing orientation handling, long-edge limit of 1280, and JPEG quality 85 normalization. Description mode retains local Vision followed by fixed-NIM Stages 1 and 2; Direct DDL retains validated local DDL followed by fixed-NIM Stage 2. NIM receives text alone. Image bytes, URI, path, display name, EXIF, location, and digest enter neither a remote request nor history or metadata. A user-selected cloud-backed item may be materialized by Photo Picker itself; that does not authorize sending the image to a remote model.
 
 Cancelling Photo Picker or receiving a null result restores the pre-run Compose state without starting local Vision, NIM, rendering, or saving. Unreadable, empty, unsupported, or undecodable content fails during image preparation with no remote call or save. The app deletes only its owned temporary copy after success, failure, Cancel, system Back, a stale run, or ViewModel shutdown and never modifies or deletes the original. Existing `input_provenance.origin` records `camera` for a capture and `photo_picker` for Photo Picker; Provenance displays the latter as Existing photo. This milestone adds no Room schema, migration, backfill, new column, per-stage resume, background recovery, custom reduce-motion setting, E4B, or CameraX.

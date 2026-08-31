@@ -27,7 +27,7 @@ enum class RefinementElement(val id: String, val derivationKind: String) {
     }
 }
 
-/** 強度. Shown only under the variation radio, and only there (SPEC `:614`). */
+/** Intensity. Shown only under the variation radio, and only there (SPEC `:614`). */
 enum class VariationAmplitude(val id: String) {
     Small("small"),
     Medium("medium"),
@@ -35,7 +35,7 @@ enum class VariationAmplitude(val id: String) {
     ;
 
     companion object {
-        /** 既定は中庸. */
+        /** Medium is the default. */
         val Default = Medium
 
         fun byId(id: String?): VariationAmplitude = entries.firstOrNull { it.id == id } ?: Default

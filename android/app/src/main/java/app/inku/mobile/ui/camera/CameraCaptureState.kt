@@ -6,6 +6,7 @@ import androidx.core.content.FileProvider
 import app.inku.mobile.data.model.CameraInputProvenance
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 
 enum class CameraInputSource {
     Camera,
@@ -108,13 +109,16 @@ class CameraCaptureFileStore(private val context: Context) {
 class SelectedImageFileStore(cacheRoot: File) {
     private val imageDir = File(cacheRoot, SELECTED_IMAGE_DIRECTORY)
 
-    fun importImage(input: InputStream): File {
+    fun importImage(input: InputStream, maxBytes: Long = MAX_SELECTED_IMAGE_BYTES): File {
+        require(maxBytes > 0L) { "Selected-image byte limit must be positive." }
         cleanupStaleImages()
         check(imageDir.isDirectory || imageDir.mkdirs()) { "Selected-image cache is unavailable." }
         val file = File.createTempFile(FILE_PREFIX, FILE_SUFFIX, imageDir)
         try {
             input.use { source ->
-                file.outputStream().use(source::copyTo)
+                file.outputStream().buffered().use { output ->
+                    copySelectedImageAtMost(source, output, maxBytes)
+                }
             }
             require(file.length() > 0L) { "The selected image is empty." }
             return file
@@ -146,5 +150,21 @@ class SelectedImageFileStore(cacheRoot: File) {
         private const val SELECTED_IMAGE_DIRECTORY = "selected-images"
         private const val FILE_PREFIX = "inku-selected-"
         private const val FILE_SUFFIX = ".image"
+    }
+}
+
+private const val MAX_SELECTED_IMAGE_BYTES = 64L * 1024L * 1024L
+
+private fun copySelectedImageAtMost(input: InputStream, output: OutputStream, maxBytes: Long) {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var copied = 0L
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) return
+        if (copied > maxBytes - read) {
+            throw IllegalArgumentException("The selected image is too large.")
+        }
+        output.write(buffer, 0, read)
+        copied += read
     }
 }

@@ -5,6 +5,7 @@ import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -51,5 +52,27 @@ class SelectedImageFileStoreTest {
 
         assertFalse(selected.exists())
         assertTrue(outside.exists())
+    }
+
+    @Test
+    fun importRejectsOversizedPickerInputAndRemovesThePartialCopy() {
+        val cache = temporaryFolder.newFolder("oversized-cache")
+        val store = SelectedImageFileStore(cache)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            store.importImage(ByteArrayInputStream(ByteArray(9)), maxBytes = 8L)
+        }
+        assertTrue(File(cache, "selected-images").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun importAcceptsInputAtTheExactLimit() {
+        val cache = temporaryFolder.newFolder("exact-limit-cache")
+        val expected = byteArrayOf(1, 2, 3, 4)
+        val store = SelectedImageFileStore(cache)
+
+        val file = store.importImage(ByteArrayInputStream(expected), maxBytes = expected.size.toLong())
+
+        assertArrayEquals(expected, file.readBytes())
     }
 }

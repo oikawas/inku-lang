@@ -192,6 +192,7 @@ import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
+import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
@@ -2097,7 +2098,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistorySvg(context, it, profile)
                         "SVG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> error.message ?: "SVG export failed." }
+                    }.getOrElse { error -> safeErrorMessage(error, "SVG export failed.") }
                 }
             },
             onExportPng = { heightPx ->
@@ -2108,7 +2109,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistoryPng(context, it, heightPx)
                         "PNG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> error.message ?: "PNG export failed." }
+                    }.getOrElse { error -> safeErrorMessage(error, "PNG export failed.") }
                     pngExporting = false
                 }
             },

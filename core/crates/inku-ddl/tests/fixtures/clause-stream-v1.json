@@ -130,6 +130,62 @@
         {"kind": "line_break", "surface": "\r\n", "start_byte": 5, "end_byte": 7}
       ],
       "delivery_conservation_count": 0
+    },
+    {
+      "id": "ja-full-relation-literal",
+      "language": "ja",
+      "source": "前の弧に両端で触れる。",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 30,
+          "atoms": [
+            {
+              "kind": "relation:touching",
+              "surface": "前の弧に両端で触れる",
+              "start_byte": 0,
+              "end_byte": 30
+            }
+          ]
+        }
+      ],
+      "expected_separators": [
+        {
+          "kind": "sentence_end",
+          "surface": "。",
+          "start_byte": 30,
+          "end_byte": 33
+        }
+      ],
+      "delivery_conservation_count": 1
+    },
+    {
+      "id": "en-full-relation-literal-case",
+      "language": "en",
+      "source": "TOUCHING THE PREVIOUS ARC AT BOTH ENDS.",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 38,
+          "atoms": [
+            {
+              "kind": "relation:touching",
+              "surface": "TOUCHING THE PREVIOUS ARC AT BOTH ENDS",
+              "start_byte": 0,
+              "end_byte": 38
+            }
+          ]
+        }
+      ],
+      "expected_separators": [
+        {
+          "kind": "sentence_end",
+          "surface": ".",
+          "start_byte": 38,
+          "end_byte": 39
+        }
+      ],
+      "delivery_conservation_count": 1
     }
   ]
 }

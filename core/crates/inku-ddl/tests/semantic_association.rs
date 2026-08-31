@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v5.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v6.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -108,6 +108,13 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
             "{}: every slice-owned occurrence must be delivered exactly once",
             case.id
         );
+        assert!(
+            result.explicit_previous_references.is_empty(),
+            "{}: legacy fixture has no accepted full relation literal",
+            case.id
+        );
+        assert_eq!(result.owned_compound_reference_count, 0, "{}", case.id);
+        assert_eq!(result.delivered_compound_reference_count, 0, "{}", case.id);
         assert_eq!(
             result
                 .ast
@@ -428,13 +435,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v5"
+        "inku.semantic-entity-association.v6"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v5"
+        "inku.semantic-entity-association-fixture.v6"
     );
-    assert_eq!(fixture.version, 5);
+    assert_eq!(fixture.version, 6);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -750,6 +757,140 @@ fn every_accepted_proportion_row_belongs_to_exactly_one_closed_dimension() {
             .into_iter()
             .collect()
     );
+}
+
+#[test]
+fn accepted_full_relation_atoms_are_compound_owned_without_false_entity_delivery() {
+    let asset = saijiki_asset();
+    let shapes = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katachi")
+        .expect("accepted asset has Primitive rows");
+    let line = shapes
+        .words
+        .iter()
+        .find(|word| word.surface_en.as_deref() == Some("line"))
+        .expect("accepted asset has line");
+    let circle = shapes
+        .words
+        .iter()
+        .find(|word| word.surface_en.as_deref() == Some("circle"))
+        .expect("accepted asset has circle");
+
+    for relation in &asset.relations {
+        for (language, literals, previous_surface, current_surface, ending) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                &relation.literals_ja,
+                line.surface_ja.as_str(),
+                circle.surface_ja.as_str(),
+                "。",
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                &relation.literals_en,
+                line.surface_en.as_deref().expect("line has EN surface"),
+                circle.surface_en.as_deref().expect("circle has EN surface"),
+                ".",
+            ),
+        ] {
+            for literal in literals {
+                let source =
+                    format!("{previous_surface}{ending} {current_surface} {literal}{ending}");
+                let document = NormalizedDdlDocument::new(source.clone(), language, Vec::new())
+                    .expect("accepted full relation source forms a document");
+                let result = associate_semantic_entities(&document)
+                    .expect("accepted full relation source forms an association");
+                assert!(
+                    result.issues.is_empty(),
+                    "{literal}: {:?}",
+                    result
+                        .issues
+                        .iter()
+                        .map(|issue| (
+                            issue.kind.as_str(),
+                            issue
+                                .upstream_diagnostic
+                                .as_ref()
+                                .map(|diagnostic| diagnostic.surface.as_str()),
+                        ))
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(
+                    result.ast.entities.len(),
+                    2,
+                    "{literal}: no false target head"
+                );
+                assert_eq!(result.owned_occurrence_count, 2, "{literal}");
+                assert_eq!(result.explicit_previous_references.len(), 1, "{literal}");
+                assert_eq!(result.owned_compound_reference_count, 1, "{literal}");
+                assert_eq!(result.delivered_compound_reference_count, 1, "{literal}");
+                let occurrence = &result.explicit_previous_references[0];
+                assert_eq!(
+                    occurrence.kind.as_str(),
+                    relation.relation_type,
+                    "{literal}"
+                );
+                assert_eq!(
+                    occurrence.reference.as_str(),
+                    if relation.relation_type == "between" {
+                        "previous_two"
+                    } else {
+                        "previous_one"
+                    },
+                    "{literal}"
+                );
+                assert_eq!(occurrence.provenance.surface, *literal, "{literal}");
+                assert_eq!(
+                    source[occurrence.provenance.span.start_byte
+                        ..occurrence.provenance.span.end_byte],
+                    *literal,
+                    "{literal}"
+                );
+                assert!(matches!(
+                    result
+                        .clause_stream
+                        .clauses
+                        .get(occurrence.provenance.clause_index)
+                        .and_then(|clause| clause.atoms.get(occurrence.provenance.atom_index)),
+                    Some(ClauseAtom::SaijikiRelation { span, .. })
+                        if *span == occurrence.provenance.span
+                ));
+            }
+        }
+    }
+
+    for relation in &asset.relations {
+        for (language, short_surface, previous_surface, current_surface, ending) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                relation.surface_ja.as_str(),
+                line.surface_ja.as_str(),
+                circle.surface_ja.as_str(),
+                "。",
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                relation.surface_en.as_str(),
+                line.surface_en.as_deref().expect("line has EN surface"),
+                circle.surface_en.as_deref().expect("circle has EN surface"),
+                ".",
+            ),
+        ] {
+            let source =
+                format!("{previous_surface}{ending} {current_surface} {short_surface}{ending}");
+            let document = NormalizedDdlDocument::new(source, language, Vec::new())
+                .expect("short relation surface forms a document");
+            let result = associate_semantic_entities(&document)
+                .expect("short relation surface forms an association");
+            assert!(
+                result.explicit_previous_references.is_empty(),
+                "{short_surface}"
+            );
+            assert_eq!(result.ast.entities.len(), 2, "{short_surface}");
+        }
+    }
 }
 
 fn load_fixture() -> Fixture {

@@ -7,11 +7,12 @@ use serde_json::{Number, Value};
 use crate::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreRoleKind,
     NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind,
-    ResolvedInstructionLanguage, SourceSpan, parse_clause_stream, project_macro_semantic_ref,
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, parse_clause_stream,
+    project_macro_semantic_ref, saijiki_asset,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v5";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v6";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,6 +30,61 @@ pub struct SourceOccurrence {
     pub region_index: usize,
     pub clause_index: usize,
     pub atom_index: usize,
+}
+
+/// Closed semantic identity of one accepted explicit previous-object relation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticRelationKind {
+    Along,
+    NotTouching,
+    Cutting,
+    Between,
+    Touching,
+}
+
+impl SemanticRelationKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Along => "along",
+            Self::NotTouching => "not_touching",
+            Self::Cutting => "cutting",
+            Self::Between => "between",
+            Self::Touching => "touching",
+        }
+    }
+}
+
+/// Closed source-order reference depth for one explicit relation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticPreviousReference {
+    PreviousOne,
+    PreviousTwo,
+}
+
+impl SemanticPreviousReference {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PreviousOne => "previous_one",
+            Self::PreviousTwo => "previous_two",
+        }
+    }
+
+    pub(crate) const fn required_previous_count(self) -> usize {
+        match self {
+            Self::PreviousOne => 1,
+            Self::PreviousTwo => 2,
+        }
+    }
+}
+
+/// One accepted full-literal relation atom retained as a source-owned compound occurrence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExplicitPreviousReferenceOccurrence {
+    pub kind: SemanticRelationKind,
+    pub reference: SemanticPreviousReference,
+    pub provenance: SourceOccurrence,
+    pub asset_id: String,
+    pub relation_type: String,
 }
 
 /// Saijiki identity and localized label retained only as source provenance.
@@ -192,8 +248,8 @@ pub struct SemanticAssociationIssue {
     pub upstream_diagnostic: Option<NeutralDiagnostic>,
 }
 
-/// Source-preserving association result. Counts refer only to the closed entity roles and exact
-/// numbers owned by this slice, not the wider clause-stream delivery overlay.
+/// Source-preserving association result. Entity counts and compound-reference counts remain
+/// separate so the accepted I-592 occurrence accounting is not recounted by this slice.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticAssociationResult {
     pub schema_id: &'static str,
@@ -203,6 +259,9 @@ pub struct SemanticAssociationResult {
     pub canonical_bytes: Option<Vec<u8>>,
     pub owned_occurrence_count: usize,
     pub delivered_occurrence_count: usize,
+    pub explicit_previous_references: Vec<ExplicitPreviousReferenceOccurrence>,
+    pub owned_compound_reference_count: usize,
+    pub delivered_compound_reference_count: usize,
 }
 
 #[derive(Default)]
@@ -284,6 +343,7 @@ pub fn associate_semantic_entities(
     let clause_stream = parse_clause_stream(document)?;
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
     let mut owned_occurrence_count = 0;
+    let mut explicit_previous_references = Vec::new();
 
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
@@ -407,10 +467,28 @@ pub fn associate_semantic_entities(
                 ClauseAtom::UnresolvedDiagnostic(diagnostic) => {
                     region.diagnostics.push(diagnostic.clone());
                 }
+                ClauseAtom::SaijikiRelation {
+                    asset_id,
+                    relation_type,
+                    surface,
+                    span,
+                } => {
+                    if let Some(occurrence) = explicit_previous_reference_occurrence(
+                        document,
+                        asset_id,
+                        relation_type,
+                        surface,
+                        *span,
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    ) {
+                        explicit_previous_references.push(occurrence);
+                    }
+                }
                 ClauseAtom::CoreRole(_)
                 | ClauseAtom::RemainingRole(_)
-                | ClauseAtom::FunctionWord { .. }
-                | ClauseAtom::SaijikiRelation { .. } => {}
+                | ClauseAtom::FunctionWord { .. } => {}
             }
         }
     }
@@ -430,6 +508,12 @@ pub fn associate_semantic_entities(
         delivered_occurrence_count, owned_occurrence_count,
         "semantic association must deliver every owned occurrence exactly once"
     );
+    let owned_compound_reference_count = explicit_previous_references.len();
+    let delivered_compound_reference_count = explicit_previous_references.len();
+    assert_eq!(
+        delivered_compound_reference_count, owned_compound_reference_count,
+        "semantic association must retain every full-literal compound exactly once"
+    );
 
     let ast = SemanticEntityAssociationAst {
         entities,
@@ -445,6 +529,63 @@ pub fn associate_semantic_entities(
         canonical_bytes,
         owned_occurrence_count,
         delivered_occurrence_count,
+        explicit_previous_references,
+        owned_compound_reference_count,
+        delivered_compound_reference_count,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn explicit_previous_reference_occurrence(
+    document: &NormalizedDdlDocument,
+    asset_id: &str,
+    relation_type: &str,
+    surface: &str,
+    span: SourceSpan,
+    region_index: usize,
+    clause_index: usize,
+    atom_index: usize,
+) -> Option<ExplicitPreviousReferenceOccurrence> {
+    if asset_id != SAIJIKI_ASSET_ID {
+        return None;
+    }
+    let relation = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == relation_type)?;
+    let literals = match document.language() {
+        ResolvedInstructionLanguage::Ja => &relation.literals_ja,
+        ResolvedInstructionLanguage::En => &relation.literals_en,
+    };
+    let accepted = literals.iter().any(|literal| match document.language() {
+        ResolvedInstructionLanguage::Ja => surface == literal,
+        ResolvedInstructionLanguage::En => surface.eq_ignore_ascii_case(literal),
+    });
+    if !accepted {
+        return None;
+    }
+
+    let kind = match relation_type {
+        "along" => SemanticRelationKind::Along,
+        "not_touching" => SemanticRelationKind::NotTouching,
+        "cutting" => SemanticRelationKind::Cutting,
+        "between" => SemanticRelationKind::Between,
+        "touching" => SemanticRelationKind::Touching,
+        _ => return None,
+    };
+    let reference = match kind {
+        SemanticRelationKind::Between => SemanticPreviousReference::PreviousTwo,
+        SemanticRelationKind::Along
+        | SemanticRelationKind::NotTouching
+        | SemanticRelationKind::Cutting
+        | SemanticRelationKind::Touching => SemanticPreviousReference::PreviousOne,
+    };
+    Some(ExplicitPreviousReferenceOccurrence {
+        kind,
+        reference,
+        provenance: source_occurrence(document, span, region_index, clause_index, atom_index),
+        asset_id: asset_id.to_owned(),
+        relation_type: relation_type.to_owned(),
     })
 }
 

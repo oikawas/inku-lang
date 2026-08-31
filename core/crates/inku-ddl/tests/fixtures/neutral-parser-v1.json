@@ -145,6 +145,40 @@
       "expected_tokens": [],
       "expected_diagnostics": [],
       "recognized_delivery_count": 0
+    },
+    {
+      "id": "ja-full-relation-literal",
+      "language": "ja",
+      "source": "前の弧に両端で触れる。",
+      "expected_tokens": [
+        {
+          "kind": "saijiki_relation",
+          "surface": "前の弧に両端で触れる",
+          "start_byte": 0,
+          "end_byte": 30,
+          "asset_id": "inku.saijiki.v1",
+          "relation_type": "touching"
+        }
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 1
+    },
+    {
+      "id": "en-full-relation-literal-case",
+      "language": "en",
+      "source": "TOUCHING THE PREVIOUS ARC AT BOTH ENDS.",
+      "expected_tokens": [
+        {
+          "kind": "saijiki_relation",
+          "surface": "TOUCHING THE PREVIOUS ARC AT BOTH ENDS",
+          "start_byte": 0,
+          "end_byte": 38,
+          "asset_id": "inku.saijiki.v1",
+          "relation_type": "touching"
+        }
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 1
     }
   ]
 }

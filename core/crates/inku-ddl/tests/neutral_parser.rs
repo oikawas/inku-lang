@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    parse_neutral_lexemes,
+    parse_neutral_lexemes, saijiki_asset,
 };
 use serde::Deserialize;
 
@@ -224,7 +224,7 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v1");
     assert_eq!(fixture.version, 1);
-    assert_eq!(fixture.cases.len(), 11);
+    assert_eq!(fixture.cases.len(), 13);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -245,11 +245,65 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "en-substring-false-positives",
         "ja-substring-and-qualified-macro-unknown",
         "separator-only-source",
+        "ja-full-relation-literal",
+        "en-full-relation-literal-case",
     ] {
         assert!(
             ids.contains(required),
             "missing required fixture case: {required}"
         );
+    }
+}
+
+#[test]
+fn accepted_full_relation_literals_are_single_source_preserving_lexemes() {
+    for relation in &saijiki_asset().relations {
+        for (language, literals) in [
+            (ResolvedInstructionLanguage::Ja, &relation.literals_ja),
+            (ResolvedInstructionLanguage::En, &relation.literals_en),
+        ] {
+            for literal in literals {
+                let source = format!("{literal}.");
+                let document = NormalizedDdlDocument::new(source.clone(), language, Vec::new())
+                    .expect("accepted relation literal forms a document");
+                let result = parse_neutral_lexemes(&document);
+                assert!(result.diagnostics.is_empty(), "{literal}");
+                assert_eq!(result.tokens.len(), 1, "{literal}");
+                let token = &result.tokens[0];
+                assert_eq!(token.surface, *literal, "{literal}");
+                assert_eq!(token.span.start_byte, 0, "{literal}");
+                assert_eq!(token.span.end_byte, literal.len(), "{literal}");
+                assert!(matches!(
+                    &token.kind,
+                    NeutralTokenKind::SaijikiRelation { relation_type, .. }
+                        if relation_type == &relation.relation_type
+                ));
+            }
+        }
+
+        for literal in &relation.literals_en {
+            let upper = literal.to_ascii_uppercase();
+            let source = format!("{upper}.");
+            let document =
+                NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                    .expect("ASCII case variant forms a document");
+            let result = parse_neutral_lexemes(&document);
+            assert!(result.diagnostics.is_empty(), "{upper}");
+            assert_eq!(result.tokens.len(), 1, "{upper}");
+            assert_eq!(result.tokens[0].surface, upper);
+
+            let embedded = format!("x{literal}y");
+            let document =
+                NormalizedDdlDocument::new(embedded, ResolvedInstructionLanguage::En, Vec::new())
+                    .expect("embedded ASCII surface forms a document");
+            assert!(
+                parse_neutral_lexemes(&document)
+                    .tokens
+                    .iter()
+                    .all(|token| !token.surface.eq_ignore_ascii_case(literal)),
+                "{literal}: ASCII word boundary"
+            );
+        }
     }
 }
 

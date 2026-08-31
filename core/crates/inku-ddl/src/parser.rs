@@ -322,24 +322,30 @@ fn candidates_at(
     }
 
     for relation in &asset.relations {
-        let surface = match language {
-            ResolvedInstructionLanguage::Ja => relation.surface_ja.as_str(),
-            ResolvedInstructionLanguage::En => relation.surface_en.as_str(),
+        let (surface, full_literals) = match language {
+            ResolvedInstructionLanguage::Ja => {
+                (relation.surface_ja.as_str(), &relation.literals_ja)
+            }
+            ResolvedInstructionLanguage::En => {
+                (relation.surface_en.as_str(), &relation.literals_en)
+            }
         };
-        push_surface_candidate(
-            &mut candidates,
-            source,
-            start_byte,
-            language,
-            require_boundary,
-            surface,
-            PRIORITY_ASSET,
-            format!("relation:{}", relation.relation_type),
-            CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
-                asset_id: SAIJIKI_ASSET_ID.to_owned(),
-                relation_type: relation.relation_type.clone(),
-            }),
-        );
+        for surface in std::iter::once(surface).chain(full_literals.iter().map(String::as_str)) {
+            push_surface_candidate(
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                surface,
+                PRIORITY_ASSET,
+                format!("relation:{}", relation.relation_type),
+                CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
+                    asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                    relation_type: relation.relation_type.clone(),
+                }),
+            );
+        }
     }
 
     let function_words = match language {

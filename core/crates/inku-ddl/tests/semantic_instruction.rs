@@ -4,12 +4,12 @@ use inku_ddl::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, MacroLock, NormalizedDdlDocument,
     RemainingRoleKind, ResolvedInstructionLanguage, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstructionAssociationResult,
-    SourceOccurrence, associate_semantic_instructions,
+    SourceOccurrence, associate_semantic_instructions, saijiki_asset,
     semantic_instruction::SemanticInstructionOccurrenceRole,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v6.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v7.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -51,6 +51,10 @@ struct Case {
     instruction_proportion_width_extents: Vec<Option<String>>,
     #[serde(default)]
     instruction_proportion_arc_forms: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_relations: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_relation_references: Vec<Option<String>>,
     association_issue_kinds: Vec<String>,
     instruction_issues: Vec<String>,
     canonical: Option<String>,
@@ -351,6 +355,46 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
                 case.id
             );
         }
+        if !case.instruction_relations.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .relation
+                            .as_ref()
+                            .map(|relation| relation.kind.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_relations
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: explicit relation kind",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .relation
+                            .as_ref()
+                            .map(|relation| relation.reference.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_relation_references
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: explicit previous reference",
+                case.id
+            );
+        }
         assert_eq!(
             result
                 .ast
@@ -409,7 +453,9 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
         );
         assert_eq!(
             result.ast.complete,
-            result.association.ast.complete && result.issues.is_empty(),
+            result.association.ast.complete
+                && result.issues.is_empty()
+                && result.relation_issues.is_empty(),
             "{}: only upstream-complete, instruction-issue-free AST is complete",
             case.id
         );
@@ -456,13 +502,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v6"
+        "inku.semantic-instruction-association.v7"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v6"
+        "inku.semantic-instruction-association-fixture.v7"
     );
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.version, 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -500,6 +546,185 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
             "missing required fixture case: {required}"
         );
     }
+}
+
+#[test]
+fn accepted_full_literals_form_closed_previous_edges_and_canonical_identity() {
+    let asset = saijiki_asset();
+    let shapes = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katachi")
+        .expect("accepted asset has Primitive rows");
+    let shape = |english: &str| {
+        shapes
+            .words
+            .iter()
+            .find(|word| word.surface_en.as_deref() == Some(english))
+            .unwrap_or_else(|| panic!("accepted asset has {english}"))
+    };
+    let line = shape("line");
+    let square = shape("square");
+    let circle = shape("circle");
+    let mut canonical_by_relation = HashMap::<String, Vec<u8>>::new();
+
+    for relation in &asset.relations {
+        for (language, literals, line_surface, square_surface, circle_surface, ending) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                &relation.literals_ja,
+                line.surface_ja.as_str(),
+                square.surface_ja.as_str(),
+                circle.surface_ja.as_str(),
+                "。",
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                &relation.literals_en,
+                line.surface_en.as_deref().expect("line has EN surface"),
+                square.surface_en.as_deref().expect("square has EN surface"),
+                circle.surface_en.as_deref().expect("circle has EN surface"),
+                ".",
+            ),
+        ] {
+            for literal in literals {
+                let (source, expected_reference, expected_instruction_count) = if relation
+                    .relation_type
+                    == "between"
+                {
+                    (
+                        format!(
+                            "{line_surface}{ending} {square_surface}{ending} {circle_surface} {literal}{ending}"
+                        ),
+                        "previous_two",
+                        3,
+                    )
+                } else {
+                    (
+                        format!("{line_surface}{ending} {circle_surface} {literal}{ending}"),
+                        "previous_one",
+                        2,
+                    )
+                };
+                let document = NormalizedDdlDocument::new(source.clone(), language, Vec::new())
+                    .expect("accepted relation source forms a document");
+                let result = associate_semantic_instructions(&document)
+                    .expect("accepted relation source forms an instruction association");
+                assert!(result.association.issues.is_empty(), "{literal}");
+                assert!(result.issues.is_empty(), "{literal}");
+                assert!(result.relation_issues.is_empty(), "{literal}");
+                assert_eq!(
+                    result.ast.instructions.len(),
+                    expected_instruction_count,
+                    "{literal}"
+                );
+                let edge = result
+                    .ast
+                    .instructions
+                    .last()
+                    .and_then(|instruction| instruction.relation.as_ref())
+                    .expect("current instruction has one relation");
+                assert_eq!(edge.kind.as_str(), relation.relation_type, "{literal}");
+                assert_eq!(edge.reference.as_str(), expected_reference, "{literal}");
+                assert_eq!(edge.provenance.surface, *literal, "{literal}");
+                assert_eq!(result.owned_relation_occurrence_count, 1, "{literal}");
+                assert_eq!(result.delivered_relation_occurrence_count, 1, "{literal}");
+
+                let canonical = result.canonical_bytes.expect("issue-free canonical bytes");
+                if let Some(expected) = canonical_by_relation.get(&relation.relation_type) {
+                    assert_eq!(&canonical, expected, "{literal}: bilingual canonical");
+                } else {
+                    canonical_by_relation.insert(relation.relation_type.clone(), canonical.clone());
+                }
+                let canonical_json: serde_json::Value =
+                    serde_json::from_slice(&canonical).expect("canonical JSON");
+                let relation_value = canonical_json["instructions"]
+                    .as_array()
+                    .and_then(|instructions| instructions.last())
+                    .and_then(|instruction| instruction.get("relation"))
+                    .expect("canonical relation value");
+                assert_eq!(
+                    relation_value.as_object().map(|object| object.len()),
+                    Some(2)
+                );
+                assert_eq!(relation_value["kind"], relation.relation_type);
+                assert_eq!(relation_value["reference"], expected_reference);
+            }
+        }
+    }
+}
+
+#[test]
+fn relation_issues_and_short_surface_boundary_are_closed_without_fallback() {
+    let asset = saijiki_asset();
+    let relation = |kind: &str| {
+        asset
+            .relations
+            .iter()
+            .find(|relation| relation.relation_type == kind)
+            .unwrap_or_else(|| panic!("accepted relation {kind}"))
+    };
+    let along = relation("along");
+    let between = relation("between");
+    let touching = relation("touching");
+    let along_literal = along.literals_en.first().expect("along EN literal");
+    let between_literal = between.literals_en.first().expect("between EN literal");
+    let touching_literal = touching.literals_en.first().expect("touching EN literal");
+
+    for (source, expected_issue, expected_owned) in [
+        (
+            format!("circle {along_literal}."),
+            "missing_previous_one",
+            1,
+        ),
+        (
+            format!("line. circle {between_literal}."),
+            "missing_previous_two",
+            1,
+        ),
+        (
+            format!("line. {along_literal}."),
+            "missing_current_instruction",
+            1,
+        ),
+        (
+            format!("line. circle {along_literal} {touching_literal}."),
+            "conflicting_relations",
+            2,
+        ),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .expect("relation issue source forms a document");
+        let result = associate_semantic_instructions(&document)
+            .expect("relation issue source forms an association");
+        assert_eq!(result.relation_issues.len(), 1, "{expected_issue}");
+        assert_eq!(result.relation_issues[0].kind.as_str(), expected_issue);
+        assert_eq!(
+            result.relation_issues[0].occurrences.len(),
+            expected_owned,
+            "{expected_issue}"
+        );
+        assert_eq!(result.owned_relation_occurrence_count, expected_owned);
+        assert_eq!(result.delivered_relation_occurrence_count, expected_owned);
+        assert!(result.canonical_bytes.is_none(), "{expected_issue}");
+    }
+
+    let source = format!("line. circle {}.", along.surface_en);
+    let document = NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+        .expect("short relation surface forms a document");
+    let result = associate_semantic_instructions(&document)
+        .expect("short relation surface forms an association");
+    assert!(result.relation_issues.is_empty());
+    assert_eq!(result.owned_relation_occurrence_count, 0);
+    assert!(
+        result
+            .ast
+            .instructions
+            .iter()
+            .all(|instruction| instruction.relation.is_none())
+    );
+    assert!(result.canonical_bytes.is_some());
 }
 
 fn load_fixture() -> Fixture {

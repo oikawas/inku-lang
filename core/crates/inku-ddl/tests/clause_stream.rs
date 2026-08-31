@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use inku_ddl::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind,
     NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
-    SourceSpan, parse_clause_stream,
+    SourceSpan, parse_clause_stream, saijiki_asset,
 };
 use serde::Deserialize;
 
@@ -260,7 +260,7 @@ fn fixture_schema_and_required_boundary_cases_are_guarded() {
     assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v1");
     assert_eq!(fixture.schema, "inku.clause-stream-fixture.v1");
     assert_eq!(fixture.version, 1);
-    assert_eq!(fixture.cases.len(), 5);
+    assert_eq!(fixture.cases.len(), 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -275,11 +275,43 @@ fn fixture_schema_and_required_boundary_cases_are_guarded() {
         "en-all-sentence-endings",
         "en-punctuation-does-not-split",
         "separator-only",
+        "ja-full-relation-literal",
+        "en-full-relation-literal-case",
     ] {
         assert!(
             ids.contains(required),
             "missing required fixture case: {required}"
         );
+    }
+}
+
+#[test]
+fn every_accepted_full_relation_literal_is_one_unchanged_relation_atom() {
+    for relation in &saijiki_asset().relations {
+        for (language, literals, ending) in [
+            (ResolvedInstructionLanguage::Ja, &relation.literals_ja, "。"),
+            (ResolvedInstructionLanguage::En, &relation.literals_en, "."),
+        ] {
+            for literal in literals {
+                let source = format!("{literal}{ending}");
+                let document = NormalizedDdlDocument::new(source.clone(), language, Vec::new())
+                    .expect("accepted full literal forms a document");
+                let stream = parse_clause_stream(&document)
+                    .expect("accepted full literal forms a clause stream");
+                assert_eq!(stream.clauses.len(), 1, "{literal}");
+                assert_eq!(stream.clauses[0].atoms.len(), 1, "{literal}");
+                assert!(matches!(
+                    &stream.clauses[0].atoms[0],
+                    ClauseAtom::SaijikiRelation { relation_type, surface, span, .. }
+                        if relation_type == &relation.relation_type
+                            && surface == literal
+                            && span.start_byte == 0
+                            && span.end_byte == literal.len()
+                ));
+                assert_eq!(stream.delivery_conservation_count, 1, "{literal}");
+                assert_stream_integrity(&source, &stream);
+            }
+        }
     }
 }
 

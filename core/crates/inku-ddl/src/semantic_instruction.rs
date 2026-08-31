@@ -1,12 +1,13 @@
-//! Explicit Action and Position association over the accepted source-preserving I-584 result.
+//! Explicit Action, Position, and previous-reference association over the accepted entity result.
 
 use std::collections::BTreeMap;
 
 use serde_json::Value;
 
 use crate::{
-    ClauseAtom, ClauseStreamError, NormalizedDdlDocument, RemainingRoleKind,
-    SemanticAssociationResult, SemanticEntity, SemanticTerm, associate_semantic_entities,
+    ClauseAtom, ClauseStreamError, ExplicitPreviousReferenceOccurrence, NormalizedDdlDocument,
+    RemainingRoleKind, SemanticAssociationResult, SemanticEntity, SemanticPreviousReference,
+    SemanticRelationKind, SemanticTerm, SourceOccurrence, associate_semantic_entities,
     semantic_association::{
         project_semantic_term, semantic_entity_value, semantic_identity_value,
         sentence_region_index,
@@ -15,7 +16,15 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v6";
+    "inku.semantic-instruction-association.v7";
+
+/// One explicit relation from the current instruction to prior source-ordered instruction(s).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticRelation {
+    pub kind: SemanticRelationKind,
+    pub reference: SemanticPreviousReference,
+    pub provenance: SourceOccurrence,
+}
 
 /// One single-head entity and its independently optional explicit Action and Position.
 ///
@@ -25,6 +34,7 @@ pub struct SemanticInstruction {
     pub entity: SemanticEntity,
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
+    pub relation: Option<SemanticRelation>,
 }
 
 /// Partial or complete semantic instruction sequence in entity source order.
@@ -85,10 +95,38 @@ pub struct SemanticInstructionIssue {
     pub occurrences: Vec<SemanticInstructionOccurrence>,
 }
 
-/// Source-preserving explicit Action / Position association result.
+/// Stable relation-association issue classes without fallback target selection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticRelationIssueKind {
+    ConflictingRelations,
+    MissingCurrentInstruction,
+    MissingPreviousOne,
+    MissingPreviousTwo,
+}
+
+impl SemanticRelationIssueKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ConflictingRelations => "conflicting_relations",
+            Self::MissingCurrentInstruction => "missing_current_instruction",
+            Self::MissingPreviousOne => "missing_previous_one",
+            Self::MissingPreviousTwo => "missing_previous_two",
+        }
+    }
+}
+
+/// One typed relation issue owning every undelivered full-literal occurrence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticRelationIssue {
+    pub kind: SemanticRelationIssueKind,
+    pub region_index: usize,
+    pub occurrences: Vec<ExplicitPreviousReferenceOccurrence>,
+}
+
+/// Source-preserving explicit Action / Position / previous-reference association result.
 ///
-/// The accepted I-584 association is owned unchanged. Occurrence counts include only Motion and
-/// Place terms newly owned by this slice; I-584 entity occurrences are not recounted.
+/// The accepted entity association is owned unchanged. Action / Position counts and relation
+/// counts are separate; accepted entity occurrences are not recounted.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticInstructionAssociationResult {
     pub schema_id: &'static str,
@@ -98,17 +136,21 @@ pub struct SemanticInstructionAssociationResult {
     pub canonical_bytes: Option<Vec<u8>>,
     pub owned_instruction_occurrence_count: usize,
     pub delivered_instruction_occurrence_count: usize,
+    pub relation_issues: Vec<SemanticRelationIssue>,
+    pub owned_relation_occurrence_count: usize,
+    pub delivered_relation_occurrence_count: usize,
 }
 
 #[derive(Default)]
 struct InstructionRegion {
     actions: Vec<SemanticTerm>,
     positions: Vec<SemanticTerm>,
+    relations: Vec<ExplicitPreviousReferenceOccurrence>,
 }
 
-/// Associate explicit Saijiki Motion and Place terms with I-584 single-head entities.
+/// Associate explicit Saijiki Motion, Place, and full-literal relation terms with single-head entities.
 ///
-/// I-584 is called exactly once. Its owned `ClauseStream`, entities, partial state, and issues are
+/// Entity association is called exactly once. Its `ClauseStream`, entities, state, and issues are
 /// reused directly; no parser, role composition, or sentence-region splitter is rerun.
 pub fn associate_semantic_instructions(
     document: &NormalizedDdlDocument,
@@ -141,9 +183,18 @@ pub fn associate_semantic_instructions(
             owned_instruction_occurrence_count += 1;
         }
     }
+    let owned_relation_occurrence_count = association.explicit_previous_references.len();
+    for occurrence in &association.explicit_previous_references {
+        occurrences_by_region
+            .entry(occurrence.provenance.region_index)
+            .or_default()
+            .relations
+            .push(occurrence.clone());
+    }
 
     let mut instructions = Vec::new();
     let mut issues = Vec::new();
+    let mut relation_issues = Vec::new();
     for entity in &association.ast.entities {
         let region_index = entity.head.provenance.source.region_index;
         let region = occurrences_by_region
@@ -163,10 +214,17 @@ pub fn associate_semantic_instructions(
             region_index,
             &mut issues,
         );
+        let relation = select_relation(
+            region.relations,
+            instructions.len(),
+            region_index,
+            &mut relation_issues,
+        );
         instructions.push(SemanticInstruction {
             entity: entity.clone(),
             action,
             position,
+            relation,
         });
     }
     for (region_index, region) in occurrences_by_region {
@@ -177,6 +235,13 @@ pub fn associate_semantic_instructions(
             region_index,
             &mut issues,
         );
+        if !region.relations.is_empty() {
+            relation_issues.push(SemanticRelationIssue {
+                kind: SemanticRelationIssueKind::MissingCurrentInstruction,
+                region_index,
+                occurrences: region.relations,
+            });
+        }
         append_orphan_issue(
             region.positions,
             SemanticInstructionOccurrenceRole::Position,
@@ -200,10 +265,22 @@ pub fn associate_semantic_instructions(
         delivered_instruction_occurrence_count, owned_instruction_occurrence_count,
         "semantic instruction association must deliver every Action / Position occurrence exactly once"
     );
+    let delivered_relation_occurrence_count = instructions
+        .iter()
+        .filter(|instruction| instruction.relation.is_some())
+        .count()
+        + relation_issues
+            .iter()
+            .map(|issue| issue.occurrences.len())
+            .sum::<usize>();
+    assert_eq!(
+        delivered_relation_occurrence_count, owned_relation_occurrence_count,
+        "semantic instruction association must deliver every full-literal relation exactly once"
+    );
 
     let ast = SemanticInstructionAssociationAst {
         instructions,
-        complete: association.ast.complete && issues.is_empty(),
+        complete: association.ast.complete && issues.is_empty() && relation_issues.is_empty(),
     };
     let canonical_bytes = ast.complete.then(|| canonical_ast_bytes(&ast));
 
@@ -215,6 +292,48 @@ pub fn associate_semantic_instructions(
         canonical_bytes,
         owned_instruction_occurrence_count,
         delivered_instruction_occurrence_count,
+        relation_issues,
+        owned_relation_occurrence_count,
+        delivered_relation_occurrence_count,
+    })
+}
+
+fn select_relation(
+    mut occurrences: Vec<ExplicitPreviousReferenceOccurrence>,
+    previous_instruction_count: usize,
+    region_index: usize,
+    issues: &mut Vec<SemanticRelationIssue>,
+) -> Option<SemanticRelation> {
+    if occurrences.is_empty() {
+        return None;
+    }
+    if occurrences.len() > 1 {
+        issues.push(SemanticRelationIssue {
+            kind: SemanticRelationIssueKind::ConflictingRelations,
+            region_index,
+            occurrences,
+        });
+        return None;
+    }
+
+    let occurrence = occurrences.pop().expect("one relation occurrence");
+    if previous_instruction_count < occurrence.reference.required_previous_count() {
+        let kind = match occurrence.reference {
+            SemanticPreviousReference::PreviousOne => SemanticRelationIssueKind::MissingPreviousOne,
+            SemanticPreviousReference::PreviousTwo => SemanticRelationIssueKind::MissingPreviousTwo,
+        };
+        issues.push(SemanticRelationIssue {
+            kind,
+            region_index,
+            occurrences: vec![occurrence],
+        });
+        return None;
+    }
+
+    Some(SemanticRelation {
+        kind: occurrence.kind,
+        reference: occurrence.reference,
+        provenance: occurrence.provenance,
     })
 }
 
@@ -317,6 +436,27 @@ pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> V
             .as_ref()
             .map(|position| semantic_identity_value(&position.identity))
             .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "relation".to_owned(),
+        instruction
+            .relation
+            .as_ref()
+            .map(semantic_relation_value)
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_relation_value(relation: &SemanticRelation) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "kind".to_owned(),
+        Value::String(relation.kind.as_str().to_owned()),
+    );
+    record.insert(
+        "reference".to_owned(),
+        Value::String(relation.reference.as_str().to_owned()),
     );
     Value::Object(record.into_iter().collect())
 }

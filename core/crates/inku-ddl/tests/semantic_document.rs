@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v2.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -239,17 +239,17 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v2");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v3");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v5"
+        "inku.semantic-entity-association.v6"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v6"
+        "inku.semantic-instruction-association.v7"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v2");
-    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v3");
+    assert_eq!(fixture.version, 3);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -334,6 +334,89 @@ fn every_accepted_ground_row_projects_to_one_document_global_identity() {
         .map(str::to_owned)
         .into_iter()
         .collect()
+    );
+}
+
+#[test]
+fn document_retains_ground_and_owned_relation_edge_without_reparse() {
+    let asset = saijiki_asset();
+    let shapes = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katachi")
+        .expect("accepted asset has Primitive rows");
+    let english_shape = |name: &str| {
+        shapes
+            .words
+            .iter()
+            .find(|word| word.surface_en.as_deref() == Some(name))
+            .and_then(|word| word.surface_en.as_deref())
+            .expect("accepted English Primitive surface")
+    };
+    let ground = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "ji")
+        .and_then(|category| category.words.first())
+        .and_then(|word| word.surface_en.as_deref())
+        .expect("accepted Ground English surface");
+    let relation = asset
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "along")
+        .expect("accepted along relation");
+    let literal = relation
+        .literals_en
+        .first()
+        .expect("accepted along EN literal");
+    let source = format!(
+        "{ground}. {}. {} {literal}.",
+        english_shape("line"),
+        english_shape("circle")
+    );
+    let document = NormalizedDdlDocument::new(
+        source,
+        inku_ddl::ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .expect("Ground and relation source forms a document");
+    let result = associate_semantic_document(&document)
+        .expect("Ground and relation source forms a semantic document");
+
+    assert!(result.issues.is_empty());
+    assert!(result.instruction_association.relation_issues.is_empty());
+    assert_eq!(
+        result.ast.instructions,
+        result.instruction_association.ast.instructions
+    );
+    assert!(result.ast.ground.is_some());
+    assert_eq!(result.ast.instructions.len(), 2);
+    let relation = result.ast.instructions[1]
+        .relation
+        .as_ref()
+        .expect("current instruction retains relation");
+    assert_eq!(relation.kind.as_str(), "along");
+    assert_eq!(relation.reference.as_str(), "previous_one");
+    assert_eq!(relation.provenance.surface, *literal);
+
+    let canonical: serde_json::Value = serde_json::from_slice(
+        result
+            .canonical_bytes
+            .as_deref()
+            .expect("issue-free document canonical"),
+    )
+    .expect("document canonical JSON");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v3");
+    assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
+    assert_eq!(
+        canonical["instructions"][1]["relation"]["reference"],
+        "previous_one"
+    );
+    assert_eq!(
+        canonical["instructions"][1]["relation"]
+            .as_object()
+            .map(|object| object.len()),
+        Some(2)
     );
 }
 

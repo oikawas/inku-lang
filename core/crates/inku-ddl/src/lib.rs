@@ -138,10 +138,11 @@ pub use saijiki::{
     saijiki_relation_literal_table, saijiki_score_wire_maps,
 };
 pub use semantic_association::{
-    OwnedSemanticOccurrence, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue,
-    SemanticAssociationIssueKind, SemanticAssociationResult, SemanticEntity,
-    SemanticEntityAssociationAst, SemanticFluctuation, SemanticIdentity, SemanticProportion,
-    SemanticQuantity, SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
+    ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue, SemanticAssociationIssueKind,
+    SemanticAssociationResult, SemanticEntity, SemanticEntityAssociationAst, SemanticFluctuation,
+    SemanticIdentity, SemanticPreviousReference, SemanticProportion, SemanticQuantity,
+    SemanticRelationKind, SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
     associate_semantic_entities,
 };
 pub use semantic_document::{
@@ -151,7 +152,8 @@ pub use semantic_document::{
 pub use semantic_instruction::{
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,
     SemanticInstructionAssociationAst, SemanticInstructionAssociationResult,
-    SemanticInstructionIssue, SemanticInstructionIssueKind, associate_semantic_instructions,
+    SemanticInstructionIssue, SemanticInstructionIssueKind, SemanticRelation,
+    SemanticRelationIssue, SemanticRelationIssueKind, associate_semantic_instructions,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v2";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v3";
 
 /// Document-global semantic AST with accepted drawable instructions and optional support material.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -43,7 +43,7 @@ pub struct SemanticDocumentIssue {
     pub occurrences: Vec<SemanticTerm>,
 }
 
-/// Source-preserving document semantic result over the accepted I-590 chain.
+/// Source-preserving document semantic result over the accepted instruction chain.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticDocumentResult {
     pub schema_id: &'static str,
@@ -55,7 +55,7 @@ pub struct SemanticDocumentResult {
     pub delivered_ground_occurrence_count: usize,
 }
 
-/// Associate explicit Ground as document-global support material without reparsing I-590 output.
+/// Associate explicit Ground as document-global support material without reparsing instructions.
 pub fn associate_semantic_document(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticDocumentResult, ClauseStreamError> {

@@ -1,0 +1,364 @@
+use std::collections::{HashMap, HashSet};
+
+use inku_ddl::{
+    ClauseAtom, ClauseStream, CoreRoleKind, NormalizedDdlDocument, SEMANTIC_DOCUMENT_SCHEMA_ID,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
+    SemanticDocumentResult, SemanticInstructionAssociationResult, SourceOccurrence,
+    associate_semantic_document, project_macro_semantic_ref, saijiki_asset,
+};
+use serde::Deserialize;
+
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v1.json");
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Fixture {
+    schema: String,
+    version: u32,
+    cases: Vec<Case>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Case {
+    id: String,
+    language: String,
+    source: String,
+    ground: Option<String>,
+    instruction_count: usize,
+    document_issue_kinds: Vec<String>,
+    association_issue_kinds: Vec<String>,
+    instruction_issue_kinds: Vec<String>,
+    canonical: Option<String>,
+    instruction_canonical: Option<String>,
+    ground_occurrence_count: usize,
+}
+
+#[test]
+fn fixture_associates_document_global_ground_without_reparsing_instruction_ownership() {
+    let fixture = load_fixture();
+    let mut canonical_by_case = HashMap::new();
+
+    for case in &fixture.cases {
+        let document = NormalizedDdlDocument::new(
+            case.source.clone(),
+            parse_language(&case.language, &case.id),
+            Vec::new(),
+        )
+        .unwrap_or_else(|error| panic!("{}: unexpected document diagnostic: {error}", case.id));
+        let result = associate_semantic_document(&document)
+            .unwrap_or_else(|error| panic!("{}: unexpected clause-stream error: {error}", case.id));
+
+        assert_eq!(result.schema_id, SEMANTIC_DOCUMENT_SCHEMA_ID, "{}", case.id);
+        assert_eq!(
+            result.instruction_association.schema_id, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
+            "{}: accepted instruction schema remains unchanged",
+            case.id
+        );
+        assert_eq!(
+            result.instruction_association.association.schema_id,
+            SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
+            "{}: accepted entity schema remains unchanged",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .ground
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            case.ground.as_deref(),
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result.ast.instructions.len(),
+            case.instruction_count,
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result.ast.instructions, result.instruction_association.ast.instructions,
+            "{}: accepted instruction AST is retained unchanged",
+            case.id
+        );
+        assert_eq!(
+            result
+                .issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>(),
+            case.document_issue_kinds
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result
+                .instruction_association
+                .association
+                .issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>(),
+            case.association_issue_kinds
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            instruction_issue_kinds(&result.instruction_association),
+            case.instruction_issue_kinds,
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result.canonical_bytes.as_deref(),
+            case.canonical.as_ref().map(String::as_bytes),
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result.instruction_association.canonical_bytes.as_deref(),
+            case.instruction_canonical.as_ref().map(String::as_bytes),
+            "{}: accepted instruction canonical bytes remain unchanged",
+            case.id
+        );
+        assert_eq!(
+            result.ast.complete,
+            result.instruction_association.ast.complete && result.issues.is_empty(),
+            "{}: only instruction-complete, document-issue-free AST is complete",
+            case.id
+        );
+        assert_eq!(
+            result.owned_ground_occurrence_count, case.ground_occurrence_count,
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result.delivered_ground_occurrence_count, result.owned_ground_occurrence_count,
+            "{}: every Ground occurrence is delivered exactly once",
+            case.id
+        );
+        assert_ground_provenance(case, &result);
+        assert_ground_occurrence_join(case, &result);
+
+        if let Some(canonical) = &case.canonical {
+            canonical_by_case.insert(case.id.as_str(), canonical.as_str());
+        }
+    }
+
+    let equivalent = [
+        "ja-paper-leading",
+        "en-paper-trailing",
+        "paper-soft-line-break",
+    ]
+    .map(|id| canonical_by_case[id]);
+    assert!(equivalent.windows(2).all(|pair| pair[0] == pair[1]));
+    assert_ne!(
+        canonical_by_case["ground-only-washi"],
+        canonical_by_case["ground-only-canvas"]
+    );
+}
+
+#[test]
+fn schema_fixture_and_required_document_boundaries_are_guarded() {
+    let fixture = load_fixture();
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v1");
+    assert_eq!(
+        SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
+        "inku.semantic-entity-association.v4"
+    );
+    assert_eq!(
+        SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
+        "inku.semantic-instruction-association.v5"
+    );
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v1");
+    assert_eq!(fixture.version, 1);
+    assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
+
+    let ids = fixture
+        .cases
+        .iter()
+        .map(|case| case.id.as_str())
+        .collect::<HashSet<_>>();
+    assert_eq!(ids.len(), fixture.cases.len());
+    for required in [
+        "no-ground-unspecified",
+        "ja-paper-leading",
+        "en-paper-trailing",
+        "paper-soft-line-break",
+        "ground-with-multiple-instructions",
+        "ground-only-washi",
+        "ground-only-canvas",
+        "conflicting-grounds",
+        "surface-and-ground-coexist",
+        "ground-preserves-i590-instruction",
+        "ground-with-upstream-issue",
+        "ground-with-instruction-issue",
+    ] {
+        assert!(
+            ids.contains(required),
+            "missing required fixture case: {required}"
+        );
+    }
+}
+
+#[test]
+fn every_accepted_ground_row_projects_to_one_document_global_identity() {
+    let category = saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == "ji")
+        .expect("accepted asset has the Ground category");
+    assert_eq!(category.words.len(), 7);
+
+    let mut ids = HashSet::new();
+    for word in &category.words {
+        let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
+            .expect("accepted Ground row has canonical identity");
+        let source = format!(
+            "{}.",
+            word.surface_en
+                .as_deref()
+                .expect("accepted Ground row has English source surface")
+        );
+        let document = NormalizedDdlDocument::new(
+            source,
+            inku_ddl::ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .expect("accepted Ground row forms a normalized document");
+        let result = associate_semantic_document(&document)
+            .expect("accepted Ground row forms a semantic document");
+        assert!(result.issues.is_empty(), "{}", projection.canonical_id);
+        assert!(
+            result.ast.instructions.is_empty(),
+            "{}",
+            projection.canonical_id
+        );
+        let ground = result.ast.ground.as_ref().expect("one explicit Ground");
+        assert_eq!(ground.identity.category, "ground");
+        assert_eq!(ground.identity.id, projection.canonical_id);
+        assert!(ids.insert(ground.identity.id.clone()));
+        assert_eq!(result.owned_ground_occurrence_count, 1);
+        assert_eq!(result.delivered_ground_occurrence_count, 1);
+    }
+
+    assert_eq!(
+        ids,
+        [
+            "paper",
+            "washi",
+            "ink_wash",
+            "charcoal_ground",
+            "canvas",
+            "drawing_paper",
+            "mezzotint",
+        ]
+        .map(str::to_owned)
+        .into_iter()
+        .collect()
+    );
+}
+
+fn load_fixture() -> Fixture {
+    serde_json::from_str(FIXTURE).expect("fixture must be valid JSON")
+}
+
+fn parse_language(value: &str, case_id: &str) -> inku_ddl::ResolvedInstructionLanguage {
+    match value {
+        "ja" => inku_ddl::ResolvedInstructionLanguage::Ja,
+        "en" => inku_ddl::ResolvedInstructionLanguage::En,
+        _ => panic!("{case_id}: invalid fixture language"),
+    }
+}
+
+fn instruction_issue_kinds(result: &SemanticInstructionAssociationResult) -> Vec<String> {
+    result
+        .issues
+        .iter()
+        .map(|issue| {
+            let role = issue
+                .occurrences
+                .first()
+                .expect("instruction issue owns occurrences")
+                .role
+                .as_str();
+            format!("{role}:{}", issue.kind.as_str())
+        })
+        .collect()
+}
+
+fn assert_ground_provenance(case: &Case, result: &SemanticDocumentResult) {
+    if let Some(ground) = &result.ast.ground {
+        assert_source_occurrence(
+            case,
+            &ground.provenance.source,
+            &result.instruction_association.association.clause_stream,
+        );
+    }
+    for issue in &result.issues {
+        for occurrence in &issue.occurrences {
+            assert_source_occurrence(
+                case,
+                &occurrence.provenance.source,
+                &result.instruction_association.association.clause_stream,
+            );
+        }
+    }
+}
+
+fn assert_source_occurrence(case: &Case, occurrence: &SourceOccurrence, stream: &ClauseStream) {
+    let span = occurrence.span;
+    assert!(
+        span.start_byte < span.end_byte && span.end_byte <= case.source.len(),
+        "{}: invalid occurrence span",
+        case.id
+    );
+    assert_eq!(
+        occurrence.surface,
+        case.source[span.start_byte..span.end_byte],
+        "{}: source slice mismatch",
+        case.id
+    );
+    let atom = stream
+        .clauses
+        .get(occurrence.clause_index)
+        .and_then(|clause| clause.atoms.get(occurrence.atom_index))
+        .unwrap_or_else(|| panic!("{}: invalid clause / atom provenance", case.id));
+    assert_eq!(atom.span(), occurrence.span, "{}: atom provenance", case.id);
+}
+
+fn assert_ground_occurrence_join(case: &Case, result: &SemanticDocumentResult) {
+    let input = result
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+        .filter_map(|atom| match atom {
+            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Ground => Some(term.span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let mut output = result
+        .ast
+        .ground
+        .iter()
+        .map(|ground| ground.provenance.source.span)
+        .chain(result.issues.iter().flat_map(|issue| {
+            issue
+                .occurrences
+                .iter()
+                .map(|term| term.provenance.source.span)
+        }))
+        .collect::<Vec<_>>();
+    output.sort_by_key(|span| span.start_byte);
+    assert_eq!(output, input, "{}: Ground occurrence join", case.id);
+}

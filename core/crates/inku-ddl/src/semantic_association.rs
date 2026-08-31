@@ -407,20 +407,16 @@ fn project_term(
     clause_index: usize,
     atom_index: usize,
 ) -> SemanticTerm {
-    let projected = project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
-        .expect("accepted typed Saijiki term has a canonical semantic identity");
-    SemanticTerm {
-        identity: SemanticIdentity {
-            category: projected.category,
-            id: projected.canonical_id,
-        },
-        provenance: SemanticTermProvenance {
-            source: source_occurrence(document, term.span, region_index, clause_index, atom_index),
-            asset_id: term.asset_id.clone(),
-            category_key: term.category_key.clone(),
-            canonical_surface_ja: term.canonical_surface_ja.clone(),
-        },
-    }
+    project_semantic_term(
+        document,
+        &term.asset_id,
+        &term.category_key,
+        &term.canonical_surface_ja,
+        term.span,
+        region_index,
+        clause_index,
+        atom_index,
+    )
 }
 
 fn project_remaining_term(
@@ -430,7 +426,29 @@ fn project_remaining_term(
     clause_index: usize,
     atom_index: usize,
 ) -> SemanticTerm {
-    let projected = project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
+    project_semantic_term(
+        document,
+        &term.asset_id,
+        &term.category_key,
+        &term.canonical_surface_ja,
+        term.span,
+        region_index,
+        clause_index,
+        atom_index,
+    )
+}
+
+pub(crate) fn project_semantic_term(
+    document: &NormalizedDdlDocument,
+    asset_id: &str,
+    category_key: &str,
+    canonical_surface_ja: &str,
+    span: SourceSpan,
+    region_index: usize,
+    clause_index: usize,
+    atom_index: usize,
+) -> SemanticTerm {
+    let projected = project_macro_semantic_ref(category_key, canonical_surface_ja)
         .expect("accepted typed Saijiki term has a canonical semantic identity");
     SemanticTerm {
         identity: SemanticIdentity {
@@ -438,10 +456,10 @@ fn project_remaining_term(
             id: projected.canonical_id,
         },
         provenance: SemanticTermProvenance {
-            source: source_occurrence(document, term.span, region_index, clause_index, atom_index),
-            asset_id: term.asset_id.clone(),
-            category_key: term.category_key.clone(),
-            canonical_surface_ja: term.canonical_surface_ja.clone(),
+            source: source_occurrence(document, span, region_index, clause_index, atom_index),
+            asset_id: asset_id.to_owned(),
+            category_key: category_key.to_owned(),
+            canonical_surface_ja: canonical_surface_ja.to_owned(),
         },
     }
 }

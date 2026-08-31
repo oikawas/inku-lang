@@ -6,10 +6,11 @@ use serde_json::Value;
 
 use crate::{
     ClauseAtom, ClauseStreamError, NormalizedDdlDocument, RemainingRoleKind,
-    SemanticAssociationResult, SemanticEntity, SemanticIdentity, SemanticTerm,
-    SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
-    project_macro_semantic_ref,
-    semantic_association::{semantic_entity_value, semantic_identity_value, sentence_region_index},
+    SemanticAssociationResult, SemanticEntity, SemanticTerm, associate_semantic_entities,
+    semantic_association::{
+        project_semantic_term, semantic_entity_value, semantic_identity_value,
+        sentence_region_index,
+    },
 };
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
@@ -268,57 +269,23 @@ fn project_instruction_term(
     clause_index: usize,
     atom_index: usize,
 ) -> SemanticTerm {
-    let projected = project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
-        .expect("accepted typed instruction term has a canonical semantic identity");
-    SemanticTerm {
-        identity: SemanticIdentity {
-            category: projected.category,
-            id: projected.canonical_id,
-        },
-        provenance: SemanticTermProvenance {
-            source: SourceOccurrence {
-                span: term.span,
-                surface: document.source()[term.span.start_byte..term.span.end_byte].to_owned(),
-                language: document.language(),
-                region_index,
-                clause_index,
-                atom_index,
-            },
-            asset_id: term.asset_id.clone(),
-            category_key: term.category_key.clone(),
-            canonical_surface_ja: term.canonical_surface_ja.clone(),
-        },
-    }
+    project_semantic_term(
+        document,
+        &term.asset_id,
+        &term.category_key,
+        &term.canonical_surface_ja,
+        term.span,
+        region_index,
+        clause_index,
+        atom_index,
+    )
 }
 
 fn canonical_ast_bytes(ast: &SemanticInstructionAssociationAst) -> Vec<u8> {
     let instructions = ast
         .instructions
         .iter()
-        .map(|instruction| {
-            let mut record = BTreeMap::new();
-            record.insert(
-                "action".to_owned(),
-                instruction
-                    .action
-                    .as_ref()
-                    .map(|action| semantic_identity_value(&action.identity))
-                    .unwrap_or(Value::Null),
-            );
-            record.insert(
-                "entity".to_owned(),
-                semantic_entity_value(&instruction.entity),
-            );
-            record.insert(
-                "position".to_owned(),
-                instruction
-                    .position
-                    .as_ref()
-                    .map(|position| semantic_identity_value(&position.identity))
-                    .unwrap_or(Value::Null),
-            );
-            Value::Object(record.into_iter().collect())
-        })
+        .map(semantic_instruction_value)
         .collect::<Vec<_>>();
     let mut root = BTreeMap::new();
     root.insert("instructions".to_owned(), Value::Array(instructions));
@@ -327,4 +294,29 @@ fn canonical_ast_bytes(ast: &SemanticInstructionAssociationAst) -> Vec<u8> {
         Value::String(SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID.to_owned()),
     );
     serde_json::to_vec(&root).expect("closed semantic instruction AST serializes")
+}
+
+pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "action".to_owned(),
+        instruction
+            .action
+            .as_ref()
+            .map(|action| semantic_identity_value(&action.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "entity".to_owned(),
+        semantic_entity_value(&instruction.entity),
+    );
+    record.insert(
+        "position".to_owned(),
+        instruction
+            .position
+            .as_ref()
+            .map(|position| semantic_identity_value(&position.identity))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
 }

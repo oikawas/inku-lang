@@ -22,6 +22,7 @@ pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
 pub mod semantic_association;
+pub mod semantic_document;
 pub mod semantic_instruction;
 pub mod visible_patch;
 
@@ -142,6 +143,10 @@ pub use semantic_association::{
     SemanticEntityAssociationAst, SemanticFluctuation, SemanticIdentity, SemanticQuantity,
     SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
     associate_semantic_entities,
+};
+pub use semantic_document::{
+    SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticDocumentIssue,
+    SemanticDocumentIssueKind, SemanticDocumentResult, associate_semantic_document,
 };
 pub use semantic_instruction::{
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,

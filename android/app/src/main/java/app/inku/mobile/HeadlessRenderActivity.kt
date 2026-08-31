@@ -43,7 +43,7 @@ class HeadlessRenderActivity : Activity() {
                     render(resolvedRunId, resolvedOutputDir)
                 }
             }.onFailure { error ->
-                Log.e(TAG, "headless render failed runId=${runId ?: "-"}", error)
+                Log.e(TAG, headlessFailureLogMessage(runId, error))
                 val id = runId
                 val dir = outputDir
                 if (id != null && dir != null) {
@@ -293,6 +293,12 @@ class HeadlessRenderActivity : Activity() {
         private const val HEADLESS_OUTPUT_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L
         private val RUN_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,80}")
     }
+}
+
+internal fun headlessFailureLogMessage(runId: String?, error: Throwable): String {
+    val type = error::class.java.simpleName.ifBlank { "Throwable" }
+    val detail = DisplaySanitizer.redact(error.message.orEmpty()).take(240)
+    return "headless render failed runId=${runId ?: "-"} failure=$type detail=$detail"
 }
 
 /**

@@ -160,10 +160,11 @@ class LocalLiteRtLmProvider(
             inkuError { it.errorModelNotReady(asset.displayName) }
         }
         val path = asset.localPath ?: inkuError { it.errorModelPathMissing(asset.displayName) }
-        if (!File(path).isFile) {
+        val modelFile = ownedLocalModelFileOrNull(context.filesDir, path)
+        if (modelFile == null) {
             inkuError { it.errorModelFileMissing(asset.displayName, path) }
         }
-        return path
+        return modelFile.absolutePath
     }
 
     private suspend fun engineFor(modelId: String, modelPath: String, maxNumTokens: Int): Engine {
@@ -248,3 +249,13 @@ class LocalLiteRtLmProvider(
         private const val ENGINE_MAX_NUM_TOKENS = 4096
     }
 }
+
+internal fun ownedLocalModelFileOrNull(filesDir: File, path: String): File? = runCatching {
+    val filesRoot = filesDir.canonicalFile
+    val root = File(filesRoot, "models").canonicalFile
+    val candidate = File(path).canonicalFile
+    candidate.takeIf {
+        root.path.startsWith(filesRoot.path + File.separator) &&
+        it.isFile && it.path.startsWith(root.path + File.separator)
+    }
+}.getOrNull()

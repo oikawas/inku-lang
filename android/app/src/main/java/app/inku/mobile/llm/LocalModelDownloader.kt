@@ -125,6 +125,7 @@ class LocalModelDownloader(
             }
         }
         output.flush()
+        validateCompletedDownloadLength(totalBytes, downloaded)
         modelAssetDao.updateDownload(spec.modelId, "verifying", downloaded, totalBytes, partFile.absolutePath, now())
         if (!verifySha256(partFile, spec.expectedSha256)) {
             modelAssetDao.updateDownload(spec.modelId, "failed_sha256", downloaded, totalBytes, partFile.absolutePath, now())
@@ -186,6 +187,15 @@ internal fun validatedPartialContentTotal(contentRange: String?, expectedStart: 
     check(start == expectedStart) { "Partial model response did not begin at the requested resume offset." }
     check(end >= start && total > end) { "Partial model response contained an inconsistent range." }
     return total
+}
+
+internal fun validateCompletedDownloadLength(expectedTotalBytes: Long?, actualDownloadedBytes: Long) {
+    require(actualDownloadedBytes >= 0L) { "Downloaded byte count must not be negative." }
+    if (expectedTotalBytes != null) {
+        check(actualDownloadedBytes == expectedTotalBytes) {
+            "Model response ended at $actualDownloadedBytes bytes; expected $expectedTotalBytes bytes."
+        }
+    }
 }
 
 private val PARTIAL_CONTENT_RANGE = Regex("bytes\\s+(\\d+)-(\\d+)/(\\d+)", RegexOption.IGNORE_CASE)

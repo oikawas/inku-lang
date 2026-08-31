@@ -70,6 +70,7 @@ import app.inku.mobile.ui.camera.providerIssue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -2730,7 +2731,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = strings().modelLicenseFirst(selectedModel?.displayName ?: "Gemma"))
             return
         }
-        if (modelDownloadJob?.isActive == true) {
+        if (modelDownloadInFlight(modelDownloadJob)) {
             localState.value = localState.value.copy(message = strings().modelDownloadAlreadyRunning)
             return
         }
@@ -2750,8 +2751,10 @@ class InkuViewModel @JvmOverloads constructor(
                 warmupLiteRtModels(modelId)
             }.onFailure { error ->
                 if (error is CancellationException) {
-                    repository.markModelDownloadCancelled(modelId)
-                    localState.value = localState.value.copy(activeModelDownloadId = null, message = strings().modelDownloadCancelled)
+                    withContext(NonCancellable) {
+                        repository.markModelDownloadCancelled(modelId)
+                        localState.value = localState.value.copy(activeModelDownloadId = null, message = strings().modelDownloadCancelled)
+                    }
                 } else {
                     repository.markModelDownloadFailed(modelId, "failed")
                     localState.value = localState.value.copy(activeModelDownloadId = null, message = messageFor(error, strings(), strings().modelDownloadFailed))
@@ -2765,13 +2768,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun cancelModelDownload() {
-        val modelId = state.value.activeModelDownloadId ?: state.value.selectedModelId
         modelDownloadJob?.cancel()
-        modelDownloadJob = null
-        viewModelScope.launch {
-            repository.markModelDownloadCancelled(modelId)
-            localState.value = localState.value.copy(activeModelDownloadId = null, message = strings().modelDownloadCancelled)
-        }
     }
 
     fun toggleStar(item: HistoryItemEntity) {
@@ -2961,6 +2958,8 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 }
+
+internal fun modelDownloadInFlight(job: Job?): Boolean = job != null && !job.isCompleted
 
 internal fun cameraVisionModeChangeLocked(state: CameraCaptureState): Boolean =
     state.locksCameraInteraction ||

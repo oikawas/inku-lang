@@ -22,4 +22,16 @@ class LocalModelDownloaderHardeningTest {
             validatedPartialContentTotal(null, expectedStart = 1_000L)
         }
     }
+
+    @Test
+    fun responseMustFinishAtTheDeclaredTotalLength() {
+        validateCompletedDownloadLength(expectedTotalBytes = 10_000L, actualDownloadedBytes = 10_000L)
+        validateCompletedDownloadLength(expectedTotalBytes = null, actualDownloadedBytes = 9_000L)
+        assertThrows(IllegalStateException::class.java) {
+            validateCompletedDownloadLength(expectedTotalBytes = 10_000L, actualDownloadedBytes = 9_999L)
+        }
+        assertThrows(IllegalStateException::class.java) {
+            validateCompletedDownloadLength(expectedTotalBytes = 10_000L, actualDownloadedBytes = 10_001L)
+        }
+    }
 }

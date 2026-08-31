@@ -5505,19 +5505,29 @@ private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, pr
 private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
     val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
     val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = height)
-    val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
-    // Not `require`: this sentence reaches the reader, so the language is
-    // chosen where it is shown rather than here (see InkuFailure).
-    if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
-    val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
-    FileOutputStream(file).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+    try {
+        val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
+        // Not `require`: this sentence reaches the reader, so the language is
+        // chosen where it is shown rather than here (see InkuFailure).
+        if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
+        val exportDir = File(context.cacheDir, "exports")
+        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
+        try {
+            FileOutputStream(file).use { out ->
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    throw IllegalStateException()
+                }
+            }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
+        } catch (error: Throwable) {
+            file.delete()
+            throw error
+        }
+    } finally {
+        bitmap.recycle()
     }
-    bitmap.recycle()
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
 }
 
 private const val MaxPngExportHeightPx = 4320

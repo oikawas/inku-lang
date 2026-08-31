@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
 import app.inku.mobile.data.model.CameraInputProvenance
+import app.inku.mobile.llm.MAX_VISION_SOURCE_IMAGE_BYTES
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -109,7 +110,7 @@ class CameraCaptureFileStore(private val context: Context) {
 class SelectedImageFileStore(cacheRoot: File) {
     private val imageDir = File(cacheRoot, SELECTED_IMAGE_DIRECTORY)
 
-    fun importImage(input: InputStream, maxBytes: Long = MAX_SELECTED_IMAGE_BYTES): File {
+    fun importImage(input: InputStream, maxBytes: Long = MAX_VISION_SOURCE_IMAGE_BYTES): File {
         require(maxBytes > 0L) { "Selected-image byte limit must be positive." }
         cleanupStaleImages()
         check(imageDir.isDirectory || imageDir.mkdirs()) { "Selected-image cache is unavailable." }
@@ -152,8 +153,6 @@ class SelectedImageFileStore(cacheRoot: File) {
         private const val FILE_SUFFIX = ".image"
     }
 }
-
-private const val MAX_SELECTED_IMAGE_BYTES = 64L * 1024L * 1024L
 
 private fun copySelectedImageAtMost(input: InputStream, output: OutputStream, maxBytes: Long) {
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)

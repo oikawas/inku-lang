@@ -8,6 +8,9 @@ object ProviderUrlValidator {
         val url = runCatching { URL(baseUrl) }.getOrElse { inkuError { s -> s.errorBaseUrlInvalid } }
         val protocol = url.protocol.lowercase()
         val host = url.host.orEmpty()
+        if (host.isBlank() || url.userInfo != null || url.query != null || url.ref != null) {
+            inkuError { it.errorBaseUrlInvalid }
+        }
         val secure = protocol == "https"
         val loopbackHttp = protocol == "http" && isLoopbackHost(host)
         // `require` would raise an IllegalArgumentException carrying a fixed

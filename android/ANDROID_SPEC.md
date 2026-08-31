@@ -102,8 +102,10 @@ Implemented:
   - recovery of a complete, already verified `.part` file without re-downloading
   - interrupted in-progress downloads are resumable from their `.part` files
   - resumed HTTP responses must return a valid `Content-Range` whose start byte matches the retained `.part` length
+  - the received byte count must exactly match a declared total when the response ends
   - free-space reservation subtracts only the current download's retained `.part` bytes, not unrelated model files
-  - app-sandbox final storage under `files/models/`
+  - cancellation retains job ownership and rejects a new download until cancellation cleanup completes
+  - app-sandbox final storage and native model loading are restricted to canonical paths under `files/models/`
 - Deterministic local fallback pipeline for:
   - natural language description to normalized DDL
   - DDL to JSON Score
@@ -1311,14 +1313,22 @@ rules.
   with an explicit limit instead of using unbounded `readText()`.
 - Headless artifacts remain under `files/headless`. At launch, old runs are
   pruned to at most 50 run directories and at most 7 days of retention.
+- Headless failure logging records only the exception class and a redacted
+  detail capped at 240 characters; it never passes the raw Throwable to Logcat.
 - App backup is disabled. The database, history, provider settings, encrypted
   API keys, local model state, and headless outputs are excluded from cloud
   backup and device transfer.
 - Remote provider Base URLs must use HTTPS, except for device-local loopback
-  HTTP (`localhost`, `127.0.0.1`, or `::1`). This preserves local Ollama / OVMS
-  verification while preventing plaintext prompt/API-key transmission to LAN or
-  external HTTP endpoints. This validation is performed both when saving a
-  provider setting and when opening a request.
+  HTTP (`localhost`, `127.0.0.1`, or `::1`). User information, queries,
+  fragments, and URLs without a host are rejected so credentials cannot be
+  embedded in the unencrypted Base URL field. Network Security Config denies
+  base cleartext and permits only those three exact loopback destinations. This
+  preserves local Ollama / OVMS verification while preventing plaintext
+  prompt/API-key transmission to LAN or external HTTP endpoints. Validation is
+  performed both when saving a provider setting and when opening a request.
+- Remote provider requests do not follow automatic redirects, so an
+  `Authorization` header configured for one provider origin is never replayed
+  to a redirect target.
 - Remote provider HTTP error bodies are redacted before display. Bearer tokens,
   NVIDIA API keys, OpenAI keys, Google API keys, and values that look like
   `api_key`, `authorization`, or `token` are hidden.
@@ -1362,6 +1372,8 @@ rules.
   `files/thumbnails`, preventing unexpected file decoding if the DB is damaged.
 - Compose work-preview and history-thumbnail caches are limited by estimated
   bitmap bytes rather than entry count.
+- PNG export recycles its raster Bitmap in `finally` on success and failure and
+  removes a partial cache file when encoding or FileProvider URI creation fails.
 - Android build number increments only for package-producing tasks such as APK,
   bundle, and install tasks. Avoid running assemble/install for checks that need
   a clean worktree.
@@ -2818,6 +2830,6 @@ The saved work records `route=local_ddl_to_nim_stage2`, `vision_output_mode=ddl`
 
 M6-1 of Abstract Instant Print makes the bottom Camera action open a source chooser with Take a photo, Choose a photo, and Cancel. Capture retains the existing `ActivityResultContracts.TakePicture`; an existing photo uses image-only `ActivityResultContracts.PickVisualMedia` and accepts one item. The app adds no storage permission, persistable URI permission, custom file browser, or multi-selection. Both inputs use the existing replacement confirmation and local-E2B/fixed-NIM preflight, then snapshot the source, Vision output mode, canvas, and UI language for the run.
 
-While the selected content URI is readable, the app copies it into app-owned cache with a fail-closed 64 MiB input cap before decoding, then sends it through the capture path's existing orientation handling, long-edge limit of 1280, and JPEG quality 85 normalization. Description mode retains local Vision followed by fixed-NIM Stages 1 and 2; Direct DDL retains validated local DDL followed by fixed-NIM Stage 2. NIM receives text alone. Image bytes, URI, path, display name, EXIF, location, and digest enter neither a remote request nor history or metadata. A user-selected cloud-backed item may be materialized by Photo Picker itself; that does not authorize sending the image to a remote model.
+While the selected content URI is readable, the app copies it into app-owned cache with a fail-closed 64 MiB input cap. Both captured and selected files are checked against the same 64 MiB source limit immediately before `ImageDecoder`, then sent through the capture path's existing orientation handling, long-edge limit of 1280, and JPEG quality 85 normalization. Description mode retains local Vision followed by fixed-NIM Stages 1 and 2; Direct DDL retains validated local DDL followed by fixed-NIM Stage 2. NIM receives text alone. Image bytes, URI, path, display name, EXIF, location, and digest enter neither a remote request nor history or metadata. A user-selected cloud-backed item may be materialized by Photo Picker itself; that does not authorize sending the image to a remote model.
 
 Cancelling Photo Picker or receiving a null result restores the pre-run Compose state without starting local Vision, NIM, rendering, or saving. Unreadable, empty, unsupported, or undecodable content fails during image preparation with no remote call or save. The app deletes only its owned temporary copy after success, failure, Cancel, system Back, a stale run, or ViewModel shutdown and never modifies or deletes the original. Existing `input_provenance.origin` records `camera` for a capture and `photo_picker` for Photo Picker; Provenance displays the latter as Existing photo. This milestone adds no Room schema, migration, backfill, new column, per-stage resume, background recovery, custom reduce-motion setting, E4B, or CameraX.

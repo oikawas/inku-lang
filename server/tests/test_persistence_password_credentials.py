@@ -53,6 +53,19 @@ def test_password_verification_preserves_valid_wrong_and_malformed() -> None:
         assert accounts.verify_password("password", malformed) is False
 
 
+@pytest.mark.parametrize("iterations", [0, -1])
+def test_password_verification_rejects_nonpositive_cost_before_kdf(
+    monkeypatch: pytest.MonkeyPatch,
+    iterations: int,
+) -> None:
+    def unexpected_kdf(*_args, **_kwargs):
+        raise AssertionError("invalid work factors must not reach PBKDF2")
+
+    monkeypatch.setattr(accounts, "pbkdf2_hmac", unexpected_kdf)
+    stored = f"pbkdf2_sha256${iterations}$00$00"
+    assert accounts.verify_password("password", stored) is False
+
+
 def test_dummy_hash_remains_a_valid_timing_guard() -> None:
     _owner_or_skip()
     assert accounts.verify_password(

@@ -8,9 +8,12 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
 from inku_server.persistence import access
+from inku_server.persistence.schema import Base, HistoryRow, UserAccountRow
 
 
 def _service_or_skip():
@@ -215,7 +218,9 @@ def test_acl_service_preserves_list_order_replace_commit_and_exceptions(
         failing_service.replace_history_acl("owner", "item", [])
 
 
-def test_acl_service_composes_grant_revoke_and_cleanup_without_widening() -> None:
+def test_acl_service_mutates_one_subject_and_cleans_up_without_widening(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     service_type = _service_or_skip()
     events: list[object] = []
 
@@ -239,18 +244,94 @@ def test_acl_service_composes_grant_revoke_and_cleanup_without_widening() -> Non
     service.delete_acl_for_histories(Session(), ["one", "two"])
     assert events[-1] == ("delete", False)
 
-    object.__setattr__(service, "list_history_acl", lambda *_args: [
-        {"subject_type": "user", "subject_id": "a", "permission": "read"},
-        {"subject_type": "user", "subject_id": "b", "permission": "read"},
-    ])
-    replaced: list[list[dict]] = []
-    object.__setattr__(service, "replace_history_acl", lambda _u, _i, entries: replaced.append(entries) or entries)
-    service.grant_history_acl("u", "i", "user", "a", "write")
-    assert replaced[-1] == [
-        {"subject_type": "user", "subject_id": "b", "permission": "read"},
-        {"subject_type": "user", "subject_id": "a", "permission": "write"},
-    ]
-    service.revoke_history_acl("u", "i", "user", "b")
-    assert replaced[-1] == [
-        {"subject_type": "user", "subject_id": "a", "permission": "read"},
-    ]
+    monkeypatch.setattr(access, "may_share", lambda *_args: True)
+    granted = SimpleNamespace(permission="read", at=1)
+    revoked = SimpleNamespace(permission="read", at=2)
+    query_rows = [granted, revoked]
+    mutations: list[object] = []
+
+    class MutationQuery:
+        def filter(self, *_conditions: object) -> MutationQuery:
+            return self
+
+        def first(self) -> object:
+            return query_rows.pop(0)
+
+    class MutationSession:
+        def __enter__(self) -> MutationSession:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def query(self, _row_type: object) -> MutationQuery:
+            return MutationQuery()
+
+        def add(self, row: object) -> None:
+            mutations.append(("add", row))
+
+        def delete(self, row: object) -> None:
+            mutations.append(("delete", row))
+
+        def commit(self) -> None:
+            mutations.append("commit")
+
+    service = service_type(MutationSession, lambda user_id: {"id": user_id}, lambda: 77)
+    after = [{"subject_type": "user", "subject_id": "kept", "permission": "read"}]
+    object.__setattr__(service, "list_history_acl", lambda *_args: after)
+
+    def forbid_whole_list_replace(*_args: object) -> None:
+        raise AssertionError("single-subject mutations must not replace the whole ACL")
+
+    object.__setattr__(service, "replace_history_acl", forbid_whole_list_replace)
+
+    assert service.grant_history_acl("u", "i", "user", "a", "write") == after
+    assert (granted.permission, granted.at) == ("write", 77)
+    assert service.revoke_history_acl("u", "i", "user", "b") == after
+    assert mutations == ["commit", ("delete", revoked), "commit"]
+
+
+def test_acl_subject_mutations_preserve_unrelated_rows_in_real_sqlite(tmp_path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'acl.db'}", future=True)
+    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    Base.metadata.create_all(engine)
+    with session_factory() as session:
+        session.add(UserAccountRow(
+            id="owner",
+            username="owner",
+            email="owner@example.test",
+            password_hash="hash",
+            role="user",
+            at=1,
+        ))
+        session.add(HistoryRow(
+            id="work",
+            user_id="owner",
+            at=1,
+            input="work",
+            score="{}",
+            svg="<svg/>",
+        ))
+        session.commit()
+
+    service = _service_or_skip()(
+        session_factory,
+        lambda user_id: {"id": user_id, "permission_groups": ["users"], "group_id": None},
+        lambda: 77,
+    )
+    try:
+        service.grant_history_acl("owner", "work", "user", "reader-a", "read")
+        entries = service.grant_history_acl("owner", "work", "user", "reader-b", "write")
+        assert entries is not None
+        assert {entry["subject_id"]: entry["permission"] for entry in entries} == {
+            "reader-a": "read",
+            "reader-b": "write",
+        }
+
+        entries = service.revoke_history_acl("owner", "work", "user", "reader-a")
+        assert entries is not None
+        assert {entry["subject_id"]: entry["permission"] for entry in entries} == {
+            "reader-b": "write",
+        }
+    finally:
+        engine.dispose()

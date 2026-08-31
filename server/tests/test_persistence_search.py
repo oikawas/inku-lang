@@ -349,7 +349,7 @@ def test_fts_execution_preserves_visibility_filters_order_and_hydration() -> Non
         assert "AND h.for_revision = 1" in sql
         assert "AND h.for_share = 1" in sql
         assert "history_fts MATCH :match" in sql
-    assert "ORDER BY h.at DESC LIMIT :limit OFFSET :offset" in list_sql
+    assert "ORDER BY h.at DESC, h.id ASC LIMIT :limit OFFSET :offset" in list_sql
     expected_params = {
         "viewer": "reader",
         "trashed": 1,

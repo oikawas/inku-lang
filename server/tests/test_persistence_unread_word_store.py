@@ -10,8 +10,11 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine, event, select
+from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
+from inku_server.persistence.schema import UnreadWordRow
 
 feedback = (
     importlib.import_module("inku_server.persistence.feedback")
@@ -86,71 +89,48 @@ def test_persistence_feedback_owns_store_and_db_delegates(
     ]
 
 
-def test_record_normalizes_short_circuits_and_preserves_insert_update_commit() -> None:
+def test_record_normalizes_and_uses_one_atomic_upsert_per_api_sized_batch(
+    tmp_path,
+) -> None:
     store_type = _store_or_skip()
-    made_sessions: list[object] = []
 
     def fail_if_opened() -> None:
         raise AssertionError("empty normalized words must not open a session")
 
     store_type(fail_if_opened).record_unread_words("user", ["", "   "], "context", at=1)
 
-    existing = _row("existing", "user", 2, 3, 4, "context")
+    engine = create_engine(f"sqlite:///{tmp_path / 'unread.sqlite'}")
+    UnreadWordRow.__table__.create(engine)
+    factory = sessionmaker(bind=engine)
+    statements: list[str] = []
 
-    class Query:
-        def __init__(self) -> None:
-            self.answers = [None, existing]
+    @event.listens_for(engine, "before_cursor_execute")
+    def capture_statement(_connection, _cursor, statement, _parameters, _context, _many):
+        if statement.lstrip().upper().startswith(("SELECT", "INSERT", "UPDATE")):
+            statements.append(" ".join(statement.split()))
 
-        def filter(self, *_conditions: object) -> Query:
-            return self
-
-        def first(self) -> object | None:
-            return self.answers.pop(0)
-
-    class Session:
-        def __init__(self) -> None:
-            self.query_object = Query()
-            self.added: list[object] = []
-            self.commits = 0
-
-        def __enter__(self) -> Session:
-            return self
-
-        def __exit__(self, *_args: object) -> None:
-            return None
-
-        def query(self, _row_type: object) -> Query:
-            return self.query_object
-
-        def add(self, row: object) -> None:
-            self.added.append(row)
-
-        def commit(self) -> None:
-            self.commits += 1
-
-    def session_factory() -> Session:
-        session = Session()
-        made_sessions.append(session)
-        return session
-
+    store = store_type(factory)
     context = "c" * 1005
     long_word = "a" * 125
-    store_type(session_factory).record_unread_words(
+    store.record_unread_words(
         "user",
-        [f" {long_word} ", " existing ", f"{long_word}suffix"],
+        [f" {long_word} ", f"{long_word}suffix"],
         context,
         at=9,
     )
+    assert len(statements) == 1
+    assert statements[0].startswith("INSERT INTO unread_words")
+    assert "ON CONFLICT (user_id, word, context) DO UPDATE" in statements[0]
 
-    assert len(made_sessions) == 1
-    session = made_sessions[0]
-    assert len(session.added) == 1
-    added = session.added[0]
-    assert added.word == "a" * 120
-    assert added.context == "c" * 1000
-    assert (added.frequency, added.first_at, added.last_at) == (1, 9, 9)
-    assert existing.frequency == 3 and existing.last_at == 9
-    assert session.commits == 1
+    statements.clear()
+    store.record_unread_words("user", [long_word], context, at=10)
+    assert len(statements) == 1
+
+    with factory() as session:
+        row = session.scalars(select(UnreadWordRow)).one()
+        assert row.word == "a" * 120
+        assert row.context == "c" * 1000
+        assert (row.frequency, row.first_at, row.last_at) == (2, 9, 10)
 
 
 def test_list_preserves_filter_aggregation_order_contexts_user_count_and_limit() -> None:
@@ -246,7 +226,7 @@ def test_record_and_list_exceptions_propagate() -> None:
         def query(self, _row_type: object) -> Query:
             return Query()
 
-        def add(self, _row: object) -> None:
+        def execute(self, _statement: object) -> None:
             return None
 
         def commit(self) -> None:

@@ -97,6 +97,7 @@ def test_file_engines_install_the_existing_pragmas(tmp_path):
             assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 10_000
             assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "wal"
         with thumbnails.connect() as connection:
+            assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 10_000
             assert connection.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "wal"
     finally:
         canonical.dispose()

@@ -149,16 +149,41 @@ class HistoryAclService:
         subject_id: str,
         permission: str,
     ) -> list[dict] | None:
-        """Add or raise one entry, leaving the rest of the list alone."""
-        current = self.list_history_acl(user_id, item_id)
-        if current is None:
-            return None
-        entries = [
-            entry for entry in current
-            if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
-        ]
-        entries.append({"subject_type": subject_type, "subject_id": subject_id, "permission": permission})
-        return self.replace_history_acl(user_id, item_id, entries)
+        """Add or raise one entry without rewriting a stale whole-list snapshot."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            if not may_share(actor, session, item_id):
+                return None
+            subject_type, subject_id, permission = validated_acl_entries([
+                {
+                    "subject_type": subject_type,
+                    "subject_id": subject_id,
+                    "permission": permission,
+                }
+            ])[0]
+            row = (
+                session.query(HistoryAclRow)
+                .filter(
+                    HistoryAclRow.history_id == item_id,
+                    HistoryAclRow.subject_type == subject_type,
+                    HistoryAclRow.subject_id == subject_id,
+                )
+                .first()
+            )
+            if row is None:
+                session.add(HistoryAclRow(
+                    id=str(uuid.uuid4()),
+                    history_id=item_id,
+                    subject_type=subject_type,
+                    subject_id=subject_id,
+                    permission=permission,
+                    at=self.now_ms_fn(),
+                ))
+            elif row.permission != permission:
+                row.permission = permission
+                row.at = self.now_ms_fn()
+            session.commit()
+        return self.list_history_acl(user_id, item_id)
 
     def revoke_history_acl(
         self,
@@ -167,15 +192,24 @@ class HistoryAclService:
         subject_type: str,
         subject_id: str,
     ) -> list[dict] | None:
-        """Drop one entry, leaving the rest of the list alone."""
-        current = self.list_history_acl(user_id, item_id)
-        if current is None:
-            return None
-        entries = [
-            entry for entry in current
-            if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
-        ]
-        return self.replace_history_acl(user_id, item_id, entries)
+        """Drop one entry without replacing grants added by another writer."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            if not may_share(actor, session, item_id):
+                return None
+            row = (
+                session.query(HistoryAclRow)
+                .filter(
+                    HistoryAclRow.history_id == item_id,
+                    HistoryAclRow.subject_type == subject_type,
+                    HistoryAclRow.subject_id == subject_id,
+                )
+                .first()
+            )
+            if row is not None:
+                session.delete(row)
+            session.commit()
+        return self.list_history_acl(user_id, item_id)
 
     def delete_acl_for_histories(self, session, history_ids: list[str]) -> None:
         """Drop the guest lists of works that are going away.

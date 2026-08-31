@@ -12,6 +12,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import OperationalError
 
 from .backup import SQLiteSnapshot, create_sqlite_snapshot
 from .invariants import capture_invariants, require_integrity, verify_invariants
@@ -329,8 +330,14 @@ def install_history_fts(connection: Connection, *, rebuild: bool) -> bool:
             "input, ddl, stage1_model, stage2_model, catalog_id, "
             "content='history', content_rowid='rowid', tokenize='trigram')"
         )
-    except Exception:  # SQLite builds without FTS5 retain the LIKE fallback.
-        return False
+    except OperationalError as exc:
+        # FTS is optional only when SQLite lacks the module. Lock, I/O, and
+        # corruption failures must abort startup rather than disable search.
+        if "no such module: fts5" in str(exc.orig).lower():
+            return False
+        raise MigrationStateError("history FTS table creation failed") from exc
+    except Exception as exc:
+        raise MigrationStateError("history FTS table creation failed") from exc
     trigger_sql = (
         """CREATE TRIGGER history_fts_ai AFTER INSERT ON history BEGIN
         INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id)

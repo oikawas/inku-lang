@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 import inku_server.persistence.migrations as migrations
 from inku_server.persistence import backup
@@ -306,6 +307,33 @@ def test_partial_fts_state_fails_without_guessing_a_repair(
         )
     assert not (tmp_path / "migration-backups").exists()
     engine.dispose()
+
+
+def test_history_fts_only_treats_the_missing_module_as_optional(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(migrations, "history_fts_state", lambda _connection: "absent")
+
+    class FailingConnection:
+        def __init__(self, message: str) -> None:
+            self.message = message
+
+        def exec_driver_sql(self, statement: str) -> None:
+            raise OperationalError(
+                statement,
+                (),
+                sqlite3.OperationalError(self.message),
+            )
+
+    assert migrations.install_history_fts(
+        FailingConnection("no such module: fts5"),
+        rebuild=False,
+    ) is False
+    with pytest.raises(MigrationStateError, match="FTS table creation failed"):
+        migrations.install_history_fts(
+            FailingConnection("database is locked"),
+            rebuild=False,
+        )
 
 
 def test_snapshot_failure_has_no_plain_file_fallback(

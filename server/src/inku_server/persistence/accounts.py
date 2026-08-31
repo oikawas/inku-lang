@@ -43,11 +43,18 @@ def verify_password(password: str, stored_hash: str) -> bool:
         if algorithm != "pbkdf2_sha256":
             return False
         iterations = int(iterations_raw)
+        # Imported or corrupted credential rows must fail closed before they
+        # reach the KDF; non-positive costs otherwise raise during login.
+        if iterations <= 0:
+            return False
         salt = bytes.fromhex(salt_hex)
         expected = bytes.fromhex(digest_hex)
     except Exception:  # noqa: BLE001
         return False
-    actual = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    try:
+        actual = pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    except (OverflowError, ValueError):
+        return False
     return secrets.compare_digest(actual, expected)
 
 
@@ -143,7 +150,7 @@ class AccountOwnerResolver:
                 PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id,
             )
             .filter(PermissionGroupRow.name == "admins")
-            .order_by(UserAccountRow.at.asc())
+            .order_by(UserAccountRow.at.asc(), UserAccountRow.id.asc())
             .first()
         )
         return admin.id if admin else None
@@ -158,7 +165,11 @@ class AccountOwnerResolver:
         admin_id = self.oldest_admin_id(session)
         if admin_id:
             return admin_id
-        user = session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
+        user = (
+            session.query(UserAccountRow)
+            .order_by(UserAccountRow.at.asc(), UserAccountRow.id.asc())
+            .first()
+        )
         return user.id if user else None
 
 
@@ -228,11 +239,10 @@ class SingleUserAccountCreator:
                 at=self.now_ms_fn(),
             )
             session.add(row)
-            session.commit()
-            # The one account owns the server, so it holds `admins`.  _oldest_admin_id
-            # asks the permission groups now, and it is the same query that resolves
-            # the history owner: leaving this to the role mirror would make the two
-            # name different people.
+            session.flush()
+            # The account and its admins membership are one bootstrap fact. If the
+            # membership fails, committing the account alone would make every later
+            # startup see a user while leaving single-user mode without an owner.
             self.set_permission_groups_fn(session, row, ["admins"])
             session.commit()
             return row.id
@@ -558,7 +568,9 @@ class UserAccountCreator:
             if group_id and not session.get(UserGroupRow, group_id):
                 raise ValueError("group not found")
             session.add(row)
-            session.commit()
+            # Keep the account and its permission memberships in one transaction.
+            # The flush validates the account row without making a partial user visible.
+            session.flush()
             self.set_permission_groups_fn(session, row, wanted)
             session.commit()
             session.refresh(row)

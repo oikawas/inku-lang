@@ -1,0 +1,167 @@
+{
+  "schema": "inku.english-noun-phrase-evidence-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "case-variants-opaque-utf8",
+      "language": "en",
+      "source": "A circle. AN quiet square! tHe 静かな arc?",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 8},
+          "determiner": {"kind": "a", "surface": "A", "span": {"start_byte": 0, "end_byte": 1}},
+          "candidate_region": {"surface": "A circle", "start_byte": 0, "end_byte": 8},
+          "head_candidate": {"surface": "circle", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "span": {"start_byte": 2, "end_byte": 8}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 1, "end_byte": 2},
+          "diagnostic": null
+        },
+        {
+          "clause_index": 1,
+          "clause_span": {"start_byte": 9, "end_byte": 25},
+          "determiner": {"kind": "an", "surface": "AN", "span": {"start_byte": 10, "end_byte": 12}},
+          "candidate_region": {"surface": "AN quiet square", "start_byte": 10, "end_byte": 25},
+          "head_candidate": {"surface": "square", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "四角", "span": {"start_byte": 19, "end_byte": 25}},
+          "opaque_pre_head": {"surface": " quiet ", "start_byte": 12, "end_byte": 19},
+          "diagnostic": null
+        },
+        {
+          "clause_index": 2,
+          "clause_span": {"start_byte": 26, "end_byte": 44},
+          "determiner": {"kind": "the", "surface": "tHe", "span": {"start_byte": 27, "end_byte": 30}},
+          "candidate_region": {"surface": "tHe 静かな arc", "start_byte": 27, "end_byte": 44},
+          "head_candidate": {"surface": "arc", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "弧", "span": {"start_byte": 41, "end_byte": 44}},
+          "opaque_pre_head": {"surface": " 静かな ", "start_byte": 30, "end_byte": 41},
+          "diagnostic": null
+        }
+      ],
+      "delivery_conservation_count": 6
+    },
+    {
+      "id": "multiple-determiners",
+      "language": "en",
+      "source": "a circle an square",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 18},
+          "determiner": {"kind": "a", "surface": "a", "span": {"start_byte": 0, "end_byte": 1}},
+          "candidate_region": {"surface": "a circle ", "start_byte": 0, "end_byte": 9},
+          "head_candidate": {"surface": "circle", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "span": {"start_byte": 2, "end_byte": 8}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 1, "end_byte": 2},
+          "diagnostic": null
+        },
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 18},
+          "determiner": {"kind": "an", "surface": "an", "span": {"start_byte": 9, "end_byte": 11}},
+          "candidate_region": {"surface": "an square", "start_byte": 9, "end_byte": 18},
+          "head_candidate": {"surface": "square", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "四角", "span": {"start_byte": 12, "end_byte": 18}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 11, "end_byte": 12},
+          "diagnostic": null
+        }
+      ],
+      "delivery_conservation_count": 4
+    },
+    {
+      "id": "zero-candidate-clause-boundary",
+      "language": "en",
+      "source": "a blue. circle",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 6},
+          "determiner": {"kind": "a", "surface": "a", "span": {"start_byte": 0, "end_byte": 1}},
+          "candidate_region": {"surface": "a blue", "start_byte": 0, "end_byte": 6},
+          "head_candidate": null,
+          "opaque_pre_head": null,
+          "diagnostic": {"kind": "missing_canonical_head_candidate", "candidate_spans": []}
+        }
+      ],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "multiple-candidates",
+      "language": "en",
+      "source": "the circle square",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 17},
+          "determiner": {"kind": "the", "surface": "the", "span": {"start_byte": 0, "end_byte": 3}},
+          "candidate_region": {"surface": "the circle square", "start_byte": 0, "end_byte": 17},
+          "head_candidate": null,
+          "opaque_pre_head": null,
+          "diagnostic": {"kind": "ambiguous_canonical_head_candidates", "candidate_spans": [{"start_byte": 4, "end_byte": 10}, {"start_byte": 11, "end_byte": 17}]}
+        }
+      ],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "typed-opaque-atoms",
+      "language": "en",
+      "source": "an blue top eight arc",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 21},
+          "determiner": {"kind": "an", "surface": "an", "span": {"start_byte": 0, "end_byte": 2}},
+          "candidate_region": {"surface": "an blue top eight arc", "start_byte": 0, "end_byte": 21},
+          "head_candidate": {"surface": "arc", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "弧", "span": {"start_byte": 18, "end_byte": 21}},
+          "opaque_pre_head": {"surface": " blue top eight ", "start_byte": 2, "end_byte": 18},
+          "diagnostic": null
+        }
+      ],
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "multiple-clauses-line-endings",
+      "language": "en",
+      "source": "a circle\r\nan square\nthe arc",
+      "expected_evidence": [
+        {
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 8},
+          "determiner": {"kind": "a", "surface": "a", "span": {"start_byte": 0, "end_byte": 1}},
+          "candidate_region": {"surface": "a circle", "start_byte": 0, "end_byte": 8},
+          "head_candidate": {"surface": "circle", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "span": {"start_byte": 2, "end_byte": 8}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 1, "end_byte": 2},
+          "diagnostic": null
+        },
+        {
+          "clause_index": 1,
+          "clause_span": {"start_byte": 10, "end_byte": 19},
+          "determiner": {"kind": "an", "surface": "an", "span": {"start_byte": 10, "end_byte": 12}},
+          "candidate_region": {"surface": "an square", "start_byte": 10, "end_byte": 19},
+          "head_candidate": {"surface": "square", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "四角", "span": {"start_byte": 13, "end_byte": 19}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 12, "end_byte": 13},
+          "diagnostic": null
+        },
+        {
+          "clause_index": 2,
+          "clause_span": {"start_byte": 20, "end_byte": 27},
+          "determiner": {"kind": "the", "surface": "the", "span": {"start_byte": 20, "end_byte": 23}},
+          "candidate_region": {"surface": "the arc", "start_byte": 20, "end_byte": 27},
+          "head_candidate": {"surface": "arc", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "弧", "span": {"start_byte": 24, "end_byte": 27}},
+          "opaque_pre_head": {"surface": " ", "start_byte": 23, "end_byte": 24},
+          "diagnostic": null
+        }
+      ],
+      "delivery_conservation_count": 6
+    },
+    {
+      "id": "ja-input",
+      "language": "ja",
+      "source": "a 円。an 四角\r\n",
+      "expected_evidence": [],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "en-no-determiner",
+      "language": "en",
+      "source": "circle and blue",
+      "expected_evidence": [],
+      "delivery_conservation_count": 3
+    }
+  ]
+}

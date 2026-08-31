@@ -8,6 +8,7 @@ pub mod document;
 pub mod language;
 pub mod macro_definition;
 pub mod macro_seed;
+pub mod noun_phrase;
 pub mod parser;
 pub mod prompt;
 pub mod saijiki;
@@ -44,6 +45,12 @@ pub use macro_definition::{
 pub use macro_seed::{
     MACRO_SEED_DOMAIN, MACRO_SEED_SCHEME_ID, MacroInvocation, MacroInvocationError, MacroSeed,
     derive_macro_seed, macro_seed_hash_input,
+};
+pub use noun_phrase::{
+    CanonicalHeadCandidate, EnglishDeterminerEvidence, EnglishDeterminerKind,
+    EnglishNounPhraseCandidateEvidence, EnglishNounPhraseEvidenceResult,
+    NOUN_PHRASE_EVIDENCE_SCHEMA_ID, NounPhraseEvidenceDiagnostic, NounPhraseEvidenceDiagnosticKind,
+    collect_english_noun_phrase_evidence,
 };
 pub use parser::{
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,

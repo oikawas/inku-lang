@@ -36,6 +36,43 @@ const SEMANTIC_CATEGORIES: [(&str, &str); 11] = [
     ("ratio", "wariai"),
 ];
 
+/// Exact read-only projection from one accepted typed role to macro semantic identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroSemanticRefProjection {
+    pub category: String,
+    pub canonical_id: String,
+}
+
+/// Project exact I-563 role bytes through the I-534 semantic category / ID authority.
+///
+/// Neither input is normalized. The category key and canonical Japanese surface must match
+/// one embedded Saijiki row byte-for-byte, and the returned ID uses the same Score value or
+/// canonical English wire-ID rule that validates definition-local semantic references.
+pub fn project_macro_semantic_ref(
+    category_key: &str,
+    canonical_surface_ja: &str,
+) -> Option<MacroSemanticRefProjection> {
+    let (category, asset_key) = SEMANTIC_CATEGORIES
+        .iter()
+        .find(|(_, asset_key)| *asset_key == category_key)?;
+    let word = saijiki_asset()
+        .categories
+        .iter()
+        .find(|candidate| candidate.key == *asset_key)?
+        .words
+        .iter()
+        .find(|word| word.surface_ja == canonical_surface_ja)?;
+    let canonical_id = word
+        .score_value
+        .clone()
+        .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))?;
+    debug_assert!(known_semantic_id(category, &canonical_id));
+    Some(MacroSemanticRefProjection {
+        category: (*category).to_owned(),
+        canonical_id,
+    })
+}
+
 /// A bytewise-key-ordered semantic map that rejects duplicate JSON members.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(transparent)]

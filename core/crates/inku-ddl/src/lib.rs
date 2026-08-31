@@ -8,6 +8,7 @@ pub mod composition;
 pub mod document;
 pub mod language;
 pub mod macro_definition;
+pub mod macro_parameter_binding;
 pub mod macro_resolution;
 pub mod macro_seed;
 pub mod noun_phrase;
@@ -50,8 +51,14 @@ pub use macro_definition::{
     ComponentDefinition, Expression, LEGACY_PLUGIN_FORMAT_WARNING, LegacyImportOutcome,
     LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
     MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
-    MacroDefinitionValidation, NumericRange, ParameterSchema, SemanticMap, Statement,
-    TransformExpression, validate_macro_definition_semantic_version,
+    MacroDefinitionValidation, MacroSemanticRefProjection, NumericRange, ParameterSchema,
+    SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
+    validate_macro_definition_semantic_version,
+};
+pub use macro_parameter_binding::{
+    BoundMacroParameterValue, CompleteMacroParameterBinding, MACRO_PARAMETER_BINDING_SCHEMA_ID,
+    MacroParameterBinding, MacroParameterBindingDiagnostic, MacroParameterBindingDiagnosticKind,
+    MacroParameterBindingResult, bind_macro_parameters,
 };
 pub use macro_resolution::{
     MACRO_INVOCATION_LOCK_RESOLUTION_SCHEMA_ID, MacroInvocationLockResolutionResult,

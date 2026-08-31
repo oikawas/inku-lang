@@ -1,0 +1,187 @@
+{
+  "schema": "inku.english-determiner-phrase-evidence-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "missing-zero-opaque-run",
+      "language": "en",
+      "source": "a blue",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 6},
+          "candidate_region_atom_indices": [1],
+          "canonical_candidate_spans": [],
+          "opaque_candidate_runs": [],
+          "availability": "missing"
+        }
+      ],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "missing-one-opaque-run",
+      "language": "en",
+      "source": "a hush murmur",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 13},
+          "candidate_region_atom_indices": [1, 2],
+          "canonical_candidate_spans": [],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 3, "candidate_count": 2}
+          ],
+          "availability": "missing"
+        }
+      ],
+      "delivery_conservation_count": 1
+    },
+    {
+      "id": "missing-multiple-opaque-runs",
+      "language": "en",
+      "source": "a hush blue murmur",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 18},
+          "candidate_region_atom_indices": [1, 2, 3],
+          "canonical_candidate_spans": [],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 2, "candidate_count": 1},
+            {"start_atom_index": 3, "end_atom_index": 4, "candidate_count": 1}
+          ],
+          "availability": "missing"
+        }
+      ],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "canonical-exact-one-opaque-before-after",
+      "language": "en",
+      "source": "a hush circle murmur",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 20},
+          "candidate_region_atom_indices": [1, 2, 3],
+          "canonical_candidate_spans": [
+            {"start_byte": 7, "end_byte": 13}
+          ],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 2, "candidate_count": 1},
+            {"start_atom_index": 3, "end_atom_index": 4, "candidate_count": 1}
+          ],
+          "availability": "exact_one"
+        }
+      ],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "synthetic-canonical-multiple",
+      "language": "en",
+      "source": "the hush circle murmur square",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 3},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 29},
+          "candidate_region_atom_indices": [1, 2, 3, 4],
+          "canonical_candidate_spans": [
+            {"start_byte": 9, "end_byte": 15},
+            {"start_byte": 23, "end_byte": 29}
+          ],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 2, "candidate_count": 1},
+            {"start_atom_index": 3, "end_atom_index": 4, "candidate_count": 1}
+          ],
+          "availability": "multiple"
+        }
+      ],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "known-atom-interleaving",
+      "language": "en",
+      "source": "an blue hush top quiet arc",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 2},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 26},
+          "candidate_region_atom_indices": [1, 2, 3, 4, 5],
+          "canonical_candidate_spans": [
+            {"start_byte": 23, "end_byte": 26}
+          ],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 2, "end_atom_index": 3, "candidate_count": 1},
+            {"start_atom_index": 4, "end_atom_index": 5, "candidate_count": 1}
+          ],
+          "availability": "exact_one"
+        }
+      ],
+      "delivery_conservation_count": 4
+    },
+    {
+      "id": "next-determiner-boundary",
+      "language": "en",
+      "source": "a hush an circle",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 7},
+          "candidate_region_atom_indices": [1],
+          "canonical_candidate_spans": [],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 2, "candidate_count": 1}
+          ],
+          "availability": "missing"
+        },
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 7, "end_byte": 9},
+          "candidate_region_span": {"start_byte": 7, "end_byte": 16},
+          "candidate_region_atom_indices": [3],
+          "canonical_candidate_spans": [
+            {"start_byte": 10, "end_byte": 16}
+          ],
+          "opaque_candidate_runs": [],
+          "availability": "exact_one"
+        }
+      ],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "utf8-source",
+      "language": "en",
+      "source": "the 雪影 circle",
+      "expected_nodes": [
+        {
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 3},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 17},
+          "candidate_region_atom_indices": [1, 2],
+          "canonical_candidate_spans": [
+            {"start_byte": 11, "end_byte": 17}
+          ],
+          "opaque_candidate_runs": [
+            {"start_atom_index": 1, "end_atom_index": 2, "candidate_count": 1}
+          ],
+          "availability": "exact_one"
+        }
+      ],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "ja-non-output",
+      "language": "ja",
+      "source": "a 影",
+      "expected_nodes": [],
+      "delivery_conservation_count": 0
+    }
+  ]
+}

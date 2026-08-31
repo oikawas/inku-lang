@@ -5,9 +5,11 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::{
-    ClauseAtom, ClauseStreamError, ExplicitPreviousReferenceOccurrence, NormalizedDdlDocument,
-    RemainingRoleKind, SemanticAssociationResult, SemanticEntity, SemanticPreviousReference,
-    SemanticRelationKind, SemanticTerm, SourceOccurrence, associate_semantic_entities,
+    ClauseAtom, ClauseStreamError, ExplicitPreviousReferenceOccurrence,
+    MacroParameterBindingResult, NormalizedDdlDocument, RemainingRoleKind,
+    SemanticAssociationResult, SemanticEntity, SemanticPreviousReference, SemanticRelationKind,
+    SemanticTerm, SourceOccurrence, associate_semantic_entities,
+    associate_semantic_entities_with_macro_binding,
     semantic_association::{
         project_semantic_term, semantic_entity_value, semantic_identity_value,
         sentence_region_index,
@@ -16,7 +18,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v7";
+    "inku.semantic-instruction-association.v8";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,7 +31,7 @@ pub struct SemanticRelation {
 /// One single-head entity and its independently optional explicit Action and Position.
 ///
 /// A missing field is unspecified; neither field receives a default.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticInstruction {
     pub entity: SemanticEntity,
     pub action: Option<SemanticTerm>,
@@ -38,7 +40,7 @@ pub struct SemanticInstruction {
 }
 
 /// Partial or complete semantic instruction sequence in entity source order.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticInstructionAssociationAst {
     pub instructions: Vec<SemanticInstruction>,
     pub complete: bool,
@@ -127,7 +129,7 @@ pub struct SemanticRelationIssue {
 ///
 /// The accepted entity association is owned unchanged. Action / Position counts and relation
 /// counts are separate; accepted entity occurrences are not recounted.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticInstructionAssociationResult {
     pub schema_id: &'static str,
     pub association: SemanticAssociationResult,
@@ -156,6 +158,23 @@ pub fn associate_semantic_instructions(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticInstructionAssociationResult, ClauseStreamError> {
     let association = associate_semantic_entities(document)?;
+    Ok(build_semantic_instructions(document, association))
+}
+
+/// Associate instructions from one caller-owned accepted I-581 result without rerunning it.
+pub fn associate_semantic_instructions_with_macro_binding(
+    document: &NormalizedDdlDocument,
+    macro_parameter_binding: MacroParameterBindingResult,
+) -> SemanticInstructionAssociationResult {
+    let association =
+        associate_semantic_entities_with_macro_binding(document, macro_parameter_binding);
+    build_semantic_instructions(document, association)
+}
+
+fn build_semantic_instructions(
+    document: &NormalizedDdlDocument,
+    association: SemanticAssociationResult,
+) -> SemanticInstructionAssociationResult {
     let mut occurrences_by_region = BTreeMap::<usize, InstructionRegion>::new();
     let mut owned_instruction_occurrence_count = 0;
 
@@ -164,6 +183,9 @@ pub fn associate_semantic_instructions(
             let ClauseAtom::RemainingRole(term) = atom else {
                 continue;
             };
+            if association.macro_parameter_owns_span(term.span) {
+                continue;
+            }
             let role = match term.role {
                 RemainingRoleKind::Motion => SemanticInstructionOccurrenceRole::Action,
                 RemainingRoleKind::Place => SemanticInstructionOccurrenceRole::Position,
@@ -196,7 +218,7 @@ pub fn associate_semantic_instructions(
     let mut issues = Vec::new();
     let mut relation_issues = Vec::new();
     for entity in &association.ast.entities {
-        let region_index = entity.head.provenance.source.region_index;
+        let region_index = entity.head.source().region_index;
         let region = occurrences_by_region
             .remove(&region_index)
             .unwrap_or_default();
@@ -284,7 +306,7 @@ pub fn associate_semantic_instructions(
     };
     let canonical_bytes = ast.complete.then(|| canonical_ast_bytes(&ast));
 
-    Ok(SemanticInstructionAssociationResult {
+    SemanticInstructionAssociationResult {
         schema_id: SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
         association,
         ast,
@@ -295,7 +317,7 @@ pub fn associate_semantic_instructions(
         relation_issues,
         owned_relation_occurrence_count,
         delivered_relation_occurrence_count,
-    })
+    }
 }
 
 fn select_relation(

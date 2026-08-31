@@ -5,14 +5,16 @@ use std::collections::BTreeMap;
 use serde_json::{Number, Value};
 
 use crate::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreRoleKind,
-    NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind,
-    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, parse_clause_stream,
-    project_macro_semantic_ref, saijiki_asset,
+    BoundMacroParameterValue, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
+    CoreRoleKind, MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity,
+    MacroParameterBinding, MacroParameterBindingDiagnosticKind, MacroParameterBindingResult,
+    NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema,
+    RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
+    parse_clause_stream, project_macro_semantic_ref, saijiki_asset,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v6";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v7";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -110,6 +112,67 @@ pub struct SemanticQuantity {
     pub provenance: SourceOccurrence,
 }
 
+/// Canonical value of one source-owned macro parameter.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SemanticMacroParameterValue {
+    Integer(i64),
+    Number(f64),
+    SemanticRef(SemanticIdentity),
+}
+
+/// One complete parameter binding retained by a semantic MacroInvocation head.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SemanticMacroParameterBinding {
+    pub name: String,
+    pub schema: ParameterSchema,
+    pub value: SemanticMacroParameterValue,
+    pub provenance: SourceOccurrence,
+    pub source_asset_id: Option<String>,
+    pub canonical_surface_ja: Option<String>,
+}
+
+/// Source-only identity of one resolved visible macro invocation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticMacroInvocationProvenance {
+    pub source: SourceOccurrence,
+    pub ordinal: u64,
+    pub qualified_name: Option<String>,
+}
+
+/// One definition-locked, completely bound, still-unexpanded macro semantic head.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SemanticMacroInvocationHead {
+    pub qualified_name: String,
+    pub definition_version: String,
+    pub definition_digest: String,
+    pub lock: MacroLockResolutionIdentity,
+    pub provenance: SemanticMacroInvocationProvenance,
+    pub parameters: Vec<SemanticMacroParameterBinding>,
+}
+
+/// Closed semantic entity head kind.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SemanticHead {
+    Primitive(SemanticTerm),
+    MacroInvocation(SemanticMacroInvocationHead),
+}
+
+impl SemanticHead {
+    pub const fn source(&self) -> &SourceOccurrence {
+        match self {
+            Self::Primitive(term) => &term.provenance.source,
+            Self::MacroInvocation(head) => &head.provenance.source,
+        }
+    }
+
+    const fn occurrence_count(&self) -> usize {
+        match self {
+            Self::Primitive(_) => 1,
+            Self::MacroInvocation(head) => 1 + head.parameters.len(),
+        }
+    }
+}
+
 /// Two independent explicit Surface dimensions. Missing values remain unspecified.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SemanticSurface {
@@ -134,9 +197,9 @@ pub struct SemanticProportion {
 }
 
 /// One single-head entity. A field is absent only when it was not explicitly and uniquely stated.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticEntity {
-    pub head: SemanticTerm,
+    pub head: SemanticHead,
     pub color: Option<SemanticTerm>,
     pub quantity: Option<SemanticQuantity>,
     pub touch: Option<SemanticTerm>,
@@ -148,16 +211,17 @@ pub struct SemanticEntity {
 }
 
 /// Partial or complete semantic entity sequence in sentence-region source order.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticEntityAssociationAst {
     pub entities: Vec<SemanticEntity>,
     pub complete: bool,
 }
 
 /// An association-owned occurrence delivered to a typed issue rather than an AST field.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum OwnedSemanticOccurrence {
-    Head(SemanticTerm),
+    Head(SemanticHead),
+    MacroDiagnostic(SemanticMacroInvocationProvenance),
     Color(SemanticTerm),
     Quantity(SemanticQuantity),
     Touch(SemanticTerm),
@@ -172,8 +236,9 @@ impl OwnedSemanticOccurrence {
     /// Return the byte-exact source occurrence delivered by this issue.
     pub const fn source(&self) -> &SourceOccurrence {
         match self {
-            Self::Head(term)
-            | Self::Color(term)
+            Self::Head(head) => head.source(),
+            Self::MacroDiagnostic(provenance) => &provenance.source,
+            Self::Color(term)
             | Self::Touch(term)
             | Self::Continuity(term)
             | Self::Angle(term)
@@ -181,6 +246,21 @@ impl OwnedSemanticOccurrence {
             | Self::Fluctuation(term)
             | Self::Proportion(term) => &term.provenance.source,
             Self::Quantity(quantity) => &quantity.provenance,
+        }
+    }
+
+    const fn occurrence_count(&self) -> usize {
+        match self {
+            Self::Head(head) => head.occurrence_count(),
+            Self::MacroDiagnostic(_)
+            | Self::Color(_)
+            | Self::Quantity(_)
+            | Self::Touch(_)
+            | Self::Continuity(_)
+            | Self::Angle(_)
+            | Self::Surface(_)
+            | Self::Fluctuation(_)
+            | Self::Proportion(_) => 1,
         }
     }
 }
@@ -209,6 +289,8 @@ pub enum SemanticAssociationIssueKind {
     UpstreamHole,
     UpstreamConflict,
     UpstreamUnknown,
+    MacroResolution(MacroInvocationResolutionDiagnosticKind),
+    MacroParameterBinding(MacroParameterBindingDiagnosticKind),
 }
 
 impl SemanticAssociationIssueKind {
@@ -235,12 +317,71 @@ impl SemanticAssociationIssueKind {
             Self::UpstreamHole => "upstream_hole",
             Self::UpstreamConflict => "upstream_conflict",
             Self::UpstreamUnknown => "upstream_unknown",
+            Self::MacroResolution(kind) => macro_resolution_issue_kind(kind),
+            Self::MacroParameterBinding(kind) => macro_parameter_binding_issue_kind(kind),
+        }
+    }
+}
+
+const fn macro_resolution_issue_kind(
+    kind: MacroInvocationResolutionDiagnosticKind,
+) -> &'static str {
+    match kind {
+        MacroInvocationResolutionDiagnosticKind::MissingLock => "macro_resolution_missing_lock",
+        MacroInvocationResolutionDiagnosticKind::AmbiguousLockPrefix => {
+            "macro_resolution_ambiguous_lock_prefix"
+        }
+        MacroInvocationResolutionDiagnosticKind::MissingDefinition => {
+            "macro_resolution_missing_definition"
+        }
+        MacroInvocationResolutionDiagnosticKind::DuplicateMatchingDefinition => {
+            "macro_resolution_duplicate_matching_definition"
+        }
+        MacroInvocationResolutionDiagnosticKind::InvalidDefinition => {
+            "macro_resolution_invalid_definition"
+        }
+        MacroInvocationResolutionDiagnosticKind::QualifiedNameMismatch => {
+            "macro_resolution_qualified_name_mismatch"
+        }
+        MacroInvocationResolutionDiagnosticKind::VersionMismatch => {
+            "macro_resolution_version_mismatch"
+        }
+        MacroInvocationResolutionDiagnosticKind::DigestMismatch => {
+            "macro_resolution_digest_mismatch"
+        }
+        MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch => {
+            "macro_resolution_source_clause_atom_mismatch"
+        }
+    }
+}
+
+const fn macro_parameter_binding_issue_kind(
+    kind: MacroParameterBindingDiagnosticKind,
+) -> &'static str {
+    match kind {
+        MacroParameterBindingDiagnosticKind::MissingCompatibleFact => {
+            "macro_binding_missing_compatible_fact"
+        }
+        MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment => {
+            "macro_binding_ambiguous_complete_assignment"
+        }
+        MacroParameterBindingDiagnosticKind::SharedFact => "macro_binding_shared_fact",
+        MacroParameterBindingDiagnosticKind::UnsupportedSchema => {
+            "macro_binding_unsupported_schema"
+        }
+        MacroParameterBindingDiagnosticKind::NumericRange => "macro_binding_numeric_range",
+        MacroParameterBindingDiagnosticKind::NumericPrecision => "macro_binding_numeric_precision",
+        MacroParameterBindingDiagnosticKind::DefinitionIdentityOwnershipMismatch => {
+            "macro_binding_definition_identity_ownership_mismatch"
+        }
+        MacroParameterBindingDiagnosticKind::SourceClauseAtomOwnershipMismatch => {
+            "macro_binding_source_clause_atom_ownership_mismatch"
         }
     }
 }
 
 /// One typed issue with either its owned occurrences or its unchanged upstream diagnostic.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticAssociationIssue {
     pub kind: SemanticAssociationIssueKind,
     pub region_index: usize,
@@ -250,7 +391,7 @@ pub struct SemanticAssociationIssue {
 
 /// Source-preserving association result. Entity counts and compound-reference counts remain
 /// separate so the accepted I-592 occurrence accounting is not recounted by this slice.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticAssociationResult {
     pub schema_id: &'static str,
     pub clause_stream: ClauseStream,
@@ -262,11 +403,26 @@ pub struct SemanticAssociationResult {
     pub explicit_previous_references: Vec<ExplicitPreviousReferenceOccurrence>,
     pub owned_compound_reference_count: usize,
     pub delivered_compound_reference_count: usize,
+    pub macro_parameter_binding: Option<MacroParameterBindingResult>,
+}
+
+impl SemanticAssociationResult {
+    pub(crate) fn macro_parameter_owns_span(&self, span: SourceSpan) -> bool {
+        self.macro_parameter_binding
+            .as_ref()
+            .is_some_and(|binding| {
+                binding
+                    .complete
+                    .iter()
+                    .flat_map(|complete| &complete.parameters)
+                    .any(|parameter| parameter.source_span == span)
+            })
+    }
 }
 
 #[derive(Default)]
 struct AssociationRegion {
-    heads: Vec<SemanticTerm>,
+    heads: Vec<SemanticHead>,
     colors: Vec<SemanticTerm>,
     quantities: Vec<SemanticQuantity>,
     touches: Vec<SemanticTerm>,
@@ -341,23 +497,53 @@ pub fn associate_semantic_entities(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticAssociationResult, ClauseStreamError> {
     let clause_stream = parse_clause_stream(document)?;
+    Ok(build_semantic_entities(document, clause_stream, None))
+}
+
+/// Associate semantic entities from one caller-owned accepted I-581 result without rerunning it.
+pub fn associate_semantic_entities_with_macro_binding(
+    document: &NormalizedDdlDocument,
+    macro_parameter_binding: MacroParameterBindingResult,
+) -> SemanticAssociationResult {
+    let clause_stream = macro_parameter_binding
+        .macro_resolution
+        .relation_reference_evidence
+        .attachment_evidence
+        .noun_phrase
+        .clause_stream
+        .clone();
+    build_semantic_entities(document, clause_stream, Some(macro_parameter_binding))
+}
+
+fn build_semantic_entities(
+    document: &NormalizedDdlDocument,
+    clause_stream: ClauseStream,
+    macro_parameter_binding: Option<MacroParameterBindingResult>,
+) -> SemanticAssociationResult {
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
+    let mut issues = Vec::new();
     let mut owned_occurrence_count = 0;
     let mut explicit_previous_references = Vec::new();
 
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
+            if macro_parameter_binding
+                .as_ref()
+                .is_some_and(|binding| macro_parameter_binding_owns_span(binding, atom.span()))
+            {
+                continue;
+            }
             let region_index = sentence_region_index(&clause_stream, atom.span());
             let region = regions.entry(region_index).or_default();
             match atom {
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive => {
-                    region.heads.push(project_term(
+                    region.heads.push(SemanticHead::Primitive(project_term(
                         document,
                         term,
                         region_index,
                         clause_index,
                         atom_index,
-                    ));
+                    )));
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => {
@@ -465,7 +651,12 @@ pub fn associate_semantic_entities(
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::UnresolvedDiagnostic(diagnostic) => {
-                    region.diagnostics.push(diagnostic.clone());
+                    if !macro_parameter_binding
+                        .as_ref()
+                        .is_some_and(|binding| macro_invocation_owns_span(binding, diagnostic.span))
+                    {
+                        region.diagnostics.push(diagnostic.clone());
+                    }
                 }
                 ClauseAtom::SaijikiRelation {
                     asset_id,
@@ -493,8 +684,18 @@ pub fn associate_semantic_entities(
         }
     }
 
+    if let Some(binding) = &macro_parameter_binding {
+        append_macro_ownership(
+            document,
+            &clause_stream,
+            binding,
+            &mut regions,
+            &mut issues,
+            &mut owned_occurrence_count,
+        );
+    }
+
     let mut entities = Vec::new();
-    let mut issues = Vec::new();
     for (region_index, region) in regions {
         associate_region(region_index, region, &mut entities, &mut issues);
     }
@@ -502,7 +703,8 @@ pub fn associate_semantic_entities(
     let delivered_occurrence_count = entities.iter().map(entity_occurrence_count).sum::<usize>()
         + issues
             .iter()
-            .map(|issue| issue.occurrences.len())
+            .flat_map(|issue| &issue.occurrences)
+            .map(OwnedSemanticOccurrence::occurrence_count)
             .sum::<usize>();
     assert_eq!(
         delivered_occurrence_count, owned_occurrence_count,
@@ -521,7 +723,7 @@ pub fn associate_semantic_entities(
     };
     let canonical_bytes = ast.complete.then(|| canonical_ast_bytes(&ast));
 
-    Ok(SemanticAssociationResult {
+    SemanticAssociationResult {
         schema_id: SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
         clause_stream,
         ast,
@@ -532,7 +734,194 @@ pub fn associate_semantic_entities(
         explicit_previous_references,
         owned_compound_reference_count,
         delivered_compound_reference_count,
-    })
+        macro_parameter_binding,
+    }
+}
+
+fn macro_parameter_binding_owns_span(
+    binding: &MacroParameterBindingResult,
+    span: SourceSpan,
+) -> bool {
+    binding
+        .complete
+        .iter()
+        .flat_map(|complete| &complete.parameters)
+        .any(|parameter| parameter.source_span == span)
+}
+
+fn macro_invocation_owns_span(binding: &MacroParameterBindingResult, span: SourceSpan) -> bool {
+    binding
+        .macro_resolution
+        .resolved
+        .iter()
+        .any(|resolved| resolved.span == span)
+        || binding
+            .macro_resolution
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.span == span)
+}
+
+fn append_macro_ownership(
+    document: &NormalizedDdlDocument,
+    clause_stream: &ClauseStream,
+    binding: &MacroParameterBindingResult,
+    regions: &mut BTreeMap<usize, AssociationRegion>,
+    issues: &mut Vec<SemanticAssociationIssue>,
+    owned_occurrence_count: &mut usize,
+) {
+    for complete in &binding.complete {
+        let resolved = binding
+            .macro_resolution
+            .resolved
+            .get(complete.invocation_index)
+            .expect("accepted I-581 binding references one resolved invocation");
+        assert_eq!(
+            complete.definition_identity, resolved.definition_identity,
+            "accepted I-581 binding retains the resolved definition identity"
+        );
+        let head = SemanticHead::MacroInvocation(semantic_macro_head(
+            document,
+            clause_stream,
+            resolved,
+            complete,
+        ));
+        let region_index = head.source().region_index;
+        *owned_occurrence_count += head.occurrence_count();
+        regions.entry(region_index).or_default().heads.push(head);
+    }
+
+    for diagnostic in &binding.macro_resolution.diagnostics {
+        let provenance = SemanticMacroInvocationProvenance {
+            source: source_occurrence(
+                document,
+                diagnostic.span,
+                sentence_region_index(clause_stream, diagnostic.span),
+                diagnostic
+                    .clause_index
+                    .expect("accepted I-580 diagnostic retains its clause owner"),
+                diagnostic
+                    .atom_index
+                    .expect("accepted I-580 diagnostic retains its atom owner"),
+            ),
+            ordinal: diagnostic.ordinal,
+            qualified_name: diagnostic
+                .invocation
+                .as_ref()
+                .map(|invocation| invocation.qualified_name()),
+        };
+        *owned_occurrence_count += 1;
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::MacroResolution(diagnostic.kind),
+            region_index: provenance.source.region_index,
+            occurrences: vec![OwnedSemanticOccurrence::MacroDiagnostic(provenance)],
+            upstream_diagnostic: None,
+        });
+    }
+
+    for diagnostic in &binding.diagnostics {
+        let resolved = binding
+            .macro_resolution
+            .resolved
+            .get(diagnostic.invocation_index)
+            .expect("accepted I-581 diagnostic references one resolved invocation");
+        let provenance = macro_invocation_provenance(document, clause_stream, resolved);
+        *owned_occurrence_count += 1;
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::MacroParameterBinding(diagnostic.kind),
+            region_index: provenance.source.region_index,
+            occurrences: vec![OwnedSemanticOccurrence::MacroDiagnostic(provenance)],
+            upstream_diagnostic: None,
+        });
+    }
+}
+
+fn semantic_macro_head(
+    document: &NormalizedDdlDocument,
+    clause_stream: &ClauseStream,
+    resolved: &crate::ResolvedMacroInvocation,
+    complete: &crate::CompleteMacroParameterBinding,
+) -> SemanticMacroInvocationHead {
+    let mut parameters = complete
+        .parameters
+        .iter()
+        .map(|parameter| semantic_macro_parameter(document, clause_stream, parameter))
+        .collect::<Vec<_>>();
+    parameters.sort_by(|left, right| left.name.cmp(&right.name));
+    SemanticMacroInvocationHead {
+        qualified_name: resolved.invocation.qualified_name(),
+        definition_version: resolved.definition_identity.version().to_owned(),
+        definition_digest: resolved.definition_identity.full_digest_hex().to_owned(),
+        lock: resolved.lock.clone(),
+        provenance: macro_invocation_provenance(document, clause_stream, resolved),
+        parameters,
+    }
+}
+
+fn macro_invocation_provenance(
+    document: &NormalizedDdlDocument,
+    clause_stream: &ClauseStream,
+    resolved: &crate::ResolvedMacroInvocation,
+) -> SemanticMacroInvocationProvenance {
+    SemanticMacroInvocationProvenance {
+        source: source_occurrence(
+            document,
+            resolved.span,
+            sentence_region_index(clause_stream, resolved.span),
+            resolved.clause_index,
+            resolved.atom_index,
+        ),
+        ordinal: resolved.invocation.ordinal(),
+        qualified_name: Some(resolved.invocation.qualified_name()),
+    }
+}
+
+fn semantic_macro_parameter(
+    document: &NormalizedDdlDocument,
+    clause_stream: &ClauseStream,
+    parameter: &MacroParameterBinding,
+) -> SemanticMacroParameterBinding {
+    assert_eq!(
+        parameter.source_span,
+        parameter.value.source_span(),
+        "accepted I-581 parameter value retains its owned source span"
+    );
+    let (value, source_asset_id, canonical_surface_ja) = match &parameter.value {
+        BoundMacroParameterValue::Integer { value, .. } => {
+            (SemanticMacroParameterValue::Integer(*value), None, None)
+        }
+        BoundMacroParameterValue::Number { value, .. } => {
+            (SemanticMacroParameterValue::Number(*value), None, None)
+        }
+        BoundMacroParameterValue::SemanticRef {
+            category,
+            canonical_id,
+            source_asset_id,
+            canonical_surface_ja,
+            ..
+        } => (
+            SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
+                category: category.clone(),
+                id: canonical_id.clone(),
+            }),
+            Some(source_asset_id.clone()),
+            Some(canonical_surface_ja.clone()),
+        ),
+    };
+    SemanticMacroParameterBinding {
+        name: parameter.parameter_name.clone(),
+        schema: parameter.parameter_schema.clone(),
+        value,
+        provenance: source_occurrence(
+            document,
+            parameter.source_span,
+            sentence_region_index(clause_stream, parameter.source_span),
+            parameter.source_fact_clause_index,
+            parameter.source_fact_atom_index,
+        ),
+        source_asset_id,
+        canonical_surface_ja,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1004,7 +1393,8 @@ fn append_upstream_issues(
 }
 
 fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
-    1 + usize::from(entity.color.is_some())
+    entity.head.occurrence_count()
+        + usize::from(entity.color.is_some())
         + usize::from(entity.quantity.is_some())
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
@@ -1064,10 +1454,7 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
         "fluctuation".to_owned(),
         semantic_fluctuation_value(&entity.fluctuation),
     );
-    record.insert(
-        "head".to_owned(),
-        semantic_identity_value(&entity.head.identity),
-    );
+    record.insert("head".to_owned(), semantic_head_value(&entity.head));
     record.insert(
         "proportion".to_owned(),
         semantic_proportion_value(&entity.proportion),
@@ -1091,6 +1478,63 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .as_ref()
             .map(|quantity| Value::Number(Number::from(quantity.value)))
             .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_head_value(head: &SemanticHead) -> Value {
+    match head {
+        SemanticHead::Primitive(term) => semantic_identity_value(&term.identity),
+        SemanticHead::MacroInvocation(head) => semantic_macro_head_value(head),
+    }
+}
+
+fn semantic_macro_head_value(head: &SemanticMacroInvocationHead) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "definition_digest".to_owned(),
+        Value::String(head.definition_digest.clone()),
+    );
+    record.insert(
+        "definition_version".to_owned(),
+        Value::String(head.definition_version.clone()),
+    );
+    record.insert(
+        "kind".to_owned(),
+        Value::String("macro_invocation".to_owned()),
+    );
+    record.insert(
+        "parameters".to_owned(),
+        Value::Array(
+            head.parameters
+                .iter()
+                .map(semantic_macro_parameter_value)
+                .collect(),
+        ),
+    );
+    record.insert(
+        "qualified_name".to_owned(),
+        Value::String(head.qualified_name.clone()),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_macro_parameter_value(parameter: &SemanticMacroParameterBinding) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert("name".to_owned(), Value::String(parameter.name.clone()));
+    record.insert(
+        "schema".to_owned(),
+        serde_json::to_value(&parameter.schema).expect("closed parameter schema serializes"),
+    );
+    record.insert(
+        "value".to_owned(),
+        match &parameter.value {
+            SemanticMacroParameterValue::Integer(value) => Value::Number(Number::from(*value)),
+            SemanticMacroParameterValue::Number(value) => Value::Number(
+                Number::from_f64(*value).expect("accepted macro Number binding is finite"),
+            ),
+            SemanticMacroParameterValue::SemanticRef(identity) => semantic_identity_value(identity),
+        },
     );
     Value::Object(record.into_iter().collect())
 }

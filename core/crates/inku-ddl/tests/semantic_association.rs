@@ -1,14 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind, NormalizedDdlDocument,
-    OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
-    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SourceOccurrence,
-    associate_semantic_entities, project_macro_semantic_ref, saijiki_asset,
+    ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind, MacroDefinition, MacroLock,
+    NormalizedDdlDocument, OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SemanticHead,
+    SemanticMacroInvocationHead, SemanticMacroParameterValue, SourceOccurrence,
+    associate_semantic_entities, associate_semantic_entities_with_macro_binding,
+    bind_macro_parameters, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v6.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v7.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -435,13 +437,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v6"
+        "inku.semantic-entity-association.v7"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v6"
+        "inku.semantic-entity-association-fixture.v7"
     );
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.version, 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -907,7 +909,7 @@ fn parse_language(value: &str, case_id: &str) -> ResolvedInstructionLanguage {
 
 fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
     for entity in &result.ast.entities {
-        assert_source_occurrence(case, &entity.head.provenance.source, &result.clause_stream);
+        assert_source_occurrence(case, entity.head.source(), &result.clause_stream);
         if let Some(color) = &entity.color {
             assert_source_occurrence(case, &color.provenance.source, &result.clause_stream);
         }
@@ -920,7 +922,8 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         {
             assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
             assert_eq!(
-                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                entity.head.source().region_index,
+                term.provenance.source.region_index,
                 "{}: entity attribute must remain in its sentence region",
                 case.id
             );
@@ -931,7 +934,8 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         {
             assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
             assert_eq!(
-                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                entity.head.source().region_index,
+                term.provenance.source.region_index,
                 "{}: Surface dimension must remain in its sentence region",
                 case.id
             );
@@ -946,7 +950,8 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         {
             assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
             assert_eq!(
-                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                entity.head.source().region_index,
+                term.provenance.source.region_index,
                 "{}: Fluctuation dimension must remain in its sentence region",
                 case.id
             );
@@ -961,7 +966,8 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         {
             assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
             assert_eq!(
-                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                entity.head.source().region_index,
+                term.provenance.source.region_index,
                 "{}: Proportion dimension must remain in its sentence region",
                 case.id
             );
@@ -1085,7 +1091,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
 
     let mut output_spans = Vec::new();
     for entity in &result.ast.entities {
-        output_spans.push(entity.head.provenance.source.span);
+        output_spans.push(entity.head.source().span);
         if let Some(color) = &entity.color {
             output_spans.push(color.provenance.source.span);
         }
@@ -1127,9 +1133,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
     }
     for occurrence in result.issues.iter().flat_map(|issue| &issue.occurrences) {
         output_spans.push(match occurrence {
-            OwnedSemanticOccurrence::Head(term) | OwnedSemanticOccurrence::Color(term) => {
-                term.provenance.source.span
-            }
+            OwnedSemanticOccurrence::Head(head) => head.source().span,
+            OwnedSemanticOccurrence::MacroDiagnostic(provenance) => provenance.source.span,
+            OwnedSemanticOccurrence::Color(term) => term.provenance.source.span,
             OwnedSemanticOccurrence::Quantity(quantity) => quantity.provenance.span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
@@ -1152,4 +1158,503 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             case.id
         );
     }
+}
+
+#[test]
+fn resolved_complete_macro_invocation_becomes_a_semantic_head_without_reexecution() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"Leaf","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
+    )
+    .expect("fixture definition parses");
+    let identity = definition.identity().expect("fixture definition is valid");
+    let document = NormalizedDdlDocument::new(
+        "Nature.Leaf",
+        ResolvedInstructionLanguage::En,
+        vec![
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .expect("fixture lock is valid"),
+        ],
+    )
+    .expect("fixture document is valid");
+    let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition))
+        .expect("fixture binding is accepted");
+
+    let result = associate_semantic_entities_with_macro_binding(&document, binding);
+    assert!(result.issues.is_empty());
+    assert_eq!(result.ast.entities.len(), 1);
+    let SemanticHead::MacroInvocation(head) = &result.ast.entities[0].head else {
+        panic!("resolved invocation must not fall back to Primitive");
+    };
+    assert_eq!(head.qualified_name, "Nature.Leaf");
+    assert!(head.parameters.is_empty());
+    let accepted = result
+        .macro_parameter_binding
+        .as_ref()
+        .expect("macro-aware result owns accepted I-581 result");
+    assert_eq!(
+        result.clause_stream,
+        accepted
+            .macro_resolution
+            .relation_reference_evidence
+            .attachment_evidence
+            .noun_phrase
+            .clause_stream
+    );
+}
+
+#[test]
+fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
+    let definition = semantic_macro_definition(
+        "Nature",
+        "Leaf",
+        "1.0.0",
+        serde_json::json!({
+            "count": {"type": "integer"},
+            "shape": {"type": "semantic_ref", "category": "shape"},
+            "tint": {"type": "semantic_ref", "category": "color"},
+            "touch": {"type": "semantic_ref", "category": "touch"}
+        }),
+        serde_json::json!([]),
+    );
+    let document = locked_macro_document(
+        "Nature.Leaf circle 8 blue silverpoint",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+    let accepted = binding.clone();
+    let result = associate_semantic_entities_with_macro_binding(&document, binding);
+
+    assert!(result.issues.is_empty());
+    assert_eq!(result.macro_parameter_binding.as_ref(), Some(&accepted));
+    assert_eq!(result.ast.entities.len(), 1);
+    let entity = &result.ast.entities[0];
+    let head = macro_head(entity);
+    let identity = definition
+        .identity()
+        .expect("synthetic definition identity");
+    assert_eq!(head.definition_version, identity.version());
+    assert_eq!(head.definition_digest, identity.full_digest_hex());
+    assert_eq!(head.lock.qualified_name, head.qualified_name);
+    assert_eq!(head.lock.version, head.definition_version);
+    assert_eq!(
+        head.lock.digest,
+        format!("sha256:{}", head.definition_digest)
+    );
+    assert_eq!(head.parameters.len(), 4);
+    assert!(
+        entity.color.is_none(),
+        "bound Color must not become outer Color"
+    );
+    assert!(
+        entity.quantity.is_none(),
+        "bound number must not become outer quantity"
+    );
+    assert!(
+        entity.touch.is_none(),
+        "bound Touch must not become outer Touch"
+    );
+    assert_eq!(result.owned_occurrence_count, 5);
+    assert_eq!(result.delivered_occurrence_count, 5);
+    assert_eq!(
+        head.parameters
+            .iter()
+            .map(|parameter| parameter.name.as_str())
+            .collect::<Vec<_>>(),
+        ["count", "shape", "tint", "touch"]
+    );
+    assert!(matches!(
+        head.parameters[0].value,
+        SemanticMacroParameterValue::Integer(8)
+    ));
+    assert!(matches!(
+        &head.parameters[1].value,
+        SemanticMacroParameterValue::SemanticRef(identity)
+            if identity.category == "shape" && identity.id == "circle"
+    ));
+    let mut owned_spans = head
+        .parameters
+        .iter()
+        .map(|parameter| parameter.provenance.span)
+        .collect::<Vec<_>>();
+    owned_spans.push(head.provenance.source.span);
+    owned_spans.sort_by_key(|span| span.start_byte);
+    owned_spans.dedup();
+    assert_eq!(
+        owned_spans.len(),
+        5,
+        "macro head and parameters own distinct spans"
+    );
+
+    let canonical: serde_json::Value = serde_json::from_slice(
+        result
+            .canonical_bytes
+            .as_deref()
+            .expect("complete canonical"),
+    )
+    .unwrap();
+    let canonical_head = &canonical["entities"][0]["head"];
+    assert_eq!(canonical_head["kind"], "macro_invocation");
+    assert_eq!(canonical_head["qualified_name"], "Nature.Leaf");
+    assert_eq!(
+        canonical_head["parameters"].as_array().map(Vec::len),
+        Some(4)
+    );
+    assert!(canonical_head.get("source").is_none());
+    assert!(canonical_head.get("span").is_none());
+    assert!(canonical_head.get("ordinal").is_none());
+    assert!(canonical_head.get("lock").is_none());
+
+    let outer_definition = semantic_macro_definition(
+        "Nature",
+        "Outer",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let outer_document = locked_macro_document(
+        "Nature.Outer blue",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&outer_definition),
+    );
+    let outer_binding =
+        bind_macro_parameters(&outer_document, std::slice::from_ref(&outer_definition)).unwrap();
+    let outer = associate_semantic_entities_with_macro_binding(&outer_document, outer_binding);
+    assert_eq!(
+        outer.ast.entities[0]
+            .color
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("blue"),
+        "unbound Color remains an outer modifier"
+    );
+
+    let number_definition = semantic_macro_definition(
+        "Nature",
+        "Measure",
+        "1.0.0",
+        serde_json::json!({"measure": {"type": "number"}}),
+        serde_json::json!([]),
+    );
+    let number = macro_association(
+        "Nature.Measure 5",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&number_definition),
+    );
+    assert!(matches!(
+        macro_head(&number.ast.entities[0]).parameters[0].value,
+        SemanticMacroParameterValue::Number(value) if value == 5.0
+    ));
+    assert!(number.ast.entities[0].quantity.is_none());
+}
+
+#[test]
+fn macro_head_canonical_depends_only_on_definition_and_parameter_meaning() {
+    let definition = semantic_macro_definition(
+        "Nature",
+        "Leaf",
+        "1.0.0",
+        serde_json::json!({"shape": {"type": "semantic_ref", "category": "shape"}}),
+        serde_json::json!([]),
+    );
+    let en = macro_association(
+        "Nature.Leaf circle",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let ja = macro_association(
+        "紙 Nature.Leaf 円",
+        ResolvedInstructionLanguage::Ja,
+        std::slice::from_ref(&definition),
+    );
+    assert_eq!(canonical_head(&en, 0), canonical_head(&ja, 0));
+
+    let prefix = semantic_macro_definition(
+        "Nature",
+        "Other",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let ordinal_shifted = macro_association(
+        "Nature.Other! Nature.Leaf circle",
+        ResolvedInstructionLanguage::En,
+        &[prefix, definition.clone()],
+    );
+    assert_eq!(canonical_head(&en, 0), canonical_head(&ordinal_shifted, 1));
+    assert_ne!(
+        macro_head(&en.ast.entities[0]).provenance.ordinal,
+        macro_head(&ordinal_shifted.ast.entities[1])
+            .provenance
+            .ordinal
+    );
+
+    let version = semantic_macro_definition(
+        "Nature",
+        "Leaf",
+        "2.0.0",
+        serde_json::json!({"shape": {"type": "semantic_ref", "category": "shape"}}),
+        serde_json::json!([]),
+    );
+    let digest = semantic_macro_definition(
+        "Nature",
+        "Leaf",
+        "1.0.0",
+        serde_json::json!({"shape": {"type": "semantic_ref", "category": "shape"}}),
+        serde_json::json!([{"op": "anchor", "name": "root"}]),
+    );
+    let qualified = semantic_macro_definition(
+        "Nature",
+        "Bud",
+        "1.0.0",
+        serde_json::json!({"shape": {"type": "semantic_ref", "category": "shape"}}),
+        serde_json::json!([]),
+    );
+    let changed_version = macro_association(
+        "Nature.Leaf circle",
+        ResolvedInstructionLanguage::En,
+        &[version],
+    );
+    let changed_digest = macro_association(
+        "Nature.Leaf circle",
+        ResolvedInstructionLanguage::En,
+        &[digest],
+    );
+    let changed_name = macro_association(
+        "Nature.Bud circle",
+        ResolvedInstructionLanguage::En,
+        &[qualified],
+    );
+    let changed_value = macro_association(
+        "Nature.Leaf square",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let base = canonical_head(&en, 0);
+    assert_ne!(base, canonical_head(&changed_version, 0));
+    assert_ne!(base, canonical_head(&changed_digest, 0));
+    assert_ne!(base, canonical_head(&changed_name, 0));
+    assert_ne!(base, canonical_head(&changed_value, 0));
+}
+
+#[test]
+fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
+    let zero = semantic_macro_definition(
+        "Nature",
+        "Leaf",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let unlocked_document =
+        NormalizedDdlDocument::new("Nature.Leaf", ResolvedInstructionLanguage::En, Vec::new())
+            .unwrap();
+    let unlocked_binding =
+        bind_macro_parameters(&unlocked_document, std::slice::from_ref(&zero)).unwrap();
+    let unlocked =
+        associate_semantic_entities_with_macro_binding(&unlocked_document, unlocked_binding);
+    assert_eq!(
+        association_issue_kinds(&unlocked),
+        ["macro_resolution_missing_lock"]
+    );
+    assert!(unlocked.ast.entities.is_empty());
+    let [OwnedSemanticOccurrence::MacroDiagnostic(provenance)] =
+        unlocked.issues[0].occurrences.as_slice()
+    else {
+        panic!("typed macro issue must own exactly one invocation occurrence");
+    };
+    assert_eq!(provenance.source.surface, "Nature.Leaf");
+    assert_eq!(provenance.qualified_name.as_deref(), Some("Nature.Leaf"));
+    assert_eq!(provenance.ordinal, 0);
+
+    let missing_document = locked_macro_document(
+        "Nature.Leaf",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&zero),
+    );
+    let missing_binding = bind_macro_parameters(&missing_document, &[]).unwrap();
+    let missing =
+        associate_semantic_entities_with_macro_binding(&missing_document, missing_binding);
+    assert_eq!(
+        association_issue_kinds(&missing),
+        ["macro_resolution_missing_definition"]
+    );
+
+    let leaf = semantic_macro_definition(
+        "Nature",
+        "若葉",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let morning = semantic_macro_definition(
+        "Nature",
+        "若葉.朝",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let ambiguous_lock_document = locked_macro_document(
+        "Nature.若葉.朝",
+        ResolvedInstructionLanguage::Ja,
+        &[leaf.clone(), morning.clone()],
+    );
+    let ambiguous_lock_binding =
+        bind_macro_parameters(&ambiguous_lock_document, &[leaf, morning]).unwrap();
+    let ambiguous_lock = associate_semantic_entities_with_macro_binding(
+        &ambiguous_lock_document,
+        ambiguous_lock_binding,
+    );
+    assert_eq!(
+        association_issue_kinds(&ambiguous_lock),
+        ["macro_resolution_ambiguous_lock_prefix"]
+    );
+
+    let integer = semantic_macro_definition(
+        "Bind",
+        "Integer",
+        "1.0.0",
+        serde_json::json!({"count": {"type": "integer"}}),
+        serde_json::json!([]),
+    );
+    let incomplete = macro_association(
+        "Bind.Integer blue",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&integer),
+    );
+    assert!(
+        association_issue_kinds(&incomplete).contains(&"macro_binding_missing_compatible_fact")
+    );
+    assert!(incomplete.ast.entities.is_empty());
+
+    let color = semantic_macro_definition(
+        "Bind",
+        "Color",
+        "1.0.0",
+        serde_json::json!({"tint": {"type": "semantic_ref", "category": "color"}}),
+        serde_json::json!([]),
+    );
+    let ambiguous_binding = macro_association(
+        "Bind.Color blue red",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&color),
+    );
+    assert!(
+        association_issue_kinds(&ambiguous_binding)
+            .contains(&"macro_binding_ambiguous_complete_assignment")
+    );
+    assert!(ambiguous_binding.ast.entities.is_empty());
+
+    let primitive_and_macro = macro_association(
+        "Nature.Leaf circle",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&zero),
+    );
+    assert_eq!(
+        association_issue_kinds(&primitive_and_macro),
+        ["ambiguous_entity_ownership"]
+    );
+    assert!(primitive_and_macro.ast.entities.is_empty());
+
+    let other = semantic_macro_definition(
+        "Nature",
+        "Other",
+        "1.0.0",
+        serde_json::json!({}),
+        serde_json::json!([]),
+    );
+    let multiple_macro = macro_association(
+        "Nature.Leaf Nature.Other",
+        ResolvedInstructionLanguage::En,
+        &[zero, other],
+    );
+    assert_eq!(
+        association_issue_kinds(&multiple_macro),
+        ["ambiguous_entity_ownership"]
+    );
+    assert!(multiple_macro.ast.entities.is_empty());
+}
+
+fn semantic_macro_definition(
+    namespace: &str,
+    heading: &str,
+    version: &str,
+    parameters: serde_json::Value,
+    body: serde_json::Value,
+) -> MacroDefinition {
+    MacroDefinition::from_json(
+        &serde_json::json!({
+            "schema": "inku.macro-definition.v1",
+            "namespace": namespace,
+            "heading": heading,
+            "version": version,
+            "parameters": parameters,
+            "components": {},
+            "body": body
+        })
+        .to_string(),
+    )
+    .expect("synthetic semantic macro definition parses")
+}
+
+fn locked_macro_document(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> NormalizedDdlDocument {
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition
+                .identity()
+                .expect("synthetic definition is valid");
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .expect("synthetic lock is valid")
+        })
+        .collect();
+    NormalizedDdlDocument::new(source, language, locks).expect("synthetic macro document is valid")
+}
+
+fn macro_association(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> SemanticAssociationResult {
+    let document = locked_macro_document(source, language, definitions);
+    let binding = bind_macro_parameters(&document, definitions).expect("accepted I-581 result");
+    associate_semantic_entities_with_macro_binding(&document, binding)
+}
+
+fn macro_head(entity: &inku_ddl::SemanticEntity) -> &SemanticMacroInvocationHead {
+    let SemanticHead::MacroInvocation(head) = &entity.head else {
+        panic!("expected MacroInvocation head");
+    };
+    head
+}
+
+fn canonical_head(result: &SemanticAssociationResult, index: usize) -> serde_json::Value {
+    serde_json::from_slice::<serde_json::Value>(
+        result
+            .canonical_bytes
+            .as_deref()
+            .expect("complete canonical"),
+    )
+    .expect("canonical JSON")["entities"][index]["head"]
+        .clone()
+}
+
+fn association_issue_kinds(result: &SemanticAssociationResult) -> Vec<&str> {
+    result
+        .issues
+        .iter()
+        .map(|issue| issue.kind.as_str())
+        .collect()
 }

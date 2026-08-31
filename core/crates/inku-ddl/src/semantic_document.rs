@@ -5,17 +5,18 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::{
-    ClauseAtom, ClauseStreamError, CoreRoleKind, NormalizedDdlDocument, SemanticInstruction,
-    SemanticInstructionAssociationResult, SemanticTerm, associate_semantic_instructions,
+    ClauseAtom, ClauseStreamError, CoreRoleKind, MacroParameterBindingResult,
+    NormalizedDdlDocument, SemanticInstruction, SemanticInstructionAssociationResult, SemanticTerm,
+    associate_semantic_instructions, associate_semantic_instructions_with_macro_binding,
     semantic_association::{project_semantic_term, semantic_identity_value, sentence_region_index},
     semantic_instruction::semantic_instruction_value,
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v3";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v4";
 
 /// Document-global semantic AST with accepted drawable instructions and optional support material.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticDocumentAst {
     pub ground: Option<SemanticTerm>,
     pub instructions: Vec<SemanticInstruction>,
@@ -44,7 +45,7 @@ pub struct SemanticDocumentIssue {
 }
 
 /// Source-preserving document semantic result over the accepted instruction chain.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SemanticDocumentResult {
     pub schema_id: &'static str,
     pub instruction_association: SemanticInstructionAssociationResult,
@@ -60,6 +61,23 @@ pub fn associate_semantic_document(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticDocumentResult, ClauseStreamError> {
     let instruction_association = associate_semantic_instructions(document)?;
+    Ok(build_semantic_document(document, instruction_association))
+}
+
+/// Associate a document from one caller-owned accepted I-581 result without rerunning it.
+pub fn associate_semantic_document_with_macro_binding(
+    document: &NormalizedDdlDocument,
+    macro_parameter_binding: MacroParameterBindingResult,
+) -> SemanticDocumentResult {
+    let instruction_association =
+        associate_semantic_instructions_with_macro_binding(document, macro_parameter_binding);
+    build_semantic_document(document, instruction_association)
+}
+
+fn build_semantic_document(
+    document: &NormalizedDdlDocument,
+    instruction_association: SemanticInstructionAssociationResult,
+) -> SemanticDocumentResult {
     let mut grounds = Vec::new();
 
     for (clause_index, clause) in instruction_association
@@ -74,6 +92,12 @@ pub fn associate_semantic_document(
                 continue;
             };
             if term.role != CoreRoleKind::Ground {
+                continue;
+            }
+            if instruction_association
+                .association
+                .macro_parameter_owns_span(term.span)
+            {
                 continue;
             }
             let region_index = sentence_region_index(
@@ -122,7 +146,7 @@ pub fn associate_semantic_document(
     };
     let canonical_bytes = ast.complete.then(|| canonical_ast_bytes(&ast));
 
-    Ok(SemanticDocumentResult {
+    SemanticDocumentResult {
         schema_id: SEMANTIC_DOCUMENT_SCHEMA_ID,
         instruction_association,
         ast,
@@ -130,7 +154,7 @@ pub fn associate_semantic_document(
         canonical_bytes,
         owned_ground_occurrence_count,
         delivered_ground_occurrence_count,
-    })
+    }
 }
 
 fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {

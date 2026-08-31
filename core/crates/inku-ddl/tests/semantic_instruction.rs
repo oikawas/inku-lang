@@ -1,15 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStream, MacroLock, NormalizedDdlDocument,
-    RemainingRoleKind, ResolvedInstructionLanguage, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-    SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstructionAssociationResult,
-    SourceOccurrence, associate_semantic_instructions, saijiki_asset,
-    semantic_instruction::SemanticInstructionOccurrenceRole,
+    ClauseAtom, ClauseSeparatorKind, ClauseStream, MacroDefinition, MacroLock,
+    NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
+    SemanticHead, SemanticInstructionAssociationResult, SourceOccurrence,
+    associate_semantic_instructions, associate_semantic_instructions_with_macro_binding,
+    bind_macro_parameters, saijiki_asset, semantic_instruction::SemanticInstructionOccurrenceRole,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v7.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v8.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -502,13 +503,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v7"
+        "inku.semantic-instruction-association.v8"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v7"
+        "inku.semantic-instruction-association-fixture.v8"
     );
-    assert_eq!(fixture.version, 7);
+    assert_eq!(fixture.version, 8);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -749,7 +750,7 @@ fn assert_source_provenance(case: &Case, result: &SemanticInstructionAssociation
                 &result.association.clause_stream,
             );
             assert_eq!(
-                instruction.entity.head.provenance.source.region_index,
+                instruction.entity.head.source().region_index,
                 action.provenance.source.region_index,
                 "{}: entity and Action must share one sentence region",
                 case.id
@@ -763,7 +764,7 @@ fn assert_source_provenance(case: &Case, result: &SemanticInstructionAssociation
                 &result.association.clause_stream,
             );
             assert_eq!(
-                instruction.entity.head.provenance.source.region_index,
+                instruction.entity.head.source().region_index,
                 position.provenance.source.region_index,
                 "{}: entity and Position must share one sentence region",
                 case.id
@@ -886,4 +887,191 @@ fn assert_instruction_occurrence_join(case: &Case, result: &SemanticInstructionA
     output.sort_by_key(|(role, span)| (*role, span.start_byte));
 
     assert_eq!(output, input, "{}: instruction occurrence join", case.id);
+}
+
+#[test]
+fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
+    let definition = instruction_macro_definition("Nature", "Leaf", serde_json::json!({}));
+    let motion = english_role_surface("ugoki");
+    let place = english_role_surface("basho");
+    let along = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "along")
+        .and_then(|relation| relation.literals_en.first())
+        .expect("accepted along literal");
+    let source = format!("circle! Nature.Leaf {motion} {place} {along}! square {along}!");
+    let document = instruction_macro_document(&source, std::slice::from_ref(&definition));
+    let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+    let result = associate_semantic_instructions_with_macro_binding(&document, binding);
+
+    assert!(result.issues.is_empty());
+    assert!(result.relation_issues.is_empty());
+    assert_eq!(result.ast.instructions.len(), 3);
+    assert!(matches!(
+        result.ast.instructions[1].entity.head,
+        SemanticHead::MacroInvocation(_)
+    ));
+    assert_eq!(
+        result.ast.instructions[1]
+            .action
+            .as_ref()
+            .map(|term| term.identity.category.as_str()),
+        Some("movement")
+    );
+    assert_eq!(
+        result.ast.instructions[1]
+            .position
+            .as_ref()
+            .map(|term| term.identity.category.as_str()),
+        Some("place")
+    );
+    let relation = result.ast.instructions[1]
+        .relation
+        .as_ref()
+        .expect("MacroInvocation current instruction retains its unbound relation");
+    assert_eq!(relation.kind.as_str(), "along");
+    assert_eq!(relation.reference.as_str(), "previous_one");
+    assert_eq!(
+        result.ast.instructions[2]
+            .relation
+            .as_ref()
+            .map(|relation| relation.reference.as_str()),
+        Some("previous_one"),
+        "Primitive current instruction counts the previous MacroInvocation"
+    );
+    assert_eq!(result.owned_instruction_occurrence_count, 2);
+    assert_eq!(result.delivered_instruction_occurrence_count, 2);
+
+    let canonical: serde_json::Value = serde_json::from_slice(
+        result
+            .canonical_bytes
+            .as_deref()
+            .expect("complete canonical"),
+    )
+    .unwrap();
+    assert_eq!(
+        canonical["schema"],
+        "inku.semantic-instruction-association.v8"
+    );
+    assert_eq!(
+        canonical["instructions"][1]["entity"]["head"]["kind"],
+        "macro_invocation"
+    );
+    assert_eq!(
+        canonical["instructions"][1]["relation"]["reference"],
+        "previous_one"
+    );
+
+    let between = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "between")
+        .and_then(|relation| relation.literals_en.first())
+        .expect("accepted between literal");
+    let previous_two_source = format!("circle! Nature.Leaf! square {between}!");
+    let previous_two_document =
+        instruction_macro_document(&previous_two_source, std::slice::from_ref(&definition));
+    let previous_two_binding =
+        bind_macro_parameters(&previous_two_document, std::slice::from_ref(&definition)).unwrap();
+    let previous_two = associate_semantic_instructions_with_macro_binding(
+        &previous_two_document,
+        previous_two_binding,
+    );
+    assert!(previous_two.relation_issues.is_empty());
+    assert_eq!(previous_two.ast.instructions.len(), 3);
+    assert!(matches!(
+        previous_two.ast.instructions[1].entity.head,
+        SemanticHead::MacroInvocation(_)
+    ));
+    assert_eq!(
+        previous_two.ast.instructions[2]
+            .relation
+            .as_ref()
+            .map(|relation| relation.reference.as_str()),
+        Some("previous_two")
+    );
+}
+
+#[test]
+fn bound_action_and_position_are_not_redelivered_to_outer_instruction_fields() {
+    let definition = instruction_macro_definition(
+        "Nature",
+        "Bound",
+        serde_json::json!({
+            "action": {"type": "semantic_ref", "category": "movement"},
+            "position": {"type": "semantic_ref", "category": "place"}
+        }),
+    );
+    let source = format!(
+        "Nature.Bound {} {}",
+        english_role_surface("ugoki"),
+        english_role_surface("basho")
+    );
+    let document = instruction_macro_document(&source, std::slice::from_ref(&definition));
+    let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+    let result = associate_semantic_instructions_with_macro_binding(&document, binding);
+
+    assert!(result.issues.is_empty());
+    assert_eq!(result.ast.instructions.len(), 1);
+    assert!(result.ast.instructions[0].action.is_none());
+    assert!(result.ast.instructions[0].position.is_none());
+    assert_eq!(result.owned_instruction_occurrence_count, 0);
+    assert_eq!(result.delivered_instruction_occurrence_count, 0);
+    let SemanticHead::MacroInvocation(head) = &result.ast.instructions[0].entity.head else {
+        panic!("expected MacroInvocation head");
+    };
+    assert_eq!(head.parameters.len(), 2);
+}
+
+fn instruction_macro_definition(
+    namespace: &str,
+    heading: &str,
+    parameters: serde_json::Value,
+) -> MacroDefinition {
+    MacroDefinition::from_json(
+        &serde_json::json!({
+            "schema": "inku.macro-definition.v1",
+            "namespace": namespace,
+            "heading": heading,
+            "version": "1.0.0",
+            "parameters": parameters,
+            "components": {},
+            "body": []
+        })
+        .to_string(),
+    )
+    .expect("synthetic instruction macro definition parses")
+}
+
+fn instruction_macro_document(
+    source: &str,
+    definitions: &[MacroDefinition],
+) -> NormalizedDdlDocument {
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition
+                .identity()
+                .expect("synthetic definition is valid");
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .expect("synthetic lock is valid")
+        })
+        .collect();
+    NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, locks)
+        .expect("synthetic instruction macro document is valid")
+}
+
+fn english_role_surface(category_key: &str) -> &str {
+    saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == category_key)
+        .and_then(|category| category.words.first())
+        .and_then(|word| word.surface_en.as_deref())
+        .expect("accepted role has an English surface")
 }

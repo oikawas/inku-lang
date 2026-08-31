@@ -10,6 +10,7 @@ pub mod language;
 pub mod macro_definition;
 pub mod macro_seed;
 pub mod noun_phrase;
+pub mod opaque_head;
 pub mod parser;
 pub mod prompt;
 pub mod saijiki;
@@ -57,6 +58,11 @@ pub use noun_phrase::{
     EnglishNounPhraseCandidateEvidence, EnglishNounPhraseEvidenceResult,
     NOUN_PHRASE_EVIDENCE_SCHEMA_ID, NounPhraseEvidenceDiagnostic, NounPhraseEvidenceDiagnosticKind,
     collect_english_noun_phrase_evidence,
+};
+pub use opaque_head::{
+    EnglishOpaqueHeadCandidateEvidenceResult, OPAQUE_HEAD_CANDIDATE_EVIDENCE_SCHEMA_ID,
+    OpaqueHeadCandidateEvidence, OpaqueHeadCandidateEvidenceDiagnostic,
+    OpaqueHeadCandidateEvidenceDiagnosticKind, collect_english_opaque_head_candidate_evidence,
 };
 pub use parser::{
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,

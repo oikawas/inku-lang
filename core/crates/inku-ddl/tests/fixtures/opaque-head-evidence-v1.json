@@ -1,0 +1,150 @@
+{
+  "schema": "inku.english-opaque-head-candidate-evidence-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "typed-and-recognized-exclusions",
+      "language": "en",
+      "source": "a blue top paper eight many with not touching",
+      "expected_outcomes": [
+        {
+          "kind": "missing",
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 45},
+          "candidates": []
+        }
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 1,
+      "separator_count": 0,
+      "delivery_conservation_count": 8
+    },
+    {
+      "id": "exact-one-utf8",
+      "language": "en",
+      "source": "the 雪影 blue",
+      "expected_outcomes": [
+        {
+          "kind": "exact_one",
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 3},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 15},
+          "candidates": [
+            {"surface": "雪影", "span": {"start_byte": 4, "end_byte": 10}}
+          ]
+        }
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 1,
+      "separator_count": 0,
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "multiple-opaque",
+      "language": "en",
+      "source": "an quiet blue jagged",
+      "expected_outcomes": [
+        {
+          "kind": "ambiguous",
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 2},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 20},
+          "candidates": [
+            {"surface": "quiet", "span": {"start_byte": 3, "end_byte": 8}},
+            {"surface": "jagged", "span": {"start_byte": 14, "end_byte": 20}}
+          ]
+        }
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 1,
+      "separator_count": 0,
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "canonical-exact-one",
+      "language": "en",
+      "source": "a circle",
+      "expected_outcomes": [],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 0,
+      "separator_count": 0,
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "canonical-ambiguous",
+      "language": "en",
+      "source": "the circle square",
+      "expected_outcomes": [],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 1,
+      "separator_count": 0,
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "multiple-determiners-clauses-and-separators",
+      "language": "en",
+      "source": "a hush an blue\r\nthe murmur\na silent.",
+      "expected_outcomes": [
+        {
+          "kind": "exact_one",
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 0, "end_byte": 1},
+          "candidate_region_span": {"start_byte": 0, "end_byte": 7},
+          "candidates": [
+            {"surface": "hush", "span": {"start_byte": 2, "end_byte": 6}}
+          ]
+        },
+        {
+          "kind": "missing",
+          "clause_index": 0,
+          "determiner_span": {"start_byte": 7, "end_byte": 9},
+          "candidate_region_span": {"start_byte": 7, "end_byte": 14},
+          "candidates": []
+        },
+        {
+          "kind": "exact_one",
+          "clause_index": 1,
+          "determiner_span": {"start_byte": 16, "end_byte": 19},
+          "candidate_region_span": {"start_byte": 16, "end_byte": 26},
+          "candidates": [
+            {"surface": "murmur", "span": {"start_byte": 20, "end_byte": 26}}
+          ]
+        },
+        {
+          "kind": "exact_one",
+          "clause_index": 2,
+          "determiner_span": {"start_byte": 27, "end_byte": 28},
+          "candidate_region_span": {"start_byte": 27, "end_byte": 35},
+          "candidates": [
+            {"surface": "silent", "span": {"start_byte": 29, "end_byte": 35}}
+          ]
+        }
+      ],
+      "noun_phrase_evidence_count": 4,
+      "noun_phrase_diagnostic_count": 4,
+      "separator_count": 3,
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "ja-input",
+      "language": "ja",
+      "source": "a 影",
+      "expected_outcomes": [],
+      "noun_phrase_evidence_count": 0,
+      "noun_phrase_diagnostic_count": 0,
+      "separator_count": 0,
+      "delivery_conservation_count": 0
+    },
+    {
+      "id": "en-no-determiner",
+      "language": "en",
+      "source": "quiet blue",
+      "expected_outcomes": [],
+      "noun_phrase_evidence_count": 0,
+      "noun_phrase_diagnostic_count": 0,
+      "separator_count": 0,
+      "delivery_conservation_count": 1
+    }
+  ]
+}

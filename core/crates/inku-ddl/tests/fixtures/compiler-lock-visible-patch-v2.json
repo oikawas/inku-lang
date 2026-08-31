@@ -1,6 +1,6 @@
 {
-  "schema": "inku.compiler-lock-visible-patch-v1-fixture.v1",
-  "version": 1,
+  "schema": "inku.compiler-lock-visible-patch-fixture.v2",
+  "version": 2,
   "definition": {
     "schema": "inku.macro-definition.v1",
     "namespace": "Canon",
@@ -11,11 +11,11 @@
     "body": []
   },
   "known_answers": {
-    "canonical_bytes": "{\"facts\":[{\"clause\":0,\"invocation\":\"Canon.Empty\",\"kind\":\"macro_binding\",\"ordinal\":0,\"parameters\":[]}],\"holes\":[],\"schema\":\"inku.canonical-semantic-ddl.v1\"}",
-    "canonical_sha256": "ac36e573ca45c36259a9b6f4638ed435ae6a4dc92e655e2374200c4915515b13",
-    "seed_digest": "1332b8adf5e47d94db6fdc0523400d186ab17a680e1d0066700e8a7cc618b3de",
+    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v4\"}",
+    "canonical_sha256": "5f1282e093dcfe55240ae550d0e9e20676d1cb1cd4749c2b3d128da7bc61dfe4",
+    "seed_digest": "26246df2f89bd8b40147c822c15070f3b4c4e41243b4e2720941ab26b51e3409",
     "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
-    "full_lock_digest": "91bcfec9b1296a1df15350aaaa0c04393a11c8bf58c8b55a5d0fee458ed154f7"
+    "full_lock_digest": "e5c662019df0aebeec2fac2048405b402221621a2561ad00c258ce05f86578be"
   },
   "delivery_case_ids": [
     "explicit-and-syntax",

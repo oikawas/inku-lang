@@ -2,12 +2,13 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SourceSpan, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
-    VisibleDdlPatchEdit, VisiblePatchDiagnostic, compile_typed_ddl, validate_visible_ddl_patch,
+    ResolvedInstructionLanguage, SemanticDeliveryOwner, SourceSpan, VISIBLE_DDL_PATCH_SCHEMA_ID,
+    VisibleDdlPatch, VisibleDdlPatchEdit, VisiblePatchDiagnostic, compile_typed_ddl,
+    validate_visible_ddl_patch,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v1.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v2.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -23,14 +24,17 @@ struct FixtureIds {
 
 #[test]
 fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candidates() {
-    let base = base("many white many");
+    let base = base("circle white many. square black many");
     let base_snapshot = base.clone();
     let holes = source_ordered_holes(&base);
     assert_eq!(holes.len(), 2);
 
     let single_patch = patch(&base, vec![edit(holes[0], "8")]);
     let single = validate_visible_ddl_patch(&base, &single_patch, &[], None, LIMITS).unwrap();
-    assert_eq!(single.document.source(), "8 white many");
+    assert_eq!(
+        single.document.source(),
+        "circle white 8. square black many"
+    );
     assert_eq!(
         single.compilation.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::IncompleteKnownHole
@@ -41,7 +45,10 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
 
     let multiple_patch = patch(&base, vec![edit(holes[0], "8"), edit(holes[1], "12")]);
     let multiple = validate_visible_ddl_patch(&base, &multiple_patch, &[], None, LIMITS).unwrap();
-    assert_eq!(multiple.document.source(), "8 white 12");
+    assert_eq!(
+        multiple.document.source(),
+        "circle white 8. square black 12"
+    );
     assert_eq!(
         multiple.compilation.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::CanonicalReady
@@ -53,7 +60,7 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
     let explicit_outside = base
         .deliveries
         .iter()
-        .find(|item| item.descriptor.contains("role=color"))
+        .find(|item| item.identity.owner == SemanticDeliveryOwner::Color)
         .unwrap();
     assert!(
         multiple
@@ -66,7 +73,7 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
 
 #[test]
 fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
-    let base = base("many white many");
+    let base = base("circle white many. square black many");
     let holes = source_ordered_holes(&base);
     let valid_first = edit(holes[0], "8");
     let valid_second = edit(holes[1], "12");
@@ -112,8 +119,12 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
         VisiblePatchDiagnostic::InvalidRange,
     );
     let ja_base = compile_typed_ddl(
-        NormalizedDdlDocument::new("たくさん 白", ResolvedInstructionLanguage::Ja, Vec::new())
-            .unwrap(),
+        NormalizedDdlDocument::new(
+            "円 たくさん 白",
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap(),
         &[],
         None,
         LIMITS,
@@ -153,7 +164,7 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
     let explicit = base
         .deliveries
         .iter()
-        .find(|item| item.descriptor.contains("role=color"))
+        .find(|item| item.identity.owner == SemanticDeliveryOwner::Color)
         .unwrap();
     assert_error(
         &base,
@@ -259,7 +270,7 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
         VisiblePatchDiagnostic::BaseIntegrityFailure
     );
 
-    let patch_base = base("many white");
+    let patch_base = base("circle many white");
     let hole = &patch_base.holes[0];
     assert_error(
         &patch_base,
@@ -273,32 +284,11 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
     );
 
     let relation = base("eight along twelve");
-    let relation_hole = &relation.holes[0];
+    assert!(relation.holes.is_empty());
     assert_error(
         &relation,
-        patch(&relation, vec![edit(relation_hole, "circle")]),
-        VisiblePatchDiagnostic::TargetUnresolved,
-    );
-    let completed_relation = validate_visible_ddl_patch(
-        &relation,
-        &patch(&relation, vec![edit(relation_hole, "along circle")]),
-        &[],
-        None,
-        LIMITS,
-    )
-    .unwrap();
-    assert_eq!(
-        completed_relation.document.source(),
-        "eight along circle twelve"
-    );
-    assert_eq!(
-        completed_relation
-            .compilation
-            .compiler_lock
-            .as_ref()
-            .unwrap()
-            .state,
-        CompilerLockState::CanonicalReady
+        VisibleDdlPatch::new(source(&relation), lock(&relation), vec![fabricated_edit()]),
+        VisiblePatchDiagnostic::PatchTargetUnavailable,
     );
 
     let definition = MacroDefinition::from_json(
@@ -320,9 +310,11 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
         None,
         LIMITS,
     );
+    let candidate = result.expect("typed macro-head hole accepts a Primitive head replacement");
+    assert_eq!(candidate.document.source(), "circle");
     assert_eq!(
-        result.unwrap_err(),
-        VisiblePatchDiagnostic::TargetUnresolved
+        candidate.compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::CanonicalReady
     );
 }
 

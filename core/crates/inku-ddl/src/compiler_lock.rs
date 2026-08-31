@@ -2,28 +2,28 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::{Map, Number, Value};
+use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    AttachmentMarkerKind, BoundMacroParameterValue, ClauseAtom, CompleteMacroParameterBinding,
-    EnglishAttachmentMarkerKind, ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment,
-    JapaneseAttachmentMarkerKind, MacroDefinition, MacroExpansionDiagnosticKind,
-    MacroExpansionLimits, MacroExpansionResult, MacroInvocationResolutionDiagnosticKind,
-    MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, MacroSeed,
-    NeutralDiagnosticKind, NormalizedDdlDocument, RelationReferenceEvidenceAvailability,
-    RelationReferenceOccurrenceKind, SourceSpan, bind_macro_parameters, derive_macro_seed,
-    expand_macros, project_macro_semantic_ref,
+    ClauseAtom, ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, MacroDefinition,
+    MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult,
+    MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
+    MacroParameterBindingResult, MacroSeed, NormalizedDdlDocument, OwnedSemanticOccurrence,
+    SemanticAssociationIssueKind, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
+    SemanticInstructionIssueKind, SemanticMacroParameterValue, SemanticRelationIssueKind,
+    SemanticTerm, SourceSpan, associate_semantic_document_with_macro_binding,
+    bind_macro_parameters, derive_macro_seed, expand_macros,
 };
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v1";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v2";
 /// Stable identity for source-independent pre-expansion semantic bytes.
-pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = "inku.canonical-semantic-ddl.v1";
+pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v1";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v2";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v1";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v2";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,11 +71,75 @@ impl SemanticDeliveryKind {
     }
 }
 
+/// Closed owner identity for one structured semantic occurrence.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum SemanticDeliveryOwner {
+    EntityHead,
+    MacroParameter,
+    Color,
+    Quantity,
+    Touch,
+    Continuity,
+    Angle,
+    SurfaceQuality,
+    SurfaceIntensity,
+    FluctuationAmplitude,
+    FluctuationFrequency,
+    FluctuationQuality,
+    ProportionAspect,
+    ProportionWidthExtent,
+    ProportionArcForm,
+    Action,
+    Position,
+    Relation,
+    Ground,
+    ExpandedNode,
+    TypedIssue,
+    SyntaxOnly,
+}
+
+impl SemanticDeliveryOwner {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::EntityHead => "entity_head",
+            Self::MacroParameter => "macro_parameter",
+            Self::Color => "color",
+            Self::Quantity => "quantity",
+            Self::Touch => "touch",
+            Self::Continuity => "continuity",
+            Self::Angle => "angle",
+            Self::SurfaceQuality => "surface_quality",
+            Self::SurfaceIntensity => "surface_intensity",
+            Self::FluctuationAmplitude => "fluctuation_amplitude",
+            Self::FluctuationFrequency => "fluctuation_frequency",
+            Self::FluctuationQuality => "fluctuation_quality",
+            Self::ProportionAspect => "proportion_aspect",
+            Self::ProportionWidthExtent => "proportion_width_extent",
+            Self::ProportionArcForm => "proportion_arc_form",
+            Self::Action => "action",
+            Self::Position => "position",
+            Self::Relation => "relation",
+            Self::Ground => "ground",
+            Self::ExpandedNode => "expanded_node",
+            Self::TypedIssue => "typed_issue",
+            Self::SyntaxOnly => "syntax_only",
+        }
+    }
+}
+
+/// Source-independent, structured comparison key for one delivery.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct SemanticDeliveryIdentity {
+    pub owner: SemanticDeliveryOwner,
+    pub canonical_key: String,
+}
+
 /// One exactly-once classified source or expansion occurrence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticDelivery {
     pub id: String,
     pub kind: SemanticDeliveryKind,
+    pub identity: SemanticDeliveryIdentity,
     pub descriptor: String,
     pub span: Option<SourceSpan>,
     pub source_independent: bool,
@@ -116,7 +180,7 @@ pub struct TypedHole {
     pub span: SourceSpan,
     pub allowed_span: SourceSpan,
     pub expected_range_digest: String,
-    pub candidate_identity: String,
+    pub expected_owner: SemanticDeliveryOwner,
     pub upstream_diagnostic_identity: String,
 }
 
@@ -162,7 +226,7 @@ pub struct TypedDdlCompilerLock {
     pub schema_id: &'static str,
     pub state: CompilerLockState,
     pub visible_source_digest: String,
-    pub explicit_fact_digest: String,
+    pub structured_semantic_occurrence_digest: String,
     pub canonical_pre_expansion_digest: Option<String>,
     pub composition_seed: Option<u64>,
     pub definition_identities: Vec<CompilerDefinitionIdentity>,
@@ -185,9 +249,8 @@ pub struct TypedDdlCompilation {
     pub holes: Vec<TypedHole>,
     pub conflicts: Vec<CompilerConflict>,
     pub blocking_diagnostics: Vec<CompilerBlockingDiagnostic>,
-    pub canonical_semantic_bytes: Option<Vec<u8>>,
+    pub semantic_document: Option<SemanticDocumentResult>,
     pub derived_seeds: Vec<MacroSeed>,
-    pub parameter_binding: Option<MacroParameterBindingResult>,
     pub macro_expansion: Option<MacroExpansionResult>,
     pub compiler_lock: Option<TypedDdlCompilerLock>,
 }
@@ -195,11 +258,27 @@ pub struct TypedDdlCompilation {
 impl TypedDdlCompilation {
     /// The exact accepted I-581 result, regardless of whether I-582 was reached.
     pub fn accepted_parameter_binding(&self) -> Option<&MacroParameterBindingResult> {
-        self.parameter_binding.as_ref().or_else(|| {
-            self.macro_expansion
-                .as_ref()
-                .map(|expansion| &expansion.parameter_binding)
-        })
+        self.semantic_document
+            .as_ref()
+            .and_then(|document| {
+                document
+                    .instruction_association
+                    .association
+                    .macro_parameter_binding
+                    .as_ref()
+            })
+            .or_else(|| {
+                self.macro_expansion
+                    .as_ref()
+                    .map(|expansion| &expansion.parameter_binding)
+            })
+    }
+
+    /// Borrow the sole I-595 pre-expansion meaning authority when the document is complete.
+    pub fn pre_expansion_canonical_bytes(&self) -> Option<&[u8]> {
+        self.semantic_document
+            .as_ref()
+            .and_then(|document| document.canonical_bytes.as_deref())
     }
 
     /// Source-independent fingerprints used by constrained patch validation.
@@ -208,11 +287,16 @@ impl TypedDdlCompilation {
             .iter()
             .filter_map(|delivery| {
                 (delivery.kind == SemanticDeliveryKind::Explicit)
-                    .then_some(
-                        delivery
-                            .span
-                            .map(|span| (span, delivery.descriptor.clone())),
-                    )
+                    .then_some(delivery.span.map(|span| {
+                        (
+                            span,
+                            format!(
+                                "{}|{}",
+                                delivery.identity.owner.as_str(),
+                                delivery.identity.canonical_key
+                            ),
+                        )
+                    }))
                     .flatten()
             })
             .collect()
@@ -225,8 +309,6 @@ struct Projection {
     holes: Vec<TypedHole>,
     conflicts: Vec<CompilerConflict>,
     blocking: Vec<CompilerBlockingDiagnostic>,
-    facts: Vec<Value>,
-    source_independent: bool,
 }
 
 /// Compile one source-preserving document without selecting defaults, targets, Score, or runtime
@@ -245,56 +327,35 @@ pub fn compile_typed_ddl(
         Ok(binding) => binding,
         Err(_) => return integrity_failure(document, "clause_stream_integrity"),
     };
-    let mut projection = project_deliveries(&document, &parameter_binding);
+    let mut semantic_document =
+        associate_semantic_document_with_macro_binding(&document, parameter_binding);
+    let mut projection = project_deliveries(&document, &semantic_document);
     sort_projection(&mut projection);
-
-    let explicit_bytes = canonical_bytes(CANONICAL_SEMANTIC_DDL_SCHEMA_ID, &projection.facts, &[]);
-    let explicit_fact_digest = sha256_hex(&explicit_bytes);
-    let canonical_semantic_bytes = if projection.source_independent
-        && projection.conflicts.is_empty()
-        && projection.blocking.is_empty()
-    {
-        let holes = projection
-            .holes
-            .iter()
-            .map(|hole| {
-                string_record(&[
-                    ("candidate", hole.candidate_identity.as_str()),
-                    ("kind", hole.kind.as_str()),
-                ])
-            })
-            .collect::<Vec<_>>();
-        Some(canonical_bytes(
-            CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-            &projection.facts,
-            &holes,
-        ))
-    } else {
-        None
-    };
-
-    let source_independent_projection = projection.conflicts.is_empty()
-        && projection.blocking.is_empty()
-        && canonical_semantic_bytes.is_some();
+    let structured_semantic_occurrence_digest = sha256_hex(&structured_semantic_occurrence_bytes(
+        &projection.deliveries,
+    ));
+    let canonical_ready = semantic_document.canonical_bytes.is_some();
     let mut seeds = Vec::new();
     let mut expansion = None;
-    let mut retained_binding = Some(parameter_binding);
 
-    if source_independent_projection {
-        let canonical = String::from_utf8(
-            canonical_semantic_bytes
-                .as_ref()
-                .expect("ready projection has canonical UTF-8")
-                .clone(),
-        )
-        .expect("serde_json emits UTF-8");
-        let binding = retained_binding
+    if canonical_ready {
+        let binding = semantic_document
+            .instruction_association
+            .association
+            .macro_parameter_binding
             .take()
-            .expect("binding is owned exactly once");
+            .expect("I-595 document owns the accepted binding exactly once");
+        let canonical = std::str::from_utf8(
+            semantic_document
+                .canonical_bytes
+                .as_deref()
+                .expect("complete semantic document has canonical bytes"),
+        )
+        .expect("I-595 canonical JSON is UTF-8");
         for complete in &binding.complete {
             let resolved = &binding.macro_resolution.resolved[complete.invocation_index];
             seeds.push(derive_macro_seed(
-                &canonical,
+                canonical,
                 &resolved.invocation,
                 composition_seed,
             ));
@@ -319,8 +380,8 @@ pub fn compile_typed_ddl(
         definitions,
         composition_seed,
         &projection,
-        explicit_fact_digest,
-        canonical_semantic_bytes.as_deref(),
+        structured_semantic_occurrence_digest,
+        semantic_document.canonical_bytes.as_deref(),
         &seeds,
         expanded_digest,
         state,
@@ -335,9 +396,8 @@ pub fn compile_typed_ddl(
         holes: projection.holes,
         conflicts: projection.conflicts,
         blocking_diagnostics: projection.blocking,
-        canonical_semantic_bytes,
+        semantic_document: Some(semantic_document),
         derived_seeds: seeds,
-        parameter_binding: retained_binding,
         macro_expansion: expansion,
         compiler_lock: Some(lock),
     }
@@ -352,6 +412,10 @@ fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCom
     let delivery = SemanticDelivery {
         id: diagnostic.id.clone(),
         kind: SemanticDeliveryKind::BlockingDiagnostic,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: kind.to_owned(),
+        },
         descriptor: kind.to_owned(),
         span: None,
         source_independent: false,
@@ -367,9 +431,8 @@ fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCom
         holes: Vec::new(),
         conflicts: Vec::new(),
         blocking_diagnostics: vec![diagnostic],
-        canonical_semantic_bytes: None,
+        semantic_document: None,
         derived_seeds: Vec::new(),
-        parameter_binding: None,
         macro_expansion: None,
         compiler_lock: None,
     }
@@ -377,255 +440,372 @@ fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCom
 
 fn project_deliveries(
     document: &NormalizedDdlDocument,
-    binding: &MacroParameterBindingResult,
+    semantic_document: &SemanticDocumentResult,
 ) -> Projection {
-    let mut projection = Projection {
-        source_independent: true,
-        ..Projection::default()
-    };
-    let relation = &binding.macro_resolution.relation_reference_evidence;
-    let stream = &relation.attachment_evidence.noun_phrase.clause_stream;
-    let relation_spans = relation
-        .evidence
-        .iter()
-        .map(|item| item.occurrence.span)
-        .chain(relation.diagnostics.iter().map(|item| item.occurrence.span))
-        .collect::<Vec<_>>();
-    let macro_spans = binding
-        .macro_resolution
-        .resolved
-        .iter()
-        .map(|item| item.span)
-        .chain(
-            binding
-                .macro_resolution
-                .diagnostics
-                .iter()
-                .map(|item| item.span),
-        )
-        .collect::<Vec<_>>();
+    let mut projection = Projection::default();
 
-    for evidence in &relation.evidence {
-        let occurrence = relation_occurrence_descriptor(&evidence.occurrence.kind);
-        let candidates = evidence
-            .candidate_atom_indices
-            .iter()
-            .map(|index| atom_descriptor(&stream.clauses[evidence.clause_index].atoms[*index]))
-            .collect::<Vec<_>>();
-        let descriptor = format!(
-            "relation|clause={}|occurrence={}|candidates={}",
-            evidence.clause_index,
-            occurrence,
-            candidates.join(",")
-        );
-        match evidence.availability {
-            RelationReferenceEvidenceAvailability::Zero => add_hole(
-                document,
-                &mut projection,
-                "missing_relation_target",
-                evidence.occurrence.span,
-                format!("{occurrence}:missing-target"),
-                "i579:zero".to_owned(),
-            ),
-            RelationReferenceEvidenceAvailability::ExactOne => {
-                add_explicit(
-                    &mut projection,
-                    evidence.occurrence.span,
-                    descriptor.clone(),
-                );
-                projection.facts.push(string_record(&[
-                    ("association", candidates[0].as_str()),
-                    ("clause", &evidence.clause_index.to_string()),
-                    ("kind", "relation"),
-                    ("occurrence", occurrence.as_str()),
-                ]));
-            }
-            RelationReferenceEvidenceAvailability::Multiple => add_conflict(
-                &mut projection,
-                "multiple_relation_targets",
-                Some(evidence.occurrence.span),
-                candidates,
-            ),
-        }
+    if let Some(ground) = &semantic_document.ast.ground {
+        add_term_explicit(&mut projection, SemanticDeliveryOwner::Ground, ground);
     }
-    for diagnostic in &relation.diagnostics {
-        add_blocking(
-            &mut projection,
-            "relation_evidence_integrity",
-            Some(diagnostic.occurrence.span),
-        );
+    for instruction in &semantic_document.ast.instructions {
+        project_instruction(instruction, &mut projection);
     }
 
-    for (clause_index, clause) in stream.clauses.iter().enumerate() {
-        for atom in &clause.atoms {
-            let span = atom.span();
-            if relation_spans.contains(&span) || macro_spans.contains(&span) {
-                continue;
-            }
-            match atom {
-                ClauseAtom::CoreRole(term) => {
-                    let descriptor = format!(
-                        "role|clause={clause_index}|role={}|id={}",
-                        core_role_name(term.role),
-                        canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-                    );
-                    add_explicit(&mut projection, span, descriptor);
-                    projection.facts.push(string_record(&[
-                        ("clause", &clause_index.to_string()),
-                        (
-                            "id",
-                            canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-                                .as_str(),
-                        ),
-                        ("kind", "role"),
-                        ("role", core_role_name(term.role)),
-                    ]));
-                }
-                ClauseAtom::RemainingRole(term) => {
-                    let descriptor = format!(
-                        "role|clause={clause_index}|role={}|id={}",
-                        remaining_role_name(term.role),
-                        canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-                    );
-                    add_explicit(&mut projection, span, descriptor);
-                    projection.facts.push(string_record(&[
-                        ("clause", &clause_index.to_string()),
-                        (
-                            "id",
-                            canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-                                .as_str(),
-                        ),
-                        ("kind", "role"),
-                        ("role", remaining_role_name(term.role)),
-                    ]));
-                }
-                ClauseAtom::UnattachedExactNumber(number) => {
-                    let descriptor = format!("number|clause={clause_index}|value={}", number.value);
-                    add_explicit(&mut projection, span, descriptor);
-                    projection
-                        .facts
-                        .push(number_record(clause_index, number.value));
-                }
-                ClauseAtom::FunctionWord { .. } => {
-                    add_syntax(&mut projection, span, "function_word")
-                }
-                ClauseAtom::SaijikiRelation { .. } => {
-                    add_blocking(&mut projection, "unaccounted_relation", Some(span));
-                }
-                ClauseAtom::UnresolvedDiagnostic(diagnostic) => match diagnostic.kind {
-                    NeutralDiagnosticKind::Hole if diagnostic.recognized => add_hole(
-                        document,
-                        &mut projection,
-                        "unresolved_value",
-                        span,
-                        "known-value".to_owned(),
-                        "parser:hole".to_owned(),
-                    ),
-                    NeutralDiagnosticKind::Conflict if diagnostic.recognized => {
-                        add_conflict(&mut projection, "parser_conflict", Some(span), Vec::new())
-                    }
-                    _ => add_blocking(&mut projection, "unknown_source", Some(span)),
-                },
-            }
-        }
-    }
-
-    for resolved in &binding.macro_resolution.resolved {
-        let complete = binding.complete.iter().find(|item| {
-            item.invocation_index < binding.macro_resolution.resolved.len()
-                && binding.macro_resolution.resolved[item.invocation_index]
-                    .invocation
-                    .ordinal()
-                    == resolved.invocation.ordinal()
-        });
-        if let Some(complete) = complete {
-            let descriptor = binding_descriptor(complete);
-            add_explicit(&mut projection, resolved.span, descriptor.clone());
-            projection.facts.push(binding_record(complete));
-        }
-    }
-
-    for diagnostic in &binding.macro_resolution.diagnostics {
-        let kind = macro_resolution_kind(diagnostic.kind);
-        match diagnostic.kind {
-            MacroInvocationResolutionDiagnosticKind::MissingLock
-            | MacroInvocationResolutionDiagnosticKind::MissingDefinition
-            | MacroInvocationResolutionDiagnosticKind::InvalidDefinition => add_hole(
-                document,
-                &mut projection,
-                kind,
-                diagnostic.span,
-                diagnostic
-                    .invocation
-                    .as_ref()
-                    .map(|value| value.qualified_name())
-                    .unwrap_or_else(|| "unresolved-macro".to_owned()),
-                format!("i580:{kind}"),
-            ),
-            MacroInvocationResolutionDiagnosticKind::AmbiguousLockPrefix
-            | MacroInvocationResolutionDiagnosticKind::DuplicateMatchingDefinition => add_conflict(
-                &mut projection,
-                kind,
-                Some(diagnostic.span),
-                diagnostic
-                    .matching_locks
-                    .iter()
-                    .map(|item| format!("{}@{}#{}", item.qualified_name, item.version, item.digest))
-                    .collect(),
-            ),
-            MacroInvocationResolutionDiagnosticKind::QualifiedNameMismatch
-            | MacroInvocationResolutionDiagnosticKind::VersionMismatch
-            | MacroInvocationResolutionDiagnosticKind::DigestMismatch
-            | MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch => {
-                add_blocking(&mut projection, kind, Some(diagnostic.span));
-            }
-        }
-    }
-
-    for diagnostic in &binding.diagnostics {
-        let resolved = binding
-            .macro_resolution
-            .resolved
-            .get(diagnostic.invocation_index);
-        let span = resolved.map(|item| item.span);
-        let kind = macro_binding_kind(diagnostic.kind);
-        match diagnostic.kind {
-            MacroParameterBindingDiagnosticKind::MissingCompatibleFact
-            | MacroParameterBindingDiagnosticKind::UnsupportedSchema
-            | MacroParameterBindingDiagnosticKind::NumericRange
-            | MacroParameterBindingDiagnosticKind::NumericPrecision => {
+    let association = &semantic_document.instruction_association.association;
+    for issue in &association.issues {
+        let span = issue
+            .upstream_diagnostic
+            .as_ref()
+            .map(|diagnostic| diagnostic.span)
+            .or_else(|| {
+                issue
+                    .occurrences
+                    .first()
+                    .map(|occurrence| occurrence.source().span)
+            });
+        let kind = issue.kind.as_str();
+        match issue.kind {
+            SemanticAssociationIssueKind::UpstreamHole => {
                 if let Some(span) = span {
                     add_hole(
                         document,
                         &mut projection,
                         kind,
                         span,
-                        format!(
-                            "{}:{}",
-                            diagnostic.definition_identity.qualified_name(),
-                            diagnostic.parameter_names.join(",")
-                        ),
-                        format!("i581:{kind}"),
+                        SemanticDeliveryOwner::Quantity,
+                        "semantic_association:upstream_hole".to_owned(),
                     );
                 } else {
-                    add_blocking(&mut projection, "binding_missing_invocation", None);
+                    add_blocking(&mut projection, kind, None);
                 }
             }
-            MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment
-            | MacroParameterBindingDiagnosticKind::SharedFact => add_conflict(
+            SemanticAssociationIssueKind::MacroResolution(
+                MacroInvocationResolutionDiagnosticKind::MissingLock
+                | MacroInvocationResolutionDiagnosticKind::MissingDefinition
+                | MacroInvocationResolutionDiagnosticKind::InvalidDefinition,
+            )
+            | SemanticAssociationIssueKind::MacroParameterBinding(
+                MacroParameterBindingDiagnosticKind::MissingCompatibleFact
+                | MacroParameterBindingDiagnosticKind::UnsupportedSchema
+                | MacroParameterBindingDiagnosticKind::NumericRange
+                | MacroParameterBindingDiagnosticKind::NumericPrecision,
+            ) => {
+                if let Some(span) = span {
+                    add_hole(
+                        document,
+                        &mut projection,
+                        kind,
+                        span,
+                        SemanticDeliveryOwner::EntityHead,
+                        format!("semantic_association:{kind}"),
+                    );
+                } else {
+                    add_blocking(&mut projection, kind, None);
+                }
+            }
+            SemanticAssociationIssueKind::AmbiguousEntityOwnership
+            | SemanticAssociationIssueKind::ConflictingColors
+            | SemanticAssociationIssueKind::ConflictingQuantities
+            | SemanticAssociationIssueKind::ConflictingTouches
+            | SemanticAssociationIssueKind::ConflictingContinuities
+            | SemanticAssociationIssueKind::ConflictingAngles
+            | SemanticAssociationIssueKind::ConflictingSurfaceQualities
+            | SemanticAssociationIssueKind::ConflictingSurfaceIntensities
+            | SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes
+            | SemanticAssociationIssueKind::ConflictingFluctuationFrequencies
+            | SemanticAssociationIssueKind::ConflictingFluctuationQualities
+            | SemanticAssociationIssueKind::ConflictingProportionAspects
+            | SemanticAssociationIssueKind::ConflictingProportionWidthExtents
+            | SemanticAssociationIssueKind::ConflictingProportionArcForms
+            | SemanticAssociationIssueKind::UpstreamConflict
+            | SemanticAssociationIssueKind::MacroResolution(
+                MacroInvocationResolutionDiagnosticKind::AmbiguousLockPrefix
+                | MacroInvocationResolutionDiagnosticKind::DuplicateMatchingDefinition,
+            )
+            | SemanticAssociationIssueKind::MacroParameterBinding(
+                MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment
+                | MacroParameterBindingDiagnosticKind::SharedFact,
+            ) => add_conflict(
                 &mut projection,
                 kind,
                 span,
-                diagnostic.parameter_names.clone(),
+                issue.occurrences.iter().map(owned_occurrence_key).collect(),
             ),
-            MacroParameterBindingDiagnosticKind::DefinitionIdentityOwnershipMismatch
-            | MacroParameterBindingDiagnosticKind::SourceClauseAtomOwnershipMismatch => {
-                add_blocking(&mut projection, kind, span);
+            SemanticAssociationIssueKind::MissingEntityHead
+            | SemanticAssociationIssueKind::UnknownSurfaceDimension
+            | SemanticAssociationIssueKind::UnknownFluctuationDimension
+            | SemanticAssociationIssueKind::UnknownProportionDimension
+            | SemanticAssociationIssueKind::UpstreamUnknown
+            | SemanticAssociationIssueKind::MacroResolution(_)
+            | SemanticAssociationIssueKind::MacroParameterBinding(_) => {
+                add_blocking(&mut projection, kind, span)
+            }
+        }
+    }
+
+    for issue in &semantic_document.instruction_association.issues {
+        let span = issue
+            .occurrences
+            .first()
+            .map(|occurrence| occurrence.term.provenance.source.span);
+        match issue.kind {
+            SemanticInstructionIssueKind::ConflictingActions
+            | SemanticInstructionIssueKind::ConflictingPositions => add_conflict(
+                &mut projection,
+                issue.kind.as_str(),
+                span,
+                issue
+                    .occurrences
+                    .iter()
+                    .map(|occurrence| term_key(&occurrence.term))
+                    .collect(),
+            ),
+            SemanticInstructionIssueKind::MissingActionEntity
+            | SemanticInstructionIssueKind::MissingPositionEntity => {
+                add_blocking(&mut projection, issue.kind.as_str(), span)
+            }
+        }
+    }
+
+    for issue in &semantic_document.instruction_association.relation_issues {
+        let span = issue
+            .occurrences
+            .first()
+            .map(|occurrence| occurrence.provenance.span);
+        match issue.kind {
+            SemanticRelationIssueKind::ConflictingRelations => add_conflict(
+                &mut projection,
+                issue.kind.as_str(),
+                span,
+                issue
+                    .occurrences
+                    .iter()
+                    .map(|occurrence| {
+                        format!(
+                            "{}:{}",
+                            occurrence.kind.as_str(),
+                            occurrence.reference.as_str()
+                        )
+                    })
+                    .collect(),
+            ),
+            SemanticRelationIssueKind::MissingCurrentInstruction
+            | SemanticRelationIssueKind::MissingPreviousOne
+            | SemanticRelationIssueKind::MissingPreviousTwo => {
+                if let Some(span) = span {
+                    add_hole(
+                        document,
+                        &mut projection,
+                        issue.kind.as_str(),
+                        span,
+                        SemanticDeliveryOwner::Relation,
+                        format!("semantic_relation:{}", issue.kind.as_str()),
+                    );
+                } else {
+                    add_blocking(&mut projection, issue.kind.as_str(), None);
+                }
+            }
+        }
+    }
+
+    for issue in &semantic_document.issues {
+        match issue.kind {
+            SemanticDocumentIssueKind::ConflictingGrounds => add_conflict(
+                &mut projection,
+                issue.kind.as_str(),
+                issue
+                    .occurrences
+                    .first()
+                    .map(|term| term.provenance.source.span),
+                issue.occurrences.iter().map(term_key).collect(),
+            ),
+        }
+    }
+
+    let covered_spans = projection
+        .deliveries
+        .iter()
+        .filter_map(|delivery| delivery.span)
+        .collect::<Vec<_>>();
+    for clause in &association.clause_stream.clauses {
+        for atom in &clause.atoms {
+            if !covered_spans.contains(&atom.span()) {
+                let kind = match atom {
+                    ClauseAtom::CoreRole(_) => "core_role_transport",
+                    ClauseAtom::RemainingRole(_) => "remaining_role_transport",
+                    ClauseAtom::UnattachedExactNumber(_) => "exact_number_transport",
+                    ClauseAtom::FunctionWord { .. } => "function_word",
+                    ClauseAtom::SaijikiRelation { .. } => "relation_transport",
+                    ClauseAtom::UnresolvedDiagnostic(_) => "diagnostic_transport",
+                };
+                add_syntax(&mut projection, atom.span(), kind);
             }
         }
     }
 
     projection
+}
+
+fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mut Projection) {
+    match &instruction.entity.head {
+        SemanticHead::Primitive(term) => {
+            add_term_explicit(projection, SemanticDeliveryOwner::EntityHead, term)
+        }
+        SemanticHead::MacroInvocation(head) => {
+            add_explicit(
+                projection,
+                head.provenance.source.span,
+                SemanticDeliveryOwner::EntityHead,
+                format!(
+                    "macro:{}@{}#{}",
+                    head.qualified_name, head.definition_version, head.definition_digest
+                ),
+            );
+            for parameter in &head.parameters {
+                add_explicit(
+                    projection,
+                    parameter.provenance.span,
+                    SemanticDeliveryOwner::MacroParameter,
+                    format!(
+                        "{}={}",
+                        parameter.name,
+                        semantic_macro_parameter_value_key(&parameter.value)
+                    ),
+                );
+            }
+        }
+    }
+    for (owner, term) in [
+        (
+            SemanticDeliveryOwner::Color,
+            instruction.entity.color.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::Touch,
+            instruction.entity.touch.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::Continuity,
+            instruction.entity.continuity.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::Angle,
+            instruction.entity.angle.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::SurfaceQuality,
+            instruction.entity.surface.quality.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::SurfaceIntensity,
+            instruction.entity.surface.intensity.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::FluctuationAmplitude,
+            instruction.entity.fluctuation.amplitude.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::FluctuationFrequency,
+            instruction.entity.fluctuation.frequency.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::FluctuationQuality,
+            instruction.entity.fluctuation.quality.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::ProportionAspect,
+            instruction.entity.proportion.aspect.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::ProportionWidthExtent,
+            instruction.entity.proportion.width_extent.as_ref(),
+        ),
+        (
+            SemanticDeliveryOwner::ProportionArcForm,
+            instruction.entity.proportion.arc_form.as_ref(),
+        ),
+        (SemanticDeliveryOwner::Action, instruction.action.as_ref()),
+        (
+            SemanticDeliveryOwner::Position,
+            instruction.position.as_ref(),
+        ),
+    ] {
+        if let Some(term) = term {
+            add_term_explicit(projection, owner, term);
+        }
+    }
+    if let Some(quantity) = &instruction.entity.quantity {
+        add_explicit(
+            projection,
+            quantity.provenance.span,
+            SemanticDeliveryOwner::Quantity,
+            quantity.value.to_string(),
+        );
+    }
+    if let Some(relation) = &instruction.relation {
+        add_explicit(
+            projection,
+            relation.provenance.span,
+            SemanticDeliveryOwner::Relation,
+            format!("{}:{}", relation.kind.as_str(), relation.reference.as_str()),
+        );
+    }
+}
+
+fn add_term_explicit(
+    projection: &mut Projection,
+    owner: SemanticDeliveryOwner,
+    term: &SemanticTerm,
+) {
+    add_explicit(
+        projection,
+        term.provenance.source.span,
+        owner,
+        term_key(term),
+    );
+}
+
+fn term_key(term: &SemanticTerm) -> String {
+    format!("{}:{}", term.identity.category, term.identity.id)
+}
+
+fn semantic_macro_parameter_value_key(value: &SemanticMacroParameterValue) -> String {
+    match value {
+        SemanticMacroParameterValue::Integer(value) => format!("integer:{value}"),
+        SemanticMacroParameterValue::Number(value) => {
+            format!("number:{}", compact_json(&finite_number(*value)))
+        }
+        SemanticMacroParameterValue::SemanticRef(identity) => {
+            format!("semantic_ref:{}:{}", identity.category, identity.id)
+        }
+    }
+}
+
+fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
+    match occurrence {
+        OwnedSemanticOccurrence::Head(SemanticHead::Primitive(term)) => {
+            format!("head:{}", term_key(term))
+        }
+        OwnedSemanticOccurrence::Head(SemanticHead::MacroInvocation(head)) => format!(
+            "macro:{}@{}#{}",
+            head.qualified_name, head.definition_version, head.definition_digest
+        ),
+        OwnedSemanticOccurrence::MacroDiagnostic(provenance) => format!(
+            "macro_diagnostic:{}:{}",
+            provenance.ordinal,
+            provenance.qualified_name.as_deref().unwrap_or("unresolved")
+        ),
+        OwnedSemanticOccurrence::Color(term)
+        | OwnedSemanticOccurrence::Touch(term)
+        | OwnedSemanticOccurrence::Continuity(term)
+        | OwnedSemanticOccurrence::Angle(term)
+        | OwnedSemanticOccurrence::Surface(term)
+        | OwnedSemanticOccurrence::Fluctuation(term)
+        | OwnedSemanticOccurrence::Proportion(term) => term_key(term),
+        OwnedSemanticOccurrence::Quantity(quantity) => {
+            format!("quantity:{}", quantity.value)
+        }
+    }
 }
 
 fn project_expansion_diagnostics(
@@ -660,12 +840,7 @@ fn project_expansion_diagnostics(
                         projection,
                         kind,
                         span,
-                        format!(
-                            "expansion:{}",
-                            compact_json(&Value::Array(
-                                diagnostic.expansion_path.iter().map(path_value).collect()
-                            ))
-                        ),
+                        SemanticDeliveryOwner::ExpandedNode,
                         format!("i582:{kind}"),
                     );
                 } else {
@@ -711,6 +886,10 @@ fn project_expanded_deliveries(expansion: &MacroExpansionResult, projection: &mu
             projection.deliveries.push(SemanticDelivery {
                 id: identity("expanded", &identity_bytes),
                 kind: SemanticDeliveryKind::Explicit,
+                identity: SemanticDeliveryIdentity {
+                    owner: SemanticDeliveryOwner::ExpandedNode,
+                    canonical_key: descriptor.clone(),
+                },
                 descriptor,
                 span: Some(provenance.invocation.source_span),
                 source_independent: true,
@@ -735,10 +914,20 @@ fn flatten_nodes(nodes: &[ExpandedMacroNode]) -> Vec<&ExpandedMacroNode> {
     flattened
 }
 
-fn add_explicit(projection: &mut Projection, span: SourceSpan, descriptor: String) {
+fn add_explicit(
+    projection: &mut Projection,
+    span: SourceSpan,
+    owner: SemanticDeliveryOwner,
+    canonical_key: String,
+) {
+    let descriptor = format!("{}|{canonical_key}", owner.as_str());
     projection.deliveries.push(SemanticDelivery {
         id: ranged_identity("explicit", &descriptor, span, ""),
         kind: SemanticDeliveryKind::Explicit,
+        identity: SemanticDeliveryIdentity {
+            owner,
+            canonical_key,
+        },
         descriptor,
         span: Some(span),
         source_independent: true,
@@ -749,6 +938,10 @@ fn add_syntax(projection: &mut Projection, span: SourceSpan, descriptor: &str) {
     projection.deliveries.push(SemanticDelivery {
         id: ranged_identity("syntax", descriptor, span, ""),
         kind: SemanticDeliveryKind::SyntaxOnly,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::SyntaxOnly,
+            canonical_key: descriptor.to_owned(),
+        },
         descriptor: descriptor.to_owned(),
         span: Some(span),
         source_independent: false,
@@ -760,7 +953,7 @@ fn add_hole(
     projection: &mut Projection,
     kind: &str,
     span: SourceSpan,
-    candidate_identity: String,
+    expected_owner: SemanticDeliveryOwner,
     upstream: String,
 ) {
     let range = document
@@ -775,13 +968,17 @@ fn add_hole(
         span,
         allowed_span: span,
         expected_range_digest: range_digest,
-        candidate_identity: candidate_identity.clone(),
+        expected_owner,
         upstream_diagnostic_identity: upstream,
     });
     projection.deliveries.push(SemanticDelivery {
         id,
         kind: SemanticDeliveryKind::Hole,
-        descriptor: format!("{kind}|candidate={candidate_identity}"),
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: format!("{kind}|expects={}", expected_owner.as_str()),
+        },
+        descriptor: format!("{kind}|expects={}", expected_owner.as_str()),
         span: Some(span),
         source_independent: true,
     });
@@ -808,6 +1005,10 @@ fn add_conflict(
     projection.deliveries.push(SemanticDelivery {
         id,
         kind: SemanticDeliveryKind::Conflict,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: payload.clone(),
+        },
         descriptor: payload,
         span,
         source_independent: true,
@@ -827,11 +1028,14 @@ fn add_blocking(projection: &mut Projection, kind: &str, span: Option<SourceSpan
     projection.deliveries.push(SemanticDelivery {
         id,
         kind: SemanticDeliveryKind::BlockingDiagnostic,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: kind.to_owned(),
+        },
         descriptor: kind.to_owned(),
         span,
         source_independent: false,
     });
-    projection.source_independent = false;
 }
 
 fn sort_projection(projection: &mut Projection) {
@@ -856,7 +1060,6 @@ fn sort_projection(projection: &mut Projection) {
     projection
         .blocking
         .sort_by(|left, right| left.id.cmp(&right.id));
-    projection.facts.sort_by_key(compact_json);
 }
 
 fn summarize(deliveries: &[SemanticDelivery]) -> DeliverySummary {
@@ -865,6 +1068,25 @@ fn summarize(deliveries: &[SemanticDelivery]) -> DeliverySummary {
         summary.add(delivery.kind);
     }
     summary
+}
+
+fn structured_semantic_occurrence_bytes(deliveries: &[SemanticDelivery]) -> Vec<u8> {
+    let mut identities = deliveries
+        .iter()
+        .filter(|delivery| {
+            delivery.kind == SemanticDeliveryKind::Explicit
+                && delivery.identity.owner != SemanticDeliveryOwner::ExpandedNode
+        })
+        .map(|delivery| delivery.identity.clone())
+        .collect::<Vec<_>>();
+    identities.sort();
+
+    let mut bytes = b"inku.structured-semantic-occurrences.v1".to_vec();
+    for identity in identities {
+        append_field(&mut bytes, identity.owner.as_str().as_bytes());
+        append_field(&mut bytes, identity.canonical_key.as_bytes());
+    }
+    bytes
 }
 
 fn compiler_state(projection: &Projection) -> CompilerLockState {
@@ -885,21 +1107,20 @@ fn build_lock(
     definitions: &[MacroDefinition],
     composition_seed: Option<u64>,
     projection: &Projection,
-    explicit_fact_digest: String,
+    structured_semantic_occurrence_digest: String,
     canonical_bytes: Option<&[u8]>,
     seeds: &[MacroSeed],
     expanded_meaning_digest: Option<String>,
     state: CompilerLockState,
 ) -> TypedDdlCompilerLock {
-    let ready = state == CompilerLockState::CanonicalReady;
-    let canonical_pre_expansion_digest =
-        ready.then(|| sha256_hex(canonical_bytes.expect("ready lock has canonical bytes")));
-    let definition_identities = if ready {
+    let canonical_pre_expansion_digest = canonical_bytes.map(sha256_hex);
+    let has_structured_meaning = canonical_pre_expansion_digest.is_some();
+    let definition_identities = if has_structured_meaning {
         definition_identities(document, definitions)
     } else {
         Vec::new()
     };
-    let macro_seeds = if ready {
+    let macro_seeds = if has_structured_meaning {
         seeds
             .iter()
             .map(|seed| CompilerSeedIdentity {
@@ -917,12 +1138,12 @@ fn build_lock(
         schema_id: TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
         state,
         visible_source_digest: sha256_hex(document.source().as_bytes()),
-        explicit_fact_digest,
+        structured_semantic_occurrence_digest,
         canonical_pre_expansion_digest,
-        composition_seed: ready.then_some(composition_seed.unwrap_or(0)),
+        composition_seed: has_structured_meaning.then_some(composition_seed.unwrap_or(0)),
         definition_identities,
         macro_seeds,
-        expanded_meaning_digest: ready.then_some(expanded_meaning_digest).flatten(),
+        expanded_meaning_digest,
         hole_identities: projection
             .holes
             .iter()
@@ -950,7 +1171,10 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
     append_field(&mut bytes, lock.schema_id.as_bytes());
     append_field(&mut bytes, lock.state.as_str().as_bytes());
     append_field(&mut bytes, lock.visible_source_digest.as_bytes());
-    append_field(&mut bytes, lock.explicit_fact_digest.as_bytes());
+    append_field(
+        &mut bytes,
+        lock.structured_semantic_occurrence_digest.as_bytes(),
+    );
     append_optional(&mut bytes, lock.canonical_pre_expansion_digest.as_deref());
     match lock.composition_seed {
         Some(seed) => {
@@ -993,14 +1217,6 @@ fn definition_identities(
                 .map(|identity| identity.full_digest_hex().to_owned()),
         })
         .collect()
-}
-
-fn canonical_bytes(schema: &str, facts: &[Value], holes: &[Value]) -> Vec<u8> {
-    let mut root = BTreeMap::new();
-    root.insert("facts".to_owned(), Value::Array(facts.to_vec()));
-    root.insert("holes".to_owned(), Value::Array(holes.to_vec()));
-    root.insert("schema".to_owned(), Value::String(schema.to_owned()));
-    serde_json::to_vec(&root).expect("closed canonical semantic values serialize")
 }
 
 /// Canonical expanded meaning bytes with all display and provenance fields excluded.
@@ -1220,204 +1436,6 @@ fn path_value(segment: &ExpansionPathSegment) -> Value {
         }
     }
     Value::Object(record.into_iter().collect())
-}
-
-fn binding_record(binding: &CompleteMacroParameterBinding) -> Value {
-    let mut parameters = binding
-        .parameters
-        .iter()
-        .map(|parameter| {
-            let mut record = BTreeMap::new();
-            record.insert(
-                "name".to_owned(),
-                Value::String(parameter.parameter_name.clone()),
-            );
-            record.insert("value".to_owned(), bound_value(&parameter.value));
-            Value::Object(record.into_iter().collect())
-        })
-        .collect::<Vec<_>>();
-    parameters.sort_by_key(compact_json);
-    let mut record = BTreeMap::new();
-    record.insert(
-        "clause".to_owned(),
-        Value::Number(Number::from(binding.clause_index as u64)),
-    );
-    record.insert(
-        "invocation".to_owned(),
-        Value::String(binding.definition_identity.qualified_name().to_owned()),
-    );
-    record.insert("kind".to_owned(), Value::String("macro_binding".to_owned()));
-    record.insert(
-        "ordinal".to_owned(),
-        Value::Number(Number::from(binding.invocation_ordinal)),
-    );
-    record.insert("parameters".to_owned(), Value::Array(parameters));
-    Value::Object(record.into_iter().collect())
-}
-
-fn binding_descriptor(binding: &CompleteMacroParameterBinding) -> String {
-    compact_json(&binding_record(binding))
-}
-
-fn bound_value(value: &BoundMacroParameterValue) -> Value {
-    let mut record = BTreeMap::new();
-    match value {
-        BoundMacroParameterValue::Integer { value, .. } => {
-            record.insert("kind".to_owned(), Value::String("integer".to_owned()));
-            record.insert("value".to_owned(), Value::Number(Number::from(*value)));
-        }
-        BoundMacroParameterValue::Number { value, .. } => {
-            record.insert("kind".to_owned(), Value::String("number".to_owned()));
-            record.insert("value".to_owned(), finite_number(*value));
-        }
-        BoundMacroParameterValue::SemanticRef {
-            category,
-            canonical_id,
-            ..
-        } => {
-            record.insert("kind".to_owned(), Value::String("semantic_ref".to_owned()));
-            record.insert("category".to_owned(), Value::String(category.clone()));
-            record.insert("id".to_owned(), Value::String(canonical_id.clone()));
-        }
-    }
-    Value::Object(record.into_iter().collect())
-}
-
-fn number_record(clause: usize, value: u64) -> Value {
-    let mut record = BTreeMap::new();
-    record.insert(
-        "clause".to_owned(),
-        Value::Number(Number::from(clause as u64)),
-    );
-    record.insert("kind".to_owned(), Value::String("exact_number".to_owned()));
-    record.insert("value".to_owned(), Value::Number(Number::from(value)));
-    Value::Object(record.into_iter().collect())
-}
-
-fn string_record(fields: &[(&str, &str)]) -> Value {
-    Value::Object(
-        fields
-            .iter()
-            .map(|(key, value)| ((*key).to_owned(), Value::String((*value).to_owned())))
-            .collect::<Map<_, _>>(),
-    )
-}
-
-fn relation_occurrence_descriptor(kind: &RelationReferenceOccurrenceKind) -> String {
-    match kind {
-        RelationReferenceOccurrenceKind::SaijikiRelation { relation_type, .. } => {
-            format!("relation:{relation_type}")
-        }
-        RelationReferenceOccurrenceKind::AttachmentMarker { marker, .. } => {
-            format!("attachment:{}", attachment_marker_id(*marker))
-        }
-    }
-}
-
-const fn attachment_marker_id(marker: AttachmentMarkerKind) -> &'static str {
-    match marker {
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wo) => "ja:wo",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Ni) => "ja:ni",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::De) => "ja:de",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No) => "ja:no",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wa) => "ja:wa",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Ga) => "ja:ga",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::He) => "ja:he",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::To) => "ja:to",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::With) => "en:with",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::In) => "en:in",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::At) => "en:at",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::On) => "en:on",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::To) => "en:to",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::Of) => "en:of",
-    }
-}
-
-fn atom_descriptor(atom: &ClauseAtom) -> String {
-    match atom {
-        ClauseAtom::CoreRole(term) => format!(
-            "{}:{}",
-            core_role_name(term.role),
-            canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-        ),
-        ClauseAtom::RemainingRole(term) => format!(
-            "{}:{}",
-            remaining_role_name(term.role),
-            canonical_asset_id(&term.category_key, &term.canonical_surface_ja)
-        ),
-        ClauseAtom::UnattachedExactNumber(number) => format!("number:{}", number.value),
-        ClauseAtom::UnresolvedDiagnostic(_) => "unknown".to_owned(),
-        ClauseAtom::FunctionWord { .. } => "syntax".to_owned(),
-        ClauseAtom::SaijikiRelation { relation_type, .. } => format!("relation:{relation_type}"),
-    }
-}
-
-fn canonical_asset_id(category: &str, canonical_surface_ja: &str) -> String {
-    let projected = project_macro_semantic_ref(category, canonical_surface_ja)
-        .expect("accepted typed roles have a canonical semantic projection");
-    format!("{}:{}", projected.category, projected.canonical_id)
-}
-
-const fn core_role_name(role: crate::CoreRoleKind) -> &'static str {
-    match role {
-        crate::CoreRoleKind::Primitive => "primitive",
-        crate::CoreRoleKind::Touch => "touch",
-        crate::CoreRoleKind::Color => "color",
-        crate::CoreRoleKind::Surface => "surface",
-        crate::CoreRoleKind::Ground => "ground",
-    }
-}
-
-const fn remaining_role_name(role: crate::RemainingRoleKind) -> &'static str {
-    match role {
-        crate::RemainingRoleKind::Angle => "angle",
-        crate::RemainingRoleKind::Continuity => "continuity",
-        crate::RemainingRoleKind::Fluctuation => "fluctuation",
-        crate::RemainingRoleKind::Place => "place",
-        crate::RemainingRoleKind::Motion => "motion",
-        crate::RemainingRoleKind::Proportion => "proportion",
-    }
-}
-
-fn macro_resolution_kind(kind: MacroInvocationResolutionDiagnosticKind) -> &'static str {
-    match kind {
-        MacroInvocationResolutionDiagnosticKind::MissingLock => "missing_macro_lock",
-        MacroInvocationResolutionDiagnosticKind::AmbiguousLockPrefix => "ambiguous_macro_lock",
-        MacroInvocationResolutionDiagnosticKind::MissingDefinition => "missing_macro_definition",
-        MacroInvocationResolutionDiagnosticKind::DuplicateMatchingDefinition => {
-            "duplicate_macro_definition"
-        }
-        MacroInvocationResolutionDiagnosticKind::InvalidDefinition => "invalid_macro_definition",
-        MacroInvocationResolutionDiagnosticKind::QualifiedNameMismatch => {
-            "macro_qualified_name_mismatch"
-        }
-        MacroInvocationResolutionDiagnosticKind::VersionMismatch => "macro_version_mismatch",
-        MacroInvocationResolutionDiagnosticKind::DigestMismatch => "macro_digest_mismatch",
-        MacroInvocationResolutionDiagnosticKind::SourceClauseAtomMismatch => {
-            "macro_source_ownership"
-        }
-    }
-}
-
-fn macro_binding_kind(kind: MacroParameterBindingDiagnosticKind) -> &'static str {
-    match kind {
-        MacroParameterBindingDiagnosticKind::MissingCompatibleFact => "missing_macro_parameter",
-        MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment => {
-            "ambiguous_macro_assignment"
-        }
-        MacroParameterBindingDiagnosticKind::SharedFact => "shared_macro_fact",
-        MacroParameterBindingDiagnosticKind::UnsupportedSchema => "unsupported_macro_parameter",
-        MacroParameterBindingDiagnosticKind::NumericRange => "macro_parameter_numeric_range",
-        MacroParameterBindingDiagnosticKind::NumericPrecision => {
-            "macro_parameter_numeric_precision"
-        }
-        MacroParameterBindingDiagnosticKind::DefinitionIdentityOwnershipMismatch => {
-            "macro_definition_ownership"
-        }
-        MacroParameterBindingDiagnosticKind::SourceClauseAtomOwnershipMismatch => {
-            "macro_source_ownership"
-        }
-    }
 }
 
 fn macro_expansion_kind(kind: MacroExpansionDiagnosticKind) -> &'static str {

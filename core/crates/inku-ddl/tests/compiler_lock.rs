@@ -2,15 +2,16 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, CompilerLockState, MacroDefinition, MacroExpansionLimits,
-    MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, TYPED_DDL_COMPILATION_SCHEMA_ID,
-    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters, compile_typed_ddl,
-    expanded_meaning_canonical_bytes,
+    MacroLock, NormalizedDdlDocument, RelationReferenceEvidenceAvailability,
+    ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDeliveryOwner, SemanticHead,
+    TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters,
+    compile_typed_ddl, expanded_meaning_canonical_bytes, saijiki_asset,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v1.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v2.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -41,6 +42,242 @@ struct KnownAnswers {
 }
 
 #[test]
+fn structured_document_is_the_only_pre_expansion_meaning_authority() {
+    let result = compile(
+        "circle white eight",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let semantic_document = result
+        .semantic_document
+        .as_ref()
+        .expect("an integrity-valid compilation owns the I-595 result");
+
+    assert_eq!(
+        CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
+        SEMANTIC_DOCUMENT_SCHEMA_ID
+    );
+    assert_eq!(
+        result.pre_expansion_canonical_bytes(),
+        semantic_document.canonical_bytes.as_deref()
+    );
+    assert_eq!(
+        result
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .canonical_pre_expansion_digest,
+        semantic_document.canonical_bytes.as_deref().map(sha256)
+    );
+}
+
+#[test]
+fn complete_binding_and_unbound_outer_modifier_keep_distinct_typed_owners() {
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Color","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
+    );
+    let result = compile_locked(
+        "Canon.Color white eight",
+        ResolvedInstructionLanguage::En,
+        &[definition],
+        Some(11),
+        LIMITS,
+    );
+    let semantic_document = result.semantic_document.as_ref().unwrap();
+    let instruction = &semantic_document.ast.instructions[0];
+    let SemanticHead::MacroInvocation(head) = &instruction.entity.head else {
+        panic!("expected resolved MacroInvocation head");
+    };
+
+    assert_eq!(head.parameters.len(), 1);
+    assert_eq!(head.parameters[0].name, "value");
+    assert_eq!(
+        instruction
+            .entity
+            .quantity
+            .as_ref()
+            .map(|value| value.value),
+        Some(8)
+    );
+    assert!(result.deliveries.iter().any(|delivery| {
+        delivery.identity.owner == SemanticDeliveryOwner::MacroParameter
+            && delivery
+                .identity
+                .canonical_key
+                .contains("semantic_ref:color:white")
+    }));
+    assert!(result.deliveries.iter().any(|delivery| {
+        delivery.identity.owner == SemanticDeliveryOwner::Quantity
+            && delivery.identity.canonical_key == "8"
+    }));
+    assert_eq!(
+        result.pre_expansion_canonical_bytes(),
+        semantic_document.canonical_bytes.as_deref()
+    );
+    assert_eq!(
+        result.accepted_parameter_binding(),
+        result
+            .macro_expansion
+            .as_ref()
+            .map(|expansion| &expansion.parameter_binding)
+    );
+}
+
+#[test]
+fn same_macro_meaning_across_language_and_format_has_same_seed_not_source_digest() {
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
+    );
+    let en = compile_locked(
+        "  Canon.Empty  ",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(23),
+        LIMITS,
+    );
+    let ja = compile_locked(
+        "Canon.Empty",
+        ResolvedInstructionLanguage::Ja,
+        &[definition],
+        Some(23),
+        LIMITS,
+    );
+
+    assert_eq!(
+        en.pre_expansion_canonical_bytes(),
+        ja.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(
+        en.derived_seeds[0].full_digest_hex(),
+        ja.derived_seeds[0].full_digest_hex()
+    );
+    assert_ne!(
+        en.compiler_lock.as_ref().unwrap().visible_source_digest,
+        ja.compiler_lock.as_ref().unwrap().visible_source_digest
+    );
+}
+
+#[test]
+fn i579_exact_one_availability_is_not_promoted_to_typed_relation_meaning() {
+    let result = compile(
+        "eight along circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let binding = result.accepted_parameter_binding().unwrap();
+    assert_eq!(
+        binding
+            .macro_resolution
+            .relation_reference_evidence
+            .evidence[0]
+            .availability,
+        RelationReferenceEvidenceAvailability::ExactOne
+    );
+    assert!(
+        result
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .instructions
+            .iter()
+            .all(|instruction| instruction.relation.is_none())
+    );
+    assert!(
+        result
+            .deliveries
+            .iter()
+            .all(|delivery| { delivery.identity.owner != SemanticDeliveryOwner::Relation })
+    );
+}
+
+#[test]
+fn structured_ownership_action_position_ground_and_previous_relation_change_the_lock() {
+    let plain = compile("circle", ResolvedInstructionLanguage::En, &[], None, LIMITS);
+    let action_position = compile(
+        "place circle at center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let grounded = compile(
+        "paper. place circle at center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let left_owned = compile(
+        "circle white. square.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let right_owned = compile(
+        "circle. square white.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    let relation_literal = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "along")
+        .and_then(|relation| relation.literals_en.first())
+        .expect("accepted along relation has an English full literal");
+    let relation = compile(
+        &format!("line. circle {relation_literal}."),
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    for result in [
+        &plain,
+        &action_position,
+        &grounded,
+        &left_owned,
+        &right_owned,
+        &relation,
+    ] {
+        assert_eq!(
+            result.compiler_lock.as_ref().unwrap().state,
+            CompilerLockState::CanonicalReady
+        );
+    }
+    assert_ne!(
+        canonical_bytes_of(&plain),
+        canonical_bytes_of(&action_position)
+    );
+    assert_ne!(
+        canonical_bytes_of(&action_position),
+        canonical_bytes_of(&grounded)
+    );
+    assert_ne!(
+        canonical_bytes_of(&left_owned),
+        canonical_bytes_of(&right_owned)
+    );
+    assert!(relation.deliveries.iter().any(|delivery| {
+        delivery.identity.owner == SemanticDeliveryOwner::Relation
+            && delivery.identity.canonical_key == "along:previous_one"
+    }));
+    assert_ne!(canonical_bytes_of(&plain), canonical_bytes_of(&relation));
+    assert_ne!(
+        plain.compiler_lock.as_ref().unwrap().full_digest,
+        relation.compiler_lock.as_ref().unwrap().full_digest
+    );
+}
+
+#[test]
 fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
@@ -50,19 +287,28 @@ fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
 
     assert_eq!(result.schema_id, TYPED_DDL_COMPILATION_SCHEMA_ID);
     assert_eq!(result.accepted_parameter_binding(), Some(&accepted));
-    assert!(result.parameter_binding.is_none());
+    assert!(
+        result
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .instruction_association
+            .association
+            .macro_parameter_binding
+            .is_none()
+    );
     let expansion = result.macro_expansion.as_ref().unwrap();
     assert_eq!(&expansion.parameter_binding, &accepted);
     assert!(expansion.diagnostics.is_empty());
     assert_eq!(result.derived_seeds.len(), 1);
 
-    let canonical = result.canonical_semantic_bytes.as_ref().unwrap();
+    let canonical = result.pre_expansion_canonical_bytes().unwrap();
     let lock = result.compiler_lock.as_ref().unwrap();
     assert_eq!(lock.schema_id, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID);
     assert_eq!(lock.state, CompilerLockState::CanonicalReady);
 
     let actual = KnownAnswers {
-        canonical_bytes: String::from_utf8(canonical.clone()).unwrap(),
+        canonical_bytes: std::str::from_utf8(canonical).unwrap().to_owned(),
         canonical_sha256: sha256(canonical),
         seed_digest: result.derived_seeds[0].full_digest_hex().to_owned(),
         expanded_meaning_sha256: sha256(&expanded_meaning_canonical_bytes(expansion)),
@@ -140,10 +386,13 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         );
         assert_eq!(result.delivery_summary.recognized_but_ignored, 0);
     }
-    assert_eq!(ja.canonical_semantic_bytes, en.canonical_semantic_bytes);
     assert_eq!(
-        en.canonical_semantic_bytes,
-        en_format.canonical_semantic_bytes
+        ja.pre_expansion_canonical_bytes(),
+        en.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(
+        en.pre_expansion_canonical_bytes(),
+        en_format.pre_expansion_canonical_bytes()
     );
     assert_eq!(
         ja.compiler_lock
@@ -172,8 +421,8 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         LIMITS,
     );
     assert_ne!(
-        en.canonical_semantic_bytes,
-        different_number.canonical_semantic_bytes
+        en.pre_expansion_canonical_bytes(),
+        different_number.pre_expansion_canonical_bytes()
     );
     let different_multiplicity = compile(
         "circle circle white eight",
@@ -183,13 +432,13 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         LIMITS,
     );
     assert_ne!(
-        en.canonical_semantic_bytes,
-        different_multiplicity.canonical_semantic_bytes
+        en.pre_expansion_canonical_bytes(),
+        different_multiplicity.pre_expansion_canonical_bytes()
     );
 }
 
 #[test]
-fn definition_identity_is_not_seed_input_and_expanded_meaning_excludes_definition_provenance() {
+fn definition_identity_changes_structured_meaning_seed_and_lock_but_not_expanded_nodes() {
     let plain = definition_from(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Meaning","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"}}}]}"#,
     );
@@ -215,11 +464,11 @@ fn definition_identity_is_not_seed_input_and_expanded_meaning_excludes_definitio
         Some(17),
         LIMITS,
     );
-    assert_eq!(
-        left.canonical_semantic_bytes,
-        right.canonical_semantic_bytes
+    assert_ne!(
+        left.pre_expansion_canonical_bytes(),
+        right.pre_expansion_canonical_bytes()
     );
-    assert_eq!(
+    assert_ne!(
         left.derived_seeds[0].full_digest_hex(),
         right.derived_seeds[0].full_digest_hex()
     );
@@ -248,8 +497,8 @@ fn definition_identity_is_not_seed_input_and_expanded_meaning_excludes_definitio
         LIMITS,
     );
     assert_eq!(
-        left.canonical_semantic_bytes,
-        different_composition_seed.canonical_semantic_bytes
+        left.pre_expansion_canonical_bytes(),
+        different_composition_seed.pre_expansion_canonical_bytes()
     );
     assert_ne!(
         left.derived_seeds[0].full_digest_hex(),
@@ -305,7 +554,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::IncompleteKnownHole,
+            CompilerLockState::BlockedDiagnostic,
         ),
         (
             "relation-exact-one",
@@ -365,7 +614,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::BlockedConflict,
+            CompilerLockState::BlockedDiagnostic,
         ),
         (
             "expansion-diagnostic-hole",
@@ -398,12 +647,12 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             "{id}"
         );
         assert_eq!(
-            result.canonical_semantic_bytes.is_some(),
-            matches!(
-                expected_state,
-                CompilerLockState::CanonicalReady | CompilerLockState::IncompleteKnownHole
-            ),
-            "{id}"
+            result.pre_expansion_canonical_bytes(),
+            result
+                .semantic_document
+                .as_ref()
+                .and_then(|document| document.canonical_bytes.as_deref()),
+            "{id}: I-595 result is the sole canonical authority"
         );
         assert_eq!(result.delivery_summary.unspecified, 0, "{id}");
         assert_eq!(result.delivery_summary.defaulted, 0, "{id}");
@@ -456,14 +705,14 @@ fn successful_expanded_nodes_are_explicit_deliveries_without_entering_pre_expans
         )
     );
     assert!(
-        !String::from_utf8(result.canonical_semantic_bytes.unwrap())
+        !std::str::from_utf8(result.pre_expansion_canonical_bytes().unwrap())
             .unwrap()
             .contains("semantic_ref")
     );
 }
 
 #[test]
-fn source_independent_known_hole_still_seeds_every_complete_binding_and_runs_i582() {
+fn incomplete_structured_document_retains_binding_and_does_not_seed_or_expand() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
     let result = compile_locked(
@@ -477,14 +726,20 @@ fn source_independent_known_hole_still_seeds_every_complete_binding_and_runs_i58
         result.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::IncompleteKnownHole
     );
-    assert!(result.canonical_semantic_bytes.is_some());
+    assert!(result.pre_expansion_canonical_bytes().is_none());
     assert_eq!(result.holes.len(), 1);
-    assert_eq!(result.derived_seeds.len(), 1);
-    assert!(result.parameter_binding.is_none());
-    let expansion = result.macro_expansion.as_ref().unwrap();
-    assert_eq!(expansion.parameter_binding.complete.len(), 1);
-    assert_eq!(expansion.expanded.len(), 1);
-    assert!(expansion.diagnostics.is_empty());
+    assert!(result.derived_seeds.is_empty());
+    assert!(
+        result
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .instruction_association
+            .association
+            .macro_parameter_binding
+            .is_some()
+    );
+    assert!(result.macro_expansion.is_none());
     let lock = result.compiler_lock.as_ref().unwrap();
     assert!(lock.canonical_pre_expansion_digest.is_none());
     assert!(lock.macro_seeds.is_empty());
@@ -496,12 +751,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-v1-fixture.v1"
+        "inku.compiler-lock-visible-patch-fixture.v2"
     );
-    assert_eq!(fixture.version, 1);
+    assert_eq!(fixture.version, 2);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.canonical-semantic-ddl.v1"
+        "inku.semantic-document.v4"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(
@@ -584,4 +839,10 @@ fn sha256(value: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+fn canonical_bytes_of(result: &inku_ddl::TypedDdlCompilation) -> &[u8] {
+    result
+        .pre_expansion_canonical_bytes()
+        .expect("focused input has complete I-595 canonical bytes")
 }

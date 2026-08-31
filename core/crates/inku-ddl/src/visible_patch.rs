@@ -4,7 +4,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    SemanticDeliveryKind, SourceSpan, TypedDdlCompilation, compile_typed_ddl,
+    SemanticDeliveryIdentity, SemanticDeliveryKind, SourceSpan, TypedDdlCompilation,
+    compile_typed_ddl,
 };
 
 /// Stable identity for constrained visible DDL patch requests.
@@ -311,31 +312,9 @@ fn target_resolved(
     range: SourceSpan,
 ) -> bool {
     candidate.deliveries.iter().any(|item| {
-        if item.kind != SemanticDeliveryKind::Explicit
-            || !item.span.is_some_and(|span| overlaps(span, range))
-        {
-            return false;
-        }
-        match hole.kind.as_str() {
-            "unresolved_value" => item.descriptor.starts_with("number|"),
-            "missing_relation_target" => hole
-                .candidate_identity
-                .strip_suffix(":missing-target")
-                .is_some_and(|occurrence| {
-                    item.descriptor
-                        .contains(&format!("occurrence={occurrence}"))
-                }),
-            "missing_macro_lock"
-            | "missing_macro_definition"
-            | "invalid_macro_definition"
-            | "missing_macro_parameter"
-            | "unsupported_macro_parameter"
-            | "macro_parameter_numeric_range"
-            | "macro_parameter_numeric_precision" => {
-                item.descriptor.contains(&hole.candidate_identity)
-            }
-            _ => false,
-        }
+        item.kind == SemanticDeliveryKind::Explicit
+            && item.identity.owner == hole.expected_owner
+            && item.span.is_some_and(|span| overlaps(span, range))
     })
 }
 
@@ -401,7 +380,10 @@ fn outside_bytes_preserved(
     base[base_cursor..] == candidate[candidate_cursor..]
 }
 
-fn outside_explicit(compilation: &TypedDdlCompilation, ranges: &[SourceSpan]) -> Vec<String> {
+fn outside_explicit(
+    compilation: &TypedDdlCompilation,
+    ranges: &[SourceSpan],
+) -> Vec<SemanticDeliveryIdentity> {
     let mut values = compilation
         .deliveries
         .iter()
@@ -410,18 +392,21 @@ fn outside_explicit(compilation: &TypedDdlCompilation, ranges: &[SourceSpan]) ->
             item.span
                 .is_none_or(|span| !ranges.iter().any(|range| overlaps(span, *range)))
         })
-        .map(|item| item.descriptor.clone())
+        .map(|item| item.identity.clone())
         .collect::<Vec<_>>();
     values.sort();
     values
 }
 
-fn outside_holes(compilation: &TypedDdlCompilation, ranges: &[SourceSpan]) -> Vec<String> {
+fn outside_holes(
+    compilation: &TypedDdlCompilation,
+    ranges: &[SourceSpan],
+) -> Vec<(String, crate::SemanticDeliveryOwner)> {
     let mut values = compilation
         .holes
         .iter()
         .filter(|item| !ranges.iter().any(|range| overlaps(item.span, *range)))
-        .map(|item| format!("{}|{}", item.kind, item.candidate_identity))
+        .map(|item| (item.kind.clone(), item.expected_owner))
         .collect::<Vec<_>>();
     values.sort();
     values

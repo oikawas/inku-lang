@@ -39,9 +39,10 @@ pub use clause::{
 pub use compiler_lock::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, COMPILER_LOCK_DIGEST_DOMAIN, CompilerBlockingDiagnostic,
     CompilerConflict, CompilerDefinitionIdentity, CompilerLockState, CompilerSeedIdentity,
-    DeliverySummary, SemanticDelivery, SemanticDeliveryKind, TYPED_DDL_COMPILATION_SCHEMA_ID,
-    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation, TypedDdlCompilerLock, TypedHole,
-    compile_typed_ddl, compiler_lock_hash_input, expanded_meaning_canonical_bytes,
+    DeliverySummary, SemanticDelivery, SemanticDeliveryIdentity, SemanticDeliveryKind,
+    SemanticDeliveryOwner, TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
+    TypedDdlCompilation, TypedDdlCompilerLock, TypedHole, compile_typed_ddl,
+    compiler_lock_hash_input, expanded_meaning_canonical_bytes,
 };
 pub use composition::{
     CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,

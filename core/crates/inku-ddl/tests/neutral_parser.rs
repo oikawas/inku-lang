@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
+    NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnosticKind, NeutralTokenKind,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, parse_neutral_lexemes,
+    project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/neutral-parser-v1.json");
+const FIXTURE: &str = include_str!("fixtures/neutral-parser-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -194,6 +195,43 @@ fn bilingual_surfaces_share_the_same_canonical_asset_row() {
 }
 
 #[test]
+fn closed_cardinal_grammar_maps_standard_forms_to_one_exact_number() {
+    let cases = [
+        (ResolvedInstructionLanguage::Ja, "ひとつ", 1),
+        (ResolvedInstructionLanguage::Ja, "ふたつ", 2),
+        (ResolvedInstructionLanguage::Ja, "みっつ", 3),
+        (ResolvedInstructionLanguage::Ja, "よっつ", 4),
+        (ResolvedInstructionLanguage::Ja, "いつつ", 5),
+        (ResolvedInstructionLanguage::Ja, "むっつ", 6),
+        (ResolvedInstructionLanguage::Ja, "ななつ", 7),
+        (ResolvedInstructionLanguage::Ja, "やっつ", 8),
+        (ResolvedInstructionLanguage::Ja, "ここのつ", 9),
+        (ResolvedInstructionLanguage::Ja, "とお", 10),
+        (ResolvedInstructionLanguage::Ja, "一億二万三", 100_020_003),
+        (ResolvedInstructionLanguage::En, "nineteen", 19),
+        (ResolvedInstructionLanguage::En, "NINETY-NINE", 99),
+        (
+            ResolvedInstructionLanguage::En,
+            "nine hundred and ninety-nine",
+            999,
+        ),
+    ];
+
+    for (language, source, value) in cases {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(result.diagnostics.is_empty(), "{source}");
+        assert_eq!(result.tokens.len(), 1, "{source}");
+        assert_eq!(result.tokens[0].span.start_byte, 0, "{source}");
+        assert_eq!(result.tokens[0].span.end_byte, source.len(), "{source}");
+        assert!(matches!(
+            result.tokens[0].kind,
+            NeutralTokenKind::ExactNumber { value: actual } if actual == value
+        ));
+    }
+}
+
+#[test]
 fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
     let asset = saijiki_asset();
     let mut active = 0;
@@ -374,9 +412,13 @@ fn false_positive_and_macro_cases_never_emit_saijiki_tokens() {
 #[test]
 fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v1");
-    assert_eq!(fixture.version, 1);
-    assert_eq!(fixture.cases.len(), 13);
+    assert_eq!(
+        NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
+        "inku.neutral-lexeme-parser.v2"
+    );
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v2");
+    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.cases.len(), 18);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -399,6 +441,11 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "separator-only-source",
         "ja-full-relation-literal",
         "en-full-relation-literal-case",
+        "ja-unknown-resync-known-suffix",
+        "ja-general-exact-cardinals",
+        "en-general-exact-cardinals",
+        "numeric-negative-forms",
+        "ja-unsupported-counter-and-ordinal",
     ] {
         assert!(
             ids.contains(required),

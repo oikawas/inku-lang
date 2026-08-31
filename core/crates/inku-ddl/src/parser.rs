@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v1";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v2";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,8 +73,18 @@ const FUNCTION_WORDS_JA: &[&str] = &["を", "に", "で", "の", "は", "が", "
 const FUNCTION_WORDS_EN: &[&str] = &[
     "a", "an", "the", "with", "in", "at", "on", "to", "of", "and",
 ];
-const EXACT_NUMBERS_JA: &[(&str, u64)] = &[("八つ", 8), ("十二", 12)];
-const EXACT_NUMBERS_EN: &[(&str, u64)] = &[("eight", 8), ("twelve", 12)];
+const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
+    ("ひとつ", 1),
+    ("ふたつ", 2),
+    ("みっつ", 3),
+    ("よっつ", 4),
+    ("いつつ", 5),
+    ("むっつ", 6),
+    ("ななつ", 7),
+    ("やっつ", 8),
+    ("ここのつ", 9),
+    ("とお", 10),
+];
 const QUALITATIVE_QUANTITIES_JA: &[&str] =
     &["少し", "数個", "いくつか", "たくさん", "多数", "無数"];
 const QUALITATIVE_QUANTITIES_EN: &[&str] = &["a few", "several", "many", "numerous", "countless"];
@@ -93,38 +103,7 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
     let mut cursor = 0;
 
     while cursor < source.len() {
-        if let Some(end_byte) = unsupported_numeric_end(source, cursor) {
-            diagnostics.push(diagnostic(
-                source,
-                cursor,
-                end_byte,
-                NeutralDiagnosticKind::Hole,
-                true,
-            ));
-            recognized_delivery_count += 1;
-            cursor = end_byte;
-            continue;
-        }
-
-        if let Some(macro_match) = qualified_macro_match(document, cursor) {
-            let (end_byte, kind, recognized) = match macro_match {
-                QualifiedMacroMatch::Unlocked { end_byte }
-                | QualifiedMacroMatch::ExactLock { end_byte, .. } => {
-                    (end_byte, NeutralDiagnosticKind::Unknown, false)
-                }
-                QualifiedMacroMatch::AmbiguousLocks { end_byte, .. } => {
-                    (end_byte, NeutralDiagnosticKind::Conflict, true)
-                }
-            };
-            diagnostics.push(diagnostic(source, cursor, end_byte, kind, recognized));
-            recognized_delivery_count += usize::from(recognized);
-            cursor = end_byte;
-            continue;
-        }
-
-        match select_candidate(candidates_at_with_locked_macro_boundary(
-            document, cursor, language,
-        )) {
+        match selection_at(document, cursor, language) {
             Some(Selection::Token { end_byte, kind }) => {
                 tokens.push(NeutralToken {
                     span: SourceSpan {
@@ -159,6 +138,16 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
                 recognized_delivery_count += 1;
                 cursor = end_byte;
             }
+            Some(Selection::Unknown { end_byte }) => {
+                diagnostics.push(diagnostic(
+                    source,
+                    cursor,
+                    end_byte,
+                    NeutralDiagnosticKind::Unknown,
+                    false,
+                ));
+                cursor = end_byte;
+            }
             None => {
                 let character = source[cursor..]
                     .chars()
@@ -169,7 +158,7 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
                     continue;
                 }
 
-                let end_byte = unknown_end(source, cursor);
+                let end_byte = unknown_end(document, cursor, language);
                 diagnostics.push(diagnostic(
                     source,
                     cursor,
@@ -187,6 +176,29 @@ pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseRe
         diagnostics,
         recognized_delivery_count,
     }
+}
+
+fn selection_at(
+    document: &NormalizedDdlDocument,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<Selection> {
+    let source = document.source();
+    if let Some(end_byte) = unsupported_numeric_end(source, start_byte) {
+        return Some(Selection::Hole { end_byte });
+    }
+    if let Some(macro_match) = qualified_macro_match(document, start_byte) {
+        return Some(match macro_match {
+            QualifiedMacroMatch::Unlocked { end_byte }
+            | QualifiedMacroMatch::ExactLock { end_byte, .. } => Selection::Unknown { end_byte },
+            QualifiedMacroMatch::AmbiguousLocks { end_byte, .. } => {
+                Selection::Conflict { end_byte }
+            }
+        });
+    }
+    select_candidate(candidates_at_with_locked_macro_boundary(
+        document, start_byte, language,
+    ))
 }
 
 fn candidates_at_with_locked_macro_boundary(
@@ -234,6 +246,9 @@ enum Selection {
         end_byte: usize,
     },
     Conflict {
+        end_byte: usize,
+    },
+    Unknown {
         end_byte: usize,
     },
 }
@@ -365,22 +380,34 @@ fn candidates_at(
         );
     }
 
-    let exact_numbers = match language {
-        ResolvedInstructionLanguage::Ja => EXACT_NUMBERS_JA,
-        ResolvedInstructionLanguage::En => EXACT_NUMBERS_EN,
+    if language == ResolvedInstructionLanguage::Ja {
+        for (surface, value) in NATIVE_TSU_CARDINALS_JA {
+            push_surface_candidate(
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                surface,
+                PRIORITY_NUMBER,
+                format!("number:{value}"),
+                CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value: *value }),
+            );
+        }
+    }
+    let word_cardinal = match language {
+        ResolvedInstructionLanguage::Ja => japanese_kanji_cardinal_at(source, start_byte),
+        ResolvedInstructionLanguage::En => english_cardinal_at(source, start_byte),
     };
-    for (surface, value) in exact_numbers {
-        push_surface_candidate(
-            &mut candidates,
-            source,
-            start_byte,
-            language,
-            require_boundary,
-            surface,
-            PRIORITY_NUMBER,
-            format!("number:{value}"),
-            CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value: *value }),
-        );
+    if let Some((end_byte, value)) = word_cardinal {
+        if !require_boundary || has_candidate_boundary(source, start_byte, end_byte, language) {
+            candidates.push(Candidate {
+                end_byte,
+                priority: PRIORITY_NUMBER,
+                identity: format!("number:{value}"),
+                delivery: CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value }),
+            });
+        }
     }
 
     let qualitative_quantities = match language {
@@ -547,6 +574,234 @@ fn diagnostic(
     }
 }
 
+fn japanese_kanji_cardinal_at(source: &str, start_byte: usize) -> Option<(usize, u64)> {
+    let mut end_byte = start_byte;
+    for (offset, character) in source[start_byte..].char_indices() {
+        if japanese_digit(character).is_none()
+            && japanese_small_unit(character).is_none()
+            && japanese_large_unit(character).is_none()
+        {
+            break;
+        }
+        end_byte = start_byte + offset + character.len_utf8();
+    }
+    if end_byte == start_byte {
+        return None;
+    }
+    let value = parse_japanese_kanji_cardinal(&source[start_byte..end_byte])?;
+    if source[end_byte..].starts_with('つ') {
+        if value == 0 {
+            return None;
+        }
+        end_byte += 'つ'.len_utf8();
+    }
+    Some((end_byte, value))
+}
+
+fn parse_japanese_kanji_cardinal(surface: &str) -> Option<u64> {
+    if matches!(surface, "零" | "〇") {
+        return Some(0);
+    }
+
+    let mut total = 0_u64;
+    let mut section = 0_u64;
+    let mut pending_digit = None;
+    let mut last_small_unit = u64::MAX;
+    let mut last_large_unit = u64::MAX;
+
+    for character in surface.chars() {
+        if let Some(digit) = japanese_digit(character) {
+            if digit == 0 || pending_digit.replace(digit).is_some() {
+                return None;
+            }
+            continue;
+        }
+        if let Some(unit) = japanese_small_unit(character) {
+            if unit >= last_small_unit {
+                return None;
+            }
+            let factor = pending_digit.take().unwrap_or(1);
+            section = section.checked_add(factor.checked_mul(unit)?)?;
+            last_small_unit = unit;
+            continue;
+        }
+        let unit = japanese_large_unit(character)?;
+        if unit >= last_large_unit {
+            return None;
+        }
+        section = section.checked_add(pending_digit.take().unwrap_or(0))?;
+        let factor = if section == 0 { 1 } else { section };
+        total = total.checked_add(factor.checked_mul(unit)?)?;
+        section = 0;
+        last_small_unit = u64::MAX;
+        last_large_unit = unit;
+    }
+
+    section = section.checked_add(pending_digit.unwrap_or(0))?;
+    let value = total.checked_add(section)?;
+    (value > 0).then_some(value)
+}
+
+fn japanese_digit(character: char) -> Option<u64> {
+    match character {
+        '零' | '〇' => Some(0),
+        '一' => Some(1),
+        '二' => Some(2),
+        '三' => Some(3),
+        '四' => Some(4),
+        '五' => Some(5),
+        '六' => Some(6),
+        '七' => Some(7),
+        '八' => Some(8),
+        '九' => Some(9),
+        _ => None,
+    }
+}
+
+fn japanese_small_unit(character: char) -> Option<u64> {
+    match character {
+        '十' => Some(10),
+        '百' => Some(100),
+        '千' => Some(1_000),
+        _ => None,
+    }
+}
+
+fn japanese_large_unit(character: char) -> Option<u64> {
+    match character {
+        '万' => Some(10_000),
+        '億' => Some(100_000_000),
+        '兆' => Some(1_000_000_000_000),
+        '京' => Some(10_000_000_000_000_000),
+        _ => None,
+    }
+}
+
+fn english_cardinal_at(source: &str, start_byte: usize) -> Option<(usize, u64)> {
+    let bytes = source.as_bytes();
+    if !bytes.get(start_byte).is_some_and(u8::is_ascii_alphabetic) {
+        return None;
+    }
+
+    let mut cursor = start_byte;
+    let mut words = Vec::new();
+    let mut best = None;
+    for _ in 0..5 {
+        let word_start = cursor;
+        while bytes.get(cursor).is_some_and(u8::is_ascii_alphabetic) {
+            cursor += 1;
+        }
+        if cursor == word_start {
+            break;
+        }
+        words.push(source[word_start..cursor].to_ascii_lowercase());
+        if let Some(value) = parse_english_cardinal(&words) {
+            let hyphen_continues_word = bytes.get(cursor) == Some(&b'-')
+                && bytes.get(cursor + 1).is_some_and(u8::is_ascii_alphabetic);
+            if !hyphen_continues_word {
+                best = Some((cursor, value));
+            }
+        }
+
+        let Some(next_word) = english_number_separator_end(source, cursor) else {
+            break;
+        };
+        cursor = next_word;
+    }
+    best
+}
+
+fn english_number_separator_end(source: &str, start_byte: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut cursor = start_byte;
+    match bytes.get(cursor) {
+        Some(b'-') => cursor += 1,
+        Some(b' ') => {
+            while bytes.get(cursor) == Some(&b' ') {
+                cursor += 1;
+            }
+        }
+        _ => return None,
+    }
+    bytes
+        .get(cursor)
+        .is_some_and(u8::is_ascii_alphabetic)
+        .then_some(cursor)
+}
+
+fn parse_english_cardinal(words: &[String]) -> Option<u64> {
+    if let Some(value) = english_under_hundred(words) {
+        return Some(value);
+    }
+    let multiplier = english_one_to_nine(words.first()?)?;
+    if words.get(1).map(String::as_str) != Some("hundred") {
+        return None;
+    }
+    let hundreds = multiplier.checked_mul(100)?;
+    match words.len() {
+        2 => Some(hundreds),
+        3 | 4 if words.get(2).map(String::as_str) != Some("and") => {
+            hundreds.checked_add(english_under_hundred(&words[2..])?)
+        }
+        4 | 5 if words.get(2).map(String::as_str) == Some("and") => {
+            hundreds.checked_add(english_under_hundred(&words[3..])?)
+        }
+        _ => None,
+    }
+}
+
+fn english_under_hundred(words: &[String]) -> Option<u64> {
+    match words {
+        [single] => english_zero_to_nineteen(single).or_else(|| english_tens(single)),
+        [tens, ones] => english_tens(tens)?.checked_add(english_one_to_nine(ones)?),
+        _ => None,
+    }
+}
+
+fn english_zero_to_nineteen(word: &str) -> Option<u64> {
+    match word {
+        "zero" => Some(0),
+        "one" => Some(1),
+        "two" => Some(2),
+        "three" => Some(3),
+        "four" => Some(4),
+        "five" => Some(5),
+        "six" => Some(6),
+        "seven" => Some(7),
+        "eight" => Some(8),
+        "nine" => Some(9),
+        "ten" => Some(10),
+        "eleven" => Some(11),
+        "twelve" => Some(12),
+        "thirteen" => Some(13),
+        "fourteen" => Some(14),
+        "fifteen" => Some(15),
+        "sixteen" => Some(16),
+        "seventeen" => Some(17),
+        "eighteen" => Some(18),
+        "nineteen" => Some(19),
+        _ => None,
+    }
+}
+
+fn english_one_to_nine(word: &str) -> Option<u64> {
+    english_zero_to_nineteen(word).filter(|value| (1..=9).contains(value))
+}
+
+fn english_tens(word: &str) -> Option<u64> {
+    match word {
+        "twenty" => Some(20),
+        "thirty" => Some(30),
+        "forty" => Some(40),
+        "fifty" => Some(50),
+        "sixty" => Some(60),
+        "seventy" => Some(70),
+        "eighty" => Some(80),
+        "ninety" => Some(90),
+        _ => None,
+    }
+}
+
 fn unsupported_numeric_end(source: &str, start_byte: usize) -> Option<usize> {
     let bytes = source.as_bytes();
     let mut cursor = start_byte;
@@ -620,24 +875,28 @@ fn is_macro_segment_character(character: char) -> bool {
     character.is_alphanumeric() || matches!(character, '_' | '-')
 }
 
-fn unknown_end(source: &str, start_byte: usize) -> usize {
-    let mut end_byte = start_byte;
-    for (offset, character) in source[start_byte..].char_indices() {
-        if is_separator(character) {
+fn unknown_end(
+    document: &NormalizedDdlDocument,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> usize {
+    let source = document.source();
+    let first = source[start_byte..]
+        .chars()
+        .next()
+        .expect("unknown starts inside source");
+    let mut end_byte = start_byte + first.len_utf8();
+    while end_byte < source.len() {
+        let character = source[end_byte..]
+            .chars()
+            .next()
+            .expect("unknown resynchronization remains inside source");
+        if is_separator(character) || selection_at(document, end_byte, language).is_some() {
             break;
         }
-        end_byte = start_byte + offset + character.len_utf8();
+        end_byte += character.len_utf8();
     }
-    if end_byte == start_byte {
-        start_byte
-            + source[start_byte..]
-                .chars()
-                .next()
-                .expect("unknown starts inside source")
-                .len_utf8()
-    } else {
-        end_byte
-    }
+    end_byte
 }
 
 fn is_separator(character: char) -> bool {

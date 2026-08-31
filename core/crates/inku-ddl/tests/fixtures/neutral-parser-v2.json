@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v1",
-  "version": 1,
+  "schema": "inku.neutral-lexeme-parser-fixture.v2",
+  "version": 2,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",
@@ -179,6 +179,78 @@
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 1
+    },
+    {
+      "id": "ja-unknown-resync-known-suffix",
+      "language": "ja",
+      "source": "未知円をひとつ。",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 6, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"},
+        {"kind": "function_word", "surface": "を", "start_byte": 9, "end_byte": 12},
+        {"kind": "exact_number", "surface": "ひとつ", "start_byte": 12, "end_byte": 21, "value": 1}
+      ],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "未知", "start_byte": 0, "end_byte": 6, "recognized": false}
+      ],
+      "recognized_delivery_count": 3
+    },
+    {
+      "id": "ja-general-exact-cardinals",
+      "language": "ja",
+      "source": "ひとつ ふたつ みっつ とお 一つ 二十一 百二十三",
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "ひとつ", "start_byte": 0, "end_byte": 9, "value": 1},
+        {"kind": "exact_number", "surface": "ふたつ", "start_byte": 10, "end_byte": 19, "value": 2},
+        {"kind": "exact_number", "surface": "みっつ", "start_byte": 20, "end_byte": 29, "value": 3},
+        {"kind": "exact_number", "surface": "とお", "start_byte": 30, "end_byte": 36, "value": 10},
+        {"kind": "exact_number", "surface": "一つ", "start_byte": 37, "end_byte": 43, "value": 1},
+        {"kind": "exact_number", "surface": "二十一", "start_byte": 44, "end_byte": 53, "value": 21},
+        {"kind": "exact_number", "surface": "百二十三", "start_byte": 54, "end_byte": 66, "value": 123}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 7
+    },
+    {
+      "id": "en-general-exact-cardinals",
+      "language": "en",
+      "source": "ONE, Twenty-One; one hundred. TWO HUNDRED AND THIRTY-FOUR",
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "ONE", "start_byte": 0, "end_byte": 3, "value": 1},
+        {"kind": "exact_number", "surface": "Twenty-One", "start_byte": 5, "end_byte": 15, "value": 21},
+        {"kind": "exact_number", "surface": "one hundred", "start_byte": 17, "end_byte": 28, "value": 100},
+        {"kind": "exact_number", "surface": "TWO HUNDRED AND THIRTY-FOUR", "start_byte": 30, "end_byte": 57, "value": 234}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
+    },
+    {
+      "id": "numeric-negative-forms",
+      "language": "en",
+      "source": "-1 +2 1.5 1-3 first twenty-first half 18446744073709551616",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "hole", "surface": "-1", "start_byte": 0, "end_byte": 2, "recognized": true},
+        {"kind": "hole", "surface": "+2", "start_byte": 3, "end_byte": 5, "recognized": true},
+        {"kind": "hole", "surface": "1.5", "start_byte": 6, "end_byte": 9, "recognized": true},
+        {"kind": "hole", "surface": "1-3", "start_byte": 10, "end_byte": 13, "recognized": true},
+        {"kind": "unknown", "surface": "first", "start_byte": 14, "end_byte": 19, "recognized": false},
+        {"kind": "unknown", "surface": "twenty", "start_byte": 20, "end_byte": 26, "recognized": false},
+        {"kind": "unknown", "surface": "first", "start_byte": 27, "end_byte": 32, "recognized": false},
+        {"kind": "unknown", "surface": "half", "start_byte": 33, "end_byte": 37, "recognized": false},
+        {"kind": "hole", "surface": "18446744073709551616", "start_byte": 38, "end_byte": 58, "recognized": true}
+      ],
+      "recognized_delivery_count": 5
+    },
+    {
+      "id": "ja-unsupported-counter-and-ordinal",
+      "language": "ja",
+      "source": "一個 ひとつ目",
+      "expected_tokens": [],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "一個", "start_byte": 0, "end_byte": 6, "recognized": false},
+        {"kind": "unknown", "surface": "ひとつ目", "start_byte": 7, "end_byte": 19, "recognized": false}
+      ],
+      "recognized_delivery_count": 0
     }
   ]
 }

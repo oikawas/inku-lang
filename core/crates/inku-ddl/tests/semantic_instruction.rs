@@ -9,7 +9,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v2.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +29,12 @@ struct Case {
     macro_locks: Vec<FixtureMacroLock>,
     instruction_actions: Vec<Option<String>>,
     instruction_positions: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_touches: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_continuities: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_angles: Vec<Option<String>>,
     association_issue_kinds: Vec<String>,
     instruction_issues: Vec<String>,
     canonical: Option<String>,
@@ -93,6 +99,68 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
             "{}",
             case.id
         );
+        if !case.instruction_touches.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .touch
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_touches
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Touch",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .continuity
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_continuities
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Continuity",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .angle
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_angles
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity Angle",
+                case.id
+            );
+        }
         assert_eq!(
             result
                 .ast
@@ -198,13 +266,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v2"
+        "inku.semantic-instruction-association.v3"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v2"
+        "inku.semantic-instruction-association-fixture.v3"
     );
-    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.version, 3);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -230,6 +298,8 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         "soft-line-break",
         "upstream-conflict-retained",
         "unobserved-primitive-action-position-combination",
+        "style-fields-preserve-action-position",
+        "style-conflict-preserves-action-position",
     ] {
         assert!(
             ids.contains(required),

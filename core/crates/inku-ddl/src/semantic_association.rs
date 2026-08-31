@@ -6,12 +6,12 @@ use serde_json::{Number, Value};
 
 use crate::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreRoleKind,
-    NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    SourceSpan, parse_clause_stream, project_macro_semantic_ref,
+    NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind,
+    ResolvedInstructionLanguage, SourceSpan, parse_clause_stream, project_macro_semantic_ref,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v1";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v2";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -60,6 +60,9 @@ pub struct SemanticEntity {
     pub head: SemanticTerm,
     pub color: Option<SemanticTerm>,
     pub quantity: Option<SemanticQuantity>,
+    pub touch: Option<SemanticTerm>,
+    pub continuity: Option<SemanticTerm>,
+    pub angle: Option<SemanticTerm>,
 }
 
 /// Partial or complete semantic entity sequence in sentence-region source order.
@@ -75,13 +78,20 @@ pub enum OwnedSemanticOccurrence {
     Head(SemanticTerm),
     Color(SemanticTerm),
     Quantity(SemanticQuantity),
+    Touch(SemanticTerm),
+    Continuity(SemanticTerm),
+    Angle(SemanticTerm),
 }
 
 impl OwnedSemanticOccurrence {
     /// Return the byte-exact source occurrence delivered by this issue.
     pub const fn source(&self) -> &SourceOccurrence {
         match self {
-            Self::Head(term) | Self::Color(term) => &term.provenance.source,
+            Self::Head(term)
+            | Self::Color(term)
+            | Self::Touch(term)
+            | Self::Continuity(term)
+            | Self::Angle(term) => &term.provenance.source,
             Self::Quantity(quantity) => &quantity.provenance,
         }
     }
@@ -94,6 +104,9 @@ pub enum SemanticAssociationIssueKind {
     MissingEntityHead,
     ConflictingColors,
     ConflictingQuantities,
+    ConflictingTouches,
+    ConflictingContinuities,
+    ConflictingAngles,
     UpstreamHole,
     UpstreamConflict,
     UpstreamUnknown,
@@ -106,6 +119,9 @@ impl SemanticAssociationIssueKind {
             Self::MissingEntityHead => "missing_entity_head",
             Self::ConflictingColors => "conflicting_colors",
             Self::ConflictingQuantities => "conflicting_quantities",
+            Self::ConflictingTouches => "conflicting_touches",
+            Self::ConflictingContinuities => "conflicting_continuities",
+            Self::ConflictingAngles => "conflicting_angles",
             Self::UpstreamHole => "upstream_hole",
             Self::UpstreamConflict => "upstream_conflict",
             Self::UpstreamUnknown => "upstream_unknown",
@@ -122,8 +138,8 @@ pub struct SemanticAssociationIssue {
     pub upstream_diagnostic: Option<NeutralDiagnostic>,
 }
 
-/// Source-preserving association result. Counts refer only to primitive, color, and exact-number
-/// occurrences owned by this slice, not the wider clause-stream delivery overlay.
+/// Source-preserving association result. Counts refer only to the closed entity roles and exact
+/// numbers owned by this slice, not the wider clause-stream delivery overlay.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticAssociationResult {
     pub schema_id: &'static str,
@@ -140,10 +156,13 @@ struct AssociationRegion {
     heads: Vec<SemanticTerm>,
     colors: Vec<SemanticTerm>,
     quantities: Vec<SemanticQuantity>,
+    touches: Vec<SemanticTerm>,
+    continuities: Vec<SemanticTerm>,
+    angles: Vec<SemanticTerm>,
     diagnostics: Vec<NeutralDiagnostic>,
 }
 
-/// Associate primitive, explicit color, and explicit numeric quantity within sentence regions.
+/// Associate the closed single-entity roles and explicit numeric quantity within sentence regions.
 ///
 /// The accepted clause parser is invoked exactly once. Sentence endings close a region, while line
 /// breaks only create source-formatting clause boundaries inside the same region.
@@ -171,6 +190,36 @@ pub fn associate_semantic_entities(
                 }
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => {
                     region.colors.push(project_term(
+                        document,
+                        term,
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    ));
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Touch => {
+                    region.touches.push(project_term(
+                        document,
+                        term,
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    ));
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Continuity => {
+                    region.continuities.push(project_remaining_term(
+                        document,
+                        term,
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    ));
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Angle => {
+                    region.angles.push(project_remaining_term(
                         document,
                         term,
                         region_index,
@@ -270,6 +319,29 @@ fn project_term(
     }
 }
 
+fn project_remaining_term(
+    document: &NormalizedDdlDocument,
+    term: &crate::RemainingRoleTerm,
+    region_index: usize,
+    clause_index: usize,
+    atom_index: usize,
+) -> SemanticTerm {
+    let projected = project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
+        .expect("accepted typed Saijiki term has a canonical semantic identity");
+    SemanticTerm {
+        identity: SemanticIdentity {
+            category: projected.category,
+            id: projected.canonical_id,
+        },
+        provenance: SemanticTermProvenance {
+            source: source_occurrence(document, term.span, region_index, clause_index, atom_index),
+            asset_id: term.asset_id.clone(),
+            category_key: term.category_key.clone(),
+            canonical_surface_ja: term.canonical_surface_ja.clone(),
+        },
+    }
+}
+
 fn source_occurrence(
     document: &NormalizedDdlDocument,
     span: SourceSpan,
@@ -305,6 +377,14 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::Quantity),
             )
+            .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
+            .chain(
+                region
+                    .continuities
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::Continuity),
+            )
+            .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         issues.push(SemanticAssociationIssue {
@@ -328,6 +408,14 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::Quantity),
             )
+            .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
+            .chain(
+                region
+                    .continuities
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::Continuity),
+            )
+            .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
         if !occurrences.is_empty() {
@@ -343,24 +431,13 @@ fn associate_region(
     }
 
     let head = region.heads.pop().expect("single head was checked");
-    let color = match region.colors.len() {
-        0 => None,
-        1 => region.colors.pop(),
-        _ => {
-            let occurrences = region
-                .colors
-                .drain(..)
-                .map(OwnedSemanticOccurrence::Color)
-                .collect();
-            issues.push(SemanticAssociationIssue {
-                kind: SemanticAssociationIssueKind::ConflictingColors,
-                region_index,
-                occurrences,
-                upstream_diagnostic: None,
-            });
-            None
-        }
-    };
+    let color = select_term(
+        region.colors,
+        OwnedSemanticOccurrence::Color,
+        SemanticAssociationIssueKind::ConflictingColors,
+        region_index,
+        issues,
+    );
     let quantity = match region.quantities.len() {
         0 => None,
         1 => region.quantities.pop(),
@@ -379,12 +456,58 @@ fn associate_region(
             None
         }
     };
+    let touch = select_term(
+        region.touches,
+        OwnedSemanticOccurrence::Touch,
+        SemanticAssociationIssueKind::ConflictingTouches,
+        region_index,
+        issues,
+    );
+    let continuity = select_term(
+        region.continuities,
+        OwnedSemanticOccurrence::Continuity,
+        SemanticAssociationIssueKind::ConflictingContinuities,
+        region_index,
+        issues,
+    );
+    let angle = select_term(
+        region.angles,
+        OwnedSemanticOccurrence::Angle,
+        SemanticAssociationIssueKind::ConflictingAngles,
+        region_index,
+        issues,
+    );
     entities.push(SemanticEntity {
         head,
         color,
         quantity,
+        touch,
+        continuity,
+        angle,
     });
     append_upstream_issues(region_index, region.diagnostics, issues);
+}
+
+fn select_term(
+    mut terms: Vec<SemanticTerm>,
+    into_occurrence: fn(SemanticTerm) -> OwnedSemanticOccurrence,
+    conflict_kind: SemanticAssociationIssueKind,
+    region_index: usize,
+    issues: &mut Vec<SemanticAssociationIssue>,
+) -> Option<SemanticTerm> {
+    match terms.len() {
+        0 => None,
+        1 => terms.pop(),
+        _ => {
+            issues.push(SemanticAssociationIssue {
+                kind: conflict_kind,
+                region_index,
+                occurrences: terms.into_iter().map(into_occurrence).collect(),
+                upstream_diagnostic: None,
+            });
+            None
+        }
+    }
 }
 
 fn append_upstream_issues(
@@ -412,7 +535,11 @@ fn append_upstream_issues(
 }
 
 fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
-    1 + usize::from(entity.color.is_some()) + usize::from(entity.quantity.is_some())
+    1 + usize::from(entity.color.is_some())
+        + usize::from(entity.quantity.is_some())
+        + usize::from(entity.touch.is_some())
+        + usize::from(entity.continuity.is_some())
+        + usize::from(entity.angle.is_some())
 }
 
 fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
@@ -433,6 +560,14 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
 pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
     let mut record = BTreeMap::new();
     record.insert(
+        "angle".to_owned(),
+        entity
+            .angle
+            .as_ref()
+            .map(|angle| semantic_identity_value(&angle.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
         "color".to_owned(),
         entity
             .color
@@ -441,8 +576,24 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .unwrap_or(Value::Null),
     );
     record.insert(
+        "continuity".to_owned(),
+        entity
+            .continuity
+            .as_ref()
+            .map(|continuity| semantic_identity_value(&continuity.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
         "head".to_owned(),
         semantic_identity_value(&entity.head.identity),
+    );
+    record.insert(
+        "touch".to_owned(),
+        entity
+            .touch
+            .as_ref()
+            .map(|touch| semantic_identity_value(&touch.identity))
+            .unwrap_or(Value::Null),
     );
     record.insert(
         "quantity".to_owned(),

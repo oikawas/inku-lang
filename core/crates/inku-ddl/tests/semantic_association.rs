@@ -2,12 +2,13 @@ use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind, NormalizedDdlDocument,
-    OwnedSemanticOccurrence, ResolvedInstructionLanguage, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-    SemanticAssociationResult, SourceOccurrence, associate_semantic_entities,
+    OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SourceOccurrence,
+    associate_semantic_entities,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v1.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,6 +28,12 @@ struct Case {
     issue_kinds: Vec<String>,
     canonical: Option<String>,
     owned_occurrence_count: usize,
+    #[serde(default)]
+    explicit_touches: Vec<String>,
+    #[serde(default)]
+    explicit_continuities: Vec<String>,
+    #[serde(default)]
+    explicit_angles: Vec<String>,
 }
 
 #[test]
@@ -85,6 +92,51 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
             "{}: every slice-owned occurrence must be delivered exactly once",
             case.id
         );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| entity.touch.as_ref().map(|term| term.identity.id.as_str()))
+                .collect::<Vec<_>>(),
+            case.explicit_touches
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Touch fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| entity
+                    .continuity
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()))
+                .collect::<Vec<_>>(),
+            case.explicit_continuities
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Continuity fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| entity.angle.as_ref().map(|term| term.identity.id.as_str()))
+                .collect::<Vec<_>>(),
+            case.explicit_angles
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit Angle fields",
+            case.id
+        );
         assert_source_provenance(case, &result);
         assert_owned_occurrence_join(case, &result);
 
@@ -106,6 +158,27 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
         canonical_by_case["ownership-a"],
         canonical_by_case["ownership-b"]
     );
+    let styled_equivalent = [
+        "ja-style-order-one",
+        "ja-style-order-two",
+        "en-style-order-one",
+        "en-style-order-two",
+        "style-soft-line-break",
+    ]
+    .map(|id| canonical_by_case[id]);
+    assert!(styled_equivalent.windows(2).all(|pair| pair[0] == pair[1]));
+    assert_ne!(
+        canonical_by_case["en-style-order-one"],
+        canonical_by_case["style-touch-contrast"]
+    );
+    assert_ne!(
+        canonical_by_case["en-style-order-one"],
+        canonical_by_case["style-continuity-contrast"]
+    );
+    assert_ne!(
+        canonical_by_case["en-style-order-one"],
+        canonical_by_case["style-angle-contrast"]
+    );
 }
 
 #[test]
@@ -113,13 +186,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v1"
+        "inku.semantic-entity-association.v2"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v1"
+        "inku.semantic-entity-association-fixture.v2"
     );
-    assert_eq!(fixture.version, 1);
+    assert_eq!(fixture.version, 2);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -145,6 +218,23 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
         "upstream-unknown-retained",
         "negative-quantity-remains-hole",
         "unobserved-order-and-vocabulary",
+        "ja-style-order-one",
+        "ja-style-order-two",
+        "en-style-order-one",
+        "en-style-order-two",
+        "style-touch-only",
+        "style-touch-contrast",
+        "style-continuity-contrast",
+        "style-angle-contrast",
+        "conflicting-touches",
+        "conflicting-continuities",
+        "conflicting-angles",
+        "orphan-style-terms",
+        "multi-head-style-ambiguity",
+        "regional-style-ownership",
+        "style-soft-line-break",
+        "style-upstream-issue-retained",
+        "unobserved-primitive-style-combination",
     ] {
         assert!(
             ids.contains(required),
@@ -173,6 +263,17 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         }
         if let Some(quantity) = &entity.quantity {
             assert_source_occurrence(case, &quantity.provenance, &result.clause_stream);
+        }
+        for term in [&entity.touch, &entity.continuity, &entity.angle]
+            .into_iter()
+            .flatten()
+        {
+            assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
+            assert_eq!(
+                entity.head.provenance.source.region_index, term.provenance.source.region_index,
+                "{}: entity attribute must remain in its sentence region",
+                case.id
+            );
         }
     }
     for issue in &result.issues {
@@ -265,7 +366,18 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         .flat_map(|clause| &clause.atoms)
         .filter_map(|atom| match atom {
             ClauseAtom::CoreRole(term)
-                if matches!(term.role, CoreRoleKind::Primitive | CoreRoleKind::Color) =>
+                if matches!(
+                    term.role,
+                    CoreRoleKind::Primitive | CoreRoleKind::Color | CoreRoleKind::Touch
+                ) =>
+            {
+                Some(term.span)
+            }
+            ClauseAtom::RemainingRole(term)
+                if matches!(
+                    term.role,
+                    RemainingRoleKind::Continuity | RemainingRoleKind::Angle
+                ) =>
             {
                 Some(term.span)
             }
@@ -283,6 +395,12 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         if let Some(quantity) = &entity.quantity {
             output_spans.push(quantity.provenance.span);
         }
+        for term in [&entity.touch, &entity.continuity, &entity.angle]
+            .into_iter()
+            .flatten()
+        {
+            output_spans.push(term.provenance.source.span);
+        }
     }
     for occurrence in result.issues.iter().flat_map(|issue| &issue.occurrences) {
         output_spans.push(match occurrence {
@@ -290,6 +408,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
                 term.provenance.source.span
             }
             OwnedSemanticOccurrence::Quantity(quantity) => quantity.provenance.span,
+            OwnedSemanticOccurrence::Touch(term)
+            | OwnedSemanticOccurrence::Continuity(term)
+            | OwnedSemanticOccurrence::Angle(term) => term.provenance.source.span,
         });
     }
 

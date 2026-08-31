@@ -21,6 +21,7 @@ pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
+pub mod semantic_association;
 pub mod visible_patch;
 
 pub use attachment::{
@@ -133,6 +134,12 @@ pub use saijiki::{
     SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_relation_literal_table, saijiki_score_wire_maps,
+};
+pub use semantic_association::{
+    OwnedSemanticOccurrence, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue,
+    SemanticAssociationIssueKind, SemanticAssociationResult, SemanticEntity,
+    SemanticEntityAssociationAst, SemanticIdentity, SemanticQuantity, SemanticTerm,
+    SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

@@ -156,7 +156,7 @@ pub fn associate_semantic_entities(
 
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
-            let region_index = region_index_for_span(&clause_stream, atom.span());
+            let region_index = sentence_region_index(&clause_stream, atom.span());
             let region = regions.entry(region_index).or_default();
             match atom {
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive => {
@@ -236,7 +236,7 @@ pub fn associate_semantic_entities(
     })
 }
 
-fn region_index_for_span(stream: &ClauseStream, span: SourceSpan) -> usize {
+pub(crate) fn sentence_region_index(stream: &ClauseStream, span: SourceSpan) -> usize {
     stream
         .separators
         .iter()
@@ -419,27 +419,7 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
     let entities = ast
         .entities
         .iter()
-        .map(|entity| {
-            let mut record = BTreeMap::new();
-            record.insert(
-                "color".to_owned(),
-                entity
-                    .color
-                    .as_ref()
-                    .map(|color| canonical_identity(&color.identity))
-                    .unwrap_or(Value::Null),
-            );
-            record.insert("head".to_owned(), canonical_identity(&entity.head.identity));
-            record.insert(
-                "quantity".to_owned(),
-                entity
-                    .quantity
-                    .as_ref()
-                    .map(|quantity| Value::Number(Number::from(quantity.value)))
-                    .unwrap_or(Value::Null),
-            );
-            Value::Object(record.into_iter().collect())
-        })
+        .map(semantic_entity_value)
         .collect::<Vec<_>>();
     let mut root = BTreeMap::new();
     root.insert("entities".to_owned(), Value::Array(entities));
@@ -450,7 +430,32 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
     serde_json::to_vec(&root).expect("closed semantic association AST serializes")
 }
 
-fn canonical_identity(identity: &SemanticIdentity) -> Value {
+pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "color".to_owned(),
+        entity
+            .color
+            .as_ref()
+            .map(|color| semantic_identity_value(&color.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "head".to_owned(),
+        semantic_identity_value(&entity.head.identity),
+    );
+    record.insert(
+        "quantity".to_owned(),
+        entity
+            .quantity
+            .as_ref()
+            .map(|quantity| Value::Number(Number::from(quantity.value)))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+pub(crate) fn semantic_identity_value(identity: &SemanticIdentity) -> Value {
     let mut record = BTreeMap::new();
     record.insert(
         "category".to_owned(),

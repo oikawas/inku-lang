@@ -1,27 +1,29 @@
-//! Explicit Action association over the accepted source-preserving I-584 result.
+//! Explicit Action and Position association over the accepted source-preserving I-584 result.
 
 use std::collections::BTreeMap;
 
-use serde_json::{Number, Value};
+use serde_json::Value;
 
 use crate::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStreamError, NormalizedDdlDocument, RemainingRoleKind,
+    ClauseAtom, ClauseStreamError, NormalizedDdlDocument, RemainingRoleKind,
     SemanticAssociationResult, SemanticEntity, SemanticIdentity, SemanticTerm,
     SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
     project_macro_semantic_ref,
+    semantic_association::{semantic_entity_value, semantic_identity_value, sentence_region_index},
 };
 
-/// Stable identity for the runtime-disconnected explicit Action association AST.
+/// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v1";
+    "inku.semantic-instruction-association.v2";
 
-/// One single-head entity and its optional explicit Action.
+/// One single-head entity and its independently optional explicit Action and Position.
 ///
-/// A missing Action is unspecified; it is never a defaulted Action.
+/// A missing field is unspecified; neither field receives a default.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticInstruction {
     pub entity: SemanticEntity,
     pub action: Option<SemanticTerm>,
+    pub position: Option<SemanticTerm>,
 }
 
 /// Partial or complete semantic instruction sequence in entity source order.
@@ -31,11 +33,36 @@ pub struct SemanticInstructionAssociationAst {
     pub complete: bool,
 }
 
-/// Stable, expected Action-association issue classes.
+/// The two roles owned by this instruction slice.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticInstructionOccurrenceRole {
+    Action,
+    Position,
+}
+
+impl SemanticInstructionOccurrenceRole {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Action => "action",
+            Self::Position => "position",
+        }
+    }
+}
+
+/// One role-tagged occurrence delivered to an instruction issue.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticInstructionOccurrence {
+    pub role: SemanticInstructionOccurrenceRole,
+    pub term: SemanticTerm,
+}
+
+/// Stable, expected instruction-association issue classes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticInstructionIssueKind {
     ConflictingActions,
     MissingActionEntity,
+    ConflictingPositions,
+    MissingPositionEntity,
 }
 
 impl SemanticInstructionIssueKind {
@@ -43,22 +70,24 @@ impl SemanticInstructionIssueKind {
         match self {
             Self::ConflictingActions => "conflicting_actions",
             Self::MissingActionEntity => "missing_action_entity",
+            Self::ConflictingPositions => "conflicting_positions",
+            Self::MissingPositionEntity => "missing_position_entity",
         }
     }
 }
 
-/// One typed Action issue with every Action occurrence delivered exactly once.
+/// One typed instruction issue with every owned occurrence delivered exactly once.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticInstructionIssue {
     pub kind: SemanticInstructionIssueKind,
     pub region_index: usize,
-    pub actions: Vec<SemanticTerm>,
+    pub occurrences: Vec<SemanticInstructionOccurrence>,
 }
 
-/// Source-preserving explicit Action association result.
+/// Source-preserving explicit Action / Position association result.
 ///
-/// The accepted I-584 association is owned unchanged. Occurrence counts refer only to Motion
-/// terms owned as Actions by this slice.
+/// The accepted I-584 association is owned unchanged. Occurrence counts include only Motion and
+/// Place terms newly owned by this slice; I-584 entity occurrences are not recounted.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticInstructionAssociationResult {
     pub schema_id: &'static str,
@@ -66,11 +95,17 @@ pub struct SemanticInstructionAssociationResult {
     pub ast: SemanticInstructionAssociationAst,
     pub issues: Vec<SemanticInstructionIssue>,
     pub canonical_bytes: Option<Vec<u8>>,
-    pub owned_action_occurrence_count: usize,
-    pub delivered_action_occurrence_count: usize,
+    pub owned_instruction_occurrence_count: usize,
+    pub delivered_instruction_occurrence_count: usize,
 }
 
-/// Associate explicit Saijiki Motion terms as Actions with I-584 single-head entities.
+#[derive(Default)]
+struct InstructionRegion {
+    actions: Vec<SemanticTerm>,
+    positions: Vec<SemanticTerm>,
+}
+
+/// Associate explicit Saijiki Motion and Place terms with I-584 single-head entities.
 ///
 /// I-584 is called exactly once. Its owned `ClauseStream`, entities, partial state, and issues are
 /// reused directly; no parser, role composition, or sentence-region splitter is rerun.
@@ -78,29 +113,31 @@ pub fn associate_semantic_instructions(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticInstructionAssociationResult, ClauseStreamError> {
     let association = associate_semantic_entities(document)?;
-    let mut actions_by_region = BTreeMap::<usize, Vec<SemanticTerm>>::new();
-    let mut owned_action_occurrence_count = 0;
+    let mut occurrences_by_region = BTreeMap::<usize, InstructionRegion>::new();
+    let mut owned_instruction_occurrence_count = 0;
 
     for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
             let ClauseAtom::RemainingRole(term) = atom else {
                 continue;
             };
-            if term.role != RemainingRoleKind::Motion {
-                continue;
+            let role = match term.role {
+                RemainingRoleKind::Motion => SemanticInstructionOccurrenceRole::Action,
+                RemainingRoleKind::Place => SemanticInstructionOccurrenceRole::Position,
+                RemainingRoleKind::Angle
+                | RemainingRoleKind::Continuity
+                | RemainingRoleKind::Fluctuation
+                | RemainingRoleKind::Proportion => continue,
+            };
+            let region_index = sentence_region_index(&association.clause_stream, term.span);
+            let projected =
+                project_instruction_term(document, term, region_index, clause_index, atom_index);
+            let region = occurrences_by_region.entry(region_index).or_default();
+            match role {
+                SemanticInstructionOccurrenceRole::Action => region.actions.push(projected),
+                SemanticInstructionOccurrenceRole::Position => region.positions.push(projected),
             }
-            let region_index = region_index_for_span(&association, term.span);
-            actions_by_region
-                .entry(region_index)
-                .or_default()
-                .push(project_action(
-                    document,
-                    term,
-                    region_index,
-                    clause_index,
-                    atom_index,
-                ));
-            owned_action_occurrence_count += 1;
+            owned_instruction_occurrence_count += 1;
         }
     }
 
@@ -108,45 +145,59 @@ pub fn associate_semantic_instructions(
     let mut issues = Vec::new();
     for entity in &association.ast.entities {
         let region_index = entity.head.provenance.source.region_index;
-        let mut actions = actions_by_region.remove(&region_index).unwrap_or_default();
-        let action = match actions.len() {
-            0 => None,
-            1 => actions.pop(),
-            _ => {
-                issues.push(SemanticInstructionIssue {
-                    kind: SemanticInstructionIssueKind::ConflictingActions,
-                    region_index,
-                    actions,
-                });
-                None
-            }
-        };
+        let region = occurrences_by_region
+            .remove(&region_index)
+            .unwrap_or_default();
+        let action = select_one(
+            region.actions,
+            SemanticInstructionOccurrenceRole::Action,
+            SemanticInstructionIssueKind::ConflictingActions,
+            region_index,
+            &mut issues,
+        );
+        let position = select_one(
+            region.positions,
+            SemanticInstructionOccurrenceRole::Position,
+            SemanticInstructionIssueKind::ConflictingPositions,
+            region_index,
+            &mut issues,
+        );
         instructions.push(SemanticInstruction {
             entity: entity.clone(),
             action,
+            position,
         });
     }
-    issues.extend(
-        actions_by_region
-            .into_iter()
-            .map(|(region_index, actions)| SemanticInstructionIssue {
-                kind: SemanticInstructionIssueKind::MissingActionEntity,
-                region_index,
-                actions,
-            }),
-    );
+    for (region_index, region) in occurrences_by_region {
+        append_orphan_issue(
+            region.actions,
+            SemanticInstructionOccurrenceRole::Action,
+            SemanticInstructionIssueKind::MissingActionEntity,
+            region_index,
+            &mut issues,
+        );
+        append_orphan_issue(
+            region.positions,
+            SemanticInstructionOccurrenceRole::Position,
+            SemanticInstructionIssueKind::MissingPositionEntity,
+            region_index,
+            &mut issues,
+        );
+    }
 
-    let delivered_action_occurrence_count = instructions
+    let delivered_instruction_occurrence_count = instructions
         .iter()
-        .filter(|instruction| instruction.action.is_some())
-        .count()
+        .map(|instruction| {
+            usize::from(instruction.action.is_some()) + usize::from(instruction.position.is_some())
+        })
+        .sum::<usize>()
         + issues
             .iter()
-            .map(|issue| issue.actions.len())
+            .map(|issue| issue.occurrences.len())
             .sum::<usize>();
     assert_eq!(
-        delivered_action_occurrence_count, owned_action_occurrence_count,
-        "semantic instruction association must deliver every Action occurrence exactly once"
+        delivered_instruction_occurrence_count, owned_instruction_occurrence_count,
+        "semantic instruction association must deliver every Action / Position occurrence exactly once"
     );
 
     let ast = SemanticInstructionAssociationAst {
@@ -161,27 +212,56 @@ pub fn associate_semantic_instructions(
         ast,
         issues,
         canonical_bytes,
-        owned_action_occurrence_count,
-        delivered_action_occurrence_count,
+        owned_instruction_occurrence_count,
+        delivered_instruction_occurrence_count,
     })
 }
 
-fn region_index_for_span(
-    association: &SemanticAssociationResult,
-    span: crate::SourceSpan,
-) -> usize {
-    association
-        .clause_stream
-        .separators
-        .iter()
-        .filter(|separator| {
-            separator.kind == ClauseSeparatorKind::SentenceEnd
-                && separator.span.end_byte <= span.start_byte
-        })
-        .count()
+fn select_one(
+    mut terms: Vec<SemanticTerm>,
+    role: SemanticInstructionOccurrenceRole,
+    conflict_kind: SemanticInstructionIssueKind,
+    region_index: usize,
+    issues: &mut Vec<SemanticInstructionIssue>,
+) -> Option<SemanticTerm> {
+    match terms.len() {
+        0 => None,
+        1 => terms.pop(),
+        _ => {
+            issues.push(SemanticInstructionIssue {
+                kind: conflict_kind,
+                region_index,
+                occurrences: terms
+                    .into_iter()
+                    .map(|term| SemanticInstructionOccurrence { role, term })
+                    .collect(),
+            });
+            None
+        }
+    }
 }
 
-fn project_action(
+fn append_orphan_issue(
+    terms: Vec<SemanticTerm>,
+    role: SemanticInstructionOccurrenceRole,
+    kind: SemanticInstructionIssueKind,
+    region_index: usize,
+    issues: &mut Vec<SemanticInstructionIssue>,
+) {
+    if terms.is_empty() {
+        return;
+    }
+    issues.push(SemanticInstructionIssue {
+        kind,
+        region_index,
+        occurrences: terms
+            .into_iter()
+            .map(|term| SemanticInstructionOccurrence { role, term })
+            .collect(),
+    });
+}
+
+fn project_instruction_term(
     document: &NormalizedDdlDocument,
     term: &crate::RemainingRoleTerm,
     region_index: usize,
@@ -189,7 +269,7 @@ fn project_action(
     atom_index: usize,
 ) -> SemanticTerm {
     let projected = project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
-        .expect("accepted typed Motion term has a canonical semantic identity");
+        .expect("accepted typed instruction term has a canonical semantic identity");
     SemanticTerm {
         identity: SemanticIdentity {
             category: projected.category,
@@ -222,10 +302,21 @@ fn canonical_ast_bytes(ast: &SemanticInstructionAssociationAst) -> Vec<u8> {
                 instruction
                     .action
                     .as_ref()
-                    .map(|action| canonical_identity(&action.identity))
+                    .map(|action| semantic_identity_value(&action.identity))
                     .unwrap_or(Value::Null),
             );
-            record.insert("entity".to_owned(), canonical_entity(&instruction.entity));
+            record.insert(
+                "entity".to_owned(),
+                semantic_entity_value(&instruction.entity),
+            );
+            record.insert(
+                "position".to_owned(),
+                instruction
+                    .position
+                    .as_ref()
+                    .map(|position| semantic_identity_value(&position.identity))
+                    .unwrap_or(Value::Null),
+            );
             Value::Object(record.into_iter().collect())
         })
         .collect::<Vec<_>>();
@@ -236,36 +327,4 @@ fn canonical_ast_bytes(ast: &SemanticInstructionAssociationAst) -> Vec<u8> {
         Value::String(SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID.to_owned()),
     );
     serde_json::to_vec(&root).expect("closed semantic instruction AST serializes")
-}
-
-fn canonical_entity(entity: &SemanticEntity) -> Value {
-    let mut record = BTreeMap::new();
-    record.insert(
-        "color".to_owned(),
-        entity
-            .color
-            .as_ref()
-            .map(|color| canonical_identity(&color.identity))
-            .unwrap_or(Value::Null),
-    );
-    record.insert("head".to_owned(), canonical_identity(&entity.head.identity));
-    record.insert(
-        "quantity".to_owned(),
-        entity
-            .quantity
-            .as_ref()
-            .map(|quantity| Value::Number(Number::from(quantity.value)))
-            .unwrap_or(Value::Null),
-    );
-    Value::Object(record.into_iter().collect())
-}
-
-fn canonical_identity(identity: &SemanticIdentity) -> Value {
-    let mut record = BTreeMap::new();
-    record.insert(
-        "category".to_owned(),
-        Value::String(identity.category.clone()),
-    );
-    record.insert("id".to_owned(), Value::String(identity.id.clone()));
-    Value::Object(record.into_iter().collect())
 }

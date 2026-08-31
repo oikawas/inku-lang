@@ -5,10 +5,11 @@ use inku_ddl::{
     RemainingRoleKind, ResolvedInstructionLanguage, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstructionAssociationResult,
     SourceOccurrence, associate_semantic_instructions,
+    semantic_instruction::SemanticInstructionOccurrenceRole,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v1.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,10 +28,11 @@ struct Case {
     #[serde(default)]
     macro_locks: Vec<FixtureMacroLock>,
     instruction_actions: Vec<Option<String>>,
+    instruction_positions: Vec<Option<String>>,
     association_issue_kinds: Vec<String>,
-    action_issue_kinds: Vec<String>,
+    instruction_issues: Vec<String>,
     canonical: Option<String>,
-    owned_action_occurrence_count: usize,
+    owned_instruction_occurrence_count: usize,
 }
 
 #[derive(Deserialize)]
@@ -42,7 +44,7 @@ struct FixtureMacroLock {
 }
 
 #[test]
-fn fixture_associates_explicit_actions_without_surface_order_rules() {
+fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules() {
     let fixture = load_fixture();
     let mut canonical_by_case = HashMap::new();
 
@@ -93,6 +95,25 @@ fn fixture_associates_explicit_actions_without_surface_order_rules() {
         );
         assert_eq!(
             result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| {
+                    instruction
+                        .position
+                        .as_ref()
+                        .map(|position| position.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.instruction_positions
+                .iter()
+                .map(|position| position.as_deref())
+                .collect::<Vec<_>>(),
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            result
                 .association
                 .issues
                 .iter()
@@ -109,12 +130,16 @@ fn fixture_associates_explicit_actions_without_surface_order_rules() {
             result
                 .issues
                 .iter()
-                .map(|issue| issue.kind.as_str())
+                .map(|issue| {
+                    let role = issue
+                        .occurrences
+                        .first()
+                        .map(|occurrence| occurrence.role.as_str())
+                        .expect("instruction issue owns at least one occurrence");
+                    format!("{role}:{}", issue.kind.as_str())
+                })
                 .collect::<Vec<_>>(),
-            case.action_issue_kinds
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
+            case.instruction_issues,
             "{}",
             case.id
         );
@@ -127,21 +152,22 @@ fn fixture_associates_explicit_actions_without_surface_order_rules() {
         assert_eq!(
             result.ast.complete,
             result.association.ast.complete && result.issues.is_empty(),
-            "{}: only upstream-complete, action-issue-free AST is complete",
+            "{}: only upstream-complete, instruction-issue-free AST is complete",
             case.id
         );
         assert_eq!(
-            result.owned_action_occurrence_count, case.owned_action_occurrence_count,
+            result.owned_instruction_occurrence_count, case.owned_instruction_occurrence_count,
             "{}",
             case.id
         );
         assert_eq!(
-            result.delivered_action_occurrence_count, result.owned_action_occurrence_count,
-            "{}: every action occurrence must be delivered exactly once",
+            result.delivered_instruction_occurrence_count,
+            result.owned_instruction_occurrence_count,
+            "{}: every Action / Position occurrence must be delivered exactly once",
             case.id
         );
         assert_source_provenance(case, &result);
-        assert_action_occurrence_join(case, &result);
+        assert_instruction_occurrence_join(case, &result);
 
         if let Some(canonical) = &case.canonical {
             canonical_by_case.insert(case.id.as_str(), canonical.as_str());
@@ -149,17 +175,21 @@ fn fixture_associates_explicit_actions_without_surface_order_rules() {
     }
 
     let equivalent = [
-        "ja-place-order-one",
-        "ja-place-order-two",
-        "en-place-order-one",
-        "en-place-order-two",
+        "ja-position-order-one",
+        "ja-position-order-two",
+        "en-position-order-one",
+        "en-position-order-two",
         "soft-line-break",
     ]
     .map(|id| canonical_by_case[id]);
     assert!(equivalent.windows(2).all(|pair| pair[0] == pair[1]));
     assert_ne!(
-        canonical_by_case["action-line-up"],
-        canonical_by_case["action-scatter"]
+        canonical_by_case["en-position-order-one"],
+        canonical_by_case["position-left-edge"]
+    );
+    assert_ne!(
+        canonical_by_case["action-line-up-position-unspecified"],
+        canonical_by_case["action-scatter-position-unspecified"]
     );
 }
 
@@ -168,13 +198,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v1"
+        "inku.semantic-instruction-association.v2"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v1"
+        "inku.semantic-instruction-association-fixture.v2"
     );
-    assert_eq!(fixture.version, 1);
+    assert_eq!(fixture.version, 2);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -184,20 +214,22 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         .collect::<HashSet<_>>();
     assert_eq!(ids.len(), fixture.cases.len());
     for required in [
-        "ja-place-order-one",
-        "ja-place-order-two",
-        "en-place-order-one",
-        "en-place-order-two",
-        "action-line-up",
-        "action-scatter",
-        "action-unspecified",
-        "orphan-action",
-        "conflicting-actions",
-        "multi-head-action",
-        "regional-action-ownership",
+        "ja-position-order-one",
+        "ja-position-order-two",
+        "en-position-order-one",
+        "en-position-order-two",
+        "position-left-edge",
+        "position-unspecified-action",
+        "action-unspecified-position",
+        "action-and-position-unspecified",
+        "conflicting-positions",
+        "orphan-position",
+        "conflicting-actions-position-retained",
+        "multi-head-action-position",
+        "regional-instruction-ownership",
         "soft-line-break",
         "upstream-conflict-retained",
-        "unobserved-primitive-action-combination",
+        "unobserved-primitive-action-position-combination",
     ] {
         assert!(
             ids.contains(required),
@@ -230,21 +262,44 @@ fn assert_source_provenance(case: &Case, result: &SemanticInstructionAssociation
             assert_eq!(
                 instruction.entity.head.provenance.source.region_index,
                 action.provenance.source.region_index,
-                "{}: entity and action must share one sentence region",
+                "{}: entity and Action must share one sentence region",
+                case.id
+            );
+        }
+        if let Some(position) = &instruction.position {
+            assert_eq!(position.identity.category, "place", "{}", case.id);
+            assert_source_occurrence(
+                case,
+                &position.provenance.source,
+                &result.association.clause_stream,
+            );
+            assert_eq!(
+                instruction.entity.head.provenance.source.region_index,
+                position.provenance.source.region_index,
+                "{}: entity and Position must share one sentence region",
                 case.id
             );
         }
     }
     for issue in &result.issues {
-        for action in &issue.actions {
+        for occurrence in &issue.occurrences {
+            let expected_category = match occurrence.role {
+                SemanticInstructionOccurrenceRole::Action => "movement",
+                SemanticInstructionOccurrenceRole::Position => "place",
+            };
             assert_eq!(
-                action.provenance.source.region_index, issue.region_index,
+                occurrence.term.identity.category, expected_category,
+                "{}",
+                case.id
+            );
+            assert_eq!(
+                occurrence.term.provenance.source.region_index, issue.region_index,
                 "{}",
                 case.id
             );
             assert_source_occurrence(
                 case,
-                &action.provenance.source,
+                &occurrence.term.provenance.source,
                 &result.association.clause_stream,
             );
         }
@@ -295,8 +350,8 @@ fn expected_region_index(stream: &ClauseStream, span: inku_ddl::SourceSpan) -> u
         .count()
 }
 
-fn assert_action_occurrence_join(case: &Case, result: &SemanticInstructionAssociationResult) {
-    let input_spans = result
+fn assert_instruction_occurrence_join(case: &Case, result: &SemanticInstructionAssociationResult) {
+    let mut input = result
         .association
         .clause_stream
         .clauses
@@ -304,42 +359,42 @@ fn assert_action_occurrence_join(case: &Case, result: &SemanticInstructionAssoci
         .flat_map(|clause| &clause.atoms)
         .filter_map(|atom| match atom {
             ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Motion => {
-                Some(term.span)
+                Some(("action", term.span))
+            }
+            ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Place => {
+                Some(("position", term.span))
             }
             _ => None,
         })
         .collect::<Vec<_>>();
+    input.sort_by_key(|(role, span)| (*role, span.start_byte));
 
-    let mut output_spans = result
+    let mut output = result
         .ast
         .instructions
         .iter()
-        .filter_map(|instruction| {
+        .flat_map(|instruction| {
             instruction
                 .action
-                .as_ref()
-                .map(|action| action.provenance.source.span)
+                .iter()
+                .map(|term| ("action", term.provenance.source.span))
+                .chain(
+                    instruction
+                        .position
+                        .iter()
+                        .map(|term| ("position", term.provenance.source.span)),
+                )
         })
-        .chain(
-            result
-                .issues
-                .iter()
-                .flat_map(|issue| &issue.actions)
-                .map(|action| action.provenance.source.span),
-        )
+        .chain(result.issues.iter().flat_map(|issue| {
+            issue.occurrences.iter().map(|occurrence| {
+                (
+                    occurrence.role.as_str(),
+                    occurrence.term.provenance.source.span,
+                )
+            })
+        }))
         .collect::<Vec<_>>();
-    output_spans.sort_by_key(|span| span.start_byte);
+    output.sort_by_key(|(role, span)| (*role, span.start_byte));
 
-    assert_eq!(output_spans.len(), input_spans.len(), "{}", case.id);
-    for span in input_spans {
-        assert_eq!(
-            output_spans
-                .iter()
-                .filter(|candidate| **candidate == span)
-                .count(),
-            1,
-            "{}: action span {span:?} must join exactly once",
-            case.id
-        );
-    }
+    assert_eq!(output, input, "{}: instruction occurrence join", case.id);
 }

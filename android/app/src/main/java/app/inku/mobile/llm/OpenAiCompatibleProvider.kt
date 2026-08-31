@@ -118,13 +118,9 @@ class OpenAiCompatibleProvider(
     private fun open(url: String, method: String): HttpURLConnection {
         val parsedUrl = URL(url)
         ProviderUrlValidator.validateRemoteBaseUrl(parsedUrl.toString())
-        val connection = (parsedUrl.openConnection() as HttpURLConnection)
-        connection.requestMethod = method
-        connection.connectTimeout = REQUEST_TIMEOUT_MS
-        connection.readTimeout = REQUEST_TIMEOUT_MS
-        connection.setRequestProperty("Accept", "application/json")
-        apiKey?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
-        return connection
+        return (parsedUrl.openConnection() as HttpURLConnection).also { connection ->
+            configureRemoteConnection(connection, method, apiKey)
+        }
     }
 
     private fun readJson(connection: HttpURLConnection): JSONObject {
@@ -167,8 +163,20 @@ class OpenAiCompatibleProvider(
         internal fun modelForRequest(providerId: String, modelId: String): String =
             modelId.removePrefix("$providerId:").ifBlank { modelId }
 
-        private const val REQUEST_TIMEOUT_MS = 600_000
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384
     }
 }
+
+internal fun configureRemoteConnection(connection: HttpURLConnection, method: String, apiKey: String?) {
+    connection.requestMethod = method
+    // A configured provider URL is the credential boundary. Never replay its
+    // Authorization header to an automatic redirect target.
+    connection.instanceFollowRedirects = false
+    connection.connectTimeout = REMOTE_REQUEST_TIMEOUT_MS
+    connection.readTimeout = REMOTE_REQUEST_TIMEOUT_MS
+    connection.setRequestProperty("Accept", "application/json")
+    apiKey?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
+}
+
+private const val REMOTE_REQUEST_TIMEOUT_MS = 600_000

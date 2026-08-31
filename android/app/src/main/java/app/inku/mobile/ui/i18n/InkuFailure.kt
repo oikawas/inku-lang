@@ -1,13 +1,15 @@
 package app.inku.mobile.ui.i18n
 
+import app.inku.mobile.security.DisplaySanitizer
+
 /**
  * A failure whose wording is chosen where it is SHOWN, not where it is thrown.
  *
  * The data and llm layers run with no interface language in hand -- they are
  * below the composition and below the ViewModel -- so a message written there
  * would be fixed in one language at the moment the thing went wrong. The screen
- * puts `error.message` straight into the status line in thirteen places, so
- * those messages are interface wording rather than developer text.
+ * can surface provider and platform failures in its status lines, so the final
+ * message also passes through one redaction boundary in this file.
  *
  * The web solves the same problem the same way round: the server answers with a
  * stable machine detail (`'render capacity is full'`) and the page maps it to
@@ -32,6 +34,10 @@ fun inkuError(text: (InkuStrings) -> String): Nothing = throw InkuFailure(text)
  */
 fun messageFor(error: Throwable, strings: InkuStrings, fallback: String): String =
     when (error) {
-        is InkuFailure -> error.text(strings)
-        else -> error.message ?: fallback
+        is InkuFailure -> DisplaySanitizer.redact(error.text(strings))
+        else -> safeErrorMessage(error, fallback)
     }
+
+/** Redacts provider tokens and app-private paths before an exception reaches UI text. */
+fun safeErrorMessage(error: Throwable, fallback: String): String =
+    DisplaySanitizer.redact(error.message ?: fallback)

@@ -70,18 +70,26 @@ class LocalModelDownloader(
             }
 
             val append = code == HttpURLConnection.HTTP_PARTIAL && existingBytes > 0L
+            val retainedPartBytes = if (append) existingBytes else 0L
+            val totalBytes = if (code == HttpURLConnection.HTTP_PARTIAL) {
+                validatedPartialContentTotal(
+                    connection.getHeaderField("Content-Range"),
+                    expectedStart = retainedPartBytes,
+                )
+            } else {
+                connection.contentLengthLong.takeIf { it > 0L }
+            }
             if (!append && partFile.exists()) {
                 partFile.delete()
             }
 
-            val totalBytes = contentTotalBytes(connection, if (append) existingBytes else 0L)
             totalBytes?.let { check(it <= spec.maxDownloadBytes) { "Model download is larger than the allowed limit." } }
-            ensureSpace(totalBytes, modelDir)
-            modelAssetDao.updateDownload(spec.modelId, "downloading", if (append) existingBytes else 0L, totalBytes, partFile.absolutePath, now())
+            ensureSpace(totalBytes, retainedPartBytes, modelDir)
+            modelAssetDao.updateDownload(spec.modelId, "downloading", retainedPartBytes, totalBytes, partFile.absolutePath, now())
 
             connection.inputStream.use { input ->
                 FileOutputStream(partFile, append).buffered().use { output ->
-                    streamToFile(input, output, spec, partFile, totalBytes, if (append) existingBytes else 0L)
+                    streamToFile(input, output, spec, partFile, totalBytes, retainedPartBytes)
                 }
             }
         } finally {
@@ -117,6 +125,7 @@ class LocalModelDownloader(
             }
         }
         output.flush()
+        validateCompletedDownloadLength(totalBytes, downloaded)
         modelAssetDao.updateDownload(spec.modelId, "verifying", downloaded, totalBytes, partFile.absolutePath, now())
         if (!verifySha256(partFile, spec.expectedSha256)) {
             modelAssetDao.updateDownload(spec.modelId, "failed_sha256", downloaded, totalBytes, partFile.absolutePath, now())
@@ -130,26 +139,15 @@ class LocalModelDownloader(
         modelAssetDao.updateDownload(spec.modelId, "ready", finalFile.length(), finalFile.length(), finalFile.absolutePath, now())
     }
 
-    private fun contentTotalBytes(connection: HttpURLConnection, existingBytes: Long): Long? {
-        val contentRange = connection.getHeaderField("Content-Range")
-        val rangeTotal = contentRange?.substringAfter("/", missingDelimiterValue = "")?.toLongOrNull()
-        if (rangeTotal != null) return rangeTotal
-        val length = connection.contentLengthLong
-        return when {
-            length <= 0L -> null
-            existingBytes > 0L -> existingBytes + length
-            else -> length
-        }
-    }
-
-    private fun ensureSpace(totalBytes: Long?, modelDir: File) {
+    private fun ensureSpace(totalBytes: Long?, retainedPartBytes: Long, modelDir: File) {
         if (totalBytes == null) return
         val stat = StatFs(modelDir.absolutePath)
         val available = stat.availableBytes
-        val existing = modelDir.listFiles()?.sumOf { it.length() } ?: 0L
-        val needed = (totalBytes - existing).coerceAtLeast(0L)
+        // StatFs has already subtracted every other model file. Only bytes in
+        // this request's retained .part file reduce what the download still needs.
+        val needed = requiredAdditionalDownloadBytes(totalBytes, retainedPartBytes)
         val cushion = 512L * 1024L * 1024L
-        check(available > needed + cushion) {
+        check(available >= needed + cushion) {
             "Not enough storage for model. Need ${needed + cushion} bytes including safety margin, available $available bytes."
         }
     }
@@ -170,3 +168,34 @@ class LocalModelDownloader(
 
     private fun now(): Long = System.currentTimeMillis()
 }
+
+internal fun requiredAdditionalDownloadBytes(totalBytes: Long, retainedPartBytes: Long): Long {
+    require(totalBytes >= 0L && retainedPartBytes >= 0L) { "Download byte counts must not be negative." }
+    return (totalBytes - retainedPartBytes).coerceAtLeast(0L)
+}
+
+internal fun validatedPartialContentTotal(contentRange: String?, expectedStart: Long): Long {
+    require(expectedStart >= 0L) { "Resume offset must not be negative." }
+    val match = PARTIAL_CONTENT_RANGE.matchEntire(contentRange?.trim().orEmpty())
+        ?: error("Partial model response did not contain a valid Content-Range.")
+    val start = match.groupValues[1].toLongOrNull()
+        ?: error("Partial model response contained an invalid range start.")
+    val end = match.groupValues[2].toLongOrNull()
+        ?: error("Partial model response contained an invalid range end.")
+    val total = match.groupValues[3].toLongOrNull()
+        ?: error("Partial model response contained an invalid total size.")
+    check(start == expectedStart) { "Partial model response did not begin at the requested resume offset." }
+    check(end >= start && total > end) { "Partial model response contained an inconsistent range." }
+    return total
+}
+
+internal fun validateCompletedDownloadLength(expectedTotalBytes: Long?, actualDownloadedBytes: Long) {
+    require(actualDownloadedBytes >= 0L) { "Downloaded byte count must not be negative." }
+    if (expectedTotalBytes != null) {
+        check(actualDownloadedBytes == expectedTotalBytes) {
+            "Model response ended at $actualDownloadedBytes bytes; expected $expectedTotalBytes bytes."
+        }
+    }
+}
+
+private val PARTIAL_CONTENT_RANGE = Regex("bytes\\s+(\\d+)-(\\d+)/(\\d+)", RegexOption.IGNORE_CASE)

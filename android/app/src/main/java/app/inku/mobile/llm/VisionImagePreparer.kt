@@ -14,6 +14,9 @@ data class PreparedVisionImage(
     val height: Int,
 )
 
+/** Maximum app-owned image payload accepted before ImageDecoder touches it. */
+internal const val MAX_VISION_SOURCE_IMAGE_BYTES = 64L * 1024L * 1024L
+
 object VisionImagePreparer {
     internal const val MAX_LONG_EDGE = 1280
     internal const val JPEG_QUALITY = 85
@@ -27,7 +30,7 @@ object VisionImagePreparer {
     }
 
     suspend fun prepare(file: File): PreparedVisionImage = withContext(Dispatchers.IO) {
-        require(file.isFile && file.length() > 0L) { "The camera returned an empty image." }
+        validateSourceFile(file)
         val source = ImageDecoder.createSource(file)
         val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
             val (width, height) = boundedSize(info.size.width, info.size.height)
@@ -46,5 +49,12 @@ object VisionImagePreparer {
         } finally {
             bitmap.recycle()
         }
+    }
+
+    internal fun validateSourceFile(file: File, maxBytes: Long = MAX_VISION_SOURCE_IMAGE_BYTES) {
+        require(maxBytes > 0L) { "Image byte limit must be positive." }
+        val length = file.takeIf { it.isFile }?.length() ?: 0L
+        require(length > 0L) { "The camera returned an empty image." }
+        require(length <= maxBytes) { "The image is too large." }
     }
 }

@@ -2,10 +2,16 @@ package app.inku.mobile.llm
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class VisionImagePreparerContractTest {
+
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
 
     @Test
     fun preparationBoundsAndReencodesTheCameraImage() {
@@ -26,5 +32,16 @@ class VisionImagePreparerContractTest {
         assertEquals(1280 to 640, VisionImagePreparer.boundedSize(4000, 2000))
         assertEquals(640 to 1280, VisionImagePreparer.boundedSize(2000, 4000))
         assertEquals(800 to 600, VisionImagePreparer.boundedSize(800, 600))
+    }
+
+    @Test
+    fun sourceFileIsRejectedBeforeDecodeWhenItExceedsTheByteLimit() {
+        val atLimit = temporaryFolder.newFile("at-limit.image").apply { writeBytes(ByteArray(8)) }
+        val oversized = temporaryFolder.newFile("oversized.image").apply { writeBytes(ByteArray(9)) }
+
+        VisionImagePreparer.validateSourceFile(atLimit, maxBytes = 8L)
+        assertThrows(IllegalArgumentException::class.java) {
+            VisionImagePreparer.validateSourceFile(oversized, maxBytes = 8L)
+        }
     }
 }

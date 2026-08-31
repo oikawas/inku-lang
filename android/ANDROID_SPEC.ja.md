@@ -3,12 +3,12 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-26。
+最終更新: 2026-08-31。
 
-**追随状況**: Android は `2.1.4-android.72` / **render engine `default / 41`** /
+**追随状況**: Android は `2.1.4-android.77` / **render engine `default / 41`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
-master の web/server も **render engine `41`** / **`ddl_engine_version` 20** であり、
+master の web/server も **render engine `41`** で、serverの **`ddl_engine_version` は21** であり、
 ServerとAndroidは同じRust描画実装を共有する。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
 （末尾の 2026-08-05 の節を参照）。
 
@@ -86,7 +86,11 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   - 最終モデルファイル化前の SHA256 検証
   - 検証済みの完全な `.part` file からの復旧
   - 中断された in-progress download の `.part` file からの再開
-  - app sandbox final storage under `files/models/`
+  - HTTP 206再開時の`Content-Range` startと保持済み`.part` byte数の一致検証
+  - response終了時の実download byte数と宣言済みtotal byte数の完全一致検証
+  - 空き容量予約では同一downloadの保持済み`.part`だけを控除し、512 MiBの安全余白を維持
+  - download cancel中はjob ownershipを解放せず、cancel cleanup完了前の再downloadを拒否
+  - app sandbox final storageとnative model loadをcanonical `files/models/`配下に限定
 - 決定的ローカル fallback pipeline:
   - natural language description -> normalized DDL
   - DDL -> JSON Score
@@ -950,11 +954,14 @@ Android 版の安定性とローカルデータ保護のため、以下を実装
 - headless `text_file` は任意ファイルパスを許可しない。`text` extra 直接指定、または `app:headless-inputs/<file>` 形式でアプリ内部の専用入力ディレクトリ配下だけを読む。
 - headless 入力は最大 250,000 文字に制限する。`text_file` も全量 `readText()` で読むのではなく、上限を超えた時点で拒否する。
 - headless 出力 artifact は `files/headless` 配下に限定し、最大 50 run、または 7 日を超えた古い run を起動時に削除する。
+- headless failure logはThrowableを直接渡さず、exception classとredaction済み・240文字以下のdetailだけを記録する。
 - アプリバックアップは無効化する。DB、履歴、provider 設定、暗号化済み API key、ローカルモデル状態、headless 出力を cloud backup / device transfer の対象にしない。
-- remote provider の Base URL は HTTPS、または端末内 loopback (`localhost` / `127.0.0.1` / `::1`) の HTTP のみ許可する。Ollama / OVMS のローカル検証用途は維持し、LAN / 外部 HTTP への prompt・API key 平文送信は許可しない。この検証は保存時と使用時の両方で行う。
+- remote provider の Base URL は HTTPS、または端末内loopback (`localhost` / `127.0.0.1` / `::1`) のHTTPのみ許可する。userinfo、query、fragment、hostなしURLは、credentialを非暗号化Base URLへ混入させないため拒否する。Network Security Configはbase cleartextを禁止し、3個のexact loopback destinationだけを許可する。Ollama / OVMSのローカル検証用途は維持し、LAN / 外部HTTPへのprompt・API key平文送信は許可しない。この検証は保存時と使用時の両方で行う。
+- remote provider requestはautomatic redirectを追わず、設定済みprovider originの`Authorization` headerをredirect先へ再送しない。
 - remote provider の HTTP エラー本文は UI 表示前に redaction し、Bearer token、NVIDIA API key、OpenAI key、Google API key、`api_key` / `authorization` / `token` らしき値を伏せる。
 - remote provider の HTTP response body は無制限に読み込まない。成功応答は最大 2,000,000 文字、エラー応答は最大 16,384 文字まで読み、超過時は拒否または切り詰めて表示する。`HttpURLConnection` は成功・失敗に関わらず `disconnect()` する。
 - headless result と remote provider error display には共通 redaction を適用し、API key、Bearer token、端末内データパスをそのまま表示・保存しない。
+- UIへ表示するprovider／platform exceptionも同じredaction境界を通し、batch、demo、license、SVG／PNG exportを含むstatus textへtokenとapp-private pathを露出しない。
 - LiteRT-LM provider は明示的な `close()` を持ち、ViewModel 破棄時および headless render 完了時に cached Engine を閉じる。ViewModel 破棄時の close は UI thread を `runBlocking` で止めず、Application scope の IO coroutine で実行する。
 - 描画、DDL描画、バッチ、デモは run id を持ち、古い Job の完了・失敗通知が新しい描画状態を上書きしないようにする。
 - バッチ実行は最大 100 件までとする。100 件を超える入力は実行前に拒否する。
@@ -963,6 +970,7 @@ Android 版の安定性とローカルデータ保護のため、以下を実装
 - ローカルモデル download は `ModelDownloadSpec.maxDownloadBytes` を持ち、Content-Length 判明時と stream 中の両方で上限を超える download を中断する。
 - 履歴サムネイルの decode は `files/thumbnails` 配下の canonical path のみ許可する。DB破損や想定外 path による任意ファイル decode を避ける。
 - Compose の artwork / history thumbnail cache は entry 数ではなく推定 bitmap byte 数で制限する。
+- PNG exportは成功・失敗の両方でraster Bitmapを`finally`解放し、encodeまたはFileProvider URI生成に失敗したpartial cache fileを削除する。
 - Android build number は APK / bundle / install など package 生成系 task のみで increment する。clean な作業ツリーが必要な確認では assemble/install を不用意に実行しない。
 
 ## 2026-05-10 Android 性能最適化
@@ -2284,6 +2292,6 @@ DDL promptはAndroidの`WebDdlSpec`と`ServerDdlText`をauthorityにし、撮影
 
 Abstract Instant PrintのM6-1では、下部「カメラ」を押すと「撮影する」「写真を選ぶ」「キャンセル」のsource chooserを表示する。撮影は既存`ActivityResultContracts.TakePicture`を維持し、既存写真はimage-onlyの`ActivityResultContracts.PickVisualMedia`で1枚だけを受ける。storage permission、persistable URI permission、独自file browser、複数選択は追加しない。どちらも現在の記述／解釈の上書き確認とlocal E2B／固定NIM preflightを通り、source、Vision output mode、canvas、UI languageをrun開始時に固定する。
 
-選択されたcontent URIは読取可能な間だけapp-owned cacheへ一時copyし、撮影画像と同じorientation反映、long edge 1280以下、JPEG quality 85のnormalizationから既存one-touch coordinatorへ渡す。description modeはlocal Vision →固定NIM Stage 1／2、DDL direct modeは検証済みlocal DDL →固定NIM Stage 2を維持する。NIMが受けるのはtextだけであり、画像bytes、URI、path、display name、EXIF、location、digestをremote request、history、metadataへ入れない。Photo Picker自身が利用者選択によりcloud-backed mediaを取得しても、remote modelへの画像送信を許可したことにはならない。
+選択されたcontent URIは読取可能な間だけapp-owned cacheへ一時copyし、copyは64 MiBでfail closedする。撮影／選択のどちらも`ImageDecoder`へ渡す直前に同じ64 MiB source上限を再検査し、その後、撮影画像と同じorientation反映、long edge 1280以下、JPEG quality 85のnormalizationから既存one-touch coordinatorへ渡す。description modeはlocal Vision →固定NIM Stage 1／2、DDL direct modeは検証済みlocal DDL →固定NIM Stage 2を維持する。NIMが受けるのはtextだけであり、画像bytes、URI、path、display name、EXIF、location、digestをremote request、history、metadataへ入れない。Photo Picker自身が利用者選択によりcloud-backed mediaを取得しても、remote modelへの画像送信を許可したことにはならない。
 
 Photo Pickerの取消またはnull resultはerrorにせず開始前Compose状態へ戻り、local Vision、NIM、render、saveを起動しない。読取不能、空、unsupported、decode不能は画像準備failureとしてremote callと保存を行わない。app-owned一時copyは成功、失敗、Cancel、system Back、stale run、ViewModel終了で削除し、元写真は変更／削除しない。保存作品の既存`input_provenance.origin`は撮影で`camera`、Photo Pickerで`photo_picker`とし、Generation Infoは後者を「既存の写真」と表示する。Room schema／migration／backfill／新列、段別resume、background復帰、独自reduce-motion、E4B、CameraXは追加しない。

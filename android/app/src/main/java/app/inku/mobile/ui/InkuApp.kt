@@ -192,6 +192,7 @@ import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
+import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
@@ -2097,7 +2098,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistorySvg(context, it, profile)
                         "SVG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> error.message ?: "SVG export failed." }
+                    }.getOrElse { error -> safeErrorMessage(error, "SVG export failed.") }
                 }
             },
             onExportPng = { heightPx ->
@@ -2108,7 +2109,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistoryPng(context, it, heightPx)
                         "PNG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> error.message ?: "PNG export failed." }
+                    }.getOrElse { error -> safeErrorMessage(error, "PNG export failed.") }
                     pngExporting = false
                 }
             },
@@ -5504,19 +5505,29 @@ private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, pr
 private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
     val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
     val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = height)
-    val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
-    // Not `require`: this sentence reaches the reader, so the language is
-    // chosen where it is shown rather than here (see InkuFailure).
-    if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
-    val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
-    FileOutputStream(file).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+    try {
+        val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
+        // Not `require`: this sentence reaches the reader, so the language is
+        // chosen where it is shown rather than here (see InkuFailure).
+        if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
+        val exportDir = File(context.cacheDir, "exports")
+        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
+        try {
+            FileOutputStream(file).use { out ->
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    throw IllegalStateException()
+                }
+            }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
+        } catch (error: Throwable) {
+            file.delete()
+            throw error
+        }
+    } finally {
+        bitmap.recycle()
     }
-    bitmap.recycle()
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
 }
 
 private const val MaxPngExportHeightPx = 4320

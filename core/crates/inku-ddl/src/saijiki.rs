@@ -99,6 +99,23 @@ pub fn saijiki_asset_sha256_hex() -> &'static str {
         .as_str()
 }
 
+/// Return the requested-language parser surface only when this asset row is eligible.
+///
+/// Candidate membership follows the accepted asset flags. A disabled tombstone remains in the
+/// immutable asset but is never promoted into a recognized typed delivery.
+pub(crate) fn parser_candidate_surface(
+    word: &SaijikiWordAsset,
+    language: ResolvedInstructionLanguage,
+) -> Option<&str> {
+    if !word.prompt && !word.display && word.marker != Some(true) {
+        return None;
+    }
+    match language {
+        ResolvedInstructionLanguage::Ja => Some(word.surface_ja.as_str()),
+        ResolvedInstructionLanguage::En => word.surface_en.as_deref(),
+    }
+}
+
 /// A stable failure while deriving a typed Saijiki projection from its asset.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SaijikiProjectionError {

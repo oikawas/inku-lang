@@ -13,8 +13,10 @@ use crate::{
     SemanticAssociationIssueKind, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
     SemanticInstructionIssueKind, SemanticMacroParameterValue, SemanticRelationIssueKind,
     SemanticTerm, SourceSpan, associate_semantic_document_with_macro_binding,
-    bind_macro_parameters, derive_macro_seed, expand_macros,
+    bind_macro_parameters, derive_macro_seed, expand_macros, project_macro_semantic_ref,
 };
+
+const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
 pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v2";
@@ -327,6 +329,15 @@ pub fn compile_typed_ddl(
         Ok(binding) => binding,
         Err(_) => return integrity_failure(document, "clause_stream_integrity"),
     };
+    let clause_stream = &parameter_binding
+        .macro_resolution
+        .relation_reference_evidence
+        .attachment_evidence
+        .noun_phrase
+        .clause_stream;
+    if let Some(kind) = projection_integrity_failure_kind(clause_stream) {
+        return integrity_failure(document, kind);
+    }
     let mut semantic_document =
         associate_semantic_document_with_macro_binding(&document, parameter_binding);
     let mut projection = project_deliveries(&document, &semantic_document);
@@ -403,6 +414,32 @@ pub fn compile_typed_ddl(
     }
 }
 
+fn projection_integrity_failure_kind(stream: &crate::ClauseStream) -> Option<&'static str> {
+    stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+        .find_map(|atom| {
+            let (category_key, canonical_surface_ja) = match atom {
+                ClauseAtom::CoreRole(term) => (
+                    term.category_key.as_str(),
+                    term.canonical_surface_ja.as_str(),
+                ),
+                ClauseAtom::RemainingRole(term) => (
+                    term.category_key.as_str(),
+                    term.canonical_surface_ja.as_str(),
+                ),
+                ClauseAtom::UnattachedExactNumber(_)
+                | ClauseAtom::FunctionWord { .. }
+                | ClauseAtom::SaijikiRelation { .. }
+                | ClauseAtom::UnresolvedDiagnostic(_) => return None,
+            };
+            project_macro_semantic_ref(category_key, canonical_surface_ja)
+                .is_none()
+                .then_some(MISSING_CANONICAL_SEMANTIC_IDENTITY)
+        })
+}
+
 fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCompilation {
     let diagnostic = CompilerBlockingDiagnostic {
         id: identity("blocking", kind.as_bytes()),
@@ -435,6 +472,55 @@ fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCom
         derived_seeds: Vec::new(),
         macro_expansion: None,
         compiler_lock: None,
+    }
+}
+
+#[cfg(test)]
+mod projection_integrity_tests {
+    use super::*;
+    use crate::{
+        ClauseSegment, ClauseStream, CoreRoleKind, CoreRoleTerm, ResolvedInstructionLanguage,
+    };
+
+    #[test]
+    fn unprojectable_typed_term_returns_stable_blocking_compilation() {
+        let span = SourceSpan {
+            start_byte: 0,
+            end_byte: 1,
+        };
+        let stream = ClauseStream {
+            clauses: vec![ClauseSegment {
+                span,
+                atoms: vec![ClauseAtom::CoreRole(CoreRoleTerm {
+                    role: CoreRoleKind::Primitive,
+                    asset_id: "synthetic.asset".to_owned(),
+                    category_key: "synthetic.category".to_owned(),
+                    canonical_surface_ja: "x".to_owned(),
+                    span,
+                })],
+            }],
+            separators: Vec::new(),
+            delivery_conservation_count: 1,
+        };
+
+        let kind = projection_integrity_failure_kind(&stream)
+            .expect("unprojectable typed term must fail closed");
+        assert_eq!(kind, MISSING_CANONICAL_SEMANTIC_IDENTITY);
+
+        let document =
+            NormalizedDdlDocument::new("x", ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+        let result = integrity_failure(document, kind);
+        assert_eq!(result.document.source(), "x");
+        assert_eq!(result.delivery_summary.blocking_diagnostics, 1);
+        assert_eq!(result.blocking_diagnostics[0].kind, kind);
+        assert_eq!(
+            result.deliveries[0].identity.owner,
+            SemanticDeliveryOwner::TypedIssue
+        );
+        assert!(result.semantic_document.is_none());
+        assert!(result.derived_seeds.is_empty());
+        assert!(result.macro_expansion.is_none());
+        assert!(result.compiler_lock.is_none());
     }
 }
 

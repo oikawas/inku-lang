@@ -747,6 +747,37 @@ fn incomplete_structured_document_retains_binding_and_does_not_seed_or_expand() 
 }
 
 #[test]
+fn disabled_saijiki_row_uses_source_preserving_unknown_blocking_path() {
+    let disabled = saijiki_asset()
+        .categories
+        .iter()
+        .flat_map(|category| &category.words)
+        .find(|word| !word.prompt && !word.display && word.marker != Some(true))
+        .expect("accepted asset has one disabled tombstone");
+    let source = disabled.surface_ja.clone();
+    let source_digest = sha256(source.as_bytes());
+
+    let result = compile(&source, ResolvedInstructionLanguage::Ja, &[], None, LIMITS);
+
+    assert_eq!(result.document.source(), source);
+    assert_eq!(result.document.source().len(), source.len());
+    assert_eq!(sha256(result.document.source().as_bytes()), source_digest);
+    assert_eq!(result.delivery_summary.blocking_diagnostics, 1);
+    assert_eq!(
+        result.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::BlockedDiagnostic)
+    );
+    assert!(result.derived_seeds.is_empty());
+    assert!(result.macro_expansion.is_none());
+    assert!(
+        result
+            .deliveries
+            .iter()
+            .any(|delivery| delivery.identity.owner == SemanticDeliveryOwner::TypedIssue)
+    );
+}
+
+#[test]
 fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    parse_neutral_lexemes, saijiki_asset,
+    parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
@@ -190,6 +190,158 @@ fn bilingual_surfaces_share_the_same_canonical_asset_row() {
     assert_eq!(
         canonical_row("ja-longest-source-and-hole", "画用紙"),
         canonical_row("en-case-longest-source-and-hole", "Drawing Paper")
+    );
+}
+
+#[test]
+fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
+    let asset = saijiki_asset();
+    let mut active = 0;
+    let mut marker_only = 0;
+    let mut disabled = 0;
+
+    for category in &asset.categories {
+        for word in &category.words {
+            let enabled = word.prompt || word.display || word.marker == Some(true);
+            if enabled {
+                active += 1;
+                assert!(
+                    project_macro_semantic_ref(&category.key, &word.surface_ja).is_some(),
+                    "eligible asset row must have one canonical semantic identity"
+                );
+                if !word.prompt && !word.display {
+                    marker_only += 1;
+                }
+            } else {
+                disabled += 1;
+            }
+        }
+    }
+
+    assert_eq!((active, marker_only, disabled), (87, 1, 1));
+}
+
+#[test]
+fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
+    let asset = saijiki_asset();
+    let disabled = asset
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category
+                .words
+                .iter()
+                .map(move |word| (category.key.as_str(), word))
+        })
+        .find(|(_, word)| !word.prompt && !word.display && word.marker != Some(true))
+        .expect("accepted asset has one disabled tombstone");
+    let marker_only = asset
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category
+                .words
+                .iter()
+                .map(move |word| (category.key.as_str(), word))
+        })
+        .find(|(_, word)| !word.prompt && !word.display && word.marker == Some(true))
+        .expect("accepted asset has one marker-only active row");
+    let normal = asset
+        .categories
+        .iter()
+        .flat_map(|category| {
+            category
+                .words
+                .iter()
+                .map(move |word| (category.key.as_str(), word))
+        })
+        .find(|(_, word)| (word.prompt || word.display) && word.surface_en.is_some())
+        .expect("accepted asset has a bilingual normal active row");
+
+    let disabled_document = NormalizedDdlDocument::new(
+        disabled.1.surface_ja.clone(),
+        ResolvedInstructionLanguage::Ja,
+        Vec::new(),
+    )
+    .unwrap();
+    let disabled_result = parse_neutral_lexemes(&disabled_document);
+    assert!(disabled_result.tokens.is_empty());
+    assert_eq!(disabled_result.diagnostics.len(), 1);
+    assert_eq!(
+        disabled_result.diagnostics[0].kind,
+        NeutralDiagnosticKind::Unknown
+    );
+    assert_eq!(
+        disabled_result.diagnostics[0].surface,
+        disabled.1.surface_ja
+    );
+    assert!(!disabled_result.diagnostics[0].recognized);
+
+    for (category_key, word) in [marker_only, normal] {
+        for (language, surface) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                Some(word.surface_ja.as_str()),
+            ),
+            (ResolvedInstructionLanguage::En, word.surface_en.as_deref()),
+        ] {
+            let Some(surface) = surface else {
+                continue;
+            };
+            let document = NormalizedDdlDocument::new(surface, language, Vec::new()).unwrap();
+            let result = parse_neutral_lexemes(&document);
+            assert!(result.diagnostics.is_empty(), "{category_key}/{surface}");
+            assert!(result.tokens.iter().any(|token| {
+                token.span.start_byte == 0
+                    && token.span.end_byte == surface.len()
+                    && matches!(
+                        &token.kind,
+                        NeutralTokenKind::SaijikiWord {
+                            category_key: actual_category,
+                            canonical_surface_ja,
+                            ..
+                        } if actual_category == category_key
+                            && canonical_surface_ja == &word.surface_ja
+                    )
+            }));
+        }
+    }
+
+    let source = format!("{} {}", disabled.1.surface_ja, normal.1.surface_ja);
+    let document =
+        NormalizedDdlDocument::new(source.clone(), ResolvedInstructionLanguage::Ja, Vec::new())
+            .unwrap();
+    let result = parse_neutral_lexemes(&document);
+    assert!(result.tokens.iter().any(|token| {
+        token.surface == normal.1.surface_ja
+            && matches!(
+                &token.kind,
+                NeutralTokenKind::SaijikiWord { category_key, .. }
+                    if category_key == normal.0
+            )
+    }));
+    assert!(result.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == NeutralDiagnosticKind::Unknown
+            && diagnostic.surface == disabled.1.surface_ja
+            && &source[diagnostic.span.start_byte..diagnostic.span.end_byte] == diagnostic.surface
+    }));
+    for token in &result.tokens {
+        assert_eq!(
+            &source[token.span.start_byte..token.span.end_byte],
+            token.surface
+        );
+    }
+    let mut spans = result
+        .tokens
+        .iter()
+        .map(|token| token.span)
+        .chain(result.diagnostics.iter().map(|diagnostic| diagnostic.span))
+        .collect::<Vec<_>>();
+    spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+    assert!(
+        spans
+            .windows(2)
+            .all(|pair| pair[0].end_byte <= pair[1].start_byte)
     );
 }
 

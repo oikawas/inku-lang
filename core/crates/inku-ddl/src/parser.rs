@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use crate::{NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, saijiki_asset};
+use crate::{
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    saijiki::parser_candidate_surface, saijiki_asset,
+};
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
 pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v1";
@@ -296,11 +299,7 @@ fn candidates_at(
 
     for category in &asset.categories {
         for word in &category.words {
-            let surface = match language {
-                ResolvedInstructionLanguage::Ja => Some(word.surface_ja.as_str()),
-                ResolvedInstructionLanguage::En => word.surface_en.as_deref(),
-            };
-            let Some(surface) = surface else {
+            let Some(surface) = parser_candidate_surface(word, language) else {
                 continue;
             };
             push_surface_candidate(

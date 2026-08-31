@@ -22,6 +22,7 @@ pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
 pub mod semantic_association;
+pub mod semantic_instruction;
 pub mod visible_patch;
 
 pub use attachment::{
@@ -140,6 +141,11 @@ pub use semantic_association::{
     SemanticAssociationIssueKind, SemanticAssociationResult, SemanticEntity,
     SemanticEntityAssociationAst, SemanticIdentity, SemanticQuantity, SemanticTerm,
     SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
+};
+pub use semantic_instruction::{
+    SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,
+    SemanticInstructionAssociationAst, SemanticInstructionAssociationResult,
+    SemanticInstructionIssue, SemanticInstructionIssueKind, associate_semantic_instructions,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

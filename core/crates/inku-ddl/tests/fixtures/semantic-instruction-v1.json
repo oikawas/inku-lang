@@ -1,0 +1,150 @@
+{
+  "schema": "inku.semantic-instruction-association-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-place-order-one",
+      "language": "ja",
+      "source": "円を八つ置く。",
+      "instruction_actions": ["place"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "ja-place-order-two",
+      "language": "ja",
+      "source": "置く、円を八つ。",
+      "instruction_actions": ["place"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "en-place-order-one",
+      "language": "en",
+      "source": "place eight circle.",
+      "instruction_actions": ["place"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "en-place-order-two",
+      "language": "en",
+      "source": "eight circle place.",
+      "instruction_actions": ["place"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "action-line-up",
+      "language": "en",
+      "source": "line-up eight circle.",
+      "instruction_actions": ["line_up"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "action-scatter",
+      "language": "en",
+      "source": "scatter eight circle.",
+      "instruction_actions": ["scatter"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "action-unspecified",
+      "language": "en",
+      "source": "eight circle.",
+      "instruction_actions": [null],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":null,\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 0
+    },
+    {
+      "id": "orphan-action",
+      "language": "en",
+      "source": "place.",
+      "instruction_actions": [],
+      "association_issue_kinds": [],
+      "action_issue_kinds": ["missing_action_entity"],
+      "canonical": null,
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "conflicting-actions",
+      "language": "en",
+      "source": "place scatter eight circle.",
+      "instruction_actions": [null],
+      "association_issue_kinds": [],
+      "action_issue_kinds": ["conflicting_actions"],
+      "canonical": null,
+      "owned_action_occurrence_count": 2
+    },
+    {
+      "id": "multi-head-action",
+      "language": "en",
+      "source": "place circle line.",
+      "instruction_actions": [],
+      "association_issue_kinds": ["ambiguous_entity_ownership"],
+      "action_issue_kinds": ["missing_action_entity"],
+      "canonical": null,
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "regional-action-ownership",
+      "language": "en",
+      "source": "scatter circle. line-up line.",
+      "instruction_actions": ["scatter", "line_up"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":null}},{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"quantity\":null}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 2
+    },
+    {
+      "id": "soft-line-break",
+      "language": "en",
+      "source": "eight\ncircle place.",
+      "instruction_actions": ["place"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"quantity\":8}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "upstream-conflict-retained",
+      "language": "en",
+      "source": "circle place Canon.Empty.Sub!",
+      "macro_locks": [
+        {"qualified_name": "Canon.Empty", "version": "1.0.0", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"qualified_name": "Canon.Empty.Sub", "version": "1.0.0", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+      ],
+      "instruction_actions": ["place"],
+      "association_issue_kinds": ["upstream_conflict"],
+      "action_issue_kinds": [],
+      "canonical": null,
+      "owned_action_occurrence_count": 1
+    },
+    {
+      "id": "unobserved-primitive-action-combination",
+      "language": "en",
+      "source": "fill twelve arc.",
+      "instruction_actions": ["fill"],
+      "association_issue_kinds": [],
+      "action_issue_kinds": [],
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"fill\"},\"entity\":{\"color\":null,\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"quantity\":12}}],\"schema\":\"inku.semantic-instruction-association.v1\"}",
+      "owned_action_occurrence_count": 1
+    }
+  ]
+}

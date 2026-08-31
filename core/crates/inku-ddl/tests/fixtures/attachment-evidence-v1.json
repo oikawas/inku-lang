@@ -1,0 +1,200 @@
+{
+  "schema": "inku.attachment-evidence-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-exact-eight",
+      "language": "ja",
+      "source": "円 を 線 に 円 で 線 の 円 は 線 が 円 へ 線 と 円",
+      "expected_markers": [
+        {"kind": "ja:wo", "surface": "を", "span": {"start_byte": 4, "end_byte": 7}},
+        {"kind": "ja:ni", "surface": "に", "span": {"start_byte": 12, "end_byte": 15}},
+        {"kind": "ja:de", "surface": "で", "span": {"start_byte": 20, "end_byte": 23}},
+        {"kind": "ja:no", "surface": "の", "span": {"start_byte": 28, "end_byte": 31}},
+        {"kind": "ja:wa", "surface": "は", "span": {"start_byte": 36, "end_byte": 39}},
+        {"kind": "ja:ga", "surface": "が", "span": {"start_byte": 44, "end_byte": 47}},
+        {"kind": "ja:he", "surface": "へ", "span": {"start_byte": 52, "end_byte": 55}},
+        {"kind": "ja:to", "surface": "と", "span": {"start_byte": 60, "end_byte": 63}}
+      ],
+      "expected_missing": [],
+      "expected_links": [],
+      "expected_details": [
+        {
+          "evidence_index": 3,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 67},
+          "left_context": {"surface": "円 を 線 に 円 で 線 ", "start_byte": 0, "end_byte": 28},
+          "right_context": {"surface": " 円 は 線 が 円 へ 線 と 円", "start_byte": 31, "end_byte": 67},
+          "left_atom_spans": [{"start_byte": 0, "end_byte": 3}, {"start_byte": 4, "end_byte": 7}, {"start_byte": 8, "end_byte": 11}, {"start_byte": 12, "end_byte": 15}, {"start_byte": 16, "end_byte": 19}, {"start_byte": 20, "end_byte": 23}, {"start_byte": 24, "end_byte": 27}],
+          "right_atom_spans": [{"start_byte": 32, "end_byte": 35}, {"start_byte": 36, "end_byte": 39}, {"start_byte": 40, "end_byte": 43}, {"start_byte": 44, "end_byte": 47}, {"start_byte": 48, "end_byte": 51}, {"start_byte": 52, "end_byte": 55}, {"start_byte": 56, "end_byte": 59}, {"start_byte": 60, "end_byte": 63}, {"start_byte": 64, "end_byte": 67}]
+        }
+      ],
+      "noun_phrase_evidence_count": 0,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 17
+    },
+    {
+      "id": "en-exact-six-case-variants",
+      "language": "en",
+      "source": "WITH circle In line AT ellipse On arc TO square Of cloudform",
+      "expected_markers": [
+        {"kind": "en:with", "surface": "WITH", "span": {"start_byte": 0, "end_byte": 4}},
+        {"kind": "en:in", "surface": "In", "span": {"start_byte": 12, "end_byte": 14}},
+        {"kind": "en:at", "surface": "AT", "span": {"start_byte": 20, "end_byte": 22}},
+        {"kind": "en:on", "surface": "On", "span": {"start_byte": 31, "end_byte": 33}},
+        {"kind": "en:to", "surface": "TO", "span": {"start_byte": 38, "end_byte": 40}},
+        {"kind": "en:of", "surface": "Of", "span": {"start_byte": 48, "end_byte": 50}}
+      ],
+      "expected_missing": [{"evidence_index": 0, "kinds": ["missing_left_context"]}],
+      "expected_links": [],
+      "expected_details": [
+        {
+          "evidence_index": 2,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 60},
+          "left_context": {"surface": "WITH circle In line ", "start_byte": 0, "end_byte": 20},
+          "right_context": {"surface": " ellipse On arc TO square Of cloudform", "start_byte": 22, "end_byte": 60},
+          "left_atom_spans": [{"start_byte": 0, "end_byte": 4}, {"start_byte": 5, "end_byte": 11}, {"start_byte": 12, "end_byte": 14}, {"start_byte": 15, "end_byte": 19}],
+          "right_atom_spans": [{"start_byte": 23, "end_byte": 30}, {"start_byte": 31, "end_byte": 33}, {"start_byte": 34, "end_byte": 37}, {"start_byte": 38, "end_byte": 40}, {"start_byte": 41, "end_byte": 47}, {"start_byte": 48, "end_byte": 50}, {"start_byte": 51, "end_byte": 60}]
+        }
+      ],
+      "noun_phrase_evidence_count": 0,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 12
+    },
+    {
+      "id": "determiners-and-unclassified-and",
+      "language": "en",
+      "source": "a circle an line the square and cloudform",
+      "expected_markers": [],
+      "expected_missing": [],
+      "expected_links": [],
+      "expected_details": [],
+      "noun_phrase_evidence_count": 3,
+      "noun_phrase_diagnostic_count": 1,
+      "delivery_conservation_count": 8
+    },
+    {
+      "id": "mixed-atoms-and-noun-phrase",
+      "language": "en",
+      "source": "horizontal circle eight along with a tall square",
+      "expected_markers": [{"kind": "en:with", "surface": "with", "span": {"start_byte": 30, "end_byte": 34}}],
+      "expected_missing": [],
+      "expected_links": [{"evidence_index": 0, "left_evidence": [], "right_evidence": [0], "left_diagnostics": [], "right_diagnostics": []}],
+      "expected_details": [
+        {
+          "evidence_index": 0,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 48},
+          "left_context": {"surface": "horizontal circle eight along ", "start_byte": 0, "end_byte": 30},
+          "right_context": {"surface": " a tall square", "start_byte": 34, "end_byte": 48},
+          "left_atom_spans": [{"start_byte": 0, "end_byte": 10}, {"start_byte": 11, "end_byte": 17}, {"start_byte": 18, "end_byte": 23}, {"start_byte": 24, "end_byte": 29}],
+          "right_atom_spans": [{"start_byte": 35, "end_byte": 36}, {"start_byte": 37, "end_byte": 41}, {"start_byte": 42, "end_byte": 48}]
+        }
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 8
+    },
+    {
+      "id": "noun-phrase-diagnostic",
+      "language": "en",
+      "source": "with the mystery",
+      "expected_markers": [{"kind": "en:with", "surface": "with", "span": {"start_byte": 0, "end_byte": 4}}],
+      "expected_missing": [{"evidence_index": 0, "kinds": ["missing_left_context"]}],
+      "expected_links": [{"evidence_index": 0, "left_evidence": [], "right_evidence": [0], "left_diagnostics": [], "right_diagnostics": [0]}],
+      "expected_details": [
+        {
+          "evidence_index": 0,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 16},
+          "left_context": null,
+          "right_context": {"surface": " the mystery", "start_byte": 4, "end_byte": 16},
+          "left_atom_spans": [],
+          "right_atom_spans": [{"start_byte": 5, "end_byte": 8}, {"start_byte": 9, "end_byte": 16}]
+        }
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 1,
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "multiple-markers-and-determiners",
+      "language": "en",
+      "source": "a circle with the square of an line",
+      "expected_markers": [
+        {"kind": "en:with", "surface": "with", "span": {"start_byte": 9, "end_byte": 13}},
+        {"kind": "en:of", "surface": "of", "span": {"start_byte": 25, "end_byte": 27}}
+      ],
+      "expected_missing": [],
+      "expected_links": [
+        {"evidence_index": 0, "left_evidence": [], "right_evidence": [1, 2], "left_diagnostics": [], "right_diagnostics": []},
+        {"evidence_index": 1, "left_evidence": [0], "right_evidence": [2], "left_diagnostics": [], "right_diagnostics": []}
+      ],
+      "expected_details": [
+        {
+          "evidence_index": 0,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 35},
+          "left_context": {"surface": "a circle ", "start_byte": 0, "end_byte": 9},
+          "right_context": {"surface": " the square of an line", "start_byte": 13, "end_byte": 35},
+          "left_atom_spans": [{"start_byte": 0, "end_byte": 1}, {"start_byte": 2, "end_byte": 8}],
+          "right_atom_spans": [{"start_byte": 14, "end_byte": 17}, {"start_byte": 18, "end_byte": 24}, {"start_byte": 25, "end_byte": 27}, {"start_byte": 28, "end_byte": 30}, {"start_byte": 31, "end_byte": 35}]
+        },
+        {
+          "evidence_index": 1,
+          "clause_index": 0,
+          "clause_span": {"start_byte": 0, "end_byte": 35},
+          "left_context": {"surface": "a circle with the square ", "start_byte": 0, "end_byte": 25},
+          "right_context": {"surface": " an line", "start_byte": 27, "end_byte": 35},
+          "left_atom_spans": [{"start_byte": 0, "end_byte": 1}, {"start_byte": 2, "end_byte": 8}, {"start_byte": 9, "end_byte": 13}, {"start_byte": 14, "end_byte": 17}, {"start_byte": 18, "end_byte": 24}],
+          "right_atom_spans": [{"start_byte": 28, "end_byte": 30}, {"start_byte": 31, "end_byte": 35}]
+        }
+      ],
+      "noun_phrase_evidence_count": 3,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 8
+    },
+    {
+      "id": "marker-boundaries-and-separators",
+      "language": "en",
+      "source": "with. circle to.\r\n  in circle\ncircle at  ",
+      "expected_markers": [
+        {"kind": "en:with", "surface": "with", "span": {"start_byte": 0, "end_byte": 4}},
+        {"kind": "en:to", "surface": "to", "span": {"start_byte": 13, "end_byte": 15}},
+        {"kind": "en:in", "surface": "in", "span": {"start_byte": 20, "end_byte": 22}},
+        {"kind": "en:at", "surface": "at", "span": {"start_byte": 37, "end_byte": 39}}
+      ],
+      "expected_missing": [
+        {"evidence_index": 0, "kinds": ["missing_left_context", "missing_right_context"]},
+        {"evidence_index": 1, "kinds": ["missing_right_context"]},
+        {"evidence_index": 2, "kinds": ["missing_left_context"]},
+        {"evidence_index": 3, "kinds": ["missing_right_context"]}
+      ],
+      "expected_links": [],
+      "expected_details": [
+        {"evidence_index": 0, "clause_index": 0, "clause_span": {"start_byte": 0, "end_byte": 4}, "left_context": null, "right_context": null, "left_atom_spans": [], "right_atom_spans": []},
+        {"evidence_index": 1, "clause_index": 1, "clause_span": {"start_byte": 5, "end_byte": 15}, "left_context": {"surface": " circle ", "start_byte": 5, "end_byte": 13}, "right_context": null, "left_atom_spans": [{"start_byte": 6, "end_byte": 12}], "right_atom_spans": []},
+        {"evidence_index": 2, "clause_index": 2, "clause_span": {"start_byte": 18, "end_byte": 29}, "left_context": {"surface": "  ", "start_byte": 18, "end_byte": 20}, "right_context": {"surface": " circle", "start_byte": 22, "end_byte": 29}, "left_atom_spans": [], "right_atom_spans": [{"start_byte": 23, "end_byte": 29}]},
+        {"evidence_index": 3, "clause_index": 3, "clause_span": {"start_byte": 30, "end_byte": 41}, "left_context": {"surface": "circle ", "start_byte": 30, "end_byte": 37}, "right_context": {"surface": "  ", "start_byte": 39, "end_byte": 41}, "left_atom_spans": [{"start_byte": 30, "end_byte": 36}], "right_atom_spans": []}
+      ],
+      "noun_phrase_evidence_count": 0,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 7
+    },
+    {
+      "id": "cross-clause-noun-phrase-exclusion",
+      "language": "en",
+      "source": "with. the circle",
+      "expected_markers": [{"kind": "en:with", "surface": "with", "span": {"start_byte": 0, "end_byte": 4}}],
+      "expected_missing": [{"evidence_index": 0, "kinds": ["missing_left_context", "missing_right_context"]}],
+      "expected_links": [],
+      "expected_details": [
+        {"evidence_index": 0, "clause_index": 0, "clause_span": {"start_byte": 0, "end_byte": 4}, "left_context": null, "right_context": null, "left_atom_spans": [], "right_atom_spans": []}
+      ],
+      "noun_phrase_evidence_count": 1,
+      "noun_phrase_diagnostic_count": 0,
+      "delivery_conservation_count": 3
+    }
+  ]
+}

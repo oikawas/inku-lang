@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod attachment;
 pub mod clause;
 pub mod composition;
 pub mod document;
@@ -13,6 +14,11 @@ pub mod parser;
 pub mod prompt;
 pub mod saijiki;
 
+pub use attachment::{
+    ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnostic, AttachmentEvidenceDiagnosticKind,
+    AttachmentEvidenceResult, AttachmentMarkerEvidence, AttachmentMarkerKind,
+    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind, collect_attachment_evidence,
+};
 pub use clause::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,
     ClauseStream, ClauseStreamError, parse_clause_stream,

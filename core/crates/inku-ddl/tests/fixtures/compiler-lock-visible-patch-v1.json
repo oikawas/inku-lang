@@ -1,0 +1,52 @@
+{
+  "schema": "inku.compiler-lock-visible-patch-v1-fixture.v1",
+  "version": 1,
+  "definition": {
+    "schema": "inku.macro-definition.v1",
+    "namespace": "Canon",
+    "heading": "Empty",
+    "version": "1.0.0",
+    "parameters": {},
+    "components": {},
+    "body": []
+  },
+  "known_answers": {
+    "canonical_bytes": "{\"facts\":[{\"clause\":0,\"invocation\":\"Canon.Empty\",\"kind\":\"macro_binding\",\"ordinal\":0,\"parameters\":[]}],\"holes\":[],\"schema\":\"inku.canonical-semantic-ddl.v1\"}",
+    "canonical_sha256": "ac36e573ca45c36259a9b6f4638ed435ae6a4dc92e655e2374200c4915515b13",
+    "seed_digest": "1332b8adf5e47d94db6fdc0523400d186ab17a680e1d0066700e8a7cc618b3de",
+    "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
+    "full_lock_digest": "91bcfec9b1296a1df15350aaaa0c04393a11c8bf58c8b55a5d0fee458ed154f7"
+  },
+  "delivery_case_ids": [
+    "explicit-and-syntax",
+    "relation-zero-hole",
+    "relation-exact-one",
+    "relation-multiple-conflict",
+    "parser-hole",
+    "unknown-blocking",
+    "macro-missing-hole",
+    "macro-ambiguous-conflict",
+    "expansion-diagnostic-hole"
+  ],
+  "patch_case_ids": [
+    "valid-single",
+    "valid-multiple",
+    "valid-subset",
+    "stale-source",
+    "stale-lock",
+    "span-mismatch",
+    "range-mismatch",
+    "out-of-bound",
+    "non-char-boundary",
+    "unordered",
+    "overlap",
+    "duplicate-hole",
+    "empty-replacement",
+    "explicit-target",
+    "unknown-target",
+    "conflict-base",
+    "unknown-base",
+    "unresolved-replacement",
+    "new-macro-without-lock"
+  ]
+}

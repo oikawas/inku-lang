@@ -4,6 +4,7 @@
 
 pub mod attachment;
 pub mod clause;
+pub mod compiler_lock;
 pub mod composition;
 pub mod document;
 pub mod language;
@@ -20,6 +21,7 @@ pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
+pub mod visible_patch;
 
 pub use attachment::{
     ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnostic, AttachmentEvidenceDiagnosticKind,
@@ -31,6 +33,13 @@ pub use clause::{
     ClauseStream, ClauseStreamError, parse_clause_stream,
 };
 
+pub use compiler_lock::{
+    CANONICAL_SEMANTIC_DDL_SCHEMA_ID, COMPILER_LOCK_DIGEST_DOMAIN, CompilerBlockingDiagnostic,
+    CompilerConflict, CompilerDefinitionIdentity, CompilerLockState, CompilerSeedIdentity,
+    DeliverySummary, SemanticDelivery, SemanticDeliveryKind, TYPED_DDL_COMPILATION_SCHEMA_ID,
+    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation, TypedDdlCompilerLock, TypedHole,
+    compile_typed_ddl, compiler_lock_hash_input, expanded_meaning_canonical_bytes,
+};
 pub use composition::{
     CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,
     REMAINING_ROLE_COMPOSITION_SCHEMA_ID, RemainingRoleComposition, RemainingRoleKind,
@@ -124,4 +133,8 @@ pub use saijiki::{
     SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_relation_literal_table, saijiki_score_wire_maps,
+};
+pub use visible_patch::{
+    VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,
+    VisibleDdlPatchEdit, VisiblePatchDiagnostic, validate_visible_ddl_patch,
 };

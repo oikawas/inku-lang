@@ -1,0 +1,110 @@
+{
+  "schema": "inku.relation-reference-evidence-fixture.v1",
+  "version": 1,
+  "cases": [
+    {
+      "id": "ja-relation-exact-one",
+      "language": "ja",
+      "source": "八つ 沿う 円",
+      "expected_nodes": [
+        {"kind": "relation:along", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [2], "availability": "exact_one"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "ja-marker-and-relation-multiple",
+      "language": "ja",
+      "source": "円 を 線 沿う 紙",
+      "expected_nodes": [
+        {"kind": "marker:ja:wo", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2, 3, 4], "candidate_atom_indices": [0, 2, 4], "availability": "multiple"},
+        {"kind": "relation:along", "clause_index": 0, "occurrence_atom_index": 3, "left_context_atom_indices": [0, 1, 2], "right_context_atom_indices": [4], "candidate_atom_indices": [0, 2, 4], "availability": "multiple"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "en-relation-zero",
+      "language": "en",
+      "source": "eight along twelve",
+      "expected_nodes": [
+        {"kind": "relation:along", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [], "availability": "zero"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "en-marker-exact-one",
+      "language": "en",
+      "source": "eight with circle",
+      "expected_nodes": [
+        {"kind": "marker:en:with", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [2], "availability": "exact_one"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "en-multiple-markers",
+      "language": "en",
+      "source": "circle with line of square",
+      "expected_nodes": [
+        {"kind": "marker:en:with", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2, 3, 4], "candidate_atom_indices": [0, 2, 4], "availability": "multiple"},
+        {"kind": "marker:en:of", "clause_index": 0, "occurrence_atom_index": 3, "left_context_atom_indices": [0, 1, 2], "right_context_atom_indices": [4], "candidate_atom_indices": [0, 2, 4], "availability": "multiple"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "sentence-boundary-no-cross-clause-fallback",
+      "language": "en",
+      "source": "circle with. line along paper",
+      "expected_nodes": [
+        {"kind": "relation:along", "clause_index": 1, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [0, 2], "availability": "multiple"}
+      ],
+      "expected_missing_context": [
+        {"kind": "marker:en:with", "missing_left": false, "missing_right": true}
+      ],
+      "delivery_conservation_count": 5
+    },
+    {
+      "id": "line-break-no-cross-clause-fallback",
+      "language": "en",
+      "source": "circle\nwith line",
+      "expected_nodes": [],
+      "expected_missing_context": [
+        {"kind": "marker:en:with", "missing_left": true, "missing_right": false}
+      ],
+      "delivery_conservation_count": 3
+    },
+    {
+      "id": "ja-qualified-term-candidate",
+      "language": "ja",
+      "source": "八つ を Nature.若葉",
+      "expected_nodes": [
+        {"kind": "marker:ja:wo", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [2], "availability": "exact_one"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 2
+    },
+    {
+      "id": "en-marker-missing-both-contexts",
+      "language": "en",
+      "source": "with",
+      "expected_nodes": [],
+      "expected_missing_context": [
+        {"kind": "marker:en:with", "missing_left": true, "missing_right": true}
+      ],
+      "delivery_conservation_count": 1
+    },
+    {
+      "id": "en-marker-zero-candidates",
+      "language": "en",
+      "source": "eight with twelve",
+      "expected_nodes": [
+        {"kind": "marker:en:with", "clause_index": 0, "occurrence_atom_index": 1, "left_context_atom_indices": [0], "right_context_atom_indices": [2], "candidate_atom_indices": [], "availability": "zero"}
+      ],
+      "expected_missing_context": [],
+      "delivery_conservation_count": 3
+    }
+  ]
+}

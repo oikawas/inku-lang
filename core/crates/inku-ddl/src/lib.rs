@@ -15,6 +15,7 @@ pub mod parser;
 pub mod phrase;
 pub mod phrase_topology;
 pub mod prompt;
+pub mod relation_reference;
 pub mod saijiki;
 
 pub use attachment::{
@@ -87,6 +88,13 @@ pub use prompt::{
     PromptBodyTemplateSlot, PromptBodyTemplateStage, PromptBodyTemplateStageAsset,
     prompt_body_template, prompt_body_template_asset, prompt_body_template_asset_from_bytes,
     prompt_body_template_asset_sha256_hex,
+};
+pub use relation_reference::{
+    RELATION_REFERENCE_EVIDENCE_SCHEMA_ID, RelationReferenceCandidateEnvelope,
+    RelationReferenceEvidenceAvailability, RelationReferenceEvidenceDiagnostic,
+    RelationReferenceEvidenceDiagnosticKind, RelationReferenceEvidenceResult,
+    RelationReferenceOccurrence, RelationReferenceOccurrenceKind,
+    collect_relation_reference_evidence,
 };
 pub use saijiki::{
     DisplayCategoryProjection, MarkerClassProjection, MarkerOrder, ReferenceCategoryProjection,

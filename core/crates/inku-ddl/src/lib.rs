@@ -12,6 +12,7 @@ pub mod macro_seed;
 pub mod noun_phrase;
 pub mod opaque_head;
 pub mod parser;
+pub mod phrase_topology;
 pub mod prompt;
 pub mod saijiki;
 
@@ -67,6 +68,12 @@ pub use opaque_head::{
 pub use parser::{
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
     NeutralToken, NeutralTokenKind, SourceSpan, parse_neutral_lexemes,
+};
+pub use phrase_topology::{
+    EnglishUnresolvedDeterminerPhraseTopologyEvidenceResult,
+    UNRESOLVED_DETERMINER_PHRASE_TOPOLOGY_EVIDENCE_SCHEMA_ID,
+    UnresolvedDeterminerPhraseOpaqueCandidateRun, UnresolvedDeterminerPhraseTopologyEvidence,
+    collect_english_unresolved_determiner_phrase_topology_evidence,
 };
 pub use prompt::{
     PROMPT_BODY_TEMPLATE_ASSET_BYTES, PROMPT_BODY_TEMPLATE_ASSET_ID, PromptBodyTemplate,

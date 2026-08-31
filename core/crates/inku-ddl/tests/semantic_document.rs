@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v1.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,6 +32,12 @@ struct Case {
     canonical: Option<String>,
     instruction_canonical: Option<String>,
     ground_occurrence_count: usize,
+    #[serde(default)]
+    instruction_proportion_aspects: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_proportion_width_extents: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_proportion_arc_forms: Vec<Option<String>>,
 }
 
 #[test]
@@ -82,6 +88,71 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
             "{}: accepted instruction AST is retained unchanged",
             case.id
         );
+        if !case.instruction_proportion_aspects.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .proportion
+                            .aspect
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_proportion_aspects
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: document retains Proportion aspect",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .proportion
+                            .width_extent
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_proportion_width_extents
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: document retains Proportion width extent",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .proportion
+                            .arc_form
+                            .as_ref()
+                            .map(|term| term.identity.id.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_proportion_arc_forms
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: document retains Proportion arc form",
+                case.id
+            );
+        }
         assert_eq!(
             result
                 .issues
@@ -168,17 +239,17 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v1");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v2");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v4"
+        "inku.semantic-entity-association.v5"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v5"
+        "inku.semantic-instruction-association.v6"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v1");
-    assert_eq!(fixture.version, 1);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v2");
+    assert_eq!(fixture.version, 2);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture

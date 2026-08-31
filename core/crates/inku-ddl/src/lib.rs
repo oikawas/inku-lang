@@ -140,8 +140,8 @@ pub use saijiki::{
 pub use semantic_association::{
     OwnedSemanticOccurrence, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue,
     SemanticAssociationIssueKind, SemanticAssociationResult, SemanticEntity,
-    SemanticEntityAssociationAst, SemanticFluctuation, SemanticIdentity, SemanticQuantity,
-    SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
+    SemanticEntityAssociationAst, SemanticFluctuation, SemanticIdentity, SemanticProportion,
+    SemanticQuantity, SemanticSurface, SemanticTerm, SemanticTermProvenance, SourceOccurrence,
     associate_semantic_entities,
 };
 pub use semantic_document::{

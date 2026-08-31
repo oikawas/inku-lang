@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v1";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v2";
 
 /// Document-global semantic AST with accepted drawable instructions and optional support material.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -8079,3 +8079,9 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 
 - **v2.14.0で正しくfail closedした配布版Composeの旧DBを、完全一致する既知baselineとして追加した。** schema fingerprint `001823…de6c`とFTS `complete`の1組だけを`release-compose-stage0`として認識し、他の未知schema、partial FTS、破損状態は従来どおりsnapshot作成やmutationより前に拒否する。
 - **移行処理やschemaは変更していない。** SQLite Backup APIで作った隔離copyだけを移行し、履歴42件とdigest、lineage 42件を保持したままregistry v1へ到達し、2回目の初期化がidempotentであること、quick checkとforeign key checkがgreenであることを確認した。Phase B本体はv2.13.47へ無損失rollbackした状態からfix-forwardする。
+
+### Android `2.1.4-android.78` — model・画像・provider境界を堅牢化する（Build 148121、2026-08-31）
+
+- **端末内model取得と画像入力をboundedかつfail-closedにした。** Download再開時の`Content-Range`と最終byte数を検証し、同一requestの`.part`だけを空き容量予約へ反映する。Picker／camera入力はdecode前に共有64 MiB上限を適用し、取消・失敗時のpartial file、PNG bitmap、cache fileを回収する。
+- **providerとnative modelのsecurity境界を明示した。** Cleartextはloopbackだけに限定し、provider URLのuserinfo／query／fragmentとautomatic redirectを拒否する。LiteRT modelはapp-owned `files/models/`配下のregular fileだけを受理し、UI／headless logはtokenやprivate pathをredactionする。Room schema、API、保存形式、render core／pipeline、server／webは変更していない。
+- **検証:** focused 14/14、Debug JVM 354/354、lint 0 errors、release Kotlin compile、debug AndroidTest Kotlin compile、Android名義test 6/6、日英docs gate、diff checkがgreen。main統合後に共有Rust JNIを含むrelease APK packageを一度だけ生成し、`.78` Build 148121へ採番した。ADB接続端末が0台でreconnectにも応答しなかったため、verified backup、署名互換確認、data-preserving install、端末上version／Build確認は未実行であり、端末接続後にcanonical deploy helperで完了する。Real-device instrumentation、live provider／model通信、storage-pressure試験、pentala、public GitHub pushは行っていない。

@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind, MacroDefinition, MacroLock,
-    NormalizedDdlDocument, OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
+    CanonicalPreviousReference, CanonicalRelationForm, ClauseAtom, ClauseSeparatorKind,
+    ClauseStream, CoreRoleKind, MacroDefinition, MacroLock, NormalizedDdlDocument,
+    OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SemanticHead,
     SemanticMacroInvocationHead, SemanticMacroParameterValue, SourceOccurrence,
     associate_semantic_entities, associate_semantic_entities_with_macro_binding,
@@ -781,6 +782,7 @@ fn accepted_full_relation_atoms_are_compound_owned_without_false_entity_delivery
         .expect("accepted asset has circle");
 
     for relation in &asset.relations {
+        let mut meaning_bytes = None;
         for (language, literals, previous_surface, current_surface, ending) in [
             (
                 ResolvedInstructionLanguage::Ja,
@@ -828,19 +830,19 @@ fn accepted_full_relation_atoms_are_compound_owned_without_false_entity_delivery
                 assert_eq!(result.explicit_previous_references.len(), 1, "{literal}");
                 assert_eq!(result.owned_compound_reference_count, 1, "{literal}");
                 assert_eq!(result.delivered_compound_reference_count, 1, "{literal}");
+                let canonical_bytes = result
+                    .canonical_bytes
+                    .as_ref()
+                    .expect("accepted relation association remains complete");
+                if let Some(expected) = &meaning_bytes {
+                    assert_eq!(canonical_bytes, expected, "{literal}: JA/EN meaning parity");
+                } else {
+                    meaning_bytes = Some(canonical_bytes.clone());
+                }
                 let occurrence = &result.explicit_previous_references[0];
                 assert_eq!(
                     occurrence.kind.as_str(),
                     relation.relation_type,
-                    "{literal}"
-                );
-                assert_eq!(
-                    occurrence.reference.as_str(),
-                    if relation.relation_type == "between" {
-                        "previous_two"
-                    } else {
-                        "previous_one"
-                    },
                     "{literal}"
                 );
                 assert_eq!(occurrence.provenance.surface, *literal, "{literal}");
@@ -850,15 +852,33 @@ fn accepted_full_relation_atoms_are_compound_owned_without_false_entity_delivery
                     *literal,
                     "{literal}"
                 );
-                assert!(matches!(
-                    result
-                        .clause_stream
-                        .clauses
-                        .get(occurrence.provenance.clause_index)
-                        .and_then(|clause| clause.atoms.get(occurrence.provenance.atom_index)),
-                    Some(ClauseAtom::SaijikiRelation { span, .. })
-                        if *span == occurrence.provenance.span
-                ));
+                let Some(ClauseAtom::SaijikiRelation {
+                    span,
+                    canonical_identity,
+                    ..
+                }) = result
+                    .clause_stream
+                    .clauses
+                    .get(occurrence.provenance.clause_index)
+                    .and_then(|clause| clause.atoms.get(occurrence.provenance.atom_index))
+                else {
+                    panic!("{literal}: compound occurrence must retain its relation atom");
+                };
+                assert_eq!(*span, occurrence.provenance.span, "{literal}");
+                assert_eq!(canonical_identity.form, CanonicalRelationForm::FullLiteral);
+                assert_eq!(canonical_identity.kind.as_str(), occurrence.kind.as_str());
+                assert_eq!(
+                    canonical_identity.previous_reference,
+                    Some(match occurrence.reference {
+                        inku_ddl::SemanticPreviousReference::PreviousOne => {
+                            CanonicalPreviousReference::PreviousOne
+                        }
+                        inku_ddl::SemanticPreviousReference::PreviousTwo => {
+                            CanonicalPreviousReference::PreviousTwo
+                        }
+                    }),
+                    "{literal}"
+                );
             }
         }
     }

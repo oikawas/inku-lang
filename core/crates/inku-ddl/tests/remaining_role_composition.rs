@@ -399,7 +399,19 @@ fn project_deferred(token: &inku_ddl::NeutralToken) -> ExpectedDeferred {
         NeutralTokenKind::SaijikiRelation {
             asset_id,
             relation_type,
+            canonical_identity,
         } => {
+            assert_eq!(
+                canonical_identity.kind.as_str(),
+                relation_type,
+                "deferred relation canonical kind"
+            );
+            assert_eq!(
+                canonical_identity.form,
+                inku_ddl::CanonicalRelationForm::Short,
+                "fixture relation is the accepted short form"
+            );
+            assert_eq!(canonical_identity.previous_reference, None);
             projected.kind = "saijiki_relation".to_owned();
             projected.asset_id = Some(asset_id.clone());
             projected.relation_type = Some(relation_type.clone());

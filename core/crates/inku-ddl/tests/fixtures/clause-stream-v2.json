@@ -1,6 +1,6 @@
 {
-  "schema": "inku.clause-stream-fixture.v1",
-  "version": 1,
+  "schema": "inku.clause-stream-fixture.v2",
+  "version": 2,
   "cases": [
     {
       "id": "ja-all-atom-kinds",
@@ -14,7 +14,7 @@
             {"kind": "core:primitive", "surface": "円", "start_byte": 0, "end_byte": 3},
             {"kind": "function_word", "surface": "を", "start_byte": 4, "end_byte": 7},
             {"kind": "exact_number:8", "surface": "八つ", "start_byte": 8, "end_byte": 14},
-            {"kind": "relation:along", "surface": "沿う", "start_byte": 15, "end_byte": 21},
+            {"kind": "relation:along:short:none", "surface": "沿う", "start_byte": 15, "end_byte": 21},
             {"kind": "diagnostic:unknown:false", "surface": "未知", "start_byte": 22, "end_byte": 28}
           ]
         },
@@ -141,7 +141,7 @@
           "end_byte": 30,
           "atoms": [
             {
-              "kind": "relation:touching",
+              "kind": "relation:touching:full_literal:previous_one",
               "surface": "前の弧に両端で触れる",
               "start_byte": 0,
               "end_byte": 30
@@ -169,7 +169,7 @@
           "end_byte": 38,
           "atoms": [
             {
-              "kind": "relation:touching",
+              "kind": "relation:touching:full_literal:previous_one",
               "surface": "TOUCHING THE PREVIOUS ARC AT BOTH ENDS",
               "start_byte": 0,
               "end_byte": 38

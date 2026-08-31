@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSeparatorKind, ClauseStream, CoreRoleKind,
-    NeutralDiagnosticKind, NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
-    SourceSpan, parse_clause_stream, saijiki_asset,
+    CLAUSE_STREAM_SCHEMA_ID, CanonicalPreviousReference, CanonicalRelationForm, ClauseAtom,
+    ClauseSeparatorKind, ClauseStream, CoreRoleKind, NeutralDiagnosticKind, NormalizedDdlDocument,
+    RemainingRoleKind, ResolvedInstructionLanguage, SourceSpan, parse_clause_stream, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/clause-stream-v1.json");
+const FIXTURE: &str = include_str!("fixtures/clause-stream-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -257,9 +257,9 @@ fn sentence_end_without_atoms_remains_a_separator() {
 #[test]
 fn fixture_schema_and_required_boundary_cases_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v1");
-    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v1");
-    assert_eq!(fixture.version, 1);
+    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v2");
+    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v2");
+    assert_eq!(fixture.version, 2);
     assert_eq!(fixture.cases.len(), 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
@@ -300,14 +300,35 @@ fn every_accepted_full_relation_literal_is_one_unchanged_relation_atom() {
                     .expect("accepted full literal forms a clause stream");
                 assert_eq!(stream.clauses.len(), 1, "{literal}");
                 assert_eq!(stream.clauses[0].atoms.len(), 1, "{literal}");
-                assert!(matches!(
-                    &stream.clauses[0].atoms[0],
-                    ClauseAtom::SaijikiRelation { relation_type, surface, span, .. }
-                        if relation_type == &relation.relation_type
-                            && surface == literal
-                            && span.start_byte == 0
-                            && span.end_byte == literal.len()
-                ));
+                let ClauseAtom::SaijikiRelation {
+                    relation_type,
+                    canonical_identity,
+                    surface,
+                    span,
+                    ..
+                } = &stream.clauses[0].atoms[0]
+                else {
+                    panic!("{literal}: expected relation atom");
+                };
+                assert_eq!(relation_type, &relation.relation_type, "{literal}");
+                assert_eq!(surface, literal, "{literal}");
+                assert_eq!(
+                    *span,
+                    SourceSpan {
+                        start_byte: 0,
+                        end_byte: literal.len()
+                    }
+                );
+                assert_eq!(canonical_identity.kind.as_str(), relation.relation_type);
+                assert_eq!(canonical_identity.form, CanonicalRelationForm::FullLiteral);
+                assert_eq!(
+                    canonical_identity.previous_reference,
+                    Some(if relation.relation_type == "between" {
+                        CanonicalPreviousReference::PreviousTwo
+                    } else {
+                        CanonicalPreviousReference::PreviousOne
+                    })
+                );
                 assert_eq!(stream.delivery_conservation_count, 1, "{literal}");
                 assert_stream_integrity(&source, &stream);
             }
@@ -358,13 +379,22 @@ fn project_atom(atom: &ClauseAtom, source: &str) -> ExpectedAtom {
         }
         ClauseAtom::SaijikiRelation {
             asset_id,
+            canonical_identity,
             surface,
             relation_type,
             ..
         } => {
             assert_eq!(asset_id, "inku.saijiki.v1");
             assert_eq!(surface, &source[span.start_byte..span.end_byte]);
-            format!("relation:{relation_type}")
+            assert_eq!(canonical_identity.kind.as_str(), relation_type);
+            format!(
+                "relation:{relation_type}:{}:{}",
+                canonical_identity.form.as_str(),
+                canonical_identity
+                    .previous_reference
+                    .map(|reference| reference.as_str())
+                    .unwrap_or("none")
+            )
         }
         ClauseAtom::UnresolvedDiagnostic(diagnostic) => {
             assert_eq!(

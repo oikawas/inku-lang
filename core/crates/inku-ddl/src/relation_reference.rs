@@ -1,13 +1,14 @@
 //! Source-preserving relation/reference candidate evidence over accepted attachment evidence.
 
 use crate::{
-    AttachmentEvidenceResult, AttachmentMarkerKind, ClauseAtom, ClauseSegment, ClauseStreamError,
-    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind, NeutralDiagnosticKind,
-    NormalizedDdlDocument, SourceSpan, collect_attachment_evidence,
+    AttachmentEvidenceResult, AttachmentMarkerKind, CanonicalRelationIdentity, ClauseAtom,
+    ClauseSegment, ClauseStreamError, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
+    NeutralDiagnosticKind, NormalizedDdlDocument, SourceSpan, collect_attachment_evidence,
+    saijiki::canonical_relation_identity_is_valid,
 };
 
 /// Stable identity for the runtime-disconnected relation/reference evidence envelope.
-pub const RELATION_REFERENCE_EVIDENCE_SCHEMA_ID: &str = "inku.relation-reference-evidence.v1";
+pub const RELATION_REFERENCE_EVIDENCE_SCHEMA_ID: &str = "inku.relation-reference-evidence.v2";
 
 /// Closed candidate availability without a target-selection policy.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,6 +24,7 @@ pub enum RelationReferenceOccurrenceKind {
     SaijikiRelation {
         asset_id: String,
         relation_type: String,
+        canonical_identity: CanonicalRelationIdentity,
     },
     AttachmentMarker {
         attachment_evidence_index: usize,
@@ -69,6 +71,7 @@ pub enum RelationReferenceEvidenceDiagnosticKind {
     DuplicateOccurrence,
     ClauseMembershipMismatch,
     CandidateMembershipMismatch,
+    CanonicalIdentityMismatch,
 }
 
 /// One occurrence withheld from the valid envelope set.
@@ -119,6 +122,7 @@ fn build_evidence(
             let ClauseAtom::SaijikiRelation {
                 asset_id,
                 relation_type,
+                canonical_identity,
                 surface,
                 span,
             } = atom
@@ -130,6 +134,7 @@ fn build_evidence(
                     kind: RelationReferenceOccurrenceKind::SaijikiRelation {
                         asset_id: asset_id.clone(),
                         relation_type: relation_type.clone(),
+                        canonical_identity: *canonical_identity,
                     },
                     surface: surface.clone(),
                     span: *span,
@@ -209,6 +214,19 @@ fn build_envelope(
         return Err(diagnostic(
             pending,
             RelationReferenceEvidenceDiagnosticKind::SourceContainment,
+        ));
+    }
+
+    if let RelationReferenceOccurrenceKind::SaijikiRelation {
+        relation_type,
+        canonical_identity,
+        ..
+    } = &pending.occurrence.kind
+        && !canonical_relation_identity_is_valid(relation_type, *canonical_identity)
+    {
+        return Err(diagnostic(
+            pending,
+            RelationReferenceEvidenceDiagnosticKind::CanonicalIdentityMismatch,
         ));
     }
 
@@ -362,16 +380,19 @@ fn occurrence_matches_atom(
             RelationReferenceOccurrenceKind::SaijikiRelation {
                 asset_id,
                 relation_type,
+                canonical_identity,
             },
             ClauseAtom::SaijikiRelation {
                 asset_id: atom_asset_id,
                 relation_type: atom_relation_type,
+                canonical_identity: atom_canonical_identity,
                 surface,
                 ..
             },
         ) => {
             asset_id == atom_asset_id
                 && relation_type == atom_relation_type
+                && canonical_identity == atom_canonical_identity
                 && occurrence.surface == *surface
         }
         (
@@ -500,7 +521,7 @@ const fn contains(container: SourceSpan, contained: SourceSpan) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ResolvedInstructionLanguage;
+    use crate::{CanonicalRelationForm, ResolvedInstructionLanguage};
 
     fn attachment(source: &str) -> AttachmentEvidenceResult {
         let document =
@@ -556,6 +577,35 @@ mod tests {
         assert_eq!(
             result.diagnostics[0].kind,
             RelationReferenceEvidenceDiagnosticKind::CandidateMembershipMismatch
+        );
+    }
+
+    #[test]
+    fn contradictory_relation_identity_fails_closed_without_an_envelope() {
+        let source = "circle along line";
+        let mut accepted = attachment(source);
+        let relation = accepted
+            .noun_phrase
+            .clause_stream
+            .clauses
+            .iter_mut()
+            .flat_map(|clause| &mut clause.atoms)
+            .find_map(|atom| match atom {
+                ClauseAtom::SaijikiRelation {
+                    canonical_identity, ..
+                } => Some(canonical_identity),
+                _ => None,
+            })
+            .expect("source has one accepted relation atom");
+        relation.form = CanonicalRelationForm::FullLiteral;
+
+        let result = build_evidence(source, accepted);
+
+        assert!(result.evidence.is_empty());
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(
+            result.diagnostics[0].kind,
+            RelationReferenceEvidenceDiagnosticKind::CanonicalIdentityMismatch
         );
     }
 }

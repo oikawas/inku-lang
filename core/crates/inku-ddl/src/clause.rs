@@ -3,13 +3,13 @@
 use std::fmt;
 
 use crate::{
-    CoreRoleTerm, NeutralDiagnostic, NeutralToken, NeutralTokenKind, NormalizedDdlDocument,
-    RemainingRoleTerm, SourceSpan, UnattachedExactNumber, compose_core_roles,
-    compose_remaining_roles, parse_neutral_lexemes,
+    CanonicalRelationIdentity, CoreRoleTerm, NeutralDiagnostic, NeutralToken, NeutralTokenKind,
+    NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
+    compose_core_roles, compose_remaining_roles, parse_neutral_lexemes,
 };
 
 /// Stable identity for the runtime-disconnected clause-stream foundation.
-pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v1";
+pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v2";
 
 /// A source separator that ends one clause fragment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -38,6 +38,7 @@ pub enum ClauseAtom {
     SaijikiRelation {
         asset_id: String,
         relation_type: String,
+        canonical_identity: CanonicalRelationIdentity,
         surface: String,
         span: SourceSpan,
     },
@@ -300,9 +301,11 @@ fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStr
         NeutralTokenKind::SaijikiRelation {
             asset_id,
             relation_type,
+            canonical_identity,
         } => Ok(ClauseAtom::SaijikiRelation {
             asset_id,
             relation_type,
+            canonical_identity,
             surface,
             span,
         }),

@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnosticKind, NeutralTokenKind,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, parse_neutral_lexemes,
-    project_macro_semantic_ref, saijiki_asset,
+    CanonicalPreviousReference, CanonicalRelationForm, NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
+    NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
+    parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/neutral-parser-v2.json");
+const FIXTURE: &str = include_str!("fixtures/neutral-parser-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,6 +43,12 @@ struct ExpectedToken {
     canonical_surface_ja: Option<String>,
     #[serde(default)]
     relation_type: Option<String>,
+    #[serde(default)]
+    canonical_relation_kind: Option<String>,
+    #[serde(default)]
+    relation_form: Option<String>,
+    #[serde(default)]
+    previous_reference: Option<String>,
     #[serde(default)]
     value: Option<u64>,
 }
@@ -414,10 +420,10 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v2"
+        "inku.neutral-lexeme-parser.v3"
     );
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v2");
-    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v3");
+    assert_eq!(fixture.version, 3);
     assert_eq!(fixture.cases.len(), 18);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
@@ -457,6 +463,47 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
 #[test]
 fn accepted_full_relation_literals_are_single_source_preserving_lexemes() {
     for relation in &saijiki_asset().relations {
+        for (language, short_surface) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                relation.surface_ja.as_str(),
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                relation.surface_en.as_str(),
+            ),
+        ] {
+            let source = format!("{short_surface}.");
+            let document = NormalizedDdlDocument::new(source, language, Vec::new())
+                .expect("accepted short relation forms a document");
+            let result = parse_neutral_lexemes(&document);
+            assert!(result.diagnostics.is_empty(), "{short_surface}");
+            assert_eq!(result.tokens.len(), 1, "{short_surface}");
+            let NeutralTokenKind::SaijikiRelation {
+                relation_type,
+                canonical_identity,
+                ..
+            } = &result.tokens[0].kind
+            else {
+                panic!("{short_surface}: expected relation token");
+            };
+            assert_eq!(relation_type, &relation.relation_type, "{short_surface}");
+            assert_eq!(
+                canonical_identity.kind.as_str(),
+                relation.relation_type,
+                "{short_surface}"
+            );
+            assert_eq!(
+                canonical_identity.form,
+                CanonicalRelationForm::Short,
+                "{short_surface}"
+            );
+            assert_eq!(
+                canonical_identity.previous_reference, None,
+                "{short_surface}"
+            );
+        }
+
         for (language, literals) in [
             (ResolvedInstructionLanguage::Ja, &relation.literals_ja),
             (ResolvedInstructionLanguage::En, &relation.literals_en),
@@ -472,11 +519,34 @@ fn accepted_full_relation_literals_are_single_source_preserving_lexemes() {
                 assert_eq!(token.surface, *literal, "{literal}");
                 assert_eq!(token.span.start_byte, 0, "{literal}");
                 assert_eq!(token.span.end_byte, literal.len(), "{literal}");
-                assert!(matches!(
-                    &token.kind,
-                    NeutralTokenKind::SaijikiRelation { relation_type, .. }
-                        if relation_type == &relation.relation_type
-                ));
+                let NeutralTokenKind::SaijikiRelation {
+                    relation_type,
+                    canonical_identity,
+                    ..
+                } = &token.kind
+                else {
+                    panic!("{literal}: expected relation token");
+                };
+                assert_eq!(relation_type, &relation.relation_type, "{literal}");
+                assert_eq!(
+                    canonical_identity.kind.as_str(),
+                    relation.relation_type,
+                    "{literal}"
+                );
+                assert_eq!(
+                    canonical_identity.form,
+                    CanonicalRelationForm::FullLiteral,
+                    "{literal}"
+                );
+                assert_eq!(
+                    canonical_identity.previous_reference,
+                    Some(if relation.relation_type == "between" {
+                        CanonicalPreviousReference::PreviousTwo
+                    } else {
+                        CanonicalPreviousReference::PreviousOne
+                    }),
+                    "{literal}"
+                );
             }
         }
 
@@ -528,6 +598,9 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
         category_key: None,
         canonical_surface_ja: None,
         relation_type: None,
+        canonical_relation_kind: None,
+        relation_form: None,
+        previous_reference: None,
         value: None,
     };
     match &token.kind {
@@ -544,10 +617,16 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
         NeutralTokenKind::SaijikiRelation {
             asset_id,
             relation_type,
+            canonical_identity,
         } => {
             projected.kind = "saijiki_relation".to_owned();
             projected.asset_id = Some(asset_id.clone());
             projected.relation_type = Some(relation_type.clone());
+            projected.canonical_relation_kind = Some(canonical_identity.kind.as_str().to_owned());
+            projected.relation_form = Some(canonical_identity.form.as_str().to_owned());
+            projected.previous_reference = canonical_identity
+                .previous_reference
+                .map(|reference| reference.as_str().to_owned());
         }
         NeutralTokenKind::FunctionWord => projected.kind = "function_word".to_owned(),
         NeutralTokenKind::ExactNumber { value } => {

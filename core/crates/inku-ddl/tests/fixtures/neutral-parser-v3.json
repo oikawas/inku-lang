@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v2",
-  "version": 2,
+  "schema": "inku.neutral-lexeme-parser-fixture.v3",
+  "version": 3,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",
@@ -45,7 +45,7 @@
       "expected_tokens": [
         {"kind": "saijiki_word", "surface": "紙", "start_byte": 0, "end_byte": 3, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙"},
         {"kind": "function_word", "surface": "に", "start_byte": 3, "end_byte": 6},
-        {"kind": "saijiki_relation", "surface": "触れない", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching"}
+        {"kind": "saijiki_relation", "surface": "触れない", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching", "canonical_relation_kind": "not_touching", "relation_form": "short", "previous_reference": null}
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 3
@@ -56,7 +56,7 @@
       "source": "paper not touching",
       "expected_tokens": [
         {"kind": "saijiki_word", "surface": "paper", "start_byte": 0, "end_byte": 5, "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙"},
-        {"kind": "saijiki_relation", "surface": "not touching", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching"}
+        {"kind": "saijiki_relation", "surface": "not touching", "start_byte": 6, "end_byte": 18, "asset_id": "inku.saijiki.v1", "relation_type": "not_touching", "canonical_relation_kind": "not_touching", "relation_form": "short", "previous_reference": null}
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 2
@@ -157,7 +157,10 @@
           "start_byte": 0,
           "end_byte": 30,
           "asset_id": "inku.saijiki.v1",
-          "relation_type": "touching"
+          "relation_type": "touching",
+          "canonical_relation_kind": "touching",
+          "relation_form": "full_literal",
+          "previous_reference": "previous_one"
         }
       ],
       "expected_diagnostics": [],
@@ -174,7 +177,10 @@
           "start_byte": 0,
           "end_byte": 38,
           "asset_id": "inku.saijiki.v1",
-          "relation_type": "touching"
+          "relation_type": "touching",
+          "canonical_relation_kind": "touching",
+          "relation_form": "full_literal",
+          "previous_reference": "previous_one"
         }
       ],
       "expected_diagnostics": [],

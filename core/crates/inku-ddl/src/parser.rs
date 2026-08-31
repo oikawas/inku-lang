@@ -3,12 +3,14 @@
 use std::collections::HashSet;
 
 use crate::{
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
-    saijiki::parser_candidate_surface, saijiki_asset,
+    CanonicalRelationForm, CanonicalRelationIdentity, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    saijiki::{canonical_relation_identity, parser_candidate_surface},
+    saijiki_asset,
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v2";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v3";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -36,6 +38,7 @@ pub enum NeutralTokenKind {
     SaijikiRelation {
         asset_id: String,
         relation_type: String,
+        canonical_identity: CanonicalRelationIdentity,
     },
     FunctionWord,
     ExactNumber {
@@ -344,7 +347,20 @@ fn candidates_at(
                 (relation.surface_en.as_str(), &relation.literals_en)
             }
         };
-        for surface in std::iter::once(surface).chain(full_literals.iter().map(String::as_str)) {
+        for (surface, form) in std::iter::once((surface, CanonicalRelationForm::Short)).chain(
+            full_literals
+                .iter()
+                .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
+        ) {
+            let delivery = canonical_relation_identity(&relation.relation_type, form)
+                .map(|canonical_identity| {
+                    CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
+                        asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                        relation_type: relation.relation_type.clone(),
+                        canonical_identity,
+                    })
+                })
+                .unwrap_or(CandidateDelivery::Hole);
             push_surface_candidate(
                 &mut candidates,
                 source,
@@ -353,11 +369,8 @@ fn candidates_at(
                 require_boundary,
                 surface,
                 PRIORITY_ASSET,
-                format!("relation:{}", relation.relation_type),
-                CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
-                    asset_id: SAIJIKI_ASSET_ID.to_owned(),
-                    relation_type: relation.relation_type.clone(),
-                }),
+                format!("relation:{}:{}", relation.relation_type, form.as_str()),
+                delivery,
             );
         }
     }

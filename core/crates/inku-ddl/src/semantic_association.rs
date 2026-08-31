@@ -5,12 +5,13 @@ use std::collections::BTreeMap;
 use serde_json::{Number, Value};
 
 use crate::{
-    BoundMacroParameterValue, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
+    BoundMacroParameterValue, CanonicalPreviousReference, CanonicalRelationIdentity,
+    CanonicalRelationKind, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
     CoreRoleKind, MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity,
     MacroParameterBinding, MacroParameterBindingDiagnosticKind, MacroParameterBindingResult,
     NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema,
     RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
-    parse_clause_stream, project_macro_semantic_ref, saijiki_asset,
+    parse_clause_stream, project_macro_semantic_ref, saijiki::canonical_relation_identity_is_valid,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
@@ -661,20 +662,33 @@ fn build_semantic_entities(
                 ClauseAtom::SaijikiRelation {
                     asset_id,
                     relation_type,
+                    canonical_identity,
                     surface,
                     span,
                 } => {
-                    if let Some(occurrence) = explicit_previous_reference_occurrence(
+                    match explicit_previous_reference_occurrence(
                         document,
                         asset_id,
                         relation_type,
-                        surface,
+                        *canonical_identity,
                         *span,
                         region_index,
                         clause_index,
                         atom_index,
                     ) {
-                        explicit_previous_references.push(occurrence);
+                        Ok(Some(occurrence)) => explicit_previous_references.push(occurrence),
+                        Ok(None) => {}
+                        Err(()) => issues.push(SemanticAssociationIssue {
+                            kind: SemanticAssociationIssueKind::UpstreamConflict,
+                            region_index,
+                            occurrences: Vec::new(),
+                            upstream_diagnostic: Some(NeutralDiagnostic {
+                                span: *span,
+                                surface: surface.clone(),
+                                kind: NeutralDiagnosticKind::Conflict,
+                                recognized: true,
+                            }),
+                        }),
                     }
                 }
                 ClauseAtom::CoreRole(_)
@@ -929,53 +943,38 @@ fn explicit_previous_reference_occurrence(
     document: &NormalizedDdlDocument,
     asset_id: &str,
     relation_type: &str,
-    surface: &str,
+    canonical_identity: CanonicalRelationIdentity,
     span: SourceSpan,
     region_index: usize,
     clause_index: usize,
     atom_index: usize,
-) -> Option<ExplicitPreviousReferenceOccurrence> {
-    if asset_id != SAIJIKI_ASSET_ID {
-        return None;
+) -> Result<Option<ExplicitPreviousReferenceOccurrence>, ()> {
+    if asset_id != SAIJIKI_ASSET_ID
+        || !canonical_relation_identity_is_valid(relation_type, canonical_identity)
+    {
+        return Err(());
     }
-    let relation = saijiki_asset()
-        .relations
-        .iter()
-        .find(|relation| relation.relation_type == relation_type)?;
-    let literals = match document.language() {
-        ResolvedInstructionLanguage::Ja => &relation.literals_ja,
-        ResolvedInstructionLanguage::En => &relation.literals_en,
+    let Some(reference) = canonical_identity.previous_reference else {
+        return Ok(None);
     };
-    let accepted = literals.iter().any(|literal| match document.language() {
-        ResolvedInstructionLanguage::Ja => surface == literal,
-        ResolvedInstructionLanguage::En => surface.eq_ignore_ascii_case(literal),
-    });
-    if !accepted {
-        return None;
-    }
-
-    let kind = match relation_type {
-        "along" => SemanticRelationKind::Along,
-        "not_touching" => SemanticRelationKind::NotTouching,
-        "cutting" => SemanticRelationKind::Cutting,
-        "between" => SemanticRelationKind::Between,
-        "touching" => SemanticRelationKind::Touching,
-        _ => return None,
+    let kind = match canonical_identity.kind {
+        CanonicalRelationKind::Along => SemanticRelationKind::Along,
+        CanonicalRelationKind::NotTouching => SemanticRelationKind::NotTouching,
+        CanonicalRelationKind::Cutting => SemanticRelationKind::Cutting,
+        CanonicalRelationKind::Between => SemanticRelationKind::Between,
+        CanonicalRelationKind::Touching => SemanticRelationKind::Touching,
     };
-    let reference = match kind {
-        SemanticRelationKind::Between => SemanticPreviousReference::PreviousTwo,
-        SemanticRelationKind::Along
-        | SemanticRelationKind::NotTouching
-        | SemanticRelationKind::Cutting
-        | SemanticRelationKind::Touching => SemanticPreviousReference::PreviousOne,
+    let reference = match reference {
+        CanonicalPreviousReference::PreviousOne => SemanticPreviousReference::PreviousOne,
+        CanonicalPreviousReference::PreviousTwo => SemanticPreviousReference::PreviousTwo,
     };
-    Some(ExplicitPreviousReferenceOccurrence {
+    Ok(Some(ExplicitPreviousReferenceOccurrence {
         kind,
         reference,
         provenance: source_occurrence(document, span, region_index, clause_index, atom_index),
         asset_id: asset_id.to_owned(),
         relation_type: relation_type.to_owned(),
-    })
+    }))
 }
 
 pub(crate) fn sentence_region_index(stream: &ClauseStream, span: SourceSpan) -> usize {
@@ -1626,4 +1625,49 @@ pub(crate) fn semantic_identity_value(identity: &SemanticIdentity) -> Value {
     );
     record.insert("id".to_owned(), Value::String(identity.id.clone()));
     Value::Object(record.into_iter().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::CanonicalRelationForm;
+
+    #[test]
+    fn contradictory_relation_identity_blocks_semantic_edge_and_canonical_bytes() {
+        let document = NormalizedDdlDocument::new(
+            "circle along".to_owned(),
+            ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .expect("test source forms a document");
+        let mut stream = parse_clause_stream(&document).expect("test source forms a clause stream");
+        let relation = stream
+            .clauses
+            .iter_mut()
+            .flat_map(|clause| &mut clause.atoms)
+            .find_map(|atom| match atom {
+                ClauseAtom::SaijikiRelation {
+                    canonical_identity, ..
+                } => Some(canonical_identity),
+                _ => None,
+            })
+            .expect("test source has one relation atom");
+        relation.form = CanonicalRelationForm::FullLiteral;
+
+        let result = build_semantic_entities(&document, stream, None);
+
+        assert!(result.explicit_previous_references.is_empty());
+        assert!(result.canonical_bytes.is_none());
+        assert_eq!(result.issues.len(), 1);
+        assert_eq!(
+            result.issues[0].kind,
+            SemanticAssociationIssueKind::UpstreamConflict
+        );
+        let diagnostic = result.issues[0]
+            .upstream_diagnostic
+            .as_ref()
+            .expect("identity conflict retains a typed source diagnostic");
+        assert_eq!(diagnostic.kind, NeutralDiagnosticKind::Conflict);
+        assert_eq!(diagnostic.surface, "along");
+    }
 }

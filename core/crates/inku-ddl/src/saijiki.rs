@@ -73,6 +73,104 @@ pub struct RelationAsset {
     pub literals_en: Vec<String>,
 }
 
+/// Closed, language-independent identity of an accepted Saijiki relation row.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CanonicalRelationKind {
+    Along,
+    NotTouching,
+    Touching,
+    Cutting,
+    Between,
+}
+
+impl CanonicalRelationKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Along => "along",
+            Self::NotTouching => "not_touching",
+            Self::Touching => "touching",
+            Self::Cutting => "cutting",
+            Self::Between => "between",
+        }
+    }
+}
+
+/// Candidate-time distinction between a short relation and a compound full literal.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CanonicalRelationForm {
+    Short,
+    FullLiteral,
+}
+
+impl CanonicalRelationForm {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Short => "short",
+            Self::FullLiteral => "full_literal",
+        }
+    }
+}
+
+/// Closed source-order reference depth carried only by accepted full literals.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CanonicalPreviousReference {
+    PreviousOne,
+    PreviousTwo,
+}
+
+impl CanonicalPreviousReference {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PreviousOne => "previous_one",
+            Self::PreviousTwo => "previous_two",
+        }
+    }
+}
+
+/// One closed relation identity transported unchanged with the source occurrence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CanonicalRelationIdentity {
+    pub kind: CanonicalRelationKind,
+    pub form: CanonicalRelationForm,
+    pub previous_reference: Option<CanonicalPreviousReference>,
+}
+
+pub(crate) fn canonical_relation_identity(
+    relation_type: &str,
+    form: CanonicalRelationForm,
+) -> Option<CanonicalRelationIdentity> {
+    let kind = match relation_type {
+        "along" => CanonicalRelationKind::Along,
+        "not_touching" => CanonicalRelationKind::NotTouching,
+        "touching" => CanonicalRelationKind::Touching,
+        "cutting" => CanonicalRelationKind::Cutting,
+        "between" => CanonicalRelationKind::Between,
+        _ => return None,
+    };
+    let previous_reference = match form {
+        CanonicalRelationForm::Short => None,
+        CanonicalRelationForm::FullLiteral => Some(match kind {
+            CanonicalRelationKind::Between => CanonicalPreviousReference::PreviousTwo,
+            CanonicalRelationKind::Along
+            | CanonicalRelationKind::NotTouching
+            | CanonicalRelationKind::Touching
+            | CanonicalRelationKind::Cutting => CanonicalPreviousReference::PreviousOne,
+        }),
+    };
+    Some(CanonicalRelationIdentity {
+        kind,
+        form,
+        previous_reference,
+    })
+}
+
+pub(crate) fn canonical_relation_identity_is_valid(
+    relation_type: &str,
+    identity: CanonicalRelationIdentity,
+) -> bool {
+    canonical_relation_identity(relation_type, identity.form) == Some(identity)
+}
+
 static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
 

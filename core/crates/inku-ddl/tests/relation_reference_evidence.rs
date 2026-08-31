@@ -1,16 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
-    AttachmentMarkerKind, ClauseAtom, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
-    NeutralDiagnosticKind, NormalizedDdlDocument, RELATION_REFERENCE_EVIDENCE_SCHEMA_ID,
+    AttachmentMarkerKind, CanonicalPreviousReference, CanonicalRelationForm, ClauseAtom,
+    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind, NeutralDiagnosticKind,
+    NormalizedDdlDocument, RELATION_REFERENCE_EVIDENCE_SCHEMA_ID,
     RelationReferenceCandidateEnvelope, RelationReferenceEvidenceAvailability,
     RelationReferenceEvidenceDiagnosticKind, RelationReferenceEvidenceResult,
     RelationReferenceOccurrenceKind, ResolvedInstructionLanguage, SourceSpan,
-    collect_attachment_evidence, collect_relation_reference_evidence,
+    collect_attachment_evidence, collect_relation_reference_evidence, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/relation-reference-evidence-v1.json");
+const FIXTURE: &str = include_str!("fixtures/relation-reference-evidence-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -94,13 +95,13 @@ fn fixture_schema_and_required_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         RELATION_REFERENCE_EVIDENCE_SCHEMA_ID,
-        "inku.relation-reference-evidence.v1"
+        "inku.relation-reference-evidence.v2"
     );
     assert_eq!(
         fixture.schema,
-        "inku.relation-reference-evidence-fixture.v1"
+        "inku.relation-reference-evidence-fixture.v2"
     );
-    assert_eq!(fixture.version, 1);
+    assert_eq!(fixture.version, 2);
     assert_eq!(fixture.cases.len(), 10);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
@@ -123,6 +124,110 @@ fn fixture_schema_and_required_boundaries_are_guarded() {
         "en-marker-zero-candidates",
     ] {
         assert!(ids.contains(required), "missing fixture case: {required}");
+    }
+}
+
+#[test]
+fn every_accepted_short_and_full_relation_keeps_one_canonical_identity() {
+    for relation in &saijiki_asset().relations {
+        for (language, surface, form) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                relation.surface_ja.as_str(),
+                CanonicalRelationForm::Short,
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                relation.surface_en.as_str(),
+                CanonicalRelationForm::Short,
+            ),
+        ]
+        .into_iter()
+        .chain(
+            relation
+                .literals_ja
+                .iter()
+                .map(|surface| {
+                    (
+                        ResolvedInstructionLanguage::Ja,
+                        surface.as_str(),
+                        CanonicalRelationForm::FullLiteral,
+                    )
+                })
+                .chain(relation.literals_en.iter().map(|surface| {
+                    (
+                        ResolvedInstructionLanguage::En,
+                        surface.as_str(),
+                        CanonicalRelationForm::FullLiteral,
+                    )
+                })),
+        ) {
+            let source = match language {
+                ResolvedInstructionLanguage::Ja => format!("八つ {surface} 九つ"),
+                ResolvedInstructionLanguage::En => format!("eight {surface} nine"),
+            };
+            let document = NormalizedDdlDocument::new(source.clone(), language, Vec::new())
+                .expect("accepted relation source forms a document");
+            let result = collect_relation_reference_evidence(&document)
+                .expect("accepted relation source forms evidence");
+            let node = result
+                .evidence
+                .iter()
+                .find(|node| {
+                    matches!(
+                        node.occurrence.kind,
+                        RelationReferenceOccurrenceKind::SaijikiRelation { .. }
+                    )
+                })
+                .unwrap_or_else(|| panic!("{surface}: missing relation evidence"));
+            let RelationReferenceOccurrenceKind::SaijikiRelation {
+                asset_id,
+                relation_type,
+                canonical_identity,
+            } = &node.occurrence.kind
+            else {
+                unreachable!();
+            };
+            assert_eq!(asset_id, "inku.saijiki.v1", "{surface}");
+            assert_eq!(relation_type, &relation.relation_type, "{surface}");
+            assert_eq!(canonical_identity.kind.as_str(), relation.relation_type);
+            assert_eq!(canonical_identity.form, form, "{surface}");
+            assert_eq!(
+                canonical_identity.previous_reference,
+                match form {
+                    CanonicalRelationForm::Short => None,
+                    CanonicalRelationForm::FullLiteral => {
+                        Some(if relation.relation_type == "between" {
+                            CanonicalPreviousReference::PreviousTwo
+                        } else {
+                            CanonicalPreviousReference::PreviousOne
+                        })
+                    }
+                },
+                "{surface}"
+            );
+            assert_eq!(
+                &source[node.occurrence.span.start_byte..node.occurrence.span.end_byte],
+                surface,
+                "{surface}"
+            );
+            let ClauseAtom::SaijikiRelation {
+                asset_id: atom_asset_id,
+                relation_type: atom_relation_type,
+                canonical_identity: atom_identity,
+                surface: atom_surface,
+                span: atom_span,
+            } = &result.attachment_evidence.noun_phrase.clause_stream.clauses[node.clause_index]
+                .atoms[node.occurrence_atom_index]
+            else {
+                panic!("{surface}: evidence occurrence must point to its relation atom");
+            };
+            assert_eq!(atom_asset_id, asset_id, "{surface}");
+            assert_eq!(atom_relation_type, relation_type, "{surface}");
+            assert_eq!(atom_identity, canonical_identity, "{surface}");
+            assert_eq!(atom_surface, surface, "{surface}");
+            assert_eq!(*atom_span, node.occurrence.span, "{surface}");
+        }
     }
 }
 
@@ -328,8 +433,20 @@ fn is_reference_candidate(atom: &ClauseAtom) -> bool {
 
 fn occurrence_name(kind: &RelationReferenceOccurrenceKind) -> String {
     match kind {
-        RelationReferenceOccurrenceKind::SaijikiRelation { relation_type, .. } => {
-            format!("relation:{relation_type}")
+        RelationReferenceOccurrenceKind::SaijikiRelation {
+            relation_type,
+            canonical_identity,
+            ..
+        } => {
+            assert_eq!(canonical_identity.kind.as_str(), relation_type);
+            format!(
+                "relation:{relation_type}:{}:{}",
+                canonical_identity.form.as_str(),
+                canonical_identity
+                    .previous_reference
+                    .map(|reference| reference.as_str())
+                    .unwrap_or("none")
+            )
         }
         RelationReferenceOccurrenceKind::AttachmentMarker { marker, .. } => {
             format!("marker:{}", marker_name(*marker))

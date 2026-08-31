@@ -91,18 +91,20 @@ DDLは絵を記述する言語ではなく、**視覚的な短歌を書く言語
 |---|---|
 | **かたち** | 円、楕円、三角、四角、線、弧、雲形 |
 | **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
-| **てざわり** | 銀筆、鉛筆、ペン(既定)、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント、コンピュータ |
-| **つらなり** | 実線(既定)、破線、点線、一点鎖線 |
-| **おもて** | 空(既定)、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い |
+| **てざわり** | 銀筆、鉛筆、ペン、ロットリング、クレヨン、チョーク、細筆、太筆、ビュラン、ドライポイント、コンピュータ |
+| **つらなり** | 実線、破線、点線、一点鎖線 |
+| **おもて** | 空、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い |
 | **じ** | 紙、和紙、薄墨地、木炭地、カンバス、画用紙、メゾチント |
-| **いろ** | 白、黒(既定)、青、赤、緑、灰、黄、橙、紫 |
+| **いろ** | 白、黒、青、赤、緑、灰、黄、橙、紫 |
 | **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む |
 | **ばしょ** | 上、下、中央、左端、右端、上端、下端、中心、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる |
 
-キャンバス比率は語彙ではなく canvas-aspect プラグイン（§4.4）が扱い、square / golden / a4 / b4 / pillar / oban / wide / byobu / vertical の 9 種とする。
+ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed DDL compiler が採用する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` であり、parser / semantic association はこの4値を自動挿入しない。具体的な default、type applicability、typed-hole blocking、Score lowering は PLAN の Step 10 candidate / visual author gate まで未決定である。この規則は Renderer 内部の物理 fallback や既存作品の read compatibility を遡及変更しない。
+
+キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、visible DDL やmacro定義へ書かない（§19）。
 
 **コアの性質**：
 - 物理素材の語彙のみ（感情語ゼロ）
@@ -131,6 +133,8 @@ DDLは絵を記述する言語ではなく、**視覚的な短歌を書く言語
 ---
 
 ## 4. プラグイン設計原則
+
+本節のpluginは、`Nature.雨`のようなvisible qualified termから明示的に呼ぶ、data-onlyの**語彙マクロ**を意味する。外部code hookではない。Canvasはshared coreのhost option、Render Engine Packは描画coreの差し替えであり、この意味のpluginではない。
 
 ### 4.1 なぜプラグインを最初から設計するか
 
@@ -177,63 +181,29 @@ DDLが短歌を目指すなら、**Go 寄りの姿勢**が合う。短歌に「�
 プラグインAがプラグインBに依存することを禁じる。依存関係の連鎖がないことで、導入・削除が独立できる。
 
 **原則5: コアだけで書ける**
-どんなプラグインも、コア語彙で書いた記述に「展開」できる。プラグインは省略記法であって、新機能ではない。
+どんなプラグインも、コアmeaningだけで構成されたsemantic nodeへ展開できる。プラグインは省略記法であって、新機能ではない。
 
-### 4.4 実装上のプラグインフック
+### 4.4 キャンバスと語彙マクロの所有境界
 
-参照実装のプラグインフックは、v1.29 の `canvas-aspect` プラグインから始まった。語彙プラグインの現行の形は §4.6 の宣言的文書フォーマット（v1.90.0）である。
+Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。
 
-- 当初のフックは **canvas-size hook** のみだった
-- ユーザーごとのプラグイン設定は DB の plugin extension storage に JSON として保存する
-- Web UI のプラグイン呼び出しボタン（キャンバス）は記述タブの操作列に置く。現行の並び順は「色カタログ」「モデル選択」「キャンバス」「新規作成」（Build 563、§8.4）
-- プラグイン実装は system plugins と user plugins のディレクトリを分け、各プラグインを専用ディレクトリに配置する
-- 参照実装の `canvas-aspect` は、サーバー側では `server/src/inku_server/plugins/system/canvas_aspect/`、Web 側では `web/src/lib/plugins/system/canvas-aspect/` に配置する
-- キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える。ただし表示中作品の系譜文脈は保持し、次に保存する作品を表示中作品の子として `canvas_aspect_change`（UI表示: キャンバス変更）で記録する
-- `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
-- 正規化座標は 0.0〜1.0 のまま維持する。**痕の寸法（`size`）は縦横とも短辺基準で画素へ直し、記述が述べた形をどの比でも保つ**（円・弧の半径も同じ規則。v2.13.6 / render engine 30 で `size` を持つ全図形へ広げた）。**痕を並べる層も同じ規則に従う** —— `radial` の環の半径と `at.region` の広がりは短辺基準で画素へ直し、述べられた並びの形をどの比でも保つ（v2.13.8 / render engine 31）。まとまり（クラスタ）の帯と道筋（`path`）の交差軸のずれも同じ規則に従う（v2.13.13 / render engine 32。**帯は回転してから短辺へ載せる** —— 回す前に軸を縮めると回転が剪断になる）。**置き場所・領域の中心・まとまりの中心は従来どおり幅と高さに比例する** —— 縦横比は痕がどこに座るかを決め、痕と並びがどんな形かは決めない。道筋が自分の線に沿って進む量（`margin` と `span`）は形ではないので短辺基準にしない。`arrangement.margin` はその軸の長さの一定割合のままで、`scatter` / `horizontal` / `vertical` が枠いっぱいに広がることは layout の意味である
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`はread compatibilityであり、semantic authorityではない。System plugin status / enable toggleのretirementとruntime cutoverは後続Stepの責務で、本節は実装済みと偽装しない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
 
-`canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`byobu`、`vertical` とする。
+### 4.5 MacroDefinitionによる展開モデル
 
-実装方法と将来のプラグイン作成手順は `PLUGIN.md` に記録する。
+語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`Nature.雨`のような`namespace.heading`とし、definition version / digestとdocument / compiler identityはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
 
-### 4.5 プラグインの展開モデル
+全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、typed parameterをbindingした後、explicit composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionする。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。MacroDefinition本文や大量の展開結果をStage 1 / Stage 2 promptへ渡さない。
 
-プラグインは「コア語彙の組み合わせに名前を付けたもの」として定義される。
+この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
-例:
-```
-Nature.雨  →  短い線を上から下に多数散らす
-           = 「細い、縦の短い線を、上半分の領域に、散らす」
-             （コア語彙: 細線、縦、短、上半分、散らす）
-```
+### 4.6 Generic MacroDefinition v1
 
-プラグインは展開可能である。つまり、プラグインを使った記述は、コアだけで書いた記述に機械的に変換できる。これにより：
+`inku.macro-definition.v1`はclosed typed parameterと共通operator `component` / `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / `transform` / deterministic `vary`を持つ。任意code、無制限loop / recursion、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、caller-supplied seedと明示boundsから決定的なsemantic nodeとtyped provenanceを返す。
 
-- レンダラーはコアだけを知っていればいい
-- プラグインのバグがレンダリングを壊さない
-- 他言語への移植時、コアだけ移植すれば動く
-- プラグイン同士が衝突しない
+旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
-### 4.6 宣言的プラグイン文書フォーマット（v1.90.0 / Build 589）
-
-語彙プラグインはコードではなく、UTF-8の宣言的文書（1プラグイン=1個の `.inku-plugin.md`）としてロードする。文書はfront matterのmanifestと語エントリからなり、manifestには `namespace` / `name` / semantic version / `authors` / `languages` / `license` / 日英descriptionを必須とする。語エントリは名前空間付き見出し語、日英surface、自然文発火語 `fires_on`、任意の日英note、**任意の `preview`（歳時記プレビューの絵・v2.14）**、日英の展開テンプレートを持つ。任意コードとURLは許さない。**外部ファイル参照も許さず、唯一の例外が `preview` である** — 文書自身のディレクトリの中のPNGを1枚だけ指せる（条件は下の語ブロックの項）。
-
-展開層は **Stage 1出力 → プラグイン展開 → コアDDL → Stage 1.5 → Stage 2** の位置に置く。テンプレートは通常のコアDDLに加え、次の限定構文だけを使える。
-
-展開後に数値regionが明示されたコアDDLは、すでに構図判断済みの命令としてStage 1.5の正規化だけを通す。Stage 1.5は別の完成品レシピや補助図形を追加してはならず、Stage 2も明示region数を超える補助instructionを残してはならない。この境界は、対memberの決定的転写（Build 600）により領域文がテキストへ残らない場合にも適用される — プラグイン展開が転写instructionを返した入力ではStage 1.5の追加を同様に抑止する（Build 605）。この上限はScoreのinstruction数に対するものであり、各instruction内の`arrangement.count`までは固定しない。そのためモデルによって可視要素数に差が残り、最小双弧fixtureではMistralが二本に収まる一方、Qwenが二つのinstructionを反復して二本を超える弧を描く場合がある。Build 590ではこのモデル差を既知制約として受け入れる。
-
-- `N〜M枚（個／本／箇所）` および en の `marks／items／lines／leaf forms／forms／blades／cloudforms／spots／arcs`（Build 591で複数語単位を追加）: 入力hashから個数を決定し、memberごとに別regionと回転を割り当てる。単数形は単位を保存する（一枚／一本／一個、one leaf form 等）。
-- `member 名前: 定義`（Build 591）: プラグイン内ローカルの複合形。参照行の各memberへ定義をインライン展開する。名前は当該プラグイン内でのみ有効で、未定義参照はロード時に拒否する。
-- `注: …` / `note: …`（Build 591）: コメント行。展開にも閉包検査にも関与せず、読み手と歳時記傍注のために保存する。
-- `preview: …`（v2.14）: 歳時記プレビューの絵。**文書自身のディレクトリの中の `.png` を 1 枚だけ相対で指す。**展開にも閉包検査にも関与しない。**ディレクトリの外（相対・絶対とも）・非 PNG・512 KB 超・不在は拒む。拒んでも文書は落とさず、絵の無い語は組み込みと同じ落とし先へ落ちる**（絵は装飾であって、語が正しく展開できることとは別である）。**HiDPI の相方は宣言でなく名前で探す**（`名前@2x.png`。無ければ「2x が無い」と「絵が無い」を区別して返す）。絵は歳時記の payload に載せず `GET /api/saijiki/plugin-preview` が配り、`<img>` で表示する — **したがって文書は画面にマークアップを置けない。**
-- `anchor 名前`: 領域を確定し、後続memberをanchorの帯へ決定的に配置する。コアrelationの直前参照へは翻訳しない。`anchor … を N〜M箇所 置く`（Build 591）は、箇所反復×各anchorからのmember反復の入れ子（深さ2まで）とし、各箇所は個別の帯regionを持つ。
-- `{領域: 中域}` 等: コアの正規化regionへ翻訳する。登録キーの正規リストはreference §3が公開し（実装が正）、`下端の帯`（Build 591で追加）を含む。「左上から右下への斜めの帯」（Build 591）は矩形ではなく展開層計算（下降対角線に沿うmember小region列）とする。
-
-ロード時のvalidatorは、manifest必須項目、予約namespaceと語の衝突、展開結果のコア語彙閉包（別プラグイン語を含む再帰禁止）、1語48 instruction上限、反復memberの固定座標スタンプ、URL／ファイル参照を検査する。違反はwarning-onlyではなく文書全体を理由付きで拒否する。これは作品を均すgovernorではなく、実行前の構文検査である。実行時にも閉包と量を確認し、失敗した展開は修復せずdropし、通常のコア近似へ戻したことをwarningへ記録する。Build 591では、未知領域キーと未定義member参照をロード拒否理由へ加え、コメント行（注:／note:）を閉包検査の対象外とした。無言の中央fallbackは廃止し、runtimeで万一未知キーへ遭遇した場合は既定帯へ寄せてwarningを記録する。閉包マーカー表（図形・動詞・関係・歳時記修飾カテゴリ）は v1.92 の歳時記構造化により saijiki テーブルから導出される。語の現行値は reference §1・§3 を正とする。
-
-名前空間付き語は明示時に発火する。`fires_on` は自然文の指示対象として明示された場合だけStage 1が名前空間付き語へ解決でき、比喩・不明瞭な対象・未知対象へ広げない。同一位置で複数の `fires_on` 句がマッチした場合は最長一致のみを採用し（Build 591、部分文字列の誤発火の排除。例: 「枯草」入力で「草」による下草の誤発火を排除）、異なる位置の複数語は従来どおり複数発火する。Stage 1 promptへ注入するのはロード済みの表層語と発火語だけで、テンプレート本文は注入しない。Stage 1.5とcoerceはプラグイン語を生成できない。入力語→名前空間付き語の対応はprovenanceとしてAPI応答と履歴の派生メタデータへ記録するが、プラグイン本文はScore、DB正本、rh2へ保存しない。
-
-`server/plugins/` の追加・削除は署名監視で次回利用時に反映され、管理APIと `inku-cli plugin list / validate / reload` で状態、拒否理由、明示再読込を扱える。設定画面はロード状態と拒否理由を、歳時記は名前空間付き語とnote傍注をコア語と区別して表示する。プラグイン削除後も、保存済みのコアScoreとseedによるReplay SVGおよびrh2は不変でなければならない。
+旧system / user plugin directory、hot reload、plugin status API、preview等の運用詳細は現行必須仕様ではない。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は現行作成手順のauthorityではなく、その本文の整理は本SPEC補正とは別taskである。
 
 ### 4.7 Render Engine Pack との分離
 
@@ -953,8 +923,10 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 - 運動語彙はインラインの文、面・地の質感のみ「面:／地:」の固定句で分離
 - 日本語版と英語版でフォーマットの構造を共通化
 - **記述者の目に触れる前提で設計する**（解釈フィードバックUIで表示される）
-- 見える線・弧・輪郭線には、歳時記のてざわりを一つ明記する。入力が素材を明示した場合は保持し、未指定の場合は質感・文脈から選ぶ。塗りつぶされた面だけの図形には機械的に付けない
-- ビュランとドライポイントは入力がその技法を明示した場合だけ選ぶ。「黒い細線」「白い横線」のような、てざわりのない線・弧の文を正規化DDLへ残さない
+- Stage 1が記述から素材を解釈した場合は、その選択をvisible normalized DDLへ明記する。入力が明示した素材は保持する
+- 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
+- ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
+- `unspecified`を最終描画でdefault、typed hole、blocking diagnosticのどれへlowerするかはStep 10 gateで裁定する。本節の補正だけで作品生成を止めたり、Renderer fallbackを変えたりしない
 
 ### 12.5 モデル分割
 
@@ -1497,7 +1469,7 @@ Nature.風 の展開（概念）:
 
 展開はコア語彙への writing-down のみであり、プラグイン原則に従い、コアのメカニズムは変更しない。
 
-**実装の現状（v1.92 時点の注記）:** プラグイン展開の正規の場所は Stage 1 直後の宣言的プラグイン層である（§4.6）。ただし `Nature.風` / `Nature.うねり` / `Nature.無風` の 3 語だけは v1.70 参照実装として **Stage 1.5 内のハードコード展開**のまま残っている（`Nature.` 名前空間の明示時だけ機械的に展開、新 primitive・新 Score フィールドは追加しない）。この 3 語の宣言的プラグイン文書への移行は残件であり（移行までは web 歳時記への静的表示も凍結）、移行時に本節の記述を §4.6 へ統合する。§4.3 のプラグイン原則は緩めない。
+**Legacy compatibility:** v1.70の参照実装は `Nature.風` / `Nature.うねり` / `Nature.無風` をStage 1.5のhard-coded logicで展開したが、これは新規semantic canonではない。新規definitionとexpansionは§4.5〜§4.6の`inku.macro-definition.v1`境界へ従う。旧作品は保存Score / expanded artifactを優先し、旧hard-coded expanderを恒久fallbackにしない。§4.3のplugin原則は緩めない。
 
 ### 13.8 Renderer での揺らぎ生成
 
@@ -1993,25 +1965,27 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 ## 19. キャンバスモデル
 
-座標は `0.0` から `1.0` の正規化のままである。**キャンバス比を変えても DDL の座標は変わらない。** 比を変えると描画表示を消して新しい比のプレースホルダを出すが、**表示中の作品は系譜の文脈として保つ**。次に保存される作品はその子として `canvas_aspect_change` で記録される。
+Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`inku.canvas-format-registry.v1`から解決するhost optionである。同じDDLを異なるcanvasへ使え、DDL sourceの座標・語・canonical meaningは変わらない。Registryの形式と正の整数比は次の11組を正とする。
 
-組み込みの `canvas-aspect` プラグインが現在対応するもの:
+| ID | 比（width / height） |
+| --- | ---: |
+| `square` | `1 / 1` |
+| `golden` | `809 / 500` |
+| `a4` | `500 / 707` |
+| `b4` | `500 / 707` |
+| `pillar` | `1 / 5` |
+| `oban` | `2 / 3` |
+| `wide` | `47 / 20` |
+| `byobu` | `11 / 5` |
+| `vertical` | `9 / 16` |
+| `sd_monitor` | `4 / 3` |
+| `hd_monitor` | `16 / 9` |
 
-| 区分 | ID | 比 | 用途 |
-| --- | --- | --- | --- |
-| 基本 | `square` | 1:1 | 既定の整ったキャンバス |
-| 標準 | `golden` | 1.618:1 | 黄金比の矩形 |
-| 近代 | `a4` | 1:1.414 | 白銀比／印刷標準 |
-| 近代 | `b4` | 1:1.414 | 白銀比／印刷標準 |
-| 日本の古典 | `pillar` | 1:5 | 柱絵の判型 |
-| 浮世絵 | `oban` | 2:3 | 浮世絵の大判の比 |
-| シネマ | `wide` | 2.35:1 | 映画的なパノラマ |
-| 日本の古典 | `byobu` | 2.2:1 | 六曲一双の片方に基づく屏風の判型 |
-| モバイル | `vertical` | 9:16 | スマートフォンの縦位置 |
+選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostがresolved selectionをScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を決める。Stage 2が現行互換経路でcanvasを受け取る場合も、これはhost-resolved composition contextであってvisible DDL metadataではない。
 
-選ばれた比はプラグインストレージへユーザーごとに保存し、`/api/paint`・`/api/compose`・履歴保存へ渡す。**v2.13.14 から、この比は Stage 2 のプロンプトにも入る** —— 構図はどの紙のために組むのかを知って組み、合わせてよいのは大きさと配置であって個数ではない。**記述が大きさを述べていたら紙の都合で覆さない。****Stage 2 が宣言した比は `Score.canvas` に残り、実際に演奏した比は `render_canvas_aspect*` が持つ**（両者は食い違いうる）。履歴と JSON 表示はその両方を示す。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`はread compatibilityとして残る。System plugin status / enable toggleのretirementとruntime cutoverは後続Stepが所有し、本節は完了済みと主張しない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
 
-renderer は選ばれた比から SVG の `width`・`height`・`viewBox` を決める。**円と弧の半径は短い辺に基づく** — 意図しない引き伸ばしを避けるためである。
+座標は`0.0`から`1.0`の正規化のままである。痕の寸法（`size`）、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは短辺基準で画素へ直し、記述した形をcanvas比で歪めない。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。
 
 ### 数値の解像度（マスターグリッド）
 

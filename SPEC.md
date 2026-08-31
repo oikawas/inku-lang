@@ -132,9 +132,9 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
-| continuity | つらなり | solid (default), dashed, dotted, dash-dot |
-| surfaces | おもて | empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
+| continuity | つらなり | solid, dashed, dotted, dash-dot |
+| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
@@ -142,13 +142,13 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| colors | いろ | white, black (default), blue, red, green, gray, yellow, orange, purple |
+| colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-The canvas proportion is not vocabulary: it is handled by the canvas-aspect
-plugin (§4.4), with the nine kinds square / golden / a4 / b4 / pillar / oban /
-wide / byobu / vertical.
+Pen, solid, empty, and black are historical baselines for comparison with legacy Score / coerce behavior, not defaults adopted by the typed DDL compiler. When visible DDL omits the corresponding field, the typed meaning is `unspecified`; the parser and semantic association do not insert those four values. Concrete defaults, type applicability, typed-hole blocking, and Score lowering remain undecided until the PLAN Step 10 candidate / visual-author gate. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+
+Canvas format is neither vocabulary nor a plugin. It is a resolved host option owned by the shared-core `inku.canvas-format-registry.v1`. Its eleven formats are `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor`, and it is not written into visible DDL or macro definitions (§19).
 
 **Properties of the core:**
 
@@ -293,6 +293,8 @@ specific vocabulary is offered in a form that can be added as an extension.
 
 ## 4. Plugin Model
 
+In this section, a plugin means a data-only **vocabulary macro** invoked explicitly from a visible qualified term such as `Nature.雨`. It is not an external code hook. Canvas is a shared-core host option and a Render Engine Pack replaces the drawing core; neither is a plugin in this sense.
+
 ### 4.1 Why the Plugin Model Is Designed From the Start
 
 DDL designs the plugin mechanism **from the beginning rather than adding it
@@ -346,56 +348,30 @@ Plugin A may not depend on plugin B.  With no chain of dependencies, installing
 and removing are independent acts.
 
 **Principle 5: the core alone can write it.**
-Every plugin expands into a description written in core vocabulary.  A plugin is
-shorthand, not a new capability.
+Every plugin expands into semantic nodes composed only of core meaning. A plugin
+is shorthand, not a new capability.
 
-### 4.4 Implementation Hooks
+### 4.4 Ownership of Canvas and Vocabulary Macros
 
-The reference implementation's plugin hooks began with the `canvas-aspect`
-plugin (v1.29), whose only hook was the **canvas-size hook**; the current shape
-of vocabulary plugins is the declarative document format of §4.6 (v1.90.0).
-Per-user plugin settings are stored as JSON in plugin extension storage.  System plugins and user plugins live in separate
-directories, one directory per plugin: `server/src/inku_server/plugins/system/canvas_aspect/`
-on the server and `web/src/lib/plugins/system/canvas-aspect/` on the web side.
-The web UI's plugin button (Canvas) sits in the writing tab's action row,
-currently ordered color catalog, model selection, canvas, new (Build 563, §8.4).
-The aspects it offers, the coordinate rules, and what changing an aspect does to
-the displayed work are in "Canvas Model" below.  How to write a plugin is
-recorded in `PLUGIN.md`.
+The canonical owner of Canvas is the shared-core `inku.canvas-format-registry.v1`, not a vocabulary plugin or a system plugin. Canvas selection is a resolved host option outside visible DDL and MacroInvocation / MacroDefinition. The same DDL can be used on different canvases. A host boundary with no selection may choose `square` as its host default, but that does not mean the DDL compiler inserts `square` as a semantic fact. The host carries the selection through Score / render context / history, and the Renderer resolves SVG `width`, `height`, and `viewBox` (§19).
 
-### 4.5 The Expansion Model
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, and stored `Score.canvas` / `render_canvas_aspect*` are read compatibility, not semantic authority. Retirement of system-plugin status / enable toggles and the runtime cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
 
-A plugin is defined as a name given to a combination of core words.
+### 4.5 Expansion Through MacroDefinition
 
-```text
-Nature.雨  ->  many short lines scattered from top to bottom
-           =  "thin, vertical, short lines, in the upper half, scattered"
-              (core words: thin line, vertical, short, upper half, scatter)
-```
+A vocabulary plugin is a data-only macro that gives a name to a combination of core vocabulary. A visible invocation uses `namespace.heading`, as in `Nature.雨`; definition version / digest and document / compiler identity are stored in a sidecar lock rather than authored as DDL metadata.
 
-A plugin is expandable: any description that uses one converts mechanically into
-a description written with the core alone.  Because of that,
+Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds typed parameters, then performs late expansion without an LLM into semantic nodes from an explicit composition seed and caller-owned finite bounds. The Renderer does not understand plugins; it receives only the later ordinary Score. MacroDefinition bodies and large expansion results are not sent to Stage 1 or Stage 2 prompts.
 
-- the renderer only has to know the core
-- a bug in a plugin cannot break rendering
-- porting to another language only requires porting the core
-- plugins cannot collide with each other
+At this boundary the Renderer needs to know only core meaning, while a plugin cannot add primitives or syntax or rewrite core semantics. Plugins cannot depend on other plugins, so installation and removal remain independent.
 
-### 4.6 Declarative Plugin Documents (v1.90.0 / Build 589)
+### 4.6 Generic MacroDefinition v1
 
-Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.inku-plugin.md` file contains a front-matter manifest and word entries. The manifest requires `namespace`, `name`, semantic `version`, `authors`, `languages`, `license`, and Japanese/English descriptions. Each entry provides namespaced identity, Japanese/English surfaces and `fires_on` nouns, optional bilingual Saijiki notes, an optional `preview` picture for the Saijiki panel (v2.14), and equivalent bilingual expansion templates. Arbitrary code and URLs are forbidden, and so are file references with a single exception: `preview` may name one PNG inside the document's own directory (conditions in the entry-syntax list below).
+`inku.macro-definition.v1` has closed typed parameters and the shared operators `component`, `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, `transform`, and deterministic `vary`. It forbids arbitrary code, unbounded loops / recursion, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with typed provenance from caller-supplied seeds and explicit bounds.
 
-The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus bounded expansion forms: deterministic `N to M` repetition (with unit-preserving singulars, and Build 591 multi-word English units such as `leaf forms`, `blades`, `cloudforms`, `spots`, `arcs`); a `member name: definition` local composite inlined at each member (Build 591; undefined references are rejected at load); `note:` comment lines that carry no expansion (Build 591); a `preview:` line naming **one `.png` inside the document's own directory** (v2.14), which takes no part in expansion or the closure check — a path that leaves the directory (relative or absolute), a name that is not `.png`, a file over 512 KB, and a missing file are all refused, and **a refusal does not stop the document loading**, it leaves the word with the same shared picture a built-in word without one of its own gets; the HiDPI sibling is **found by name rather than declared** (`name@2x.png`), so "no HiDPI" stays distinguishable from "no picture"; the picture is served by `GET /api/saijiki/plugin-preview` instead of riding in the Saijiki payload and is shown in an `<img>`, so **a document cannot put markup on screen**; an `anchor` whose region determines separate member bands, including a Build 591 `anchor ... at N to M spots` nested repetition (spots x per-anchor members, depth two, each spot its own band); and symbolic `{region: ...}` translation, whose canonical key list is published by reference §3 and includes a `bottom band`, with an `upper-left to lower-right diagonal band` resolved as a computation (member sub-regions along a descending diagonal) rather than a rectangle. The same input chooses the same count, member regions, and rotations.
+The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
-Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This boundary also applies where the deterministic per-member transcription (Build 600) leaves no region sentence in the text: for input whose plugin expansion returned transcribed instructions, Stage 1.5's additions are suppressed the same way (Build 605). This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
-
-The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not a governor of the work itself. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). Since v1.92 the closure marker table (shapes, verbs, relations, and the Saijiki modifier categories) is derived from the saijiki table; reference §1 and §3 always show the current values.
-
-An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun only when it is the stated subject; it must not extend firing to metaphors, unclear subjects, or unknown objects. When several `fires_on` phrases match at the same position, only the longest wins (Build 591, removing substring mis-fires — e.g. the input "枯草" no longer also fires the "草" undergrowth word); phrases at different positions still fire independently. Only the loaded surface/trigger vocabulary is injected into Stage 1, never template bodies. Stage 1.5 and coerce cannot introduce plugin words. Input-term-to-qualified-term provenance is returned by the API and stored in ordinary derivation metadata, while plugin documents and dependencies remain absent from Score, canonical DB work data, and rh2.
-
-`server/plugins/` is signature-checked so add/delete changes appear without a restart; management APIs and `inku-cli plugin list / validate / reload` expose status, rejection reasons, validation, and forced reload. Settings shows loaded/rejected documents, while Saijiki distinguishes qualified plugin words and bilingual notes. Removing a plugin must not change replay SVG or rh2 for a saved work because replay uses the already saved core Score and seeds.
-
-The built-in `canvas-aspect` system plugin remains separate and uses its existing hook and per-user plugin storage. Vocabulary plugin documents do not gain that code-level hook.
+Old system / user plugin directories, hot reload, plugin-status APIs, and preview operations are not current mandatory specification. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is not the authority for the current authoring format; cleaning up that file is separate from this SPEC correction.
 
 ### 4.7 Separation From the Render Engine Pack
 
@@ -1410,14 +1386,10 @@ normalized DDL (example, in the form the corpus uses):
   English version
 - **is designed on the assumption that the author will see it** (it is shown
   in the interpretation-feedback UI)
-- names exactly one Saijiki touch on every visible line, arc or outline.  An
-  explicitly stated material is preserved; where none is stated, the touch is
-  chosen from texture and context.  A shape that is only a filled area is not
-  assigned a touch mechanically
-- selects burin and drypoint only where the input names that technique.  DDL
-  must not be left carrying touchless phrases such as "thin black line" or
-  "white horizontal line."  Dynamic few-shot selection always includes at
-  least one non-pen material example
+- when Stage 1 interprets a material from the description, writes that choice explicitly into visible normalized DDL; a material the input states explicitly is preserved
+- when an author writes direct DDL or edits generated DDL, permits touch to be omitted and retains the typed meaning as `unspecified`; it does not infer or insert a hidden touch from texture / context, primitive type, word order, or the current Score default
+- treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
+- leaves the choice of lowering `unspecified` to a default, typed hole, or blocking diagnostic to the Step 10 gate; this correction alone neither stops work generation nor changes Renderer fallbacks
 
 ### 12.5 Splitting the Model by Stage
 
@@ -2256,15 +2228,12 @@ Nature.風, conceptually, expands to:
 Expansion is only a writing-down into core vocabulary. Following the plugin
 principles, it does not change any core mechanism.
 
-**State of the implementation (a v1.92 note):** the proper place for plugin
-expansion is the declarative plugin layer immediately after Stage 1 (§4.6). Only
-the three words `Nature.風` / `Nature.うねり` / `Nature.無風` remain as a v1.70
-reference implementation, **expanded by hard-coded logic inside Stage 1.5** (they
-expand mechanically only when the `Nature.` namespace is explicit, and add no new
-primitive and no new Score field). Moving these three into declarative plugin
-documents is outstanding work — until it happens, their static display in the web
-Saijiki stays frozen — and when it happens this section folds into §4.6. The
-plugin principles in §4.3 are not relaxed for them.
+**Legacy compatibility:** the v1.70 reference implementation expanded
+`Nature.風` / `Nature.うねり` / `Nature.無風` through hard-coded Stage 1.5 logic,
+but that is not the semantic canon for new work. New definitions and expansion
+follow the `inku.macro-definition.v1` boundary in §4.5–§4.6. Old works prefer
+their stored Score / expanded artifact; the old hard-coded expander is not a
+permanent fallback. The plugin principles in §4.3 are not relaxed for them.
 
 ### 13.8 Sway Is Generated in the Renderer
 
@@ -3113,47 +3082,27 @@ files, PNG files, and other artifacts are derived outputs.
 
 ## 19. Canvas Model
 
-Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
-change DDL coordinates. **A mark's extents (`size`) become pixels through the short edge on both axes, so the shape the description
-stated is kept on any aspect** (the same rule the circle and arc radius already used; widened to every form
-with a `size` in v2.13.6 / render engine 30). **The layer that arranges marks follows the same rule** -- a `radial` ring's radius and an `at.region`'s extent
-become pixels through the short edge, so the arrangement the description stated is kept on any aspect
-(v2.13.8 / render engine 31). A cluster's band and a path's cross-axis spread follow it too
-(v2.13.13 / render engine 32; **the band is rotated first and put on the short side second** -- scaling the axes
-before the rotation would turn the rotation into a shear). **Placement, a region's centre, and a cluster's centre
-still scale with width and height** -- the aspect
-decides where a mark sits, not what shape it or its arrangement is. How far a path travels along its own line
-(`margin` and `span`) is not a shape and is not put on the short edge; `arrangement.margin` remains a fraction of
-each axis: spreading to the frame is what `scatter`, `horizontal` and `vertical` mean. Changing the aspect clears the rendered display and shows
-a placeholder for the new aspect, but retains the displayed work as lineage context.
-The next saved work is recorded as its child with `canvas_aspect_change`.
+Canvas selection is not visible-DDL or macro meaning. It is a host option resolved from the shared-core `inku.canvas-format-registry.v1`. The same DDL can be used on different canvases, and its coordinates, words, and canonical meaning do not change. The registry's canonical eleven formats and positive integer width / height ratios are:
 
-The built-in `canvas-aspect` plugin currently supports:
+| ID | Ratio (width / height) |
+| --- | ---: |
+| `square` | `1 / 1` |
+| `golden` | `809 / 500` |
+| `a4` | `500 / 707` |
+| `b4` | `500 / 707` |
+| `pillar` | `1 / 5` |
+| `oban` | `2 / 3` |
+| `wide` | `47 / 20` |
+| `byobu` | `11 / 5` |
+| `vertical` | `9 / 16` |
+| `sd_monitor` | `4 / 3` |
+| `hd_monitor` | `16 / 9` |
 
-| Category | ID | Ratio | Purpose |
-| --- | --- | --- | --- |
-| Basic | `square` | 1:1 | default ordered canvas |
-| Standard | `golden` | 1.618:1 | golden-ratio rectangle |
-| Modern | `a4` | 1:1.414 | root rectangle / print standard |
-| Modern | `b4` | 1:1.414 | root rectangle / print standard |
-| Classic JP | `pillar` | 1:5 | Japanese pillar-picture format |
-| Ukiyoe | `oban` | 2:3 | ukiyo-e oban proportion |
-| Cinema | `wide` | 2.35:1 | cinematic panorama |
-| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
-| Mobile | `vertical` | 9:16 | smartphone vertical format |
+A host boundary with no selection may choose `square` as its host default, but the DDL compiler does not insert `square` as a semantic fact. The host carries the resolved selection through Score / render context / history, and the Renderer chooses SVG `width`, `height`, and `viewBox`. If Stage 2 receives canvas through the current compatibility path, that value is host-resolved composition context rather than visible-DDL metadata.
 
-The selected aspect is stored per user in plugin storage and passed to
-`/api/paint`, `/api/compose`, and history saving.  **From v2.13.14 it also
-enters the Stage 2 prompt**: the composition is told which paper it composes
-for, and what it may fit to the paper is size and placement, never the number of
-marks.  **A size the description states is not overruled by the paper.**  **What
-Stage 2 declares stays in `Score.canvas`; the aspect actually performed on rides
-in `render_canvas_aspect*`**, and the two may disagree.  History and JSON display
-show both.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, and stored `Score.canvas` / `render_canvas_aspect*` remain as read compatibility. Retirement of system-plugin status / enable toggles and the runtime cutover belong to a later Step; this section does not claim they are complete. In the current UI, changing the aspect clears the rendered display for a placeholder but retains the displayed work as lineage context, and the next saved work may be recorded as its child with `canvas_aspect_change`.
 
-The renderer uses the selected aspect to determine SVG `width`, `height`, and
-`viewBox`.  Circle and arc radii are based on the shorter side to avoid
-accidental stretching.
+Coordinates stay normalized from `0.0` to `1.0`. Mark extent (`size`), circle and arc radii, `radial` rings, `at.region` extent, cluster bands, and a path's cross-axis spread become pixels through the short edge so the canvas ratio does not distort the described shape. Placement, region centers, and cluster centers scale with width and height; path travel (`margin` / `span`) and `arrangement.margin` remain fractions of their axes.
 
 ### The Resolution of a Number (the Master Grid)
 

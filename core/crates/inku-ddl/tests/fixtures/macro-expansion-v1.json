@@ -1,0 +1,106 @@
+{
+  "schema": "inku.macro-expansion-v1-fixture.v1",
+  "version": 1,
+  "definitions": {
+    "all": {
+      "schema": "inku.macro-definition.v1",
+      "namespace": "studio",
+      "heading": "枝組.共通",
+      "version": "1.2.3",
+      "parameters": {"density": {"type": "integer"}},
+      "components": {
+        "mark": {
+          "parameters": {"offset": {"type": "number"}},
+          "body": [
+            {"op": "emit", "binding": "mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"}, "surface": {"expr": "semantic_ref", "category": "surface", "id": "solid"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
+            {"op": "anchor", "name": "mark_anchor"}
+          ]
+        }
+      },
+      "body": [
+        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.25}}},
+        {"op": "use", "component": "mark", "arguments": {"offset": {"expr": "number", "value": 0.75}}},
+        {"op": "group", "body": [
+          {"op": "anchor", "name": "root_anchor"},
+          {"op": "emit", "binding": "root_mark", "fields": {"shape": {"expr": "semantic_ref", "category": "shape", "id": "line"}, "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}}},
+          {"op": "relation", "kind": "touching", "from": "root_anchor", "to": "root_mark"}
+        ]},
+        {"op": "repeat", "count": {"expr": "parameter", "name": "density"}, "maximum": 3, "index": "ordinal", "body": [
+          {"op": "transform", "transform": {"translate_x": {"expr": "local", "name": "ordinal"}, "translate_y": {"expr": "number", "value": 0.0}, "scale_x": null, "scale_y": null, "rotate_degrees": null}, "body": [
+            {"op": "vary", "binding": "tone", "domain": "tone_choice", "choices": [{"expr": "semantic_ref", "category": "color", "id": "black"}, {"expr": "semantic_ref", "category": "color", "id": "gray"}], "range": null, "body": [
+              {"op": "emit", "binding": null, "fields": {"color": {"expr": "local", "name": "tone"}}}
+            ]}
+          ]}
+        ]}
+      ]
+    },
+    "empty": {"schema": "inku.macro-definition.v1", "namespace": "Expand", "heading": "Empty", "version": "1.0.0", "parameters": {}, "components": {}, "body": []},
+    "typed": {
+      "schema": "inku.macro-definition.v1",
+      "namespace": "Expand",
+      "heading": "Typed",
+      "version": "1.0.0",
+      "parameters": {},
+      "components": {
+        "typed": {
+          "parameters": {"enabled": {"type": "boolean"}, "n": {"type": "number"}, "values": {"type": "list", "length": 2, "items": {"type": "number"}}},
+          "body": [
+            {"op": "transform", "transform": {"translate_x": {"expr": "parameter", "name": "n"}, "translate_y": null, "scale_x": null, "scale_y": null, "rotate_degrees": null}, "body": [
+              {"op": "vary", "binding": "choice", "domain": "range_choice", "choices": null, "range": {"start": 1.0, "end": 2.0, "step": 0.5}, "body": [
+                {"op": "anchor", "name": "point"}
+              ]}
+            ]}
+          ]
+        }
+      },
+      "body": [
+        {"op": "use", "component": "typed", "arguments": {"enabled": {"expr": "boolean", "value": true}, "n": {"expr": "integer", "value": 1}, "values": {"expr": "list", "items": [{"expr": "integer", "value": 2}, {"expr": "number", "value": 2.5}]}}}
+      ]
+    },
+    "component-mismatch": {
+      "schema": "inku.macro-definition.v1",
+      "namespace": "Expand",
+      "heading": "Mismatch",
+      "version": "1.0.0",
+      "parameters": {},
+      "components": {"typed": {"parameters": {"values": {"type": "list", "length": 2, "items": {"type": "integer"}}}, "body": []}},
+      "body": [{"op": "use", "component": "typed", "arguments": {"values": {"expr": "list", "items": [{"expr": "number", "value": 1.5}, {"expr": "number", "value": 2.5}]}}}]
+    }
+  },
+  "valid_cases": [
+    {"id": "empty-body", "definition": "empty", "source": "Expand.Empty", "language": "en", "composition_seed": 0, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["c67b204469deb190c10a0d5112a532d6a9692d0b6baf957fdb58312ca2ae0665"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []},
+    {"id": "all-operators-parameter-component-group-relation-repeat-transform-vary", "definition": "all", "source": "studio.枝組.共通 2", "language": "en", "composition_seed": 7, "expected_definition_digest": "d81d6e92d196561231b9e5528f20e750bc79eda4b354158728d73a308ddd12cf", "expected_seed_digests": ["5499bd5106f3049ba9e60609a634410768e611e490dec7c2174733430cc2306b"], "expected_node_kinds": ["emit", "anchor", "emit", "anchor", "group", "anchor", "emit", "relation", "transform", "emit", "transform", "emit"], "expected_node_count": 12, "expected_nodes": [
+      "0|emit|R0/C0:mark|binding=0:R0/C0:mark:mark;fields=shape=ref(shape,circle),surface=ref(surface,solid),touch=ref(touch,crayon);children=0",
+      "1|anchor|R0/C1:mark|target=0:R0/C1:mark:mark_anchor;children=0",
+      "2|emit|R1/C0:mark|binding=0:R1/C0:mark:mark;fields=shape=ref(shape,circle),surface=ref(surface,solid),touch=ref(touch,crayon);children=0",
+      "3|anchor|R1/C1:mark|target=0:R1/C1:mark:mark_anchor;children=0",
+      "4|group|R2|children=3",
+      "5|anchor|R2/G0|target=0:R2/G0:root_anchor;children=0",
+      "6|emit|R2/G1|binding=0:R2/G1:root_mark;fields=shape=ref(shape,line),touch=ref(touch,crayon);children=0",
+      "7|relation|R2/G2|kind=touching;from=0:R2/G0:root_anchor;to=0:R2/G1:root_mark;children=0",
+      "8|transform|R3/P0:0|tx=0;ty=0;sx=-;sy=-;rotate=-;children=1",
+      "9|emit|R3/P0:0/T0/V0:1|binding=-;fields=color=ref(color,gray);children=0",
+      "10|transform|R3/P0:1|tx=1;ty=0;sx=-;sy=-;rotate=-;children=1",
+      "11|emit|R3/P0:1/T0/V0:0|binding=-;fields=color=ref(color,black);children=0"
+    ]},
+    {"id": "recursive-list-boolean-integer-to-number-and-range", "definition": "typed", "source": "Expand.Typed", "language": "en", "composition_seed": 11, "expected_definition_digest": "46e2584421008c6fb3cbc57cab3444c5887266234f8585b1d6be5bb5d370ebc6", "expected_seed_digests": ["6eb1daec41d64ca6c895b5b2abe366612267a91d397e06b025e45ef905337357"], "expected_node_kinds": ["transform", "anchor"], "expected_node_count": 2, "expected_nodes": [
+      "0|transform|R0/C0:typed|tx=1;ty=-;sx=-;sy=-;rotate=-;children=1",
+      "1|anchor|R0/C0:typed/T0/V0:0|target=0:R0/C0:typed/T0/V0:0:point;children=0"
+    ]},
+    {"id": "two-invocations-distinct-seeds", "definition": "empty", "source": "Expand.Empty。Expand.Empty", "language": "ja", "composition_seed": 13, "expected_definition_digest": "d4a4816d6a9ebc26bf1174ac4830961a37019603610169aab636515872554192", "expected_seed_digests": ["17feffb07acb0bba810132b4ef8e9cb8332bbe15da860b23c226ccd08528348d", "05e62f42b5e7b62476f1b220b96d6af82c51f2c2c0512b289c5b43ade9934c4b"], "expected_node_kinds": [], "expected_node_count": 0, "expected_nodes": []}
+  ],
+  "known_answers": {
+    "all_seed_digest": "5499bd5106f3049ba9e60609a634410768e611e490dec7c2174733430cc2306b",
+    "repeat_zero_hash": "1e17151051c18e2d6804c86284e34b911bc5206a2ba8ab35af2759a8a6611076",
+    "repeat_zero_selected": 1,
+    "repeat_one_hash": "b0540bb576c408f88c7b67771e26154f5fae5f9b3a8aff7861c4b578c91fb0da",
+    "repeat_one_selected": 0,
+    "different_domain_hash": "c5a57e6d962950953e225b039bc07117ceb5a4c2b695480ea00e89ffc15afe86",
+    "different_composition_hash": "2bfd50342d045f69df4db93b020a29f79d46112ee7324fedbda916f17ec66686",
+    "typed_range_hash": "b3cfc2b17eac4fa56ef837d7d3b12f30697fab77d31e0a17144b60bf796e5760",
+    "typed_range_selected": 0
+  },
+  "diagnostic_case_ids": [
+    "invalid-limits", "invocation-budget", "total-node-budget", "depth-budget", "step-budget", "per-invocation-node-budget", "missing-seed", "duplicate-seed", "mismatched-seed", "definition-mismatch", "binding-ownership", "repeat-maximum", "recursive-list-type-mismatch", "target-corruption-defensive-identity", "i581-diagnostic-unchanged"
+  ]
+}

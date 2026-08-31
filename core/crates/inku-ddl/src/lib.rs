@@ -8,6 +8,7 @@ pub mod composition;
 pub mod document;
 pub mod language;
 pub mod macro_definition;
+pub mod macro_expansion;
 pub mod macro_parameter_binding;
 pub mod macro_resolution;
 pub mod macro_seed;
@@ -54,6 +55,13 @@ pub use macro_definition::{
     MacroDefinitionValidation, MacroSemanticRefProjection, NumericRange, ParameterSchema,
     SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
     validate_macro_definition_semantic_version,
+};
+pub use macro_expansion::{
+    ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue, ExpandedTransform,
+    ExpansionPathSegment, GeneratedNodeProvenance, GeneratedTargetId, MACRO_EXPANSION_SCHEMA_ID,
+    MACRO_VARY_CHOICE_SCHEME_ID, MacroExpansionDiagnostic, MacroExpansionDiagnosticKind,
+    MacroExpansionLimits, MacroExpansionResult, MacroInvocationProvenance, expand_macros,
+    macro_vary_choice_hash_input, typed_expansion_path_bytes,
 };
 pub use macro_parameter_binding::{
     BoundMacroParameterValue, CompleteMacroParameterBinding, MACRO_PARAMETER_BINDING_SCHEMA_ID,

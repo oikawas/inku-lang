@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use crate::{
     CanonicalRelationForm, CanonicalRelationIdentity, NormalizedDdlDocument,
     ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
-    saijiki::{canonical_relation_identity, parser_candidate_surface},
+    saijiki::{canonical_relation_identity, parser_candidate_surfaces},
     saijiki_asset,
 };
 
@@ -140,6 +140,16 @@ const PRIORITY_FUNCTION: u8 = 1;
 const PRIORITY_NUMBER: u8 = 2;
 const PRIORITY_ASSET: u8 = 3;
 const PRIORITY_CORE_MODIFIER: u8 = 3;
+
+pub(crate) fn is_reserved_english_non_asset_surface(surface: &str) -> bool {
+    ["thin", "small"]
+        .iter()
+        .chain(FUNCTION_WORDS_EN)
+        .chain(QUALITATIVE_QUANTITIES_EN)
+        .any(|reserved| reserved.eq_ignore_ascii_case(surface))
+        || (!surface.is_empty() && surface.bytes().all(|byte| byte.is_ascii_digit()))
+        || english_cardinal_at(surface, 0).is_some_and(|(end_byte, _)| end_byte == surface.len())
+}
 
 /// Recognize source lexemes without rewriting source or completing their meaning.
 pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseResult {
@@ -412,24 +422,26 @@ fn candidates_at(
 
     for category in &asset.categories {
         for word in &category.words {
-            let Some(surface) = parser_candidate_surface(word, language) else {
+            for surface in parser_candidate_surfaces(word, language) {
+                push_surface_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    language,
+                    require_boundary,
+                    surface,
+                    PRIORITY_ASSET,
+                    format!("word:{}:{}", category.key, word.surface_ja),
+                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                        asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                        category_key: category.key.clone(),
+                        canonical_surface_ja: word.surface_ja.clone(),
+                    }),
+                );
+            }
+            let Some(surface) = parser_candidate_surfaces(word, language).next() else {
                 continue;
             };
-            push_surface_candidate(
-                &mut candidates,
-                source,
-                start_byte,
-                language,
-                require_boundary,
-                surface,
-                PRIORITY_ASSET,
-                format!("word:{}:{}", category.key, word.surface_ja),
-                CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
-                    asset_id: SAIJIKI_ASSET_ID.to_owned(),
-                    category_key: category.key.clone(),
-                    canonical_surface_ja: word.surface_ja.clone(),
-                }),
-            );
             if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
                 if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
                     push_japanese_derived_surface_candidate(

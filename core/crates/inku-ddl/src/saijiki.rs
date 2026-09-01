@@ -47,6 +47,8 @@ pub struct SaijikiCategoryAsset {
 pub struct SaijikiWordAsset {
     pub surface_ja: String,
     pub surface_en: Option<String>,
+    #[serde(default)]
+    pub parser_forms_en: Vec<String>,
     pub default: bool,
     pub prompt: bool,
     pub display: bool,
@@ -198,21 +200,27 @@ pub fn saijiki_asset_sha256_hex() -> &'static str {
         .as_str()
 }
 
-/// Return the requested-language parser surface only when this asset row is eligible.
+/// Return the requested-language parser surfaces only when this asset row is eligible.
 ///
 /// Candidate membership follows the accepted asset flags. A disabled tombstone remains in the
 /// immutable asset but is never promoted into a recognized typed delivery.
-pub(crate) fn parser_candidate_surface(
+pub(crate) fn parser_candidate_surfaces(
     word: &SaijikiWordAsset,
     language: ResolvedInstructionLanguage,
-) -> Option<&str> {
-    if !word.prompt && !word.display && word.marker != Some(true) {
-        return None;
-    }
-    match language {
-        ResolvedInstructionLanguage::Ja => Some(word.surface_ja.as_str()),
-        ResolvedInstructionLanguage::En => word.surface_en.as_deref(),
-    }
+) -> impl Iterator<Item = &str> {
+    let eligible = word.prompt || word.display || word.marker == Some(true);
+    let canonical = eligible
+        .then(|| match language {
+            ResolvedInstructionLanguage::Ja => Some(word.surface_ja.as_str()),
+            ResolvedInstructionLanguage::En => word.surface_en.as_deref(),
+        })
+        .flatten();
+    canonical.into_iter().chain(
+        word.parser_forms_en
+            .iter()
+            .map(String::as_str)
+            .filter(move |_| eligible && language == ResolvedInstructionLanguage::En),
+    )
 }
 
 pub(crate) fn canonical_semantic_id(
@@ -306,6 +314,101 @@ fn validate_semantic_aliases(asset: &SaijikiAsset) -> Result<(), SaijikiProjecti
     Ok(())
 }
 
+fn validate_parser_forms(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
+    let mut owners = HashMap::<String, (String, String, bool)>::new();
+    for category in &asset.categories {
+        for word in &category.words {
+            let eligible = word.prompt || word.display || word.marker == Some(true);
+            if !word.parser_forms_en.is_empty() && !eligible {
+                return Err(SaijikiProjectionError::IneligibleParserForm {
+                    category_key: category.key.clone(),
+                    surface_ja: word.surface_ja.clone(),
+                    form: word.parser_forms_en[0].clone(),
+                });
+            }
+            if !word.parser_forms_en.is_empty() && word.surface_en.is_none() {
+                return Err(SaijikiProjectionError::MissingLanguageSurface {
+                    category_key: category.key.clone(),
+                    surface_ja: word.surface_ja.clone(),
+                    language: ResolvedInstructionLanguage::En,
+                });
+            }
+            if let Some(surface) = &word.surface_en {
+                register_parser_surface(
+                    asset,
+                    &mut owners,
+                    &category.key,
+                    &word.surface_ja,
+                    surface,
+                    false,
+                )?;
+            }
+            for form in &word.parser_forms_en {
+                if form.is_empty() || form.trim() != form || !form.is_ascii() {
+                    return Err(SaijikiProjectionError::InvalidParserForm {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        form: form.clone(),
+                    });
+                }
+                register_parser_surface(
+                    asset,
+                    &mut owners,
+                    &category.key,
+                    &word.surface_ja,
+                    form,
+                    true,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn register_parser_surface(
+    asset: &SaijikiAsset,
+    owners: &mut HashMap<String, (String, String, bool)>,
+    category_key: &str,
+    surface_ja: &str,
+    surface: &str,
+    parser_form: bool,
+) -> Result<(), SaijikiProjectionError> {
+    if crate::parser::is_reserved_english_non_asset_surface(surface)
+        || asset.relations.iter().any(|relation| {
+            std::iter::once(relation.surface_en.as_str())
+                .chain(relation.literals_en.iter().map(String::as_str))
+                .any(|reserved| reserved.eq_ignore_ascii_case(surface))
+        })
+    {
+        return Err(SaijikiProjectionError::ReservedParserSurfaceCollision {
+            category_key: category_key.to_owned(),
+            surface_ja: surface_ja.to_owned(),
+            surface: surface.to_owned(),
+        });
+    }
+
+    let key = surface.to_ascii_lowercase();
+    if let Some((first_category_key, first_surface_ja, first_is_form)) = owners.get(&key) {
+        if parser_form && *first_is_form {
+            return Err(SaijikiProjectionError::DuplicateParserForm {
+                form: surface.to_owned(),
+            });
+        }
+        return Err(SaijikiProjectionError::ParserSurfaceCollision {
+            surface: surface.to_owned(),
+            first_category_key: first_category_key.clone(),
+            first_surface_ja: first_surface_ja.clone(),
+            second_category_key: category_key.to_owned(),
+            second_surface_ja: surface_ja.to_owned(),
+        });
+    }
+    owners.insert(
+        key,
+        (category_key.to_owned(), surface_ja.to_owned(), parser_form),
+    );
+    Ok(())
+}
+
 fn semantic_wire_id(word: &SaijikiWordAsset) -> Option<String> {
     word.score_value
         .clone()
@@ -335,6 +438,31 @@ pub enum SaijikiProjectionError {
         category_key: String,
         surface_ja: String,
         language: ResolvedInstructionLanguage,
+    },
+    InvalidParserForm {
+        category_key: String,
+        surface_ja: String,
+        form: String,
+    },
+    IneligibleParserForm {
+        category_key: String,
+        surface_ja: String,
+        form: String,
+    },
+    DuplicateParserForm {
+        form: String,
+    },
+    ParserSurfaceCollision {
+        surface: String,
+        first_category_key: String,
+        first_surface_ja: String,
+        second_category_key: String,
+        second_surface_ja: String,
+    },
+    ReservedParserSurfaceCollision {
+        category_key: String,
+        surface_ja: String,
+        surface: String,
     },
     MarkerOrderMismatch {
         scope: String,
@@ -391,6 +519,11 @@ impl SaijikiProjectionError {
             Self::MissingCategory { .. } => "missing_category",
             Self::MissingRelation { .. } => "missing_relation",
             Self::MissingLanguageSurface { .. } => "missing_language_surface",
+            Self::InvalidParserForm { .. } => "invalid_parser_form",
+            Self::IneligibleParserForm { .. } => "ineligible_parser_form",
+            Self::DuplicateParserForm { .. } => "duplicate_parser_form",
+            Self::ParserSurfaceCollision { .. } => "parser_surface_collision",
+            Self::ReservedParserSurfaceCollision { .. } => "reserved_parser_surface_collision",
             Self::MarkerOrderMismatch { .. } => "marker_order_mismatch",
             Self::InvalidMarkerOrderEntry { .. } => "invalid_marker_order_entry",
             Self::DuplicateMarkerMember { .. } => "duplicate_marker_member",
@@ -422,6 +555,43 @@ impl fmt::Display for SaijikiProjectionError {
                 formatter,
                 "Saijiki word has no {} surface: {category_key}/{surface_ja}",
                 language.as_str()
+            ),
+            Self::InvalidParserForm {
+                category_key,
+                surface_ja,
+                form,
+            } => write!(
+                formatter,
+                "Saijiki parser form is invalid: {category_key}/{surface_ja}: {form:?}"
+            ),
+            Self::IneligibleParserForm {
+                category_key,
+                surface_ja,
+                form,
+            } => write!(
+                formatter,
+                "Saijiki parser form belongs to an ineligible row: {category_key}/{surface_ja}: {form}"
+            ),
+            Self::DuplicateParserForm { form } => {
+                write!(formatter, "Saijiki parser form is duplicated: {form}")
+            }
+            Self::ParserSurfaceCollision {
+                surface,
+                first_category_key,
+                first_surface_ja,
+                second_category_key,
+                second_surface_ja,
+            } => write!(
+                formatter,
+                "Saijiki English parser surface is ambiguous: {surface} ({first_category_key}/{first_surface_ja}, {second_category_key}/{second_surface_ja})"
+            ),
+            Self::ReservedParserSurfaceCollision {
+                category_key,
+                surface_ja,
+                surface,
+            } => write!(
+                formatter,
+                "Saijiki English parser surface collides with a reserved grammar surface: {category_key}/{surface_ja}: {surface}"
             ),
             Self::MarkerOrderMismatch {
                 scope,
@@ -580,6 +750,7 @@ pub fn saijiki_derived_projection_from_asset(
     language: ResolvedInstructionLanguage,
 ) -> Result<SaijikiDerivedProjection, SaijikiProjectionError> {
     validate_semantic_aliases(asset)?;
+    validate_parser_forms(asset)?;
     let prompt_rows = prompt_rows(asset, language)?;
     let prompt_block = prompt_rows
         .iter()

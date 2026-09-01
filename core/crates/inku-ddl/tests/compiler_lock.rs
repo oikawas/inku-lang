@@ -644,6 +644,10 @@ fn spec_ja_and_en_clause_topology_reaches_one_compiler_meaning() {
         }
     }
     assert_eq!(
+        ja.semantic_document.as_ref().unwrap().ast,
+        en.semantic_document.as_ref().unwrap().ast
+    );
+    assert_eq!(
         ja.pre_expansion_canonical_bytes(),
         en.pre_expansion_canonical_bytes()
     );
@@ -673,6 +677,13 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         LIMITS,
     );
     let en = compile(
+        "Place one thin pencil line at the center. The line sways finely.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let legacy_en = compile(
         "place one thin pencil line at the center. the line swaying fine.",
         ResolvedInstructionLanguage::En,
         &[],
@@ -680,7 +691,7 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         LIMITS,
     );
 
-    for result in [&ja, &en] {
+    for result in [&ja, &en, &legacy_en] {
         assert_eq!(
             result.compiler_lock.as_ref().map(|lock| lock.state),
             Some(CompilerLockState::CanonicalReady)
@@ -727,6 +738,10 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         en.pre_expansion_canonical_bytes()
     );
     assert_eq!(
+        en.pre_expansion_canonical_bytes(),
+        legacy_en.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(
         ja.compiler_lock
             .as_ref()
             .unwrap()
@@ -736,6 +751,62 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
             .unwrap()
             .canonical_pre_expansion_digest
     );
+    assert_ne!(
+        ja.compiler_lock.as_ref().unwrap().visible_source_digest,
+        en.compiler_lock.as_ref().unwrap().visible_source_digest
+    );
+
+    for head in ["circle", "arc"] {
+        let canonical = compile(
+            &format!("{head}. the {head} sways finely."),
+            ResolvedInstructionLanguage::En,
+            &[],
+            None,
+            LIMITS,
+        );
+        let reordered = compile(
+            &format!("{head}. the {head} finely sways."),
+            ResolvedInstructionLanguage::En,
+            &[],
+            None,
+            LIMITS,
+        );
+        let legacy = compile(
+            &format!("{head}. the {head} swaying fine."),
+            ResolvedInstructionLanguage::En,
+            &[],
+            None,
+            LIMITS,
+        );
+        for result in [&canonical, &reordered, &legacy] {
+            assert_eq!(
+                result.compiler_lock.as_ref().map(|lock| lock.state),
+                Some(CompilerLockState::CanonicalReady),
+                "{head}"
+            );
+            assert_eq!(
+                result
+                    .semantic_document
+                    .as_ref()
+                    .unwrap()
+                    .ast
+                    .continuations
+                    .len(),
+                1,
+                "{head}"
+            );
+        }
+        assert_eq!(
+            canonical.pre_expansion_canonical_bytes(),
+            reordered.pre_expansion_canonical_bytes(),
+            "{head}"
+        );
+        assert_eq!(
+            canonical.pre_expansion_canonical_bytes(),
+            legacy.pre_expansion_canonical_bytes(),
+            "{head}"
+        );
+    }
 
     let ambiguous = compile(
         "line. line. the line swaying fine.",

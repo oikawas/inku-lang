@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use inku_ddl::{
     ResolvedInstructionLanguage, SAIJIKI_ASSET_BYTES, SAIJIKI_ASSET_ID, SaijikiAsset,
     SaijikiWordAsset, project_macro_semantic_ref, saijiki_asset, saijiki_asset_sha256_hex,
-    saijiki_derived_projection_from_asset,
+    saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
+    saijiki_score_wire_maps,
 };
 use sha2::{Digest, Sha256};
 
@@ -148,6 +149,106 @@ fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
 }
 
 #[test]
+fn english_parser_forms_are_row_owned_and_do_not_leak_into_public_projections() {
+    let asset = saijiki_asset();
+    let fine = word(asset, "yuragi", "細かく");
+    let swaying = word(asset, "yuragi", "揺れる");
+    assert_eq!(fine.surface_en.as_deref(), Some("fine"));
+    assert_eq!(fine.parser_forms_en, ["finely"]);
+    assert_eq!(swaying.surface_en.as_deref(), Some("swaying"));
+    assert_eq!(swaying.parser_forms_en, ["sways"]);
+    assert_eq!(
+        asset
+            .categories
+            .iter()
+            .flat_map(|category| &category.words)
+            .map(|word| word.parser_forms_en.len())
+            .sum::<usize>(),
+        2
+    );
+
+    let projection = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
+    let markers = saijiki_marker_class_table(ResolvedInstructionLanguage::En).unwrap();
+    let score_maps = saijiki_score_wire_maps().unwrap();
+    for parser_form in ["finely", "sways"] {
+        assert!(!projection.prompt_block.contains(parser_form));
+        assert!(
+            projection
+                .display_categories
+                .iter()
+                .all(|category| { category.words.iter().all(|surface| surface != parser_form) })
+        );
+        assert!(
+            markers
+                .iter()
+                .all(|class| { class.markers.iter().all(|surface| surface != parser_form) })
+        );
+        assert!(
+            score_maps
+                .weight
+                .iter()
+                .chain(&score_maps.color)
+                .chain(&score_maps.surface_texture)
+                .all(|entry| entry.surface != parser_form)
+        );
+    }
+    assert_eq!(
+        project_macro_semantic_ref("yuragi", "細かく")
+            .unwrap()
+            .canonical_id,
+        "fine"
+    );
+    assert_eq!(
+        project_macro_semantic_ref("yuragi", "揺れる")
+            .unwrap()
+            .canonical_id,
+        "swaying"
+    );
+}
+
+#[test]
+fn invalid_english_parser_form_ownership_fails_closed_with_stable_kinds() {
+    let cases: [(&str, fn(&mut SaijikiAsset)); 9] = [
+        ("duplicate_parser_form", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en =
+                vec!["finely".to_owned(), "FINELY".to_owned()];
+        }),
+        ("parser_surface_collision", |asset| {
+            word_mut(asset, "yuragi", "大きく").surface_en = Some("FINE".to_owned());
+        }),
+        ("ineligible_parser_form", |asset| {
+            word_mut(asset, "ugoki", "描く").parser_forms_en = vec!["draws".to_owned()];
+        }),
+        ("invalid_parser_form", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec![" finely ".to_owned()];
+        }),
+        ("invalid_parser_form", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["細かく".to_owned()];
+        }),
+        ("reserved_parser_surface_collision", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["the".to_owned()];
+        }),
+        ("reserved_parser_surface_collision", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["thin".to_owned()];
+        }),
+        ("reserved_parser_surface_collision", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["eight".to_owned()];
+        }),
+        ("reserved_parser_surface_collision", |asset| {
+            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["touching".to_owned()];
+        }),
+    ];
+
+    for (expected_kind, mutate) in cases {
+        let mut asset: SaijikiAsset = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+        mutate(&mut asset);
+        let error = saijiki_derived_projection_from_asset(&asset, ResolvedInstructionLanguage::En)
+            .unwrap_err();
+        assert_eq!(error.kind(), expected_kind);
+    }
+}
+
+#[test]
 fn alias_free_rows_keep_their_existing_lexical_semantic_identity() {
     for category in &saijiki_asset().categories {
         for word in &category.words {
@@ -172,10 +273,30 @@ fn alias_free_rows_keep_their_existing_lexical_semantic_identity() {
 }
 
 fn place_word_mut<'a>(asset: &'a mut SaijikiAsset, surface_ja: &str) -> &'a mut SaijikiWordAsset {
+    word_mut(asset, "basho", surface_ja)
+}
+
+fn word<'a>(asset: &'a SaijikiAsset, category_key: &str, surface_ja: &str) -> &'a SaijikiWordAsset {
+    asset
+        .categories
+        .iter()
+        .find(|category| category.key == category_key)
+        .unwrap()
+        .words
+        .iter()
+        .find(|word| word.surface_ja == surface_ja)
+        .unwrap()
+}
+
+fn word_mut<'a>(
+    asset: &'a mut SaijikiAsset,
+    category_key: &str,
+    surface_ja: &str,
+) -> &'a mut SaijikiWordAsset {
     asset
         .categories
         .iter_mut()
-        .find(|category| category.key == "basho")
+        .find(|category| category.key == category_key)
         .unwrap()
         .words
         .iter_mut()

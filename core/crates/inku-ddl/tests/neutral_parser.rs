@@ -205,6 +205,97 @@ fn bilingual_surfaces_share_the_same_canonical_asset_row() {
 }
 
 #[test]
+fn declared_english_parser_forms_preserve_source_and_canonical_row_identity() {
+    let parse = |source: &str| {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        parse_neutral_lexemes(&document)
+    };
+
+    for (source, expected_surfaces) in [
+        ("swaying fine", ["swaying", "fine"]),
+        ("sways finely", ["sways", "finely"]),
+        ("SWAYS FINELY", ["SWAYS", "FINELY"]),
+    ] {
+        let result = parse(source);
+        assert!(result.diagnostics.is_empty(), "{source}");
+        assert_eq!(result.recognized_delivery_count, 2, "{source}");
+        let words = result
+            .tokens
+            .iter()
+            .filter_map(|token| match &token.kind {
+                NeutralTokenKind::SaijikiWord {
+                    category_key,
+                    canonical_surface_ja,
+                    ..
+                } => Some((
+                    token.surface.as_str(),
+                    category_key.as_str(),
+                    canonical_surface_ja.as_str(),
+                    &source[token.span.start_byte..token.span.end_byte],
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            words,
+            [
+                (
+                    expected_surfaces[0],
+                    "yuragi",
+                    "揺れる",
+                    expected_surfaces[0]
+                ),
+                (
+                    expected_surfaces[1],
+                    "yuragi",
+                    "細かく",
+                    expected_surfaces[1]
+                ),
+            ],
+            "{source}"
+        );
+    }
+
+    let semantic_values = |source: &str| {
+        let mut values = parse(source)
+            .tokens
+            .into_iter()
+            .filter_map(|token| match token.kind {
+                NeutralTokenKind::SaijikiWord {
+                    category_key,
+                    canonical_surface_ja,
+                    ..
+                } => Some((category_key, canonical_surface_ja)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        values.sort();
+        values
+    };
+    assert_eq!(
+        semantic_values("the circle sways finely"),
+        semantic_values("the circle finely sways")
+    );
+
+    for source in ["swayed", "swung", "finer", "finest", "xswaysy", "finelyish"] {
+        let result = parse(source);
+        assert!(
+            result
+                .tokens
+                .iter()
+                .all(|token| !matches!(token.kind, NeutralTokenKind::SaijikiWord { .. }))
+        );
+        assert_eq!(result.diagnostics.len(), 1, "{source}");
+        assert_eq!(result.diagnostics[0].kind, NeutralDiagnosticKind::Unknown);
+        assert_eq!(result.diagnostics[0].surface, source);
+        assert_eq!(result.diagnostics[0].span.start_byte, 0);
+        assert_eq!(result.diagnostics[0].span.end_byte, source.len());
+    }
+}
+
+#[test]
 fn central_place_aliases_preserve_each_lexical_row_and_source_occurrence() {
     for (language, source, canonical_surface_ja) in [
         (ResolvedInstructionLanguage::Ja, "中央", "中央"),

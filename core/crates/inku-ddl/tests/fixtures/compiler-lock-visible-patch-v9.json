@@ -1,6 +1,6 @@
 {
-  "schema": "inku.compiler-lock-visible-patch-fixture.v8",
-  "version": 8,
+  "schema": "inku.compiler-lock-visible-patch-fixture.v9",
+  "version": 9,
   "definition": {
     "schema": "inku.macro-definition.v1",
     "namespace": "Canon",
@@ -15,7 +15,7 @@
     "canonical_sha256": "4a7183a1c104e8155e8ccd090d39ca2efda3ae427f103da91dc271c8d28b5748",
     "seed_digest": "61edad72f4519a8cdd402974813fc89bb2f4703eb6f43d0ad925d04d178e023d",
     "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
-    "full_lock_digest": "44a6b57c8b577192b1c086c2f6cd4e7fe3b192461e30e39d26005e71f40f1937"
+    "full_lock_digest": "20a4de0bcab5c598c7ee5659720cc936edcac8fc8d582436953ee042cf45c1e9"
   },
   "delivery_case_ids": [
     "explicit-and-syntax",

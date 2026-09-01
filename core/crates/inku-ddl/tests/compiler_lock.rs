@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v8.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v9.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -748,11 +748,19 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         ambiguous.compiler_lock.as_ref().map(|lock| lock.state),
         Some(CompilerLockState::BlockedConflict)
     );
+    assert_eq!(
+        ambiguous
+            .conflicts
+            .iter()
+            .filter(|conflict| conflict.kind == "ambiguous_continuation_target")
+            .count(),
+        1
+    );
     assert!(
         ambiguous
             .conflicts
             .iter()
-            .all(|conflict| conflict.kind == "ambiguous_continuation_target")
+            .any(|conflict| conflict.kind == "ambiguous_entity_ownership")
     );
 
     for source in ["circle. the line swaying fine.", "the line swaying fine."] {
@@ -769,6 +777,163 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
                 .any(|diagnostic| { diagnostic.kind == "missing_continuation_target" }),
             "{source}"
         );
+    }
+}
+
+#[test]
+fn failed_continuation_projection_preserves_owners_and_unique_occurrences() {
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "三角 四角。円は 弧は 細かく 揺れる。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "triangle square. the circle the arc swaying fine.",
+        ),
+    ] {
+        let result = compile(source, language, &[], None, LIMITS);
+        let document = result.semantic_document.as_ref().unwrap();
+        assert_eq!(document.continuation_issues.len(), 2, "{source}");
+        assert!(document.ast.continuations.is_empty(), "{source}");
+        assert!(
+            document
+                .continuation_issues
+                .iter()
+                .all(|issue| issue.candidate_targets.is_empty()),
+            "{source}"
+        );
+
+        let delivery_ids = result
+            .deliveries
+            .iter()
+            .map(|delivery| delivery.id.as_str())
+            .collect::<HashSet<_>>();
+        assert_eq!(delivery_ids.len(), result.deliveries.len(), "{source}");
+
+        let delivered_spans = result
+            .deliveries
+            .iter()
+            .filter_map(|delivery| delivery.span)
+            .map(|span| (span.start_byte, span.end_byte))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            delivered_spans
+                .iter()
+                .copied()
+                .collect::<HashSet<_>>()
+                .len(),
+            delivered_spans.len(),
+            "{source}"
+        );
+
+        let mut accepted_head_spans = document
+            .instruction_association
+            .ast
+            .instructions
+            .iter()
+            .map(|instruction| instruction.entity.head.source().span)
+            .collect::<Vec<_>>();
+        accepted_head_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+        let mut delivered_head_spans = result
+            .deliveries
+            .iter()
+            .filter(|delivery| {
+                delivery.kind == inku_ddl::SemanticDeliveryKind::Explicit
+                    && delivery.identity.owner == SemanticDeliveryOwner::EntityHead
+            })
+            .filter_map(|delivery| delivery.span)
+            .collect::<Vec<_>>();
+        delivered_head_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+        assert_eq!(delivered_head_spans, accepted_head_spans, "{source}");
+        assert_eq!(
+            result.delivery_summary.recognized_but_ignored, 0,
+            "{source}"
+        );
+    }
+
+    let ambiguous = compile(
+        "line. line. the line the line swaying fine.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let document = ambiguous.semantic_document.as_ref().unwrap();
+    assert_eq!(document.continuation_issues.len(), 2);
+    assert!(document.ast.continuations.is_empty());
+    assert!(
+        document
+            .continuation_issues
+            .iter()
+            .all(|issue| issue.candidate_targets.len() == 2)
+    );
+    let continuation_conflicts = ambiguous
+        .conflicts
+        .iter()
+        .filter(|conflict| conflict.kind == "ambiguous_continuation_target")
+        .collect::<Vec<_>>();
+    assert_eq!(continuation_conflicts.len(), 2);
+    assert!(continuation_conflicts.iter().all(|conflict| {
+        conflict
+            .candidate_identities
+            .iter()
+            .filter(|identity| identity.starts_with("candidate:"))
+            .count()
+            == 2
+    }));
+    assert_eq!(
+        ambiguous
+            .deliveries
+            .iter()
+            .map(|delivery| delivery.id.as_str())
+            .collect::<HashSet<_>>()
+            .len(),
+        ambiguous.deliveries.len()
+    );
+    assert_eq!(ambiguous.delivery_summary.recognized_but_ignored, 0);
+}
+
+#[test]
+fn failed_continuation_preserves_preexisting_explicit_fingerprints() {
+    for (language, before, after) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中心に赤い鉛筆の細い線をひとつ置く。円は。",
+            "中心に赤い鉛筆の細い線をひとつ置く。円は細かく揺れる。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place one thin red pencil line at the center. the circle.",
+            "place one thin red pencil line at the center. the circle swaying fine.",
+        ),
+    ] {
+        let accepted = compile(before, language, &[], None, LIMITS);
+        let failed = compile(after, language, &[], None, LIMITS);
+        let accepted_fingerprints = accepted.explicit_fingerprints();
+        let failed_fingerprints = failed.explicit_fingerprints();
+        assert!(
+            accepted_fingerprints
+                .iter()
+                .all(|fingerprint| failed_fingerprints.contains(fingerprint)),
+            "{after}"
+        );
+        for owner in [
+            SemanticDeliveryOwner::EntityHead,
+            SemanticDeliveryOwner::Color,
+            SemanticDeliveryOwner::Quantity,
+            SemanticDeliveryOwner::Thinness,
+            SemanticDeliveryOwner::Action,
+        ] {
+            assert!(
+                accepted
+                    .deliveries
+                    .iter()
+                    .any(|delivery| delivery.identity.owner == owner),
+                "{before}: {owner:?}"
+            );
+        }
+        assert_eq!(failed.delivery_summary.recognized_but_ignored, 0, "{after}");
     }
 }
 
@@ -1299,9 +1464,9 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v8"
+        "inku.compiler-lock-visible-patch-fixture.v9"
     );
-    assert_eq!(fixture.version, 8);
+    assert_eq!(fixture.version, 9);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
         "inku.semantic-document.v10"

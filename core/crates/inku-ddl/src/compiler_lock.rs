@@ -21,13 +21,13 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v8";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v9";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v8";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v9";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v8";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v9";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -319,6 +319,13 @@ struct Projection {
     blocking: Vec<CompilerBlockingDiagnostic>,
 }
 
+#[derive(Default)]
+struct ContinuationIssueProjection {
+    kinds: Vec<String>,
+    members: Vec<String>,
+    conflict: bool,
+}
+
 /// Compile one source-preserving document without selecting defaults, targets, Score, or runtime
 /// behavior. I-581 and, when eligible, I-582 are each invoked exactly once.
 pub fn compile_typed_ddl(
@@ -543,6 +550,33 @@ fn project_deliveries(
     for instruction in &semantic_document.ast.instructions {
         project_instruction(instruction, &mut projection);
     }
+    let mut restored_failed_heads = Vec::new();
+    for issue in &semantic_document.continuation_issues {
+        let head_span = issue.instruction.entity.head.source().span;
+        if restored_failed_heads.contains(&head_span) {
+            continue;
+        }
+        if let Some(instruction) = semantic_document
+            .instruction_association
+            .ast
+            .instructions
+            .iter()
+            .find(|instruction| instruction.entity.head.source().span == head_span)
+        {
+            project_instruction(instruction, &mut projection);
+            restored_failed_heads.push(head_span);
+        } else {
+            add_blocking_with_members(
+                &mut projection,
+                "missing_continuation_original_instruction",
+                Some(issue.marker.span),
+                vec![format!(
+                    "head={}",
+                    semantic_head_key(&issue.instruction.entity.head)
+                )],
+            );
+        }
+    }
     for edge in &semantic_document.ast.continuations {
         add_syntax(
             &mut projection,
@@ -564,12 +598,6 @@ fn project_deliveries(
         .continuations
         .iter()
         .flat_map(|edge| &edge.consumed_upstream_spans)
-        .chain(
-            semantic_document
-                .continuation_issues
-                .iter()
-                .flat_map(|issue| &issue.consumed_upstream_spans),
-        )
         .copied()
         .collect::<Vec<_>>();
 
@@ -783,9 +811,7 @@ fn project_deliveries(
             ),
         }
     }
-    for issue in &semantic_document.continuation_issues {
-        project_continuation_issue(issue, &mut projection);
-    }
+    project_continuation_issues(&semantic_document.continuation_issues, &mut projection);
 
     let covered_spans = projection
         .deliveries
@@ -812,86 +838,101 @@ fn project_deliveries(
     projection
 }
 
-fn project_continuation_issue(issue: &SemanticContinuationIssue, projection: &mut Projection) {
-    let spans = instruction_semantic_spans(&issue.instruction)
-        .into_iter()
-        .chain(std::iter::once(issue.marker.span));
-    let candidates = issue
-        .candidate_targets
-        .iter()
-        .map(continuation_target_key)
-        .collect::<Vec<_>>();
-    for span in spans {
-        match issue.kind {
+fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection: &mut Projection) {
+    let mut groups = BTreeMap::<(usize, usize), ContinuationIssueProjection>::new();
+    for (issue_index, issue) in issues.iter().enumerate() {
+        let group = groups
+            .entry((issue.marker.span.start_byte, issue.marker.span.end_byte))
+            .or_default();
+        group.kinds.push(issue.kind.as_str().to_owned());
+        group
+            .members
+            .push(format!("issue:{issue_index}={}", issue.kind.as_str()));
+        group.members.push(format!(
+            "head:{issue_index}={}",
+            semantic_head_key(&issue.instruction.entity.head)
+        ));
+        for (predicate_index, predicate) in instruction_predicate_keys(&issue.instruction)
+            .into_iter()
+            .enumerate()
+        {
+            group.members.push(format!(
+                "predicate:{issue_index}:{predicate_index}={predicate}"
+            ));
+        }
+        for (candidate_index, candidate) in issue.candidate_targets.iter().enumerate() {
+            group.members.push(format!(
+                "candidate:{issue_index}:{candidate_index}={}",
+                continuation_target_key(candidate)
+            ));
+        }
+        group.conflict |= matches!(
+            issue.kind,
             SemanticContinuationIssueKind::AmbiguousTarget
-            | SemanticContinuationIssueKind::ConflictingPredicate => add_conflict(
-                projection,
-                issue.kind.as_str(),
-                Some(span),
-                candidates.clone(),
-            ),
-            SemanticContinuationIssueKind::MissingTarget
-            | SemanticContinuationIssueKind::UnsupportedPredicate
-            | SemanticContinuationIssueKind::BlockedBoundary => {
-                add_blocking(projection, issue.kind.as_str(), Some(span));
+                | SemanticContinuationIssueKind::ConflictingPredicate
+        );
+    }
+
+    for ((start_byte, end_byte), group) in groups {
+        let mut kinds = Vec::new();
+        for kind in group.kinds {
+            if !kinds.contains(&kind) {
+                kinds.push(kind);
             }
+        }
+        let kind = if kinds.len() == 1 {
+            kinds.pop().expect("one continuation issue kind")
+        } else {
+            format!("continuation_issue_set:{}", kinds.join(","))
+        };
+        let span = Some(SourceSpan {
+            start_byte,
+            end_byte,
+        });
+        if group.conflict {
+            add_ordered_conflict(projection, &kind, span, group.members);
+        } else {
+            add_blocking_with_members(projection, &kind, span, group.members);
         }
     }
 }
 
-fn instruction_semantic_spans(instruction: &SemanticInstruction) -> Vec<SourceSpan> {
-    let mut spans = vec![instruction.entity.head.source().span];
-    spans.extend(
-        [
-            instruction.entity.color.as_ref(),
-            instruction.entity.touch.as_ref(),
-            instruction.entity.continuity.as_ref(),
-            instruction.entity.angle.as_ref(),
-            instruction.entity.surface.quality.as_ref(),
-            instruction.entity.surface.intensity.as_ref(),
-            instruction.entity.fluctuation.amplitude.as_ref(),
-            instruction.entity.fluctuation.frequency.as_ref(),
-            instruction.entity.fluctuation.quality.as_ref(),
-            instruction.entity.proportion.aspect.as_ref(),
-            instruction.entity.proportion.width_extent.as_ref(),
-            instruction.entity.proportion.arc_form.as_ref(),
-            instruction.action.as_ref(),
-            instruction.position.as_ref(),
-        ]
+fn semantic_head_key(head: &SemanticHead) -> String {
+    match head {
+        SemanticHead::Primitive(term) => format!("primitive:{}", term_key(term)),
+        SemanticHead::MacroInvocation(head) => format!(
+            "macro:{}@{}#{}",
+            head.qualified_name, head.definition_version, head.definition_digest
+        ),
+    }
+}
+
+fn instruction_predicate_keys(instruction: &SemanticInstruction) -> Vec<String> {
+    let mut projected = Projection::default();
+    project_instruction(instruction, &mut projected);
+    projected.deliveries.sort_by_key(|delivery| {
+        let span = delivery
+            .span
+            .expect("instruction delivery has a source span");
+        (span.start_byte, span.end_byte)
+    });
+    projected
+        .deliveries
         .into_iter()
-        .flatten()
-        .map(|term| term.provenance.source.span),
-    );
-    spans.extend(
-        instruction
-            .entity
-            .quantity
-            .iter()
-            .map(|quantity| quantity.provenance.span),
-    );
-    spans.extend(
-        instruction
-            .entity
-            .thinness
-            .iter()
-            .map(|thinness| thinness.provenance.span),
-    );
-    spans.extend(
-        instruction
-            .entity
-            .relative_scale
-            .iter()
-            .map(|scale| scale.provenance.span),
-    );
-    spans.extend(
-        instruction
-            .relation
-            .iter()
-            .map(|relation| relation.provenance.span),
-    );
-    spans.sort_by_key(|span| (span.start_byte, span.end_byte));
-    spans.dedup();
-    spans
+        .filter(|delivery| {
+            !matches!(
+                delivery.identity.owner,
+                SemanticDeliveryOwner::EntityHead | SemanticDeliveryOwner::MacroParameter
+            )
+        })
+        .map(|delivery| {
+            format!(
+                "{}:{}",
+                delivery.identity.owner.as_str(),
+                delivery.identity.canonical_key
+            )
+        })
+        .collect()
 }
 
 fn continuation_target_key(target: &SemanticContinuationTarget) -> String {
@@ -1298,6 +1339,36 @@ fn add_conflict(
     });
 }
 
+fn add_ordered_conflict(
+    projection: &mut Projection,
+    kind: &str,
+    span: Option<SourceSpan>,
+    candidates: Vec<String>,
+) {
+    let payload = format!("{kind}|{}", candidates.join(","));
+    let id = span.map_or_else(
+        || identity("conflict", payload.as_bytes()),
+        |span| ranged_identity("conflict", kind, span, &payload),
+    );
+    projection.conflicts.push(CompilerConflict {
+        id: id.clone(),
+        kind: kind.to_owned(),
+        span,
+        candidate_identities: candidates,
+    });
+    projection.deliveries.push(SemanticDelivery {
+        id,
+        kind: SemanticDeliveryKind::Conflict,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: payload.clone(),
+        },
+        descriptor: payload,
+        span,
+        source_independent: true,
+    });
+}
+
 fn add_blocking(projection: &mut Projection, kind: &str, span: Option<SourceSpan>) {
     let id = span.map_or_else(
         || identity("blocking", kind.as_bytes()),
@@ -1318,6 +1389,35 @@ fn add_blocking(projection: &mut Projection, kind: &str, span: Option<SourceSpan
         descriptor: kind.to_owned(),
         span,
         source_independent: false,
+    });
+}
+
+fn add_blocking_with_members(
+    projection: &mut Projection,
+    kind: &str,
+    span: Option<SourceSpan>,
+    members: Vec<String>,
+) {
+    let payload = format!("{kind}|{}", members.join(","));
+    let id = span.map_or_else(
+        || identity("blocking", payload.as_bytes()),
+        |span| ranged_identity("blocking", kind, span, &payload),
+    );
+    projection.blocking.push(CompilerBlockingDiagnostic {
+        id: id.clone(),
+        kind: kind.to_owned(),
+        span,
+    });
+    projection.deliveries.push(SemanticDelivery {
+        id,
+        kind: SemanticDeliveryKind::BlockingDiagnostic,
+        identity: SemanticDeliveryIdentity {
+            owner: SemanticDeliveryOwner::TypedIssue,
+            canonical_key: payload.clone(),
+        },
+        descriptor: payload,
+        span,
+        source_independent: true,
     });
 }
 

@@ -543,6 +543,47 @@ fn structured_ownership_action_position_ground_and_previous_relation_change_the_
 }
 
 #[test]
+fn lexical_place_aliases_share_compiler_meaning_and_keep_source_provenance() {
+    let center = compile(
+        "place circle at center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let middle = compile(
+        "place circle at middle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    assert_eq!(canonical_bytes_of(&center), canonical_bytes_of(&middle));
+    assert_eq!(
+        center
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .expanded_meaning_digest,
+        middle
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .expanded_meaning_digest
+    );
+    for (result, source_surface) in [(&center, "center"), (&middle, "middle")] {
+        let position = result.semantic_document.as_ref().unwrap().ast.instructions[0]
+            .position
+            .as_ref()
+            .unwrap();
+        assert_eq!(position.identity.category, "place");
+        assert_eq!(position.identity.id, "center");
+        assert_eq!(position.provenance.source.surface, source_surface);
+    }
+}
+
+#[test]
 fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);

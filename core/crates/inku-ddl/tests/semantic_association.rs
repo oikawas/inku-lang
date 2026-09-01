@@ -1865,6 +1865,38 @@ fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
 }
 
 #[test]
+fn macro_place_parameter_keeps_lexical_provenance_with_one_typed_identity() {
+    let definition = semantic_macro_definition(
+        "Bind",
+        "Place",
+        "1.0.0",
+        serde_json::json!({"where": {"type": "semantic_ref", "category": "place"}}),
+        serde_json::json!([]),
+    );
+
+    for source_surface in ["center", "middle"] {
+        let source = format!("Bind.Place {source_surface}");
+        let result = macro_association(
+            &source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        assert!(result.issues.is_empty(), "{source_surface}");
+        let parameter = &macro_head(&result.ast.entities[0]).parameters[0];
+        assert!(matches!(
+            &parameter.value,
+            SemanticMacroParameterValue::SemanticRef(identity)
+                if identity.category == "place" && identity.id == "center"
+        ));
+        assert_eq!(parameter.provenance.surface, source_surface);
+        assert_eq!(
+            &source[parameter.provenance.span.start_byte..parameter.provenance.span.end_byte],
+            source_surface
+        );
+    }
+}
+
+#[test]
 fn macro_head_canonical_depends_only_on_definition_and_parameter_meaning() {
     let definition = semantic_macro_definition(
         "Nature",

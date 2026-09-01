@@ -160,7 +160,7 @@
         {"surface_ja": "右端", "surface_en": "right-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "上端", "surface_en": "top-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "下端", "surface_en": "bottom-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "中心", "surface_en": "middle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "中心", "surface_en": "middle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "semantic_alias": "center", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "隅", "surface_en": "corner", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,

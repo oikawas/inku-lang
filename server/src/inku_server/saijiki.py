@@ -54,6 +54,7 @@ class SaijikiWord:
     display: bool = True  # 歳時記表示 (web / API) へ出す
     marker: bool | None = None  # 閉包マーカー所属 (None = prompt に従う)
     score_value: str | None = None  # Weight / Color / SurfaceTexture の Score enum 値
+    semantic_alias: str | None = None  # localized wire IDとは別のtyped semantic identity
     # マーカー表面の言語別上書き。en「line-up」は従来マーカー「arrange」を保つ。
     marker_surfaces_ja: tuple[str, ...] | None = None
     marker_surfaces_en: tuple[str, ...] | None = None
@@ -267,7 +268,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("右端", "right-edge"),
             _w("上端", "top-edge"),
             _w("下端", "bottom-edge"),
-            _w("中心", "middle"),
+            _w("中心", "middle", semantic_alias="center"),
             _w("隅", "corner"),
         ),
     ),

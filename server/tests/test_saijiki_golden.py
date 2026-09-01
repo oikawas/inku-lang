@@ -438,7 +438,7 @@ def test_display_categories_exclude_pruned_and_hidden_words() -> None:
 
 
 def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
-    return {
+    result = {
         "surface_ja": word.surface_ja,
         "surface_en": word.surface_en,
         "default": word.default,
@@ -449,6 +449,9 @@ def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
         "marker_surfaces_ja": list(word.marker_surfaces_ja) if word.marker_surfaces_ja else None,
         "marker_surfaces_en": list(word.marker_surfaces_en) if word.marker_surfaces_en else None,
     }
+    if word.semantic_alias is not None:
+        result["semantic_alias"] = word.semantic_alias
+    return result
 
 
 def test_rust_saijiki_asset_matches_python_authority() -> None:
@@ -486,6 +489,12 @@ def test_rust_saijiki_asset_matches_python_authority() -> None:
         "relation_display_order": list(saijiki._RELATION_DISPLAY_ORDER),
         "marker_class_order": list(saijiki._MARKER_CLASS_ORDER),
     }
+    place_rows = next(category for category in expected["categories"] if category["key"] == "basho")["words"]
+    assert [
+        (row["surface_ja"], row["surface_en"], row.get("semantic_alias"))
+        for row in place_rows
+        if row.get("semantic_alias") is not None
+    ] == [("中心", "middle", "center")]
     assert actual == expected
 
 

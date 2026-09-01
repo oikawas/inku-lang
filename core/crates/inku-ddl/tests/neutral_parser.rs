@@ -205,6 +205,45 @@ fn bilingual_surfaces_share_the_same_canonical_asset_row() {
 }
 
 #[test]
+fn central_place_aliases_preserve_each_lexical_row_and_source_occurrence() {
+    for (language, source, canonical_surface_ja) in [
+        (ResolvedInstructionLanguage::Ja, "中央", "中央"),
+        (ResolvedInstructionLanguage::Ja, "中心", "中心"),
+        (ResolvedInstructionLanguage::En, "center", "中央"),
+        (ResolvedInstructionLanguage::En, "middle", "中心"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+
+        assert!(result.diagnostics.is_empty(), "{source}");
+        assert_eq!(result.tokens.len(), 1, "{source}");
+        assert_eq!(result.recognized_delivery_count, 1, "{source}");
+        let token = &result.tokens[0];
+        assert_eq!(token.surface, source);
+        assert_eq!(
+            &document.source()[token.span.start_byte..token.span.end_byte],
+            source
+        );
+        let NeutralTokenKind::SaijikiWord {
+            category_key,
+            canonical_surface_ja: actual_surface_ja,
+            ..
+        } = &token.kind
+        else {
+            panic!("{source}: expected one Saijiki word");
+        };
+        assert_eq!(category_key, "basho");
+        assert_eq!(actual_surface_ja, canonical_surface_ja);
+        assert_eq!(
+            project_macro_semantic_ref(category_key, actual_surface_ja)
+                .unwrap()
+                .canonical_id,
+            "center"
+        );
+    }
+}
+
+#[test]
 fn closed_cardinal_grammar_maps_standard_forms_to_one_exact_number() {
     let cases = [
         (ResolvedInstructionLanguage::Ja, "ひとつ", 1),

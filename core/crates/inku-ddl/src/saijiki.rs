@@ -52,6 +52,7 @@ pub struct SaijikiWordAsset {
     pub display: bool,
     pub marker: Option<bool>,
     pub score_value: Option<String>,
+    pub semantic_alias: Option<String>,
     pub marker_surfaces_ja: Option<Vec<String>>,
     pub marker_surfaces_en: Option<Vec<String>>,
 }
@@ -214,6 +215,113 @@ pub(crate) fn parser_candidate_surface(
     }
 }
 
+pub(crate) fn canonical_semantic_id(
+    category_key: &str,
+    lexical_id: &str,
+) -> Result<Option<String>, SaijikiProjectionError> {
+    canonical_semantic_id_from_asset(saijiki_asset(), category_key, lexical_id)
+}
+
+fn canonical_semantic_id_from_asset(
+    asset: &SaijikiAsset,
+    category_key: &str,
+    lexical_id: &str,
+) -> Result<Option<String>, SaijikiProjectionError> {
+    let category = asset
+        .categories
+        .iter()
+        .find(|candidate| candidate.key == category_key)
+        .ok_or_else(|| SaijikiProjectionError::MissingCategory {
+            key: category_key.to_owned(),
+        })?;
+    let mut identity = lexical_id.to_owned();
+    let mut requires_alias_target = false;
+    let mut visited = BTreeSet::new();
+
+    loop {
+        let matches = category
+            .words
+            .iter()
+            .filter(|word| semantic_wire_id(word).as_deref() == Some(identity.as_str()))
+            .collect::<Vec<_>>();
+        if matches.is_empty() {
+            if !requires_alias_target {
+                return Ok(None);
+            }
+            let crosses_category = asset.categories.iter().any(|candidate| {
+                candidate.key != category_key
+                    && candidate
+                        .words
+                        .iter()
+                        .any(|word| semantic_wire_id(word).as_deref() == Some(identity.as_str()))
+            });
+            return Err(if crosses_category {
+                SaijikiProjectionError::SemanticAliasCategoryCrossing {
+                    category_key: category_key.to_owned(),
+                    alias: identity,
+                }
+            } else {
+                SaijikiProjectionError::MissingSemanticAliasTarget {
+                    category_key: category_key.to_owned(),
+                    alias: identity,
+                }
+            });
+        }
+        if matches.len() != 1 {
+            return Err(SaijikiProjectionError::ConflictingSemanticAlias {
+                category_key: category_key.to_owned(),
+                identity,
+            });
+        }
+        if !visited.insert(identity.clone()) {
+            return Err(SaijikiProjectionError::SemanticAliasCycle {
+                category_key: category_key.to_owned(),
+                identity,
+            });
+        }
+        let word = matches[0];
+        let Some(alias) = &word.semantic_alias else {
+            return Ok(Some(identity));
+        };
+        identity = alias.clone();
+        requires_alias_target = true;
+    }
+}
+
+fn validate_semantic_aliases(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
+    for category in &asset.categories {
+        for word in &category.words {
+            if word.semantic_alias.is_none() {
+                continue;
+            }
+            let identity = semantic_wire_id(word).ok_or_else(|| {
+                SaijikiProjectionError::ConflictingSemanticAlias {
+                    category_key: category.key.clone(),
+                    identity: word.surface_ja.clone(),
+                }
+            })?;
+            canonical_semantic_id_from_asset(asset, &category.key, &identity)?;
+        }
+    }
+    Ok(())
+}
+
+fn semantic_wire_id(word: &SaijikiWordAsset) -> Option<String> {
+    word.score_value
+        .clone()
+        .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))
+}
+
+pub(crate) fn canonical_wire_id(value: &str) -> String {
+    value
+        .bytes()
+        .map(|byte| match byte {
+            b'-' | b' ' => '_',
+            _ => byte as char,
+        })
+        .collect()
+}
+
 /// A stable failure while deriving a typed Saijiki projection from its asset.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SaijikiProjectionError {
@@ -258,6 +366,22 @@ pub enum SaijikiProjectionError {
         first_value: String,
         second_value: String,
     },
+    MissingSemanticAliasTarget {
+        category_key: String,
+        alias: String,
+    },
+    SemanticAliasCategoryCrossing {
+        category_key: String,
+        alias: String,
+    },
+    SemanticAliasCycle {
+        category_key: String,
+        identity: String,
+    },
+    ConflictingSemanticAlias {
+        category_key: String,
+        identity: String,
+    },
 }
 
 impl SaijikiProjectionError {
@@ -273,6 +397,10 @@ impl SaijikiProjectionError {
             Self::MarkerClassOrderMismatch { .. } => "marker_class_order_mismatch",
             Self::MissingScoreValue { .. } => "missing_score_value",
             Self::DuplicateScoreSurface { .. } => "duplicate_score_surface",
+            Self::MissingSemanticAliasTarget { .. } => "missing_semantic_alias_target",
+            Self::SemanticAliasCategoryCrossing { .. } => "semantic_alias_category_crossing",
+            Self::SemanticAliasCycle { .. } => "semantic_alias_cycle",
+            Self::ConflictingSemanticAlias { .. } => "conflicting_semantic_alias",
         }
     }
 }
@@ -345,6 +473,34 @@ impl fmt::Display for SaijikiProjectionError {
             } => write!(
                 formatter,
                 "Saijiki score surface maps to conflicting values: {surface} ({first_value}, {second_value})"
+            ),
+            Self::MissingSemanticAliasTarget {
+                category_key,
+                alias,
+            } => write!(
+                formatter,
+                "Saijiki semantic alias target is missing: {category_key}/{alias}"
+            ),
+            Self::SemanticAliasCategoryCrossing {
+                category_key,
+                alias,
+            } => write!(
+                formatter,
+                "Saijiki semantic alias crosses categories: {category_key}/{alias}"
+            ),
+            Self::SemanticAliasCycle {
+                category_key,
+                identity,
+            } => write!(
+                formatter,
+                "Saijiki semantic alias cycle: {category_key}/{identity}"
+            ),
+            Self::ConflictingSemanticAlias {
+                category_key,
+                identity,
+            } => write!(
+                formatter,
+                "Saijiki semantic alias declaration is conflicting: {category_key}/{identity}"
             ),
         }
     }
@@ -423,6 +579,7 @@ pub fn saijiki_derived_projection_from_asset(
     asset: &SaijikiAsset,
     language: ResolvedInstructionLanguage,
 ) -> Result<SaijikiDerivedProjection, SaijikiProjectionError> {
+    validate_semantic_aliases(asset)?;
     let prompt_rows = prompt_rows(asset, language)?;
     let prompt_block = prompt_rows
         .iter()

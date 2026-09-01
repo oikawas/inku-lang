@@ -11,7 +11,11 @@ use serde::{
 };
 use sha2::{Digest, Sha256};
 
-use crate::{MacroInvocation, saijiki_asset};
+use crate::{
+    MacroInvocation,
+    saijiki::{canonical_semantic_id, canonical_wire_id},
+    saijiki_asset,
+};
 
 /// Exact schema and digest domain for this semantic definition edition.
 pub const MACRO_DEFINITION_SCHEMA_ID: &str = "inku.macro-definition.v1";
@@ -62,10 +66,12 @@ pub fn project_macro_semantic_ref(
         .words
         .iter()
         .find(|word| word.surface_ja == canonical_surface_ja)?;
-    let canonical_id = word
+    let lexical_id = word
         .score_value
         .clone()
         .or_else(|| word.surface_en.as_deref().map(canonical_wire_id))?;
+    let canonical_id = canonical_semantic_id(asset_key, &lexical_id)
+        .expect("embedded Saijiki semantic aliases must validate")?;
     debug_assert!(known_semantic_id(category, &canonical_id));
     Some(MacroSemanticRefProjection {
         category: (*category).to_owned(),
@@ -569,7 +575,9 @@ impl MacroDefinition {
         if !validation.is_valid() {
             return Err(validation);
         }
-        Ok(serde_json::to_vec(self).expect("validated MacroDefinition must serialize"))
+        let mut canonical = self.clone();
+        normalize_definition_semantic_aliases(&mut canonical);
+        Ok(serde_json::to_vec(&canonical).expect("validated MacroDefinition must serialize"))
     }
 
     /// Domain-separated full SHA-256 semantic identity.
@@ -594,6 +602,78 @@ impl MacroDefinition {
             full_digest,
             full_digest_hex,
         })
+    }
+}
+
+fn normalize_definition_semantic_aliases(definition: &mut MacroDefinition) {
+    normalize_statement_semantic_aliases(&mut definition.body);
+    for component in definition.components.0.values_mut() {
+        normalize_statement_semantic_aliases(&mut component.body);
+    }
+}
+
+fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
+    for statement in statements {
+        match statement {
+            Statement::Emit { fields, .. } => {
+                for expression in fields.0.values_mut() {
+                    normalize_expression_semantic_aliases(expression);
+                }
+            }
+            Statement::Use { arguments, .. } => {
+                for expression in arguments.0.values_mut() {
+                    normalize_expression_semantic_aliases(expression);
+                }
+            }
+            Statement::Group { body } => normalize_statement_semantic_aliases(body),
+            Statement::Repeat { count, body, .. } => {
+                normalize_expression_semantic_aliases(count);
+                normalize_statement_semantic_aliases(body);
+            }
+            Statement::Transform { transform, body } => {
+                for expression in [
+                    &mut transform.translate_x,
+                    &mut transform.translate_y,
+                    &mut transform.scale_x,
+                    &mut transform.scale_y,
+                    &mut transform.rotate_degrees,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    normalize_expression_semantic_aliases(expression);
+                }
+                normalize_statement_semantic_aliases(body);
+            }
+            Statement::Vary { choices, body, .. } => {
+                if let Some(choices) = choices {
+                    for expression in choices {
+                        normalize_expression_semantic_aliases(expression);
+                    }
+                }
+                normalize_statement_semantic_aliases(body);
+            }
+            Statement::Anchor { .. } | Statement::Relation { .. } => {}
+        }
+    }
+}
+
+fn normalize_expression_semantic_aliases(expression: &mut Expression) {
+    match expression {
+        Expression::List { items } => {
+            for item in items {
+                normalize_expression_semantic_aliases(item);
+            }
+        }
+        Expression::SemanticRef { category, id } => {
+            *id = canonical_semantic_ref_id(category, id)
+                .expect("validated semantic reference must remain known");
+        }
+        Expression::Number { .. }
+        | Expression::Integer { .. }
+        | Expression::Boolean { .. }
+        | Expression::Parameter { .. }
+        | Expression::Local { .. } => {}
     }
 }
 
@@ -1265,32 +1345,15 @@ fn known_relation(value: &str) -> bool {
 }
 
 fn known_semantic_id(category: &str, id: &str) -> bool {
-    if category == "relation" {
-        return known_relation(id);
-    }
-    let Some(asset_key) = semantic_asset_key(category) else {
-        return false;
-    };
-    saijiki_asset()
-        .categories
-        .iter()
-        .find(|candidate| candidate.key == asset_key)
-        .is_some_and(|candidate| {
-            candidate.words.iter().any(|word| {
-                word.score_value.as_deref() == Some(id)
-                    || word.surface_en.as_deref().map(canonical_wire_id).as_deref() == Some(id)
-            })
-        })
+    canonical_semantic_ref_id(category, id).is_some()
 }
 
-fn canonical_wire_id(value: &str) -> String {
-    value
-        .bytes()
-        .map(|byte| match byte {
-            b'-' | b' ' => '_',
-            _ => byte as char,
-        })
-        .collect()
+pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {
+    if category == "relation" {
+        return known_relation(id).then(|| id.to_owned());
+    }
+    let asset_key = semantic_asset_key(category)?;
+    canonical_semantic_id(asset_key, id).expect("embedded Saijiki semantic aliases must validate")
 }
 
 fn is_ascii_identifier(value: &str) -> bool {

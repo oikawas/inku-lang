@@ -274,6 +274,43 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
 }
 
 #[test]
+fn lexical_place_facts_bind_as_one_canonical_value_without_losing_source() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bind","heading":"Place","version":"1.0.0","parameters":{"where":{"type":"semantic_ref","category":"place"}},"components":{},"body":[]}"#,
+    )
+    .unwrap();
+
+    for source_surface in ["center", "middle"] {
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let source = format!("Bind.Place {source_surface}");
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap();
+        let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+
+        assert!(result.diagnostics.is_empty(), "{source_surface}");
+        let parameter = &result.complete[0].parameters[0];
+        assert_eq!(parameter.source_surface, source_surface);
+        let BoundMacroParameterValue::SemanticRef {
+            category,
+            canonical_id,
+            ..
+        } = &parameter.value
+        else {
+            panic!("{source_surface}: expected semantic Place binding");
+        };
+        assert_eq!(category, "place");
+        assert_eq!(canonical_id, "center");
+    }
+}
+
+#[test]
 fn schema_fixture_and_required_boundary_coverage_are_stable() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.macro-parameter-binding-v1-fixture.v1");

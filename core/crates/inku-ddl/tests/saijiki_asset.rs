@@ -1,6 +1,10 @@
 use std::collections::HashSet;
 
-use inku_ddl::{SAIJIKI_ASSET_BYTES, SAIJIKI_ASSET_ID, saijiki_asset, saijiki_asset_sha256_hex};
+use inku_ddl::{
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_BYTES, SAIJIKI_ASSET_ID, SaijikiAsset,
+    SaijikiWordAsset, project_macro_semantic_ref, saijiki_asset, saijiki_asset_sha256_hex,
+    saijiki_derived_projection_from_asset,
+};
 use sha2::{Digest, Sha256};
 
 #[test]
@@ -97,6 +101,86 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .collect::<HashSet<_>>();
     assert_eq!(category_keys.len(), 11);
     assert_eq!(relation_types.len(), 5);
+
+    let aliases = asset
+        .categories
+        .iter()
+        .flat_map(|category| &category.words)
+        .filter_map(|word| {
+            word.semantic_alias
+                .as_deref()
+                .map(|alias| (word.surface_ja.as_str(), alias))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(aliases, [("中心", "center")]);
+}
+
+#[test]
+fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
+    let cases: [(&str, fn(&mut SaijikiAsset)); 4] = [
+        (
+            "missing_semantic_alias_target",
+            |asset: &mut SaijikiAsset| {
+                place_word_mut(asset, "中心").semantic_alias = Some("absent".to_owned());
+            },
+        ),
+        (
+            "semantic_alias_category_crossing",
+            |asset: &mut SaijikiAsset| {
+                place_word_mut(asset, "中心").semantic_alias = Some("blue".to_owned());
+            },
+        ),
+        ("semantic_alias_cycle", |asset: &mut SaijikiAsset| {
+            place_word_mut(asset, "中央").semantic_alias = Some("middle".to_owned());
+        }),
+        ("conflicting_semantic_alias", |asset: &mut SaijikiAsset| {
+            place_word_mut(asset, "中央").surface_en = Some("middle".to_owned());
+        }),
+    ];
+
+    for (expected_kind, mutate) in cases {
+        let mut asset: SaijikiAsset = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+        mutate(&mut asset);
+        let error = saijiki_derived_projection_from_asset(&asset, ResolvedInstructionLanguage::En)
+            .unwrap_err();
+        assert_eq!(error.kind(), expected_kind);
+    }
+}
+
+#[test]
+fn alias_free_rows_keep_their_existing_lexical_semantic_identity() {
+    for category in &saijiki_asset().categories {
+        for word in &category.words {
+            if word.semantic_alias.is_some() {
+                continue;
+            }
+            let expected = word.score_value.clone().or_else(|| {
+                word.surface_en
+                    .as_deref()
+                    .map(|surface| surface.replace(['-', ' '], "_"))
+            });
+            assert_eq!(
+                project_macro_semantic_ref(&category.key, &word.surface_ja)
+                    .map(|projection| projection.canonical_id),
+                expected,
+                "{}/{}",
+                category.key,
+                word.surface_ja
+            );
+        }
+    }
+}
+
+fn place_word_mut<'a>(asset: &'a mut SaijikiAsset, surface_ja: &str) -> &'a mut SaijikiWordAsset {
+    asset
+        .categories
+        .iter_mut()
+        .find(|category| category.key == "basho")
+        .unwrap()
+        .words
+        .iter_mut()
+        .find(|word| word.surface_ja == surface_ja)
+        .unwrap()
 }
 
 #[test]

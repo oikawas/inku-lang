@@ -2,13 +2,66 @@ use std::collections::{BTreeMap, HashSet};
 
 use inku_ddl::{
     LEGACY_PLUGIN_FORMAT_WARNING, LegacyImportOutcome, MACRO_DEFINITION_DIGEST_DOMAIN,
-    MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
+    MACRO_DEFINITION_SCHEMA_ID, MacroDefinition, project_macro_semantic_ref,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
+
+#[test]
+fn central_place_rows_share_one_typed_semantic_identity() {
+    let central = project_macro_semantic_ref("basho", "中央").unwrap();
+    let middle = project_macro_semantic_ref("basho", "中心").unwrap();
+
+    assert_eq!(central.category, "place");
+    assert_eq!(middle.category, "place");
+    assert_eq!(central.canonical_id, "center");
+    assert_eq!(middle.canonical_id, "center");
+}
+
+#[test]
+fn lexical_place_ids_remain_valid_inputs_but_share_canonical_definition_identity() {
+    let definition = |id: &str| {
+        MacroDefinition::from_json(
+            &serde_json::json!({
+                "schema": "inku.macro-definition.v1",
+                "namespace": "Alias",
+                "heading": "Place",
+                "version": "1.0.0",
+                "parameters": {},
+                "components": {},
+                "body": [{
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                        "place": {"expr": "semantic_ref", "category": "place", "id": id}
+                    }
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap()
+    };
+    let center = definition("center");
+    let middle = definition("middle");
+
+    assert!(serde_json::to_string(&middle).unwrap().contains("middle"));
+    assert_eq!(
+        middle.canonical_json_bytes().unwrap(),
+        center.canonical_json_bytes().unwrap()
+    );
+    assert_eq!(
+        middle.identity().unwrap().full_digest_hex(),
+        center.identity().unwrap().full_digest_hex()
+    );
+    assert!(
+        !std::str::from_utf8(&middle.canonical_json_bytes().unwrap())
+            .unwrap()
+            .contains("middle")
+    );
+}
 
 #[derive(Deserialize)]
 struct Fixture {

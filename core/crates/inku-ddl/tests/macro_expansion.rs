@@ -463,6 +463,49 @@ fn incomplete_i581_outcome_is_owned_unchanged_and_never_expanded() {
 }
 
 #[test]
+fn definition_local_place_alias_materializes_only_the_canonical_value() {
+    let definition = |id: &str| {
+        MacroDefinition::from_json(
+            &serde_json::json!({
+                "schema": "inku.macro-definition.v1",
+                "namespace": "Alias",
+                "heading": "Place",
+                "version": "1.0.0",
+                "parameters": {},
+                "components": {},
+                "body": [{
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                        "place": {"expr": "semantic_ref", "category": "place", "id": id}
+                    }
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap()
+    };
+
+    for id in ["center", "middle"] {
+        let definition = definition(id);
+        let binding = binding(&definition, "Alias.Place", "en");
+        let seeds = seeds(&binding, "Alias.Place", 17);
+        let result = expand_macros(binding, &[definition], &seeds, LIMITS);
+        assert!(result.diagnostics.is_empty(), "{id}");
+        let ExpandedMacroNode::Emit { fields, .. } = &result.expanded[0].nodes[0] else {
+            panic!("{id}: expected emitted node");
+        };
+        assert_eq!(
+            fields.get("place"),
+            Some(&ExpandedMacroValue::SemanticRef {
+                category: "place".to_owned(),
+                id: "center".to_owned(),
+            })
+        );
+    }
+}
+
+#[test]
 fn fixture_schema_and_required_coverage_are_fixed() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.macro-expansion-v1-fixture.v1");

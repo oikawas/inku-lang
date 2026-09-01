@@ -8,6 +8,7 @@ use crate::{
     BoundMacroParameterValue, CompleteMacroParameterBinding, Expression, MacroDefinition,
     MacroDefinitionIdentity, MacroParameterBindingResult, MacroSeed, NumericRange, ParameterSchema,
     SemanticMap, SourceSpan, Statement, TransformExpression,
+    macro_definition::canonical_semantic_ref_id,
 };
 
 /// Stable identity for the runtime-disconnected expansion overlay.
@@ -527,10 +528,12 @@ fn bound_value(value: &BoundMacroParameterValue) -> Result<ExpandedMacroValue, E
             category,
             canonical_id,
             ..
-        } => Ok(ExpandedMacroValue::SemanticRef {
-            category: category.clone(),
-            id: canonical_id.clone(),
-        }),
+        } => canonical_semantic_ref_id(category, canonical_id)
+            .map(|id| ExpandedMacroValue::SemanticRef {
+                category: category.clone(),
+                id,
+            })
+            .ok_or_else(|| EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch)),
     }
 }
 
@@ -1070,10 +1073,14 @@ impl<'a> Evaluator<'a> {
             Expression::Local { name } => environment.locals.get(name).cloned().ok_or_else(|| {
                 EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch).at(path)
             }),
-            Expression::SemanticRef { category, id } => Ok(ExpandedMacroValue::SemanticRef {
-                category: category.clone(),
-                id: id.clone(),
-            }),
+            Expression::SemanticRef { category, id } => canonical_semantic_ref_id(category, id)
+                .map(|id| ExpandedMacroValue::SemanticRef {
+                    category: category.clone(),
+                    id,
+                })
+                .ok_or_else(|| {
+                    EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch).at(path)
+                }),
         }
     }
 

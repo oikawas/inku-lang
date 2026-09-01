@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v7";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v8";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -197,7 +197,7 @@ pub struct SemanticProportion {
     pub arc_form: Option<SemanticTerm>,
 }
 
-/// One single-head entity. A field is absent only when it was not explicitly and uniquely stated.
+/// One independently owned head entity. A field is absent unless it has one explicit owner.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticEntity {
     pub head: SemanticHead,
@@ -1076,14 +1076,17 @@ fn associate_region(
     issues: &mut Vec<SemanticAssociationIssue>,
 ) {
     if region.heads.len() > 1 {
+        region
+            .heads
+            .sort_by_key(|head| head.source().span.start_byte);
+        entities.extend(region.heads.drain(..).map(empty_entity));
         let surface_occurrences = take_surface_occurrences(&mut region);
         let fluctuation_occurrences = take_fluctuation_occurrences(&mut region);
         let proportion_occurrences = take_proportion_occurrences(&mut region);
         let mut occurrences = region
-            .heads
+            .colors
             .drain(..)
-            .map(OwnedSemanticOccurrence::Head)
-            .chain(region.colors.drain(..).map(OwnedSemanticOccurrence::Color))
+            .map(OwnedSemanticOccurrence::Color)
             .chain(
                 region
                     .quantities
@@ -1103,12 +1106,14 @@ fn associate_region(
             .chain(proportion_occurrences)
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
-        issues.push(SemanticAssociationIssue {
-            kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
-            region_index,
-            occurrences,
-            upstream_diagnostic: None,
-        });
+        if !occurrences.is_empty() {
+            issues.push(SemanticAssociationIssue {
+                kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
+                region_index,
+                occurrences,
+                upstream_diagnostic: None,
+            });
+        }
         append_upstream_issues(region_index, region.diagnostics, issues);
         return;
     }
@@ -1311,6 +1316,20 @@ fn associate_region(
         },
     });
     append_upstream_issues(region_index, region.diagnostics, issues);
+}
+
+fn empty_entity(head: SemanticHead) -> SemanticEntity {
+    SemanticEntity {
+        head,
+        color: None,
+        quantity: None,
+        touch: None,
+        continuity: None,
+        angle: None,
+        surface: SemanticSurface::default(),
+        fluctuation: SemanticFluctuation::default(),
+        proportion: SemanticProportion::default(),
+    }
 }
 
 fn take_surface_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemanticOccurrence> {

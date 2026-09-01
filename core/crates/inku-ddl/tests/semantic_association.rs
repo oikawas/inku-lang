@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v7.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v8.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -438,13 +438,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v7"
+        "inku.semantic-entity-association.v8"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v7"
+        "inku.semantic-entity-association-fixture.v8"
     );
-    assert_eq!(fixture.version, 7);
+    assert_eq!(fixture.version, 8);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -542,6 +542,107 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
             "missing required fixture case: {required}"
         );
     }
+}
+
+#[test]
+fn head_only_multi_head_regions_are_complete_source_ordered_entity_sequences() {
+    let mut canonical = Vec::new();
+    for (source, language, expected) in [
+        (
+            "circle line",
+            ResolvedInstructionLanguage::En,
+            ["circle", "line"],
+        ),
+        ("円 線", ResolvedInstructionLanguage::Ja, ["circle", "line"]),
+        (
+            "line circle",
+            ResolvedInstructionLanguage::En,
+            ["line", "circle"],
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+        assert!(result.issues.is_empty(), "{source}");
+        assert!(result.ast.complete, "{source}");
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .map(|entity| match &entity.head {
+                    SemanticHead::Primitive(term) => term.identity.id.as_str(),
+                    SemanticHead::MacroInvocation(_) => "macro",
+                })
+                .collect::<Vec<_>>(),
+            expected,
+            "{source}"
+        );
+        assert!(result.ast.entities.iter().all(|entity| {
+            entity.color.is_none()
+                && entity.quantity.is_none()
+                && entity.touch.is_none()
+                && entity.continuity.is_none()
+                && entity.angle.is_none()
+                && entity.surface.quality.is_none()
+                && entity.surface.intensity.is_none()
+                && entity.fluctuation.amplitude.is_none()
+                && entity.fluctuation.frequency.is_none()
+                && entity.fluctuation.quality.is_none()
+                && entity.proportion.aspect.is_none()
+                && entity.proportion.width_extent.is_none()
+                && entity.proportion.arc_form.is_none()
+        }));
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+    assert_eq!(canonical[0], canonical[1], "JA/EN meaning parity");
+    assert_ne!(canonical[0], canonical[2], "head order is semantic");
+}
+
+#[test]
+fn multi_head_modifiers_are_issues_without_redelivering_heads() {
+    let document = NormalizedDdlDocument::new(
+        "red circle blue line eight pen dashed horizontal solid dense fine slowly swaying tall full-width semicircle",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+
+    assert_eq!(result.ast.entities.len(), 2);
+    assert!(result.ast.entities.iter().all(|entity| {
+        entity.color.is_none()
+            && entity.quantity.is_none()
+            && entity.touch.is_none()
+            && entity.continuity.is_none()
+            && entity.angle.is_none()
+            && entity.surface.quality.is_none()
+            && entity.surface.intensity.is_none()
+            && entity.fluctuation.amplitude.is_none()
+            && entity.fluctuation.frequency.is_none()
+            && entity.fluctuation.quality.is_none()
+            && entity.proportion.aspect.is_none()
+            && entity.proportion.width_extent.is_none()
+            && entity.proportion.arc_form.is_none()
+    }));
+    assert_eq!(
+        association_issue_kinds(&result),
+        ["ambiguous_entity_ownership"]
+    );
+    assert_eq!(result.issues[0].occurrences.len(), 14);
+    assert!(
+        result.issues[0]
+            .occurrences
+            .iter()
+            .all(|occurrence| !matches!(occurrence, OwnedSemanticOccurrence::Head(_)))
+    );
+    assert!(
+        result.issues[0]
+            .occurrences
+            .windows(2)
+            .all(|pair| pair[0].source().span.start_byte < pair[1].source().span.start_byte)
+    );
+    assert_eq!(result.owned_occurrence_count, 16);
+    assert_eq!(result.delivered_occurrence_count, 16);
 }
 
 #[test]
@@ -1574,11 +1675,33 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&zero),
     );
-    assert_eq!(
-        association_issue_kinds(&primitive_and_macro),
-        ["ambiguous_entity_ownership"]
+    assert!(primitive_and_macro.issues.is_empty());
+    assert!(primitive_and_macro.ast.complete);
+    assert_eq!(primitive_and_macro.ast.entities.len(), 2);
+    assert!(matches!(
+        primitive_and_macro.ast.entities[0].head,
+        SemanticHead::MacroInvocation(_)
+    ));
+    assert!(matches!(
+        primitive_and_macro.ast.entities[1].head,
+        SemanticHead::Primitive(_)
+    ));
+
+    let primitive_then_macro = macro_association(
+        "circle Nature.Leaf",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&zero),
     );
-    assert!(primitive_and_macro.ast.entities.is_empty());
+    assert!(primitive_then_macro.issues.is_empty());
+    assert!(primitive_then_macro.ast.complete);
+    assert!(matches!(
+        primitive_then_macro.ast.entities[0].head,
+        SemanticHead::Primitive(_)
+    ));
+    assert!(matches!(
+        primitive_then_macro.ast.entities[1].head,
+        SemanticHead::MacroInvocation(_)
+    ));
 
     let other = semantic_macro_definition(
         "Nature",
@@ -1592,11 +1715,16 @@ fn macro_diagnostics_and_ambiguous_heads_never_fall_back_or_guess() {
         ResolvedInstructionLanguage::En,
         &[zero, other],
     );
-    assert_eq!(
-        association_issue_kinds(&multiple_macro),
-        ["ambiguous_entity_ownership"]
+    assert!(multiple_macro.issues.is_empty());
+    assert!(multiple_macro.ast.complete);
+    assert_eq!(multiple_macro.ast.entities.len(), 2);
+    assert!(
+        multiple_macro
+            .ast
+            .entities
+            .iter()
+            .all(|entity| matches!(entity.head, SemanticHead::MacroInvocation(_)))
     );
-    assert!(multiple_macro.ast.entities.is_empty());
 }
 
 fn semantic_macro_definition(

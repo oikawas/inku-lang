@@ -1,0 +1,52 @@
+{
+  "schema": "inku.compiler-lock-visible-patch-fixture.v3",
+  "version": 3,
+  "definition": {
+    "schema": "inku.macro-definition.v1",
+    "namespace": "Canon",
+    "heading": "Empty",
+    "version": "1.0.0",
+    "parameters": {},
+    "components": {},
+    "body": []
+  },
+  "known_answers": {
+    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v5\"}",
+    "canonical_sha256": "d3e155a5c54dd29dfd3935fc6c19aefa643d71d086288887c15379f3f69f5ad8",
+    "seed_digest": "14783d93fa6417c6bf967d29410c9af54235adecc1ba19dedbcade71a09c3c30",
+    "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
+    "full_lock_digest": "b9a0885064b5a558deebebb6b1f7091a5f76f5eb91cea5f47c214052f3736e39"
+  },
+  "delivery_case_ids": [
+    "explicit-and-syntax",
+    "relation-zero-hole",
+    "relation-exact-one",
+    "head-only-multiple-ready",
+    "parser-hole",
+    "unknown-blocking",
+    "macro-missing-hole",
+    "macro-ambiguous-conflict",
+    "expansion-diagnostic-hole"
+  ],
+  "patch_case_ids": [
+    "valid-single",
+    "valid-multiple",
+    "valid-subset",
+    "stale-source",
+    "stale-lock",
+    "span-mismatch",
+    "range-mismatch",
+    "out-of-bound",
+    "non-char-boundary",
+    "unordered",
+    "overlap",
+    "duplicate-hole",
+    "empty-replacement",
+    "explicit-target",
+    "unknown-target",
+    "conflict-base",
+    "unknown-base",
+    "unresolved-replacement",
+    "new-macro-without-lock"
+  ]
+}

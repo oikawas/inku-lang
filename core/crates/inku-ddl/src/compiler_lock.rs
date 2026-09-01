@@ -19,13 +19,13 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v2";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v3";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v2";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v3";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v2";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v3";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -589,8 +589,17 @@ fn project_deliveries(
                     add_blocking(&mut projection, kind, None);
                 }
             }
-            SemanticAssociationIssueKind::AmbiguousEntityOwnership
-            | SemanticAssociationIssueKind::ConflictingColors
+            SemanticAssociationIssueKind::AmbiguousEntityOwnership => {
+                for occurrence in &issue.occurrences {
+                    add_conflict(
+                        &mut projection,
+                        kind,
+                        Some(occurrence.source().span),
+                        vec![owned_occurrence_key(occurrence)],
+                    );
+                }
+            }
+            SemanticAssociationIssueKind::ConflictingColors
             | SemanticAssociationIssueKind::ConflictingQuantities
             | SemanticAssociationIssueKind::ConflictingTouches
             | SemanticAssociationIssueKind::ConflictingContinuities
@@ -635,6 +644,17 @@ fn project_deliveries(
             .first()
             .map(|occurrence| occurrence.term.provenance.source.span);
         match issue.kind {
+            SemanticInstructionIssueKind::AmbiguousActionOwnership
+            | SemanticInstructionIssueKind::AmbiguousPositionOwnership => {
+                for occurrence in &issue.occurrences {
+                    add_conflict(
+                        &mut projection,
+                        issue.kind.as_str(),
+                        Some(occurrence.term.provenance.source.span),
+                        vec![term_key(&occurrence.term)],
+                    );
+                }
+            }
             SemanticInstructionIssueKind::ConflictingActions
             | SemanticInstructionIssueKind::ConflictingPositions => add_conflict(
                 &mut projection,
@@ -659,6 +679,20 @@ fn project_deliveries(
             .first()
             .map(|occurrence| occurrence.provenance.span);
         match issue.kind {
+            SemanticRelationIssueKind::AmbiguousCurrentInstructionOwnership => {
+                for occurrence in &issue.occurrences {
+                    add_conflict(
+                        &mut projection,
+                        issue.kind.as_str(),
+                        Some(occurrence.provenance.span),
+                        vec![format!(
+                            "{}:{}",
+                            occurrence.kind.as_str(),
+                            occurrence.reference.as_str()
+                        )],
+                    );
+                }
+            }
             SemanticRelationIssueKind::ConflictingRelations => add_conflict(
                 &mut projection,
                 issue.kind.as_str(),

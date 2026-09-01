@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v2.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v3.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -71,6 +71,144 @@ fn structured_document_is_the_only_pre_expansion_meaning_authority() {
             .canonical_pre_expansion_digest,
         semantic_document.canonical_bytes.as_deref().map(sha256)
     );
+}
+
+#[test]
+fn multi_head_sequence_reaches_lock_while_unresolved_fields_are_conflicts() {
+    let forward = compile(
+        "circle line",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let reverse = compile(
+        "line circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    for result in [&forward, &reverse] {
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady)
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+                .count(),
+            2
+        );
+    }
+    assert_ne!(
+        forward.pre_expansion_canonical_bytes(),
+        reverse.pre_expansion_canonical_bytes()
+    );
+    assert_ne!(
+        forward.compiler_lock.as_ref().unwrap().full_digest,
+        reverse.compiler_lock.as_ref().unwrap().full_digest
+    );
+
+    let unresolved = compile(
+        "circle line red eight",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        unresolved.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::BlockedConflict)
+    );
+    assert_eq!(unresolved.conflicts.len(), 2);
+    assert_eq!(
+        unresolved
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+            .count(),
+        2
+    );
+    assert_eq!(
+        unresolved
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.kind == inku_ddl::SemanticDeliveryKind::Conflict)
+            .count(),
+        2
+    );
+
+    let instruction_ambiguity = compile(
+        "place center circle line",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(instruction_ambiguity.conflicts.len(), 2);
+    assert_eq!(
+        instruction_ambiguity
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+            .count(),
+        2
+    );
+
+    let relation = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "touching")
+        .and_then(|relation| relation.literals_en.first())
+        .expect("accepted touching relation has one EN full literal");
+    let relation_ambiguity = compile(
+        &format!("circle line {relation}"),
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(relation_ambiguity.conflicts.len(), 1);
+    assert_eq!(
+        relation_ambiguity.conflicts[0].kind,
+        "ambiguous_current_relation_ownership"
+    );
+
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
+    );
+    for (source, macro_index) in [("Canon.Empty circle", 0), ("circle Canon.Empty", 1)] {
+        let result = compile_locked(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+            None,
+            LIMITS,
+        );
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        let document = result.semantic_document.as_ref().unwrap();
+        assert_eq!(document.ast.instructions.len(), 2, "{source}");
+        assert!(matches!(
+            document.ast.instructions[macro_index].entity.head,
+            SemanticHead::MacroInvocation(_)
+        ));
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+                .count(),
+            2,
+            "{source}"
+        );
+    }
 }
 
 #[test]
@@ -568,7 +706,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             CompilerLockState::CanonicalReady,
         ),
         (
-            "relation-multiple-conflict",
+            "head-only-multiple-ready",
             compile(
                 "circle with line of square",
                 ResolvedInstructionLanguage::En,
@@ -576,7 +714,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::BlockedConflict,
+            CompilerLockState::CanonicalReady,
         ),
         (
             "parser-hole",
@@ -782,12 +920,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v2"
+        "inku.compiler-lock-visible-patch-fixture.v3"
     );
-    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.version, 3);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v4"
+        "inku.semantic-document.v5"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

@@ -18,7 +18,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v8";
+    "inku.semantic-instruction-association.v9";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -72,6 +72,8 @@ pub struct SemanticInstructionOccurrence {
 /// Stable, expected instruction-association issue classes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticInstructionIssueKind {
+    AmbiguousActionOwnership,
+    AmbiguousPositionOwnership,
     ConflictingActions,
     MissingActionEntity,
     ConflictingPositions,
@@ -81,6 +83,8 @@ pub enum SemanticInstructionIssueKind {
 impl SemanticInstructionIssueKind {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::AmbiguousActionOwnership => "ambiguous_action_ownership",
+            Self::AmbiguousPositionOwnership => "ambiguous_position_ownership",
             Self::ConflictingActions => "conflicting_actions",
             Self::MissingActionEntity => "missing_action_entity",
             Self::ConflictingPositions => "conflicting_positions",
@@ -100,6 +104,7 @@ pub struct SemanticInstructionIssue {
 /// Stable relation-association issue classes without fallback target selection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticRelationIssueKind {
+    AmbiguousCurrentInstructionOwnership,
     ConflictingRelations,
     MissingCurrentInstruction,
     MissingPreviousOne,
@@ -109,6 +114,7 @@ pub enum SemanticRelationIssueKind {
 impl SemanticRelationIssueKind {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::AmbiguousCurrentInstructionOwnership => "ambiguous_current_relation_ownership",
             Self::ConflictingRelations => "conflicting_relations",
             Self::MissingCurrentInstruction => "missing_current_instruction",
             Self::MissingPreviousOne => "missing_previous_one",
@@ -217,8 +223,61 @@ fn build_semantic_instructions(
     let mut instructions = Vec::new();
     let mut issues = Vec::new();
     let mut relation_issues = Vec::new();
+    let mut entity_counts_by_region = BTreeMap::<usize, usize>::new();
+    for entity in &association.ast.entities {
+        *entity_counts_by_region
+            .entry(entity.head.source().region_index)
+            .or_default() += 1;
+    }
+    for (&region_index, &entity_count) in &entity_counts_by_region {
+        if entity_count < 2 {
+            continue;
+        }
+        let region = occurrences_by_region
+            .remove(&region_index)
+            .unwrap_or_default();
+        let mut region_issues = Vec::new();
+        append_orphan_issue(
+            region.actions,
+            SemanticInstructionOccurrenceRole::Action,
+            SemanticInstructionIssueKind::AmbiguousActionOwnership,
+            region_index,
+            &mut region_issues,
+        );
+        append_orphan_issue(
+            region.positions,
+            SemanticInstructionOccurrenceRole::Position,
+            SemanticInstructionIssueKind::AmbiguousPositionOwnership,
+            region_index,
+            &mut region_issues,
+        );
+        region_issues.sort_by_key(|issue| {
+            issue
+                .occurrences
+                .first()
+                .map(|occurrence| occurrence.term.provenance.source.span.start_byte)
+                .unwrap_or(usize::MAX)
+        });
+        issues.extend(region_issues);
+        if !region.relations.is_empty() {
+            relation_issues.push(SemanticRelationIssue {
+                kind: SemanticRelationIssueKind::AmbiguousCurrentInstructionOwnership,
+                region_index,
+                occurrences: region.relations,
+            });
+        }
+    }
     for entity in &association.ast.entities {
         let region_index = entity.head.source().region_index;
+        if entity_counts_by_region[&region_index] > 1 {
+            instructions.push(SemanticInstruction {
+                entity: entity.clone(),
+                action: None,
+                position: None,
+                relation: None,
+            });
+            continue;
+        }
         let region = occurrences_by_region
             .remove(&region_index)
             .unwrap_or_default();

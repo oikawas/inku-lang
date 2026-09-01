@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v8.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v9.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -503,13 +503,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v8"
+        "inku.semantic-instruction-association.v9"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v8"
+        "inku.semantic-instruction-association-fixture.v9"
     );
-    assert_eq!(fixture.version, 8);
+    assert_eq!(fixture.version, 9);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -547,6 +547,84 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
             "missing required fixture case: {required}"
         );
     }
+}
+
+#[test]
+fn multi_head_instruction_and_relation_owners_remain_ambiguous_exactly_once() {
+    let document = NormalizedDdlDocument::new(
+        "place center circle line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+    assert_eq!(result.ast.instructions.len(), 2);
+    assert!(result.ast.instructions.iter().all(|instruction| {
+        instruction.action.is_none()
+            && instruction.position.is_none()
+            && instruction.relation.is_none()
+    }));
+    assert_eq!(
+        result
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["ambiguous_action_ownership", "ambiguous_position_ownership"]
+    );
+    assert_eq!(
+        result
+            .issues
+            .iter()
+            .map(|issue| issue.occurrences.len())
+            .sum::<usize>(),
+        2
+    );
+    assert_eq!(result.owned_instruction_occurrence_count, 2);
+    assert_eq!(result.delivered_instruction_occurrence_count, 2);
+
+    let document = NormalizedDdlDocument::new(
+        "center place circle line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let reversed = associate_semantic_instructions(&document).unwrap();
+    assert_eq!(
+        reversed
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["ambiguous_position_ownership", "ambiguous_action_ownership"]
+    );
+
+    let relation = saijiki_asset()
+        .relations
+        .iter()
+        .find(|relation| relation.relation_type == "touching")
+        .and_then(|relation| relation.literals_en.first())
+        .expect("accepted touching relation has one EN full literal");
+    let source = format!("circle line {relation}");
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+    assert_eq!(result.ast.instructions.len(), 2);
+    assert!(
+        result
+            .ast
+            .instructions
+            .iter()
+            .all(|instruction| instruction.relation.is_none())
+    );
+    assert_eq!(result.relation_issues.len(), 1);
+    assert_eq!(
+        result.relation_issues[0].kind.as_str(),
+        "ambiguous_current_relation_ownership"
+    );
+    assert_eq!(result.relation_issues[0].occurrences.len(), 1);
+    assert_eq!(result.owned_relation_occurrence_count, 1);
+    assert_eq!(result.delivered_relation_occurrence_count, 1);
 }
 
 #[test]
@@ -952,7 +1030,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v8"
+        "inku.semantic-instruction-association.v9"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

@@ -2,15 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
     ClauseAtom, ClauseStream, CoreRoleKind, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    SEMANTIC_DOCUMENT_SCHEMA_ID, SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-    SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticDocumentResult, SemanticHead,
-    SemanticInstructionAssociationResult, SourceOccurrence, associate_semantic_document,
-    associate_semantic_document_with_macro_binding, bind_macro_parameters,
-    project_macro_semantic_ref, saijiki_asset,
+    ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID,
+    SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
+    SemanticDocumentResult, SemanticHead, SemanticInstructionAssociationResult, SourceOccurrence,
+    associate_semantic_document, associate_semantic_document_with_macro_binding,
+    bind_macro_parameters, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v4.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v5.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -241,17 +241,17 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v4");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v5");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v7"
+        "inku.semantic-entity-association.v8"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v8"
+        "inku.semantic-instruction-association.v9"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v4");
-    assert_eq!(fixture.version, 4);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v5");
+    assert_eq!(fixture.version, 5);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -279,6 +279,44 @@ fn schema_fixture_and_required_document_boundaries_are_guarded() {
             "missing required fixture case: {required}"
         );
     }
+}
+
+#[test]
+fn head_only_multi_head_document_preserves_order_and_is_canonical_ready() {
+    let mut canonical = Vec::new();
+    for source in ["paper circle line", "paper line circle"] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+        assert!(result.issues.is_empty());
+        assert!(result.instruction_association.issues.is_empty());
+        assert!(result.instruction_association.relation_issues.is_empty());
+        assert!(result.ast.complete);
+        assert_eq!(
+            result
+                .ast
+                .ground
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("paper")
+        );
+        assert_eq!(result.ast.instructions.len(), 2);
+        assert_eq!(
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| match &instruction.entity.head {
+                    SemanticHead::Primitive(term) => term.identity.id.as_str(),
+                    SemanticHead::MacroInvocation(_) => "macro",
+                })
+                .collect::<Vec<_>>(),
+            source.split_whitespace().skip(1).collect::<Vec<_>>()
+        );
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+    assert_ne!(canonical[0], canonical[1]);
 }
 
 #[test]
@@ -408,7 +446,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v4");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v5");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -565,7 +603,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v4");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v5");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

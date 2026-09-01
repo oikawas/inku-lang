@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v2.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v3.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -19,6 +19,8 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 
 #[derive(Deserialize)]
 struct FixtureIds {
+    schema: String,
+    version: u32,
     patch_case_ids: Vec<String>,
 }
 
@@ -190,7 +192,7 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
 
 #[test]
 fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
-    let conflict = base("circle with line of square");
+    let conflict = base("circle line red");
     assert_eq!(
         conflict.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::BlockedConflict
@@ -322,6 +324,11 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
 fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     let fixture: FixtureIds = serde_json::from_str(FIXTURE).unwrap();
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
+    assert_eq!(
+        fixture.schema,
+        "inku.compiler-lock-visible-patch-fixture.v3"
+    );
+    assert_eq!(fixture.version, 3);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

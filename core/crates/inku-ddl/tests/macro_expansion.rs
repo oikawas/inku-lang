@@ -182,6 +182,67 @@ fn fixed_fixture_materializes_all_operators_as_closed_nodes_with_complete_proven
 }
 
 #[test]
+fn crossed_seed_is_not_accounted_by_name_or_ordinal_alone() {
+    let fixture = load_fixture();
+    let empty = definition(&fixture, "empty");
+    let mut other = empty.clone();
+    other.heading = "Other".to_owned();
+    let definitions = [empty, other];
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+        })
+        .collect();
+    let source = "Expand.Empty Expand.Other";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, locks).unwrap();
+    let binding = bind_macro_parameters(&document, &definitions).unwrap();
+    assert_eq!(binding.complete.len(), 2);
+    let valid_seeds = seeds(&binding, source, 29);
+
+    let normal = expand_macros(binding.clone(), &definitions, &valid_seeds, LIMITS);
+    assert!(normal.diagnostics.is_empty());
+    assert_eq!(normal.expanded.len(), 2);
+    assert_eq!(
+        normal
+            .expanded
+            .iter()
+            .map(|expanded| expanded.provenance.definition_qualified_name.as_str())
+            .collect::<Vec<_>>(),
+        ["Expand.Empty", "Expand.Other"]
+    );
+    for (index, (expanded, seed)) in normal.expanded.iter().zip(&valid_seeds).enumerate() {
+        assert_eq!(expanded.provenance.invocation_index, index);
+        assert_eq!(expanded.provenance.invocation_ordinal, index as u64);
+        assert_eq!(expanded.provenance.seed_full_digest, seed.full_digest_hex());
+        assert_eq!(expanded.provenance.resolved_seed, seed.resolved_seed());
+        assert_eq!(
+            expanded.provenance.effective_composition_seed,
+            seed.effective_composition_seed()
+        );
+    }
+
+    let crossed = derive_macro_seed(
+        source,
+        &MacroInvocation::new("Expand", "Empty", 1).unwrap(),
+        Some(29),
+    );
+    let mut seeds_with_crossed = valid_seeds;
+    seeds_with_crossed.push(crossed);
+    assert_global_failure(
+        expand_macros(binding, &definitions, &seeds_with_crossed, LIMITS),
+        MacroExpansionDiagnosticKind::MismatchedSeed,
+    );
+}
+
+#[test]
 fn vary_framing_paths_and_modulo_match_fixed_known_answers() {
     let fixture = load_fixture();
     assert_eq!(MACRO_VARY_CHOICE_SCHEME_ID, "inku.macro-vary-choice.v1");
@@ -409,6 +470,40 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         expand_macros(all_binding.clone(), &[all.clone()], &[wrong_seed], LIMITS),
         MacroExpansionDiagnosticKind::MismatchedSeed,
     );
+    let ordinal_only_seed = derive_macro_seed(
+        "studio.枝組.共通 2",
+        &MacroInvocation::new("Other", "Seed", 0).unwrap(),
+        Some(7),
+    );
+    assert_invocation_failure(
+        expand_macros(
+            all_binding.clone(),
+            &[all.clone()],
+            &[ordinal_only_seed],
+            LIMITS,
+        ),
+        MacroExpansionDiagnosticKind::MismatchedSeed,
+    );
+    let both_mismatch_seed = derive_macro_seed(
+        "studio.枝組.共通 2",
+        &MacroInvocation::new("Other", "Seed", 9).unwrap(),
+        Some(7),
+    );
+    let both_mismatch = expand_macros(
+        all_binding.clone(),
+        &[all.clone()],
+        &[both_mismatch_seed],
+        LIMITS,
+    );
+    assert!(both_mismatch.expanded.is_empty());
+    assert!(both_mismatch.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == MacroExpansionDiagnosticKind::MissingSeed
+            && diagnostic.invocation_index.is_some()
+    }));
+    assert!(both_mismatch.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == MacroExpansionDiagnosticKind::MismatchedSeed
+            && diagnostic.invocation_index.is_none()
+    }));
     assert_invocation_failure(
         expand_macros(all_binding.clone(), &[], &all_seed, LIMITS),
         MacroExpansionDiagnosticKind::DefinitionOwnershipMismatch,

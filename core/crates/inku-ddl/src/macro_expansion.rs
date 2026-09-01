@@ -245,9 +245,7 @@ pub fn expand_macros(
 
     for (binding_index, binding) in parameter_binding.complete.iter().enumerate() {
         for (seed_index, seed) in seeds.iter().enumerate() {
-            if seed.qualified_macro_name() == binding.definition_identity.qualified_name()
-                || seed.ordinal() == binding.invocation_ordinal
-            {
+            if seed_matches_binding(seed, binding) {
                 accounted_seed_indices.insert(seed_index);
             }
         }
@@ -406,14 +404,14 @@ fn prepare_invocation(
     let matching_seed_indices = seeds
         .iter()
         .enumerate()
-        .filter(|(_, seed)| {
-            seed.qualified_macro_name() == identity.qualified_name()
-                && seed.ordinal() == binding.invocation_ordinal
-        })
+        .filter(|(_, seed)| seed_matches_binding(seed, binding))
         .map(|(index, _)| index)
         .collect::<Vec<_>>();
     let seed_index = match matching_seed_indices.as_slice() {
         [] => {
+            // A partial identity match localizes the existing invocation diagnostic only. It is
+            // never ownership or consumption evidence; global accounting still requires the
+            // complete pair through `seed_matches_binding`.
             let mismatched = seeds.iter().any(|seed| {
                 seed.qualified_macro_name() == identity.qualified_name()
                     || seed.ordinal() == binding.invocation_ordinal
@@ -443,6 +441,11 @@ fn prepare_invocation(
         node_count: evaluator.nodes,
         identity: identity.clone(),
     })
+}
+
+fn seed_matches_binding(seed: &MacroSeed, binding: &CompleteMacroParameterBinding) -> bool {
+    seed.qualified_macro_name() == binding.definition_identity.qualified_name()
+        && seed.ordinal() == binding.invocation_ordinal
 }
 
 fn root_environment(

@@ -6,10 +6,10 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected core-role composition foundation.
-pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v2";
+pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v3";
 
 /// Stable identity for the runtime-disconnected remaining-role composition foundation.
-pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v2";
+pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v3";
 
 /// One of the exact core drawing roles typed by this foundation slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

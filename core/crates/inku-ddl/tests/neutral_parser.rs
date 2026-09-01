@@ -7,7 +7,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/neutral-parser-v4.json");
+const FIXTURE: &str = include_str!("fixtures/neutral-parser-v5.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -463,11 +463,11 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v4"
+        "inku.neutral-lexeme-parser.v5"
     );
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v4");
-    assert_eq!(fixture.version, 4);
-    assert_eq!(fixture.cases.len(), 28);
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v5");
+    assert_eq!(fixture.version, 5);
+    assert_eq!(fixture.cases.len(), 30);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -505,6 +505,8 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "ja-consecutive-known-terms",
         "ja-invalid-derived-suffix-counter",
         "ja-agglutinative-punctuation-newline",
+        "ja-core-relative-scale-small",
+        "en-core-relative-scale-small-case-insensitive",
     ] {
         assert!(
             ids.contains(required),
@@ -685,6 +687,54 @@ fn core_thinness_respects_ja_and_en_word_boundaries() {
 }
 
 #[test]
+fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
+    for (source, language, expected_surface) in [
+        ("小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
+        ("青小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
+        ("青 小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
+        ("SMALL circle", ResolvedInstructionLanguage::En, "SMALL"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+        let modifiers = result
+            .tokens
+            .iter()
+            .filter_map(|token| match &token.kind {
+                NeutralTokenKind::CoreModifier(identity)
+                    if identity.dimension.as_str() == "relative_scale" =>
+                {
+                    Some((token.surface.as_str(), identity.value.as_str()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(modifiers, [(expected_surface, "small")], "{source}");
+    }
+
+    for (source, language) in [
+        ("大小さな円", ResolvedInstructionLanguage::Ja),
+        ("未知小さな円", ResolvedInstructionLanguage::Ja),
+        ("未知 小さな円", ResolvedInstructionLanguage::Ja),
+        (" 小さな円", ResolvedInstructionLanguage::Ja),
+        ("小さな", ResolvedInstructionLanguage::Ja),
+        ("小さな紙", ResolvedInstructionLanguage::Ja),
+        ("smallish circle", ResolvedInstructionLanguage::En),
+        ("Nature.small circle", ResolvedInstructionLanguage::En),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(
+            result.tokens.iter().all(|token| !matches!(
+                &token.kind,
+                NeutralTokenKind::CoreModifier(identity)
+                    if identity.dimension.as_str() == "relative_scale"
+            )),
+            "{source}: relative scale must fail closed"
+        );
+    }
+}
+
+#[test]
 fn japanese_color_inflection_classes_keep_canonical_identity_and_exact_surface() {
     for (source, canonical_surface_ja) in [
         ("白い", "白"),
@@ -807,6 +857,23 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
     );
     assert_eq!(result.diagnostics[0].surface, "未知");
 
+    let spaced = NormalizedDdlDocument::new(
+        "円 を 未知".to_owned(),
+        ResolvedInstructionLanguage::Ja,
+        Vec::new(),
+    )
+    .unwrap();
+    let spaced = parse_neutral_lexemes(&spaced);
+    assert_eq!(
+        spaced
+            .tokens
+            .iter()
+            .map(|token| token.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["円", "を"]
+    );
+    assert_eq!(spaced.diagnostics[0].surface, "未知");
+
     for source in ["もの", "のり", "未知の小さな"] {
         let document = NormalizedDdlDocument::new(
             source.to_owned(),
@@ -823,6 +890,28 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
         );
         assert_eq!(result.diagnostics.len(), 1, "{source}");
         assert_eq!(result.diagnostics[0].surface, source, "{source}");
+    }
+
+    for source in ["未知 を 円", " を 円"] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(
+            result
+                .tokens
+                .iter()
+                .all(|token| !matches!(token.kind, NeutralTokenKind::FunctionWord))
+        );
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.surface == "を")
+        );
     }
 }
 

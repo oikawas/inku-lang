@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v4";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v5";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -31,12 +31,14 @@ pub struct NeutralToken {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierDimension {
     Thinness,
+    RelativeScale,
 }
 
 impl CoreModifierDimension {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Thinness => "thinness",
+            Self::RelativeScale => "relative_scale",
         }
     }
 }
@@ -45,12 +47,14 @@ impl CoreModifierDimension {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierValue {
     Fine,
+    Small,
 }
 
 impl CoreModifierValue {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Fine => "fine",
+            Self::Small => "small",
         }
     }
 }
@@ -380,6 +384,32 @@ fn candidates_at(
         );
     }
 
+    let relative_scale_surface = match language {
+        ResolvedInstructionLanguage::Ja => "小さな",
+        ResolvedInstructionLanguage::En => "small",
+    };
+    let relative_scale_end = start_byte + relative_scale_surface.len();
+    if language != ResolvedInstructionLanguage::Ja
+        || (source.get(start_byte..relative_scale_end) == Some(relative_scale_surface)
+            && (!require_boundary || has_japanese_typed_left_boundary(source, start_byte))
+            && has_japanese_primitive_candidate_at(source, relative_scale_end))
+    {
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            relative_scale_surface,
+            PRIORITY_CORE_MODIFIER,
+            "core_modifier:relative_scale:small".to_owned(),
+            CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
+                dimension: CoreModifierDimension::RelativeScale,
+                value: CoreModifierValue::Small,
+            })),
+        );
+    }
+
     for category in &asset.categories {
         for word in &category.words {
             let Some(surface) = parser_candidate_surface(word, language) else {
@@ -604,6 +634,41 @@ fn has_japanese_recognized_left_candidate(source: &str, start_byte: usize) -> bo
         })
 }
 
+fn has_japanese_recognized_left_candidate_across_separators(
+    source: &str,
+    start_byte: usize,
+) -> bool {
+    let mut candidate_end = start_byte;
+    while let Some(character) = source[..candidate_end].chars().next_back() {
+        if !is_separator(character) {
+            break;
+        }
+        candidate_end -= character.len_utf8();
+    }
+    candidate_end < start_byte && has_japanese_recognized_left_candidate(source, candidate_end)
+}
+
+fn has_japanese_typed_left_boundary(source: &str, start_byte: usize) -> bool {
+    start_byte == 0
+        || has_japanese_recognized_left_candidate(source, start_byte)
+        || has_japanese_recognized_left_candidate_across_separators(source, start_byte)
+}
+
+fn has_japanese_primitive_candidate_at(source: &str, start_byte: usize) -> bool {
+    start_byte < source.len()
+        && candidates_at(source, start_byte, ResolvedInstructionLanguage::Ja, false)
+            .iter()
+            .any(|candidate| {
+                matches!(
+                    &candidate.delivery,
+                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                        category_key,
+                        ..
+                    }) if category_key == "katachi"
+                )
+            })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn push_surface_candidate(
     candidates: &mut Vec<Candidate>,
@@ -677,7 +742,9 @@ fn push_japanese_function_candidate(
 ) {
     let end_byte = start_byte + surface.len();
     if source.get(start_byte..end_byte) != Some(surface)
-        || (require_boundary && !has_japanese_recognized_left_candidate(source, start_byte))
+        || (require_boundary
+            && !has_japanese_recognized_left_candidate(source, start_byte)
+            && !has_japanese_recognized_left_candidate_across_separators(source, start_byte))
     {
         return;
     }

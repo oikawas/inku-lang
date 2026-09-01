@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected clause-stream foundation.
-pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v3";
+pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v4";
 
 /// A source separator that ends one clause fragment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

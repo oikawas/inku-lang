@@ -1,6 +1,6 @@
 {
-  "schema": "inku.remaining-role-composition-fixture.v2",
-  "version": 2,
+  "schema": "inku.remaining-role-composition-fixture.v3",
+  "version": 3,
   "cases": [
     {
       "id": "ja-mixed-six",
@@ -114,6 +114,22 @@
       ],
       "expected_core_modifiers": [
         {"dimension": "thinness", "value": "fine", "start_byte": 0, "end_byte": 4}
+      ],
+      "expected_remaining_roles": [],
+      "expected_unattached_exact_numbers": [],
+      "expected_deferred": [],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
+    },
+    {
+      "id": "ja-core-relative-scale-small",
+      "language": "ja",
+      "source": "小さな円",
+      "expected_core_roles": [
+        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 9, "end_byte": 12}
+      ],
+      "expected_core_modifiers": [
+        {"dimension": "relative_scale", "value": "small", "start_byte": 0, "end_byte": 9}
       ],
       "expected_remaining_roles": [],
       "expected_unattached_exact_numbers": [],

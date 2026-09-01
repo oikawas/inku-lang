@@ -148,9 +148,9 @@ pub use semantic_association::{
     SemanticAssociationResult, SemanticEntity, SemanticEntityAssociationAst, SemanticFluctuation,
     SemanticHead, SemanticIdentity, SemanticMacroInvocationHead, SemanticMacroInvocationProvenance,
     SemanticMacroParameterBinding, SemanticMacroParameterValue, SemanticPreviousReference,
-    SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticSurface, SemanticTerm,
-    SemanticTermProvenance, SemanticThinness, SourceOccurrence, associate_semantic_entities,
-    associate_semantic_entities_with_macro_binding,
+    SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticRelativeScale,
+    SemanticSurface, SemanticTerm, SemanticTermProvenance, SemanticThinness, SourceOccurrence,
+    associate_semantic_entities, associate_semantic_entities_with_macro_binding,
 };
 pub use semantic_document::{
     SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticDocumentIssue,

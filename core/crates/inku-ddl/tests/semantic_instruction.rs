@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v12.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v13.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -526,13 +526,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v12"
+        "inku.semantic-instruction-association.v13"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v12"
+        "inku.semantic-instruction-association-fixture.v13"
     );
-    assert_eq!(fixture.version, 12);
+    assert_eq!(fixture.version, 13);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -760,6 +760,28 @@ fn core_thinness_is_owned_unchanged_by_the_nested_instruction_entity() {
     assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 1);
     assert_eq!(instruction.action.as_ref().unwrap().identity.id, "place");
     assert_eq!(instruction.position.as_ref().unwrap().identity.id, "center");
+}
+
+#[test]
+fn core_relative_scale_is_owned_unchanged_by_the_nested_instruction_entity() {
+    let document = NormalizedDdlDocument::new(
+        "place one small circle at center.",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+    assert!(result.issues.is_empty());
+    assert!(result.association.issues.is_empty());
+    let instruction = &result.ast.instructions[0];
+    let relative_scale = instruction
+        .entity
+        .relative_scale
+        .as_ref()
+        .expect("nested entity owns explicit relative scale");
+    assert_eq!(relative_scale.value.as_str(), "small");
+    assert_eq!(relative_scale.provenance.surface, "small");
+    assert!(instruction.entity.thinness.is_none());
 }
 
 #[test]
@@ -1365,7 +1387,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v12"
+        "inku.semantic-instruction-association.v13"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

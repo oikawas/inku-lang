@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v6.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v7.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -177,6 +177,35 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
         ),
         VisiblePatchDiagnostic::ExplicitTarget,
     );
+    let explicit_scale_base = compile_typed_ddl(
+        NormalizedDdlDocument::new(
+            "small circle. many square",
+            ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap(),
+        &[],
+        None,
+        LIMITS,
+    );
+    let explicit_scale = explicit_scale_base
+        .deliveries
+        .iter()
+        .find(|item| item.identity.owner == SemanticDeliveryOwner::RelativeScale)
+        .unwrap();
+    assert_error(
+        &explicit_scale_base,
+        patch(
+            &explicit_scale_base,
+            vec![VisibleDdlPatchEdit {
+                hole_id: explicit_scale.id.clone(),
+                allowed_span: explicit_scale.span.unwrap(),
+                expected_range_digest: String::new(),
+                replacement: "small".to_owned(),
+            }],
+        ),
+        VisiblePatchDiagnostic::ExplicitTarget,
+    );
     let mut unknown = valid_first.clone();
     unknown.hole_id = "hole:unknown".to_owned();
     assert_error(
@@ -322,9 +351,9 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v6"
+        "inku.compiler-lock-visible-patch-fixture.v7"
     );
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.version, 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

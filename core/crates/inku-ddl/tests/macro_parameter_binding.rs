@@ -248,7 +248,7 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
     let document = NormalizedDdlDocument::new(
         "Bind.ThinParam thin",
         ResolvedInstructionLanguage::En,
-        vec![lock],
+        vec![lock.clone()],
     )
     .unwrap();
     let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
@@ -271,6 +271,29 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
             .flat_map(|clause| &clause.atoms)
             .any(|atom| matches!(atom, ClauseAtom::CoreModifier(_)))
     );
+
+    let document = NormalizedDdlDocument::new(
+        "Bind.ThinParam small circle",
+        ResolvedInstructionLanguage::En,
+        vec![lock],
+    )
+    .unwrap();
+    let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+    assert!(result.complete.is_empty());
+    assert_eq!(
+        result.diagnostics[0].kind,
+        MacroParameterBindingDiagnosticKind::MissingCompatibleFact
+    );
+    assert!(result
+        .macro_resolution
+        .relation_reference_evidence
+        .attachment_evidence
+        .noun_phrase
+        .clause_stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+        .any(|atom| matches!(atom, ClauseAtom::CoreModifier(modifier) if modifier.identity.dimension.as_str() == "relative_scale")));
 }
 
 #[test]

@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v6.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v7.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -259,6 +259,25 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             .span
             .map(|span| &thin_primitive.document.source()[span.start_byte..span.end_byte]),
         Some("thin")
+    );
+    let small_primitive = compile(
+        "small circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let small_delivery = small_primitive
+        .deliveries
+        .iter()
+        .find(|delivery| delivery.identity.owner == SemanticDeliveryOwner::RelativeScale)
+        .expect("explicit relative-scale delivery");
+    assert_eq!(small_delivery.identity.canonical_key, "small");
+    assert_eq!(
+        small_delivery
+            .span
+            .map(|span| &small_primitive.document.source()[span.start_byte..span.end_byte]),
+        Some("small")
     );
     assert_eq!(
         primitive
@@ -924,6 +943,17 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             CompilerLockState::CanonicalReady,
         ),
         (
+            "core-relative-scale-explicit",
+            compile(
+                "small circle",
+                ResolvedInstructionLanguage::En,
+                &[],
+                None,
+                LIMITS,
+            ),
+            CompilerLockState::CanonicalReady,
+        ),
+        (
             "relation-zero-hole",
             compile(
                 "eight along twelve",
@@ -1160,12 +1190,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v6"
+        "inku.compiler-lock-visible-patch-fixture.v7"
     );
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.version, 7);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v8"
+        "inku.semantic-document.v9"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(
@@ -1174,7 +1204,7 @@ fn fixture_schema_and_closed_ids_are_stable() {
             .iter()
             .collect::<HashSet<_>>()
             .len(),
-        10
+        11
     );
     assert_eq!(
         fixture.patch_case_ids.iter().collect::<HashSet<_>>().len(),

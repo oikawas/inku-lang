@@ -1,6 +1,6 @@
 {
-  "schema": "inku.clause-stream-fixture.v3",
-  "version": 3,
+  "schema": "inku.clause-stream-fixture.v4",
+  "version": 4,
   "cases": [
     {
       "id": "ja-all-atom-kinds",
@@ -205,6 +205,23 @@
       ],
       "expected_separators": [],
       "delivery_conservation_count": 4
+    },
+    {
+      "id": "ja-core-relative-scale-small-atom",
+      "language": "ja",
+      "source": "小さな円",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 12,
+          "atoms": [
+            {"kind": "core_modifier:relative_scale:small", "surface": "小さな", "start_byte": 0, "end_byte": 9},
+            {"kind": "core:primitive", "surface": "円", "start_byte": 9, "end_byte": 12}
+          ]
+        }
+      ],
+      "expected_separators": [],
+      "delivery_conservation_count": 2
     }
   ]
 }

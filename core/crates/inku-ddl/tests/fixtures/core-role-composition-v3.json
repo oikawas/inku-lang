@@ -1,6 +1,6 @@
 {
-  "schema": "inku.core-role-composition-fixture.v2",
-  "version": 2,
+  "schema": "inku.core-role-composition-fixture.v3",
+  "version": 3,
   "cases": [
     {
       "id": "ja-exact-five",
@@ -111,6 +111,20 @@
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 4
+    },
+    {
+      "id": "en-core-relative-scale-small",
+      "language": "en",
+      "source": "small circle",
+      "expected_roles": [
+        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 6, "end_byte": 12}
+      ],
+      "expected_core_modifiers": [
+        {"dimension": "relative_scale", "value": "small", "start_byte": 0, "end_byte": 5}
+      ],
+      "expected_deferred": [],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
     }
   ]
 }

@@ -7,7 +7,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/clause-stream-v3.json");
+const FIXTURE: &str = include_str!("fixtures/clause-stream-v4.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -258,10 +258,10 @@ fn sentence_end_without_atoms_remains_a_separator() {
 #[test]
 fn fixture_schema_and_required_boundary_cases_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v3");
-    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v3");
-    assert_eq!(fixture.version, 3);
-    assert_eq!(fixture.cases.len(), 8);
+    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v4");
+    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v4");
+    assert_eq!(fixture.version, 4);
+    assert_eq!(fixture.cases.len(), 9);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -279,6 +279,7 @@ fn fixture_schema_and_required_boundary_cases_are_guarded() {
         "ja-full-relation-literal",
         "en-full-relation-literal-case",
         "ja-core-thinness-atom",
+        "ja-core-relative-scale-small-atom",
     ] {
         assert!(
             ids.contains(required),

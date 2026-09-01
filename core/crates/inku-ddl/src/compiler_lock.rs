@@ -19,13 +19,13 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v6";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v7";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v6";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v7";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v6";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v7";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,6 +81,7 @@ pub enum SemanticDeliveryOwner {
     Color,
     Quantity,
     Thinness,
+    RelativeScale,
     Touch,
     Continuity,
     Angle,
@@ -109,6 +110,7 @@ impl SemanticDeliveryOwner {
             Self::Color => "color",
             Self::Quantity => "quantity",
             Self::Thinness => "thinness",
+            Self::RelativeScale => "relative_scale",
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
@@ -605,6 +607,7 @@ fn project_deliveries(
             SemanticAssociationIssueKind::ConflictingColors
             | SemanticAssociationIssueKind::ConflictingQuantities
             | SemanticAssociationIssueKind::ConflictingThinness
+            | SemanticAssociationIssueKind::ConflictingRelativeScales
             | SemanticAssociationIssueKind::ConflictingTouches
             | SemanticAssociationIssueKind::ConflictingContinuities
             | SemanticAssociationIssueKind::ConflictingAngles
@@ -875,6 +878,14 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             thinness.value.as_str().to_owned(),
         );
     }
+    if let Some(relative_scale) = &instruction.entity.relative_scale {
+        add_explicit(
+            projection,
+            relative_scale.provenance.span,
+            SemanticDeliveryOwner::RelativeScale,
+            relative_scale.value.as_str().to_owned(),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -940,6 +951,9 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
         }
         OwnedSemanticOccurrence::Thinness(thinness) => {
             format!("thinness:{}", thinness.value.as_str())
+        }
+        OwnedSemanticOccurrence::RelativeScale(relative_scale) => {
+            format!("relative_scale:{}", relative_scale.value.as_str())
         }
     }
 }

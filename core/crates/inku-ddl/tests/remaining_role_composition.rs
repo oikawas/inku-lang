@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/remaining-role-composition-v2.json");
+const FIXTURE: &str = include_str!("fixtures/remaining-role-composition-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -329,11 +329,11 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         REMAINING_ROLE_COMPOSITION_SCHEMA_ID,
-        "inku.remaining-role-composition.v2"
+        "inku.remaining-role-composition.v3"
     );
-    assert_eq!(fixture.schema, "inku.remaining-role-composition-fixture.v2");
-    assert_eq!(fixture.version, 2);
-    assert_eq!(fixture.cases.len(), 6);
+    assert_eq!(fixture.schema, "inku.remaining-role-composition-fixture.v3");
+    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.cases.len(), 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -349,6 +349,7 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
         "en-number-only",
         "en-zero-remaining",
         "en-core-thinness",
+        "ja-core-relative-scale-small",
     ] {
         assert!(
             ids.contains(required),

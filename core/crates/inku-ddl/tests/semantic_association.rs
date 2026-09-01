@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v11.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v12.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -459,13 +459,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v11"
+        "inku.semantic-entity-association.v12"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v11"
+        "inku.semantic-entity-association-fixture.v12"
     );
-    assert_eq!(fixture.version, 11);
+    assert_eq!(fixture.version, 12);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -754,6 +754,103 @@ fn core_thinness_uses_pre_head_ownership_without_default_or_nearest_fallback() {
     assert_eq!(
         conflict.owned_occurrence_count,
         conflict.delivered_occurrence_count
+    );
+}
+
+#[test]
+fn core_relative_scale_has_bilingual_provenance_and_bounded_pre_head_ownership() {
+    let mut canonical = Vec::new();
+    for (source, language, expected_surface) in [
+        ("小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
+        ("SMALL circle", ResolvedInstructionLanguage::En, "SMALL"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+        assert!(result.issues.is_empty(), "{source}: {:?}", result.issues);
+        let entity = &result.ast.entities[0];
+        let relative_scale = entity
+            .relative_scale
+            .as_ref()
+            .expect("explicit relative scale");
+        assert_eq!(relative_scale.value.as_str(), "small");
+        assert_eq!(relative_scale.provenance.surface, expected_surface);
+        assert!(entity.thinness.is_none());
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+    assert_eq!(canonical[0], canonical[1]);
+
+    let multi = NormalizedDdlDocument::new(
+        "small circle line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let multi = associate_semantic_entities(&multi).unwrap();
+    assert_eq!(multi.ast.entities.len(), 2);
+    assert_eq!(
+        multi.ast.entities[0]
+            .relative_scale
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "small"
+    );
+    assert!(multi.ast.entities[1].relative_scale.is_none());
+
+    let post_head =
+        NormalizedDdlDocument::new("circle small", ResolvedInstructionLanguage::En, Vec::new())
+            .unwrap();
+    let post_head = associate_semantic_entities(&post_head).unwrap();
+    assert!(post_head.ast.entities[0].relative_scale.is_none());
+    assert_eq!(
+        association_issue_kinds(&post_head),
+        ["ambiguous_entity_ownership"]
+    );
+    assert!(matches!(
+        post_head.issues[0].occurrences.as_slice(),
+        [OwnedSemanticOccurrence::RelativeScale(_)]
+    ));
+
+    let conflict = NormalizedDdlDocument::new(
+        "small SMALL line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let conflict = associate_semantic_entities(&conflict).unwrap();
+    assert!(conflict.ast.entities[0].relative_scale.is_none());
+    assert_eq!(
+        association_issue_kinds(&conflict),
+        ["conflicting_relative_scales"]
+    );
+    assert_eq!(conflict.issues[0].occurrences.len(), 2);
+
+    let coexist = NormalizedDdlDocument::new(
+        "thin small line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let coexist = associate_semantic_entities(&coexist).unwrap();
+    assert!(coexist.issues.is_empty());
+    assert_eq!(
+        coexist.ast.entities[0]
+            .thinness
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "fine"
+    );
+    assert_eq!(
+        coexist.ast.entities[0]
+            .relative_scale
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "small"
     );
 }
 
@@ -1479,6 +1576,15 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
                 case.id
             );
         }
+        if let Some(relative_scale) = &entity.relative_scale {
+            assert_source_occurrence(case, &relative_scale.provenance, &result.clause_stream);
+            assert_eq!(
+                entity.head.source().region_index,
+                relative_scale.provenance.region_index,
+                "{}: core relative scale must remain in its sentence region",
+                case.id
+            );
+        }
         for term in [
             &entity.fluctuation.amplitude,
             &entity.fluctuation.frequency,
@@ -1641,6 +1747,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         if let Some(thinness) = &entity.thinness {
             output_spans.push(thinness.provenance.span);
         }
+        if let Some(relative_scale) = &entity.relative_scale {
+            output_spans.push(relative_scale.provenance.span);
+        }
         for term in [&entity.touch, &entity.continuity, &entity.angle]
             .into_iter()
             .flatten()
@@ -1681,6 +1790,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::Color(term) => term.provenance.source.span,
             OwnedSemanticOccurrence::Quantity(quantity) => quantity.provenance.span,
             OwnedSemanticOccurrence::Thinness(thinness) => thinness.provenance.span,
+            OwnedSemanticOccurrence::RelativeScale(relative_scale) => {
+                relative_scale.provenance.span
+            }
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)

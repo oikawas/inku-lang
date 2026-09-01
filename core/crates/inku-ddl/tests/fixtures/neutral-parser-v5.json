@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v4",
-  "version": 4,
+  "schema": "inku.neutral-lexeme-parser-fixture.v5",
+  "version": 5,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",
@@ -384,6 +384,28 @@
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 3
+    },
+    {
+      "id": "ja-core-relative-scale-small",
+      "language": "ja",
+      "source": "小さな円",
+      "expected_tokens": [
+        {"kind": "core_modifier", "surface": "小さな", "start_byte": 0, "end_byte": 9, "modifier_dimension": "relative_scale", "modifier_value": "small"},
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 9, "end_byte": 12, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
+    },
+    {
+      "id": "en-core-relative-scale-small-case-insensitive",
+      "language": "en",
+      "source": "SMALL circle",
+      "expected_tokens": [
+        {"kind": "core_modifier", "surface": "SMALL", "start_byte": 0, "end_byte": 5, "modifier_dimension": "relative_scale", "modifier_value": "small"},
+        {"kind": "saijiki_word", "surface": "circle", "start_byte": 6, "end_byte": 12, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
     }
   ]
 }

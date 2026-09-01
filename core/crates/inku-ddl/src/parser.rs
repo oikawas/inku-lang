@@ -109,6 +109,10 @@ pub struct NeutralParseResult {
 }
 
 const FUNCTION_WORDS_JA: &[&str] = &["を", "に", "で", "の", "は", "が", "へ", "と"];
+// V1 closed Japanese morphology classes. These are grammatical classes over accepted
+// canonical rows, not aliases or independent semantic vocabulary.
+const JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1: &[&str] = &["白", "黒", "青", "赤"];
+const JAPANESE_COUNTERS_V1: &[&str] = &["本", "個", "枚"];
 const FUNCTION_WORDS_EN: &[&str] = &[
     "a", "an", "the", "with", "in", "at", "on", "to", "of", "and",
 ];
@@ -358,7 +362,7 @@ fn candidates_at(
     };
     if language != ResolvedInstructionLanguage::Ja
         || !require_boundary
-        || has_japanese_core_modifier_left_boundary(source, start_byte)
+        || has_japanese_recognized_left_boundary(source, start_byte)
     {
         push_surface_candidate(
             &mut candidates,
@@ -396,6 +400,40 @@ fn candidates_at(
                     canonical_surface_ja: word.surface_ja.clone(),
                 }),
             );
+            if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
+                if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
+                    push_japanese_derived_surface_candidate(
+                        &mut candidates,
+                        source,
+                        start_byte,
+                        require_boundary,
+                        surface,
+                        "い",
+                        PRIORITY_ASSET,
+                        format!("word:{}:{}", category.key, word.surface_ja),
+                        CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                            asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                            category_key: category.key.clone(),
+                            canonical_surface_ja: word.surface_ja.clone(),
+                        }),
+                    );
+                }
+                push_japanese_derived_surface_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    require_boundary,
+                    surface,
+                    "色",
+                    PRIORITY_ASSET,
+                    format!("word:{}:{}", category.key, word.surface_ja),
+                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                        asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                        category_key: category.key.clone(),
+                        canonical_surface_ja: word.surface_ja.clone(),
+                    }),
+                );
+            }
         }
     }
 
@@ -441,17 +479,33 @@ fn candidates_at(
         ResolvedInstructionLanguage::En => FUNCTION_WORDS_EN,
     };
     for surface in function_words {
-        push_surface_candidate(
-            &mut candidates,
-            source,
-            start_byte,
-            language,
-            require_boundary,
-            surface,
-            PRIORITY_FUNCTION,
-            format!("function:{surface}"),
-            CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
-        );
+        if language == ResolvedInstructionLanguage::Ja {
+            push_japanese_function_candidate(
+                &mut candidates,
+                source,
+                start_byte,
+                require_boundary,
+                surface,
+                format!("function:{surface}"),
+            );
+        } else {
+            push_surface_candidate(
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                surface,
+                PRIORITY_FUNCTION,
+                format!("function:{surface}"),
+                CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+            );
+        }
+    }
+    if language == ResolvedInstructionLanguage::Ja {
+        for counter in JAPANESE_COUNTERS_V1 {
+            push_japanese_counter_candidate(&mut candidates, source, start_byte, counter);
+        }
     }
 
     if language == ResolvedInstructionLanguage::Ja {
@@ -526,24 +580,28 @@ fn candidates_at(
     candidates
 }
 
-fn has_japanese_core_modifier_left_boundary(source: &str, start_byte: usize) -> bool {
+fn has_japanese_recognized_left_boundary(source: &str, start_byte: usize) -> bool {
     start_byte == 0
         || source[..start_byte]
             .chars()
             .next_back()
             .is_some_and(is_separator)
-        || source[..start_byte]
-            .char_indices()
-            .any(|(candidate_start, _)| {
-                candidates_at(
-                    source,
-                    candidate_start,
-                    ResolvedInstructionLanguage::Ja,
-                    false,
-                )
-                .iter()
-                .any(|candidate| candidate.end_byte == start_byte)
-            })
+        || has_japanese_recognized_left_candidate(source, start_byte)
+}
+
+fn has_japanese_recognized_left_candidate(source: &str, start_byte: usize) -> bool {
+    source[..start_byte]
+        .char_indices()
+        .any(|(candidate_start, _)| {
+            candidates_at(
+                source,
+                candidate_start,
+                ResolvedInstructionLanguage::Ja,
+                false,
+            )
+            .iter()
+            .any(|candidate| candidate.end_byte == start_byte)
+        })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -577,6 +635,93 @@ fn push_surface_candidate(
         identity,
         delivery,
     });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_japanese_derived_surface_candidate(
+    candidates: &mut Vec<Candidate>,
+    source: &str,
+    start_byte: usize,
+    require_boundary: bool,
+    stem: &str,
+    suffix: &str,
+    priority: u8,
+    identity: String,
+    delivery: CandidateDelivery,
+) {
+    let end_byte = start_byte + stem.len() + suffix.len();
+    let Some(actual) = source.get(start_byte..end_byte) else {
+        return;
+    };
+    if !actual.starts_with(stem)
+        || &actual[stem.len()..] != suffix
+        || (require_boundary && !has_japanese_recognized_left_boundary(source, start_byte))
+    {
+        return;
+    }
+    candidates.push(Candidate {
+        end_byte,
+        priority,
+        identity,
+        delivery,
+    });
+}
+
+fn push_japanese_function_candidate(
+    candidates: &mut Vec<Candidate>,
+    source: &str,
+    start_byte: usize,
+    require_boundary: bool,
+    surface: &str,
+    identity: String,
+) {
+    let end_byte = start_byte + surface.len();
+    if source.get(start_byte..end_byte) != Some(surface)
+        || (require_boundary && !has_japanese_recognized_left_candidate(source, start_byte))
+    {
+        return;
+    }
+    candidates.push(Candidate {
+        end_byte,
+        priority: PRIORITY_FUNCTION,
+        identity,
+        delivery: CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+    });
+}
+
+fn push_japanese_counter_candidate(
+    candidates: &mut Vec<Candidate>,
+    source: &str,
+    start_byte: usize,
+    surface: &str,
+) {
+    let end_byte = start_byte + surface.len();
+    if source.get(start_byte..end_byte) != Some(surface)
+        || !japanese_exact_number_ends_at(source, start_byte)
+    {
+        return;
+    }
+    candidates.push(Candidate {
+        end_byte,
+        priority: PRIORITY_FUNCTION,
+        identity: format!("function:counter:{surface}"),
+        delivery: CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+    });
+}
+
+fn japanese_exact_number_ends_at(source: &str, end_byte: usize) -> bool {
+    source[..end_byte].char_indices().any(|(start_byte, _)| {
+        NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
+            start_byte + surface.len() == end_byte
+                && source.get(start_byte..end_byte) == Some(*surface)
+        }) || japanese_kanji_cardinal_at(source, start_byte)
+            .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
+            || (source.as_bytes()[start_byte].is_ascii_digit()
+                && source.as_bytes()[start_byte..end_byte]
+                    .iter()
+                    .all(u8::is_ascii_digit)
+                && source[start_byte..end_byte].parse::<u64>().is_ok())
+    })
 }
 
 fn has_candidate_boundary(

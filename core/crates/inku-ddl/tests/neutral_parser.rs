@@ -467,7 +467,7 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     );
     assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v4");
     assert_eq!(fixture.version, 4);
-    assert_eq!(fixture.cases.len(), 20);
+    assert_eq!(fixture.cases.len(), 28);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -494,9 +494,17 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "ja-general-exact-cardinals",
         "en-general-exact-cardinals",
         "numeric-negative-forms",
-        "ja-unsupported-counter-and-ordinal",
+        "ja-supported-counter-and-unsupported-ordinal",
         "ja-core-thinness",
         "en-core-thinness-case-insensitive",
+        "ja-color-i-inflection-known",
+        "ja-color-nominal-localized",
+        "ja-number-counter",
+        "ja-particle-known-term",
+        "ja-particle-unknown-remainder",
+        "ja-consecutive-known-terms",
+        "ja-invalid-derived-suffix-counter",
+        "ja-agglutinative-punctuation-newline",
     ] {
         assert!(
             ids.contains(required),
@@ -673,6 +681,148 @@ fn core_thinness_respects_ja_and_en_word_boundaries() {
                 .all(|token| !matches!(token.kind, NeutralTokenKind::CoreModifier(_))),
             "{source}"
         );
+    }
+}
+
+#[test]
+fn japanese_color_inflection_classes_keep_canonical_identity_and_exact_surface() {
+    for (source, canonical_surface_ja) in [
+        ("白い", "白"),
+        ("黒い円", "黒"),
+        ("青い", "青"),
+        ("赤い", "赤"),
+        ("灰色", "灰"),
+        ("紫色", "紫"),
+    ] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let result = parse_neutral_lexemes(&document);
+        let color = result
+            .tokens
+            .iter()
+            .find(|token| {
+                matches!(
+                    &token.kind,
+                    NeutralTokenKind::SaijikiWord { category_key, .. } if category_key == "iro"
+                )
+            })
+            .unwrap_or_else(|| panic!("{source}: expected color"));
+        let NeutralTokenKind::SaijikiWord {
+            canonical_surface_ja: actual,
+            ..
+        } = &color.kind
+        else {
+            unreachable!();
+        };
+        assert_eq!(actual, canonical_surface_ja, "{source}");
+        assert_eq!(
+            &document.source()[color.span.start_byte..color.span.end_byte],
+            color.surface,
+            "{source}"
+        );
+    }
+
+    for source in ["緑い", "灰い", "極黒い"] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        assert!(
+            parse_neutral_lexemes(&document)
+                .tokens
+                .iter()
+                .all(|token| !matches!(
+                    &token.kind,
+                    NeutralTokenKind::SaijikiWord { category_key, .. } if category_key == "iro"
+                )),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn japanese_counters_are_syntax_only_after_exact_numbers() {
+    for (source, number_surface, counter_surface, value) in [
+        ("一本", "一", "本", 1),
+        ("十二枚", "十二", "枚", 12),
+        ("3個", "3", "個", 3),
+    ] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(result.diagnostics.is_empty(), "{source}");
+        assert_eq!(result.tokens.len(), 2, "{source}");
+        assert_eq!(result.tokens[0].surface, number_surface, "{source}");
+        assert!(matches!(
+            result.tokens[0].kind,
+            NeutralTokenKind::ExactNumber { value: actual } if actual == value
+        ));
+        assert_eq!(result.tokens[1].surface, counter_surface, "{source}");
+        assert!(matches!(
+            result.tokens[1].kind,
+            NeutralTokenKind::FunctionWord
+        ));
+    }
+
+    for source in ["本", "一羽", "ひとつ目"] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(result.tokens.is_empty(), "{source}");
+        assert_eq!(result.diagnostics.len(), 1, "{source}");
+        assert_eq!(result.diagnostics[0].surface, source, "{source}");
+    }
+}
+
+#[test]
+fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_side() {
+    let document = NormalizedDdlDocument::new(
+        "円を未知".to_owned(),
+        ResolvedInstructionLanguage::Ja,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = parse_neutral_lexemes(&document);
+    assert_eq!(
+        result
+            .tokens
+            .iter()
+            .map(|token| token.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["円", "を"]
+    );
+    assert_eq!(result.diagnostics[0].surface, "未知");
+
+    for source in ["もの", "のり", "未知の小さな"] {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(
+            result
+                .tokens
+                .iter()
+                .all(|token| !matches!(token.kind, NeutralTokenKind::FunctionWord))
+        );
+        assert_eq!(result.diagnostics.len(), 1, "{source}");
+        assert_eq!(result.diagnostics[0].surface, source, "{source}");
     }
 }
 

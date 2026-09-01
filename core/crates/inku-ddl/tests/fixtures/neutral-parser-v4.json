@@ -248,15 +248,17 @@
       "recognized_delivery_count": 5
     },
     {
-      "id": "ja-unsupported-counter-and-ordinal",
+      "id": "ja-supported-counter-and-unsupported-ordinal",
       "language": "ja",
       "source": "一個 ひとつ目",
-      "expected_tokens": [],
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "一", "start_byte": 0, "end_byte": 3, "value": 1},
+        {"kind": "function_word", "surface": "個", "start_byte": 3, "end_byte": 6}
+      ],
       "expected_diagnostics": [
-        {"kind": "unknown", "surface": "一個", "start_byte": 0, "end_byte": 6, "recognized": false},
         {"kind": "unknown", "surface": "ひとつ目", "start_byte": 7, "end_byte": 19, "recognized": false}
       ],
-      "recognized_delivery_count": 0
+      "recognized_delivery_count": 2
     },
     {
       "id": "ja-core-thinness",
@@ -281,6 +283,107 @@
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 2
+    },
+    {
+      "id": "ja-color-i-inflection-known",
+      "language": "ja",
+      "source": "黒い円",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "黒い", "start_byte": 0, "end_byte": 6, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "黒"},
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 6, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
+    },
+    {
+      "id": "ja-color-nominal-localized",
+      "language": "ja",
+      "source": "灰色の線",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "灰色", "start_byte": 0, "end_byte": 6, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "灰"},
+        {"kind": "function_word", "surface": "の", "start_byte": 6, "end_byte": 9},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 9, "end_byte": 12, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 3
+    },
+    {
+      "id": "ja-number-counter",
+      "language": "ja",
+      "source": "一本の線 十二枚",
+      "expected_tokens": [
+        {"kind": "exact_number", "surface": "一", "start_byte": 0, "end_byte": 3, "value": 1},
+        {"kind": "function_word", "surface": "本", "start_byte": 3, "end_byte": 6},
+        {"kind": "function_word", "surface": "の", "start_byte": 6, "end_byte": 9},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 9, "end_byte": 12, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"},
+        {"kind": "exact_number", "surface": "十二", "start_byte": 13, "end_byte": 19, "value": 12},
+        {"kind": "function_word", "surface": "枚", "start_byte": 19, "end_byte": 22}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 6
+    },
+    {
+      "id": "ja-particle-known-term",
+      "language": "ja",
+      "source": "円に線",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 0, "end_byte": 3, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"},
+        {"kind": "function_word", "surface": "に", "start_byte": 3, "end_byte": 6},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 6, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 3
+    },
+    {
+      "id": "ja-particle-unknown-remainder",
+      "language": "ja",
+      "source": "円を未知",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 0, "end_byte": 3, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"},
+        {"kind": "function_word", "surface": "を", "start_byte": 3, "end_byte": 6}
+      ],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "未知", "start_byte": 6, "end_byte": 12, "recognized": false}
+      ],
+      "recognized_delivery_count": 2
+    },
+    {
+      "id": "ja-consecutive-known-terms",
+      "language": "ja",
+      "source": "黒い円赤い線",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "黒い", "start_byte": 0, "end_byte": 6, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "黒"},
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 6, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"},
+        {"kind": "saijiki_word", "surface": "赤い", "start_byte": 9, "end_byte": 15, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "赤"},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 15, "end_byte": 18, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
+    },
+    {
+      "id": "ja-invalid-derived-suffix-counter",
+      "language": "ja",
+      "source": "緑い円 一羽",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "円", "start_byte": 6, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円"}
+      ],
+      "expected_diagnostics": [
+        {"kind": "unknown", "surface": "緑い", "start_byte": 0, "end_byte": 6, "recognized": false},
+        {"kind": "unknown", "surface": "一羽", "start_byte": 10, "end_byte": 16, "recognized": false}
+      ],
+      "recognized_delivery_count": 1
+    },
+    {
+      "id": "ja-agglutinative-punctuation-newline",
+      "language": "ja",
+      "source": "赤い、\n青い線",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "赤い", "start_byte": 0, "end_byte": 6, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "赤"},
+        {"kind": "saijiki_word", "surface": "青い", "start_byte": 10, "end_byte": 16, "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "青"},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 16, "end_byte": 19, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 3
     }
   ]
 }

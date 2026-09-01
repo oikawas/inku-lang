@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v3.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v4.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -208,6 +208,82 @@ fn multi_head_sequence_reaches_lock_while_unresolved_fields_are_conflicts() {
             2,
             "{source}"
         );
+    }
+}
+
+#[test]
+fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() {
+    let primitive = compile(
+        "red circle blue line",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        primitive.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::CanonicalReady)
+    );
+    assert_eq!(
+        primitive
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+            .count(),
+        2
+    );
+    assert_eq!(
+        primitive
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Color)
+            .count(),
+        2
+    );
+
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
+    );
+    for (source, macro_index) in [
+        ("red Canon.Empty blue circle", 0),
+        ("red circle blue Canon.Empty", 1),
+    ] {
+        let result = compile_locked(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+            None,
+            LIMITS,
+        );
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        let document = result.semantic_document.as_ref().unwrap();
+        assert_eq!(
+            document
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| {
+                    instruction
+                        .entity
+                        .color
+                        .as_ref()
+                        .unwrap()
+                        .identity
+                        .id
+                        .as_str()
+                })
+                .collect::<Vec<_>>(),
+            ["red", "blue"],
+            "{source}"
+        );
+        assert!(matches!(
+            document.ast.instructions[macro_index].entity.head,
+            SemanticHead::MacroInvocation(_)
+        ));
     }
 }
 
@@ -920,12 +996,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v3"
+        "inku.compiler-lock-visible-patch-fixture.v4"
     );
-    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.version, 4);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v5"
+        "inku.semantic-document.v6"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

@@ -1,21 +1,23 @@
 //! Single-head semantic association over the accepted source-preserving clause stream.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Number, Value};
 
 use crate::{
-    BoundMacroParameterValue, CanonicalPreviousReference, CanonicalRelationIdentity,
-    CanonicalRelationKind, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
-    CoreRoleKind, MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity,
-    MacroParameterBinding, MacroParameterBindingDiagnosticKind, MacroParameterBindingResult,
-    NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema,
-    RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
-    parse_clause_stream, project_macro_semantic_ref, saijiki::canonical_relation_identity_is_valid,
+    AttachmentEvidenceResult, AttachmentMarkerKind, BoundMacroParameterValue,
+    CanonicalPreviousReference, CanonicalRelationIdentity, CanonicalRelationKind, ClauseAtom,
+    ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreRoleKind,
+    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
+    MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity, MacroParameterBinding,
+    MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, NeutralDiagnostic,
+    NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema, RemainingRoleKind,
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, collect_attachment_evidence,
+    project_macro_semantic_ref, saijiki::canonical_relation_identity_is_valid,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v8";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v9";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -443,6 +445,26 @@ struct AssociationRegion {
     diagnostics: Vec<NeutralDiagnostic>,
 }
 
+#[derive(Default)]
+struct PreHeadPhraseOwnership {
+    modifier_starts_by_head: BTreeMap<usize, BTreeSet<usize>>,
+}
+
+impl PreHeadPhraseOwnership {
+    fn insert(&mut self, head_span: SourceSpan, modifier_span: SourceSpan) {
+        self.modifier_starts_by_head
+            .entry(head_span.start_byte)
+            .or_default()
+            .insert(modifier_span.start_byte);
+    }
+
+    fn owns(&self, head: &SemanticHead, occurrence_span: SourceSpan) -> bool {
+        self.modifier_starts_by_head
+            .get(&head.source().span.start_byte)
+            .is_some_and(|starts| starts.contains(&occurrence_span.start_byte))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SurfaceDimension {
     Quality,
@@ -490,15 +512,142 @@ fn classify_proportion_dimension(canonical_id: &str) -> Option<ProportionDimensi
     }
 }
 
-/// Associate the closed single-entity roles and explicit numeric quantity within sentence regions.
+fn collect_pre_head_phrase_ownership(
+    attachment_evidence: &AttachmentEvidenceResult,
+    macro_parameter_binding: Option<&MacroParameterBindingResult>,
+) -> PreHeadPhraseOwnership {
+    let clause_stream = &attachment_evidence.noun_phrase.clause_stream;
+    let mut heads = clause_stream
+        .clauses
+        .iter()
+        .enumerate()
+        .flat_map(|(clause_index, clause)| {
+            clause.atoms.iter().filter_map(move |atom| match atom {
+                ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive => {
+                    Some((term.span, clause_index))
+                }
+                _ => None,
+            })
+        })
+        .collect::<Vec<_>>();
+    if let Some(binding) = macro_parameter_binding {
+        for complete in &binding.complete {
+            let resolved = binding
+                .macro_resolution
+                .resolved
+                .get(complete.invocation_index)
+                .expect("accepted I-581 binding references one resolved invocation");
+            heads.push((resolved.span, resolved.clause_index));
+        }
+    }
+    heads.sort_by_key(|(span, _)| span.start_byte);
+    heads.dedup_by_key(|(span, _)| span.start_byte);
+
+    let head_starts = heads
+        .iter()
+        .map(|(span, _)| span.start_byte)
+        .collect::<BTreeSet<_>>();
+    let genitive_marker_starts = attachment_evidence
+        .evidence
+        .iter()
+        .filter(|evidence| {
+            matches!(
+                evidence.marker,
+                AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No)
+                    | AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::Of)
+            )
+        })
+        .map(|evidence| evidence.span.start_byte)
+        .collect::<BTreeSet<_>>();
+
+    let mut ownership = PreHeadPhraseOwnership::default();
+    for (head_span, clause_index) in heads {
+        let determiner_evidence =
+            attachment_evidence
+                .noun_phrase
+                .evidence
+                .iter()
+                .find(|evidence| {
+                    evidence.clause_index == clause_index
+                        && evidence
+                            .head_candidate
+                            .as_ref()
+                            .is_some_and(|candidate| candidate.span == head_span)
+                });
+        let phrase_floor = determiner_evidence.map(|evidence| {
+            evidence
+                .opaque_pre_head_span
+                .map_or(evidence.determiner.span.end_byte, |span| span.start_byte)
+        });
+        let clause = clause_stream
+            .clauses
+            .get(clause_index)
+            .expect("accepted head provenance references one clause");
+
+        for atom in clause
+            .atoms
+            .iter()
+            .rev()
+            .filter(|atom| atom.span().end_byte <= head_span.start_byte)
+        {
+            let span = atom.span();
+            if phrase_floor.is_some_and(|floor| span.end_byte <= floor)
+                || head_starts.contains(&span.start_byte)
+            {
+                break;
+            }
+            match atom {
+                ClauseAtom::UnresolvedDiagnostic(_) => break,
+                ClauseAtom::FunctionWord { .. } => {
+                    if !genitive_marker_starts.contains(&span.start_byte) {
+                        break;
+                    }
+                }
+                _ if is_pre_head_modifier_atom(atom) => ownership.insert(head_span, span),
+                _ => {}
+            }
+        }
+    }
+    ownership
+}
+
+fn is_pre_head_modifier_atom(atom: &ClauseAtom) -> bool {
+    matches!(
+        atom,
+        ClauseAtom::CoreRole(term)
+            if matches!(
+                term.role,
+                CoreRoleKind::Color | CoreRoleKind::Touch | CoreRoleKind::Surface
+            )
+    ) || matches!(
+        atom,
+        ClauseAtom::RemainingRole(term)
+            if matches!(
+                term.role,
+                RemainingRoleKind::Continuity
+                    | RemainingRoleKind::Angle
+                    | RemainingRoleKind::Fluctuation
+                    | RemainingRoleKind::Proportion
+            )
+    ) || matches!(atom, ClauseAtom::UnattachedExactNumber(_))
+}
+
+/// Associate the closed entity roles and explicit numeric quantity within sentence regions.
 ///
-/// The accepted clause parser is invoked exactly once. Sentence endings close a region, while line
-/// breaks only create source-formatting clause boundaries inside the same region.
+/// The accepted attachment entrypoint is invoked exactly once and its owned clause stream is
+/// retained. Sentence endings close a region, while line breaks remain phrase boundaries.
 pub fn associate_semantic_entities(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticAssociationResult, ClauseStreamError> {
-    let clause_stream = parse_clause_stream(document)?;
-    Ok(build_semantic_entities(document, clause_stream, None))
+    let attachment_evidence = collect_attachment_evidence(document)?;
+    let pre_head_ownership = collect_pre_head_phrase_ownership(&attachment_evidence, None);
+    let clause_stream = attachment_evidence.noun_phrase.clause_stream;
+    Ok(build_semantic_entities(
+        document,
+        clause_stream,
+        None,
+        pre_head_ownership,
+    ))
 }
 
 /// Associate semantic entities from one caller-owned accepted I-581 result without rerunning it.
@@ -506,6 +655,12 @@ pub fn associate_semantic_entities_with_macro_binding(
     document: &NormalizedDdlDocument,
     macro_parameter_binding: MacroParameterBindingResult,
 ) -> SemanticAssociationResult {
+    let attachment_evidence = &macro_parameter_binding
+        .macro_resolution
+        .relation_reference_evidence
+        .attachment_evidence;
+    let pre_head_ownership =
+        collect_pre_head_phrase_ownership(attachment_evidence, Some(&macro_parameter_binding));
     let clause_stream = macro_parameter_binding
         .macro_resolution
         .relation_reference_evidence
@@ -513,13 +668,19 @@ pub fn associate_semantic_entities_with_macro_binding(
         .noun_phrase
         .clause_stream
         .clone();
-    build_semantic_entities(document, clause_stream, Some(macro_parameter_binding))
+    build_semantic_entities(
+        document,
+        clause_stream,
+        Some(macro_parameter_binding),
+        pre_head_ownership,
+    )
 }
 
 fn build_semantic_entities(
     document: &NormalizedDdlDocument,
     clause_stream: ClauseStream,
     macro_parameter_binding: Option<MacroParameterBindingResult>,
+    pre_head_ownership: PreHeadPhraseOwnership,
 ) -> SemanticAssociationResult {
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
     let mut issues = Vec::new();
@@ -711,7 +872,13 @@ fn build_semantic_entities(
 
     let mut entities = Vec::new();
     for (region_index, region) in regions {
-        associate_region(region_index, region, &mut entities, &mut issues);
+        associate_region(
+            region_index,
+            region,
+            &pre_head_ownership,
+            &mut entities,
+            &mut issues,
+        );
     }
 
     let delivered_occurrence_count = entities.iter().map(entity_occurrence_count).sum::<usize>()
@@ -1072,6 +1239,7 @@ fn source_occurrence(
 fn associate_region(
     region_index: usize,
     mut region: AssociationRegion,
+    pre_head_ownership: &PreHeadPhraseOwnership,
     entities: &mut Vec<SemanticEntity>,
     issues: &mut Vec<SemanticAssociationIssue>,
 ) {
@@ -1079,7 +1247,16 @@ fn associate_region(
         region
             .heads
             .sort_by_key(|head| head.source().span.start_byte);
-        entities.extend(region.heads.drain(..).map(empty_entity));
+        for head in std::mem::take(&mut region.heads) {
+            let owned_region = take_pre_head_region(&mut region, head, pre_head_ownership);
+            associate_region(
+                region_index,
+                owned_region,
+                pre_head_ownership,
+                entities,
+                issues,
+            );
+        }
         let surface_occurrences = take_surface_occurrences(&mut region);
         let fluctuation_occurrences = take_fluctuation_occurrences(&mut region);
         let proportion_occurrences = take_proportion_occurrences(&mut region);
@@ -1318,18 +1495,83 @@ fn associate_region(
     append_upstream_issues(region_index, region.diagnostics, issues);
 }
 
-fn empty_entity(head: SemanticHead) -> SemanticEntity {
-    SemanticEntity {
-        head,
-        color: None,
-        quantity: None,
-        touch: None,
-        continuity: None,
-        angle: None,
-        surface: SemanticSurface::default(),
-        fluctuation: SemanticFluctuation::default(),
-        proportion: SemanticProportion::default(),
+fn take_pre_head_region(
+    region: &mut AssociationRegion,
+    head: SemanticHead,
+    ownership: &PreHeadPhraseOwnership,
+) -> AssociationRegion {
+    AssociationRegion {
+        colors: take_owned_terms(&mut region.colors, &head, ownership),
+        quantities: take_owned_quantities(&mut region.quantities, &head, ownership),
+        touches: take_owned_terms(&mut region.touches, &head, ownership),
+        continuities: take_owned_terms(&mut region.continuities, &head, ownership),
+        angles: take_owned_terms(&mut region.angles, &head, ownership),
+        surface_qualities: take_owned_terms(&mut region.surface_qualities, &head, ownership),
+        surface_intensities: take_owned_terms(&mut region.surface_intensities, &head, ownership),
+        unclassified_surfaces: take_owned_terms(
+            &mut region.unclassified_surfaces,
+            &head,
+            ownership,
+        ),
+        fluctuation_amplitudes: take_owned_terms(
+            &mut region.fluctuation_amplitudes,
+            &head,
+            ownership,
+        ),
+        fluctuation_frequencies: take_owned_terms(
+            &mut region.fluctuation_frequencies,
+            &head,
+            ownership,
+        ),
+        fluctuation_qualities: take_owned_terms(
+            &mut region.fluctuation_qualities,
+            &head,
+            ownership,
+        ),
+        unclassified_fluctuations: take_owned_terms(
+            &mut region.unclassified_fluctuations,
+            &head,
+            ownership,
+        ),
+        proportion_aspects: take_owned_terms(&mut region.proportion_aspects, &head, ownership),
+        proportion_width_extents: take_owned_terms(
+            &mut region.proportion_width_extents,
+            &head,
+            ownership,
+        ),
+        proportion_arc_forms: take_owned_terms(&mut region.proportion_arc_forms, &head, ownership),
+        unclassified_proportions: take_owned_terms(
+            &mut region.unclassified_proportions,
+            &head,
+            ownership,
+        ),
+        heads: vec![head],
+        diagnostics: Vec::new(),
     }
+}
+
+fn take_owned_terms(
+    terms: &mut Vec<SemanticTerm>,
+    head: &SemanticHead,
+    ownership: &PreHeadPhraseOwnership,
+) -> Vec<SemanticTerm> {
+    let (owned, remaining) = std::mem::take(terms)
+        .into_iter()
+        .partition(|term| ownership.owns(head, term.provenance.source.span));
+    *terms = remaining;
+    owned
+}
+
+fn take_owned_quantities(
+    quantities: &mut Vec<SemanticQuantity>,
+    head: &SemanticHead,
+    ownership: &PreHeadPhraseOwnership,
+) -> Vec<SemanticQuantity> {
+    let (owned, remaining) = std::mem::take(quantities)
+        .into_iter()
+        .partition(|quantity| ownership.owns(head, quantity.provenance.span));
+    *quantities = remaining;
+    owned
 }
 
 fn take_surface_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemanticOccurrence> {
@@ -1659,7 +1901,8 @@ mod tests {
             Vec::new(),
         )
         .expect("test source forms a document");
-        let mut stream = parse_clause_stream(&document).expect("test source forms a clause stream");
+        let mut stream =
+            crate::parse_clause_stream(&document).expect("test source forms a clause stream");
         let relation = stream
             .clauses
             .iter_mut()
@@ -1673,7 +1916,8 @@ mod tests {
             .expect("test source has one relation atom");
         relation.form = CanonicalRelationForm::FullLiteral;
 
-        let result = build_semantic_entities(&document, stream, None);
+        let result =
+            build_semantic_entities(&document, stream, None, PreHeadPhraseOwnership::default());
 
         assert!(result.explicit_previous_references.is_empty());
         assert!(result.canonical_bytes.is_none());

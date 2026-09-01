@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v3.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v4.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -326,9 +326,9 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v3"
+        "inku.compiler-lock-visible-patch-fixture.v4"
     );
-    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.version, 4);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

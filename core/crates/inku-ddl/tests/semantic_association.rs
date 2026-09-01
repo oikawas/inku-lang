@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v8.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v9.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -438,13 +438,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v8"
+        "inku.semantic-entity-association.v9"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v8"
+        "inku.semantic-entity-association-fixture.v9"
     );
-    assert_eq!(fixture.version, 8);
+    assert_eq!(fixture.version, 9);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -599,7 +599,254 @@ fn head_only_multi_head_regions_are_complete_source_ordered_entity_sequences() {
 }
 
 #[test]
-fn multi_head_modifiers_are_issues_without_redelivering_heads() {
+fn pre_head_colors_are_owned_by_each_multi_head_in_source_order() {
+    let mut canonical = Vec::new();
+    for (source, expected_colors) in [
+        ("red circle blue line", ["red", "blue"]),
+        ("blue circle red line", ["blue", "red"]),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+
+        assert!(result.issues.is_empty(), "{source}");
+        assert!(result.ast.complete, "{source}");
+        assert_eq!(result.ast.entities.len(), 2, "{source}");
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .map(|entity| {
+                    entity
+                        .color
+                        .as_ref()
+                        .map(|color| color.identity.id.as_str())
+                })
+                .collect::<Vec<_>>(),
+            expected_colors.into_iter().map(Some).collect::<Vec<_>>(),
+            "{source}"
+        );
+        assert_eq!(result.owned_occurrence_count, 4, "{source}");
+        assert_eq!(result.delivered_occurrence_count, 4, "{source}");
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+    assert_ne!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn conflicting_modifiers_inside_one_pre_head_phrase_use_existing_typed_conflict() {
+    let document = NormalizedDdlDocument::new(
+        "red blue circle green line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+
+    assert!(!result.ast.complete);
+    assert_eq!(result.ast.entities.len(), 2);
+    assert!(result.ast.entities[0].color.is_none());
+    assert_eq!(
+        result.ast.entities[1].color.as_ref().unwrap().identity.id,
+        "green"
+    );
+    assert_eq!(association_issue_kinds(&result), ["conflicting_colors"]);
+    assert_eq!(
+        result.issues[0]
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.source().surface.as_str())
+            .collect::<Vec<_>>(),
+        ["red", "blue"]
+    );
+    assert_eq!(result.owned_occurrence_count, 5);
+    assert_eq!(result.delivered_occurrence_count, 5);
+}
+
+#[test]
+fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
+    let document = NormalizedDdlDocument::new(
+        "red two pen dashed horizontal hatch dense fine slowly swaying tall full-width semicircle circle blue three pencil dotted vertical grain faint large quickly trembling wide half-width crescent line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert!(result.ast.complete);
+    assert_eq!(result.ast.entities.len(), 2);
+    let first = &result.ast.entities[0];
+    let second = &result.ast.entities[1];
+    assert_eq!(first.color.as_ref().unwrap().identity.id, "red");
+    assert_eq!(first.quantity.as_ref().unwrap().value, 2);
+    assert_eq!(first.touch.as_ref().unwrap().identity.id, "pen");
+    assert_eq!(first.continuity.as_ref().unwrap().identity.id, "dashed");
+    assert_eq!(first.angle.as_ref().unwrap().identity.id, "horizontal");
+    assert_eq!(first.surface.quality.as_ref().unwrap().identity.id, "hatch");
+    assert_eq!(
+        first.surface.intensity.as_ref().unwrap().identity.id,
+        "dense"
+    );
+    assert_eq!(
+        first.fluctuation.amplitude.as_ref().unwrap().identity.id,
+        "fine"
+    );
+    assert_eq!(
+        first.fluctuation.frequency.as_ref().unwrap().identity.id,
+        "slowly"
+    );
+    assert_eq!(
+        first.fluctuation.quality.as_ref().unwrap().identity.id,
+        "swaying"
+    );
+    assert_eq!(
+        first.proportion.aspect.as_ref().unwrap().identity.id,
+        "tall"
+    );
+    assert_eq!(
+        first.proportion.width_extent.as_ref().unwrap().identity.id,
+        "full_width"
+    );
+    assert_eq!(
+        first.proportion.arc_form.as_ref().unwrap().identity.id,
+        "semicircle"
+    );
+
+    assert_eq!(second.color.as_ref().unwrap().identity.id, "blue");
+    assert_eq!(second.quantity.as_ref().unwrap().value, 3);
+    assert_eq!(second.touch.as_ref().unwrap().identity.id, "pencil");
+    assert_eq!(second.continuity.as_ref().unwrap().identity.id, "dotted");
+    assert_eq!(second.angle.as_ref().unwrap().identity.id, "vertical");
+    assert_eq!(
+        second.surface.quality.as_ref().unwrap().identity.id,
+        "grain"
+    );
+    assert_eq!(
+        second.surface.intensity.as_ref().unwrap().identity.id,
+        "faint"
+    );
+    assert_eq!(
+        second.fluctuation.amplitude.as_ref().unwrap().identity.id,
+        "large"
+    );
+    assert_eq!(
+        second.fluctuation.frequency.as_ref().unwrap().identity.id,
+        "quickly"
+    );
+    assert_eq!(
+        second.fluctuation.quality.as_ref().unwrap().identity.id,
+        "trembling"
+    );
+    assert_eq!(
+        second.proportion.aspect.as_ref().unwrap().identity.id,
+        "wide"
+    );
+    assert_eq!(
+        second.proportion.width_extent.as_ref().unwrap().identity.id,
+        "half_width"
+    );
+    assert_eq!(
+        second.proportion.arc_form.as_ref().unwrap().identity.id,
+        "crescent"
+    );
+    assert_eq!(result.owned_occurrence_count, 28);
+    assert_eq!(result.delivered_occurrence_count, 28);
+}
+
+#[test]
+fn typed_determiner_and_genitive_connectors_stay_inside_pre_head_phrases() {
+    for (source, language) in [
+        (
+            "the red circle the blue line",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "red of circle blue of line",
+            ResolvedInstructionLanguage::En,
+        ),
+        ("赤の円 青の線", ResolvedInstructionLanguage::Ja),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+        assert!(result.issues.is_empty(), "{source}");
+        assert!(result.ast.complete, "{source}");
+        assert_eq!(result.ast.entities.len(), 2, "{source}");
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .map(|entity| entity.color.as_ref().unwrap().identity.id.as_str())
+                .collect::<Vec<_>>(),
+            ["red", "blue"],
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn pre_head_ownership_stops_at_typed_boundaries_and_keeps_remaining_issues() {
+    for source in [
+        "red circle blue with line",
+        "red circle blue mystery line",
+        "red\ncircle blue line",
+        "red circle blue line eight",
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+        assert_eq!(result.ast.entities.len(), 2, "{source}");
+        assert_eq!(
+            result.ast.entities[0]
+                .color
+                .as_ref()
+                .map(|color| color.identity.id.as_str()),
+            (source != "red\ncircle blue line").then_some("red"),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.entities[1]
+                .color
+                .as_ref()
+                .map(|color| color.identity.id.as_str()),
+            (!source.contains("with") && !source.contains("mystery")).then_some("blue"),
+            "{source}"
+        );
+        let ambiguous = result
+            .issues
+            .iter()
+            .find(|issue| issue.kind.as_str() == "ambiguous_entity_ownership")
+            .expect("one typed ownership issue");
+        assert_eq!(
+            ambiguous
+                .occurrences
+                .iter()
+                .map(|occurrence| occurrence.source().surface.as_str())
+                .collect::<Vec<_>>(),
+            if source.ends_with("eight") {
+                vec!["eight"]
+            } else {
+                vec![if source.starts_with("red\n") {
+                    "red"
+                } else {
+                    "blue"
+                }]
+            },
+            "{source}"
+        );
+        assert_eq!(
+            result.owned_occurrence_count,
+            result.delivered_occurrence_count
+        );
+    }
+}
+
+#[test]
+fn multi_head_remaining_modifiers_are_issues_without_redelivering_heads() {
     let document = NormalizedDdlDocument::new(
         "red circle blue line eight pen dashed horizontal solid dense fine slowly swaying tall full-width semicircle",
         ResolvedInstructionLanguage::En,
@@ -609,9 +856,17 @@ fn multi_head_modifiers_are_issues_without_redelivering_heads() {
     let result = associate_semantic_entities(&document).unwrap();
 
     assert_eq!(result.ast.entities.len(), 2);
+    assert_eq!(
+        result
+            .ast
+            .entities
+            .iter()
+            .map(|entity| entity.color.as_ref().unwrap().identity.id.as_str())
+            .collect::<Vec<_>>(),
+        ["red", "blue"]
+    );
     assert!(result.ast.entities.iter().all(|entity| {
-        entity.color.is_none()
-            && entity.quantity.is_none()
+        entity.quantity.is_none()
             && entity.touch.is_none()
             && entity.continuity.is_none()
             && entity.angle.is_none()
@@ -628,7 +883,7 @@ fn multi_head_modifiers_are_issues_without_redelivering_heads() {
         association_issue_kinds(&result),
         ["ambiguous_entity_ownership"]
     );
-    assert_eq!(result.issues[0].occurrences.len(), 14);
+    assert_eq!(result.issues[0].occurrences.len(), 12);
     assert!(
         result.issues[0]
             .occurrences

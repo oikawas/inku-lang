@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v5.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v6.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -241,17 +241,17 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v5");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v6");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v8"
+        "inku.semantic-entity-association.v9"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v9"
+        "inku.semantic-instruction-association.v10"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v5");
-    assert_eq!(fixture.version, 5);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v6");
+    assert_eq!(fixture.version, 6);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -317,6 +317,42 @@ fn head_only_multi_head_document_preserves_order_and_is_canonical_ready() {
         canonical.push(result.canonical_bytes.unwrap());
     }
     assert_ne!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn document_preserves_ground_and_source_ordered_pre_head_modifier_ownership() {
+    let document = NormalizedDdlDocument::new(
+        "paper red circle blue line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_document(&document).unwrap();
+
+    assert!(result.issues.is_empty());
+    assert!(result.instruction_association.issues.is_empty());
+    assert!(result.instruction_association.relation_issues.is_empty());
+    assert!(result.ast.complete);
+    assert_eq!(result.ast.ground.as_ref().unwrap().identity.id, "paper");
+    assert_eq!(
+        result
+            .ast
+            .instructions
+            .iter()
+            .map(|instruction| {
+                instruction
+                    .entity
+                    .color
+                    .as_ref()
+                    .unwrap()
+                    .identity
+                    .id
+                    .as_str()
+            })
+            .collect::<Vec<_>>(),
+        ["red", "blue"]
+    );
+    assert!(result.canonical_bytes.is_some());
 }
 
 #[test]
@@ -446,7 +482,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v5");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v6");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -603,7 +639,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v5");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v6");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

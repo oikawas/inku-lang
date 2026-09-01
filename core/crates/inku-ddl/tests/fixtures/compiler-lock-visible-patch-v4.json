@@ -1,6 +1,6 @@
 {
-  "schema": "inku.compiler-lock-visible-patch-fixture.v3",
-  "version": 3,
+  "schema": "inku.compiler-lock-visible-patch-fixture.v4",
+  "version": 4,
   "definition": {
     "schema": "inku.macro-definition.v1",
     "namespace": "Canon",
@@ -11,11 +11,11 @@
     "body": []
   },
   "known_answers": {
-    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v5\"}",
-    "canonical_sha256": "d3e155a5c54dd29dfd3935fc6c19aefa643d71d086288887c15379f3f69f5ad8",
-    "seed_digest": "14783d93fa6417c6bf967d29410c9af54235adecc1ba19dedbcade71a09c3c30",
+    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v6\"}",
+    "canonical_sha256": "b34e4a0bf0e3018bbbe77507f083096b3d96691da69bed4d6bc7915487692da4",
+    "seed_digest": "a0d17fb293f59f6a00862f2a0a20742c1e7c21f3c1bf29cadc6b60685911f141",
     "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
-    "full_lock_digest": "b9a0885064b5a558deebebb6b1f7091a5f76f5eb91cea5f47c214052f3736e39"
+    "full_lock_digest": "e73d2ffd262ba9ae1badd3705cdf9d9a5e3a6a7a3ea7da0186fab2d903e38e9e"
   },
   "delivery_case_ids": [
     "explicit-and-syntax",

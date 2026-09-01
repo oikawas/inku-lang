@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v10.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v11.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,6 +32,8 @@ struct Case {
     instruction_positions: Vec<Option<String>>,
     #[serde(default)]
     instruction_touches: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_thinnesses: Vec<Option<String>>,
     #[serde(default)]
     instruction_continuities: Vec<Option<String>>,
     #[serde(default)]
@@ -179,6 +181,28 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
                     .map(|value| value.as_deref())
                     .collect::<Vec<_>>(),
                 "{}: nested entity Angle",
+                case.id
+            );
+        }
+        if !case.instruction_thinnesses.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .thinness
+                            .as_ref()
+                            .map(|thinness| thinness.value.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_thinnesses
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: nested entity core Thinness",
                 case.id
             );
         }
@@ -503,13 +527,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v10"
+        "inku.semantic-instruction-association.v11"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v10"
+        "inku.semantic-instruction-association-fixture.v11"
     );
-    assert_eq!(fixture.version, 10);
+    assert_eq!(fixture.version, 11);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -523,6 +547,7 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         "ja-position-order-two",
         "en-position-order-one",
         "en-position-order-two",
+        "en-core-thinness",
         "position-left-edge",
         "position-unspecified-action",
         "action-unspecified-position",
@@ -670,6 +695,32 @@ fn pre_head_modifier_ownership_reaches_each_instruction_without_target_guessing(
             .collect::<Vec<_>>(),
         ["ambiguous_action_ownership", "ambiguous_position_ownership"]
     );
+}
+
+#[test]
+fn core_thinness_is_owned_unchanged_by_the_nested_instruction_entity() {
+    let document = NormalizedDdlDocument::new(
+        "place one thin pencil line at center.",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert!(result.issues.is_empty());
+    assert!(result.association.issues.is_empty());
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    let thinness = instruction
+        .entity
+        .thinness
+        .as_ref()
+        .expect("nested entity owns explicit thinness");
+    assert_eq!(thinness.value.as_str(), "fine");
+    assert_eq!(thinness.provenance.surface, "thin");
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 1);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "place");
+    assert_eq!(instruction.position.as_ref().unwrap().identity.id, "center");
 }
 
 #[test]
@@ -1075,7 +1126,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v10"
+        "inku.semantic-instruction-association.v11"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

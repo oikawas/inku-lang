@@ -7,7 +7,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/core-role-composition-v1.json");
+const FIXTURE: &str = include_str!("fixtures/core-role-composition-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,6 +24,8 @@ struct Case {
     language: String,
     source: String,
     expected_roles: Vec<ExpectedRole>,
+    #[serde(default)]
+    expected_core_modifiers: Vec<ExpectedCoreModifier>,
     expected_deferred: Vec<ExpectedDeferred>,
     expected_diagnostics: Vec<ExpectedDiagnostic>,
     recognized_delivery_count: usize,
@@ -36,6 +38,15 @@ struct ExpectedRole {
     asset_id: String,
     category_key: String,
     canonical_surface_ja: String,
+    start_byte: usize,
+    end_byte: usize,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct ExpectedCoreModifier {
+    dimension: String,
+    value: String,
     start_byte: usize,
     end_byte: usize,
 }
@@ -97,6 +108,21 @@ fn fixture_composes_exact_five_and_defers_every_other_delivery() {
         );
         assert_eq!(
             composition
+                .core_modifiers
+                .iter()
+                .map(|modifier| ExpectedCoreModifier {
+                    dimension: modifier.identity.dimension.as_str().to_owned(),
+                    value: modifier.identity.value.as_str().to_owned(),
+                    start_byte: modifier.span.start_byte,
+                    end_byte: modifier.span.end_byte,
+                })
+                .collect::<Vec<_>>(),
+            case.expected_core_modifiers,
+            "{}",
+            case.id
+        );
+        assert_eq!(
+            composition
                 .deferred_tokens
                 .iter()
                 .map(project_deferred)
@@ -117,7 +143,9 @@ fn fixture_composes_exact_five_and_defers_every_other_delivery() {
         );
         assert_eq!(
             input_token_count,
-            composition.typed_roles.len() + composition.deferred_tokens.len(),
+            composition.typed_roles.len()
+                + composition.core_modifiers.len()
+                + composition.deferred_tokens.len(),
             "{}",
             case.id
         );
@@ -129,6 +157,7 @@ fn fixture_composes_exact_five_and_defers_every_other_delivery() {
         assert_eq!(
             composition.delivery_conservation_count,
             composition.typed_roles.len()
+                + composition.core_modifiers.len()
                 + composition.deferred_tokens.len()
                 + composition
                     .diagnostics
@@ -228,11 +257,11 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         CORE_ROLE_COMPOSITION_SCHEMA_ID,
-        "inku.core-role-composition.v1"
+        "inku.core-role-composition.v2"
     );
-    assert_eq!(fixture.schema, "inku.core-role-composition-fixture.v1");
-    assert_eq!(fixture.version, 1);
-    assert_eq!(fixture.cases.len(), 6);
+    assert_eq!(fixture.schema, "inku.core-role-composition-fixture.v2");
+    assert_eq!(fixture.version, 2);
+    assert_eq!(fixture.cases.len(), 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -248,6 +277,7 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
         "en-all-deferred-kinds",
         "en-partial-hole-and-unknowns",
         "en-unknown-sentence-and-qualified-macro",
+        "ja-core-thinness",
     ] {
         assert!(
             ids.contains(required),
@@ -299,6 +329,9 @@ fn project_deferred(token: &inku_ddl::NeutralToken) -> ExpectedDeferred {
         value: None,
     };
     match &token.kind {
+        NeutralTokenKind::CoreModifier(_) => {
+            panic!("typed core modifier must not remain deferred")
+        }
         NeutralTokenKind::SaijikiWord {
             asset_id,
             category_key,

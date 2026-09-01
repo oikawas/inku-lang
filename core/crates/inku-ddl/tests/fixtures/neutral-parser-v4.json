@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v3",
-  "version": 3,
+  "schema": "inku.neutral-lexeme-parser-fixture.v4",
+  "version": 4,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",
@@ -257,6 +257,30 @@
         {"kind": "unknown", "surface": "ひとつ目", "start_byte": 7, "end_byte": 19, "recognized": false}
       ],
       "recognized_delivery_count": 0
+    },
+    {
+      "id": "ja-core-thinness",
+      "language": "ja",
+      "source": "鉛筆の細い線",
+      "expected_tokens": [
+        {"kind": "saijiki_word", "surface": "鉛筆", "start_byte": 0, "end_byte": 6, "asset_id": "inku.saijiki.v1", "category_key": "tezawari", "canonical_surface_ja": "鉛筆"},
+        {"kind": "function_word", "surface": "の", "start_byte": 6, "end_byte": 9},
+        {"kind": "core_modifier", "surface": "細い", "start_byte": 9, "end_byte": 15, "modifier_dimension": "thinness", "modifier_value": "fine"},
+        {"kind": "saijiki_word", "surface": "線", "start_byte": 15, "end_byte": 18, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
+    },
+    {
+      "id": "en-core-thinness-case-insensitive",
+      "language": "en",
+      "source": "THIN line",
+      "expected_tokens": [
+        {"kind": "core_modifier", "surface": "THIN", "start_byte": 0, "end_byte": 4, "modifier_dimension": "thinness", "modifier_value": "fine"},
+        {"kind": "saijiki_word", "surface": "line", "start_byte": 5, "end_byte": 9, "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線"}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 2
     }
   ]
 }

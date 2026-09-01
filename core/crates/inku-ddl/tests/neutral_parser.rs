@@ -7,7 +7,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/neutral-parser-v3.json");
+const FIXTURE: &str = include_str!("fixtures/neutral-parser-v4.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +49,10 @@ struct ExpectedToken {
     relation_form: Option<String>,
     #[serde(default)]
     previous_reference: Option<String>,
+    #[serde(default)]
+    modifier_dimension: Option<String>,
+    #[serde(default)]
+    modifier_value: Option<String>,
     #[serde(default)]
     value: Option<u64>,
 }
@@ -420,11 +424,11 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v3"
+        "inku.neutral-lexeme-parser.v4"
     );
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v3");
-    assert_eq!(fixture.version, 3);
-    assert_eq!(fixture.cases.len(), 18);
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v4");
+    assert_eq!(fixture.version, 4);
+    assert_eq!(fixture.cases.len(), 20);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -452,6 +456,8 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "en-general-exact-cardinals",
         "numeric-negative-forms",
         "ja-unsupported-counter-and-ordinal",
+        "ja-core-thinness",
+        "en-core-thinness-case-insensitive",
     ] {
         assert!(
             ids.contains(required),
@@ -576,6 +582,61 @@ fn accepted_full_relation_literals_are_single_source_preserving_lexemes() {
     }
 }
 
+#[test]
+fn spec_core_thinness_is_recognized_without_swallowing_the_genitive_marker() {
+    let document = NormalizedDdlDocument::new(
+        "鉛筆の細い線".to_owned(),
+        ResolvedInstructionLanguage::Ja,
+        Vec::new(),
+    )
+    .expect("SPEC phrase forms a document");
+    let result = parse_neutral_lexemes(&document);
+
+    assert!(result.diagnostics.is_empty());
+    assert_eq!(
+        result
+            .tokens
+            .iter()
+            .map(|token| token.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["鉛筆", "の", "細い", "線"]
+    );
+    let thinness = result
+        .tokens
+        .iter()
+        .find_map(|token| match token.kind {
+            NeutralTokenKind::CoreModifier(identity) => Some((token.span, identity)),
+            _ => None,
+        })
+        .expect("SPEC phrase has one typed core modifier");
+    assert_eq!(
+        &document.source()[thinness.0.start_byte..thinness.0.end_byte],
+        "細い"
+    );
+    assert_eq!(thinness.1.dimension.as_str(), "thinness");
+    assert_eq!(thinness.1.value.as_str(), "fine");
+}
+
+#[test]
+fn core_thinness_respects_ja_and_en_word_boundaries() {
+    for (source, language) in [
+        ("極細い", ResolvedInstructionLanguage::Ja),
+        ("xthiny", ResolvedInstructionLanguage::En),
+        ("thinner", ResolvedInstructionLanguage::En),
+    ] {
+        let document = NormalizedDdlDocument::new(source.to_owned(), language, Vec::new())
+            .expect("negative boundary source forms a document");
+        let result = parse_neutral_lexemes(&document);
+        assert!(
+            result
+                .tokens
+                .iter()
+                .all(|token| !matches!(token.kind, NeutralTokenKind::CoreModifier(_))),
+            "{source}"
+        );
+    }
+}
+
 fn load_fixture() -> Fixture {
     serde_json::from_str(FIXTURE).expect("fixture must be valid JSON")
 }
@@ -601,9 +662,16 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
         canonical_relation_kind: None,
         relation_form: None,
         previous_reference: None,
+        modifier_dimension: None,
+        modifier_value: None,
         value: None,
     };
     match &token.kind {
+        NeutralTokenKind::CoreModifier(identity) => {
+            projected.kind = "core_modifier".to_owned();
+            projected.modifier_dimension = Some(identity.dimension.as_str().to_owned());
+            projected.modifier_value = Some(identity.value.as_str().to_owned());
+        }
         NeutralTokenKind::SaijikiWord {
             asset_id,
             category_key,

@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v4.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v5.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -232,6 +232,34 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             .count(),
         2
     );
+
+    let thin_primitive = compile(
+        "thin circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        thin_primitive
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Thinness)
+            .count(),
+        1
+    );
+    let thin_delivery = thin_primitive
+        .deliveries
+        .iter()
+        .find(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Thinness)
+        .unwrap();
+    assert_eq!(thin_delivery.identity.canonical_key, "fine");
+    assert_eq!(
+        thin_delivery
+            .span
+            .map(|span| &thin_primitive.document.source()[span.start_byte..span.end_byte]),
+        Some("thin")
+    );
     assert_eq!(
         primitive
             .deliveries
@@ -285,6 +313,29 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             SemanticHead::MacroInvocation(_)
         ));
     }
+
+    let thin_macro = compile_locked(
+        "thin Canon.Empty blue circle",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        thin_macro
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Thinness)
+            .count(),
+        1
+    );
+    assert!(thin_macro.deliveries.iter().all(|delivery| {
+        !(delivery.identity.owner == SemanticDeliveryOwner::MacroParameter
+            && delivery
+                .span
+                .map(|span| &thin_macro.document.source()[span.start_byte..span.end_byte])
+                == Some("thin"))
+    }));
 }
 
 #[test]
@@ -760,6 +811,17 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             CompilerLockState::CanonicalReady,
         ),
         (
+            "core-thinness-explicit",
+            compile(
+                "thin circle",
+                ResolvedInstructionLanguage::En,
+                &[],
+                None,
+                LIMITS,
+            ),
+            CompilerLockState::CanonicalReady,
+        ),
+        (
             "relation-zero-hole",
             compile(
                 "eight along twelve",
@@ -996,12 +1058,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v4"
+        "inku.compiler-lock-visible-patch-fixture.v5"
     );
-    assert_eq!(fixture.version, 4);
+    assert_eq!(fixture.version, 5);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v6"
+        "inku.semantic-document.v7"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(
@@ -1010,7 +1072,7 @@ fn fixture_schema_and_closed_ids_are_stable() {
             .iter()
             .collect::<HashSet<_>>()
             .len(),
-        9
+        10
     );
     assert_eq!(
         fixture.patch_case_ids.iter().collect::<HashSet<_>>().len(),

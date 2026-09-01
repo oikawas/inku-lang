@@ -233,6 +233,47 @@ fn incomplete_or_nonunique_clause_assignments_return_only_stable_diagnostics() {
 }
 
 #[test]
+fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bind","heading":"ThinParam","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"variation"}},"components":{},"body":[]}"#,
+    )
+    .unwrap();
+    let identity = definition.identity().unwrap();
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    let document = NormalizedDdlDocument::new(
+        "Bind.ThinParam thin",
+        ResolvedInstructionLanguage::En,
+        vec![lock],
+    )
+    .unwrap();
+    let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+
+    assert!(result.complete.is_empty());
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(
+        result.diagnostics[0].kind,
+        MacroParameterBindingDiagnosticKind::MissingCompatibleFact
+    );
+    assert!(
+        result
+            .macro_resolution
+            .relation_reference_evidence
+            .attachment_evidence
+            .noun_phrase
+            .clause_stream
+            .clauses
+            .iter()
+            .flat_map(|clause| &clause.atoms)
+            .any(|atom| matches!(atom, ClauseAtom::CoreModifier(_)))
+    );
+}
+
+#[test]
 fn schema_fixture_and_required_boundary_coverage_are_stable() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.macro-parameter-binding-v1-fixture.v1");

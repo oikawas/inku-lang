@@ -3,13 +3,13 @@
 use std::fmt;
 
 use crate::{
-    CanonicalRelationIdentity, CoreRoleTerm, NeutralDiagnostic, NeutralToken, NeutralTokenKind,
-    NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
+    CanonicalRelationIdentity, CoreModifierTerm, CoreRoleTerm, NeutralDiagnostic, NeutralToken,
+    NeutralTokenKind, NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
     compose_core_roles, compose_remaining_roles, parse_neutral_lexemes,
 };
 
 /// Stable identity for the runtime-disconnected clause-stream foundation.
-pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v2";
+pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v3";
 
 /// A source separator that ends one clause fragment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -29,6 +29,7 @@ pub struct ClauseSeparator {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ClauseAtom {
     CoreRole(CoreRoleTerm),
+    CoreModifier(CoreModifierTerm),
     RemainingRole(RemainingRoleTerm),
     UnattachedExactNumber(UnattachedExactNumber),
     FunctionWord {
@@ -50,6 +51,7 @@ impl ClauseAtom {
     pub const fn span(&self) -> SourceSpan {
         match self {
             Self::CoreRole(term) => term.span,
+            Self::CoreModifier(term) => term.span,
             Self::RemainingRole(term) => term.span,
             Self::UnattachedExactNumber(number) => number.span,
             Self::FunctionWord { span, .. } | Self::SaijikiRelation { span, .. } => *span,
@@ -170,6 +172,12 @@ pub fn parse_clause_stream(
     let mut atoms = Vec::new();
 
     atoms.extend(composition.core_roles.into_iter().map(ClauseAtom::CoreRole));
+    atoms.extend(
+        composition
+            .core_modifiers
+            .into_iter()
+            .map(ClauseAtom::CoreModifier),
+    );
     atoms.extend(
         composition
             .remaining_roles
@@ -309,7 +317,9 @@ fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStr
             surface,
             span,
         }),
-        NeutralTokenKind::SaijikiWord { .. } | NeutralTokenKind::ExactNumber { .. } => {
+        NeutralTokenKind::CoreModifier(_)
+        | NeutralTokenKind::SaijikiWord { .. }
+        | NeutralTokenKind::ExactNumber { .. } => {
             Err(ClauseStreamError::UnsupportedDeferredToken { atom_span: span })
         }
     }

@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v6.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v7.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,6 +40,8 @@ struct Case {
     instruction_proportion_width_extents: Vec<Option<String>>,
     #[serde(default)]
     instruction_proportion_arc_forms: Vec<Option<String>>,
+    #[serde(default)]
+    instruction_thinnesses: Vec<Option<String>>,
 }
 
 #[test]
@@ -85,6 +87,28 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
             "{}",
             case.id
         );
+        if !case.instruction_thinnesses.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .instructions
+                    .iter()
+                    .map(|instruction| {
+                        instruction
+                            .entity
+                            .thinness
+                            .as_ref()
+                            .map(|thinness| thinness.value.as_str())
+                    })
+                    .collect::<Vec<_>>(),
+                case.instruction_thinnesses
+                    .iter()
+                    .map(|value| value.as_deref())
+                    .collect::<Vec<_>>(),
+                "{}: document nested core Thinness",
+                case.id
+            );
+        }
         assert_eq!(
             result.ast.instructions, result.instruction_association.ast.instructions,
             "{}: accepted instruction AST is retained unchanged",
@@ -241,17 +265,17 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v6");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v7");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v9"
+        "inku.semantic-entity-association.v10"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v10"
+        "inku.semantic-instruction-association.v11"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v6");
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v7");
+    assert_eq!(fixture.version, 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -262,6 +286,7 @@ fn schema_fixture_and_required_document_boundaries_are_guarded() {
     assert_eq!(ids.len(), fixture.cases.len());
     for required in [
         "no-ground-unspecified",
+        "en-core-thinness",
         "ja-paper-leading",
         "en-paper-trailing",
         "paper-soft-line-break",
@@ -482,7 +507,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v6");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v7");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -594,6 +619,30 @@ fn assert_ground_occurrence_join(case: &Case, result: &SemanticDocumentResult) {
 }
 
 #[test]
+fn core_thinness_reaches_the_document_root_without_reparse_or_default() {
+    let document = NormalizedDdlDocument::new(
+        "thin circle paper",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_document(&document).unwrap();
+
+    assert!(result.issues.is_empty());
+    assert_eq!(result.ast.instructions.len(), 1);
+    assert_eq!(result.ast.ground.as_ref().unwrap().identity.id, "paper");
+    let thinness = result.ast.instructions[0]
+        .entity
+        .thinness
+        .as_ref()
+        .expect("document retains nested explicit thinness");
+    assert_eq!(thinness.value.as_str(), "fine");
+    assert_eq!(thinness.provenance.surface, "thin");
+    let canonical = std::str::from_utf8(result.canonical_bytes.as_deref().unwrap()).unwrap();
+    assert!(canonical.contains("\"thinness\":\"fine\""));
+}
+
+#[test]
 fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document_owner() {
     let ground_surface = saijiki_asset()
         .categories
@@ -639,7 +688,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v6");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v7");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

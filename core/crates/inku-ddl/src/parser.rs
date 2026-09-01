@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v3";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v4";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,9 +27,45 @@ pub struct NeutralToken {
     pub kind: NeutralTokenKind,
 }
 
+/// Closed core modifier dimension independent of the Saijiki asset.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CoreModifierDimension {
+    Thinness,
+}
+
+impl CoreModifierDimension {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Thinness => "thinness",
+        }
+    }
+}
+
+/// Closed core modifier value independent of localized source spelling.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CoreModifierValue {
+    Fine,
+}
+
+impl CoreModifierValue {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Fine => "fine",
+        }
+    }
+}
+
+/// Language-independent identity of one recognized core modifier.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CoreModifierIdentity {
+    pub dimension: CoreModifierDimension,
+    pub value: CoreModifierValue,
+}
+
 /// The lexical identity of a recognized item, before typed composition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NeutralTokenKind {
+    CoreModifier(CoreModifierIdentity),
     SaijikiWord {
         asset_id: String,
         category_key: String,
@@ -95,6 +131,7 @@ const QUALITATIVE_QUANTITIES_EN: &[&str] = &["a few", "several", "many", "numero
 const PRIORITY_FUNCTION: u8 = 1;
 const PRIORITY_NUMBER: u8 = 2;
 const PRIORITY_ASSET: u8 = 3;
+const PRIORITY_CORE_MODIFIER: u8 = 3;
 
 /// Recognize source lexemes without rewriting source or completing their meaning.
 pub fn parse_neutral_lexemes(document: &NormalizedDdlDocument) -> NeutralParseResult {
@@ -315,6 +352,30 @@ fn candidates_at(
     let mut candidates = Vec::new();
     let asset = saijiki_asset();
 
+    let core_modifier_surface = match language {
+        ResolvedInstructionLanguage::Ja => "細い",
+        ResolvedInstructionLanguage::En => "thin",
+    };
+    if language != ResolvedInstructionLanguage::Ja
+        || !require_boundary
+        || has_japanese_core_modifier_left_boundary(source, start_byte)
+    {
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            core_modifier_surface,
+            PRIORITY_CORE_MODIFIER,
+            "core_modifier:thinness:fine".to_owned(),
+            CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
+                dimension: CoreModifierDimension::Thinness,
+                value: CoreModifierValue::Fine,
+            })),
+        );
+    }
+
     for category in &asset.categories {
         for word in &category.words {
             let Some(surface) = parser_candidate_surface(word, language) else {
@@ -463,6 +524,26 @@ fn candidates_at(
     }
 
     candidates
+}
+
+fn has_japanese_core_modifier_left_boundary(source: &str, start_byte: usize) -> bool {
+    start_byte == 0
+        || source[..start_byte]
+            .chars()
+            .next_back()
+            .is_some_and(is_separator)
+        || source[..start_byte]
+            .char_indices()
+            .any(|(candidate_start, _)| {
+                candidates_at(
+                    source,
+                    candidate_start,
+                    ResolvedInstructionLanguage::Ja,
+                    false,
+                )
+                .iter()
+                .any(|candidate| candidate.end_byte == start_byte)
+            })
 }
 
 #[allow(clippy::too_many_arguments)]

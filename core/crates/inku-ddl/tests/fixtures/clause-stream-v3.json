@@ -1,6 +1,6 @@
 {
-  "schema": "inku.clause-stream-fixture.v2",
-  "version": 2,
+  "schema": "inku.clause-stream-fixture.v3",
+  "version": 3,
   "cases": [
     {
       "id": "ja-all-atom-kinds",
@@ -186,6 +186,25 @@
         }
       ],
       "delivery_conservation_count": 1
+    },
+    {
+      "id": "ja-core-thinness-atom",
+      "language": "ja",
+      "source": "鉛筆の細い線",
+      "expected_clauses": [
+        {
+          "start_byte": 0,
+          "end_byte": 18,
+          "atoms": [
+            {"kind": "core:touch", "surface": "鉛筆", "start_byte": 0, "end_byte": 6},
+            {"kind": "function_word", "surface": "の", "start_byte": 6, "end_byte": 9},
+            {"kind": "core_modifier:thinness:fine", "surface": "細い", "start_byte": 9, "end_byte": 15},
+            {"kind": "core:primitive", "surface": "線", "start_byte": 15, "end_byte": 18}
+          ]
+        }
+      ],
+      "expected_separators": [],
+      "delivery_conservation_count": 4
     }
   ]
 }

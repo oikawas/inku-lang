@@ -7,7 +7,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/clause-stream-v2.json");
+const FIXTURE: &str = include_str!("fixtures/clause-stream-v3.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -151,6 +151,7 @@ fn fixture_preserves_source_order_clauses_separators_and_all_atom_kinds() {
         observed_atom_classes,
         [
             "core",
+            "core_modifier",
             "remaining",
             "exact_number",
             "function_word",
@@ -257,10 +258,10 @@ fn sentence_end_without_atoms_remains_a_separator() {
 #[test]
 fn fixture_schema_and_required_boundary_cases_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v2");
-    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v2");
-    assert_eq!(fixture.version, 2);
-    assert_eq!(fixture.cases.len(), 7);
+    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v3");
+    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v3");
+    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.cases.len(), 8);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -277,6 +278,7 @@ fn fixture_schema_and_required_boundary_cases_are_guarded() {
         "separator-only",
         "ja-full-relation-literal",
         "en-full-relation-literal-case",
+        "ja-core-thinness-atom",
     ] {
         assert!(
             ids.contains(required),
@@ -360,6 +362,11 @@ fn project_atom(atom: &ClauseAtom, source: &str) -> ExpectedAtom {
                 CoreRoleKind::Surface => "surface",
                 CoreRoleKind::Ground => "ground",
             }
+        ),
+        ClauseAtom::CoreModifier(term) => format!(
+            "core_modifier:{}:{}",
+            term.identity.dimension.as_str(),
+            term.identity.value.as_str()
         ),
         ClauseAtom::RemainingRole(term) => format!(
             "remaining:{}",

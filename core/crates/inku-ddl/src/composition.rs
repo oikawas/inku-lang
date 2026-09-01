@@ -1,12 +1,15 @@
 //! Language-independent typed composition over meaning-neutral parser deliveries.
 
-use crate::{NeutralDiagnostic, NeutralParseResult, NeutralToken, NeutralTokenKind, SourceSpan};
+use crate::{
+    CoreModifierIdentity, NeutralDiagnostic, NeutralParseResult, NeutralToken, NeutralTokenKind,
+    SourceSpan,
+};
 
 /// Stable identity for the runtime-disconnected core-role composition foundation.
-pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v1";
+pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v2";
 
 /// Stable identity for the runtime-disconnected remaining-role composition foundation.
-pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v1";
+pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v2";
 
 /// One of the exact core drawing roles typed by this foundation slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -28,10 +31,18 @@ pub struct CoreRoleTerm {
     pub span: SourceSpan,
 }
 
+/// One typed core modifier at its exact source location.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CoreModifierTerm {
+    pub identity: CoreModifierIdentity,
+    pub span: SourceSpan,
+}
+
 /// Partial typed composition with every untyped delivery retained for a later slice.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoreRoleComposition {
     pub typed_roles: Vec<CoreRoleTerm>,
+    pub core_modifiers: Vec<CoreModifierTerm>,
     pub deferred_tokens: Vec<NeutralToken>,
     pub diagnostics: Vec<NeutralDiagnostic>,
     pub delivery_conservation_count: usize,
@@ -69,6 +80,7 @@ pub struct UnattachedExactNumber {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RemainingRoleComposition {
     pub core_roles: Vec<CoreRoleTerm>,
+    pub core_modifiers: Vec<CoreModifierTerm>,
     pub remaining_roles: Vec<RemainingRoleTerm>,
     pub unattached_exact_numbers: Vec<UnattachedExactNumber>,
     pub deferred_tokens: Vec<NeutralToken>,
@@ -84,12 +96,21 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
         recognized_delivery_count: _,
     } = neutral;
     let mut typed_roles = Vec::new();
+    let mut core_modifiers = Vec::new();
     let mut deferred_tokens = Vec::new();
 
     for token in tokens {
+        if let NeutralTokenKind::CoreModifier(identity) = &token.kind {
+            core_modifiers.push(CoreModifierTerm {
+                identity: *identity,
+                span: token.span,
+            });
+            continue;
+        }
         let role = match &token.kind {
             NeutralTokenKind::SaijikiWord { category_key, .. } => role_for_category(category_key),
-            NeutralTokenKind::SaijikiRelation { .. }
+            NeutralTokenKind::CoreModifier(_)
+            | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord
             | NeutralTokenKind::ExactNumber { .. } => None,
         };
@@ -116,6 +137,7 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
     }
 
     let delivery_conservation_count = typed_roles.len()
+        + core_modifiers.len()
         + deferred_tokens.len()
         + diagnostics
             .iter()
@@ -124,6 +146,7 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
 
     CoreRoleComposition {
         typed_roles,
+        core_modifiers,
         deferred_tokens,
         diagnostics,
         delivery_conservation_count,
@@ -134,6 +157,7 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
 pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleComposition {
     let CoreRoleComposition {
         typed_roles: core_roles,
+        core_modifiers,
         deferred_tokens,
         diagnostics,
         delivery_conservation_count: input_delivery_conservation_count,
@@ -147,7 +171,8 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
             NeutralTokenKind::SaijikiWord { category_key, .. } => {
                 remaining_role_for_category(category_key)
             }
-            NeutralTokenKind::SaijikiRelation { .. }
+            NeutralTokenKind::CoreModifier(_)
+            | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord
             | NeutralTokenKind::ExactNumber { .. } => None,
         };
@@ -183,6 +208,7 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
     }
 
     let delivery_conservation_count = core_roles.len()
+        + core_modifiers.len()
         + remaining_roles.len()
         + unattached_exact_numbers.len()
         + still_deferred_tokens.len()
@@ -197,6 +223,7 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
 
     RemainingRoleComposition {
         core_roles,
+        core_modifiers,
         remaining_roles,
         unattached_exact_numbers,
         deferred_tokens: still_deferred_tokens,

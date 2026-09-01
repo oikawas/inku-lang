@@ -1,6 +1,6 @@
 {
-  "schema": "inku.core-role-composition-fixture.v1",
-  "version": 1,
+  "schema": "inku.core-role-composition-fixture.v2",
+  "version": 2,
   "cases": [
     {
       "id": "ja-exact-five",
@@ -94,6 +94,23 @@
         {"kind": "unknown", "surface": "Nature.petals", "start_byte": 23, "end_byte": 36, "recognized": false}
       ],
       "recognized_delivery_count": 0
+    },
+    {
+      "id": "ja-core-thinness",
+      "language": "ja",
+      "source": "鉛筆の細い線",
+      "expected_roles": [
+        {"role": "touch", "asset_id": "inku.saijiki.v1", "category_key": "tezawari", "canonical_surface_ja": "鉛筆", "start_byte": 0, "end_byte": 6},
+        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線", "start_byte": 15, "end_byte": 18}
+      ],
+      "expected_core_modifiers": [
+        {"dimension": "thinness", "value": "fine", "start_byte": 9, "end_byte": 15}
+      ],
+      "expected_deferred": [
+        {"kind": "function_word", "surface": "の", "start_byte": 6, "end_byte": 9}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 4
     }
   ]
 }

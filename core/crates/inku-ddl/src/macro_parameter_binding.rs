@@ -419,7 +419,8 @@ fn clause_facts(
                 &term.canonical_surface_ja,
             )?,
             ClauseAtom::UnattachedExactNumber(number) => FactKind::ExactNumber(number.value),
-            ClauseAtom::FunctionWord { .. }
+            ClauseAtom::CoreModifier(_)
+            | ClauseAtom::FunctionWord { .. }
             | ClauseAtom::SaijikiRelation { .. }
             | ClauseAtom::UnresolvedDiagnostic(_) => continue,
         };

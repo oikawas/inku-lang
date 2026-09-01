@@ -19,13 +19,13 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v4";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v5";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v4";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v5";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v4";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v5";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,6 +80,7 @@ pub enum SemanticDeliveryOwner {
     MacroParameter,
     Color,
     Quantity,
+    Thinness,
     Touch,
     Continuity,
     Angle,
@@ -107,6 +108,7 @@ impl SemanticDeliveryOwner {
             Self::MacroParameter => "macro_parameter",
             Self::Color => "color",
             Self::Quantity => "quantity",
+            Self::Thinness => "thinness",
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
@@ -429,7 +431,8 @@ fn projection_integrity_failure_kind(stream: &crate::ClauseStream) -> Option<&'s
                     term.category_key.as_str(),
                     term.canonical_surface_ja.as_str(),
                 ),
-                ClauseAtom::UnattachedExactNumber(_)
+                ClauseAtom::CoreModifier(_)
+                | ClauseAtom::UnattachedExactNumber(_)
                 | ClauseAtom::FunctionWord { .. }
                 | ClauseAtom::SaijikiRelation { .. }
                 | ClauseAtom::UnresolvedDiagnostic(_) => return None,
@@ -601,6 +604,7 @@ fn project_deliveries(
             }
             SemanticAssociationIssueKind::ConflictingColors
             | SemanticAssociationIssueKind::ConflictingQuantities
+            | SemanticAssociationIssueKind::ConflictingThinness
             | SemanticAssociationIssueKind::ConflictingTouches
             | SemanticAssociationIssueKind::ConflictingContinuities
             | SemanticAssociationIssueKind::ConflictingAngles
@@ -752,6 +756,7 @@ fn project_deliveries(
             if !covered_spans.contains(&atom.span()) {
                 let kind = match atom {
                     ClauseAtom::CoreRole(_) => "core_role_transport",
+                    ClauseAtom::CoreModifier(_) => "core_modifier_transport",
                     ClauseAtom::RemainingRole(_) => "remaining_role_transport",
                     ClauseAtom::UnattachedExactNumber(_) => "exact_number_transport",
                     ClauseAtom::FunctionWord { .. } => "function_word",
@@ -862,6 +867,14 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             quantity.value.to_string(),
         );
     }
+    if let Some(thinness) = &instruction.entity.thinness {
+        add_explicit(
+            projection,
+            thinness.provenance.span,
+            SemanticDeliveryOwner::Thinness,
+            thinness.value.as_str().to_owned(),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -924,6 +937,9 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
         | OwnedSemanticOccurrence::Proportion(term) => term_key(term),
         OwnedSemanticOccurrence::Quantity(quantity) => {
             format!("quantity:{}", quantity.value)
+        }
+        OwnedSemanticOccurrence::Thinness(thinness) => {
+            format!("thinness:{}", thinness.value.as_str())
         }
     }
 }

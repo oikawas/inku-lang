@@ -45,9 +45,10 @@ pub use compiler_lock::{
     compiler_lock_hash_input, expanded_meaning_canonical_bytes,
 };
 pub use composition::{
-    CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreRoleComposition, CoreRoleKind, CoreRoleTerm,
-    REMAINING_ROLE_COMPOSITION_SCHEMA_ID, RemainingRoleComposition, RemainingRoleKind,
-    RemainingRoleTerm, UnattachedExactNumber, compose_core_roles, compose_remaining_roles,
+    CORE_ROLE_COMPOSITION_SCHEMA_ID, CoreModifierTerm, CoreRoleComposition, CoreRoleKind,
+    CoreRoleTerm, REMAINING_ROLE_COMPOSITION_SCHEMA_ID, RemainingRoleComposition,
+    RemainingRoleKind, RemainingRoleTerm, UnattachedExactNumber, compose_core_roles,
+    compose_remaining_roles,
 };
 
 pub use document::{
@@ -102,6 +103,7 @@ pub use opaque_head::{
     OpaqueHeadCandidateEvidenceDiagnosticKind, collect_english_opaque_head_candidate_evidence,
 };
 pub use parser::{
+    CoreModifierDimension, CoreModifierIdentity, CoreModifierValue,
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
     NeutralToken, NeutralTokenKind, SourceSpan, parse_neutral_lexemes,
 };
@@ -147,7 +149,7 @@ pub use semantic_association::{
     SemanticHead, SemanticIdentity, SemanticMacroInvocationHead, SemanticMacroInvocationProvenance,
     SemanticMacroParameterBinding, SemanticMacroParameterValue, SemanticPreviousReference,
     SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticSurface, SemanticTerm,
-    SemanticTermProvenance, SourceOccurrence, associate_semantic_entities,
+    SemanticTermProvenance, SemanticThinness, SourceOccurrence, associate_semantic_entities,
     associate_semantic_entities_with_macro_binding,
 };
 pub use semantic_document::{

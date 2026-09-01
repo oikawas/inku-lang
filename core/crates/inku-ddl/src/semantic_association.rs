@@ -7,7 +7,7 @@ use serde_json::{Number, Value};
 use crate::{
     AttachmentEvidenceResult, AttachmentMarkerKind, BoundMacroParameterValue,
     CanonicalPreviousReference, CanonicalRelationIdentity, CanonicalRelationKind, ClauseAtom,
-    ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreRoleKind,
+    ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreModifierValue, CoreRoleKind,
     EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
     MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity, MacroParameterBinding,
     MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, NeutralDiagnostic,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v9";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v10";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -115,6 +115,13 @@ pub struct SemanticQuantity {
     pub provenance: SourceOccurrence,
 }
 
+/// One explicit core thinness value and its exact source provenance.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticThinness {
+    pub value: CoreModifierValue,
+    pub provenance: SourceOccurrence,
+}
+
 /// Canonical value of one source-owned macro parameter.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SemanticMacroParameterValue {
@@ -205,6 +212,7 @@ pub struct SemanticEntity {
     pub head: SemanticHead,
     pub color: Option<SemanticTerm>,
     pub quantity: Option<SemanticQuantity>,
+    pub thinness: Option<SemanticThinness>,
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
@@ -227,6 +235,7 @@ pub enum OwnedSemanticOccurrence {
     MacroDiagnostic(SemanticMacroInvocationProvenance),
     Color(SemanticTerm),
     Quantity(SemanticQuantity),
+    Thinness(SemanticThinness),
     Touch(SemanticTerm),
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
@@ -249,6 +258,7 @@ impl OwnedSemanticOccurrence {
             | Self::Fluctuation(term)
             | Self::Proportion(term) => &term.provenance.source,
             Self::Quantity(quantity) => &quantity.provenance,
+            Self::Thinness(thinness) => &thinness.provenance,
         }
     }
 
@@ -258,6 +268,7 @@ impl OwnedSemanticOccurrence {
             Self::MacroDiagnostic(_)
             | Self::Color(_)
             | Self::Quantity(_)
+            | Self::Thinness(_)
             | Self::Touch(_)
             | Self::Continuity(_)
             | Self::Angle(_)
@@ -275,6 +286,7 @@ pub enum SemanticAssociationIssueKind {
     MissingEntityHead,
     ConflictingColors,
     ConflictingQuantities,
+    ConflictingThinness,
     ConflictingTouches,
     ConflictingContinuities,
     ConflictingAngles,
@@ -303,6 +315,7 @@ impl SemanticAssociationIssueKind {
             Self::MissingEntityHead => "missing_entity_head",
             Self::ConflictingColors => "conflicting_colors",
             Self::ConflictingQuantities => "conflicting_quantities",
+            Self::ConflictingThinness => "conflicting_thinness",
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
             Self::ConflictingAngles => "conflicting_angles",
@@ -428,6 +441,7 @@ struct AssociationRegion {
     heads: Vec<SemanticHead>,
     colors: Vec<SemanticTerm>,
     quantities: Vec<SemanticQuantity>,
+    thinnesses: Vec<SemanticThinness>,
     touches: Vec<SemanticTerm>,
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
@@ -629,6 +643,10 @@ fn is_pre_head_modifier_atom(atom: &ClauseAtom) -> bool {
                     | RemainingRoleKind::Fluctuation
                     | RemainingRoleKind::Proportion
             )
+    ) || matches!(
+        atom,
+        ClauseAtom::CoreModifier(term)
+            if term.identity.dimension == crate::CoreModifierDimension::Thinness
     ) || matches!(atom, ClauseAtom::UnattachedExactNumber(_))
 }
 
@@ -805,6 +823,19 @@ fn build_semantic_entities(
                         provenance: source_occurrence(
                             document,
                             quantity.span,
+                            region_index,
+                            clause_index,
+                            atom_index,
+                        ),
+                    });
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::CoreModifier(modifier) => {
+                    region.thinnesses.push(SemanticThinness {
+                        value: modifier.identity.value,
+                        provenance: source_occurrence(
+                            document,
+                            modifier.span,
                             region_index,
                             clause_index,
                             atom_index,
@@ -1270,6 +1301,12 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::Quantity),
             )
+            .chain(
+                region
+                    .thinnesses
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::Thinness),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -1309,6 +1346,12 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::Quantity),
             )
+            .chain(
+                region
+                    .thinnesses
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::Thinness),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -1335,6 +1378,19 @@ fn associate_region(
     }
 
     let head = region.heads.pop().expect("single head was checked");
+    let owned_thinnesses = take_owned_thinnesses(&mut region.thinnesses, &head, pre_head_ownership);
+    if !region.thinnesses.is_empty() {
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
+            region_index,
+            occurrences: region
+                .thinnesses
+                .drain(..)
+                .map(OwnedSemanticOccurrence::Thinness)
+                .collect(),
+            upstream_diagnostic: None,
+        });
+    }
     let color = select_term(
         region.colors,
         OwnedSemanticOccurrence::Color,
@@ -1355,6 +1411,22 @@ fn associate_region(
                 kind: SemanticAssociationIssueKind::ConflictingQuantities,
                 region_index,
                 occurrences,
+                upstream_diagnostic: None,
+            });
+            None
+        }
+    };
+    let thinness = match owned_thinnesses.len() {
+        0 => None,
+        1 => owned_thinnesses.into_iter().next(),
+        _ => {
+            issues.push(SemanticAssociationIssue {
+                kind: SemanticAssociationIssueKind::ConflictingThinness,
+                region_index,
+                occurrences: owned_thinnesses
+                    .into_iter()
+                    .map(OwnedSemanticOccurrence::Thinness)
+                    .collect(),
                 upstream_diagnostic: None,
             });
             None
@@ -1477,6 +1549,7 @@ fn associate_region(
         head,
         color,
         quantity,
+        thinness,
         touch,
         continuity,
         angle,
@@ -1503,6 +1576,7 @@ fn take_pre_head_region(
     AssociationRegion {
         colors: take_owned_terms(&mut region.colors, &head, ownership),
         quantities: take_owned_quantities(&mut region.quantities, &head, ownership),
+        thinnesses: take_owned_thinnesses(&mut region.thinnesses, &head, ownership),
         touches: take_owned_terms(&mut region.touches, &head, ownership),
         continuities: take_owned_terms(&mut region.continuities, &head, ownership),
         angles: take_owned_terms(&mut region.angles, &head, ownership),
@@ -1571,6 +1645,18 @@ fn take_owned_quantities(
         .into_iter()
         .partition(|quantity| ownership.owns(head, quantity.provenance.span));
     *quantities = remaining;
+    owned
+}
+
+fn take_owned_thinnesses(
+    thinnesses: &mut Vec<SemanticThinness>,
+    head: &SemanticHead,
+    ownership: &PreHeadPhraseOwnership,
+) -> Vec<SemanticThinness> {
+    let (owned, remaining) = std::mem::take(thinnesses)
+        .into_iter()
+        .partition(|thinness| ownership.owns(head, thinness.provenance.span));
+    *thinnesses = remaining;
     owned
 }
 
@@ -1656,6 +1742,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
     entity.head.occurrence_count()
         + usize::from(entity.color.is_some())
         + usize::from(entity.quantity.is_some())
+        + usize::from(entity.thinness.is_some())
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
@@ -1729,6 +1816,14 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .touch
             .as_ref()
             .map(|touch| semantic_identity_value(&touch.identity))
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "thinness".to_owned(),
+        entity
+            .thinness
+            .as_ref()
+            .map(|thinness| Value::String(thinness.value.as_str().to_owned()))
             .unwrap_or(Value::Null),
     );
     record.insert(

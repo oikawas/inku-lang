@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v9.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v10.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -33,6 +33,8 @@ struct Case {
     owned_occurrence_count: usize,
     #[serde(default)]
     explicit_touches: Vec<String>,
+    #[serde(default)]
+    explicit_thinnesses: Vec<String>,
     #[serde(default)]
     explicit_continuities: Vec<String>,
     #[serde(default)]
@@ -130,6 +132,25 @@ fn fixture_associates_single_head_entities_without_surface_order_rules() {
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
             "{}: explicit Touch fields",
+            case.id
+        );
+        assert_eq!(
+            result
+                .ast
+                .entities
+                .iter()
+                .filter_map(|entity| {
+                    entity
+                        .thinness
+                        .as_ref()
+                        .map(|thinness| thinness.value.as_str())
+                })
+                .collect::<Vec<_>>(),
+            case.explicit_thinnesses
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            "{}: explicit core Thinness fields",
             case.id
         );
         assert_eq!(
@@ -438,13 +459,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v9"
+        "inku.semantic-entity-association.v10"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v9"
+        "inku.semantic-entity-association-fixture.v10"
     );
-    assert_eq!(fixture.version, 9);
+    assert_eq!(fixture.version, 10);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -455,6 +476,7 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     assert_eq!(ids.len(), fixture.cases.len());
     for required in [
         "ja-canonical-order-one",
+        "en-core-thinness",
         "ja-canonical-order-two",
         "en-canonical-order-one",
         "en-canonical-order-two",
@@ -633,6 +655,106 @@ fn pre_head_colors_are_owned_by_each_multi_head_in_source_order() {
         canonical.push(result.canonical_bytes.unwrap());
     }
     assert_ne!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn spec_core_thinness_has_language_independent_entity_meaning_and_source_provenance() {
+    let mut canonical = Vec::new();
+    for (source, language, expected_surface) in [
+        (
+            "中心に鉛筆の細い線をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+            "細い",
+        ),
+        (
+            "Place one thin pencil line at the center.",
+            ResolvedInstructionLanguage::En,
+            "thin",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+
+        assert!(result.issues.is_empty(), "{source}: {:?}", result.issues);
+        assert!(result.ast.complete, "{source}");
+        assert_eq!(result.ast.entities.len(), 1, "{source}");
+        let entity = &result.ast.entities[0];
+        assert_eq!(
+            entity.head.source().surface,
+            if language == ResolvedInstructionLanguage::Ja {
+                "線"
+            } else {
+                "line"
+            }
+        );
+        assert_eq!(entity.touch.as_ref().unwrap().identity.id, "pencil");
+        assert_eq!(entity.quantity.as_ref().unwrap().value, 1);
+        let thinness = entity.thinness.as_ref().expect("explicit core thinness");
+        assert_eq!(thinness.value.as_str(), "fine");
+        assert_eq!(thinness.provenance.surface, expected_surface);
+        assert_eq!(
+            &document.source()
+                [thinness.provenance.span.start_byte..thinness.provenance.span.end_byte],
+            expected_surface
+        );
+        assert_eq!(result.owned_occurrence_count, 4, "{source}");
+        assert_eq!(result.delivered_occurrence_count, 4, "{source}");
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+
+    assert_eq!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn core_thinness_uses_pre_head_ownership_without_default_or_nearest_fallback() {
+    let multi = NormalizedDdlDocument::new(
+        "thin line circle",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let multi = associate_semantic_entities(&multi).unwrap();
+    assert!(multi.issues.is_empty());
+    assert_eq!(multi.ast.entities.len(), 2);
+    assert_eq!(
+        multi.ast.entities[0]
+            .thinness
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "fine"
+    );
+    assert!(multi.ast.entities[1].thinness.is_none());
+
+    let post_head =
+        NormalizedDdlDocument::new("line thin", ResolvedInstructionLanguage::En, Vec::new())
+            .unwrap();
+    let post_head = associate_semantic_entities(&post_head).unwrap();
+    assert!(post_head.ast.entities[0].thinness.is_none());
+    assert_eq!(
+        association_issue_kinds(&post_head),
+        ["ambiguous_entity_ownership"]
+    );
+    assert!(matches!(
+        post_head.issues[0].occurrences.as_slice(),
+        [OwnedSemanticOccurrence::Thinness(_)]
+    ));
+
+    let conflict = NormalizedDdlDocument::new(
+        "thin THIN line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let conflict = associate_semantic_entities(&conflict).unwrap();
+    assert!(conflict.ast.entities[0].thinness.is_none());
+    assert_eq!(association_issue_kinds(&conflict), ["conflicting_thinness"]);
+    assert_eq!(conflict.issues[0].occurrences.len(), 2);
+    assert_eq!(
+        conflict.owned_occurrence_count,
+        conflict.delivered_occurrence_count
+    );
 }
 
 #[test]
@@ -1316,6 +1438,15 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
                 case.id
             );
         }
+        if let Some(thinness) = &entity.thinness {
+            assert_source_occurrence(case, &thinness.provenance, &result.clause_stream);
+            assert_eq!(
+                entity.head.source().region_index,
+                thinness.provenance.region_index,
+                "{}: core thinness must remain in its sentence region",
+                case.id
+            );
+        }
         for term in [
             &entity.fluctuation.amplitude,
             &entity.fluctuation.frequency,
@@ -1461,6 +1592,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
                 Some(term.span)
             }
             ClauseAtom::UnattachedExactNumber(number) => Some(number.span),
+            ClauseAtom::CoreModifier(modifier) => Some(modifier.span),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -1473,6 +1605,9 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         }
         if let Some(quantity) = &entity.quantity {
             output_spans.push(quantity.provenance.span);
+        }
+        if let Some(thinness) = &entity.thinness {
+            output_spans.push(thinness.provenance.span);
         }
         for term in [&entity.touch, &entity.continuity, &entity.angle]
             .into_iter()
@@ -1513,6 +1648,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::MacroDiagnostic(provenance) => provenance.source.span,
             OwnedSemanticOccurrence::Color(term) => term.provenance.source.span,
             OwnedSemanticOccurrence::Quantity(quantity) => quantity.provenance.span,
+            OwnedSemanticOccurrence::Thinness(thinness) => thinness.provenance.span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)

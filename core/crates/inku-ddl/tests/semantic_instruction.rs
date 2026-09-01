@@ -10,7 +10,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v11.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v12.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -73,7 +73,7 @@ struct FixtureMacroLock {
 }
 
 #[test]
-fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules() {
+fn fixture_associates_uniform_clause_local_actions_and_positions() {
     let fixture = load_fixture();
     let mut canonical_by_case = HashMap::new();
 
@@ -508,7 +508,6 @@ fn fixture_associates_explicit_actions_and_positions_without_surface_order_rules
         "ja-position-order-two",
         "en-position-order-one",
         "en-position-order-two",
-        "soft-line-break",
     ]
     .map(|id| canonical_by_case[id]);
     assert!(equivalent.windows(2).all(|pair| pair[0] == pair[1]));
@@ -527,13 +526,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v11"
+        "inku.semantic-instruction-association.v12"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v11"
+        "inku.semantic-instruction-association-fixture.v12"
     );
-    assert_eq!(fixture.version, 11);
+    assert_eq!(fixture.version, 12);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -621,7 +620,47 @@ fn multi_head_instruction_and_relation_owners_remain_ambiguous_exactly_once() {
             .iter()
             .map(|issue| issue.kind.as_str())
             .collect::<Vec<_>>(),
-        ["ambiguous_position_ownership", "ambiguous_action_ownership"]
+        ["ambiguous_position_ownership"]
+    );
+    assert_eq!(
+        reversed.ast.instructions[0]
+            .action
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("place"),
+        "typed Motion owns the first bounded following entity phrase"
+    );
+
+    let document = NormalizedDdlDocument::new(
+        "place circle line at center",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let next_head_boundary = associate_semantic_instructions(&document).unwrap();
+    assert_eq!(
+        next_head_boundary
+            .ast
+            .instructions
+            .iter()
+            .map(|instruction| instruction
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str()))
+            .collect::<Vec<_>>(),
+        [Some("place"), None]
+    );
+    assert!(
+        next_head_boundary
+            .ast
+            .instructions
+            .iter()
+            .all(|instruction| instruction.position.is_none()),
+        "Position after another head must not attach to the first instruction"
+    );
+    assert_eq!(
+        next_head_boundary.issues[0].kind.as_str(),
+        "ambiguous_position_ownership"
     );
 
     let relation = saijiki_asset()
@@ -721,6 +760,206 @@ fn core_thinness_is_owned_unchanged_by_the_nested_instruction_entity() {
     assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 1);
     assert_eq!(instruction.action.as_ref().unwrap().identity.id, "place");
     assert_eq!(instruction.position.as_ref().unwrap().identity.id, "center");
+}
+
+#[test]
+fn spec_ja_and_en_use_one_clause_local_instruction_meaning() {
+    let cases = [
+        (
+            "中心に、鉛筆の細い線をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+            ["線", "鉛筆", "細い", "ひとつ", "置く", "中心"],
+        ),
+        (
+            "place one thin pencil line at the center",
+            ResolvedInstructionLanguage::En,
+            ["line", "pencil", "thin", "one", "place", "center"],
+        ),
+    ];
+    let mut canonical = Vec::new();
+
+    for (source, language, surfaces) in cases {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_instructions(&document).unwrap();
+
+        assert!(result.association.issues.is_empty(), "{source}");
+        assert!(result.issues.is_empty(), "{source}");
+        assert_eq!(result.ast.instructions.len(), 1, "{source}");
+        let instruction = &result.ast.instructions[0];
+        let SemanticHead::Primitive(head) = &instruction.entity.head else {
+            panic!("{source}: expected Primitive head");
+        };
+        assert_eq!(head.identity.id, "line", "{source}");
+        assert_eq!(
+            instruction.entity.head.source().surface,
+            surfaces[0],
+            "{source}"
+        );
+        assert_eq!(
+            instruction.entity.touch.as_ref().unwrap().identity.id,
+            "pencil",
+            "{source}"
+        );
+        assert_eq!(
+            instruction
+                .entity
+                .touch
+                .as_ref()
+                .unwrap()
+                .provenance
+                .source
+                .surface,
+            surfaces[1],
+            "{source}"
+        );
+        assert_eq!(
+            instruction.entity.thinness.as_ref().unwrap().value.as_str(),
+            "fine",
+            "{source}"
+        );
+        assert_eq!(
+            instruction
+                .entity
+                .thinness
+                .as_ref()
+                .unwrap()
+                .provenance
+                .surface,
+            surfaces[2],
+            "{source}"
+        );
+        assert_eq!(
+            instruction.entity.quantity.as_ref().unwrap().value,
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            instruction
+                .entity
+                .quantity
+                .as_ref()
+                .unwrap()
+                .provenance
+                .surface,
+            surfaces[3],
+            "{source}"
+        );
+        assert_eq!(
+            instruction.action.as_ref().unwrap().identity.id,
+            "place",
+            "{source}"
+        );
+        assert_eq!(
+            instruction
+                .action
+                .as_ref()
+                .unwrap()
+                .provenance
+                .source
+                .surface,
+            surfaces[4],
+            "{source}"
+        );
+        assert_eq!(
+            instruction.position.as_ref().unwrap().identity.id,
+            "center",
+            "{source}"
+        );
+        assert_eq!(
+            instruction
+                .position
+                .as_ref()
+                .unwrap()
+                .provenance
+                .source
+                .surface,
+            surfaces[5],
+            "{source}"
+        );
+        assert_eq!(
+            result.owned_instruction_occurrence_count,
+            result.delivered_instruction_occurrence_count,
+            "{source}"
+        );
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+
+    assert_eq!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn ja_and_en_multi_instruction_pairs_keep_source_order_and_shared_meaning() {
+    let cases = [
+        (
+            "中央に円をひとつ置く。左端に線を二つ並べる。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "place one circle at center. line-up two line at left-edge.",
+            ResolvedInstructionLanguage::En,
+        ),
+    ];
+    let mut canonical = Vec::new();
+
+    for (source, language) in cases {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_instructions(&document).unwrap();
+
+        assert!(result.association.issues.is_empty(), "{source}");
+        assert!(result.issues.is_empty(), "{source}");
+        assert_eq!(result.ast.instructions.len(), 2, "{source}");
+        assert_eq!(
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| match &instruction.entity.head {
+                    SemanticHead::Primitive(head) => head.identity.id.as_str(),
+                    SemanticHead::MacroInvocation(_) => panic!("{source}: unexpected macro head"),
+                })
+                .collect::<Vec<_>>(),
+            ["circle", "line"],
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| instruction.entity.quantity.as_ref().unwrap().value)
+                .collect::<Vec<_>>(),
+            [1, 2],
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| instruction.action.as_ref().unwrap().identity.id.as_str())
+                .collect::<Vec<_>>(),
+            ["place", "line_up"],
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| instruction.position.as_ref().unwrap().identity.id.as_str())
+                .collect::<Vec<_>>(),
+            ["center", "left_edge"],
+            "{source}"
+        );
+        assert_eq!(
+            result.owned_instruction_occurrence_count,
+            result.delivered_instruction_occurrence_count,
+            "{source}"
+        );
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+
+    assert_eq!(canonical[0], canonical[1]);
 }
 
 #[test]
@@ -1074,7 +1313,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
         .find(|relation| relation.relation_type == "along")
         .and_then(|relation| relation.literals_en.first())
         .expect("accepted along literal");
-    let source = format!("circle! Nature.Leaf {motion} {place} {along}! square {along}!");
+    let source = format!("circle! {motion} Nature.Leaf at {place} {along}! square {along}!");
     let document = instruction_macro_document(&source, std::slice::from_ref(&definition));
     let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
     let result = associate_semantic_instructions_with_macro_binding(&document, binding);
@@ -1126,7 +1365,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v11"
+        "inku.semantic-instruction-association.v12"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

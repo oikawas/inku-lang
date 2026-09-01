@@ -1,6 +1,6 @@
 {
-  "schema": "inku.compiler-lock-visible-patch-fixture.v5",
-  "version": 5,
+  "schema": "inku.compiler-lock-visible-patch-fixture.v6",
+  "version": 6,
   "definition": {
     "schema": "inku.macro-definition.v1",
     "namespace": "Canon",
@@ -11,11 +11,11 @@
     "body": []
   },
   "known_answers": {
-    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v7\"}",
-    "canonical_sha256": "6ac5af673064a7926faef3c56d0631f23a559bdee2f8be515cd6de453741f7c6",
-    "seed_digest": "ca0d380024677ff8a74a4d57d2f723e89bc1ef8dc78ed8f4fc5ae167f922e6e6",
+    "canonical_bytes": "{\"ground\":null,\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v8\"}",
+    "canonical_sha256": "d611188ba0d16fdd14d0b9ab75f29acaf3395c09278b8180d95585c16a5710db",
+    "seed_digest": "245cb8f0e844eca7a92564ed2515570a70508f6f035830bbe0a93af5dc6cb363",
     "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
-    "full_lock_digest": "b04ed786d8592dc58f73d16db6450dc6939b1df2e5a311ec92c39be03a6fbc22"
+    "full_lock_digest": "9fe5de4cf5011e28018e361cb1e8ccb577a82e64d2a654a3d12e7bfd71e240a1"
   },
   "delivery_case_ids": [
     "explicit-and-syntax",

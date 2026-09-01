@@ -1,15 +1,15 @@
 //! Explicit Action, Position, and previous-reference association over the accepted entity result.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
 use crate::{
-    ClauseAtom, ClauseStreamError, ExplicitPreviousReferenceOccurrence,
-    MacroParameterBindingResult, NormalizedDdlDocument, RemainingRoleKind,
-    SemanticAssociationResult, SemanticEntity, SemanticPreviousReference, SemanticRelationKind,
-    SemanticTerm, SourceOccurrence, associate_semantic_entities,
-    associate_semantic_entities_with_macro_binding,
+    AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind, EnglishAttachmentMarkerKind,
+    ExplicitPreviousReferenceOccurrence, JapaneseAttachmentMarkerKind, MacroParameterBindingResult,
+    NormalizedDdlDocument, RemainingRoleKind, SemanticAssociationResult, SemanticEntity,
+    SemanticPreviousReference, SemanticRelationKind, SemanticTerm, SourceOccurrence,
+    associate_semantic_entities, associate_semantic_entities_with_macro_binding,
     semantic_association::{
         project_semantic_term, semantic_entity_value, semantic_identity_value,
         sentence_region_index,
@@ -18,7 +18,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v11";
+    "inku.semantic-instruction-association.v12";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,10 +150,25 @@ pub struct SemanticInstructionAssociationResult {
 }
 
 #[derive(Default)]
-struct InstructionRegion {
-    actions: Vec<SemanticTerm>,
-    positions: Vec<SemanticTerm>,
-    relations: Vec<ExplicitPreviousReferenceOccurrence>,
+struct InstructionOwnership {
+    action_starts_by_head: BTreeMap<usize, BTreeSet<usize>>,
+    position_starts_by_head: BTreeMap<usize, BTreeSet<usize>>,
+}
+
+impl InstructionOwnership {
+    fn insert_action(&mut self, head_start: usize, action_start: usize) {
+        self.action_starts_by_head
+            .entry(head_start)
+            .or_default()
+            .insert(action_start);
+    }
+
+    fn insert_position(&mut self, head_start: usize, position_start: usize) {
+        self.position_starts_by_head
+            .entry(head_start)
+            .or_default()
+            .insert(position_start);
+    }
 }
 
 /// Associate explicit Saijiki Motion, Place, and full-literal relation terms with single-head entities.
@@ -181,7 +196,8 @@ fn build_semantic_instructions(
     document: &NormalizedDdlDocument,
     association: SemanticAssociationResult,
 ) -> SemanticInstructionAssociationResult {
-    let mut occurrences_by_region = BTreeMap::<usize, InstructionRegion>::new();
+    let mut actions = Vec::new();
+    let mut positions = Vec::new();
     let mut owned_instruction_occurrence_count = 0;
 
     for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
@@ -203,22 +219,24 @@ fn build_semantic_instructions(
             let region_index = sentence_region_index(&association.clause_stream, term.span);
             let projected =
                 project_instruction_term(document, term, region_index, clause_index, atom_index);
-            let region = occurrences_by_region.entry(region_index).or_default();
             match role {
-                SemanticInstructionOccurrenceRole::Action => region.actions.push(projected),
-                SemanticInstructionOccurrenceRole::Position => region.positions.push(projected),
+                SemanticInstructionOccurrenceRole::Action => actions.push(projected),
+                SemanticInstructionOccurrenceRole::Position => positions.push(projected),
             }
             owned_instruction_occurrence_count += 1;
         }
     }
     let owned_relation_occurrence_count = association.explicit_previous_references.len();
+    let mut relations_by_region =
+        BTreeMap::<usize, Vec<ExplicitPreviousReferenceOccurrence>>::new();
     for occurrence in &association.explicit_previous_references {
-        occurrences_by_region
+        relations_by_region
             .entry(occurrence.provenance.region_index)
             .or_default()
-            .relations
             .push(occurrence.clone());
     }
+
+    let ownership = collect_instruction_ownership(&association, &actions, &positions);
 
     let mut instructions = Vec::new();
     let mut issues = Vec::new();
@@ -230,77 +248,51 @@ fn build_semantic_instructions(
             .or_default() += 1;
     }
     for (&region_index, &entity_count) in &entity_counts_by_region {
-        if entity_count < 2 {
-            continue;
-        }
-        let region = occurrences_by_region
-            .remove(&region_index)
-            .unwrap_or_default();
-        let mut region_issues = Vec::new();
-        append_orphan_issue(
-            region.actions,
-            SemanticInstructionOccurrenceRole::Action,
-            SemanticInstructionIssueKind::AmbiguousActionOwnership,
-            region_index,
-            &mut region_issues,
-        );
-        append_orphan_issue(
-            region.positions,
-            SemanticInstructionOccurrenceRole::Position,
-            SemanticInstructionIssueKind::AmbiguousPositionOwnership,
-            region_index,
-            &mut region_issues,
-        );
-        region_issues.sort_by_key(|issue| {
-            issue
-                .occurrences
-                .first()
-                .map(|occurrence| occurrence.term.provenance.source.span.start_byte)
-                .unwrap_or(usize::MAX)
-        });
-        issues.extend(region_issues);
-        if !region.relations.is_empty() {
+        if entity_count > 1
+            && let Some(relations) = relations_by_region.remove(&region_index)
+        {
             relation_issues.push(SemanticRelationIssue {
                 kind: SemanticRelationIssueKind::AmbiguousCurrentInstructionOwnership,
                 region_index,
-                occurrences: region.relations,
+                occurrences: relations,
             });
         }
     }
     for entity in &association.ast.entities {
         let region_index = entity.head.source().region_index;
-        if entity_counts_by_region[&region_index] > 1 {
-            instructions.push(SemanticInstruction {
-                entity: entity.clone(),
-                action: None,
-                position: None,
-                relation: None,
-            });
-            continue;
-        }
-        let region = occurrences_by_region
-            .remove(&region_index)
-            .unwrap_or_default();
+        let head_start = entity.head.source().span.start_byte;
         let action = select_one(
-            region.actions,
+            take_owned_instruction_terms(
+                &mut actions,
+                ownership.action_starts_by_head.get(&head_start),
+            ),
             SemanticInstructionOccurrenceRole::Action,
             SemanticInstructionIssueKind::ConflictingActions,
             region_index,
             &mut issues,
         );
         let position = select_one(
-            region.positions,
+            take_owned_instruction_terms(
+                &mut positions,
+                ownership.position_starts_by_head.get(&head_start),
+            ),
             SemanticInstructionOccurrenceRole::Position,
             SemanticInstructionIssueKind::ConflictingPositions,
             region_index,
             &mut issues,
         );
-        let relation = select_relation(
-            region.relations,
-            instructions.len(),
-            region_index,
-            &mut relation_issues,
-        );
+        let relation = if entity_counts_by_region[&region_index] == 1 {
+            select_relation(
+                relations_by_region
+                    .remove(&region_index)
+                    .unwrap_or_default(),
+                instructions.len(),
+                region_index,
+                &mut relation_issues,
+            )
+        } else {
+            None
+        };
         instructions.push(SemanticInstruction {
             entity: entity.clone(),
             action,
@@ -308,29 +300,64 @@ fn build_semantic_instructions(
             relation,
         });
     }
-    for (region_index, region) in occurrences_by_region {
+    let mut remaining_by_region = BTreeMap::<usize, (Vec<SemanticTerm>, Vec<SemanticTerm>)>::new();
+    for action in actions {
+        remaining_by_region
+            .entry(action.provenance.source.region_index)
+            .or_default()
+            .0
+            .push(action);
+    }
+    for position in positions {
+        remaining_by_region
+            .entry(position.provenance.source.region_index)
+            .or_default()
+            .1
+            .push(position);
+    }
+    for (region_index, (actions, positions)) in remaining_by_region {
+        let has_entity = entity_counts_by_region
+            .get(&region_index)
+            .copied()
+            .unwrap_or(0)
+            > 0;
         append_orphan_issue(
-            region.actions,
+            actions,
             SemanticInstructionOccurrenceRole::Action,
-            SemanticInstructionIssueKind::MissingActionEntity,
+            if has_entity {
+                SemanticInstructionIssueKind::AmbiguousActionOwnership
+            } else {
+                SemanticInstructionIssueKind::MissingActionEntity
+            },
             region_index,
             &mut issues,
         );
-        if !region.relations.is_empty() {
-            relation_issues.push(SemanticRelationIssue {
-                kind: SemanticRelationIssueKind::MissingCurrentInstruction,
-                region_index,
-                occurrences: region.relations,
-            });
-        }
         append_orphan_issue(
-            region.positions,
+            positions,
             SemanticInstructionOccurrenceRole::Position,
-            SemanticInstructionIssueKind::MissingPositionEntity,
+            if has_entity {
+                SemanticInstructionIssueKind::AmbiguousPositionOwnership
+            } else {
+                SemanticInstructionIssueKind::MissingPositionEntity
+            },
             region_index,
             &mut issues,
         );
     }
+    for (region_index, relations) in relations_by_region {
+        relation_issues.push(SemanticRelationIssue {
+            kind: SemanticRelationIssueKind::MissingCurrentInstruction,
+            region_index,
+            occurrences: relations,
+        });
+    }
+    issues.sort_by_key(|issue| {
+        issue
+            .occurrences
+            .first()
+            .map(|occurrence| occurrence.term.provenance.source.span.start_byte)
+            .unwrap_or(usize::MAX)
+    });
 
     let delivered_instruction_occurrence_count = instructions
         .iter()
@@ -377,6 +404,402 @@ fn build_semantic_instructions(
         owned_relation_occurrence_count,
         delivered_relation_occurrence_count,
     }
+}
+
+fn take_owned_instruction_terms(
+    terms: &mut Vec<SemanticTerm>,
+    owned_starts: Option<&BTreeSet<usize>>,
+) -> Vec<SemanticTerm> {
+    let Some(owned_starts) = owned_starts else {
+        return Vec::new();
+    };
+    let (owned, remaining) = std::mem::take(terms)
+        .into_iter()
+        .partition(|term| owned_starts.contains(&term.provenance.source.span.start_byte));
+    *terms = remaining;
+    owned
+}
+
+fn collect_instruction_ownership(
+    association: &SemanticAssociationResult,
+    actions: &[SemanticTerm],
+    positions: &[SemanticTerm],
+) -> InstructionOwnership {
+    let mut ownership = InstructionOwnership::default();
+    collect_japanese_instruction_ownership(association, actions, positions, &mut ownership);
+    collect_english_instruction_ownership(association, actions, positions, &mut ownership);
+    ownership
+}
+
+fn collect_japanese_instruction_ownership(
+    association: &SemanticAssociationResult,
+    actions: &[SemanticTerm],
+    positions: &[SemanticTerm],
+    ownership: &mut InstructionOwnership,
+) {
+    for marker in association
+        .clause_topology
+        .attachment_markers
+        .iter()
+        .filter(|marker| {
+            marker.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wo)
+        })
+    {
+        let clause = &association.clause_stream.clauses[marker.clause_index];
+        let previous_action_end = actions
+            .iter()
+            .filter(|action| {
+                action.provenance.source.clause_index == marker.clause_index
+                    && action.provenance.source.span.end_byte <= marker.span.start_byte
+            })
+            .map(|action| action.provenance.source.span.end_byte)
+            .max()
+            .unwrap_or(clause.span.start_byte);
+        let candidate_entities = association
+            .ast
+            .entities
+            .iter()
+            .filter(|entity| {
+                let source = entity.head.source();
+                source.clause_index == marker.clause_index
+                    && previous_action_end <= source.span.start_byte
+                    && source.span.end_byte <= marker.span.start_byte
+            })
+            .collect::<Vec<_>>();
+        if candidate_entities.len() != 1
+            || !japanese_entity_segment_is_clear(
+                association,
+                marker.clause_index,
+                previous_action_end,
+                marker.span.start_byte,
+            )
+        {
+            continue;
+        }
+        let entity = candidate_entities[0];
+        let head_start = entity.head.source().span.start_byte;
+        let next_head_start = association
+            .ast
+            .entities
+            .iter()
+            .filter(|candidate| {
+                let source = candidate.head.source();
+                source.clause_index == marker.clause_index
+                    && marker.span.end_byte <= source.span.start_byte
+            })
+            .map(|candidate| candidate.head.source().span.start_byte)
+            .min()
+            .unwrap_or(clause.span.end_byte);
+        if !japanese_predicate_segment_is_clear(
+            association,
+            marker.clause_index,
+            marker.span.end_byte,
+            next_head_start,
+        ) {
+            continue;
+        }
+        let candidate_actions = actions
+            .iter()
+            .filter(|action| {
+                action.provenance.source.clause_index == marker.clause_index
+                    && marker.span.end_byte <= action.provenance.source.span.start_byte
+                    && action.provenance.source.span.end_byte <= next_head_start
+            })
+            .collect::<Vec<_>>();
+        if candidate_actions.is_empty() {
+            continue;
+        }
+        for action in &candidate_actions {
+            ownership.insert_action(head_start, action.provenance.source.span.start_byte);
+        }
+        let predicate_start = candidate_actions
+            .iter()
+            .map(|action| action.provenance.source.span.start_byte)
+            .min()
+            .expect("non-empty action candidates");
+        for position in positions.iter().filter(|position| {
+            position.provenance.source.clause_index == marker.clause_index
+                && previous_action_end <= position.provenance.source.span.start_byte
+                && position.provenance.source.span.end_byte <= predicate_start
+        }) {
+            let has_direct_marker = association
+                .clause_topology
+                .attachment_markers
+                .iter()
+                .filter(|candidate| candidate.clause_index == marker.clause_index)
+                .filter(|candidate| {
+                    matches!(
+                        candidate.marker,
+                        AttachmentMarkerKind::Japanese(
+                            JapaneseAttachmentMarkerKind::Ni
+                                | JapaneseAttachmentMarkerKind::De
+                                | JapaneseAttachmentMarkerKind::He
+                        )
+                    )
+                })
+                .any(|candidate| {
+                    position.provenance.source.span.end_byte <= candidate.span.start_byte
+                        && candidate.span.end_byte <= predicate_start
+                        && clause.atoms.iter().all(|atom| {
+                            atom.span().end_byte <= position.provenance.source.span.end_byte
+                                || candidate.span.start_byte <= atom.span().start_byte
+                        })
+                });
+            if has_direct_marker {
+                ownership.insert_position(head_start, position.provenance.source.span.start_byte);
+            }
+        }
+    }
+}
+
+fn collect_english_instruction_ownership(
+    association: &SemanticAssociationResult,
+    actions: &[SemanticTerm],
+    positions: &[SemanticTerm],
+    ownership: &mut InstructionOwnership,
+) {
+    for action in actions {
+        let clause_index = action.provenance.source.clause_index;
+        let clause = &association.clause_stream.clauses[clause_index];
+        let upper_bound = actions
+            .iter()
+            .filter(|candidate| {
+                candidate.provenance.source.clause_index == clause_index
+                    && action.provenance.source.span.end_byte
+                        <= candidate.provenance.source.span.start_byte
+            })
+            .map(|candidate| candidate.provenance.source.span.start_byte)
+            .min()
+            .unwrap_or(clause.span.end_byte);
+        let candidate_entities = association
+            .ast
+            .entities
+            .iter()
+            .filter(|entity| {
+                let source = entity.head.source();
+                source.clause_index == clause_index
+                    && action.provenance.source.span.end_byte <= source.span.start_byte
+                    && source.span.end_byte <= upper_bound
+                    && english_entity_prefix_is_clear(
+                        association,
+                        clause_index,
+                        action.provenance.source.span.end_byte,
+                        source.span.start_byte,
+                    )
+            })
+            .collect::<Vec<_>>();
+        if candidate_entities.len() != 1 {
+            continue;
+        }
+        let entity = candidate_entities[0];
+        let head_start = entity.head.source().span.start_byte;
+        ownership.insert_action(head_start, action.provenance.source.span.start_byte);
+
+        for marker in association
+            .clause_topology
+            .attachment_markers
+            .iter()
+            .filter(|marker| marker.clause_index == clause_index)
+            .filter(|marker| {
+                matches!(
+                    marker.marker,
+                    AttachmentMarkerKind::English(
+                        EnglishAttachmentMarkerKind::At
+                            | EnglishAttachmentMarkerKind::In
+                            | EnglishAttachmentMarkerKind::On
+                            | EnglishAttachmentMarkerKind::To
+                    )
+                )
+            })
+            .filter(|marker| {
+                entity.head.source().span.end_byte <= marker.span.start_byte
+                    && marker.span.end_byte <= upper_bound
+            })
+            .filter(|marker| {
+                english_entity_to_marker_gap_is_clear(
+                    association,
+                    clause_index,
+                    entity.head.source().span.end_byte,
+                    marker.span.start_byte,
+                )
+            })
+        {
+            for position in positions.iter().filter(|position| {
+                position.provenance.source.clause_index == clause_index
+                    && marker.span.end_byte <= position.provenance.source.span.start_byte
+                    && position.provenance.source.span.end_byte <= upper_bound
+            }) {
+                if english_position_gap_is_clear(
+                    association,
+                    clause_index,
+                    marker.span.end_byte,
+                    position.provenance.source.span.start_byte,
+                ) {
+                    ownership
+                        .insert_position(head_start, position.provenance.source.span.start_byte);
+                }
+            }
+        }
+    }
+}
+
+fn japanese_entity_segment_is_clear(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+    end_byte: usize,
+) -> bool {
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
+        .all(|atom| match atom {
+            ClauseAtom::CoreRole(term) => term.role != CoreRoleKind::Ground,
+            ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::RemainingRole(term) => term.role != RemainingRoleKind::Motion,
+            ClauseAtom::FunctionWord { span, .. } => matches!(
+                attachment_marker_at(association, clause_index, span.start_byte),
+                Some(AttachmentMarkerKind::Japanese(
+                    JapaneseAttachmentMarkerKind::No
+                        | JapaneseAttachmentMarkerKind::Ni
+                        | JapaneseAttachmentMarkerKind::De
+                        | JapaneseAttachmentMarkerKind::He
+                ))
+            ),
+            ClauseAtom::SaijikiRelation { .. } | ClauseAtom::UnresolvedDiagnostic(_) => false,
+        })
+}
+
+fn japanese_predicate_segment_is_clear(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+    end_byte: usize,
+) -> bool {
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
+        .all(|atom| match atom {
+            ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::RemainingRole(term) => {
+                matches!(
+                    term.role,
+                    RemainingRoleKind::Motion | RemainingRoleKind::Place
+                )
+            }
+            ClauseAtom::FunctionWord { span, .. } => matches!(
+                attachment_marker_at(association, clause_index, span.start_byte),
+                Some(AttachmentMarkerKind::Japanese(
+                    JapaneseAttachmentMarkerKind::Ni
+                        | JapaneseAttachmentMarkerKind::De
+                        | JapaneseAttachmentMarkerKind::He
+                ))
+            ),
+            ClauseAtom::CoreRole(_)
+            | ClauseAtom::SaijikiRelation { .. }
+            | ClauseAtom::UnresolvedDiagnostic(_) => false,
+        })
+}
+
+fn english_entity_prefix_is_clear(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+    end_byte: usize,
+) -> bool {
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
+        .all(|atom| match atom {
+            ClauseAtom::CoreRole(term) => matches!(
+                term.role,
+                CoreRoleKind::Color | CoreRoleKind::Touch | CoreRoleKind::Surface
+            ),
+            ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::RemainingRole(term) => matches!(
+                term.role,
+                RemainingRoleKind::Angle
+                    | RemainingRoleKind::Continuity
+                    | RemainingRoleKind::Fluctuation
+                    | RemainingRoleKind::Proportion
+            ),
+            ClauseAtom::FunctionWord { span, .. } => {
+                association
+                    .clause_topology
+                    .determiner_starts
+                    .contains(&span.start_byte)
+                    || attachment_marker_at(association, clause_index, span.start_byte)
+                        == Some(AttachmentMarkerKind::English(
+                            EnglishAttachmentMarkerKind::Of,
+                        ))
+            }
+            ClauseAtom::SaijikiRelation { .. } | ClauseAtom::UnresolvedDiagnostic(_) => false,
+        })
+}
+
+fn english_entity_to_marker_gap_is_clear(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+    end_byte: usize,
+) -> bool {
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
+        .all(|atom| match atom {
+            ClauseAtom::RemainingRole(term) => term.role == RemainingRoleKind::Place,
+            ClauseAtom::FunctionWord { span, .. } => {
+                association
+                    .clause_topology
+                    .determiner_starts
+                    .contains(&span.start_byte)
+                    || matches!(
+                        attachment_marker_at(association, clause_index, span.start_byte),
+                        Some(AttachmentMarkerKind::English(
+                            EnglishAttachmentMarkerKind::At
+                                | EnglishAttachmentMarkerKind::In
+                                | EnglishAttachmentMarkerKind::On
+                                | EnglishAttachmentMarkerKind::To
+                        ))
+                    )
+            }
+            _ => false,
+        })
+}
+
+fn english_position_gap_is_clear(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+    end_byte: usize,
+) -> bool {
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
+        .all(|atom| match atom {
+            ClauseAtom::FunctionWord { span, .. } => association
+                .clause_topology
+                .determiner_starts
+                .contains(&span.start_byte),
+            _ => false,
+        })
+}
+
+fn attachment_marker_at(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    start_byte: usize,
+) -> Option<AttachmentMarkerKind> {
+    association
+        .clause_topology
+        .attachment_markers
+        .iter()
+        .find(|marker| marker.clause_index == clause_index && marker.span.start_byte == start_byte)
+        .map(|marker| marker.marker)
 }
 
 fn select_relation(

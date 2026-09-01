@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v5.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v6.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -44,7 +44,7 @@ struct KnownAnswers {
 #[test]
 fn structured_document_is_the_only_pre_expansion_meaning_authority() {
     let result = compile(
-        "circle white eight",
+        "eight white circle",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -344,7 +344,7 @@ fn complete_binding_and_unbound_outer_modifier_keep_distinct_typed_owners() {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Canon","heading":"Color","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
     );
     let result = compile_locked(
-        "Canon.Color white eight",
+        "eight Canon.Color white",
         ResolvedInstructionLanguage::En,
         &[definition],
         Some(11),
@@ -478,14 +478,14 @@ fn structured_ownership_action_position_ground_and_previous_relation_change_the_
         LIMITS,
     );
     let left_owned = compile(
-        "circle white. square.",
+        "white circle. square.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
         LIMITS,
     );
     let right_owned = compile(
-        "circle. square white.",
+        "circle. white square.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -584,6 +584,67 @@ fn lexical_place_aliases_share_compiler_meaning_and_keep_source_provenance() {
 }
 
 #[test]
+fn spec_ja_and_en_clause_topology_reaches_one_compiler_meaning() {
+    let ja = compile(
+        "中心に、鉛筆の細い線をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        None,
+        LIMITS,
+    );
+    let en = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    for result in [&ja, &en] {
+        assert_eq!(
+            result.compiler_lock.as_ref().unwrap().state,
+            CompilerLockState::CanonicalReady
+        );
+        assert_eq!(result.delivery_summary.recognized_but_ignored, 0);
+        for owner in [
+            SemanticDeliveryOwner::Quantity,
+            SemanticDeliveryOwner::Thinness,
+            SemanticDeliveryOwner::Touch,
+            SemanticDeliveryOwner::Action,
+            SemanticDeliveryOwner::Position,
+        ] {
+            assert_eq!(
+                result
+                    .deliveries
+                    .iter()
+                    .filter(|delivery| delivery.identity.owner == owner)
+                    .count(),
+                1,
+                "{owner:?}"
+            );
+        }
+    }
+    assert_eq!(
+        ja.pre_expansion_canonical_bytes(),
+        en.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(
+        ja.compiler_lock
+            .as_ref()
+            .unwrap()
+            .canonical_pre_expansion_digest,
+        en.compiler_lock
+            .as_ref()
+            .unwrap()
+            .canonical_pre_expansion_digest
+    );
+    assert_ne!(
+        ja.compiler_lock.as_ref().unwrap().visible_source_digest,
+        en.compiler_lock.as_ref().unwrap().visible_source_digest
+    );
+}
+
+#[test]
 fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
@@ -668,7 +729,7 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         LIMITS,
     );
     let en = compile(
-        "circle white eight",
+        "eight white circle",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -720,7 +781,7 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
     );
 
     let different_number = compile(
-        "circle white twelve",
+        "twelve white circle",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -731,7 +792,7 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         different_number.pre_expansion_canonical_bytes()
     );
     let different_multiplicity = compile(
-        "circle circle white eight",
+        "circle eight white circle",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -1099,12 +1160,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v5"
+        "inku.compiler-lock-visible-patch-fixture.v6"
     );
-    assert_eq!(fixture.version, 5);
+    assert_eq!(fixture.version, 6);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v7"
+        "inku.semantic-document.v8"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

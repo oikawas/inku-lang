@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v10.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v11.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -459,13 +459,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v10"
+        "inku.semantic-entity-association.v11"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v10"
+        "inku.semantic-entity-association-fixture.v11"
     );
-    assert_eq!(fixture.version, 10);
+    assert_eq!(fixture.version, 11);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -758,6 +758,38 @@ fn core_thinness_uses_pre_head_ownership_without_default_or_nearest_fallback() {
 }
 
 #[test]
+fn single_head_uses_the_same_bounded_pre_head_modifier_ownership_as_multi_head() {
+    let document = NormalizedDdlDocument::new(
+        "blue circle red",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+
+    assert_eq!(result.ast.entities.len(), 1);
+    assert_eq!(
+        result.ast.entities[0]
+            .color
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("blue")
+    );
+    assert_eq!(
+        association_issue_kinds(&result),
+        ["ambiguous_entity_ownership"]
+    );
+    assert!(matches!(
+        result.issues[0].occurrences.as_slice(),
+        [OwnedSemanticOccurrence::Color(term)] if term.identity.id == "red"
+    ));
+    assert_eq!(
+        result.owned_occurrence_count,
+        result.delivered_occurrence_count
+    );
+}
+
+#[test]
 fn conflicting_modifiers_inside_one_pre_head_phrase_use_existing_typed_conflict() {
     let document = NormalizedDdlDocument::new(
         "red blue circle green line",
@@ -1037,7 +1069,7 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Surface row has canonical identity");
         let source = format!(
-            "circle {}.",
+            "{} circle.",
             word.surface_en
                 .as_deref()
                 .expect("accepted Surface row has English source surface")
@@ -1106,7 +1138,7 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Fluctuation row has canonical identity");
         let source = format!(
-            "circle {}.",
+            "{} circle.",
             word.surface_en
                 .as_deref()
                 .expect("accepted Fluctuation row has English source surface")
@@ -1181,7 +1213,7 @@ fn every_accepted_proportion_row_belongs_to_exactly_one_closed_dimension() {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Proportion row has canonical identity");
         let source = format!(
-            "circle {}.",
+            "{} circle.",
             word.surface_en
                 .as_deref()
                 .expect("accepted Proportion row has English source surface")
@@ -1829,7 +1861,7 @@ fn complete_macro_parameters_are_owned_once_and_excluded_from_outer_fields() {
         serde_json::json!([]),
     );
     let outer_document = locked_macro_document(
-        "Nature.Outer blue",
+        "blue Nature.Outer",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&outer_definition),
     );

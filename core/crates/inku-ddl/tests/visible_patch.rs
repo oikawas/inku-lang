@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v5.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v6.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -26,7 +26,7 @@ struct FixtureIds {
 
 #[test]
 fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candidates() {
-    let base = base("circle white many. square black many");
+    let base = base("white triangle. many circle. many square");
     let base_snapshot = base.clone();
     let holes = source_ordered_holes(&base);
     assert_eq!(holes.len(), 2);
@@ -35,7 +35,7 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
     let single = validate_visible_ddl_patch(&base, &single_patch, &[], None, LIMITS).unwrap();
     assert_eq!(
         single.document.source(),
-        "circle white 8. square black many"
+        "white triangle. 8 circle. many square"
     );
     assert_eq!(
         single.compilation.compiler_lock.as_ref().unwrap().state,
@@ -49,7 +49,7 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
     let multiple = validate_visible_ddl_patch(&base, &multiple_patch, &[], None, LIMITS).unwrap();
     assert_eq!(
         multiple.document.source(),
-        "circle white 8. square black 12"
+        "white triangle. 8 circle. 12 square"
     );
     assert_eq!(
         multiple.compilation.compiler_lock.as_ref().unwrap().state,
@@ -75,7 +75,7 @@ fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candid
 
 #[test]
 fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
-    let base = base("circle white many. square black many");
+    let base = base("white triangle. many circle. many square");
     let holes = source_ordered_holes(&base);
     let valid_first = edit(holes[0], "8");
     let valid_second = edit(holes[1], "12");
@@ -121,12 +121,8 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
         VisiblePatchDiagnostic::InvalidRange,
     );
     let ja_base = compile_typed_ddl(
-        NormalizedDdlDocument::new(
-            "円 たくさん 白",
-            ResolvedInstructionLanguage::Ja,
-            Vec::new(),
-        )
-        .unwrap(),
+        NormalizedDdlDocument::new("たくさん 円", ResolvedInstructionLanguage::Ja, Vec::new())
+            .unwrap(),
         &[],
         None,
         LIMITS,
@@ -192,7 +188,7 @@ fn stale_order_range_overlap_and_target_boundaries_fail_closed() {
 
 #[test]
 fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
-    let conflict = base("circle line red");
+    let conflict = base("red blue circle");
     assert_eq!(
         conflict.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::BlockedConflict
@@ -272,7 +268,7 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
         VisiblePatchDiagnostic::BaseIntegrityFailure
     );
 
-    let patch_base = base("circle many white");
+    let patch_base = base("many circle");
     let hole = &patch_base.holes[0];
     assert_error(
         &patch_base,
@@ -326,9 +322,9 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v5"
+        "inku.compiler-lock-visible-patch-fixture.v6"
     );
-    assert_eq!(fixture.version, 5);
+    assert_eq!(fixture.version, 6);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

@@ -5,10 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Number, Value};
 
 use crate::{
-    AttachmentEvidenceResult, AttachmentMarkerKind, BoundMacroParameterValue,
-    CanonicalPreviousReference, CanonicalRelationIdentity, CanonicalRelationKind, ClauseAtom,
-    ClauseSeparatorKind, ClauseStream, ClauseStreamError, CoreModifierValue, CoreRoleKind,
-    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
+    AttachmentEvidenceResult, AttachmentMarkerEvidence, AttachmentMarkerKind,
+    BoundMacroParameterValue, CanonicalPreviousReference, CanonicalRelationIdentity,
+    CanonicalRelationKind, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
+    CoreModifierValue, CoreRoleKind, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
     MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity, MacroParameterBinding,
     MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, NeutralDiagnostic,
     NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema, RemainingRoleKind,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v10";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v11";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -420,6 +420,7 @@ pub struct SemanticAssociationResult {
     pub owned_compound_reference_count: usize,
     pub delivered_compound_reference_count: usize,
     pub macro_parameter_binding: Option<MacroParameterBindingResult>,
+    pub(crate) clause_topology: ClauseTopologyEvidence,
 }
 
 impl SemanticAssociationResult {
@@ -433,6 +434,26 @@ impl SemanticAssociationResult {
                     .flat_map(|complete| &complete.parameters)
                     .any(|parameter| parameter.source_span == span)
             })
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ClauseTopologyEvidence {
+    pub attachment_markers: Vec<AttachmentMarkerEvidence>,
+    pub determiner_starts: BTreeSet<usize>,
+}
+
+impl ClauseTopologyEvidence {
+    fn from_attachment(attachment: &AttachmentEvidenceResult) -> Self {
+        Self {
+            attachment_markers: attachment.evidence.clone(),
+            determiner_starts: attachment
+                .noun_phrase
+                .evidence
+                .iter()
+                .map(|evidence| evidence.determiner.span.start_byte)
+                .collect(),
+        }
     }
 }
 
@@ -622,7 +643,126 @@ fn collect_pre_head_phrase_ownership(
             }
         }
     }
+    collect_japanese_post_head_quantity_ownership(
+        attachment_evidence,
+        macro_parameter_binding,
+        &mut ownership,
+    );
     ownership
+}
+
+fn collect_japanese_post_head_quantity_ownership(
+    attachment: &AttachmentEvidenceResult,
+    macro_parameter_binding: Option<&MacroParameterBindingResult>,
+    ownership: &mut PreHeadPhraseOwnership,
+) {
+    let wo_markers = attachment.evidence.iter().filter(|evidence| {
+        evidence.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wo)
+    });
+    for marker in wo_markers {
+        let clause = &attachment.noun_phrase.clause_stream.clauses[marker.clause_index];
+        let lower_bound = clause
+            .atoms
+            .iter()
+            .filter(|atom| atom.span().end_byte <= marker.span.start_byte)
+            .filter(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::RemainingRole(term)
+                        if term.role == RemainingRoleKind::Motion
+                            && !macro_parameter_binding.is_some_and(|binding| {
+                                macro_parameter_binding_owns_span(binding, term.span)
+                            })
+                )
+            })
+            .map(|atom| atom.span().end_byte)
+            .max()
+            .unwrap_or(clause.span.start_byte);
+        let heads = clause
+            .atoms
+            .iter()
+            .filter_map(|atom| match atom {
+                ClauseAtom::CoreRole(term)
+                    if term.role == CoreRoleKind::Primitive
+                        && lower_bound <= term.span.start_byte
+                        && term.span.end_byte <= marker.span.start_byte =>
+                {
+                    Some(term.span)
+                }
+                _ => None,
+            })
+            .chain(macro_parameter_binding.into_iter().flat_map(|binding| {
+                binding.complete.iter().filter_map(|complete| {
+                    let resolved = &binding.macro_resolution.resolved[complete.invocation_index];
+                    (resolved.clause_index == marker.clause_index
+                        && lower_bound <= resolved.span.start_byte
+                        && resolved.span.end_byte <= marker.span.start_byte)
+                        .then_some(resolved.span)
+                })
+            }))
+            .collect::<Vec<_>>();
+        if heads.len() != 1 {
+            continue;
+        }
+        let head_span = heads[0];
+        let predicate_end = clause
+            .atoms
+            .iter()
+            .filter(|atom| marker.span.end_byte <= atom.span().start_byte)
+            .filter(|atom| {
+                matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive)
+                    || matches!(atom, ClauseAtom::UnresolvedDiagnostic(_))
+            })
+            .map(|atom| atom.span().start_byte)
+            .chain(
+                attachment
+                    .evidence
+                    .iter()
+                    .filter(|candidate| {
+                        candidate.clause_index == marker.clause_index
+                            && candidate.marker
+                                == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wo)
+                            && marker.span.end_byte <= candidate.span.start_byte
+                    })
+                    .map(|candidate| candidate.span.start_byte),
+            )
+            .min()
+            .unwrap_or(clause.span.end_byte);
+        let motions = clause
+            .atoms
+            .iter()
+            .filter_map(|atom| match atom {
+                ClauseAtom::RemainingRole(term)
+                    if term.role == RemainingRoleKind::Motion
+                        && marker.span.end_byte <= term.span.start_byte
+                        && term.span.end_byte <= predicate_end
+                        && !macro_parameter_binding.is_some_and(|binding| {
+                            macro_parameter_binding_owns_span(binding, term.span)
+                        }) =>
+                {
+                    Some(term.span)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if motions.len() != 1 {
+            continue;
+        }
+        for quantity in clause.atoms.iter().filter_map(|atom| match atom {
+            ClauseAtom::UnattachedExactNumber(quantity)
+                if marker.span.end_byte <= quantity.span.start_byte
+                    && quantity.span.end_byte <= motions[0].start_byte
+                    && !macro_parameter_binding.is_some_and(|binding| {
+                        macro_parameter_binding_owns_span(binding, quantity.span)
+                    }) =>
+            {
+                Some(quantity.span)
+            }
+            _ => None,
+        }) {
+            ownership.insert(head_span, quantity);
+        }
+    }
 }
 
 fn is_pre_head_modifier_atom(atom: &ClauseAtom) -> bool {
@@ -659,12 +799,14 @@ pub fn associate_semantic_entities(
 ) -> Result<SemanticAssociationResult, ClauseStreamError> {
     let attachment_evidence = collect_attachment_evidence(document)?;
     let pre_head_ownership = collect_pre_head_phrase_ownership(&attachment_evidence, None);
+    let clause_topology = ClauseTopologyEvidence::from_attachment(&attachment_evidence);
     let clause_stream = attachment_evidence.noun_phrase.clause_stream;
     Ok(build_semantic_entities(
         document,
         clause_stream,
         None,
         pre_head_ownership,
+        clause_topology,
     ))
 }
 
@@ -679,6 +821,7 @@ pub fn associate_semantic_entities_with_macro_binding(
         .attachment_evidence;
     let pre_head_ownership =
         collect_pre_head_phrase_ownership(attachment_evidence, Some(&macro_parameter_binding));
+    let clause_topology = ClauseTopologyEvidence::from_attachment(attachment_evidence);
     let clause_stream = macro_parameter_binding
         .macro_resolution
         .relation_reference_evidence
@@ -691,6 +834,7 @@ pub fn associate_semantic_entities_with_macro_binding(
         clause_stream,
         Some(macro_parameter_binding),
         pre_head_ownership,
+        clause_topology,
     )
 }
 
@@ -699,6 +843,7 @@ fn build_semantic_entities(
     clause_stream: ClauseStream,
     macro_parameter_binding: Option<MacroParameterBindingResult>,
     pre_head_ownership: PreHeadPhraseOwnership,
+    clause_topology: ClauseTopologyEvidence,
 ) -> SemanticAssociationResult {
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
     let mut issues = Vec::new();
@@ -947,6 +1092,7 @@ fn build_semantic_entities(
         owned_compound_reference_count,
         delivered_compound_reference_count,
         macro_parameter_binding,
+        clause_topology,
     }
 }
 
@@ -1377,32 +1523,34 @@ fn associate_region(
         return;
     }
 
+    let diagnostics = std::mem::take(&mut region.diagnostics);
     let head = region.heads.pop().expect("single head was checked");
-    let owned_thinnesses = take_owned_thinnesses(&mut region.thinnesses, &head, pre_head_ownership);
-    if !region.thinnesses.is_empty() {
+    let mut owned_region = take_pre_head_region(&mut region, head, pre_head_ownership);
+    let occurrences = take_all_modifier_occurrences(&mut region);
+    if !occurrences.is_empty() {
         issues.push(SemanticAssociationIssue {
             kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
             region_index,
-            occurrences: region
-                .thinnesses
-                .drain(..)
-                .map(OwnedSemanticOccurrence::Thinness)
-                .collect(),
+            occurrences,
             upstream_diagnostic: None,
         });
     }
+    let head = owned_region
+        .heads
+        .pop()
+        .expect("bounded phrase retains its head");
     let color = select_term(
-        region.colors,
+        owned_region.colors,
         OwnedSemanticOccurrence::Color,
         SemanticAssociationIssueKind::ConflictingColors,
         region_index,
         issues,
     );
-    let quantity = match region.quantities.len() {
+    let quantity = match owned_region.quantities.len() {
         0 => None,
-        1 => region.quantities.pop(),
+        1 => owned_region.quantities.pop(),
         _ => {
-            let occurrences = region
+            let occurrences = owned_region
                 .quantities
                 .drain(..)
                 .map(OwnedSemanticOccurrence::Quantity)
@@ -1416,14 +1564,15 @@ fn associate_region(
             None
         }
     };
-    let thinness = match owned_thinnesses.len() {
+    let thinness = match owned_region.thinnesses.len() {
         0 => None,
-        1 => owned_thinnesses.into_iter().next(),
+        1 => owned_region.thinnesses.pop(),
         _ => {
             issues.push(SemanticAssociationIssue {
                 kind: SemanticAssociationIssueKind::ConflictingThinness,
                 region_index,
-                occurrences: owned_thinnesses
+                occurrences: owned_region
+                    .thinnesses
                     .into_iter()
                     .map(OwnedSemanticOccurrence::Thinness)
                     .collect(),
@@ -1433,45 +1582,45 @@ fn associate_region(
         }
     };
     let touch = select_term(
-        region.touches,
+        owned_region.touches,
         OwnedSemanticOccurrence::Touch,
         SemanticAssociationIssueKind::ConflictingTouches,
         region_index,
         issues,
     );
     let continuity = select_term(
-        region.continuities,
+        owned_region.continuities,
         OwnedSemanticOccurrence::Continuity,
         SemanticAssociationIssueKind::ConflictingContinuities,
         region_index,
         issues,
     );
     let angle = select_term(
-        region.angles,
+        owned_region.angles,
         OwnedSemanticOccurrence::Angle,
         SemanticAssociationIssueKind::ConflictingAngles,
         region_index,
         issues,
     );
     let quality = select_term(
-        region.surface_qualities,
+        owned_region.surface_qualities,
         OwnedSemanticOccurrence::Surface,
         SemanticAssociationIssueKind::ConflictingSurfaceQualities,
         region_index,
         issues,
     );
     let intensity = select_term(
-        region.surface_intensities,
+        owned_region.surface_intensities,
         OwnedSemanticOccurrence::Surface,
         SemanticAssociationIssueKind::ConflictingSurfaceIntensities,
         region_index,
         issues,
     );
-    if !region.unclassified_surfaces.is_empty() {
+    if !owned_region.unclassified_surfaces.is_empty() {
         issues.push(SemanticAssociationIssue {
             kind: SemanticAssociationIssueKind::UnknownSurfaceDimension,
             region_index,
-            occurrences: region
+            occurrences: owned_region
                 .unclassified_surfaces
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Surface)
@@ -1480,31 +1629,31 @@ fn associate_region(
         });
     }
     let amplitude = select_term(
-        region.fluctuation_amplitudes,
+        owned_region.fluctuation_amplitudes,
         OwnedSemanticOccurrence::Fluctuation,
         SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes,
         region_index,
         issues,
     );
     let frequency = select_term(
-        region.fluctuation_frequencies,
+        owned_region.fluctuation_frequencies,
         OwnedSemanticOccurrence::Fluctuation,
         SemanticAssociationIssueKind::ConflictingFluctuationFrequencies,
         region_index,
         issues,
     );
     let fluctuation_quality = select_term(
-        region.fluctuation_qualities,
+        owned_region.fluctuation_qualities,
         OwnedSemanticOccurrence::Fluctuation,
         SemanticAssociationIssueKind::ConflictingFluctuationQualities,
         region_index,
         issues,
     );
-    if !region.unclassified_fluctuations.is_empty() {
+    if !owned_region.unclassified_fluctuations.is_empty() {
         issues.push(SemanticAssociationIssue {
             kind: SemanticAssociationIssueKind::UnknownFluctuationDimension,
             region_index,
-            occurrences: region
+            occurrences: owned_region
                 .unclassified_fluctuations
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Fluctuation)
@@ -1513,31 +1662,31 @@ fn associate_region(
         });
     }
     let aspect = select_term(
-        region.proportion_aspects,
+        owned_region.proportion_aspects,
         OwnedSemanticOccurrence::Proportion,
         SemanticAssociationIssueKind::ConflictingProportionAspects,
         region_index,
         issues,
     );
     let width_extent = select_term(
-        region.proportion_width_extents,
+        owned_region.proportion_width_extents,
         OwnedSemanticOccurrence::Proportion,
         SemanticAssociationIssueKind::ConflictingProportionWidthExtents,
         region_index,
         issues,
     );
     let arc_form = select_term(
-        region.proportion_arc_forms,
+        owned_region.proportion_arc_forms,
         OwnedSemanticOccurrence::Proportion,
         SemanticAssociationIssueKind::ConflictingProportionArcForms,
         region_index,
         issues,
     );
-    if !region.unclassified_proportions.is_empty() {
+    if !owned_region.unclassified_proportions.is_empty() {
         issues.push(SemanticAssociationIssue {
             kind: SemanticAssociationIssueKind::UnknownProportionDimension,
             region_index,
-            occurrences: region
+            occurrences: owned_region
                 .unclassified_proportions
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Proportion)
@@ -1565,7 +1714,43 @@ fn associate_region(
             arc_form,
         },
     });
-    append_upstream_issues(region_index, region.diagnostics, issues);
+    append_upstream_issues(region_index, diagnostics, issues);
+}
+
+fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSemanticOccurrence> {
+    let surface_occurrences = take_surface_occurrences(region);
+    let fluctuation_occurrences = take_fluctuation_occurrences(region);
+    let proportion_occurrences = take_proportion_occurrences(region);
+    let mut occurrences = region
+        .colors
+        .drain(..)
+        .map(OwnedSemanticOccurrence::Color)
+        .chain(
+            region
+                .quantities
+                .drain(..)
+                .map(OwnedSemanticOccurrence::Quantity),
+        )
+        .chain(
+            region
+                .thinnesses
+                .drain(..)
+                .map(OwnedSemanticOccurrence::Thinness),
+        )
+        .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
+        .chain(
+            region
+                .continuities
+                .drain(..)
+                .map(OwnedSemanticOccurrence::Continuity),
+        )
+        .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+        .chain(surface_occurrences)
+        .chain(fluctuation_occurrences)
+        .chain(proportion_occurrences)
+        .collect::<Vec<_>>();
+    occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
+    occurrences
 }
 
 fn take_pre_head_region(
@@ -2011,8 +2196,13 @@ mod tests {
             .expect("test source has one relation atom");
         relation.form = CanonicalRelationForm::FullLiteral;
 
-        let result =
-            build_semantic_entities(&document, stream, None, PreHeadPhraseOwnership::default());
+        let result = build_semantic_entities(
+            &document,
+            stream,
+            None,
+            PreHeadPhraseOwnership::default(),
+            ClauseTopologyEvidence::default(),
+        );
 
         assert!(result.explicit_previous_references.is_empty());
         assert!(result.canonical_bytes.is_none());

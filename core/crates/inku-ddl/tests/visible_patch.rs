@@ -8,7 +8,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v7.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v8.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -346,14 +346,66 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
 }
 
 #[test]
+fn visible_patch_preserves_continuation_identity_and_rejects_unresolved_reference_bases() {
+    let continuation_base = base("line. the line swaying fine. many circle");
+    assert_eq!(continuation_base.holes.len(), 1);
+    let continuation = &continuation_base
+        .semantic_document
+        .as_ref()
+        .unwrap()
+        .ast
+        .continuations[0];
+    let target = continuation.target.clone();
+    let hole = &continuation_base.holes[0];
+    let candidate = validate_visible_ddl_patch(
+        &continuation_base,
+        &patch(&continuation_base, vec![edit(hole, "eight")]),
+        &[],
+        None,
+        LIMITS,
+    )
+    .expect("a disjoint quantity hole preserves the accepted continuation");
+    assert_eq!(
+        candidate.compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::CanonicalReady
+    );
+    assert_eq!(
+        candidate
+            .compilation
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .continuations[0]
+            .target,
+        target
+    );
+
+    let unresolved = base("circle. the line swaying fine.");
+    assert_eq!(
+        unresolved.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::BlockedDiagnostic
+    );
+    assert_error(
+        &unresolved,
+        VisibleDdlPatch::new(
+            source(&unresolved),
+            lock(&unresolved),
+            vec![fabricated_edit()],
+        ),
+        VisiblePatchDiagnostic::PatchTargetUnavailable,
+    );
+}
+
+#[test]
 fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     let fixture: FixtureIds = serde_json::from_str(FIXTURE).unwrap();
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v7"
+        "inku.compiler-lock-visible-patch-fixture.v8"
     );
-    assert_eq!(fixture.version, 7);
+    assert_eq!(fixture.version, 8);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

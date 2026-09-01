@@ -153,9 +153,10 @@ pub use semantic_association::{
     associate_semantic_entities, associate_semantic_entities_with_macro_binding,
 };
 pub use semantic_document::{
-    SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticDocumentIssue,
-    SemanticDocumentIssueKind, SemanticDocumentResult, associate_semantic_document,
-    associate_semantic_document_with_macro_binding,
+    SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticContinuationEdge, SemanticContinuationIssue,
+    SemanticContinuationIssueKind, SemanticContinuationTarget, SemanticDocumentAst,
+    SemanticDocumentIssue, SemanticDocumentIssueKind, SemanticDocumentResult,
+    associate_semantic_document, associate_semantic_document_with_macro_binding,
 };
 pub use semantic_instruction::{
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,

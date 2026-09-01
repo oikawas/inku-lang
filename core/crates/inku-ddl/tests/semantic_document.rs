@@ -4,13 +4,14 @@ use inku_ddl::{
     ClauseAtom, ClauseStream, CoreRoleKind, MacroDefinition, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-    SemanticDocumentResult, SemanticHead, SemanticInstructionAssociationResult, SourceOccurrence,
-    associate_semantic_document, associate_semantic_document_with_macro_binding,
-    bind_macro_parameters, project_macro_semantic_ref, saijiki_asset,
+    SemanticContinuationIssueKind, SemanticDocumentResult, SemanticHead,
+    SemanticInstructionAssociationResult, SourceOccurrence, associate_semantic_document,
+    associate_semantic_document_with_macro_binding, bind_macro_parameters,
+    project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v9.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v10.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -263,9 +264,293 @@ fn fixture_associates_document_global_ground_without_reparsing_instruction_owner
 }
 
 #[test]
+fn marked_subject_predicate_continues_the_unique_prior_entity() {
+    let mut canonical = Vec::new();
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place one thin pencil line at the center. the line swaying fine.",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert_eq!(
+            result.ast.instructions.len(),
+            1,
+            "marked subject predicate must continue one prior entity: {source}"
+        );
+        assert_eq!(result.ast.continuations.len(), 1, "{source}");
+        assert!(result.continuation_issues.is_empty(), "{source}");
+        assert_eq!(result.owned_continuation_occurrence_count, 2, "{source}");
+        assert_eq!(
+            result.delivered_continuation_occurrence_count,
+            result.owned_continuation_occurrence_count,
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[0]
+                .entity
+                .fluctuation
+                .amplitude
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("fine"),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[0]
+                .entity
+                .fluctuation
+                .quality
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("swaying"),
+            "{source}"
+        );
+        assert!(result.ast.complete, "{source}");
+        canonical.push(result.canonical_bytes.unwrap());
+    }
+    assert_eq!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallback() {
+    for (source, expected) in [
+        (
+            "circle. the line swaying fine.",
+            SemanticContinuationIssueKind::MissingTarget,
+        ),
+        (
+            "line. line. the line swaying fine.",
+            SemanticContinuationIssueKind::AmbiguousTarget,
+        ),
+        (
+            "line. mystery. the line swaying fine.",
+            SemanticContinuationIssueKind::BlockedBoundary,
+        ),
+        (
+            "fine line. the line large swaying.",
+            SemanticContinuationIssueKind::ConflictingPredicate,
+        ),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert_eq!(result.continuation_issues.len(), 1, "{source}");
+        assert_eq!(result.continuation_issues[0].kind, expected, "{source}");
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+        assert_eq!(result.owned_continuation_occurrence_count, 2, "{source}");
+        assert_eq!(
+            result.delivered_continuation_occurrence_count,
+            result.owned_continuation_occurrence_count,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn leading_marked_predicate_is_missing_target_but_head_only_remains_independent() {
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "線は細かく揺れる。"),
+        (ResolvedInstructionLanguage::En, "the line swaying fine."),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert!(result.ast.instructions.is_empty(), "{source}");
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert_eq!(result.continuation_issues.len(), 1, "{source}");
+        assert_eq!(
+            result.continuation_issues[0].kind,
+            SemanticContinuationIssueKind::MissingTarget,
+            "{source}"
+        );
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+        assert_eq!(result.owned_continuation_occurrence_count, 2, "{source}");
+        assert_eq!(
+            result.delivered_continuation_occurrence_count,
+            result.owned_continuation_occurrence_count,
+            "{source}"
+        );
+    }
+
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "線は。"),
+        (ResolvedInstructionLanguage::En, "the line."),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert_eq!(result.ast.instructions.len(), 1, "{source}");
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert!(result.continuation_issues.is_empty(), "{source}");
+        assert_eq!(result.owned_continuation_occurrence_count, 0, "{source}");
+    }
+}
+
+#[test]
+fn continuation_preserves_original_fields_and_accepts_reordered_predicate_atoms() {
+    let sources = [
+        "place one thin pencil line at center. the line swaying fine.",
+        "place one thin pencil line at center. the line fine swaying.",
+    ];
+    let results = sources.map(|source| {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        associate_semantic_document(&document).unwrap()
+    });
+    for result in &results {
+        assert!(result.ast.complete);
+        assert_eq!(result.ast.instructions.len(), 1);
+        let instruction = &result.ast.instructions[0];
+        assert_eq!(
+            instruction
+                .entity
+                .quantity
+                .as_ref()
+                .map(|value| value.value),
+            Some(1)
+        );
+        assert_eq!(
+            instruction
+                .entity
+                .thinness
+                .as_ref()
+                .map(|value| value.value.as_str()),
+            Some("fine")
+        );
+        assert_eq!(
+            instruction
+                .entity
+                .touch
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("pencil")
+        );
+        assert_eq!(
+            instruction
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("place")
+        );
+        assert_eq!(
+            instruction
+                .position
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("center")
+        );
+    }
+    assert_eq!(results[0].canonical_bytes, results[1].canonical_bytes);
+}
+
+#[test]
+fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
+    let document = NormalizedDdlDocument::new(
+        "line. the flat dense tall thin small line place.",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = associate_semantic_document(&document).unwrap();
+
+    assert!(
+        result.ast.complete,
+        "association={:?} instruction={:?} continuation={:?}",
+        result
+            .instruction_association
+            .association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        result
+            .instruction_association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        result
+            .continuation_issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(result.ast.instructions.len(), 1);
+    assert_eq!(result.ast.continuations.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(
+        instruction
+            .entity
+            .surface
+            .quality
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("solid")
+    );
+    assert_eq!(
+        instruction
+            .entity
+            .surface
+            .intensity
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("dense")
+    );
+    assert_eq!(
+        instruction
+            .entity
+            .proportion
+            .aspect
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("tall")
+    );
+    assert_eq!(
+        instruction
+            .entity
+            .thinness
+            .as_ref()
+            .map(|value| value.value.as_str()),
+        Some("fine")
+    );
+    assert_eq!(
+        instruction
+            .entity
+            .relative_scale
+            .as_ref()
+            .map(|value| value.value.as_str()),
+        Some("small")
+    );
+    assert_eq!(
+        instruction
+            .action
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("place")
+    );
+    assert_eq!(result.owned_continuation_occurrence_count, 2);
+    assert_eq!(
+        result.delivered_continuation_occurrence_count,
+        result.owned_continuation_occurrence_count
+    );
+}
+
+#[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v9");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v10");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-entity-association.v12"
@@ -274,8 +559,8 @@ fn schema_fixture_and_required_document_boundaries_are_guarded() {
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-instruction-association.v13"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v9");
-    assert_eq!(fixture.version, 9);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v10");
+    assert_eq!(fixture.version, 10);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -507,7 +792,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v9");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v10");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -710,7 +995,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v9");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v10");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

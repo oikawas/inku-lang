@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v7.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v8.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -664,6 +664,115 @@ fn spec_ja_and_en_clause_topology_reaches_one_compiler_meaning() {
 }
 
 #[test]
+fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
+    let ja = compile(
+        "中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        None,
+        LIMITS,
+    );
+    let en = compile(
+        "place one thin pencil line at the center. the line swaying fine.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    for result in [&ja, &en] {
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady)
+        );
+        let document = result.semantic_document.as_ref().unwrap();
+        assert_eq!(document.ast.instructions.len(), 1);
+        assert_eq!(document.ast.continuations.len(), 1);
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::EntityHead)
+                .count(),
+            1
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| {
+                    delivery.identity.owner == SemanticDeliveryOwner::SyntaxOnly
+                        && delivery.descriptor.starts_with("continuation_")
+                })
+                .count(),
+            2
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| {
+                    matches!(
+                        delivery.identity.owner,
+                        SemanticDeliveryOwner::FluctuationAmplitude
+                            | SemanticDeliveryOwner::FluctuationQuality
+                    )
+                })
+                .count(),
+            2
+        );
+    }
+    assert_eq!(
+        ja.pre_expansion_canonical_bytes(),
+        en.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(
+        ja.compiler_lock
+            .as_ref()
+            .unwrap()
+            .canonical_pre_expansion_digest,
+        en.compiler_lock
+            .as_ref()
+            .unwrap()
+            .canonical_pre_expansion_digest
+    );
+
+    let ambiguous = compile(
+        "line. line. the line swaying fine.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        ambiguous.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::BlockedConflict)
+    );
+    assert!(
+        ambiguous
+            .conflicts
+            .iter()
+            .all(|conflict| conflict.kind == "ambiguous_continuation_target")
+    );
+
+    for source in ["circle. the line swaying fine.", "the line swaying fine."] {
+        let missing = compile(source, ResolvedInstructionLanguage::En, &[], None, LIMITS);
+        assert_eq!(
+            missing.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::BlockedDiagnostic),
+            "{source}"
+        );
+        assert!(
+            missing
+                .blocking_diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.kind == "missing_continuation_target" }),
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
@@ -1190,12 +1299,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v7"
+        "inku.compiler-lock-visible-patch-fixture.v8"
     );
-    assert_eq!(fixture.version, 7);
+    assert_eq!(fixture.version, 8);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v9"
+        "inku.semantic-document.v10"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

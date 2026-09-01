@@ -908,6 +908,10 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
   中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。
 ```
 
+Typed DDL compilerでは、この例の第二文は第二のdrawable entityを作らない。`は` / `が`、または意味同等の英語determinerを伴うcanonical headが、一意な先行entityを再導入するとき、後続predicateを同じentity / instructionへ結ぶsource-preserving continuation edgeとなる。Target候補がない、複数ある、clause境界が不明瞭である、またはunknown / conflictを含む場合はtyped issueとしてfail closedし、first / nearest / lastで推測しない。
+
+Continuationはreintroduced head、subject marker / determiner、predicateの正確なsource spanとclause provenanceを保存する一方、canonical semantic bytesにはlocalized surfaceを含めない。Headとmarkerはcontinuation syntax、predicateの明示modifier / actionはtargetのstructured fieldとしてそれぞれexactly once配送され、元のquantity、position、relation、Ground、MacroInvocationを作り直さない。既存relationの`previous_one` / `previous_two`は明示relation edgeのtargetであり、このmarked-subject continuation targetとは別である。これはJSON Scoreより前のvisible typed semantic graphである。後節にあるJSON Score例はこのgraphそのものではなく、Score / Rendererへのloweringとdefault裁定はStep 10 gateの責務であり、本規則はそれらを開始しない。
+
 **却下した選択肢:**
 
 | 形式 | 却下理由 |

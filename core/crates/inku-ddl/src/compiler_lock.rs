@@ -10,22 +10,24 @@ use crate::{
     MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult,
     MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
     MacroParameterBindingResult, MacroSeed, NormalizedDdlDocument, OwnedSemanticOccurrence,
-    SemanticAssociationIssueKind, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
-    SemanticInstructionIssueKind, SemanticMacroParameterValue, SemanticRelationIssueKind,
-    SemanticTerm, SourceSpan, associate_semantic_document_with_macro_binding,
-    bind_macro_parameters, derive_macro_seed, expand_macros, project_macro_semantic_ref,
+    SemanticAssociationIssueKind, SemanticContinuationIssue, SemanticContinuationIssueKind,
+    SemanticContinuationTarget, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
+    SemanticInstruction, SemanticInstructionIssueKind, SemanticMacroParameterValue,
+    SemanticRelationIssueKind, SemanticTerm, SourceSpan,
+    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    expand_macros, project_macro_semantic_ref,
 };
 
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v7";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v8";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v7";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v8";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v7";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v8";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -541,6 +543,35 @@ fn project_deliveries(
     for instruction in &semantic_document.ast.instructions {
         project_instruction(instruction, &mut projection);
     }
+    for edge in &semantic_document.ast.continuations {
+        add_syntax(
+            &mut projection,
+            edge.reintroduced_head.source().span,
+            &format!(
+                "continuation_head:{}",
+                continuation_target_key(&edge.target)
+            ),
+        );
+        add_syntax(
+            &mut projection,
+            edge.marker.span,
+            "continuation_subject_marker",
+        );
+    }
+
+    let consumed_continuation_spans = semantic_document
+        .ast
+        .continuations
+        .iter()
+        .flat_map(|edge| &edge.consumed_upstream_spans)
+        .chain(
+            semantic_document
+                .continuation_issues
+                .iter()
+                .flat_map(|issue| &issue.consumed_upstream_spans),
+        )
+        .copied()
+        .collect::<Vec<_>>();
 
     let association = &semantic_document.instruction_association.association;
     for issue in &association.issues {
@@ -595,7 +626,9 @@ fn project_deliveries(
                 }
             }
             SemanticAssociationIssueKind::AmbiguousEntityOwnership => {
-                for occurrence in &issue.occurrences {
+                for occurrence in issue.occurrences.iter().filter(|occurrence| {
+                    !consumed_continuation_spans.contains(&occurrence.source().span)
+                }) {
                     add_conflict(
                         &mut projection,
                         kind,
@@ -653,7 +686,9 @@ fn project_deliveries(
         match issue.kind {
             SemanticInstructionIssueKind::AmbiguousActionOwnership
             | SemanticInstructionIssueKind::AmbiguousPositionOwnership => {
-                for occurrence in &issue.occurrences {
+                for occurrence in issue.occurrences.iter().filter(|occurrence| {
+                    !consumed_continuation_spans.contains(&occurrence.term.provenance.source.span)
+                }) {
                     add_conflict(
                         &mut projection,
                         issue.kind.as_str(),
@@ -748,6 +783,9 @@ fn project_deliveries(
             ),
         }
     }
+    for issue in &semantic_document.continuation_issues {
+        project_continuation_issue(issue, &mut projection);
+    }
 
     let covered_spans = projection
         .deliveries
@@ -772,6 +810,101 @@ fn project_deliveries(
     }
 
     projection
+}
+
+fn project_continuation_issue(issue: &SemanticContinuationIssue, projection: &mut Projection) {
+    let spans = instruction_semantic_spans(&issue.instruction)
+        .into_iter()
+        .chain(std::iter::once(issue.marker.span));
+    let candidates = issue
+        .candidate_targets
+        .iter()
+        .map(continuation_target_key)
+        .collect::<Vec<_>>();
+    for span in spans {
+        match issue.kind {
+            SemanticContinuationIssueKind::AmbiguousTarget
+            | SemanticContinuationIssueKind::ConflictingPredicate => add_conflict(
+                projection,
+                issue.kind.as_str(),
+                Some(span),
+                candidates.clone(),
+            ),
+            SemanticContinuationIssueKind::MissingTarget
+            | SemanticContinuationIssueKind::UnsupportedPredicate
+            | SemanticContinuationIssueKind::BlockedBoundary => {
+                add_blocking(projection, issue.kind.as_str(), Some(span));
+            }
+        }
+    }
+}
+
+fn instruction_semantic_spans(instruction: &SemanticInstruction) -> Vec<SourceSpan> {
+    let mut spans = vec![instruction.entity.head.source().span];
+    spans.extend(
+        [
+            instruction.entity.color.as_ref(),
+            instruction.entity.touch.as_ref(),
+            instruction.entity.continuity.as_ref(),
+            instruction.entity.angle.as_ref(),
+            instruction.entity.surface.quality.as_ref(),
+            instruction.entity.surface.intensity.as_ref(),
+            instruction.entity.fluctuation.amplitude.as_ref(),
+            instruction.entity.fluctuation.frequency.as_ref(),
+            instruction.entity.fluctuation.quality.as_ref(),
+            instruction.entity.proportion.aspect.as_ref(),
+            instruction.entity.proportion.width_extent.as_ref(),
+            instruction.entity.proportion.arc_form.as_ref(),
+            instruction.action.as_ref(),
+            instruction.position.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|term| term.provenance.source.span),
+    );
+    spans.extend(
+        instruction
+            .entity
+            .quantity
+            .iter()
+            .map(|quantity| quantity.provenance.span),
+    );
+    spans.extend(
+        instruction
+            .entity
+            .thinness
+            .iter()
+            .map(|thinness| thinness.provenance.span),
+    );
+    spans.extend(
+        instruction
+            .entity
+            .relative_scale
+            .iter()
+            .map(|scale| scale.provenance.span),
+    );
+    spans.extend(
+        instruction
+            .relation
+            .iter()
+            .map(|relation| relation.provenance.span),
+    );
+    spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+    spans.dedup();
+    spans
+}
+
+fn continuation_target_key(target: &SemanticContinuationTarget) -> String {
+    match target {
+        SemanticContinuationTarget::Primitive(identity) => {
+            format!("primitive:{}:{}", identity.category, identity.id)
+        }
+        SemanticContinuationTarget::MacroInvocation {
+            qualified_name,
+            definition_version,
+            definition_digest,
+        } => format!("macro:{qualified_name}@{definition_version}#{definition_digest}"),
+    }
 }
 
 fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mut Projection) {

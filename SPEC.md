@@ -1367,6 +1367,10 @@ normalized DDL (example, in the form the corpus uses):
   (Place one thin pencil line at the center.  The line sways finely.)
 ```
 
+In the typed DDL compiler, the second sentence in this example does not create a second drawable entity. When a canonical head marked by `は` / `が`, or by the meaning-equivalent English determiner topology, reintroduces exactly one prior entity, a source-preserving continuation edge attaches the following predicate to that same entity and instruction. Zero or multiple target candidates, an unclear clause boundary, or an unknown or conflict fails closed as a typed issue; the compiler does not guess by first, nearest, or last position.
+
+The continuation retains exact source spans and clause provenance for the reintroduced head, subject marker or determiner, and predicate, while localized surfaces stay out of canonical semantic bytes. The head and marker are delivered exactly once as continuation syntax, and explicit predicate modifiers or actions are delivered exactly once as structured fields on the target. Existing quantity, position, relation, Ground, and MacroInvocation ownership is not rebuilt. Existing relation targets `previous_one` and `previous_two` belong to explicit relation edges; they are separate from this marked-subject continuation target. This is the visible typed semantic graph before JSON Score. JSON Score examples later in this specification are not the graph itself: lowering to Score or Renderer and deciding defaults belong to the Step 10 gate, and this rule does not begin either operation.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |

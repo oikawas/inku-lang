@@ -14,6 +14,90 @@ use serde::Deserialize;
 
 const FIXTURE: &str = include_str!("fixtures/semantic-document-v11.json");
 
+#[test]
+fn multi_head_continuation_predicate_occurrences_have_one_exclusive_owner() {
+    for (language, source, expected_claims) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "線 円。線は 円は 細かく 揺れる。",
+            2,
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "line circle. the line the circle swaying fine.",
+            2,
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "線 円。線は 円は 置く。",
+            1,
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "line circle. the line the circle place.",
+            1,
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert_eq!(result.continuation_issues.len(), 2, "{source}");
+        assert!(result.continuation_issues.iter().all(|issue| {
+            issue.kind == SemanticContinuationIssueKind::AmbiguousTarget
+                && issue.candidate_targets.len() == 2
+                && issue.consumed_upstream_spans.len() == expected_claims
+                && issue.consumed_upstream_spans.first() == Some(&issue.predicate_span)
+        }));
+        let mut claims_by_span = HashMap::<(usize, usize), usize>::new();
+        for issue in &result.continuation_issues {
+            for claim in &issue.consumed_upstream_spans {
+                *claims_by_span
+                    .entry((claim.start_byte, claim.end_byte))
+                    .or_default() += 1;
+            }
+        }
+        assert_eq!(claims_by_span.len(), expected_claims, "{source}");
+        assert!(claims_by_span.values().all(|claims| *claims == 2));
+        let retained_upstream_occurrences = result
+            .instruction_association
+            .association
+            .issues
+            .iter()
+            .map(|issue| issue.occurrences.len())
+            .sum::<usize>()
+            + result
+                .instruction_association
+                .issues
+                .iter()
+                .map(|issue| issue.occurrences.len())
+                .sum::<usize>();
+        assert_eq!(retained_upstream_occurrences, expected_claims, "{source}");
+        assert_eq!(result.owned_continuation_occurrence_count, 4, "{source}");
+        assert_eq!(
+            result.delivered_continuation_occurrence_count,
+            result.owned_continuation_occurrence_count,
+            "{source}"
+        );
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+        let claimed_spans = result
+            .ast
+            .continuations
+            .iter()
+            .flat_map(|edge| edge.consumed_upstream_spans.iter().copied())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            claimed_spans
+                .iter()
+                .map(|span| (span.start_byte, span.end_byte))
+                .collect::<HashSet<_>>()
+                .len(),
+            claimed_spans.len(),
+            "one predicate source occurrence cannot be cloned into multiple edges: {source}"
+        );
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Fixture {

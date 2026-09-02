@@ -16,6 +16,7 @@ use crate::{
     SemanticRelationIssueKind, SemanticTerm, SourceSpan,
     associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
     expand_macros, project_macro_semantic_ref,
+    semantic_document::exclusive_continuation_issue_claim_spans,
 };
 
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
@@ -326,6 +327,13 @@ struct ContinuationIssueProjection {
     conflict: bool,
 }
 
+struct ExclusiveContinuationClaimProjection {
+    claim_span: SourceSpan,
+    issue_indices: Vec<usize>,
+}
+
+type ContinuationClaimKey = (usize, usize);
+
 /// Compile one source-preserving document without selecting defaults, targets, Score, or runtime
 /// behavior. I-581 and, when eligible, I-582 are each invoked exactly once.
 pub fn compile_typed_ddl(
@@ -543,6 +551,8 @@ fn project_deliveries(
     semantic_document: &SemanticDocumentResult,
 ) -> Projection {
     let mut projection = Projection::default();
+    let exclusive_continuation_claims =
+        exclusive_continuation_claim_groups(&semantic_document.continuation_issues);
 
     if let Some(ground) = &semantic_document.ast.ground {
         add_term_explicit(&mut projection, SemanticDeliveryOwner::Ground, ground);
@@ -563,7 +573,12 @@ fn project_deliveries(
             .iter()
             .find(|instruction| instruction.entity.head.source().span == head_span)
         {
-            project_instruction(instruction, &mut projection);
+            project_instruction_excluding_claims(
+                instruction,
+                &exclusive_continuation_claims,
+                &semantic_document.continuation_issues,
+                &mut projection,
+            );
             restored_failed_heads.push(head_span);
         } else {
             add_blocking_with_members(
@@ -599,6 +614,16 @@ fn project_deliveries(
         .iter()
         .flat_map(|edge| &edge.consumed_upstream_spans)
         .copied()
+        .chain(
+            exclusive_continuation_claims
+                .values()
+                .filter(|group| {
+                    group.issue_indices.len() > 1
+                        && exclusive_claim_owner(group, &semantic_document.continuation_issues)
+                            .is_some()
+                })
+                .map(|group| group.claim_span),
+        )
         .collect::<Vec<_>>();
 
     let association = &semantic_document.instruction_association.association;
@@ -839,8 +864,17 @@ fn project_deliveries(
 }
 
 fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection: &mut Projection) {
+    let exclusive_claims = exclusive_continuation_claim_groups(issues);
+    let exclusive_issue_indices = exclusive_claims
+        .values()
+        .filter(|group| group.issue_indices.len() > 1)
+        .flat_map(|group| group.issue_indices.iter().copied())
+        .collect::<Vec<_>>();
     let mut groups = BTreeMap::<(usize, usize), ContinuationIssueProjection>::new();
     for (issue_index, issue) in issues.iter().enumerate() {
+        if exclusive_issue_indices.contains(&issue_index) {
+            continue;
+        }
         let group = groups
             .entry((issue.marker.span.start_byte, issue.marker.span.end_byte))
             .or_default();
@@ -895,6 +929,127 @@ fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection:
             add_blocking_with_members(projection, &kind, span, group.members);
         }
     }
+
+    for group in exclusive_claims
+        .values()
+        .filter(|group| group.issue_indices.len() > 1)
+    {
+        let claim_owner = exclusive_claim_owner(group, issues);
+        let mut members = vec![format!(
+            "owner={}",
+            claim_owner.map_or("invalid", SemanticDeliveryOwner::as_str)
+        )];
+        for issue_index in &group.issue_indices {
+            let issue = &issues[*issue_index];
+            members.push(format!("issue:{issue_index}={}", issue.kind.as_str()));
+            members.push(format!(
+                "head:{issue_index}={}",
+                semantic_head_key(&issue.instruction.entity.head)
+            ));
+            members.push(format!(
+                "marker:{issue_index}={}:{}",
+                issue.marker.span.start_byte, issue.marker.span.end_byte
+            ));
+            for (_, predicate) in
+                instruction_predicate_deliveries_for_span(&issue.instruction, group.claim_span)
+            {
+                members.push(format!("predicate:{issue_index}={predicate}"));
+            }
+            for (candidate_index, candidate) in issue.candidate_targets.iter().enumerate() {
+                members.push(format!(
+                    "candidate:{issue_index}:{candidate_index}={}",
+                    continuation_target_key(candidate)
+                ));
+            }
+        }
+        let span = Some(group.claim_span);
+        if claim_owner.is_some() {
+            add_ordered_conflict(
+                projection,
+                SemanticContinuationIssueKind::AmbiguousTarget.as_str(),
+                span,
+                members,
+            );
+        } else {
+            add_blocking_with_members(
+                projection,
+                "continuation_claim_owner_integrity",
+                span,
+                members,
+            );
+        }
+    }
+}
+
+fn exclusive_continuation_claim_groups(
+    issues: &[SemanticContinuationIssue],
+) -> BTreeMap<ContinuationClaimKey, ExclusiveContinuationClaimProjection> {
+    let mut groups = BTreeMap::new();
+    for (issue_index, issue) in issues.iter().enumerate() {
+        let Some(claim_spans) = exclusive_continuation_issue_claim_spans(issue) else {
+            continue;
+        };
+        for claim_span in claim_spans {
+            let group = groups
+                .entry((claim_span.start_byte, claim_span.end_byte))
+                .or_insert_with(|| ExclusiveContinuationClaimProjection {
+                    claim_span: *claim_span,
+                    issue_indices: Vec::new(),
+                });
+            group.issue_indices.push(issue_index);
+        }
+    }
+    groups
+}
+
+fn exclusive_claim_owner(
+    group: &ExclusiveContinuationClaimProjection,
+    issues: &[SemanticContinuationIssue],
+) -> Option<SemanticDeliveryOwner> {
+    let mut owner = None;
+    for issue_index in &group.issue_indices {
+        let deliveries = instruction_predicate_deliveries_for_span(
+            &issues[*issue_index].instruction,
+            group.claim_span,
+        );
+        let [(candidate, _)] = deliveries.as_slice() else {
+            return None;
+        };
+        if owner.is_some_and(|owner| owner != *candidate) {
+            return None;
+        }
+        owner = Some(*candidate);
+    }
+    owner
+}
+
+fn instruction_predicate_deliveries_for_span(
+    instruction: &SemanticInstruction,
+    claim_span: SourceSpan,
+) -> Vec<(SemanticDeliveryOwner, String)> {
+    let mut projected = Projection::default();
+    project_instruction(instruction, &mut projected);
+    projected
+        .deliveries
+        .into_iter()
+        .filter(|delivery| delivery.span == Some(claim_span))
+        .filter(|delivery| {
+            !matches!(
+                delivery.identity.owner,
+                SemanticDeliveryOwner::EntityHead | SemanticDeliveryOwner::MacroParameter
+            )
+        })
+        .map(|delivery| {
+            (
+                delivery.identity.owner,
+                format!(
+                    "{}:{}",
+                    delivery.identity.owner.as_str(),
+                    delivery.identity.canonical_key
+                ),
+            )
+        })
+        .collect()
 }
 
 fn semantic_head_key(head: &SemanticHead) -> String {
@@ -946,6 +1101,26 @@ fn continuation_target_key(target: &SemanticContinuationTarget) -> String {
             definition_digest,
         } => format!("macro:{qualified_name}@{definition_version}#{definition_digest}"),
     }
+}
+
+fn project_instruction_excluding_claims(
+    instruction: &SemanticInstruction,
+    claims: &BTreeMap<ContinuationClaimKey, ExclusiveContinuationClaimProjection>,
+    issues: &[SemanticContinuationIssue],
+    projection: &mut Projection,
+) {
+    let mut restored = Projection::default();
+    project_instruction(instruction, &mut restored);
+    projection
+        .deliveries
+        .extend(restored.deliveries.into_iter().filter(|delivery| {
+            !claims.values().any(|group| {
+                group.issue_indices.len() > 1
+                    && delivery.span == Some(group.claim_span)
+                    && exclusive_claim_owner(group, issues)
+                        .is_some_and(|owner| delivery.identity.owner == owner)
+            })
+        }));
 }
 
 fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mut Projection) {

@@ -75,6 +75,132 @@ fn compiler_chain_preserves_typed_causes_without_duplicate_deliveries() {
     );
 }
 
+#[test]
+fn multi_head_continuation_claims_project_one_conflict_per_predicate_occurrence() {
+    for (language, source, expected_claims, expected_owners) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "線 円。線は 円は 細かく 揺れる。",
+            2,
+            &["owner=fluctuation_amplitude", "owner=fluctuation_quality"][..],
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "line circle. the line the circle swaying fine.",
+            2,
+            &["owner=fluctuation_amplitude", "owner=fluctuation_quality"][..],
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "線 円。線は 円は 置く。",
+            1,
+            &["owner=action"][..],
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "line circle. the line the circle place.",
+            1,
+            &["owner=action"][..],
+        ),
+    ] {
+        let result = compile(source, language, &[], None, LIMITS);
+        let document = result.semantic_document.as_ref().unwrap();
+        assert!(document.ast.continuations.is_empty(), "{source}");
+        assert_eq!(document.continuation_issues.len(), 2, "{source}");
+        assert!(document.canonical_bytes.is_none(), "{source}");
+        assert!(result.derived_seeds.is_empty(), "{source}");
+        assert!(result.macro_expansion.is_none(), "{source}");
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::BlockedConflict),
+            "{source}"
+        );
+
+        let claim_conflicts = result
+            .conflicts
+            .iter()
+            .filter(|conflict| conflict.kind == "ambiguous_continuation_target")
+            .collect::<Vec<_>>();
+        assert_eq!(claim_conflicts.len(), expected_claims, "{source}");
+        assert_eq!(
+            claim_conflicts
+                .iter()
+                .filter_map(|conflict| conflict.candidate_identities.first().map(String::as_str))
+                .collect::<HashSet<_>>(),
+            expected_owners.iter().copied().collect::<HashSet<_>>(),
+            "{source}"
+        );
+        assert!(claim_conflicts.iter().all(|conflict| {
+            let members = &conflict.candidate_identities;
+            members
+                .iter()
+                .filter(|member| member.starts_with("head:"))
+                .count()
+                == 2
+                && members
+                    .iter()
+                    .filter(|member| member.starts_with("marker:"))
+                    .count()
+                    == 2
+                && members
+                    .iter()
+                    .filter(|member| member.starts_with("predicate:"))
+                    .count()
+                    == 2
+        }));
+        for conflict in &claim_conflicts {
+            let span = conflict
+                .span
+                .expect("claim conflict owns its predicate span");
+            assert_eq!(
+                result
+                    .deliveries
+                    .iter()
+                    .filter(|delivery| delivery.span == Some(span))
+                    .count(),
+                1,
+                "predicate occurrence is delivered exactly once: {source}"
+            );
+        }
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .map(|delivery| delivery.id.as_str())
+                .collect::<HashSet<_>>()
+                .len(),
+            result.deliveries.len(),
+            "{source}"
+        );
+        let source_owner_keys = result
+            .deliveries
+            .iter()
+            .filter_map(|delivery| {
+                delivery.span.map(|span| {
+                    (
+                        span.start_byte,
+                        span.end_byte,
+                        delivery.identity.owner.as_str(),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            source_owner_keys
+                .iter()
+                .copied()
+                .collect::<HashSet<_>>()
+                .len(),
+            source_owner_keys.len(),
+            "source span plus semantic owner is exclusive: {source}"
+        );
+        assert_eq!(
+            result.delivery_summary.recognized_but_ignored, 0,
+            "{source}"
+        );
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Fixture {

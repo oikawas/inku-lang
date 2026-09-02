@@ -208,8 +208,28 @@ fn build_semantic_document(
 
     let (instructions, continuations, continuation_issues, owned_continuation_occurrence_count) =
         associate_continuations(document, &instruction_association);
-    let delivered_continuation_occurrence_count =
-        2 * (continuations.len() + continuation_issues.len());
+    let mut delivered_continuation_owners = continuations
+        .iter()
+        .map(|edge| {
+            (
+                edge.reintroduced_head.source().span.start_byte,
+                edge.reintroduced_head.source().span.end_byte,
+                edge.marker.span.start_byte,
+                edge.marker.span.end_byte,
+            )
+        })
+        .chain(continuation_issues.iter().map(|issue| {
+            (
+                issue.instruction.entity.head.source().span.start_byte,
+                issue.instruction.entity.head.source().span.end_byte,
+                issue.marker.span.start_byte,
+                issue.marker.span.end_byte,
+            )
+        }))
+        .collect::<Vec<_>>();
+    delivered_continuation_owners.sort_unstable();
+    delivered_continuation_owners.dedup();
+    let delivered_continuation_occurrence_count = 2 * delivered_continuation_owners.len();
     assert_eq!(
         delivered_continuation_occurrence_count, owned_continuation_occurrence_count,
         "semantic document must deliver every continuation head and marker exactly once"
@@ -270,6 +290,16 @@ fn build_semantic_document(
     }
 }
 
+struct PendingContinuation {
+    instruction: SemanticInstruction,
+    marker: SourceOccurrence,
+    predicate_span: SourceSpan,
+    target_instruction_index: usize,
+    target: SemanticContinuationTarget,
+    consumed_upstream_spans: Vec<SourceSpan>,
+    claims: Vec<SourceSpan>,
+}
+
 fn associate_continuations(
     document: &NormalizedDdlDocument,
     association: &SemanticInstructionAssociationResult,
@@ -282,6 +312,7 @@ fn associate_continuations(
     let mut instructions = Vec::new();
     let mut continuations = Vec::new();
     let mut issues = Vec::new();
+    let mut pending = Vec::new();
     let mut owned = 0;
 
     for original_instruction in &association.ast.instructions {
@@ -332,8 +363,6 @@ fn associate_continuations(
             &consumed_upstream_spans,
         ) {
             Some(SemanticContinuationIssueKind::BlockedBoundary)
-        } else if !predicate_is_compatible(&instructions[targets[0].0], &instruction) {
-            Some(SemanticContinuationIssueKind::ConflictingPredicate)
         } else {
             None
         };
@@ -369,14 +398,90 @@ fn associate_continuations(
         }
 
         let (target_index, target) = targets.into_iter().next().expect("exact one target");
-        merge_predicate(&mut instructions[target_index], &instruction);
-        continuations.push(SemanticContinuationEdge {
-            target,
-            target_instruction_index: target_index,
-            reintroduced_head: instruction.entity.head.clone(),
+        let claims = consumed_upstream_spans.clone();
+        pending.push(PendingContinuation {
+            instruction,
             marker,
             predicate_span,
+            target_instruction_index: target_index,
+            target,
             consumed_upstream_spans,
+            claims,
+        });
+    }
+
+    let mut claimants = BTreeMap::<(usize, usize), Vec<usize>>::new();
+    for (pending_index, candidate) in pending.iter().enumerate() {
+        for claim in &candidate.claims {
+            let claimants = claimants
+                .entry((claim.start_byte, claim.end_byte))
+                .or_default();
+            if !claimants.contains(&pending_index) {
+                claimants.push(pending_index);
+            }
+        }
+    }
+    let pending_targets = pending
+        .iter()
+        .map(|candidate| candidate.target.clone())
+        .collect::<Vec<_>>();
+
+    for candidate in pending {
+        let duplicate_claims = candidate
+            .claims
+            .iter()
+            .filter(|claim| claimants[&(claim.start_byte, claim.end_byte)].len() > 1)
+            .copied()
+            .collect::<Vec<_>>();
+        if !duplicate_claims.is_empty() {
+            let mut candidate_targets = Vec::new();
+            for claim in &duplicate_claims {
+                for pending_index in &claimants[&(claim.start_byte, claim.end_byte)] {
+                    let target = pending_targets[*pending_index].clone();
+                    if !candidate_targets.contains(&target) {
+                        candidate_targets.push(target);
+                    }
+                }
+            }
+            issues.push(SemanticContinuationIssue {
+                kind: SemanticContinuationIssueKind::AmbiguousTarget,
+                instruction: candidate.instruction,
+                marker: candidate.marker,
+                predicate_span: duplicate_claims[0],
+                candidate_targets,
+                consumed_upstream_spans: duplicate_claims,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            });
+            continue;
+        }
+
+        if !predicate_is_compatible(
+            &instructions[candidate.target_instruction_index],
+            &candidate.instruction,
+        ) {
+            issues.push(SemanticContinuationIssue {
+                kind: SemanticContinuationIssueKind::ConflictingPredicate,
+                instruction: candidate.instruction,
+                marker: candidate.marker,
+                predicate_span: candidate.predicate_span,
+                candidate_targets: vec![candidate.target],
+                consumed_upstream_spans: candidate.consumed_upstream_spans,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            });
+            continue;
+        }
+
+        merge_predicate(
+            &mut instructions[candidate.target_instruction_index],
+            &candidate.instruction,
+        );
+        continuations.push(SemanticContinuationEdge {
+            target: candidate.target,
+            target_instruction_index: candidate.target_instruction_index,
+            reintroduced_head: candidate.instruction.entity.head,
+            marker: candidate.marker,
+            predicate_span: candidate.predicate_span,
+            consumed_upstream_spans: candidate.consumed_upstream_spans,
         });
     }
 
@@ -511,6 +616,17 @@ fn set_if_empty<T: Clone>(target: &mut Option<T>, value: &T) -> bool {
     }
     *target = Some(value.clone());
     true
+}
+
+pub(crate) fn exclusive_continuation_issue_claim_spans(
+    issue: &SemanticContinuationIssue,
+) -> Option<&[SourceSpan]> {
+    if issue.kind != SemanticContinuationIssueKind::AmbiguousTarget
+        || issue.consumed_upstream_spans.first() != Some(&issue.predicate_span)
+    {
+        return None;
+    }
+    Some(&issue.consumed_upstream_spans)
 }
 
 fn continuation_marker(

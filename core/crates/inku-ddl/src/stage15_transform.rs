@@ -6,15 +6,17 @@ use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    CompilerLockState, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
-    ExpansionPathSegment, GeneratedNodeProvenance, MACRO_EXPANSION_SCHEMA_ID,
+    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroInvocation,
+    ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, GeneratedNodeProvenance,
     SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticIdentity, SemanticTermProvenance,
     TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
-    compiler_lock_hash_input, expanded_meaning_canonical_bytes,
+    compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
+    expanded_meaning_canonical_bytes, semantic_document::canonical_ast_bytes,
+    semantic_source_provenance_canonical_bytes,
 };
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
-pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v1";
+pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v2";
 /// Framed hash domain for source-independent baseline focus selection.
 pub const STAGE15_FOCUS_SELECTION_DOMAIN: &[u8] = b"inku.typed-stage15-focus-selection.v1";
 
@@ -60,6 +62,8 @@ pub enum Stage15VariationAmplitude {
 }
 
 impl Stage15VariationAmplitude {
+    pub const ALL: [Self; 3] = [Self::Small, Self::Medium, Self::Large];
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Small => "small",
@@ -180,13 +184,16 @@ pub enum Stage15TransformError {
     IncompleteSemanticDocument,
     MissingSemanticCanonicalBytes,
     MissingSemanticCanonicalDigest,
+    SemanticAstCanonicalMismatch,
     SemanticCanonicalDigestMismatch,
+    MissingSemanticSourceProvenanceDigest,
+    SemanticSourceProvenanceDigestMismatch,
     MissingMacroExpansion,
     ExpansionDiagnostic,
     MissingExpandedMeaningDigest,
     ExpandedMeaningDigestMismatch,
-    MissingCompositionSeedIdentity,
-    CompositionSeedMismatch,
+    MissingExpandedGeneratedProvenanceDigest,
+    ExpandedGeneratedProvenanceDigestMismatch,
     DuplicateTarget(Stage15TargetPath),
     MissingTarget(Stage15TargetPath),
     OriginalIdentityMismatch(Stage15TargetPath),
@@ -195,7 +202,6 @@ pub enum Stage15TransformError {
 /// Validate and detach the complete source-independent input needed by Stage 1.5.
 pub fn stage15_transformation_input(
     compilation: &TypedDdlCompilation,
-    composition_seed: Option<u64>,
 ) -> Result<Stage15TransformationInput, Stage15TransformError> {
     if compilation.schema_id != TYPED_DDL_COMPILATION_SCHEMA_ID {
         return Err(Stage15TransformError::CompilationSchema);
@@ -234,12 +240,24 @@ pub fn stage15_transformation_input(
         .canonical_bytes
         .as_deref()
         .ok_or(Stage15TransformError::MissingSemanticCanonicalBytes)?;
+    if canonical_ast_bytes(&semantic.ast) != semantic_bytes {
+        return Err(Stage15TransformError::SemanticAstCanonicalMismatch);
+    }
     let pre_expansion_digest = lock
         .canonical_pre_expansion_digest
         .as_ref()
         .ok_or(Stage15TransformError::MissingSemanticCanonicalDigest)?;
     if sha256_hex(semantic_bytes) != *pre_expansion_digest {
         return Err(Stage15TransformError::SemanticCanonicalDigestMismatch);
+    }
+    let semantic_source_provenance_digest = lock
+        .semantic_source_provenance_digest
+        .as_ref()
+        .ok_or(Stage15TransformError::MissingSemanticSourceProvenanceDigest)?;
+    if sha256_hex(&semantic_source_provenance_canonical_bytes(&semantic.ast))
+        != *semantic_source_provenance_digest
+    {
+        return Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch);
     }
 
     let expansion = compilation
@@ -256,11 +274,14 @@ pub fn stage15_transformation_input(
     if sha256_hex(&expanded_meaning_canonical_bytes(expansion)) != *expanded_meaning_digest {
         return Err(Stage15TransformError::ExpandedMeaningDigestMismatch);
     }
-    let effective_composition_seed = lock
-        .composition_seed
-        .ok_or(Stage15TransformError::MissingCompositionSeedIdentity)?;
-    if effective_composition_seed != composition_seed.unwrap_or(0) {
-        return Err(Stage15TransformError::CompositionSeedMismatch);
+    let expanded_generated_provenance_digest =
+        lock.expanded_generated_provenance_digest
+            .as_ref()
+            .ok_or(Stage15TransformError::MissingExpandedGeneratedProvenanceDigest)?;
+    if sha256_hex(&expanded_generated_provenance_canonical_bytes(expansion))
+        != *expanded_generated_provenance_digest
+    {
+        return Err(Stage15TransformError::ExpandedGeneratedProvenanceDigestMismatch);
     }
 
     Ok(Stage15TransformationInput {
@@ -268,7 +289,7 @@ pub fn stage15_transformation_input(
         expanded_invocations: expansion.expanded.clone(),
         pre_expansion_digest: pre_expansion_digest.clone(),
         expanded_meaning_digest: expanded_meaning_digest.clone(),
-        composition_seed,
+        composition_seed: lock.composition_seed,
     })
 }
 
@@ -555,19 +576,25 @@ fn focus_hash_input(input: &Stage15TransformationInput) -> Vec<u8> {
 }
 
 fn varied_focus(baseline: FocusRegion, variation: Stage15Variation) -> FocusRegion {
-    let key = format!(
-        "variation-offset:{}:{}:focus",
-        variation.amplitude.as_str(),
-        variation.seed
-    );
-    let digest = Sha256::digest(key.as_bytes());
-    let hash = u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 has eight bytes"));
-    let offset = 1 + hash % 97;
-    let others = FocusRegion::ALL
+    let mut available = FocusRegion::ALL
         .into_iter()
         .filter(|focus| *focus != baseline)
         .collect::<Vec<_>>();
-    others[offset as usize % others.len()]
+    for amplitude in Stage15VariationAmplitude::ALL {
+        let offset = variation_offset(amplitude, variation.seed);
+        let selected = available.remove(offset as usize % available.len());
+        if amplitude == variation.amplitude {
+            return selected;
+        }
+    }
+    unreachable!("closed amplitude order contains every variation amplitude")
+}
+
+fn variation_offset(amplitude: Stage15VariationAmplitude, seed: u64) -> u64 {
+    let key = format!("variation-offset:{}:{}:focus", amplitude.as_str(), seed);
+    let digest = Sha256::digest(key.as_bytes());
+    let hash = u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 has eight bytes"));
+    1 + hash % 97
 }
 
 fn effective_canonical_bytes(
@@ -588,7 +615,10 @@ fn effective_canonical_bytes(
     );
     root.insert(
         "original_expanded".to_owned(),
-        identity_value(MACRO_EXPANSION_SCHEMA_ID, &input.expanded_meaning_digest),
+        identity_value(
+            EXPANDED_MACRO_MEANING_SCHEMA_ID,
+            &input.expanded_meaning_digest,
+        ),
     );
     root.insert(
         "focus_selection".to_owned(),

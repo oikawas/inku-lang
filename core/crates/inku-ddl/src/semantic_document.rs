@@ -986,7 +986,7 @@ fn merge_option<T: Clone>(target: &mut Option<T>, continuation: &Option<T>) {
     }
 }
 
-fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
+pub(crate) fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     let mut root = BTreeMap::new();
     root.insert(
         "coordinated_head_groups".to_owned(),

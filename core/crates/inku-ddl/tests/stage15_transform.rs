@@ -1,7 +1,9 @@
 use inku_ddl::{
-    CompilerLockState, FocusRegion, MacroDefinition, MacroExpansionLimits, MacroLock,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, Stage15TargetPath, Stage15TransformError,
-    Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl, compiler_lock_hash_input,
+    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, FocusRegion, MacroDefinition,
+    MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
+    STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID, Stage15TargetPath,
+    Stage15TransformError, Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl,
+    compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
     expanded_meaning_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
@@ -62,6 +64,14 @@ struct Snapshot {
 fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     let fixture = fixture();
     assert_eq!(
+        STAGE15_TRANSFORMATION_SCHEMA_ID,
+        "inku.typed-stage15-transformation.v2"
+    );
+    assert_eq!(
+        STAGE15_FOCUS_SELECTION_DOMAIN,
+        b"inku.typed-stage15-focus-selection.v1"
+    );
+    assert_eq!(
         fixture.schema,
         "inku.stage15-transform-cross-platform-fixture.v1"
     );
@@ -94,10 +104,14 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
                 .expanded
                 .clone();
             let result = transform_stage15(
-                stage15_transformation_input(&compilation, case.composition_seed).unwrap(),
+                stage15_transformation_input(&compilation).unwrap(),
                 case.variation.map(variation),
             )
             .unwrap();
+            assert_eq!(result.schema_id, STAGE15_TRANSFORMATION_SCHEMA_ID);
+            let canonical: serde_json::Value =
+                serde_json::from_slice(&result.effective_canonical_bytes).unwrap();
+            assert_eq!(canonical["schema"], STAGE15_TRANSFORMATION_SCHEMA_ID);
             assert_eq!(
                 result.original_semantic_document, original_semantic,
                 "{}",
@@ -147,13 +161,10 @@ fn no_target_and_non_center_meaning_remain_effective_no_ops() {
             LIMITS,
         );
         let original_semantic = compilation.semantic_document.as_ref().unwrap().ast.clone();
-        let without_variation = transform_stage15(
-            stage15_transformation_input(&compilation, Some(42)).unwrap(),
-            None,
-        )
-        .unwrap();
+        let without_variation =
+            transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
         let with_variation = transform_stage15(
-            stage15_transformation_input(&compilation, Some(42)).unwrap(),
+            stage15_transformation_input(&compilation).unwrap(),
             Some(Stage15Variation {
                 amplitude: Stage15VariationAmplitude::Large,
                 seed: 9,
@@ -213,17 +224,101 @@ fn omitted_and_explicit_zero_composition_seeds_keep_distinct_focus_provenance() 
             .unwrap()
             .expanded_meaning_digest
     );
+    assert_eq!(
+        omitted.compiler_lock.as_ref().unwrap().composition_seed,
+        None
+    );
+    assert_eq!(
+        explicit_zero
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .composition_seed,
+        Some(0)
+    );
+    assert_ne!(
+        omitted.compiler_lock.as_ref().unwrap().full_digest,
+        explicit_zero.compiler_lock.as_ref().unwrap().full_digest
+    );
     let omitted_result =
-        transform_stage15(stage15_transformation_input(&omitted, None).unwrap(), None).unwrap();
-    let explicit_result = transform_stage15(
-        stage15_transformation_input(&explicit_zero, Some(0)).unwrap(),
-        None,
-    )
-    .unwrap();
+        transform_stage15(stage15_transformation_input(&omitted).unwrap(), None).unwrap();
+    let explicit_result =
+        transform_stage15(stage15_transformation_input(&explicit_zero).unwrap(), None).unwrap();
     assert_ne!(
         omitted_result.effective_canonical_bytes,
         explicit_result.effective_canonical_bytes
     );
+}
+
+#[test]
+fn ja_and_en_variation_keep_the_same_effective_identity_and_expanded_schema_owner() {
+    let variation = Some(Stage15Variation {
+        amplitude: Stage15VariationAmplitude::Medium,
+        seed: 0,
+    });
+    let results = [
+        (
+            "中心に、鉛筆の細い線をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "place one thin pencil line at the center",
+            ResolvedInstructionLanguage::En,
+        ),
+    ]
+    .map(|(source, language)| {
+        let compilation = compile(source, language, &[], None, LIMITS);
+        transform_stage15(
+            stage15_transformation_input(&compilation).unwrap(),
+            variation,
+        )
+        .unwrap()
+    });
+
+    assert_eq!(
+        results[0].effective_canonical_digest,
+        results[1].effective_canonical_digest
+    );
+    let canonical: serde_json::Value =
+        serde_json::from_slice(&results[0].effective_canonical_bytes).unwrap();
+    assert_eq!(
+        canonical["original_expanded"]["schema"],
+        EXPANDED_MACRO_MEANING_SCHEMA_ID
+    );
+}
+
+#[test]
+fn seed_zero_variation_amplitudes_resolve_to_three_distinct_non_baseline_focuses() {
+    let compilation = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    let baseline = transform_stage15(stage15_transformation_input(&compilation).unwrap(), None)
+        .unwrap()
+        .baseline_focus
+        .unwrap();
+    let resolved = [
+        Stage15VariationAmplitude::Small,
+        Stage15VariationAmplitude::Medium,
+        Stage15VariationAmplitude::Large,
+    ]
+    .map(|amplitude| {
+        transform_stage15(
+            stage15_transformation_input(&compilation).unwrap(),
+            Some(Stage15Variation { amplitude, seed: 0 }),
+        )
+        .unwrap()
+        .resolved_focus
+        .unwrap()
+    });
+
+    assert!(resolved.iter().all(|focus| *focus != baseline));
+    assert_ne!(resolved[0], resolved[1]);
+    assert_ne!(resolved[0], resolved[2]);
+    assert_ne!(resolved[1], resolved[2]);
 }
 
 #[test]
@@ -235,11 +330,8 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
         Some(11),
         LIMITS,
     );
-    let source_result = transform_stage15(
-        stage15_transformation_input(&source, Some(11)).unwrap(),
-        None,
-    )
-    .unwrap();
+    let source_result =
+        transform_stage15(stage15_transformation_input(&source).unwrap(), None).unwrap();
     assert_eq!(source_result.targets.len(), 1);
     assert!(matches!(
         source_result.targets[0].path,
@@ -259,11 +351,8 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
         Some(11),
         LIMITS,
     );
-    let group_result = transform_stage15(
-        stage15_transformation_input(&group, Some(11)).unwrap(),
-        None,
-    )
-    .unwrap();
+    let group_result =
+        transform_stage15(stage15_transformation_input(&group).unwrap(), None).unwrap();
     assert_eq!(group_result.targets.len(), 1);
     assert!(matches!(
         group_result.targets[0].path,
@@ -287,7 +376,7 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
     );
     let original_expansion = generated.macro_expansion.as_ref().unwrap().expanded.clone();
     let generated_result = transform_stage15(
-        stage15_transformation_input(&generated, Some(17)).unwrap(),
+        stage15_transformation_input(&generated).unwrap(),
         Some(Stage15Variation {
             amplitude: Stage15VariationAmplitude::Small,
             seed: 3,
@@ -324,6 +413,52 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
 }
 
 #[test]
+fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
+    let definition = center_emit_definition();
+    let compilation = compile_locked(
+        "place one thin pencil line at the center. place circle and Focus.Center at center.",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    let result = transform_stage15(
+        stage15_transformation_input(&compilation).unwrap(),
+        Some(Stage15Variation {
+            amplitude: Stage15VariationAmplitude::Large,
+            seed: 0,
+        }),
+    )
+    .unwrap();
+
+    assert_eq!(result.targets.len(), 4);
+    assert!(matches!(
+        result.targets[0].path,
+        Stage15TargetPath::Instruction {
+            instruction_index: 0
+        }
+    ));
+    assert!(matches!(
+        result.targets[1].path,
+        Stage15TargetPath::GroupPredicate {
+            edge_index: 0,
+            group_index: 0
+        }
+    ));
+    assert!(
+        result.targets[2..]
+            .iter()
+            .all(|target| matches!(target.path, Stage15TargetPath::MacroEmit { .. }))
+    );
+    assert!(
+        result
+            .targets
+            .iter()
+            .all(|target| target.effective_focus == result.resolved_focus.unwrap())
+    );
+}
+
+#[test]
 fn canonical_ready_gate_and_target_integrity_fail_closed() {
     for (source, expected_state) in [
         ("many", CompilerLockState::IncompleteKnownHole),
@@ -335,7 +470,7 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
     ] {
         let compilation = compile(source, ResolvedInstructionLanguage::En, &[], None, LIMITS);
         assert_eq!(
-            stage15_transformation_input(&compilation, None),
+            stage15_transformation_input(&compilation),
             Err(Stage15TransformError::CompilerState(expected_state)),
             "{source}"
         );
@@ -357,23 +492,81 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
         .unwrap()
         .push(b' ');
     assert_eq!(
-        stage15_transformation_input(&semantic_corruption, None),
-        Err(Stage15TransformError::SemanticCanonicalDigestMismatch)
+        stage15_transformation_input(&semantic_corruption),
+        Err(Stage15TransformError::SemanticAstCanonicalMismatch)
     );
 
-    let seed_mismatch = compile(
+    let mut ast_corruption = compile(
         "place one thin pencil line at the center",
         ResolvedInstructionLanguage::En,
         &[],
-        Some(5),
+        None,
         LIMITS,
     );
+    ast_corruption
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .position
+        .as_mut()
+        .unwrap()
+        .identity
+        .id = "left_edge".to_owned();
     assert_eq!(
-        stage15_transformation_input(&seed_mismatch, Some(6)),
-        Err(Stage15TransformError::CompositionSeedMismatch)
+        stage15_transformation_input(&ast_corruption),
+        Err(Stage15TransformError::SemanticAstCanonicalMismatch)
+    );
+
+    let mut source_provenance_corruption = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    source_provenance_corruption
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .position
+        .as_mut()
+        .unwrap()
+        .provenance
+        .source
+        .surface
+        .push('!');
+    assert_eq!(
+        stage15_transformation_input(&source_provenance_corruption),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
     );
 
     let definition = center_emit_definition();
+    let mut generated_provenance_corruption = compile_locked(
+        "Focus.Center",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(5),
+        LIMITS,
+    );
+    let inku_ddl::ExpandedMacroNode::Emit { provenance, .. } = &mut generated_provenance_corruption
+        .macro_expansion
+        .as_mut()
+        .unwrap()
+        .expanded[0]
+        .nodes[0]
+    else {
+        panic!("center fixture starts with one generated emit");
+    };
+    provenance.generated_ordinal += 1;
+    assert_eq!(
+        stage15_transformation_input(&generated_provenance_corruption),
+        Err(Stage15TransformError::ExpandedGeneratedProvenanceDigestMismatch)
+    );
+
     let mut duplicate = compile_locked(
         "Focus.Center",
         ResolvedInstructionLanguage::En,
@@ -386,8 +579,11 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
     expansion.expanded[0].nodes.push(duplicated_node);
     let lock = duplicate.compiler_lock.as_mut().unwrap();
     lock.expanded_meaning_digest = Some(sha256(&expanded_meaning_canonical_bytes(expansion)));
+    lock.expanded_generated_provenance_digest = Some(sha256(
+        &expanded_generated_provenance_canonical_bytes(expansion),
+    ));
     lock.full_digest = sha256(&compiler_lock_hash_input(lock));
-    let input = stage15_transformation_input(&duplicate, Some(5)).unwrap();
+    let input = stage15_transformation_input(&duplicate).unwrap();
     assert!(matches!(
         transform_stage15(input, None),
         Err(Stage15TransformError::DuplicateTarget(

@@ -6,13 +6,18 @@ use inku_ddl::{
     ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDeliveryOwner, SemanticHead,
     SemanticIssueCausalProvenance, SemanticUpstreamCausalRelation, TYPED_DDL_COMPILATION_SCHEMA_ID,
     TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters, compile_typed_ddl,
-    expanded_meaning_canonical_bytes, saijiki_asset,
+    expanded_generated_provenance_canonical_bytes, expanded_meaning_canonical_bytes, saijiki_asset,
+    semantic_source_provenance_canonical_bytes,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.json");
+const V12_FULL_LOCK_KNOWN_ANSWER: &str =
+    "ae73dd825955efda06dd344fb464ae56c8d89ef8d38810ec99fb1ccf92cfe449";
+const V13_FULL_LOCK_KNOWN_ANSWER: &str =
+    "970707f4f2f8550fc158270d3b08723a4c031d7ade27f062a1032ea85210a51a";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -1622,9 +1627,10 @@ fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
         fixture.known_answers.expanded_meaning_sha256
     );
     assert_eq!(
-        actual.full_lock_digest,
-        fixture.known_answers.full_lock_digest
+        fixture.known_answers.full_lock_digest,
+        V12_FULL_LOCK_KNOWN_ANSWER
     );
+    assert_eq!(actual.full_lock_digest, V13_FULL_LOCK_KNOWN_ANSWER);
     assert_eq!(
         lock.canonical_pre_expansion_digest,
         Some(actual.canonical_sha256)
@@ -1633,7 +1639,43 @@ fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
         lock.expanded_meaning_digest,
         Some(actual.expanded_meaning_sha256)
     );
+    assert_eq!(
+        lock.semantic_source_provenance_digest,
+        Some(sha256(&semantic_source_provenance_canonical_bytes(
+            &result.semantic_document.as_ref().unwrap().ast,
+        )))
+    );
+    assert_eq!(
+        lock.expanded_generated_provenance_digest,
+        Some(sha256(&expanded_generated_provenance_canonical_bytes(
+            expansion,
+        )))
+    );
     assert_eq!(lock.macro_seeds[0].full_digest, actual.seed_digest);
+}
+
+#[test]
+fn compiler_lock_preserves_omitted_and_explicit_zero_seed_presence() {
+    let omitted = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let explicit_zero = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    let omitted_lock = omitted.compiler_lock.as_ref().unwrap();
+    let explicit_lock = explicit_zero.compiler_lock.as_ref().unwrap();
+
+    assert_eq!(omitted_lock.composition_seed, None);
+    assert_eq!(explicit_lock.composition_seed, Some(0));
+    assert_ne!(omitted_lock.full_digest, explicit_lock.full_digest);
 }
 
 #[test]
@@ -1666,7 +1708,7 @@ fn language_format_and_approved_order_project_to_same_semantics_but_not_source_l
         );
         assert_eq!(
             result.compiler_lock.as_ref().unwrap().composition_seed,
-            Some(0)
+            None
         );
         assert_eq!(result.delivery_summary.recognized_but_ignored, 0);
     }

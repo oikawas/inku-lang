@@ -6,30 +6,37 @@ use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ClauseAtom, ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, MacroDefinition,
-    MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult,
-    MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
-    MacroParameterBindingResult, MacroSeed, NeutralDiagnosticKind, NormalizedDdlDocument,
-    OwnedSemanticOccurrence, SemanticAssociationIssueKind, SemanticContinuationIssue,
-    SemanticContinuationIssueKind, SemanticContinuationTarget, SemanticCoordinationIssueKind,
+    ClauseAtom, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
+    ExpansionPathSegment, GeneratedNodeProvenance, MacroDefinition, MacroExpansionDiagnosticKind,
+    MacroExpansionLimits, MacroExpansionResult, MacroInvocationResolutionDiagnosticKind,
+    MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, MacroSeed,
+    NeutralDiagnosticKind, NormalizedDdlDocument, OwnedSemanticOccurrence,
+    SemanticAssociationIssueKind, SemanticContinuationIssue, SemanticContinuationIssueKind,
+    SemanticContinuationTarget, SemanticCoordinationIssueKind, SemanticDocumentAst,
     SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead, SemanticInstruction,
     SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole, SemanticIssueCausalProvenance,
-    SemanticMacroParameterValue, SemanticRelationIssueKind, SemanticTerm, SourceSpan,
-    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
-    expand_macros, project_macro_semantic_ref,
+    SemanticMacroParameterValue, SemanticRelationIssueKind, SemanticTerm, SourceOccurrence,
+    SourceSpan, associate_semantic_document_with_macro_binding, bind_macro_parameters,
+    derive_macro_seed, expand_macros, project_macro_semantic_ref,
     semantic_document::exclusive_continuation_issue_claim_spans,
 };
 
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v11";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v12";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v12";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v13";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v12";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v13";
+/// Stable identity for source-bearing semantic provenance bytes.
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v1";
+/// Stable identity for generated macro provenance bytes.
+pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
+/// Stable identity for source-independent expanded macro meaning bytes.
+pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v1";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -238,10 +245,12 @@ pub struct TypedDdlCompilerLock {
     pub visible_source_digest: String,
     pub structured_semantic_occurrence_digest: String,
     pub canonical_pre_expansion_digest: Option<String>,
+    pub semantic_source_provenance_digest: Option<String>,
     pub composition_seed: Option<u64>,
     pub definition_identities: Vec<CompilerDefinitionIdentity>,
     pub macro_seeds: Vec<CompilerSeedIdentity>,
     pub expanded_meaning_digest: Option<String>,
+    pub expanded_generated_provenance_digest: Option<String>,
     pub hole_identities: Vec<String>,
     pub conflict_identities: Vec<String>,
     pub blocking_diagnostic_identities: Vec<String>,
@@ -408,6 +417,18 @@ pub fn compile_typed_ddl(
     } else {
         None
     };
+    let semantic_source_provenance_digest = canonical_ready.then(|| {
+        sha256_hex(&semantic_source_provenance_canonical_bytes(
+            &semantic_document.ast,
+        ))
+    });
+    let expanded_generated_provenance_digest = if state == CompilerLockState::CanonicalReady {
+        expansion
+            .as_ref()
+            .map(|value| sha256_hex(&expanded_generated_provenance_canonical_bytes(value)))
+    } else {
+        None
+    };
     let lock = build_lock(
         &document,
         definitions,
@@ -415,8 +436,10 @@ pub fn compile_typed_ddl(
         &projection,
         structured_semantic_occurrence_digest,
         semantic_document.canonical_bytes.as_deref(),
+        semantic_source_provenance_digest,
         &seeds,
         expanded_digest,
+        expanded_generated_provenance_digest,
         state,
     );
     let summary = summarize(&projection.deliveries);
@@ -1841,8 +1864,10 @@ fn build_lock(
     projection: &Projection,
     structured_semantic_occurrence_digest: String,
     canonical_bytes: Option<&[u8]>,
+    semantic_source_provenance_digest: Option<String>,
     seeds: &[MacroSeed],
     expanded_meaning_digest: Option<String>,
+    expanded_generated_provenance_digest: Option<String>,
     state: CompilerLockState,
 ) -> TypedDdlCompilerLock {
     let canonical_pre_expansion_digest = canonical_bytes.map(sha256_hex);
@@ -1872,10 +1897,16 @@ fn build_lock(
         visible_source_digest: sha256_hex(document.source().as_bytes()),
         structured_semantic_occurrence_digest,
         canonical_pre_expansion_digest,
-        composition_seed: has_structured_meaning.then_some(composition_seed.unwrap_or(0)),
+        semantic_source_provenance_digest,
+        composition_seed: if has_structured_meaning {
+            composition_seed
+        } else {
+            None
+        },
         definition_identities,
         macro_seeds,
         expanded_meaning_digest,
+        expanded_generated_provenance_digest,
         hole_identities: projection
             .holes
             .iter()
@@ -1908,6 +1939,10 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
         lock.structured_semantic_occurrence_digest.as_bytes(),
     );
     append_optional(&mut bytes, lock.canonical_pre_expansion_digest.as_deref());
+    append_optional(
+        &mut bytes,
+        lock.semantic_source_provenance_digest.as_deref(),
+    );
     match lock.composition_seed {
         Some(seed) => {
             append_field(&mut bytes, b"present");
@@ -1921,6 +1956,10 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
     );
     append_field(&mut bytes, &seed_identity_bytes(&lock.macro_seeds));
     append_optional(&mut bytes, lock.expanded_meaning_digest.as_deref());
+    append_optional(
+        &mut bytes,
+        lock.expanded_generated_provenance_digest.as_deref(),
+    );
     append_strings(&mut bytes, &lock.hole_identities);
     append_strings(&mut bytes, &lock.conflict_identities);
     append_strings(&mut bytes, &lock.blocking_diagnostic_identities);
@@ -1951,6 +1990,462 @@ fn definition_identities(
         .collect()
 }
 
+/// Canonical source-bearing provenance for the complete returned semantic graph.
+pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
+    let mut root = BTreeMap::new();
+    root.insert(
+        "schema".to_owned(),
+        Value::String(SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID.to_owned()),
+    );
+    root.insert(
+        "ground".to_owned(),
+        ast.ground
+            .as_ref()
+            .map(term_provenance_value)
+            .unwrap_or(Value::Null),
+    );
+    root.insert(
+        "instructions".to_owned(),
+        Value::Array(
+            ast.instructions
+                .iter()
+                .map(instruction_provenance_value)
+                .collect(),
+        ),
+    );
+    root.insert(
+        "coordinated_head_groups".to_owned(),
+        Value::Array(
+            ast.coordinated_head_groups
+                .iter()
+                .map(|group| {
+                    let mut record = BTreeMap::new();
+                    record.insert(
+                        "member_instruction_indices".to_owned(),
+                        Value::Array(
+                            group
+                                .member_instruction_indices
+                                .iter()
+                                .map(|index| Value::Number(Number::from(*index as u64)))
+                                .collect(),
+                        ),
+                    );
+                    record.insert(
+                        "markers".to_owned(),
+                        Value::Array(group.markers.iter().map(source_occurrence_value).collect()),
+                    );
+                    Value::Object(record.into_iter().collect())
+                })
+                .collect(),
+        ),
+    );
+    root.insert(
+        "group_predicates".to_owned(),
+        Value::Array(
+            ast.group_predicates
+                .iter()
+                .map(|edge| {
+                    let mut record = BTreeMap::new();
+                    record.insert(
+                        "group_index".to_owned(),
+                        Value::Number(Number::from(edge.group_index as u64)),
+                    );
+                    record.insert(
+                        "action".to_owned(),
+                        edge.action
+                            .as_ref()
+                            .map(term_provenance_value)
+                            .unwrap_or(Value::Null),
+                    );
+                    record.insert(
+                        "position".to_owned(),
+                        edge.position
+                            .as_ref()
+                            .map(term_provenance_value)
+                            .unwrap_or(Value::Null),
+                    );
+                    Value::Object(record.into_iter().collect())
+                })
+                .collect(),
+        ),
+    );
+    root.insert(
+        "continuations".to_owned(),
+        Value::Array(
+            ast.continuations
+                .iter()
+                .map(|edge| {
+                    let mut record = BTreeMap::new();
+                    record.insert(
+                        "target_instruction_index".to_owned(),
+                        Value::Number(Number::from(edge.target_instruction_index as u64)),
+                    );
+                    record.insert(
+                        "reintroduced_head".to_owned(),
+                        head_provenance_value(&edge.reintroduced_head),
+                    );
+                    record.insert("marker".to_owned(), source_occurrence_value(&edge.marker));
+                    record.insert(
+                        "predicate_span".to_owned(),
+                        source_span_value(edge.predicate_span),
+                    );
+                    record.insert(
+                        "consumed_upstream_spans".to_owned(),
+                        Value::Array(
+                            edge.consumed_upstream_spans
+                                .iter()
+                                .map(|span| source_span_value(*span))
+                                .collect(),
+                        ),
+                    );
+                    Value::Object(record.into_iter().collect())
+                })
+                .collect(),
+        ),
+    );
+    serde_json::to_vec(&root).expect("closed semantic provenance values serialize")
+}
+
+fn instruction_provenance_value(instruction: &SemanticInstruction) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "entity".to_owned(),
+        entity_provenance_value(&instruction.entity),
+    );
+    record.insert(
+        "action".to_owned(),
+        instruction
+            .action
+            .as_ref()
+            .map(term_provenance_value)
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "position".to_owned(),
+        instruction
+            .position
+            .as_ref()
+            .map(term_provenance_value)
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "relation".to_owned(),
+        instruction
+            .relation
+            .as_ref()
+            .map(|relation| source_occurrence_value(&relation.provenance))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert("head".to_owned(), head_provenance_value(&entity.head));
+    for (field, term) in [
+        ("color", entity.color.as_ref()),
+        ("touch", entity.touch.as_ref()),
+        ("continuity", entity.continuity.as_ref()),
+        ("angle", entity.angle.as_ref()),
+        ("surface_quality", entity.surface.quality.as_ref()),
+        ("surface_intensity", entity.surface.intensity.as_ref()),
+        (
+            "fluctuation_amplitude",
+            entity.fluctuation.amplitude.as_ref(),
+        ),
+        (
+            "fluctuation_frequency",
+            entity.fluctuation.frequency.as_ref(),
+        ),
+        ("fluctuation_quality", entity.fluctuation.quality.as_ref()),
+        ("proportion_aspect", entity.proportion.aspect.as_ref()),
+        (
+            "proportion_width_extent",
+            entity.proportion.width_extent.as_ref(),
+        ),
+        ("proportion_arc_form", entity.proportion.arc_form.as_ref()),
+    ] {
+        record.insert(
+            field.to_owned(),
+            term.map(term_provenance_value).unwrap_or(Value::Null),
+        );
+    }
+    for (field, occurrence) in [
+        (
+            "quantity",
+            entity.quantity.as_ref().map(|value| &value.provenance),
+        ),
+        (
+            "thinness",
+            entity.thinness.as_ref().map(|value| &value.provenance),
+        ),
+        (
+            "relative_scale",
+            entity
+                .relative_scale
+                .as_ref()
+                .map(|value| &value.provenance),
+        ),
+    ] {
+        record.insert(
+            field.to_owned(),
+            occurrence
+                .map(source_occurrence_value)
+                .unwrap_or(Value::Null),
+        );
+    }
+    Value::Object(record.into_iter().collect())
+}
+
+fn head_provenance_value(head: &SemanticHead) -> Value {
+    let mut record = BTreeMap::new();
+    match head {
+        SemanticHead::Primitive(term) => {
+            record.insert("kind".to_owned(), Value::String("primitive".to_owned()));
+            record.insert("provenance".to_owned(), term_provenance_value(term));
+        }
+        SemanticHead::MacroInvocation(head) => {
+            record.insert(
+                "kind".to_owned(),
+                Value::String("macro_invocation".to_owned()),
+            );
+            record.insert(
+                "source".to_owned(),
+                source_occurrence_value(&head.provenance.source),
+            );
+            record.insert(
+                "ordinal".to_owned(),
+                Value::Number(Number::from(head.provenance.ordinal)),
+            );
+            record.insert(
+                "qualified_name".to_owned(),
+                head.provenance
+                    .qualified_name
+                    .as_ref()
+                    .map(|value| Value::String(value.clone()))
+                    .unwrap_or(Value::Null),
+            );
+            record.insert(
+                "parameters".to_owned(),
+                Value::Array(
+                    head.parameters
+                        .iter()
+                        .map(|parameter| {
+                            let mut value = BTreeMap::new();
+                            value.insert("name".to_owned(), Value::String(parameter.name.clone()));
+                            value.insert(
+                                "source".to_owned(),
+                                source_occurrence_value(&parameter.provenance),
+                            );
+                            value.insert(
+                                "source_asset_id".to_owned(),
+                                parameter
+                                    .source_asset_id
+                                    .as_ref()
+                                    .map(|item| Value::String(item.clone()))
+                                    .unwrap_or(Value::Null),
+                            );
+                            value.insert(
+                                "canonical_surface_ja".to_owned(),
+                                parameter
+                                    .canonical_surface_ja
+                                    .as_ref()
+                                    .map(|item| Value::String(item.clone()))
+                                    .unwrap_or(Value::Null),
+                            );
+                            Value::Object(value.into_iter().collect())
+                        })
+                        .collect(),
+                ),
+            );
+        }
+    }
+    Value::Object(record.into_iter().collect())
+}
+
+fn term_provenance_value(term: &SemanticTerm) -> Value {
+    let provenance = &term.provenance;
+    let mut record = BTreeMap::new();
+    record.insert(
+        "source".to_owned(),
+        source_occurrence_value(&provenance.source),
+    );
+    record.insert(
+        "asset_id".to_owned(),
+        Value::String(provenance.asset_id.clone()),
+    );
+    record.insert(
+        "category_key".to_owned(),
+        Value::String(provenance.category_key.clone()),
+    );
+    record.insert(
+        "canonical_surface_ja".to_owned(),
+        Value::String(provenance.canonical_surface_ja.clone()),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn source_occurrence_value(occurrence: &SourceOccurrence) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert("span".to_owned(), source_span_value(occurrence.span));
+    record.insert(
+        "surface".to_owned(),
+        Value::String(occurrence.surface.clone()),
+    );
+    record.insert(
+        "language".to_owned(),
+        Value::String(occurrence.language.as_str().to_owned()),
+    );
+    record.insert(
+        "region_index".to_owned(),
+        Value::Number(Number::from(occurrence.region_index as u64)),
+    );
+    record.insert(
+        "clause_index".to_owned(),
+        Value::Number(Number::from(occurrence.clause_index as u64)),
+    );
+    record.insert(
+        "atom_index".to_owned(),
+        Value::Number(Number::from(occurrence.atom_index as u64)),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn source_span_value(span: SourceSpan) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "start_byte".to_owned(),
+        Value::Number(Number::from(span.start_byte as u64)),
+    );
+    record.insert(
+        "end_byte".to_owned(),
+        Value::Number(Number::from(span.end_byte as u64)),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+/// Canonical generated provenance for the complete returned expanded graph.
+pub fn expanded_generated_provenance_canonical_bytes(expansion: &MacroExpansionResult) -> Vec<u8> {
+    let mut root = BTreeMap::new();
+    root.insert(
+        "schema".to_owned(),
+        Value::String(EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID.to_owned()),
+    );
+    root.insert(
+        "invocations".to_owned(),
+        Value::Array(
+            expansion
+                .expanded
+                .iter()
+                .map(expanded_invocation_provenance_value)
+                .collect(),
+        ),
+    );
+    serde_json::to_vec(&root).expect("closed generated provenance values serialize")
+}
+
+fn expanded_invocation_provenance_value(invocation: &ExpandedMacroInvocation) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "provenance".to_owned(),
+        macro_invocation_provenance_value(&invocation.provenance),
+    );
+    record.insert(
+        "nodes".to_owned(),
+        Value::Array(
+            invocation
+                .nodes
+                .iter()
+                .map(generated_node_provenance_value)
+                .collect(),
+        ),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn generated_node_provenance_value(node: &ExpandedMacroNode) -> Value {
+    let mut record = BTreeMap::new();
+    let (kind, body) = match node {
+        ExpandedMacroNode::Emit { .. } => ("emit", None),
+        ExpandedMacroNode::Group { body, .. } => ("group", Some(body.as_slice())),
+        ExpandedMacroNode::Anchor { .. } => ("anchor", None),
+        ExpandedMacroNode::Relation { .. } => ("relation", None),
+        ExpandedMacroNode::Transform { body, .. } => ("transform", Some(body.as_slice())),
+    };
+    record.insert("kind".to_owned(), Value::String(kind.to_owned()));
+    record.insert(
+        "provenance".to_owned(),
+        generated_provenance_value(node.provenance()),
+    );
+    record.insert(
+        "body".to_owned(),
+        body.map(|nodes| Value::Array(nodes.iter().map(generated_node_provenance_value).collect()))
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn generated_provenance_value(provenance: &GeneratedNodeProvenance) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "invocation".to_owned(),
+        macro_invocation_provenance_value(&provenance.invocation),
+    );
+    record.insert(
+        "generated_ordinal".to_owned(),
+        Value::Number(Number::from(provenance.generated_ordinal)),
+    );
+    record.insert(
+        "expansion_path".to_owned(),
+        Value::Array(provenance.expansion_path.iter().map(path_value).collect()),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn macro_invocation_provenance_value(provenance: &crate::MacroInvocationProvenance) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "schema".to_owned(),
+        Value::String(provenance.schema_id.to_owned()),
+    );
+    record.insert(
+        "invocation_index".to_owned(),
+        Value::Number(Number::from(provenance.invocation_index as u64)),
+    );
+    record.insert(
+        "invocation_ordinal".to_owned(),
+        Value::Number(Number::from(provenance.invocation_ordinal)),
+    );
+    record.insert(
+        "source_span".to_owned(),
+        source_span_value(provenance.source_span),
+    );
+    for (field, value) in [
+        (
+            "definition_qualified_name",
+            provenance.definition_qualified_name.as_str(),
+        ),
+        ("definition_version", provenance.definition_version.as_str()),
+        (
+            "definition_full_digest",
+            provenance.definition_full_digest.as_str(),
+        ),
+        ("seed_scheme_id", provenance.seed_scheme_id),
+        ("seed_full_digest", provenance.seed_full_digest.as_str()),
+    ] {
+        record.insert(field.to_owned(), Value::String(value.to_owned()));
+    }
+    record.insert(
+        "resolved_seed".to_owned(),
+        Value::Number(Number::from(provenance.resolved_seed)),
+    );
+    record.insert(
+        "effective_composition_seed".to_owned(),
+        Value::Number(Number::from(provenance.effective_composition_seed)),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
 /// Canonical expanded meaning bytes with all display and provenance fields excluded.
 pub fn expanded_meaning_canonical_bytes(expansion: &MacroExpansionResult) -> Vec<u8> {
     let mut invocations = expansion
@@ -1974,7 +2469,7 @@ pub fn expanded_meaning_canonical_bytes(expansion: &MacroExpansionResult) -> Vec
     root.insert("invocations".to_owned(), Value::Array(invocations));
     root.insert(
         "schema".to_owned(),
-        Value::String("inku.expanded-macro-meaning.v1".to_owned()),
+        Value::String(EXPANDED_MACRO_MEANING_SCHEMA_ID.to_owned()),
     );
     serde_json::to_vec(&root).expect("closed expanded values serialize")
 }

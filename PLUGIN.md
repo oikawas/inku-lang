@@ -1,176 +1,105 @@
-# inku Plugin Guide
+# inku Vocabulary Plugin Authoring Guide
 
-inku keeps the drawing pipeline small and treats optional behavior as plugins.
-The first reference plugin is `canvas-aspect`, which changes the SVG canvas
-aspect ratio without changing the Stage 1/Stage 2 DDL or JSON Score contract.
+In inku, a plugin is a data-only vocabulary macro. A visible qualified term
+such as `Nature.雨` invokes one versioned `inku.macro-definition.v1` definition,
+which expands into ordinary typed core meaning. A plugin is not executable
+code, a parser extension, or a renderer hook.
 
-## Current Architecture
+Canvas selection is a host option owned by
+`inku.canvas-format-registry.v1`, not a plugin. A Render Engine Pack is a
+separate replacement for the drawing core. The normative plugin boundary is
+[SPEC §4](SPEC.md#4-plugin-model).
 
-The plugin system currently has one hook:
+## Definition Format
 
-```text
-canvas-size hook
-  UI plugin button -> per-user plugin storage -> API request field -> renderer canvas size
-                   -> aspect-aware placeholder before the next render
-```
+A definition has exactly these top-level fields:
 
-Core code owns authentication, DDL generation, JSON Score validation, history,
-and SVG rendering.  A plugin should provide a narrow option surface and pass its
-state through the hook.  This keeps the core schema stable while allowing
-extensions to affect rendering.
+- `schema`: exactly `inku.macro-definition.v1`
+- `namespace` and `heading`: together form the visible
+  `Namespace.Heading` name
+- `version`: the definition version locked with its canonical digest
+- `parameters`: a closed map of typed input schemas
+- `components`: definition-local reusable components
+- `body`: the bounded, data-only statement list
 
-## Reference Plugin: canvas-aspect
+Parameter schemas are closed to `number`, `integer`, `boolean`, fixed-length
+`list`, and `semantic_ref`. Expressions are closed to typed number, integer,
+boolean, list, parameter, local, and semantic-reference forms. Unknown fields,
+types, expressions, operators, and semantic references are rejected.
 
-Files:
+The body may use `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`,
+typed `transform`, and deterministic bounded `vary`; `components` are local to
+the same definition. A definition cannot contain arbitrary code, I/O,
+filesystem, network, clock, or environment access, recursion or component
+cycles, external macro dependencies, raw SVG or Score data, Renderer
+instructions, or plugin-specific parsers, grammars, or renderers.
 
-```text
-server/src/inku_server/plugins/__init__.py
-server/src/inku_server/plugins/system/canvas_aspect/__init__.py
-server/src/inku_server/plugins/user/__init__.py
-web/src/lib/plugins/system/canvas-aspect/index.ts
-web/src/lib/plugins/user/README.md
-web/src/lib/components/CanvasAspectPlugin.svelte
-```
-
-System plugins and user plugins are separated by directory.  Each plugin owns a
-dedicated directory:
-
-```text
-server/src/inku_server/plugins/
-  __init__.py                    # stable registry / re-export surface
-  system/
-    canvas_aspect/
-      __init__.py                # bundled canvas-aspect hook implementation
-  user/
-    __init__.py                  # reserved namespace for future user plugins
-
-web/src/lib/plugins/
-  system/
-    canvas-aspect/
-      index.ts                   # bundled canvas-aspect UI data/helpers
-  user/
-    README.md                    # reserved location for future user plugins
-```
-
-System plugins are shipped with inku and may be used by the reference UI.
-User plugins are reserved for locally installed or third-party extensions; the
-runtime loader is not implemented yet.
-
-The plugin supports these aspect identifiers:
-
-| Category | ID | Ratio | Purpose |
-| --- | --- | --- | --- |
-| Basic | `square` | 1:1 | Default ordered square canvas |
-| Standard | `golden` | 1.618:1 | Golden-ratio rectangle |
-| Modern | `a4` | 1:1.414 | Root rectangle / print standard |
-| Modern | `b4` | 1:1.414 | Root rectangle / print standard |
-| Classic JP | `pillar` | 1:5 | Tall Japanese pillar-picture format |
-| Ukiyoe | `oban` | 2:3 | Ukiyo-e oban proportion |
-| Cinema | `wide` | 2.35:1 | Cinematic panorama |
-| Classic JP | `byobu` | 2.2:1 | Japanese folding screen format based on one half of a six-panel pair |
-| Mobile | `vertical` | 9:16 | Smartphone vertical format |
-
-
-## Reference Plugin: Nature
-
-`Nature` is the v1.70 reference vocabulary plugin. It is not a runtime-loaded
-third-party plugin; it is a bundled Stage 1.5 macro that demonstrates the
-plugin principles for phenomenon-driven motion.
-
-Supported terms:
-
-| Term | Expansion intent |
-| --- | --- |
-| `Nature.風` / `Nature.wind` | Slow left-to-right wind-like sway |
-| `Nature.うねり` / `Nature.undulation` | Broad medium-independent undulation |
-| `Nature.無風` / `Nature.stillness` | Suppress variation and placement paths |
-
-The macro fires only when the `Nature.` namespace is explicit. Plain words such
-as wind, wave, 風, or うねり remain ordinary author language and do not invoke
-the plugin. The expansion emits ordinary DDL that Stage 2 maps to existing
-`variation` and `arrangement` fields. It does not add primitives, Score fields,
-renderer hooks, or coerce rules.
-
-The v1.70 result answers the open freedom question conservatively: the reference
-Nature behavior was expressible as a vocabulary macro, so the plugin principles
-do not need to be relaxed.
-
-## User Storage
-
-Each user has a JSON plugin extension field in the server DB:
+This is the smallest accepted definition:
 
 ```json
 {
-  "canvas-aspect": {
-    "selected": "golden"
-  }
+  "schema": "inku.macro-definition.v1",
+  "namespace": "Example",
+  "heading": "QuietMark",
+  "version": "1.0.0",
+  "parameters": {},
+  "components": {},
+  "body": []
 }
 ```
 
-API endpoints:
+## Resolution, Expansion, and LLM Boundary
 
-```text
-GET /api/auth/me/plugin-storage
-PUT /api/auth/me/plugin-storage
-PUT /api/auth/me/plugin-storage/{plugin_id}
-```
+The compiler resolves an explicit qualified invocation against a sidecar lock.
+The lock attests the definition name, version, canonical digest, document and
+compiler identity, and the source and generated provenance needed to reproduce
+the expansion. Expansion binds typed parameters and uses the attested
+composition seed plus caller-owned finite bounds. It is effect-free and
+deterministic, and its output rejoins ordinary typed lowering.
 
-The storage object is intentionally generic.  Plugin IDs must be short,
-non-empty strings using alphanumeric characters plus `-`, `_`, or `.`.  Values
-must be JSON objects, and total storage is size-limited.
+For a Description request, Stage 1 may receive only a bounded signature,
+parameter schema, and short summary. It never receives the definition body or
+expanded DDL. Direct DDL with an unknown or ambiguous qualified term fails
+explicitly; it does not trigger a hidden LLM fallback.
 
-## Renderer Contract
+## Geometry and Count Boundary
 
-The renderer receives `canvas_aspect` from `/api/paint`, `/api/compose`, and
-history replay/save paths.  The canvas-size hook changes SVG `width`, `height`,
-and `viewBox`.
+Macros emit typed core meaning rather than final geometry. Size has three
+distinct authorities: unspecified, explicit qualitative, and explicit numeric
+geometry. Explicit normal is not unspecified. Position likewise distinguishes
+named center, a qualitative region, and an exact numeric coordinate. On a
+non-square canvas, X is a fraction of width and Y of height; isotropic size uses
+its allocation or the short side, so circles remain circular and ellipse aspect
+is preserved. `(0.0,0.0)` is top-left, `(1.0,1.0)` is bottom-right, and
+`(0.5,0.5)` is exact center.
 
-Normalized coordinates remain `0.0-1.0`:
+The exact canonical primitive set is `line`, `circle`, `ellipse`, `triangle`,
+`square`, `polygon`, `arc`, and `cloudform`. Geometry is resolved only by the
+single `inku-ddl` owner identified as `inku.geometry-resolution-policy.v1`;
+plugins cannot add another owner or a ninth primitive. Exact counts remain
+lossless symbolic intent until the Step 11 pure ceiling passes before any
+O(count) allocation or materialization.
 
-```text
-x -> canvas width
-y -> canvas height
-circle radius / arc radius -> shorter canvas side
-ellipse / rectangle size -> canvas width and height
-```
+## Current Implementation Status
 
-This avoids stretching circles into ellipses when a wide or vertical canvas is
-selected.
+The shared Rust compiler foundation can parse, validate, identify, lock, bind,
+and deterministically expand MacroDefinition v1 values. Production runtime
+integration, an installable package catalog, preview, legacy cutover, and a
+general user-package loader are not complete. This guide therefore does not
+claim that arbitrary packages can currently be installed or loaded.
 
-## UI Contract
+`Nature` and `Bamboo` are future or explanatory reference-vocabulary names,
+not installed packages or entries in an official registry. The v1.70
+hard-coded Nature expansion and legacy `.inku-plugin.md` / `fires_on` fixtures
+are not the current authoring format.
 
-The plugin invocation button is placed in the prompt header before model
-selection.  A plugin UI should live in its own Svelte component and should not
-embed large behavior directly in `+page.svelte`.
+The current `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias,
+system/user plugin directories, and plugin status or enable controls are
+compatibility surfaces while retirement remains unfinished. They are not an
+authoring or loading API for vocabulary macros.
 
-When a user selects a new canvas aspect, the current rendered SVG is cleared and
-the drawing panel returns to an aspect-aware placeholder.  This avoids showing a
-previous square or wide render under a newly selected canvas setting.  The next
-paint/compose request then renders with the selected `canvas_aspect`.
-
-The canvas display reads the actual SVG `viewBox` when possible, so old history
-items keep their original aspect ratio even after the current plugin setting is
-changed.
-
-The drawing status bar also exposes the active canvas aspect.  For a fresh
-render it displays the current `canvas-aspect` selection; for history display it
-prefers the saved JSON Score `canvas` value, so the user can see which canvas
-type produced that item.  Export controls stay separate from this context
-display and use compact download icons for SVG / PNG actions.
-
-## Adding Another Hook
-
-Future hooks should follow the same shape:
-
-1. Add the server implementation under `server/src/inku_server/plugins/system/<plugin_name>/` or `server/src/inku_server/plugins/user/<plugin_name>/`.
-2. Re-export the stable hook surface from `server/src/inku_server/plugins/__init__.py` when core API or renderer code needs it.
-3. Add the frontend module under `web/src/lib/plugins/system/<plugin-id>/` or `web/src/lib/plugins/user/<plugin-id>/`.
-4. Add a component under `web/src/lib/components/` only for the visible plugin UI.
-5. Store user choices under `/api/auth/me/plugin-storage/{plugin_id}`.
-6. Pass only the needed hook value into the core API or renderer.
-7. Document the hook contract in this file.
-
-For example, a future natural-primitive plugin such as `leaf` should first
-define whether it extends JSON Score, Stage 2 composition, or only the SVG
-renderer.  If it changes the score schema, it needs a stricter compatibility
-plan than the canvas-size hook.
+A compatibility importer reports `legacy_plugin_format` and returns a
+per-macro `Imported` or `Omitted` outcome. Existing works prefer their stored
+Score or expanded artifact. An omitted macro without such an artifact must not
+silently render partially, fall back to the old expander forever, or become a
+different figure.

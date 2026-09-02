@@ -352,23 +352,23 @@ is shorthand, not a new capability.
 
 The canonical owner of Canvas is the shared-core `inku.canvas-format-registry.v1`, not a vocabulary plugin or a system plugin. Canvas selection is a resolved host option outside visible DDL and MacroInvocation / MacroDefinition. The same DDL can be used on different canvases. A host boundary with no selection may choose `square` as its host default, but that does not mean the DDL compiler inserts `square` as a semantic fact. The host carries the selection through Score / render context / history, and the Renderer resolves SVG `width`, `height`, and `viewBox` (§19).
 
-The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, and stored `Score.canvas` / `render_canvas_aspect*` are read compatibility, not semantic authority. Retirement of system-plugin status / enable toggles and the runtime cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls are read-compatibility surfaces, not semantic authority or a new authoring / loading API. Their retirement and the runtime / UI cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
 
 ### 4.5 Expansion Through MacroDefinition
 
-A vocabulary plugin is a data-only macro that gives a name to a combination of core vocabulary. A visible invocation uses `namespace.heading`, as in `Nature.雨`; definition version / digest and document / compiler identity are stored in a sidecar lock rather than authored as DDL metadata.
+A vocabulary plugin is a data-only macro that gives a name to a combination of core vocabulary. A visible invocation uses `Namespace.Heading`, as in `Nature.雨`; definition version / canonical digest, document / compiler identity, and source / generated provenance are stored in a sidecar lock rather than authored as DDL metadata.
 
-Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds typed parameters, then performs late expansion without an LLM into semantic nodes from an explicit composition seed and caller-owned finite bounds. The Renderer does not understand plugins; it receives only the later ordinary Score. MacroDefinition bodies and large expansion results are not sent to Stage 1 or Stage 2 prompts.
+Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is an explicit error, not a hidden LLM fallback.
 
 At this boundary the Renderer needs to know only core meaning, while a plugin cannot add primitives or syntax or rewrite core semantics. Plugins cannot depend on other plugins, so installation and removal remain independent.
 
 ### 4.6 Generic MacroDefinition v1
 
-`inku.macro-definition.v1` has closed typed parameters and the shared operators `component`, `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, `transform`, and deterministic `vary`. It forbids arbitrary code, unbounded loops / recursion, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with typed provenance from caller-supplied seeds and explicit bounds.
+`inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
 
 The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
-Old system / user plugin directories, hot reload, plugin-status APIs, and preview operations are not current mandatory specification. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is not the authority for the current authoring format; cleaning up that file is separate from this SPEC correction.
+The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion, but production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader are incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
 ### 4.7 Separation From the Render Engine Pack
 
@@ -416,19 +416,13 @@ exist.  A plugin should have the same property.
 It does not add a feature.  It gives a name to a combination that is already
 there.  That is what a plugin is for.
 
-### 4.9 Official Reference Plugins
+### 4.9 Reference Vocabulary Names
 
-DDL's stance on the split between "official" and "unofficial" plugins:
-
-**The approach: provide only a few official reference plugins.**  A handful —
-Nature, Bamboo — are offered as worked examples of how a plugin is written.
-Anything else users write freely, and there is no official registry.
-
-**What that buys:**
-- the manner of writing a plugin is shown by example
-- the burden of official review is avoided
-- users can read a reference implementation and write their own
-- the core team stays on the core
+`Nature` and `Bamboo` are future or explanatory reference-vocabulary names.
+They are not claimed to be runtime-loaded packages, installed packages, or
+entries in an official registry. Any future reference definition must use the
+same MacroDefinition v1 schema and ordinary lock / expansion boundary, with no
+plugin-specific execution path.
 
 ### 4.10 Namespace Convention
 
@@ -445,13 +439,13 @@ So that:
 - where a plugin is used is evident from the description
 - words of the same name do not collide (`Nature.雨` and `Weather.雨` stay
   distinct)
-- Saijiki can display plugin words in categories of their own
+- a future package / catalog implementation can display Saijiki words by namespace
 
-### 4.11 The Final Judgment on Freedom Is Reserved
+### 4.11 The Boundary of Freedom
 
-The principles above push hard toward "a plugin is limited to a macro over
-vocabulary."  **The final extent of that freedom, however, is decided by
-implementation and testing.**
+The current canon is that a plugin is limited to a macro over vocabulary.
+Widening that freedom requires a separate author ruling, schema / version, and
+compatibility design; nothing is added implicitly to MacroDefinition v1.
 
 #### Accounting for the form "touching" (v1.90.0)
 
@@ -466,7 +460,7 @@ implementation and testing.**
   uniformity is gone.  The cost is judged smaller than the expressive absence of
   being unable to write a closed form.
 
-Questions still to be answered:
+Questions any future proposal to change this boundary must answer:
 
 - how far meaningful expression reaches with core primitives alone
 - whether limiting plugins to vocabulary macros still expresses concrete worlds
@@ -475,8 +469,9 @@ Questions still to be answered:
   enough
 
 **Even when a principle is relaxed, keep an explicit line that avoids becoming
-Emacs.**  When freedom is increased, decide only after stating what that freedom
-takes away.
+Emacs.** When freedom is increased, decide only after stating what that freedom
+takes away and giving the change a separately ruled schema / version and
+compatibility boundary.
 
 ---
 
@@ -2187,8 +2182,11 @@ and by `arrangement` (layout / path / jitter).
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
-Sway that comes from a natural phenomenon is provided as a Nature plugin. The
-writer does not write sway parameters; the writer **calls the phenomenon**.
+Sway from a natural phenomenon can be represented by a future or explanatory
+Nature vocabulary definition. The writer does not write internal parameters or
+Score fields; the writer **calls the phenomenon through a visible qualified
+term**. `Nature` here does not imply an installed package, runtime loader, or
+official registry.
 
 **Basic form:**
 
@@ -2207,7 +2205,7 @@ Nature.うねりを かける
 "Let the wind through", "run a swell through it" — a natural phenomenon can be
 woven into the description as a verb. It reads close to the way a tanka reads.
 
-**Representative Nature plugins (candidates for reference implementation):**
+**Reference-vocabulary candidates:**
 
 - `Nature.風` (wind): a slow horizontal wave
 - `Nature.うねり` (swell): fine waveforms superimposed
@@ -2215,26 +2213,29 @@ woven into the description as a verb. It reads close to the way a tanka reads.
 - `Nature.震え` (tremble): small high-frequency oscillation
 - `Nature.無風` (no wind): sway suppressed, including the material's own
 
-**An example of macro expansion:**
+**Conceptual expansion through MacroDefinition v1:**
 
 ```
-Nature.風, conceptually, expands to:
-  for every line and form
-  a gentle horizontal wave
-  amplitude: 2-5% of the drawn object's size
-  frequency: 1-2 cycles across the canvas width
-  shape: Perlin noise
+Nature.風 (inku.macro-definition.v1):
+  bind closed typed parameters
+  use group / bounded repeat / typed transform / deterministic bounded vary
+  emit core variation / arrangement meaning
+  rejoin ordinary typed lowering
 ```
 
-Expansion is only a writing-down into core vocabulary. Following the plugin
-principles, it does not change any core mechanism.
+A definition does not write raw Score `variation` / `arrangement` fields,
+Renderer instructions, or a noise algorithm. Expansion only writes down core
+meaning and follows §4's lock, composition seed, finite bounds, and source /
+generated provenance.
 
 **Legacy compatibility:** the v1.70 reference implementation expanded
 `Nature.風` / `Nature.うねり` / `Nature.無風` through hard-coded Stage 1.5 logic,
-but that is not the semantic canon for new work. New definitions and expansion
-follow the `inku.macro-definition.v1` boundary in §4.5–§4.6. Old works prefer
-their stored Score / expanded artifact; the old hard-coded expander is not a
-permanent fallback. The plugin principles in §4.3 are not relaxed for them.
+but that is neither the semantic canon for new work nor a current package. New
+definitions and expansion follow the `inku.macro-definition.v1` boundary in
+§4.5–§4.6. Old works prefer their stored Score / expanded artifact; the old
+hard-coded expander is not a permanent fallback. An omission with no artifact
+must not become a silent partial render or a different figure. The plugin
+principles in §4.3 are not relaxed for them.
 
 ### 13.8 Sway Is Generated in the Renderer
 
@@ -2385,8 +2386,15 @@ expanded marks never consulted a declared coordinate**.
 
 #### How a stated count is treated (v2.7.6)
 
-A count written in plain words in the description is stronger than anything
-inferred downstream.
+In canonical meaning, a stated count remains lossless symbolic intent. The Step
+11 pure ceiling preflight runs before expansion, allocation, or any other
+O(count) materialization. Even a value such as `u32::MAX` is not clamped or
+silently rewritten to a representative count; rejection performs zero
+allocation and zero materialization.
+
+The following records compatibility behavior in the existing Score / coerce
+path. It does not redefine the symbolic intent above, and the runtime state
+before the Step 11 cutover is not the new semantic canon.
 
 | Request | Treatment |
 |---|---|
@@ -3021,7 +3029,7 @@ Important score concepts:
 
 - `canvas`: selected canvas aspect identifier, such as `square` or `golden`
 - `instructions`: ordered drawing instructions
-- primitive fields: line, circle, ellipse, triangle, square, polygon, arc, cloudform, and related process data
+- primitive fields: the canonical exact eight, line, circle, ellipse, triangle, square, polygon, arc, and cloudform, plus related process data. `rectangle` is not a ninth primitive and requires a separate author ruling and schema / version before it can be added
 - `weight`: material / tool quality
 - `variation`: visible wobble, blur, tremble, or motion behavior
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
@@ -3031,24 +3039,37 @@ Important score concepts:
 - `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
 - `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; a touching relation pins both endpoints
 
-A count the description states outright outranks any later reading of it. Below
-the threshold (240 by default) the count is literal: the requested value is used
-unchanged. At the threshold and above it is represented by a count of 80-120 plus
-`arrangement.density`, `cluster_count`, `fade`, and `preserve_space`, so that
-negative space remains part of the composition. The threshold matches
-`max_expanded_per_instruction`; raising it alone to 300 would leave 241-299
-defined as literal and yet cut at 240, so normalization forces them into
-agreement. **A number the description states is drawn as stated up to the
-threshold of its configuration: at the defaults, two hundred thirty-three strokes
-are two hundred thirty-three. The threshold is recorded on the work** (v2.10.0).
+A count the description states outright outranks any later reading of it.
+Canonical meaning keeps the value as lossless symbolic intent. The Step 11 pure
+ceiling preflight runs before expansion, allocation, or any other O(count)
+materialization. A value such as `u32::MAX` is neither clamped nor silently
+rewritten to a representative count; rejection performs zero allocation and
+zero materialization. Threshold and representation behavior remaining in the
+current runtime is compatibility behavior, not semantic authority to change the
+canonical count into another value.
 
-A size the description states outranks the default. A mark handed over with an empty radius
-or size is filled from the dimension that word answers -- 0.038 for a circle,
-`[0.06, 0.032]` for an ellipse, or the value itself where the clause states one -- but only
-where the clause naming that primitive carries a size word. **Where two clauses name it,
-nothing is filled**: the description does not say which mark it is talking about. **A size the
-model stated is never overwritten**, and a description that states no size keeps the default
-answer (v2.13.17, ddl engine 16).
+**Size has three authorities.** Unspecified, explicit qualitative, and explicit
+numeric geometry remain distinct. Composition decides an unspecified normal
+from canvas, count, placement, typed role, and the attested composition seed.
+Explicit qualitative size applies a shared, versioned relative factor for small
+and large against that normal; an explicit "normal size" is not folded into
+unspecified. On the Description path, Stage 1 normalizes surface intensifiers
+such as "quite", "very", and their language-specific equivalents into a finite,
+language-independent intensity class, and the deterministic compiler decides
+the dimension. An unknown or ambiguous degree in direct DDL is an explicit
+error, never a hidden LLM completion.
+
+Explicit numeric geometry retains dimension, basis, canonical base-10
+coefficient / scale, and source-spelling provenance. Conversion to Score `f64`
+happens at one deterministic lowering boundary only, with no silent clamp or
+rescale. The old circle `0.038` and ellipse `[0.06, 0.032]` values are only past
+calibration / compatibility evidence, not a universal normal or the final size
+rule.
+
+The single canonical owner for resolving size and position is `inku-ddl`; its
+identity / digest is `inku.geometry-resolution-policy.v1`. The compiler lock
+references and attests that identity / digest, while `ddl_engine_version` is
+activation metadata only. There is no `size_rule_version` or second owner.
 
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
@@ -3101,9 +3122,23 @@ Canvas selection is not visible-DDL or macro meaning. It is a host option resolv
 
 A host boundary with no selection may choose `square` as its host default, but the DDL compiler does not insert `square` as a semantic fact. The host carries the resolved selection through Score / render context / history, and the Renderer chooses SVG `width`, `height`, and `viewBox`. If Stage 2 receives canvas through the current compatibility path, that value is host-resolved composition context rather than visible-DDL metadata.
 
-The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, and stored `Score.canvas` / `render_canvas_aspect*` remain as read compatibility. Retirement of system-plugin status / enable toggles and the runtime cutover belong to a later Step; this section does not claim they are complete. In the current UI, changing the aspect clears the rendered display for a placeholder but retains the displayed work as lineage context, and the next saved work may be recorded as its child with `canvas_aspect_change`.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as read compatibility. They are not the new plugin-authoring model. Retirement and the runtime / UI cutover belong to a later Step; this section does not claim they are complete. In the current UI, changing the aspect clears the rendered display for a placeholder but retains the displayed work as lineage context, and the next saved work may be recorded as its child with `canvas_aspect_change`.
 
-Coordinates stay normalized from `0.0` to `1.0`. Mark extent (`size`), circle and arc radii, `radial` rings, `at.region` extent, cluster bands, and a path's cross-axis spread become pixels through the short edge so the canvas ratio does not distort the described shape. Placement, region centers, and cluster centers scale with width and height; path travel (`margin` / `span`) and `arrangement.margin` remain fractions of their axes.
+Position coordinates remain normalized from `0.0` to `1.0`: X is a fraction of
+canvas width and Y is a fraction of canvas height. Top-left is `(0.0,0.0)`,
+bottom-right is `(1.0,1.0)`, and exact center is `(0.5,0.5)`. Named center, a
+qualitative region, and an exact numeric coordinate are separate authorities.
+An exact coordinate is not a Stage 1.5 focus target and is never silently moved,
+clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
+extent clips the canvas are separate matters.
+
+Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
+cluster bands, and a path's cross-axis spread become pixels from their allocation
+or the short edge. Circles remain aspect-correct and ellipses retain their stated
+aspect. Placement, region centers, and cluster centers scale with width and
+height; path travel (`margin` / `span`) and `arrangement.margin` remain fractions
+of their axes. This decision follows the single
+`inku.geometry-resolution-policy.v1` owner in §18.
 
 ### The Resolution of a Number (the Master Grid)
 

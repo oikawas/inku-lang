@@ -187,23 +187,23 @@ DDLが短歌を目指すなら、**Go 寄りの姿勢**が合う。短歌に「�
 
 Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。
 
-現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`はread compatibilityであり、semantic authorityではない。System plugin status / enable toggleのretirementとruntime cutoverは後続Stepの責務で、本節は実装済みと偽装しない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはread compatibility surfaceであり、semantic authorityでも新規authoring / loading APIでもない。これらのretirementとruntime / UI cutoverは後続Stepの責務で、本節は実装済みと偽装しない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
 
 ### 4.5 MacroDefinitionによる展開モデル
 
-語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`Nature.雨`のような`namespace.heading`とし、definition version / digestとdocument / compiler identityはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
+語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`Nature.雨`のような`Namespace.Heading`とし、definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
 
-全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、typed parameterをbindingした後、explicit composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionする。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。MacroDefinition本文や大量の展開結果をStage 1 / Stage 2 promptへ渡さない。
+全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わず、明示errorにする。
 
 この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
 ### 4.6 Generic MacroDefinition v1
 
-`inku.macro-definition.v1`はclosed typed parameterと共通operator `component` / `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / `transform` / deterministic `vary`を持つ。任意code、無制限loop / recursion、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、caller-supplied seedと明示boundsから決定的なsemantic nodeとtyped provenanceを返す。
+`inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
 旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
-旧system / user plugin directory、hot reload、plugin status API、preview等の運用詳細は現行必須仕様ではない。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は現行作成手順のauthorityではなく、その本文の整理は本SPEC補正とは別taskである。
+Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionまで存在するが、production runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
 ### 4.7 Render Engine Pack との分離
 
@@ -240,19 +240,9 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 新機能を足すのではなく、既存の組み合わせに名前を与える。それがプラグインの役割。
 
-### 4.9 公式 Reference Plugins
+### 4.9 Reference vocabulary names
 
-「公式」と「非公式」のプラグインを分ける問題への DDL の姿勢：
-
-**方針: 公式 reference plugins を数個だけ用意する**
-
-Nature、Bamboo など、数個の公式プラグインを「プラグインの書き方の手本」として提供する。それ以外はユーザーが自由に作れるが、公式レジストリは持たない。
-
-**利点:**
-- プラグインの作法が手本で示される
-- 公式レビューの負担を避けられる
-- ユーザーは参考実装を読んで自分のプラグインを書ける
-- コアチームはコアに集中できる
+`Nature`、`Bamboo`は将来または説明用のreference vocabulary名である。現存するruntime-loaded package、install済みpackage、公式registry entryとは主張しない。将来reference definitionを提供する場合も、同じMacroDefinition v1 schemaと通常のlock / expansion境界に従い、plugin固有の実行経路を持たない。
 
 ### 4.10 名前空間の規約
 
@@ -268,23 +258,23 @@ Seasons.桜
 これにより：
 - プラグイン使用箇所が記述から明らかになる
 - 同名語彙の衝突を防ぐ（Nature.雨 と Weather.雨 は別物として扱える）
-- 歳時記（Saijiki）でもプラグイン別にカテゴリを分けて表示できる
+- 将来のpackage / catalog実装では歳時記（Saijiki）を名前空間別に表示できる
 
-### 4.11 自由度に関する最終判断の留保
+### 4.11 自由度の境界
 
-上記の原則は「プラグインは語彙のマクロに限定する」を強く推している。しかし、**最終的な自由度の範囲は、実装とテストを経て決める**。
+現行canonは「プラグインは語彙のマクロに限定する」である。自由度を広げるには別の作者裁定、schema / version、互換性設計が必要で、MacroDefinition v1へ暗黙に追加しない。
 
 #### 「触れる」の形式の会計（v1.90.0）
 
 - **得るもの:** 二つの弧が両端で接する木の葉形（vesica）のような閉じた有機的輪郭を、座標を楽譜へ凍結せず、位置・傾きの演奏揺らぎを保ったまま書ける。素描で現れた「閉じるがスタンプになる／変わるが割れる」という二律背反を、一つの観察可能な関係語で解消する。
 - **失うもの:** あいだへ初めて端点一致という正確な拘束を入れる。既存の距離範囲を演奏が解決する緩い関係だけで構成された族の均質性は失われる。この対価は、閉形を書けない表現上の欠落より小さいと判断する。
 
-検証すべき問い：
+将来この境界を変更するproposalが検証すべき問い：
 - コアのプリミティブだけでどこまで意味のある表現ができるか
 - プラグインを語彙マクロに限定しても、Nature や Bamboo のような具象世界を十分表現できるか
 - 拡張のニーズが「マクロでは足りない」ことを示した場合、原則をどこまで緩めるか
 
-**原則を緩める場合も、Emacs 化を避けるための明確な線引きを維持する**。自由度を増やすときは、その自由度が失わせるものを明示した上で判断する。
+**原則を緩める場合も、Emacs 化を避けるための明確な線引きを維持する**。自由度を増やすときは、その自由度が失わせるものを明示し、別のschema / versionと互換性境界を作者裁定してから判断する。
 
 ---
 
@@ -1434,7 +1424,7 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
-自然現象の揺らぎは Nature plugin として提供する。記述者は揺らぎのパラメータを書くのではなく、**現象を呼び出す**。
+自然現象の揺らぎは、将来または説明用のNature vocabulary definitionで表せる。記述者は揺らぎの内部parameterやScore fieldを書くのではなく、**visible qualified termで現象を呼び出す**。ここでの`Nature`はinstalled package、runtime loader、公式registryの存在を意味しない。
 
 **基本形:**
 
@@ -1452,7 +1442,7 @@ Nature.うねりを かける
 
 「風を通す」「うねりを通す」は動詞として自然現象を記述に織り込める。短歌の読み心地に近い。
 
-**代表的な Nature plugins（参考実装候補）:**
+**Reference vocabulary候補:**
 
 - `Nature.風`: 横方向のゆるやかな波
 - `Nature.うねり`: 細かい波形の重畳
@@ -1460,20 +1450,19 @@ Nature.うねりを かける
 - `Nature.震え`: 高周波の小さな揺動
 - `Nature.無風`: 揺らぎを抑制（素材固有揺らぎも消す）
 
-**マクロ展開の例:**
+**MacroDefinition v1による概念展開:**
 
 ```
-Nature.風 の展開（概念）:
-  全ての線と形に対して
-  水平方向の緩やかな波
-  振幅: 描画対象サイズの 2-5%
-  周波数: 画面幅あたり 1-2 周期
-  形状: パーリンノイズ
+Nature.風（inku.macro-definition.v1）:
+  closed typed parameterをbindingする
+  group / bounded repeat / typed transform / deterministic bounded varyで
+  coreのvariation / arrangement meaningをemitする
+  通常のtyped loweringへ合流する
 ```
 
-展開はコア語彙への writing-down のみであり、プラグイン原則に従い、コアのメカニズムは変更しない。
+Definitionはraw Score `variation` / `arrangement` field、renderer命令、noise algorithmを直接書かない。展開はcore meaningへのwriting-downだけであり、§4のlock、composition seed、finite bound、source / generated provenanceに従う。
 
-**Legacy compatibility:** v1.70の参照実装は `Nature.風` / `Nature.うねり` / `Nature.無風` をStage 1.5のhard-coded logicで展開したが、これは新規semantic canonではない。新規definitionとexpansionは§4.5〜§4.6の`inku.macro-definition.v1`境界へ従う。旧作品は保存Score / expanded artifactを優先し、旧hard-coded expanderを恒久fallbackにしない。§4.3のplugin原則は緩めない。
+**Legacy compatibility:** v1.70の参照実装は `Nature.風` / `Nature.うねり` / `Nature.無風` をStage 1.5のhard-coded logicで展開したが、これは新規semantic canonでも現存packageでもない。新規definitionとexpansionは§4.5〜§4.6の`inku.macro-definition.v1`境界へ従う。旧作品は保存Score / expanded artifactを優先し、旧hard-coded expanderを恒久fallbackにしない。Artifactのないomissionをsilent partial renderや別図形へ変えない。§4.3のplugin原則は緩めない。
 
 ### 13.8 Renderer での揺らぎ生成
 
@@ -1592,7 +1581,9 @@ engine 19 まではどの layout も置き場所を seed から決めており�
 
 #### 明示された個数の扱い（v2.7.6）
 
-記述に平文で書かれた個数は、下流の推測より強い。
+Canonical meaningでは、記述に明示された個数をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightを、展開、配列確保、またはその他のO(count) materializationより前に適用する。`u32::MAX`等の巨大な値もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。
+
+以下は既存Score / coerce経路のcompatibility behaviorを記録したもので、上のsymbolic intentを再定義しない。Step 11 cutover前のruntime状態を新規semantic canonと取り違えない。
 
 | 要求 | 扱い |
 |---|---|
@@ -1929,7 +1920,7 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 - `canvas`: 選ばれたキャンバス比の識別子（`square`・`golden` など）
 - `instructions`: 順序を持つ描画命令
-- primitive のフィールド: line・circle・ellipse・triangle・square・polygon・arc・cloudform と関連する処理データ
+- primitive のフィールド: canonical exact 8であるline・circle・ellipse・triangle・square・polygon・arc・cloudformと関連する処理データ。`rectangle`は9番目のprimitiveではなく、別の作者裁定とschema / versionなしに追加しない
 - `weight`: 素材／道具の質
 - `variation`: 目に見える揺れ・にじみ・震え・運動の挙動
 - `arrangement`: 個数・分布・経路・グループ化・密度・減衰・色循環
@@ -1939,9 +1930,13 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 - `at.region`: 任意の正規化された配置領域 `[x0,y0,x1,y1]`。renderer の seed が解決する
 - `relation`: 直前の命令に対する任意の観察可能な関係 — `along`・`not_touching`・`cutting`・`between`・`touching`。触れる関係は両端点を固定する
 
-**記述が明示した個数は、その後のいかなる読み取りより優先する。** 閾値（既定 240）未満では個数は文字どおりで、要求された値をそのまま使う。閾値以上では 80〜120 の個数と `arrangement.density`・`cluster_count`・`fade`・`preserve_space` で表し、余白が構図の一部であり続けるようにする。しきい値は `max_expanded_per_instruction` に一致させてある — 閾値だけを 300 へ上げると 241〜299 が「文字どおり」と定義されながら 240 で切られることになるので、正規化が整合を強制する。**記述が述べた数は、その構成の閾値まではそのまま描かれる。既定では 233 本の線は 233 本である。閾値は作品に記録される**（v2.10.0）。
+**記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**記述が述べた大きさは、既定より優先する。** 半径や寸法が空欄のまま渡された痕は、その primitive を名指す句が大きさの語を持つときにかぎり、その語が答える寸法で埋める（円 0.038・楕円 `[0.06, 0.032]`。句が値そのものを述べていればその値を使う）。**名指す句が 2 つ以上あるときは埋めない** — 記述がどちらの痕の話をしているかを述べていないからである。**明示された寸法は上書きしない。**大きさを述べていない記述の答えは既定のままである（v2.13.17・ddl engine 16）。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。Unspecifiedのnormalはcanvas、count、placement、typed role、attested composition seedからcompositionが決める。Explicit qualitativeはnormalに対してsmall / large共通のversioned relative factorを適用し、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Description pathのStage 1 LLMは「かなり」「とても」「すごく」「めちゃくちゃ」「めっちゃ」「すげー」等の表層を有限でlanguage-independentなintensity classへ正規化し、deterministic compilerが寸法を決める。Direct DDLのunknown / ambiguous degreeはhidden LLMで補わず、明示errorにする。
+
+Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。旧circle `0.038` / ellipse `[0.06, 0.032]`は過去のcalibration / compatibility evidenceに限り、universal normalや最終size ruleではない。
+
+Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、そのidentity / digestは`inku.geometry-resolution-policy.v1`である。Compiler lockはこのidentity / digestを参照・attestし、`ddl_engine_version`はactivation metadataに限定する。`size_rule_version`や二重ownerを作らない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
 
@@ -1987,9 +1982,11 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostがresolved selectionをScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を決める。Stage 2が現行互換経路でcanvasを受け取る場合も、これはhost-resolved composition contextであってvisible DDL metadataではない。
 
-現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`はread compatibilityとして残る。System plugin status / enable toggleのretirementとruntime cutoverは後続Stepが所有し、本節は完了済みと主張しない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはread compatibilityとして残る。これらは新規plugin authoring modelではない。Retirementとruntime / UI cutoverは後続Stepが所有し、本節は完了済みと主張しない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
 
-座標は`0.0`から`1.0`の正規化のままである。痕の寸法（`size`）、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは短辺基準で画素へ直し、記述した形をcanvas比で歪めない。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。
+Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
+
+痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 
 ### 数値の解像度（マスターグリッド）
 

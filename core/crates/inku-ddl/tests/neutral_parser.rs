@@ -205,7 +205,7 @@ fn bilingual_surfaces_share_the_same_canonical_asset_row() {
 }
 
 #[test]
-fn declared_english_parser_forms_preserve_source_and_canonical_row_identity() {
+fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
     let parse = |source: &str| {
         let document =
             NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
@@ -258,6 +258,33 @@ fn declared_english_parser_forms_preserve_source_and_canonical_row_identity() {
         );
     }
 
+    for (canonical, derived, expected_surface_ja) in [
+        ("undulating", "undulates", "波打つ"),
+        ("trembling", "trembles", "震える"),
+    ] {
+        let mut identities = Vec::new();
+        for source in [canonical, derived] {
+            let result = parse(source);
+            assert!(result.diagnostics.is_empty(), "{source}");
+            assert_eq!(result.recognized_delivery_count, 1, "{source}");
+            let token = result.tokens.first().unwrap();
+            assert_eq!(token.surface, source);
+            assert_eq!(&source[token.span.start_byte..token.span.end_byte], source);
+            let NeutralTokenKind::SaijikiWord {
+                category_key,
+                canonical_surface_ja,
+                ..
+            } = &token.kind
+            else {
+                panic!("{source}: expected one Saijiki word");
+            };
+            assert_eq!(category_key, "yuragi");
+            assert_eq!(canonical_surface_ja, expected_surface_ja);
+            identities.push((category_key.clone(), canonical_surface_ja.clone()));
+        }
+        assert_eq!(identities[0], identities[1]);
+    }
+
     let semantic_values = |source: &str| {
         let mut values = parse(source)
             .tokens
@@ -279,7 +306,16 @@ fn declared_english_parser_forms_preserve_source_and_canonical_row_identity() {
         semantic_values("the circle finely sways")
     );
 
-    for source in ["swayed", "swung", "finer", "finest", "xswaysy", "finelyish"] {
+    for source in [
+        "swayed",
+        "swung",
+        "undulated",
+        "trembled",
+        "finer",
+        "finest",
+        "xswaysy",
+        "finelyish",
+    ] {
         let result = parse(source);
         assert!(
             result

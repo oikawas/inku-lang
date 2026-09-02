@@ -135,13 +135,13 @@
       "name_en": "movements",
       "marker_class": "variation",
       "words": [
-        {"surface_ja": "細かく", "surface_en": "fine", "parser_forms_en": ["finely"], "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "細かく", "surface_en": "fine", "english_grammar": {"lemma": "fine", "lexical_class": "adjective", "canonical_form": "base", "permitted_forms": ["adverb"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "大きく", "surface_en": "large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "ゆっくり", "surface_en": "slowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "速く", "surface_en": "quickly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "揺れる", "surface_en": "swaying", "parser_forms_en": ["sways"], "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "波打つ", "surface_en": "undulating", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "震える", "surface_en": "trembling", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "揺れる", "surface_en": "swaying", "english_grammar": {"lemma": "sway", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "波打つ", "surface_en": "undulating", "english_grammar": {"lemma": "undulate", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "震える", "surface_en": "trembling", "english_grammar": {"lemma": "tremble", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "滲む", "surface_en": "blurring", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,

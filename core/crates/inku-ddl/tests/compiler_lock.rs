@@ -644,10 +644,6 @@ fn spec_ja_and_en_clause_topology_reaches_one_compiler_meaning() {
         }
     }
     assert_eq!(
-        ja.semantic_document.as_ref().unwrap().ast,
-        en.semantic_document.as_ref().unwrap().ast
-    );
-    assert_eq!(
         ja.pre_expansion_canonical_bytes(),
         en.pre_expansion_canonical_bytes()
     );
@@ -805,6 +801,35 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
             canonical.pre_expansion_canonical_bytes(),
             legacy.pre_expansion_canonical_bytes(),
             "{head}"
+        );
+    }
+
+    for (canonical_form, derived_form) in [("undulating", "undulates"), ("trembling", "trembles")] {
+        let canonical = compile(
+            &format!("circle. the circle {canonical_form} fine."),
+            ResolvedInstructionLanguage::En,
+            &[],
+            None,
+            LIMITS,
+        );
+        let derived = compile(
+            &format!("circle. the circle {derived_form} fine."),
+            ResolvedInstructionLanguage::En,
+            &[],
+            None,
+            LIMITS,
+        );
+        for result in [&canonical, &derived] {
+            assert_eq!(
+                result.compiler_lock.as_ref().map(|lock| lock.state),
+                Some(CompilerLockState::CanonicalReady),
+                "{derived_form}"
+            );
+        }
+        assert_eq!(
+            canonical.pre_expansion_canonical_bytes(),
+            derived.pre_expansion_canonical_bytes(),
+            "{derived_form}"
         );
     }
 

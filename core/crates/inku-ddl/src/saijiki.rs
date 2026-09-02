@@ -1,6 +1,7 @@
 //! Immutable, versioned Saijiki and relation source asset.
 
 use std::{
+    borrow::Cow,
     collections::{BTreeSet, HashMap},
     fmt,
     sync::OnceLock,
@@ -48,7 +49,7 @@ pub struct SaijikiWordAsset {
     pub surface_ja: String,
     pub surface_en: Option<String>,
     #[serde(default)]
-    pub parser_forms_en: Vec<String>,
+    english_grammar: Option<EnglishGrammarAsset>,
     pub default: bool,
     pub prompt: bool,
     pub display: bool,
@@ -57,6 +58,51 @@ pub struct SaijikiWordAsset {
     pub semantic_alias: Option<String>,
     pub marker_surfaces_ja: Option<Vec<String>>,
     pub marker_surfaces_en: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+struct EnglishGrammarAsset {
+    lemma: String,
+    lexical_class: EnglishLexicalClass,
+    canonical_form: EnglishGrammaticalForm,
+    #[serde(default)]
+    permitted_forms: Vec<EnglishGrammaticalForm>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(rename_all = "snake_case")]
+enum EnglishLexicalClass {
+    Adjective,
+    Verb,
+}
+
+impl EnglishLexicalClass {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Adjective => "adjective",
+            Self::Verb => "verb",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(rename_all = "snake_case")]
+enum EnglishGrammaticalForm {
+    Base,
+    Adverb,
+    PresentParticiple,
+    ThirdPersonSingular,
+}
+
+impl EnglishGrammaticalForm {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Base => "base",
+            Self::Adverb => "adverb",
+            Self::PresentParticiple => "present_participle",
+            Self::ThirdPersonSingular => "third_person_singular",
+        }
+    }
 }
 
 /// The language-specific order used by a relation marker table.
@@ -207,20 +253,61 @@ pub fn saijiki_asset_sha256_hex() -> &'static str {
 pub(crate) fn parser_candidate_surfaces(
     word: &SaijikiWordAsset,
     language: ResolvedInstructionLanguage,
-) -> impl Iterator<Item = &str> {
+) -> Vec<Cow<'_, str>> {
     let eligible = word.prompt || word.display || word.marker == Some(true);
-    let canonical = eligible
-        .then(|| match language {
-            ResolvedInstructionLanguage::Ja => Some(word.surface_ja.as_str()),
-            ResolvedInstructionLanguage::En => word.surface_en.as_deref(),
-        })
-        .flatten();
-    canonical.into_iter().chain(
-        word.parser_forms_en
-            .iter()
-            .map(String::as_str)
-            .filter(move |_| eligible && language == ResolvedInstructionLanguage::En),
+    if !eligible {
+        return Vec::new();
+    }
+    match language {
+        ResolvedInstructionLanguage::Ja => vec![Cow::Borrowed(word.surface_ja.as_str())],
+        ResolvedInstructionLanguage::En => {
+            let mut surfaces = word
+                .surface_en
+                .as_deref()
+                .map(Cow::Borrowed)
+                .into_iter()
+                .collect::<Vec<_>>();
+            if let Some(grammar) = &word.english_grammar {
+                surfaces.extend(grammar.permitted_forms.iter().filter_map(|form| {
+                    project_english_grammatical_form(grammar, *form).map(Cow::Owned)
+                }));
+            }
+            surfaces
+        }
+    }
+}
+
+fn english_form_is_compatible(
+    lexical_class: EnglishLexicalClass,
+    form: EnglishGrammaticalForm,
+) -> bool {
+    matches!(
+        (lexical_class, form),
+        (
+            EnglishLexicalClass::Adjective,
+            EnglishGrammaticalForm::Base | EnglishGrammaticalForm::Adverb
+        ) | (
+            EnglishLexicalClass::Verb,
+            EnglishGrammaticalForm::Base
+                | EnglishGrammaticalForm::PresentParticiple
+                | EnglishGrammaticalForm::ThirdPersonSingular
+        )
     )
+}
+
+fn project_english_grammatical_form(
+    grammar: &EnglishGrammarAsset,
+    form: EnglishGrammaticalForm,
+) -> Option<String> {
+    english_form_is_compatible(grammar.lexical_class, form).then(|| match form {
+        EnglishGrammaticalForm::Base => grammar.lemma.clone(),
+        EnglishGrammaticalForm::Adverb => format!("{}ly", grammar.lemma),
+        EnglishGrammaticalForm::PresentParticiple => {
+            let stem = grammar.lemma.strip_suffix('e').unwrap_or(&grammar.lemma);
+            format!("{stem}ing")
+        }
+        EnglishGrammaticalForm::ThirdPersonSingular => format!("{}s", grammar.lemma),
+    })
 }
 
 pub(crate) fn canonical_semantic_id(
@@ -314,24 +401,73 @@ fn validate_semantic_aliases(asset: &SaijikiAsset) -> Result<(), SaijikiProjecti
     Ok(())
 }
 
-fn validate_parser_forms(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
-    let mut owners = HashMap::<String, (String, String, bool)>::new();
+fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
+    let mut owners = HashMap::<String, (String, String)>::new();
     for category in &asset.categories {
         for word in &category.words {
             let eligible = word.prompt || word.display || word.marker == Some(true);
-            if !word.parser_forms_en.is_empty() && !eligible {
-                return Err(SaijikiProjectionError::IneligibleParserForm {
-                    category_key: category.key.clone(),
-                    surface_ja: word.surface_ja.clone(),
-                    form: word.parser_forms_en[0].clone(),
-                });
-            }
-            if !word.parser_forms_en.is_empty() && word.surface_en.is_none() {
-                return Err(SaijikiProjectionError::MissingLanguageSurface {
-                    category_key: category.key.clone(),
-                    surface_ja: word.surface_ja.clone(),
-                    language: ResolvedInstructionLanguage::En,
-                });
+            let mut derived_forms = Vec::new();
+            if let Some(grammar) = &word.english_grammar {
+                if !eligible {
+                    return Err(SaijikiProjectionError::IneligibleEnglishGrammar {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                    });
+                }
+                let Some(surface_en) = &word.surface_en else {
+                    return Err(SaijikiProjectionError::MissingLanguageSurface {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        language: ResolvedInstructionLanguage::En,
+                    });
+                };
+                if grammar.lemma.is_empty()
+                    || grammar.lemma.trim() != grammar.lemma
+                    || !grammar.lemma.bytes().all(|byte| byte.is_ascii_lowercase())
+                {
+                    return Err(SaijikiProjectionError::InvalidEnglishLemma {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        lemma: grammar.lemma.clone(),
+                    });
+                }
+                if !english_form_is_compatible(grammar.lexical_class, grammar.canonical_form) {
+                    return Err(SaijikiProjectionError::IncompatibleEnglishGrammarForm {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        lexical_class: grammar.lexical_class.as_str(),
+                        form: grammar.canonical_form.as_str(),
+                    });
+                }
+                let projected_canonical =
+                    project_english_grammatical_form(grammar, grammar.canonical_form).unwrap();
+                if projected_canonical != *surface_en {
+                    return Err(SaijikiProjectionError::CanonicalEnglishFormMismatch {
+                        category_key: category.key.clone(),
+                        surface_ja: word.surface_ja.clone(),
+                        surface_en: surface_en.clone(),
+                        projected: projected_canonical,
+                    });
+                }
+                let mut permitted = BTreeSet::new();
+                for form in &grammar.permitted_forms {
+                    if !english_form_is_compatible(grammar.lexical_class, *form) {
+                        return Err(SaijikiProjectionError::IncompatibleEnglishGrammarForm {
+                            category_key: category.key.clone(),
+                            surface_ja: word.surface_ja.clone(),
+                            lexical_class: grammar.lexical_class.as_str(),
+                            form: form.as_str(),
+                        });
+                    }
+                    if *form == grammar.canonical_form || !permitted.insert(*form) {
+                        return Err(SaijikiProjectionError::DuplicateEnglishGrammaticalForm {
+                            category_key: category.key.clone(),
+                            surface_ja: word.surface_ja.clone(),
+                            form: form.as_str(),
+                        });
+                    }
+                    derived_forms.push(project_english_grammatical_form(grammar, *form).unwrap());
+                }
             }
             if let Some(surface) = &word.surface_en {
                 register_parser_surface(
@@ -340,24 +476,15 @@ fn validate_parser_forms(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionEr
                     &category.key,
                     &word.surface_ja,
                     surface,
-                    false,
                 )?;
             }
-            for form in &word.parser_forms_en {
-                if form.is_empty() || form.trim() != form || !form.is_ascii() {
-                    return Err(SaijikiProjectionError::InvalidParserForm {
-                        category_key: category.key.clone(),
-                        surface_ja: word.surface_ja.clone(),
-                        form: form.clone(),
-                    });
-                }
+            for surface in derived_forms {
                 register_parser_surface(
                     asset,
                     &mut owners,
                     &category.key,
                     &word.surface_ja,
-                    form,
-                    true,
+                    &surface,
                 )?;
             }
         }
@@ -367,11 +494,10 @@ fn validate_parser_forms(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionEr
 
 fn register_parser_surface(
     asset: &SaijikiAsset,
-    owners: &mut HashMap<String, (String, String, bool)>,
+    owners: &mut HashMap<String, (String, String)>,
     category_key: &str,
     surface_ja: &str,
     surface: &str,
-    parser_form: bool,
 ) -> Result<(), SaijikiProjectionError> {
     if crate::parser::is_reserved_english_non_asset_surface(surface)
         || asset.relations.iter().any(|relation| {
@@ -388,12 +514,7 @@ fn register_parser_surface(
     }
 
     let key = surface.to_ascii_lowercase();
-    if let Some((first_category_key, first_surface_ja, first_is_form)) = owners.get(&key) {
-        if parser_form && *first_is_form {
-            return Err(SaijikiProjectionError::DuplicateParserForm {
-                form: surface.to_owned(),
-            });
-        }
+    if let Some((first_category_key, first_surface_ja)) = owners.get(&key) {
         return Err(SaijikiProjectionError::ParserSurfaceCollision {
             surface: surface.to_owned(),
             first_category_key: first_category_key.clone(),
@@ -402,10 +523,7 @@ fn register_parser_surface(
             second_surface_ja: surface_ja.to_owned(),
         });
     }
-    owners.insert(
-        key,
-        (category_key.to_owned(), surface_ja.to_owned(), parser_form),
-    );
+    owners.insert(key, (category_key.to_owned(), surface_ja.to_owned()));
     Ok(())
 }
 
@@ -439,18 +557,31 @@ pub enum SaijikiProjectionError {
         surface_ja: String,
         language: ResolvedInstructionLanguage,
     },
-    InvalidParserForm {
+    InvalidEnglishLemma {
         category_key: String,
         surface_ja: String,
-        form: String,
+        lemma: String,
     },
-    IneligibleParserForm {
+    IneligibleEnglishGrammar {
         category_key: String,
         surface_ja: String,
-        form: String,
     },
-    DuplicateParserForm {
-        form: String,
+    IncompatibleEnglishGrammarForm {
+        category_key: String,
+        surface_ja: String,
+        lexical_class: &'static str,
+        form: &'static str,
+    },
+    DuplicateEnglishGrammaticalForm {
+        category_key: String,
+        surface_ja: String,
+        form: &'static str,
+    },
+    CanonicalEnglishFormMismatch {
+        category_key: String,
+        surface_ja: String,
+        surface_en: String,
+        projected: String,
     },
     ParserSurfaceCollision {
         surface: String,
@@ -519,9 +650,11 @@ impl SaijikiProjectionError {
             Self::MissingCategory { .. } => "missing_category",
             Self::MissingRelation { .. } => "missing_relation",
             Self::MissingLanguageSurface { .. } => "missing_language_surface",
-            Self::InvalidParserForm { .. } => "invalid_parser_form",
-            Self::IneligibleParserForm { .. } => "ineligible_parser_form",
-            Self::DuplicateParserForm { .. } => "duplicate_parser_form",
+            Self::InvalidEnglishLemma { .. } => "invalid_english_lemma",
+            Self::IneligibleEnglishGrammar { .. } => "ineligible_english_grammar",
+            Self::IncompatibleEnglishGrammarForm { .. } => "incompatible_english_grammar_form",
+            Self::DuplicateEnglishGrammaticalForm { .. } => "duplicate_english_grammatical_form",
+            Self::CanonicalEnglishFormMismatch { .. } => "canonical_english_form_mismatch",
             Self::ParserSurfaceCollision { .. } => "parser_surface_collision",
             Self::ReservedParserSurfaceCollision { .. } => "reserved_parser_surface_collision",
             Self::MarkerOrderMismatch { .. } => "marker_order_mismatch",
@@ -556,25 +689,47 @@ impl fmt::Display for SaijikiProjectionError {
                 "Saijiki word has no {} surface: {category_key}/{surface_ja}",
                 language.as_str()
             ),
-            Self::InvalidParserForm {
+            Self::InvalidEnglishLemma {
+                category_key,
+                surface_ja,
+                lemma,
+            } => write!(
+                formatter,
+                "Saijiki English lemma is invalid: {category_key}/{surface_ja}: {lemma:?}"
+            ),
+            Self::IneligibleEnglishGrammar {
+                category_key,
+                surface_ja,
+            } => write!(
+                formatter,
+                "Saijiki English grammar belongs to an ineligible row: {category_key}/{surface_ja}"
+            ),
+            Self::IncompatibleEnglishGrammarForm {
+                category_key,
+                surface_ja,
+                lexical_class,
+                form,
+            } => write!(
+                formatter,
+                "Saijiki English grammatical form is incompatible: {category_key}/{surface_ja}: {lexical_class}/{form}"
+            ),
+            Self::DuplicateEnglishGrammaticalForm {
                 category_key,
                 surface_ja,
                 form,
             } => write!(
                 formatter,
-                "Saijiki parser form is invalid: {category_key}/{surface_ja}: {form:?}"
+                "Saijiki English grammatical form is duplicated: {category_key}/{surface_ja}: {form}"
             ),
-            Self::IneligibleParserForm {
+            Self::CanonicalEnglishFormMismatch {
                 category_key,
                 surface_ja,
-                form,
+                surface_en,
+                projected,
             } => write!(
                 formatter,
-                "Saijiki parser form belongs to an ineligible row: {category_key}/{surface_ja}: {form}"
+                "Saijiki canonical English form mismatch: {category_key}/{surface_ja}: surface={surface_en}, projected={projected}"
             ),
-            Self::DuplicateParserForm { form } => {
-                write!(formatter, "Saijiki parser form is duplicated: {form}")
-            }
             Self::ParserSurfaceCollision {
                 surface,
                 first_category_key,
@@ -750,7 +905,7 @@ pub fn saijiki_derived_projection_from_asset(
     language: ResolvedInstructionLanguage,
 ) -> Result<SaijikiDerivedProjection, SaijikiProjectionError> {
     validate_semantic_aliases(asset)?;
-    validate_parser_forms(asset)?;
+    validate_english_grammar(asset)?;
     let prompt_rows = prompt_rows(asset, language)?;
     let prompt_block = prompt_rows
         .iter()

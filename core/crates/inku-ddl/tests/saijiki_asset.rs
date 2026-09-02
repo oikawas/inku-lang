@@ -6,6 +6,7 @@ use inku_ddl::{
     saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_score_wire_maps,
 };
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 #[test]
@@ -149,102 +150,192 @@ fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
 }
 
 #[test]
-fn english_parser_forms_are_row_owned_and_do_not_leak_into_public_projections() {
-    let asset = saijiki_asset();
-    let fine = word(asset, "yuragi", "細かく");
-    let swaying = word(asset, "yuragi", "揺れる");
-    assert_eq!(fine.surface_en.as_deref(), Some("fine"));
-    assert_eq!(fine.parser_forms_en, ["finely"]);
-    assert_eq!(swaying.surface_en.as_deref(), Some("swaying"));
-    assert_eq!(swaying.parser_forms_en, ["sways"]);
+fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections() {
+    let asset_value: Value = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+    for (surface_ja, grammar) in [
+        (
+            "細かく",
+            json!({
+                "lemma": "fine",
+                "lexical_class": "adjective",
+                "canonical_form": "base",
+                "permitted_forms": ["adverb"]
+            }),
+        ),
+        (
+            "揺れる",
+            json!({
+                "lemma": "sway",
+                "lexical_class": "verb",
+                "canonical_form": "present_participle",
+                "permitted_forms": ["third_person_singular"]
+            }),
+        ),
+        (
+            "波打つ",
+            json!({
+                "lemma": "undulate",
+                "lexical_class": "verb",
+                "canonical_form": "present_participle",
+                "permitted_forms": ["third_person_singular"]
+            }),
+        ),
+        (
+            "震える",
+            json!({
+                "lemma": "tremble",
+                "lexical_class": "verb",
+                "canonical_form": "present_participle",
+                "permitted_forms": ["third_person_singular"]
+            }),
+        ),
+    ] {
+        assert_eq!(
+            word_value(&asset_value, "yuragi", surface_ja).get("english_grammar"),
+            Some(&grammar)
+        );
+    }
+    let words = asset_value["categories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|category| category["words"].as_array().unwrap());
     assert_eq!(
-        asset
-            .categories
-            .iter()
-            .flat_map(|category| &category.words)
-            .map(|word| word.parser_forms_en.len())
-            .sum::<usize>(),
-        2
+        words
+            .clone()
+            .filter(|word| word.get("english_grammar").is_some())
+            .count(),
+        4
     );
+    assert!(
+        words
+            .clone()
+            .all(|word| word.get("parser_forms_en").is_none())
+    );
+    let asset_source = std::str::from_utf8(SAIJIKI_ASSET_BYTES).unwrap();
+    assert!(!asset_source.contains("parser_forms_en"));
+    for derived_surface in ["finely", "sways", "undulates", "trembles"] {
+        assert!(!asset_source.contains(&format!("\"{derived_surface}\"")));
+    }
 
     let projection = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
     let markers = saijiki_marker_class_table(ResolvedInstructionLanguage::En).unwrap();
     let score_maps = saijiki_score_wire_maps().unwrap();
-    for parser_form in ["finely", "sways"] {
-        assert!(!projection.prompt_block.contains(parser_form));
-        assert!(
-            projection
-                .display_categories
+    for derived_surface in ["finely", "sways", "undulates", "trembles"] {
+        assert!(!projection.prompt_block.contains(derived_surface));
+        assert!(projection.display_categories.iter().all(|category| {
+            category
+                .words
                 .iter()
-                .all(|category| { category.words.iter().all(|surface| surface != parser_form) })
-        );
-        assert!(
-            markers
+                .all(|surface| surface != derived_surface)
+        }));
+        assert!(markers.iter().all(|class| {
+            class
+                .markers
                 .iter()
-                .all(|class| { class.markers.iter().all(|surface| surface != parser_form) })
-        );
+                .all(|surface| surface != derived_surface)
+        }));
         assert!(
             score_maps
                 .weight
                 .iter()
                 .chain(&score_maps.color)
                 .chain(&score_maps.surface_texture)
-                .all(|entry| entry.surface != parser_form)
+                .all(|entry| entry.surface != derived_surface)
         );
     }
-    assert_eq!(
-        project_macro_semantic_ref("yuragi", "細かく")
-            .unwrap()
-            .canonical_id,
-        "fine"
-    );
-    assert_eq!(
-        project_macro_semantic_ref("yuragi", "揺れる")
-            .unwrap()
-            .canonical_id,
-        "swaying"
-    );
+    for (surface_ja, canonical_id) in [
+        ("細かく", "fine"),
+        ("揺れる", "swaying"),
+        ("波打つ", "undulating"),
+        ("震える", "trembling"),
+    ] {
+        assert_eq!(
+            project_macro_semantic_ref("yuragi", surface_ja)
+                .unwrap()
+                .canonical_id,
+            canonical_id
+        );
+    }
 }
 
 #[test]
-fn invalid_english_parser_form_ownership_fails_closed_with_stable_kinds() {
-    let cases: [(&str, fn(&mut SaijikiAsset)); 9] = [
-        ("duplicate_parser_form", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en =
-                vec!["finely".to_owned(), "FINELY".to_owned()];
+fn invalid_typed_english_grammar_fails_closed_with_stable_kinds() {
+    let cases: [(&str, fn(&mut Value)); 9] = [
+        ("duplicate_english_grammatical_form", |asset| {
+            word_value_mut(asset, "yuragi", "細かく")["english_grammar"]["permitted_forms"] =
+                json!(["adverb", "adverb"]);
         }),
         ("parser_surface_collision", |asset| {
-            word_mut(asset, "yuragi", "大きく").surface_en = Some("FINE".to_owned());
+            let first = word_value_mut(asset, "yuragi", "大きく");
+            first["surface_en"] = json!("foo");
+            first["english_grammar"] = json!({
+                "lemma": "foo",
+                "lexical_class": "verb",
+                "canonical_form": "base",
+                "permitted_forms": ["present_participle"]
+            });
+            let second = word_value_mut(asset, "yuragi", "ゆっくり");
+            second["surface_en"] = json!("fooe");
+            second["english_grammar"] = json!({
+                "lemma": "fooe",
+                "lexical_class": "verb",
+                "canonical_form": "base",
+                "permitted_forms": ["present_participle"]
+            });
         }),
-        ("ineligible_parser_form", |asset| {
-            word_mut(asset, "ugoki", "描く").parser_forms_en = vec!["draws".to_owned()];
+        ("parser_surface_collision", |asset| {
+            word_value_mut(asset, "yuragi", "大きく")["surface_en"] = json!("FINE");
         }),
-        ("invalid_parser_form", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec![" finely ".to_owned()];
+        ("ineligible_english_grammar", |asset| {
+            word_value_mut(asset, "ugoki", "描く")["english_grammar"] = json!({
+                "lemma": "draw",
+                "lexical_class": "verb",
+                "canonical_form": "base",
+                "permitted_forms": ["third_person_singular"]
+            });
         }),
-        ("invalid_parser_form", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["細かく".to_owned()];
+        ("missing_language_surface", |asset| {
+            word_value_mut(asset, "yuragi", "細かく")["surface_en"] = Value::Null;
+        }),
+        ("invalid_english_lemma", |asset| {
+            word_value_mut(asset, "yuragi", "細かく")["english_grammar"]["lemma"] = json!(" fine ");
+        }),
+        ("incompatible_english_grammar_form", |asset| {
+            word_value_mut(asset, "yuragi", "細かく")["english_grammar"]["canonical_form"] =
+                json!("present_participle");
+        }),
+        ("canonical_english_form_mismatch", |asset| {
+            word_value_mut(asset, "yuragi", "細かく")["english_grammar"]["lemma"] = json!("finer");
         }),
         ("reserved_parser_surface_collision", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["the".to_owned()];
-        }),
-        ("reserved_parser_surface_collision", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["thin".to_owned()];
-        }),
-        ("reserved_parser_surface_collision", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["eight".to_owned()];
-        }),
-        ("reserved_parser_surface_collision", |asset| {
-            word_mut(asset, "yuragi", "細かく").parser_forms_en = vec!["touching".to_owned()];
+            let word = word_value_mut(asset, "yuragi", "大きく");
+            word["surface_en"] = json!("touch");
+            word["english_grammar"] = json!({
+                "lemma": "touch",
+                "lexical_class": "verb",
+                "canonical_form": "base",
+                "permitted_forms": ["present_participle"]
+            });
         }),
     ];
 
     for (expected_kind, mutate) in cases {
-        let mut asset: SaijikiAsset = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
-        mutate(&mut asset);
+        let mut value: Value = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+        mutate(&mut value);
+        let asset: SaijikiAsset = serde_json::from_value(value).unwrap();
         let error = saijiki_derived_projection_from_asset(&asset, ResolvedInstructionLanguage::En)
             .unwrap_err();
         assert_eq!(error.kind(), expected_kind);
+    }
+
+    for (field, unknown) in [
+        ("lexical_class", "adverb"),
+        ("canonical_form", "past_tense"),
+    ] {
+        let mut value: Value = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+        word_value_mut(&mut value, "yuragi", "細かく")["english_grammar"][field] = json!(unknown);
+        assert!(serde_json::from_value::<SaijikiAsset>(value).is_err());
     }
 }
 
@@ -276,18 +367,6 @@ fn place_word_mut<'a>(asset: &'a mut SaijikiAsset, surface_ja: &str) -> &'a mut 
     word_mut(asset, "basho", surface_ja)
 }
 
-fn word<'a>(asset: &'a SaijikiAsset, category_key: &str, surface_ja: &str) -> &'a SaijikiWordAsset {
-    asset
-        .categories
-        .iter()
-        .find(|category| category.key == category_key)
-        .unwrap()
-        .words
-        .iter()
-        .find(|word| word.surface_ja == surface_ja)
-        .unwrap()
-}
-
 fn word_mut<'a>(
     asset: &'a mut SaijikiAsset,
     category_key: &str,
@@ -301,6 +380,34 @@ fn word_mut<'a>(
         .words
         .iter_mut()
         .find(|word| word.surface_ja == surface_ja)
+        .unwrap()
+}
+
+fn word_value<'a>(asset: &'a Value, category_key: &str, surface_ja: &str) -> &'a Value {
+    asset["categories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|category| category["key"].as_str() == Some(category_key))
+        .unwrap()["words"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|word| word["surface_ja"].as_str() == Some(surface_ja))
+        .unwrap()
+}
+
+fn word_value_mut<'a>(asset: &'a mut Value, category_key: &str, surface_ja: &str) -> &'a mut Value {
+    asset["categories"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|category| category["key"].as_str() == Some(category_key))
+        .unwrap()["words"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|word| word["surface_ja"].as_str() == Some(surface_ja))
         .unwrap()
 }
 

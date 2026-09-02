@@ -422,14 +422,15 @@ fn candidates_at(
 
     for category in &asset.categories {
         for word in &category.words {
-            for surface in parser_candidate_surfaces(word, language) {
+            let surfaces = parser_candidate_surfaces(word, language);
+            for surface in &surfaces {
                 push_surface_candidate(
                     &mut candidates,
                     source,
                     start_byte,
                     language,
                     require_boundary,
-                    surface,
+                    surface.as_ref(),
                     PRIORITY_ASSET,
                     format!("word:{}:{}", category.key, word.surface_ja),
                     CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
@@ -439,7 +440,7 @@ fn candidates_at(
                     }),
                 );
             }
-            let Some(surface) = parser_candidate_surfaces(word, language).next() else {
+            let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
                 continue;
             };
             if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {

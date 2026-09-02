@@ -108,26 +108,28 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
                 case.variation.map(variation),
             )
             .unwrap();
-            assert_eq!(result.schema_id, STAGE15_TRANSFORMATION_SCHEMA_ID);
+            assert_eq!(result.schema_id(), STAGE15_TRANSFORMATION_SCHEMA_ID);
             let canonical: serde_json::Value =
-                serde_json::from_slice(&result.effective_canonical_bytes).unwrap();
+                serde_json::from_slice(result.effective_canonical_bytes()).unwrap();
             assert_eq!(canonical["schema"], STAGE15_TRANSFORMATION_SCHEMA_ID);
             assert_eq!(
-                result.original_semantic_document, original_semantic,
+                result.original_semantic_document(),
+                &original_semantic,
                 "{}",
                 case.id
             );
             assert_eq!(
-                result.original_expanded_invocations, original_expansion,
+                result.original_expanded_invocations(),
+                original_expansion.as_slice(),
                 "{}",
                 case.id
             );
-            assert_eq!(result.targets.len(), 1, "{}", case.id);
+            assert_eq!(result.targets().len(), 1, "{}", case.id);
             Snapshot {
                 id: case.id.clone(),
-                baseline_focus: result.baseline_focus.unwrap().as_str().to_owned(),
-                effective_focus: result.resolved_focus.unwrap().as_str().to_owned(),
-                effective_sha256: result.effective_canonical_digest,
+                baseline_focus: result.baseline_focus().unwrap().as_str().to_owned(),
+                effective_focus: result.resolved_focus().unwrap().as_str().to_owned(),
+                effective_sha256: result.effective_canonical_digest().to_owned(),
             }
         })
         .collect::<Vec<_>>();
@@ -172,20 +174,21 @@ fn no_target_and_non_center_meaning_remain_effective_no_ops() {
         )
         .unwrap();
 
-        assert!(without_variation.targets.is_empty(), "{source}");
-        assert_eq!(without_variation.baseline_focus, None, "{source}");
-        assert_eq!(without_variation.resolved_focus, None, "{source}");
-        assert!(without_variation.moved_axes.is_empty(), "{source}");
+        assert!(without_variation.targets().is_empty(), "{source}");
+        assert_eq!(without_variation.baseline_focus(), None, "{source}");
+        assert_eq!(without_variation.resolved_focus(), None, "{source}");
+        assert!(without_variation.moved_axes().is_empty(), "{source}");
         assert_eq!(
-            without_variation.original_semantic_document,
-            original_semantic
+            without_variation.original_semantic_document(),
+            &original_semantic
         );
         assert_eq!(
-            with_variation.effective_canonical_bytes, without_variation.effective_canonical_bytes,
+            with_variation.effective_canonical_bytes(),
+            without_variation.effective_canonical_bytes(),
             "requested no-op option entered effective meaning for {source}"
         );
-        assert!(with_variation.moved_axes.is_empty(), "{source}");
-        assert_eq!(with_variation.effective_variation, None, "{source}");
+        assert!(with_variation.moved_axes().is_empty(), "{source}");
+        assert_eq!(with_variation.effective_variation(), None, "{source}");
     }
 }
 
@@ -245,8 +248,8 @@ fn omitted_and_explicit_zero_composition_seeds_keep_distinct_focus_provenance() 
     let explicit_result =
         transform_stage15(stage15_transformation_input(&explicit_zero).unwrap(), None).unwrap();
     assert_ne!(
-        omitted_result.effective_canonical_bytes,
-        explicit_result.effective_canonical_bytes
+        omitted_result.effective_canonical_bytes(),
+        explicit_result.effective_canonical_bytes()
     );
 }
 
@@ -276,11 +279,11 @@ fn ja_and_en_variation_keep_the_same_effective_identity_and_expanded_schema_owne
     });
 
     assert_eq!(
-        results[0].effective_canonical_digest,
-        results[1].effective_canonical_digest
+        results[0].effective_canonical_digest(),
+        results[1].effective_canonical_digest()
     );
     let canonical: serde_json::Value =
-        serde_json::from_slice(&results[0].effective_canonical_bytes).unwrap();
+        serde_json::from_slice(results[0].effective_canonical_bytes()).unwrap();
     assert_eq!(
         canonical["original_expanded"]["schema"],
         EXPANDED_MACRO_MEANING_SCHEMA_ID
@@ -298,7 +301,7 @@ fn seed_zero_variation_amplitudes_resolve_to_three_distinct_non_baseline_focuses
     );
     let baseline = transform_stage15(stage15_transformation_input(&compilation).unwrap(), None)
         .unwrap()
-        .baseline_focus
+        .baseline_focus()
         .unwrap();
     let resolved = [
         Stage15VariationAmplitude::Small,
@@ -311,7 +314,7 @@ fn seed_zero_variation_amplitudes_resolve_to_three_distinct_non_baseline_focuses
             Some(Stage15Variation { amplitude, seed: 0 }),
         )
         .unwrap()
-        .resolved_focus
+        .resolved_focus()
         .unwrap()
     });
 
@@ -332,16 +335,16 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
     );
     let source_result =
         transform_stage15(stage15_transformation_input(&source).unwrap(), None).unwrap();
-    assert_eq!(source_result.targets.len(), 1);
+    assert_eq!(source_result.targets().len(), 1);
     assert!(matches!(
-        source_result.targets[0].path,
+        source_result.targets()[0].path,
         Stage15TargetPath::Instruction {
             instruction_index: 0
         }
     ));
     assert_eq!(
-        source_result.original_semantic_document,
-        source.semantic_document.as_ref().unwrap().ast
+        source_result.original_semantic_document(),
+        &source.semantic_document.as_ref().unwrap().ast
     );
 
     let group = compile(
@@ -353,17 +356,17 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
     );
     let group_result =
         transform_stage15(stage15_transformation_input(&group).unwrap(), None).unwrap();
-    assert_eq!(group_result.targets.len(), 1);
+    assert_eq!(group_result.targets().len(), 1);
     assert!(matches!(
-        group_result.targets[0].path,
+        group_result.targets()[0].path,
         Stage15TargetPath::GroupPredicate {
             edge_index: 0,
             group_index: 0
         }
     ));
     assert_eq!(
-        group_result.original_semantic_document,
-        group.semantic_document.as_ref().unwrap().ast
+        group_result.original_semantic_document(),
+        &group.semantic_document.as_ref().unwrap().ast
     );
 
     let definition = center_emit_definition();
@@ -383,9 +386,9 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
         }),
     )
     .unwrap();
-    assert_eq!(generated_result.targets.len(), 2);
+    assert_eq!(generated_result.targets().len(), 2);
     let generated_ordinals = generated_result
-        .targets
+        .targets()
         .iter()
         .map(|target| match &target.path {
             Stage15TargetPath::MacroEmit {
@@ -398,13 +401,13 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
         .collect::<Vec<_>>();
     assert_eq!(generated_ordinals, [0, 1]);
     assert_eq!(
-        generated_result.original_expanded_invocations,
-        original_expansion
+        generated_result.original_expanded_invocations(),
+        original_expansion.as_slice()
     );
-    assert_eq!(generated_result.moved_axes.len(), 1);
-    assert_eq!(generated_result.moved_axes[0].axis, "focus");
+    assert_eq!(generated_result.moved_axes().len(), 1);
+    assert_eq!(generated_result.moved_axes()[0].axis, "focus");
     assert_eq!(
-        generated_result.effective_variation,
+        generated_result.effective_variation(),
         Some(Stage15Variation {
             amplitude: Stage15VariationAmplitude::Small,
             seed: 3,
@@ -431,30 +434,30 @@ fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
     )
     .unwrap();
 
-    assert_eq!(result.targets.len(), 4);
+    assert_eq!(result.targets().len(), 4);
     assert!(matches!(
-        result.targets[0].path,
+        result.targets()[0].path,
         Stage15TargetPath::Instruction {
             instruction_index: 0
         }
     ));
     assert!(matches!(
-        result.targets[1].path,
+        result.targets()[1].path,
         Stage15TargetPath::GroupPredicate {
             edge_index: 0,
             group_index: 0
         }
     ));
     assert!(
-        result.targets[2..]
+        result.targets()[2..]
             .iter()
             .all(|target| matches!(target.path, Stage15TargetPath::MacroEmit { .. }))
     );
     assert!(
         result
-            .targets
+            .targets()
             .iter()
-            .all(|target| target.effective_focus == result.resolved_focus.unwrap())
+            .all(|target| target.effective_focus == result.resolved_focus().unwrap())
     );
 }
 

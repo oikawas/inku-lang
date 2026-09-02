@@ -157,18 +157,104 @@ impl Stage15TransformationInput {
 /// Original typed meaning plus a separate effective overlay and its canonical identity.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stage15TransformationResult {
-    pub schema_id: &'static str,
-    pub original_semantic_document: SemanticDocumentAst,
-    pub original_expanded_invocations: Vec<ExpandedMacroInvocation>,
-    pub original_pre_expansion_digest: String,
-    pub original_expanded_meaning_digest: String,
-    pub baseline_focus: Option<FocusRegion>,
-    pub resolved_focus: Option<FocusRegion>,
-    pub effective_variation: Option<Stage15Variation>,
-    pub targets: Vec<Stage15TargetTransformation>,
-    pub moved_axes: Vec<Stage15MovedAxis>,
-    pub effective_canonical_bytes: Vec<u8>,
-    pub effective_canonical_digest: String,
+    schema_id: &'static str,
+    original_semantic_document: SemanticDocumentAst,
+    original_expanded_invocations: Vec<ExpandedMacroInvocation>,
+    original_pre_expansion_digest: String,
+    original_expanded_meaning_digest: String,
+    baseline_focus: Option<FocusRegion>,
+    resolved_focus: Option<FocusRegion>,
+    effective_variation: Option<Stage15Variation>,
+    targets: Vec<Stage15TargetTransformation>,
+    moved_axes: Vec<Stage15MovedAxis>,
+    effective_canonical_bytes: Vec<u8>,
+    effective_canonical_digest: String,
+}
+
+impl Stage15TransformationResult {
+    pub const fn schema_id(&self) -> &'static str {
+        self.schema_id
+    }
+
+    pub const fn original_semantic_document(&self) -> &SemanticDocumentAst {
+        &self.original_semantic_document
+    }
+
+    pub fn original_expanded_invocations(&self) -> &[ExpandedMacroInvocation] {
+        &self.original_expanded_invocations
+    }
+
+    pub fn original_pre_expansion_digest(&self) -> &str {
+        &self.original_pre_expansion_digest
+    }
+
+    pub fn original_expanded_meaning_digest(&self) -> &str {
+        &self.original_expanded_meaning_digest
+    }
+
+    pub const fn baseline_focus(&self) -> Option<FocusRegion> {
+        self.baseline_focus
+    }
+
+    pub const fn resolved_focus(&self) -> Option<FocusRegion> {
+        self.resolved_focus
+    }
+
+    pub const fn effective_variation(&self) -> Option<Stage15Variation> {
+        self.effective_variation
+    }
+
+    pub fn targets(&self) -> &[Stage15TargetTransformation] {
+        &self.targets
+    }
+
+    pub fn moved_axes(&self) -> &[Stage15MovedAxis] {
+        &self.moved_axes
+    }
+
+    pub fn effective_canonical_bytes(&self) -> &[u8] {
+        &self.effective_canonical_bytes
+    }
+
+    pub fn effective_canonical_digest(&self) -> &str {
+        &self.effective_canonical_digest
+    }
+
+    pub const fn verified_effective_view(&self) -> VerifiedStage15EffectiveView<'_> {
+        VerifiedStage15EffectiveView { result: self }
+    }
+}
+
+/// Read-only, non-forgeable view over one successfully transformed Stage 1.5 result.
+#[derive(Clone, Copy, Debug)]
+pub struct VerifiedStage15EffectiveView<'a> {
+    result: &'a Stage15TransformationResult,
+}
+
+impl<'a> VerifiedStage15EffectiveView<'a> {
+    pub const fn schema_id(self) -> &'static str {
+        self.result.schema_id()
+    }
+
+    pub const fn original_semantic_document(self) -> &'a SemanticDocumentAst {
+        self.result.original_semantic_document()
+    }
+
+    pub fn original_expanded_invocations(self) -> &'a [ExpandedMacroInvocation] {
+        self.result.original_expanded_invocations()
+    }
+
+    pub fn effective_canonical_bytes(self) -> &'a [u8] {
+        self.result.effective_canonical_bytes()
+    }
+
+    pub fn effective_canonical_digest(self) -> &'a str {
+        self.result.effective_canonical_digest()
+    }
+
+    pub fn pending_focus_targets(self) -> &'a [Stage15TargetTransformation] {
+        self.result.targets()
+    }
 }
 
 /// Closed fail-closed errors for input identity and target integrity.

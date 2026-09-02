@@ -21,6 +21,7 @@ pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
+pub mod score_lowering;
 pub mod semantic_association;
 pub mod semantic_document;
 pub mod semantic_instruction;
@@ -146,6 +147,12 @@ pub use saijiki::{
     saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_relation_literal_table, saijiki_score_wire_maps,
 };
+pub use score_lowering::{
+    ExactCountFieldCandidate, ExplicitSmallSizeFieldCandidate, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
+    ScoreFieldGap, ScoreInstructionFieldCandidate, ScoreLoweringCandidate,
+    ScorePrimitiveMappingError, lower_verified_stage15_view,
+    score_primitive_from_semantic_identity,
+};
 pub use semantic_association::{
     ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue, SemanticAssociationIssueKind,
@@ -177,7 +184,8 @@ pub use stage15_transform::{
     FocusRegion, STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID,
     Stage15MovedAxis, Stage15TargetPath, Stage15TargetProvenance, Stage15TargetTransformation,
     Stage15TransformError, Stage15TransformationInput, Stage15TransformationResult,
-    Stage15Variation, Stage15VariationAmplitude, stage15_transformation_input, transform_stage15,
+    Stage15Variation, Stage15VariationAmplitude, VerifiedStage15EffectiveView,
+    stage15_transformation_input, transform_stage15,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

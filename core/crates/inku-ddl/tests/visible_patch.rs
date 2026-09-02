@@ -2,13 +2,13 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SemanticDeliveryOwner, SourceSpan, VISIBLE_DDL_PATCH_SCHEMA_ID,
-    VisibleDdlPatch, VisibleDdlPatchEdit, VisiblePatchDiagnostic, compile_typed_ddl,
-    validate_visible_ddl_patch,
+    ResolvedInstructionLanguage, SemanticDeliveryOwner, SemanticIssueCausalProvenance,
+    SemanticUpstreamCausalRelation, SourceSpan, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
+    VisibleDdlPatchEdit, VisiblePatchDiagnostic, compile_typed_ddl, validate_visible_ddl_patch,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v9.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v10.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -395,6 +395,40 @@ fn visible_patch_preserves_continuation_identity_and_rejects_unresolved_referenc
         ),
         VisiblePatchDiagnostic::PatchTargetUnavailable,
     );
+
+    let causal = base("blue orchard.");
+    let issue = causal
+        .semantic_document
+        .as_ref()
+        .unwrap()
+        .instruction_association
+        .association
+        .issues
+        .iter()
+        .find(|issue| issue.kind.as_str() == "missing_entity_head")
+        .unwrap();
+    let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &issue.causal_provenance
+    else {
+        panic!("visible-patch base retains compiler-owned causal provenance");
+    };
+    assert_eq!(causes.len(), 1);
+    assert_eq!(
+        causes[0].relation,
+        SemanticUpstreamCausalRelation::MissingEntityHeadGap
+    );
+    assert_eq!(
+        causal
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.span == Some(causes[0].span))
+            .count(),
+        1
+    );
+    assert_error(
+        &causal,
+        VisibleDdlPatch::new(source(&causal), lock(&causal), vec![fabricated_edit()]),
+        VisiblePatchDiagnostic::PatchTargetUnavailable,
+    );
 }
 
 #[test]
@@ -403,9 +437,9 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
     assert_eq!(VISIBLE_DDL_PATCH_SCHEMA_ID, "inku.visible-ddl-patch.v1");
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v9"
+        "inku.compiler-lock-visible-patch-fixture.v10"
     );
-    assert_eq!(fixture.version, 9);
+    assert_eq!(fixture.version, 10);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let ids = fixture
         .patch_case_ids

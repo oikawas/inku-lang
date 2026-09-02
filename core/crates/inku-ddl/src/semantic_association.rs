@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v12";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v13";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -35,6 +35,45 @@ pub struct SourceOccurrence {
     pub region_index: usize,
     pub clause_index: usize,
     pub atom_index: usize,
+}
+
+/// Closed structural relation proving how one upstream diagnostic blocked typed ownership.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticUpstreamCausalRelation {
+    MissingEntityHeadGap,
+    EntityOwnershipPath,
+    InstructionOwnershipPath,
+    ContinuationBoundary,
+}
+
+impl SemanticUpstreamCausalRelation {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingEntityHeadGap => "missing_entity_head_gap",
+            Self::EntityOwnershipPath => "entity_ownership_path",
+            Self::InstructionOwnershipPath => "instruction_ownership_path",
+            Self::ContinuationBoundary => "continuation_boundary",
+        }
+    }
+}
+
+/// Source-ordered identity of one existing upstream diagnostic occurrence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticUpstreamDiagnosticCause {
+    pub relation: SemanticUpstreamCausalRelation,
+    pub diagnostic_kind: NeutralDiagnosticKind,
+    pub recognized: bool,
+    pub span: SourceSpan,
+    pub region_index: usize,
+    pub clause_index: usize,
+    pub atom_index: usize,
+}
+
+/// Explicit causal attribution for one existing typed issue.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SemanticIssueCausalProvenance {
+    Unattributed,
+    UpstreamDiagnostics(Vec<SemanticUpstreamDiagnosticCause>),
 }
 
 /// Closed semantic identity of one accepted explicit previous-object relation.
@@ -416,6 +455,7 @@ pub struct SemanticAssociationIssue {
     pub region_index: usize,
     pub occurrences: Vec<OwnedSemanticOccurrence>,
     pub upstream_diagnostic: Option<NeutralDiagnostic>,
+    pub causal_provenance: SemanticIssueCausalProvenance,
 }
 
 /// Source-preserving association result. Entity counts and compound-reference counts remain
@@ -1048,6 +1088,7 @@ fn build_semantic_entities(
                             kind: SemanticAssociationIssueKind::UpstreamConflict,
                             region_index,
                             occurrences: Vec::new(),
+                            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                             upstream_diagnostic: Some(NeutralDiagnostic {
                                 span: *span,
                                 surface: surface.clone(),
@@ -1085,6 +1126,7 @@ fn build_semantic_entities(
             &mut issues,
         );
     }
+    attach_association_causal_provenance(&clause_stream, &entities, &mut issues);
 
     let delivered_occurrence_count = entities.iter().map(entity_occurrence_count).sum::<usize>()
         + issues
@@ -1202,6 +1244,7 @@ fn append_macro_ownership(
             kind: SemanticAssociationIssueKind::MacroResolution(diagnostic.kind),
             region_index: provenance.source.region_index,
             occurrences: vec![OwnedSemanticOccurrence::MacroDiagnostic(provenance)],
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1218,6 +1261,7 @@ fn append_macro_ownership(
             kind: SemanticAssociationIssueKind::MacroParameterBinding(diagnostic.kind),
             region_index: provenance.source.region_index,
             occurrences: vec![OwnedSemanticOccurrence::MacroDiagnostic(provenance)],
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1506,6 +1550,7 @@ fn associate_region(
                 kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
                 region_index,
                 occurrences,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
         }
@@ -1557,6 +1602,7 @@ fn associate_region(
                 kind: SemanticAssociationIssueKind::MissingEntityHead,
                 region_index,
                 occurrences,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
         }
@@ -1573,6 +1619,7 @@ fn associate_region(
             kind: SemanticAssociationIssueKind::AmbiguousEntityOwnership,
             region_index,
             occurrences,
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1600,6 +1647,7 @@ fn associate_region(
                 kind: SemanticAssociationIssueKind::ConflictingQuantities,
                 region_index,
                 occurrences,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
             None
@@ -1617,6 +1665,7 @@ fn associate_region(
                     .into_iter()
                     .map(OwnedSemanticOccurrence::Thinness)
                     .collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
             None
@@ -1634,6 +1683,7 @@ fn associate_region(
                     .into_iter()
                     .map(OwnedSemanticOccurrence::RelativeScale)
                     .collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
             None
@@ -1683,6 +1733,7 @@ fn associate_region(
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Surface)
                 .collect(),
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1716,6 +1767,7 @@ fn associate_region(
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Fluctuation)
                 .collect(),
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1749,6 +1801,7 @@ fn associate_region(
                 .into_iter()
                 .map(OwnedSemanticOccurrence::Proportion)
                 .collect(),
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             upstream_diagnostic: None,
         });
     }
@@ -1970,6 +2023,7 @@ fn select_term(
                 kind: conflict_kind,
                 region_index,
                 occurrences: terms.into_iter().map(into_occurrence).collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
             None
@@ -1996,9 +2050,207 @@ fn append_upstream_issues(
                 },
                 region_index,
                 occurrences: Vec::new(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: Some(diagnostic),
             }),
     );
+}
+
+fn attach_association_causal_provenance(
+    clause_stream: &ClauseStream,
+    entities: &[SemanticEntity],
+    issues: &mut [SemanticAssociationIssue],
+) {
+    for issue in issues {
+        let mut causes = Vec::new();
+        match issue.kind {
+            SemanticAssociationIssueKind::MissingEntityHead => {
+                for occurrence in &issue.occurrences {
+                    let source = occurrence.source();
+                    let clause = &clause_stream.clauses[source.clause_index];
+                    let clause_has_head = clause.atoms.iter().any(|atom| {
+                        matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive)
+                    });
+                    if !clause_has_head {
+                        causes.extend(adjacent_diagnostic_causes(
+                            clause_stream,
+                            source,
+                            SemanticUpstreamCausalRelation::MissingEntityHeadGap,
+                        ));
+                    }
+                }
+            }
+            SemanticAssociationIssueKind::AmbiguousEntityOwnership => {
+                let issue_region_index = issue.region_index;
+                let heads = entities
+                    .iter()
+                    .map(|entity| entity.head.source())
+                    .filter(|source| source.region_index == issue_region_index)
+                    .collect::<Vec<_>>();
+                if heads.len() == 1 {
+                    for occurrence in &issue.occurrences {
+                        let source = occurrence.source();
+                        if source.clause_index == heads[0].clause_index {
+                            causes.extend(diagnostic_causes_between(
+                                clause_stream,
+                                source.clause_index,
+                                source.atom_index,
+                                heads[0].atom_index,
+                                SemanticUpstreamCausalRelation::EntityOwnershipPath,
+                            ));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        issue.causal_provenance = causal_provenance(causes);
+    }
+}
+
+fn adjacent_diagnostic_causes(
+    clause_stream: &ClauseStream,
+    occurrence: &SourceOccurrence,
+    relation: SemanticUpstreamCausalRelation,
+) -> Vec<SemanticUpstreamDiagnosticCause> {
+    let clause = &clause_stream.clauses[occurrence.clause_index];
+    clause
+        .atoms
+        .iter()
+        .enumerate()
+        .filter_map(|(atom_index, atom)| {
+            let ClauseAtom::UnresolvedDiagnostic(diagnostic) = atom else {
+                return None;
+            };
+            let lower = atom_index.min(occurrence.atom_index) + 1;
+            let upper = atom_index.max(occurrence.atom_index);
+            clause.atoms[lower..upper]
+                .iter()
+                .all(|between| {
+                    matches!(
+                        between,
+                        ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_)
+                    )
+                })
+                .then(|| {
+                    diagnostic_cause(
+                        clause_stream,
+                        diagnostic,
+                        occurrence.clause_index,
+                        atom_index,
+                        relation,
+                    )
+                })
+        })
+        .collect()
+}
+
+pub(crate) fn diagnostic_causes_between(
+    clause_stream: &ClauseStream,
+    clause_index: usize,
+    left_atom_index: usize,
+    right_atom_index: usize,
+    relation: SemanticUpstreamCausalRelation,
+) -> Vec<SemanticUpstreamDiagnosticCause> {
+    let lower = left_atom_index.min(right_atom_index) + 1;
+    let upper = left_atom_index.max(right_atom_index);
+    clause_stream.clauses[clause_index].atoms[lower..upper]
+        .iter()
+        .enumerate()
+        .filter_map(|(offset, atom)| {
+            let ClauseAtom::UnresolvedDiagnostic(diagnostic) = atom else {
+                return None;
+            };
+            Some(diagnostic_cause(
+                clause_stream,
+                diagnostic,
+                clause_index,
+                lower + offset,
+                relation,
+            ))
+        })
+        .collect()
+}
+
+pub(crate) fn diagnostic_causes_in_source_range(
+    clause_stream: &ClauseStream,
+    start_byte: usize,
+    end_byte: usize,
+    excluded_spans: &[SourceSpan],
+    relation: SemanticUpstreamCausalRelation,
+) -> Vec<SemanticUpstreamDiagnosticCause> {
+    clause_stream
+        .clauses
+        .iter()
+        .enumerate()
+        .flat_map(|(clause_index, clause)| {
+            clause
+                .atoms
+                .iter()
+                .enumerate()
+                .filter_map(move |(atom_index, atom)| {
+                    let ClauseAtom::UnresolvedDiagnostic(diagnostic) = atom else {
+                        return None;
+                    };
+                    (start_byte <= diagnostic.span.start_byte
+                        && diagnostic.span.end_byte <= end_byte
+                        && !excluded_spans.contains(&diagnostic.span))
+                    .then(|| {
+                        diagnostic_cause(
+                            clause_stream,
+                            diagnostic,
+                            clause_index,
+                            atom_index,
+                            relation,
+                        )
+                    })
+                })
+        })
+        .collect()
+}
+
+fn diagnostic_cause(
+    clause_stream: &ClauseStream,
+    diagnostic: &NeutralDiagnostic,
+    clause_index: usize,
+    atom_index: usize,
+    relation: SemanticUpstreamCausalRelation,
+) -> SemanticUpstreamDiagnosticCause {
+    SemanticUpstreamDiagnosticCause {
+        relation,
+        diagnostic_kind: diagnostic.kind,
+        recognized: diagnostic.recognized,
+        span: diagnostic.span,
+        region_index: sentence_region_index(clause_stream, diagnostic.span),
+        clause_index,
+        atom_index,
+    }
+}
+
+pub(crate) fn causal_provenance(
+    mut causes: Vec<SemanticUpstreamDiagnosticCause>,
+) -> SemanticIssueCausalProvenance {
+    causes.sort_by_key(|cause| {
+        (
+            cause.span.start_byte,
+            cause.span.end_byte,
+            cause.clause_index,
+            cause.atom_index,
+        )
+    });
+    causes.dedup_by_key(|cause| {
+        (
+            cause.span.start_byte,
+            cause.span.end_byte,
+            cause.clause_index,
+            cause.atom_index,
+        )
+    });
+    if causes.is_empty() {
+        SemanticIssueCausalProvenance::Unattributed
+    } else {
+        SemanticIssueCausalProvenance::UpstreamDiagnostics(causes)
+    }
 }
 
 fn entity_occurrence_count(entity: &SemanticEntity) -> usize {

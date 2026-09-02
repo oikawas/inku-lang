@@ -4,13 +4,61 @@ use inku_ddl::{
     ClauseAtom, ClauseSeparatorKind, ClauseStream, MacroDefinition, MacroLock,
     NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-    SemanticHead, SemanticInstructionAssociationResult, SourceOccurrence,
-    associate_semantic_instructions, associate_semantic_instructions_with_macro_binding,
-    bind_macro_parameters, saijiki_asset, semantic_instruction::SemanticInstructionOccurrenceRole,
+    SemanticHead, SemanticInstructionAssociationResult, SemanticIssueCausalProvenance,
+    SemanticUpstreamCausalRelation, SourceOccurrence, associate_semantic_instructions,
+    associate_semantic_instructions_with_macro_binding, bind_macro_parameters, saijiki_asset,
+    semantic_instruction::SemanticInstructionOccurrenceRole,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v13.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v14.json");
+
+#[test]
+fn action_and_position_issues_retain_only_diagnostics_on_their_ownership_paths() {
+    for (source, expected_kind) in [
+        ("place mystery circle.", "ambiguous_action_ownership"),
+        ("circle mystery at center.", "ambiguous_position_ownership"),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_instructions(&document).unwrap();
+        let issue = result
+            .issues
+            .iter()
+            .find(|issue| issue.kind.as_str() == expected_kind)
+            .unwrap_or_else(|| panic!("expected {expected_kind}: {source}"));
+        assert_eq!(issue.occurrences.len(), 1, "{source}");
+        let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &issue.causal_provenance
+        else {
+            panic!("instruction issue must retain the diagnostic on its head path: {source}");
+        };
+        assert_eq!(causes.len(), 1, "{source}");
+        assert_eq!(
+            causes[0].relation,
+            SemanticUpstreamCausalRelation::InstructionOwnershipPath,
+            "{source}"
+        );
+        assert_eq!(
+            &source[causes[0].span.start_byte..causes[0].span.end_byte],
+            "mystery",
+            "{source}"
+        );
+        assert!(
+            result
+                .association
+                .issues
+                .iter()
+                .any(|upstream| upstream.upstream_diagnostic.is_some()),
+            "the dedicated upstream issue remains separately delivered: {source}"
+        );
+        assert_eq!(
+            result.delivered_instruction_occurrence_count,
+            result.owned_instruction_occurrence_count,
+            "{source}"
+        );
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -526,13 +574,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v13"
+        "inku.semantic-instruction-association.v14"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v13"
+        "inku.semantic-instruction-association-fixture.v14"
     );
-    assert_eq!(fixture.version, 13);
+    assert_eq!(fixture.version, 14);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1387,7 +1435,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v13"
+        "inku.semantic-instruction-association.v14"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

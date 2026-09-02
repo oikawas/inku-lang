@@ -146,10 +146,11 @@ pub use semantic_association::{
     ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationIssue, SemanticAssociationIssueKind,
     SemanticAssociationResult, SemanticEntity, SemanticEntityAssociationAst, SemanticFluctuation,
-    SemanticHead, SemanticIdentity, SemanticMacroInvocationHead, SemanticMacroInvocationProvenance,
-    SemanticMacroParameterBinding, SemanticMacroParameterValue, SemanticPreviousReference,
-    SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticRelativeScale,
-    SemanticSurface, SemanticTerm, SemanticTermProvenance, SemanticThinness, SourceOccurrence,
+    SemanticHead, SemanticIdentity, SemanticIssueCausalProvenance, SemanticMacroInvocationHead,
+    SemanticMacroInvocationProvenance, SemanticMacroParameterBinding, SemanticMacroParameterValue,
+    SemanticPreviousReference, SemanticProportion, SemanticQuantity, SemanticRelationKind,
+    SemanticRelativeScale, SemanticSurface, SemanticTerm, SemanticTermProvenance, SemanticThinness,
+    SemanticUpstreamCausalRelation, SemanticUpstreamDiagnosticCause, SourceOccurrence,
     associate_semantic_entities, associate_semantic_entities_with_macro_binding,
 };
 pub use semantic_document::{

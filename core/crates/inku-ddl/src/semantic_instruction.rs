@@ -8,17 +8,18 @@ use crate::{
     AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind, EnglishAttachmentMarkerKind,
     ExplicitPreviousReferenceOccurrence, JapaneseAttachmentMarkerKind, MacroParameterBindingResult,
     NormalizedDdlDocument, RemainingRoleKind, SemanticAssociationResult, SemanticEntity,
-    SemanticPreviousReference, SemanticRelationKind, SemanticTerm, SourceOccurrence,
-    associate_semantic_entities, associate_semantic_entities_with_macro_binding,
+    SemanticIssueCausalProvenance, SemanticPreviousReference, SemanticRelationKind, SemanticTerm,
+    SemanticUpstreamCausalRelation, SourceOccurrence, associate_semantic_entities,
+    associate_semantic_entities_with_macro_binding,
     semantic_association::{
-        project_semantic_term, semantic_entity_value, semantic_identity_value,
-        sentence_region_index,
+        causal_provenance, diagnostic_causes_between, project_semantic_term, semantic_entity_value,
+        semantic_identity_value, sentence_region_index,
     },
 };
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v13";
+    "inku.semantic-instruction-association.v14";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,6 +100,7 @@ pub struct SemanticInstructionIssue {
     pub kind: SemanticInstructionIssueKind,
     pub region_index: usize,
     pub occurrences: Vec<SemanticInstructionOccurrence>,
+    pub causal_provenance: SemanticIssueCausalProvenance,
 }
 
 /// Stable relation-association issue classes without fallback target selection.
@@ -351,6 +353,7 @@ fn build_semantic_instructions(
             occurrences: relations,
         });
     }
+    attach_instruction_causal_provenance(&association, &mut issues);
     issues.sort_by_key(|issue| {
         issue
             .occurrences
@@ -859,6 +862,7 @@ fn select_one(
                     .into_iter()
                     .map(|term| SemanticInstructionOccurrence { role, term })
                     .collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             });
             None
         }
@@ -882,7 +886,42 @@ fn append_orphan_issue(
             .into_iter()
             .map(|term| SemanticInstructionOccurrence { role, term })
             .collect(),
+        causal_provenance: SemanticIssueCausalProvenance::Unattributed,
     });
+}
+
+fn attach_instruction_causal_provenance(
+    association: &SemanticAssociationResult,
+    issues: &mut [SemanticInstructionIssue],
+) {
+    let mut heads_by_region = BTreeMap::<usize, Vec<&SourceOccurrence>>::new();
+    for entity in &association.ast.entities {
+        heads_by_region
+            .entry(entity.head.source().region_index)
+            .or_default()
+            .push(entity.head.source());
+    }
+
+    for issue in issues {
+        let mut causes = Vec::new();
+        if let Some(heads) = heads_by_region.get(&issue.region_index)
+            && let [head] = heads.as_slice()
+        {
+            for occurrence in &issue.occurrences {
+                let source = &occurrence.term.provenance.source;
+                if source.clause_index == head.clause_index {
+                    causes.extend(diagnostic_causes_between(
+                        &association.clause_stream,
+                        source.clause_index,
+                        source.atom_index,
+                        head.atom_index,
+                        SemanticUpstreamCausalRelation::InstructionOwnershipPath,
+                    ));
+                }
+            }
+        }
+        issue.causal_provenance = causal_provenance(causes);
+    }
 }
 
 fn project_instruction_term(

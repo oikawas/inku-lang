@@ -1,6 +1,6 @@
 {
-  "schema": "inku.semantic-instruction-association-fixture.v13",
-  "version": 13,
+  "schema": "inku.semantic-instruction-association-fixture.v14",
+  "version": 14,
   "cases": [
     {
       "id": "ja-position-order-one",
@@ -14,7 +14,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -29,7 +29,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -44,7 +44,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -59,7 +59,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -74,7 +74,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -89,7 +89,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 1
     },
     {
@@ -121,7 +121,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 0
     },
     {
@@ -136,7 +136,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 1
     },
     {
@@ -151,7 +151,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 1
     },
     {
@@ -235,7 +235,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null},{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null},{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 4
     },
     {
@@ -299,7 +299,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"fill\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":12,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"corner\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"fill\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":12,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"corner\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -323,7 +323,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":null,\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":null,\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -379,7 +379,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2
     },
     {
@@ -441,7 +441,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"blurring\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":{\"category\":\"ratio\",\"id\":\"crescent\"},\"aspect\":{\"category\":\"ratio\",\"id\":\"wide\"},\"width_extent\":{\"category\":\"ratio\",\"id\":\"full_width\"}},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"bleed\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"blurring\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":{\"category\":\"ratio\",\"id\":\"crescent\"},\"aspect\":{\"category\":\"ratio\",\"id\":\"wide\"},\"width_extent\":{\"category\":\"ratio\",\"id\":\"full_width\"}},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"bleed\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 2,
       "instruction_proportion_aspects": [
         "wide"
@@ -494,7 +494,7 @@
       ],
       "association_issue_kinds": [],
       "instruction_issues": [],
-      "canonical": "{\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":\"fine\",\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v13\"}",
+      "canonical": "{\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":\"fine\",\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v14\"}",
       "owned_instruction_occurrence_count": 0
     }
   ]

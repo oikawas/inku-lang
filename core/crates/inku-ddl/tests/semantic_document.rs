@@ -5,13 +5,14 @@ use inku_ddl::{
     ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
     SemanticContinuationIssueKind, SemanticDocumentResult, SemanticHead,
-    SemanticInstructionAssociationResult, SourceOccurrence, associate_semantic_document,
+    SemanticInstructionAssociationResult, SemanticIssueCausalProvenance,
+    SemanticUpstreamCausalRelation, SourceOccurrence, associate_semantic_document,
     associate_semantic_document_with_macro_binding, bind_macro_parameters,
     project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v10.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v11.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -334,6 +335,10 @@ fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallba
             SemanticContinuationIssueKind::BlockedBoundary,
         ),
         (
+            "line. mystery. orchard. the line swaying fine.",
+            SemanticContinuationIssueKind::BlockedBoundary,
+        ),
+        (
             "fine line. the line large swaying.",
             SemanticContinuationIssueKind::ConflictingPredicate,
         ),
@@ -345,6 +350,31 @@ fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallba
 
         assert_eq!(result.continuation_issues.len(), 1, "{source}");
         assert_eq!(result.continuation_issues[0].kind, expected, "{source}");
+        match expected {
+            SemanticContinuationIssueKind::BlockedBoundary => {
+                let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) =
+                    &result.continuation_issues[0].causal_provenance
+                else {
+                    panic!("blocked continuation retains its diagnostic boundary: {source}");
+                };
+                let expected_count = if source.contains("orchard") { 2 } else { 1 };
+                assert_eq!(causes.len(), expected_count, "{source}");
+                assert!(causes.iter().all(|cause| {
+                    cause.relation == SemanticUpstreamCausalRelation::ContinuationBoundary
+                }));
+                assert!(
+                    causes
+                        .windows(2)
+                        .all(|pair| pair[0].span.start_byte < pair[1].span.start_byte),
+                    "{source}"
+                );
+            }
+            _ => assert_eq!(
+                result.continuation_issues[0].causal_provenance,
+                SemanticIssueCausalProvenance::Unattributed,
+                "independent continuation issue stays explicitly unattributed: {source}"
+            ),
+        }
         assert!(!result.ast.complete, "{source}");
         assert!(result.canonical_bytes.is_none(), "{source}");
         assert_eq!(result.owned_continuation_occurrence_count, 2, "{source}");
@@ -550,17 +580,17 @@ fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v10");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v11");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v12"
+        "inku.semantic-entity-association.v13"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v13"
+        "inku.semantic-instruction-association.v14"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v10");
-    assert_eq!(fixture.version, 10);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v11");
+    assert_eq!(fixture.version, 11);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -792,7 +822,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v10");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v11");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -995,7 +1025,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v10");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v11");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

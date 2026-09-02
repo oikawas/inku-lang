@@ -2,16 +2,121 @@ use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
     CanonicalPreviousReference, CanonicalRelationForm, ClauseAtom, ClauseSeparatorKind,
-    ClauseStream, CoreRoleKind, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
+    ClauseStream, CoreRoleKind, MacroDefinition, MacroLock, NeutralDiagnosticKind,
+    NormalizedDdlDocument, OwnedSemanticOccurrence, RemainingRoleKind, ResolvedInstructionLanguage,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SemanticAssociationResult, SemanticHead,
-    SemanticMacroInvocationHead, SemanticMacroParameterValue, SourceOccurrence,
-    associate_semantic_entities, associate_semantic_entities_with_macro_binding,
-    bind_macro_parameters, project_macro_semantic_ref, saijiki_asset,
+    SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroParameterValue,
+    SemanticUpstreamCausalRelation, SourceOccurrence, associate_semantic_entities,
+    associate_semantic_entities_with_macro_binding, bind_macro_parameters,
+    project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-association-v12.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-association-v13.json");
+
+#[test]
+fn missing_head_retains_typed_upstream_cause_without_weakening_existing_issues() {
+    let source = "blue orchard.";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+
+    assert_eq!(
+        association_issue_kinds(&result),
+        ["missing_entity_head", "upstream_unknown"]
+    );
+    let missing = &result.issues[0];
+    assert_eq!(missing.occurrences.len(), 1);
+    let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &missing.causal_provenance
+    else {
+        panic!("missing head must retain its structurally proven upstream cause");
+    };
+    assert_eq!(causes.len(), 1);
+    let cause = &causes[0];
+    assert_eq!(
+        cause.relation,
+        SemanticUpstreamCausalRelation::MissingEntityHeadGap
+    );
+    assert_eq!(cause.diagnostic_kind, NeutralDiagnosticKind::Unknown);
+    assert!(!cause.recognized);
+    assert_eq!(cause.region_index, 0);
+    assert_eq!(cause.clause_index, 0);
+    assert_eq!(cause.atom_index, 1);
+    assert_eq!(
+        &source[cause.span.start_byte..cause.span.end_byte],
+        "orchard"
+    );
+
+    let upstream = &result.issues[1];
+    assert!(upstream.occurrences.is_empty());
+    assert_eq!(
+        upstream
+            .upstream_diagnostic
+            .as_ref()
+            .map(|diagnostic| diagnostic.surface.as_str()),
+        Some("orchard")
+    );
+}
+
+#[test]
+fn ambiguous_entity_provenance_is_ordered_and_fail_closed_at_topology_boundaries() {
+    let source = "red mystery -8 blue circle.";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let result = associate_semantic_entities(&document).unwrap();
+    let ambiguous = result
+        .issues
+        .iter()
+        .find(|issue| issue.kind.as_str() == "ambiguous_entity_ownership")
+        .expect("blocked pre-head modifier remains an ownership issue");
+    assert_eq!(ambiguous.occurrences.len(), 1);
+    let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &ambiguous.causal_provenance
+    else {
+        panic!("both diagnostics on the modifier-to-head path must be retained");
+    };
+    assert_eq!(causes.len(), 2);
+    assert_eq!(
+        causes
+            .iter()
+            .map(|cause| cause.diagnostic_kind)
+            .collect::<Vec<_>>(),
+        [NeutralDiagnosticKind::Unknown, NeutralDiagnosticKind::Hole]
+    );
+    assert!(causes.windows(2).all(|pair| {
+        pair[0].span.start_byte < pair[1].span.start_byte && pair[0].atom_index < pair[1].atom_index
+    }));
+    assert!(causes.iter().all(|cause| {
+        cause.relation == SemanticUpstreamCausalRelation::EntityOwnershipPath
+            && cause.region_index == ambiguous.region_index
+            && cause.clause_index == 0
+    }));
+    assert_eq!(
+        result
+            .issues
+            .iter()
+            .filter(|issue| issue.upstream_diagnostic.is_some())
+            .count(),
+        2,
+        "dedicated upstream issues remain separately delivered"
+    );
+
+    for source in ["red circle blue mystery.", "red circle blue."] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_entities(&document).unwrap();
+        let ambiguous = result
+            .issues
+            .iter()
+            .find(|issue| issue.kind.as_str() == "ambiguous_entity_ownership")
+            .expect("post-head modifier remains an ownership issue");
+        assert_eq!(
+            ambiguous.causal_provenance,
+            SemanticIssueCausalProvenance::Unattributed,
+            "co-location without a diagnostic on the ownership path is not causal: {source}"
+        );
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -459,13 +564,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v12"
+        "inku.semantic-entity-association.v13"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v12"
+        "inku.semantic-entity-association-fixture.v13"
     );
-    assert_eq!(fixture.version, 12);
+    assert_eq!(fixture.version, 13);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture

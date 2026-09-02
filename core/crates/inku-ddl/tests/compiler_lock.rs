@@ -4,14 +4,15 @@ use inku_ddl::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, CompilerLockState, MacroDefinition, MacroExpansionLimits,
     MacroLock, NormalizedDdlDocument, RelationReferenceEvidenceAvailability,
     ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDeliveryOwner, SemanticHead,
-    TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters,
-    compile_typed_ddl, expanded_meaning_canonical_bytes, saijiki_asset,
+    SemanticIssueCausalProvenance, SemanticUpstreamCausalRelation, TYPED_DDL_COMPILATION_SCHEMA_ID,
+    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters, compile_typed_ddl,
+    expanded_meaning_canonical_bytes, saijiki_asset,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v9.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v10.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -19,6 +20,60 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_nodes_per_invocation: 100,
     max_total_nodes: 500,
 };
+
+#[test]
+fn compiler_chain_preserves_typed_causes_without_duplicate_deliveries() {
+    let result = compile(
+        "red mystery -8 blue circle.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(result.schema_id, TYPED_DDL_COMPILATION_SCHEMA_ID);
+    assert_eq!(
+        result.compiler_lock.as_ref().unwrap().schema_id,
+        TYPED_DDL_COMPILER_LOCK_SCHEMA_ID
+    );
+    let document = result.semantic_document.as_ref().unwrap();
+    let issue = document
+        .instruction_association
+        .association
+        .issues
+        .iter()
+        .find(|issue| issue.kind.as_str() == "ambiguous_entity_ownership")
+        .unwrap();
+    let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &issue.causal_provenance
+    else {
+        panic!("compiler-owned document must retain association provenance");
+    };
+    assert_eq!(causes.len(), 2);
+    assert!(
+        causes
+            .iter()
+            .all(|cause| { cause.relation == SemanticUpstreamCausalRelation::EntityOwnershipPath })
+    );
+    for cause in causes {
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.span == Some(cause.span))
+                .count(),
+            1,
+            "provenance references the dedicated upstream delivery instead of redelivering it"
+        );
+    }
+    assert_eq!(
+        result
+            .deliveries
+            .iter()
+            .map(|delivery| delivery.id.as_str())
+            .collect::<HashSet<_>>()
+            .len(),
+        result.deliveries.len()
+    );
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1560,12 +1615,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v9"
+        "inku.compiler-lock-visible-patch-fixture.v10"
     );
-    assert_eq!(fixture.version, 9);
+    assert_eq!(fixture.version, 10);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v10"
+        "inku.semantic-document.v11"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

@@ -9,14 +9,18 @@ use crate::{
     JapaneseAttachmentMarkerKind, MacroParameterBindingResult, NormalizedDdlDocument,
     OwnedSemanticOccurrence, ResolvedInstructionLanguage, SemanticAssociationIssueKind,
     SemanticHead, SemanticIdentity, SemanticInstruction, SemanticInstructionAssociationResult,
-    SemanticInstructionIssueKind, SemanticTerm, SourceOccurrence, SourceSpan,
-    associate_semantic_instructions, associate_semantic_instructions_with_macro_binding,
-    semantic_association::{project_semantic_term, semantic_identity_value, sentence_region_index},
+    SemanticInstructionIssueKind, SemanticIssueCausalProvenance, SemanticTerm,
+    SemanticUpstreamCausalRelation, SourceOccurrence, SourceSpan, associate_semantic_instructions,
+    associate_semantic_instructions_with_macro_binding,
+    semantic_association::{
+        causal_provenance, diagnostic_causes_in_source_range, project_semantic_term,
+        semantic_identity_value, sentence_region_index,
+    },
     semantic_instruction::semantic_instruction_value,
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v10";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v11";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -101,6 +105,7 @@ pub struct SemanticContinuationIssue {
     pub predicate_span: SourceSpan,
     pub candidate_targets: Vec<SemanticContinuationTarget>,
     pub consumed_upstream_spans: Vec<SourceSpan>,
+    pub causal_provenance: SemanticIssueCausalProvenance,
 }
 
 /// Source-preserving document semantic result over the accepted instruction chain.
@@ -334,6 +339,23 @@ fn associate_continuations(
         };
 
         if let Some(kind) = issue_kind {
+            let causal_provenance = if kind == SemanticContinuationIssueKind::BlockedBoundary {
+                let target_index = targets[0].0;
+                causal_provenance(diagnostic_causes_in_source_range(
+                    &association.association.clause_stream,
+                    instructions[target_index]
+                        .entity
+                        .head
+                        .source()
+                        .span
+                        .end_byte,
+                    marker.span.start_byte,
+                    &consumed_upstream_spans,
+                    SemanticUpstreamCausalRelation::ContinuationBoundary,
+                ))
+            } else {
+                SemanticIssueCausalProvenance::Unattributed
+            };
             issues.push(SemanticContinuationIssue {
                 kind,
                 instruction,
@@ -341,6 +363,7 @@ fn associate_continuations(
                 predicate_span,
                 candidate_targets: targets.into_iter().map(|(_, target)| target).collect(),
                 consumed_upstream_spans,
+                causal_provenance,
             });
             continue;
         }

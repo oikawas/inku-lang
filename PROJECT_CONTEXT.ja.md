@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.14.1 / Build 1066**
+**対象バージョン: v2.14.1 / Build 1072**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -52,6 +52,22 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 - `SPEC.md`: 英語公開仕様。
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: 実装・設計変更の履歴。
 
+### 受入済みのTyped DDL基盤（runtime未接続）
+
+`core/crates/inku-ddl` には、利用者に見える正規化DDLをsource span付きで保持し、
+日本語／英語の句・entity・修飾・数量・action・position・relation・coordination・
+continuationをtyped semantic documentへ組み立てるshared Rust compiler基盤がある。
+名前空間付きmacro呼出しは、汎用の`MacroDefinition`へlock解決し、typed parameterを
+bindingしてから、明示的な`composition_seed`と有限上限のもとで決定的に展開する。
+曖昧な所有先や未解決の意味は、先頭・最近傍・末尾を推測せずtyped issueとして
+fail closedする。
+
+この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
+したがって上の「現行アーキテクチャ」が現在のruntimeであり、Step 8の完了は
+Stage 1.5、Stage 2、coerce、JSON Score、Renderer、DB、APIの切替完了を意味しない。
+Scoreへのlowering、描画既定値、数量解決、typed holeの停止範囲、runtime cutoverは
+後続Stepで決める。
+
 ## 守るべき設計契約
 
 - DDLテキストは母語で書ける。
@@ -76,8 +92,9 @@ JSON Scoreのキーは英語で統一する。
 旧 `rh2` は legacy として保持）、履歴ID、系譜node IDを混同しない。
 - 系譜は明示された派生操作だけを記録し、類似度、時刻、hash一致から親子関係を推測しない。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
-- プラグインはコードではなく検証済みの宣言的文書であり、Stage 1直後にコアDDLへ展開する。
-Stage 1.5 / coerce / Score / rh2はプラグインに依存しない。
+- 言語上のmacroはdomain別codeや個別文法を足さず、一つの汎用`MacroDefinition`形式で
+  記述する。現行runtimeのlegacy plugin展開はcutoverまで互換経路として残るが、
+  新しいsemantic authorityではない。
 - 語彙の正は saijiki テーブル（`server/src/inku_server/saijiki.py`、v1.92）であり、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・web歳時記表示・reference §1はそこから導出する。
 語彙の変更はテーブルとgolden testを経由する。
 - 日本語と英語の挙動を揃え、英語だけの要件を追加しない。

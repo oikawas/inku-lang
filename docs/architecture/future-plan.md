@@ -4,6 +4,12 @@ On 2026-08-16 a review of `ddl-processing-pipeline.md` produced a set of improve
 
 The plan is a living document. As an item ships, its row moves from "ahead" to "done".
 
+This document covers observation and migration within the current generation runtime. Separately,
+the shared-Rust foundation that turns visible DDL into a typed semantic document and compiler lock
+has been accepted through Step 8, but it is not connected to product runtime. The current boundary
+between the two is canonical in `ddl-processing-pipeline.md`; this document does not count that
+disconnected foundation as a completed runtime change.
+
 ## Principles shared by every item
 
 1. **Not one byte of the drawing changes.** Most of the plan is observation, display, and documents. The portability preparation changes only ownership boundaries inside the Renderer, not the Score, seeds, or SVG. The only candidate behavior change (moving request delivery upstream) passes through its own ruling.

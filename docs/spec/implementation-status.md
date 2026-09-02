@@ -39,6 +39,9 @@ The reference implementation currently includes:
   drawing, DDL replay, batch, and demo all share the selected one
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay
+- shared-Rust `inku-ddl` compiler foundation that preserves visible normalized DDL with source
+  spans and reaches a typed semantic document, generic macro locking/binding/finite expansion,
+  ownership conservation, and fail-closed diagnostics; accepted, but not connected to product runtime
 - scene-tone color strategy, richer fallback Scores, sensory visibility
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,

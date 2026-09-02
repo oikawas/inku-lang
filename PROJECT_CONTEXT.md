@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.14.1 / Build 1066**
+**Target version: v2.14.1 / Build 1072**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -62,6 +62,22 @@ instruction
 - `SPEC.md`: maintained public English adaptation.
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: chronological design and implementation history.
 
+### Accepted typed DDL foundation (not connected to runtime)
+
+`core/crates/inku-ddl` contains the accepted shared-Rust compiler foundation. It preserves the
+visible normalized DDL with source spans and composes Japanese and English phrases, entities,
+modifiers, quantities, actions, positions, relations, coordination, and continuation into a
+typed semantic document. A qualified macro invocation is lock-resolved to the generic
+`MacroDefinition`, its typed parameters are bound, and expansion is deterministic under an
+explicit `composition_seed` and caller-owned finite limits. Ambiguous ownership and unresolved
+meaning fail closed as typed issues; the compiler does not guess by first, nearest, or last.
+
+No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
+above therefore remains the active runtime. Completion of Step 8 does not mean that Stage 1.5,
+Stage 2, coerce, JSON Score, the Renderer, the DB, or the API has been cut over. Score lowering,
+drawing defaults, quantity resolution, typed-hole blocking, and runtime cutover belong to later
+steps.
+
 ## Contracts That Must Remain Intact
 
 - DDL text may be written in the author's language.
@@ -86,8 +102,9 @@ The conversion comes from the per-mark cost the server measured, with no copy of
 - Lineage records explicit derivation operations only.
 Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
-- Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1.
-Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
+- Language-level macros use one generic `MacroDefinition` format rather than domain-specific code
+  or grammars. The current runtime's legacy plugin expansion remains a compatibility path until
+  cutover, not the new semantic authority.
 - The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary.
 The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display,
 and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
@@ -113,7 +130,7 @@ To learn why something took its current shape, search the changelog by term, ver
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 41 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 20 | `server/src/inku_server/layer_versions.py` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 21 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 

@@ -16,9 +16,6 @@ under which Japanese was canonical for the concepts and English carried the
 operational sections alone.  **Japanese remains the canonical source**: a change
 to the specification is written in `SPEC.ja.md` first and then reflected here.
 
-Sections 18 onward do not yet have a Japanese counterpart; bringing them across
-is the remaining part of that work.
-
 For ordinary development, start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
 and read only the specification sections relevant to the task. Chronological
 release history is maintained separately in [CHANGELOG.md](CHANGELOG.md), with

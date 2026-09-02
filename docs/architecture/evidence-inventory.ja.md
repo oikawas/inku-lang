@@ -4,15 +4,15 @@
 
 | 項目 | 値 |
 |---|---|
-| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoring再照合 2026-08-24、SQLite persistence refactoring完了を再照合 2026-08-27 |
-| source branch / 実装commit | `main` / `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab`（本書更新前の実装baseline） |
+| 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoring再照合 2026-08-24、SQLite persistence refactoring完了を再照合 2026-08-27、Typed DDL Step 8完了を再照合 2026-09-02 |
+| source branch / 実装commit | `main` / `4433fa4f50c6ee278d824dff4f60b8a4c3c33095`（本書更新前の実装baseline） |
 | source状態 | 実装baselineではclean。本更新は公開文書だけを変更する |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.14.1 / Build 1061` |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.14.1 / Build 1072` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.14.1`、`web/BUILD_NUMBER` = `1061` |
+| Web / app | `web/APP_VERSION` = `v2.14.1`、`web/BUILD_NUMBER` = `1072` |
 | Render Engine | 実装 `default` / `41`、共有Rust coreと薄いPython adapter |
 | DDL | `ddl_version=3` / `ddl_engine_version=21` |
-| Android | `android/VERSION` = `2.1.4-android.77`、`android/BUILD_NUMBER` = `148120`、Room schema 10、共有Rust Render Engine `41`、DDL Engine `21` |
+| Android | `android/VERSION` = `2.1.4-android.78`、`android/BUILD_NUMBER` = `148121`、Room schema 10、共有Rust Render Engine `41`、DDL Engine `21` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
 
@@ -37,6 +37,7 @@
 | PIPE-LIMITS | 描画量の上限 | 展開primitive数・命令数・個数読み取りの上限を1箇所で定義し、request単位で解決して作品へ記録 | `limits.py` (`Limits`, `DEFAULT_LIMITS`); `render.py:_limits_for_render` | Project Context「設計契約」 | 確認済み | 公開可 |
 | PIPE-SKETCH | Stage 0.5 写生 | 任意の自然文写生と状態記録 | `sketch.py`; `render.py:_resolved_sketch`; `SketchDetail` | §12.15; Project Context「パイプライン」 | 確認済み | 公開可 |
 | PIPE-S1 | Stage 1 解釈 | 記述から正規化DDL | `interpreter.py:interpret_detail`, `_build_system_prompt_parts` | §12.1, §12.6 | 確認済み | 公開可 |
+| PIPE-TYPED-DDL | Typed DDL compiler基盤（runtime未接続） | 可視DDLのsource span、typed semantic document、汎用macroのlock/binding/有限展開、所有権保存、曖昧さのfail-closed診断 | `core/crates/inku-ddl/src/{document,parser,clause,semantic_association,semantic_instruction,semantic_document,macro_definition,macro_resolution,macro_parameter_binding,macro_expansion,compiler_lock}.rs`と対応test。`compile_typed_ddl`の製品runtime consumerは同crate外に存在しない | §4.4–4.6, §12.4 | 確認済み | 公開可 |
 | PIPE-PLUGIN | 宣言的プラグイン | 検証済み文書をcore DDL/instructionへ決定的展開 | `plugins/document_format.py` (`PluginDocumentManager`, `expand_plugin_ddl`); `render.py:_call_compose_detail` | §4.4–4.7 | 確認済み | 公開可 |
 | PIPE-S15 | Stage 1.5 | 決定的な焦点書換えと明示変奏 | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | 確認済み | 公開可 |
 | PIPE-S2 | Stage 2 | DDLからJSON Score、schema tool利用 | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | 確認済み | 公開可 |

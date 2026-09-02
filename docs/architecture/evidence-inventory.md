@@ -4,15 +4,15 @@
 
 | Subject | Value |
 |---|---|
-| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring reconciled 2026-08-24; completed SQLite persistence refactoring reconciled 2026-08-27 |
-| Source branch / implementation commit | `main` / `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab` (implementation baseline before this document update) |
+| Date | 2026-08-10 (JST); fully refreshed 2026-08-17; Web/core refactoring reconciled 2026-08-24; completed SQLite persistence refactoring reconciled 2026-08-27; completed typed DDL Step 8 reconciled 2026-09-02 |
+| Source branch / implementation commit | `main` / `4433fa4f50c6ee278d824dff4f60b8a4c3c33095` (implementation baseline before this document update) |
 | Source state | Clean at the implementation baseline; this update changes public documentation only |
-| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.14.1 / Build 1061` |
+| Project Context | `PROJECT_CONTEXT.ja.md`, target `v2.14.1 / Build 1072` |
 | Japanese specification | `SPEC.ja.md`, document version `v1.92.0` |
-| Web / app | `web/APP_VERSION` = `v2.14.1`; `web/BUILD_NUMBER` = `1061` |
+| Web / app | `web/APP_VERSION` = `v2.14.1`; `web/BUILD_NUMBER` = `1072` |
 | Render Engine | implementation `default / 41`; shared Rust core with a thin Python adapter |
 | DDL | `ddl_version=3`; `ddl_engine_version=21` |
-| Android | `android/VERSION` = `2.1.4-android.77`; `android/BUILD_NUMBER` = `148120`; Room schema 10; shared Rust Render Engine `41`; DDL Engine `21` |
+| Android | `android/VERSION` = `2.1.4-android.78`; `android/BUILD_NUMBER` = `148121`; Room schema 10; shared Rust Render Engine `41`; DDL Engine `21` |
 
 Environment-variable names may appear, but values, credentials, production DB contents, and deployment-specific identifiers were outside the investigation.
 
@@ -37,6 +37,7 @@ Environment-variable names may appear, but values, credentials, production DB co
 | PIPE-LIMITS | Drawing-volume limits | Define the ceilings on expanded primitives, instructions, and counts read from a description in one place, resolve them per request, and record them on the work | `limits.py` (`Limits`, `DEFAULT_LIMITS`); `render.py:_limits_for_render` | Project Context | Confirmed |
 | PIPE-SKETCH | Stage 0.5 Sketch from life | Optional natural-language observation and state record | `sketch.py`; `render.py:_resolved_sketch`; `SketchDetail` | §12.15; Project Context | Confirmed |
 | PIPE-S1 | Stage 1 interpretation | Description to Instructions (normalized DDL) | `interpreter.py:interpret_detail`, `_build_system_prompt_parts` | §12.1, §12.6 | Confirmed |
+| PIPE-TYPED-DDL | Typed DDL compiler foundation (not connected to runtime) | Preserve visible-DDL source spans; build the typed semantic document; lock, bind, and finitely expand generic macros; conserve ownership; and fail closed on ambiguity | `core/crates/inku-ddl/src/{document,parser,clause,semantic_association,semantic_instruction,semantic_document,macro_definition,macro_resolution,macro_parameter_binding,macro_expansion,compiler_lock}.rs` and their tests. No product-runtime consumer of `compile_typed_ddl` exists outside that crate | §4.4–4.6, §12.4 | Confirmed |
 | PIPE-PLUGIN | Declarative plugin | Deterministic writing-down into core DDL and optional instructions | `plugins/document_format.py`; `render.py:_call_compose_detail` | §4.4–4.7 | Confirmed |
 | PIPE-S15 | Stage 1.5 | Deterministic focus rewrite and explicit variation | `ddl_expander.py:expand_intermediate_ddl`, `_expand_ja`, `_expand_en` | §12.11–12.13, §14.5 | Confirmed |
 | PIPE-S2 | Stage 2 | DDL to JSON Score through a schema tool | `composer.py:compose`, `_score_tool_schema`; `schema.py:Score` | §12.7 | Confirmed |

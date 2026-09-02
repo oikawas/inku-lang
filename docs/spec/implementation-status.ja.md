@@ -29,6 +29,7 @@
 - 色の搬送・否定された色・モチーフヒントの到達・数理的な釣り合いマーカーの標本行についての CLI ベンチマーク診断
 - 設定で選ぶ 2 体（`Incu` / `Yuragi`）の進捗マスコット。単一描画・DDL 再演・バッチ・デモが同じ 1 体を共有する
 - 歳時記ドロワー・拡大ダイアログ・トークン／時間の表示・中断できる `/api/compose` 再演を備えた、統合された DDL 解釈エディタ
+- 可視の正規化DDLをsource span付きで保持し、typed semantic document、汎用macroのlock／binding／有限展開、所有権保存、fail-closed診断までを行うshared Rust `inku-ddl` compiler基盤。受入済みだが製品runtimeには未接続
 - 場面の色調に基づく色の戦略、より豊かなフォールバック Score、感覚の可視性の安全装置、そして現行 schema の内側での primitive のより広い活用
 - renderer の素材効果、揺れ、回転、arrangement の経路、密度／減衰、キャンバス比の対応
 

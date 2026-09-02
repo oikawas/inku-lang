@@ -4,6 +4,11 @@
 
 計画は生きた文書である。各項目が実装されたら、本書は「これから」から「済んだもの」へ行を移す。
 
+本書は現行生成runtimeの観測・移設計画を扱う。これとは別に、可視DDLをshared Rustで
+typed semantic documentとcompiler lockへ変換する基盤はStep 8まで受入済みだが、
+製品runtimeには未接続である。両者の現在地は`ddl-processing-pipeline.ja.md`を正とし、
+未接続の基盤を本書の「済んだruntime変更」として数えない。
+
 ## 全項目に共通の原則
 
 1. **描画を1バイトも変えない。** 計画の大半は観測・表示・文書である。portabilityの前準備はRenderer内部の所有境界だけを変え、Score・seed・SVGを変えない。唯一の挙動変更候補（要求配達の移設）は独立の裁定を経る。

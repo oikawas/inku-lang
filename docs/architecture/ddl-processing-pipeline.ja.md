@@ -16,6 +16,34 @@
 
 判定単位の詳細（どの条件で・何が起き・何が記録されるか）は `description-to-svg.ja.md` が持つ。
 
+## 受入済みのTyped DDL経路（runtime未接続）
+
+Step 8で、利用者に見える正規化DDLからtyped semantic documentとcompiler lockまでを
+作るshared Rust基盤を`core/crates/inku-ddl`へ受け入れた。
+
+```mermaid
+flowchart LR
+    VDDL["可視の正規化DDL"]
+    DOC["source-preserving document"]
+    STRUCTURE["lexer / clause stream\nmacro resolution / binding"]
+    AST["typed semantic document"]
+    EXPAND["bounded macro expansion"]
+    LOCK["compiler lock"]
+    SCORE["JSON Score / 現行runtime"]
+
+    VDDL --> DOC --> STRUCTURE --> AST --> EXPAND --> LOCK
+    LOCK -.->|"後続Stepで接続"| SCORE
+```
+
+この経路は、Stage 1が生成したDDLと利用者が直接書いたDDLを同じ可視本文から扱う。
+自然文や非表示の背景情報をcompilerへ迂回させず、canvas metadataや未決定の描画既定値を
+DDLの意味として挿入しない。複数の読みが残る場合はfirst / nearest / lastで決めず、
+source spanと候補をtyped issueへ保存してfail closedする。
+
+`compile_typed_ddl`の呼出しは現時点で`inku-ddl` crate内とそのtestだけにあり、server・
+Web・Androidの製品pipelineには未接続である。したがって、以下の通常描画図は現在の
+runtimeを、上図は受入済みの次期compiler境界を表す。
+
 ## 通常描画
 
 ```mermaid

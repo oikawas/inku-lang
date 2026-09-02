@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `8c39e5f5aac0fb15c5ca0f859587b4b7eb7367ab`, app `v2.14.1 / Build 1061`.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `4433fa4f50c6ee278d824dff4f60b8a4c3c33095`, app `v2.14.1 / Build 1072`.
 
 ## Reading order
 

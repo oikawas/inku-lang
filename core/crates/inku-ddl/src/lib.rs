@@ -160,6 +160,7 @@ pub use semantic_document::{
     SemanticDocumentIssue, SemanticDocumentIssueKind, SemanticDocumentResult,
     associate_semantic_document, associate_semantic_document_with_macro_binding,
 };
+// Coordination issues expose source-owned marker, candidate, cause, and claim evidence.
 pub use semantic_instruction::{
     SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticCoordinatedHeadGroup,
     SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticGroupPredicateEdge,

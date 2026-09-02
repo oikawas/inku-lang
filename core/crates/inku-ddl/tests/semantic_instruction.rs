@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v15.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v16.json");
 
 #[test]
 fn action_and_position_issues_retain_only_diagnostics_on_their_ownership_paths() {
@@ -627,13 +627,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v15"
+        "inku.semantic-instruction-association.v16"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v15"
+        "inku.semantic-instruction-association-fixture.v16"
     );
-    assert_eq!(fixture.version, 15);
+    assert_eq!(fixture.version, 16);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1377,7 +1377,17 @@ fn coordinated_group_preserves_member_order_modifiers_and_fail_closed_boundaries
     let [issue] = blocked.coordination_issues.as_slice() else {
         panic!("blocked coordination boundary has one typed issue");
     };
-    assert_eq!(issue.kind.as_str(), "ambiguous_coordination_boundary");
+    assert_eq!(issue.kind.as_str(), "blocked_coordination_boundary");
+    let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &issue.causal_provenance
+    else {
+        panic!("blocked coordination retains typed upstream cause");
+    };
+    assert_eq!(causes.len(), 1);
+    assert_eq!(
+        &"place a circle and mystery line at the center."
+            [causes[0].span.start_byte..causes[0].span.end_byte],
+        "mystery"
+    );
     assert_eq!(issue.member_instruction_indices, [0, 1]);
     assert_eq!(issue.markers.len(), 1);
     assert_eq!(issue.predicates.len(), 2);
@@ -1385,6 +1395,74 @@ fn coordinated_group_preserves_member_order_modifiers_and_fail_closed_boundaries
     assert_eq!(blocked.delivered_instruction_occurrence_count, 2);
     assert!(!blocked.ast.complete);
     assert!(blocked.canonical_bytes.is_none());
+}
+
+#[test]
+fn every_input_coordination_marker_reaches_a_group_or_typed_issue_once() {
+    for (language, source, expected_kind, available_surface) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "and circle.",
+            "missing_left_coordination_head",
+            "circle",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "circle and.",
+            "missing_right_coordination_head",
+            "circle",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "赤と円。",
+            "missing_left_coordination_head",
+            "円",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "円と赤。",
+            "missing_right_coordination_head",
+            "円",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_instructions(&document).unwrap();
+        assert!(result.ast.coordinated_head_groups.is_empty(), "{source}");
+        let [issue] = result.coordination_issues.as_slice() else {
+            panic!("{source}: missing-side marker must have one typed owner");
+        };
+        assert_eq!(issue.kind.as_str(), expected_kind, "{source}");
+        assert_eq!(issue.markers.len(), 1, "{source}");
+        assert_eq!(issue.member_instruction_indices.len(), 1, "{source}");
+        let candidate = &result.ast.instructions[issue.member_instruction_indices[0]];
+        assert_eq!(
+            &source[candidate.entity.head.source().span.start_byte
+                ..candidate.entity.head.source().span.end_byte],
+            available_surface,
+            "{source}"
+        );
+        assert_eq!(result.owned_coordination_marker_count, 1, "{source}");
+        assert_eq!(result.delivered_coordination_marker_count, 1, "{source}");
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+    }
+
+    let document = NormalizedDdlDocument::new(
+        "circle and and line.",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let overlapping = associate_semantic_instructions(&document).unwrap();
+    assert!(overlapping.ast.coordinated_head_groups.is_empty());
+    assert_eq!(overlapping.coordination_issues.len(), 1);
+    assert_eq!(
+        overlapping.coordination_issues[0].kind.as_str(),
+        "overlapping_coordination_chain"
+    );
+    assert_eq!(overlapping.coordination_issues[0].markers.len(), 2);
+    assert_eq!(overlapping.owned_coordination_marker_count, 2);
+    assert_eq!(overlapping.delivered_coordination_marker_count, 2);
 }
 
 fn parse_language(value: &str, case_id: &str) -> ResolvedInstructionLanguage {
@@ -1625,7 +1703,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v15"
+        "inku.semantic-instruction-association.v16"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

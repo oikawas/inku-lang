@@ -9,13 +9,14 @@ use crate::{
     ClauseAtom, ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, MacroDefinition,
     MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult,
     MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
-    MacroParameterBindingResult, MacroSeed, NormalizedDdlDocument, OwnedSemanticOccurrence,
-    SemanticAssociationIssueKind, SemanticContinuationIssue, SemanticContinuationIssueKind,
-    SemanticContinuationTarget, SemanticCoordinationIssueKind, SemanticDocumentIssueKind,
-    SemanticDocumentResult, SemanticHead, SemanticInstruction, SemanticInstructionIssueKind,
-    SemanticInstructionOccurrenceRole, SemanticMacroParameterValue, SemanticRelationIssueKind,
-    SemanticTerm, SourceSpan, associate_semantic_document_with_macro_binding,
-    bind_macro_parameters, derive_macro_seed, expand_macros, project_macro_semantic_ref,
+    MacroParameterBindingResult, MacroSeed, NeutralDiagnosticKind, NormalizedDdlDocument,
+    OwnedSemanticOccurrence, SemanticAssociationIssueKind, SemanticContinuationIssue,
+    SemanticContinuationIssueKind, SemanticContinuationTarget, SemanticCoordinationIssueKind,
+    SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead, SemanticInstruction,
+    SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole, SemanticIssueCausalProvenance,
+    SemanticMacroParameterValue, SemanticRelationIssueKind, SemanticTerm, SourceSpan,
+    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    expand_macros, project_macro_semantic_ref,
     semantic_document::exclusive_continuation_issue_claim_spans,
 };
 
@@ -26,9 +27,9 @@ pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v1
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v11";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v12";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v11";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v12";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -568,24 +569,63 @@ fn project_deliveries(
             add_term_explicit(&mut projection, SemanticDeliveryOwner::Position, position);
         }
     }
-    let mut coordinated_marker_spans = semantic_document
+    let mut group_marker_spans = semantic_document
         .ast
         .coordinated_head_groups
         .iter()
         .flat_map(|group| &group.markers)
-        .chain(
-            semantic_document
-                .instruction_association
-                .coordination_issues
-                .iter()
-                .flat_map(|issue| &issue.markers),
-        )
         .map(|marker| marker.span)
         .collect::<Vec<_>>();
-    coordinated_marker_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
-    coordinated_marker_spans.dedup();
-    for span in coordinated_marker_spans {
+    let mut issue_marker_spans = semantic_document
+        .instruction_association
+        .coordination_issues
+        .iter()
+        .flat_map(|issue| &issue.markers)
+        .map(|marker| marker.span)
+        .collect::<Vec<_>>();
+    group_marker_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+    issue_marker_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+    let duplicate_group_marker = group_marker_spans.windows(2).any(|pair| pair[0] == pair[1]);
+    let duplicate_issue_marker = issue_marker_spans.windows(2).any(|pair| pair[0] == pair[1]);
+    let cross_owned_marker = group_marker_spans
+        .iter()
+        .any(|span| issue_marker_spans.contains(span));
+    if group_marker_spans.len() + issue_marker_spans.len()
+        != semantic_document
+            .instruction_association
+            .owned_coordination_marker_count
+        || semantic_document
+            .instruction_association
+            .delivered_coordination_marker_count
+            != semantic_document
+                .instruction_association
+                .owned_coordination_marker_count
+        || duplicate_group_marker
+        || duplicate_issue_marker
+        || cross_owned_marker
+    {
+        add_blocking(
+            &mut projection,
+            "coordination_marker_delivery_integrity",
+            group_marker_spans
+                .first()
+                .or(issue_marker_spans.first())
+                .copied(),
+        );
+    }
+    for span in group_marker_spans {
         add_syntax(&mut projection, span, "coordinated_head_marker");
+    }
+    for span in issue_marker_spans {
+        add_syntax(&mut projection, span, "coordination_issue_marker");
+    }
+    for marker in semantic_document
+        .instruction_association
+        .coordination_issues
+        .iter()
+        .flat_map(|issue| &issue.continuation_markers)
+    {
+        add_syntax(&mut projection, marker.span, "continuation_subject_marker");
     }
     let mut restored_failed_heads = Vec::new();
     for issue in &semantic_document.continuation_issues {
@@ -809,13 +849,54 @@ fn project_deliveries(
                 format!("marker={}:{}", marker.span.start_byte, marker.span.end_byte)
             }),
         );
+        members.extend(
+            issue
+                .candidate_instruction_indices
+                .iter()
+                .map(|index| format!("continuation_candidate={index}")),
+        );
+        members.extend(
+            issue
+                .claim_spans
+                .iter()
+                .map(|span| format!("claim={}:{}", span.start_byte, span.end_byte)),
+        );
+        if let SemanticIssueCausalProvenance::UpstreamDiagnostics(causes) = &issue.causal_provenance
+        {
+            members.extend(causes.iter().map(|cause| {
+                format!(
+                    "cause={}:{}:{}:{}",
+                    cause.relation.as_str(),
+                    neutral_diagnostic_kind_key(cause.diagnostic_kind),
+                    cause.span.start_byte,
+                    cause.span.end_byte
+                )
+            }));
+        }
         if issue.predicates.is_empty() {
-            add_blocking_with_members(
-                &mut projection,
-                issue.kind.as_str(),
-                issue.markers.first().map(|marker| marker.span),
-                members,
-            );
+            match issue.kind {
+                SemanticCoordinationIssueKind::PredicateOwnershipConflict
+                | SemanticCoordinationIssueKind::ContinuationOwnershipConflict
+                | SemanticCoordinationIssueKind::ConflictingGroupActions
+                | SemanticCoordinationIssueKind::ConflictingGroupPositions => {
+                    add_ordered_conflict(
+                        &mut projection,
+                        issue.kind.as_str(),
+                        issue.claim_spans.first().copied(),
+                        members,
+                    );
+                }
+                SemanticCoordinationIssueKind::MissingLeftHead
+                | SemanticCoordinationIssueKind::MissingRightHead
+                | SemanticCoordinationIssueKind::MissingBothHeads
+                | SemanticCoordinationIssueKind::BlockedBoundary
+                | SemanticCoordinationIssueKind::OverlappingChain => add_blocking_with_members(
+                    &mut projection,
+                    issue.kind.as_str(),
+                    issue.markers.first().map(|marker| marker.span),
+                    members,
+                ),
+            }
             continue;
         }
         for predicate in &issue.predicates {
@@ -830,13 +911,18 @@ fn project_deliveries(
                 term_key(&predicate.term)
             ));
             match issue.kind {
-                SemanticCoordinationIssueKind::AmbiguousBoundary => add_blocking_with_members(
+                SemanticCoordinationIssueKind::MissingLeftHead
+                | SemanticCoordinationIssueKind::MissingRightHead
+                | SemanticCoordinationIssueKind::MissingBothHeads
+                | SemanticCoordinationIssueKind::BlockedBoundary
+                | SemanticCoordinationIssueKind::OverlappingChain => add_blocking_with_members(
                     &mut projection,
                     issue.kind.as_str(),
                     Some(predicate.term.provenance.source.span),
                     candidates,
                 ),
                 SemanticCoordinationIssueKind::PredicateOwnershipConflict
+                | SemanticCoordinationIssueKind::ContinuationOwnershipConflict
                 | SemanticCoordinationIssueKind::ConflictingGroupActions
                 | SemanticCoordinationIssueKind::ConflictingGroupPositions => add_ordered_conflict(
                     &mut projection,
@@ -941,6 +1027,14 @@ fn project_deliveries(
     }
 
     projection
+}
+
+const fn neutral_diagnostic_kind_key(kind: NeutralDiagnosticKind) -> &'static str {
+    match kind {
+        NeutralDiagnosticKind::Hole => "hole",
+        NeutralDiagnosticKind::Conflict => "conflict",
+        NeutralDiagnosticKind::Unknown => "unknown",
+    }
 }
 
 fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection: &mut Projection) {

@@ -8,9 +8,11 @@ use crate::{
     AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind,
     JapaneseAttachmentMarkerKind, MacroParameterBindingResult, NormalizedDdlDocument,
     OwnedSemanticOccurrence, ResolvedInstructionLanguage, SemanticAssociationIssueKind,
-    SemanticHead, SemanticIdentity, SemanticInstruction, SemanticInstructionAssociationResult,
-    SemanticInstructionIssueKind, SemanticIssueCausalProvenance, SemanticTerm,
-    SemanticUpstreamCausalRelation, SourceOccurrence, SourceSpan, associate_semantic_instructions,
+    SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticHead, SemanticIdentity,
+    SemanticInstruction, SemanticInstructionAssociationResult, SemanticInstructionIssueKind,
+    SemanticInstructionOccurrence, SemanticInstructionOccurrenceRole,
+    SemanticIssueCausalProvenance, SemanticTerm, SemanticUpstreamCausalRelation, SourceOccurrence,
+    SourceSpan, associate_semantic_instructions,
     associate_semantic_instructions_with_macro_binding,
     semantic_association::{
         causal_provenance, diagnostic_causes_in_source_range, project_semantic_term,
@@ -23,7 +25,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v12";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v13";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -148,7 +150,7 @@ pub fn associate_semantic_document_with_macro_binding(
 
 fn build_semantic_document(
     document: &NormalizedDdlDocument,
-    instruction_association: SemanticInstructionAssociationResult,
+    mut instruction_association: SemanticInstructionAssociationResult,
 ) -> SemanticDocumentResult {
     let mut grounds = Vec::new();
 
@@ -211,13 +213,16 @@ fn build_semantic_document(
         "semantic document must deliver every Ground occurrence exactly once"
     );
 
+    let coordination_continuation_occurrence_count =
+        arbitrate_coordination_continuation_claims(document, &mut instruction_association);
     let (
         instructions,
         continuations,
         continuation_issues,
-        owned_continuation_occurrence_count,
+        mut owned_continuation_occurrence_count,
         instruction_index_map,
     ) = associate_continuations(document, &instruction_association);
+    owned_continuation_occurrence_count += coordination_continuation_occurrence_count;
     let coordinated_head_groups = instruction_association
         .ast
         .coordinated_head_groups
@@ -255,7 +260,14 @@ fn build_semantic_document(
         .collect::<Vec<_>>();
     delivered_continuation_owners.sort_unstable();
     delivered_continuation_owners.dedup();
-    let delivered_continuation_occurrence_count = 2 * delivered_continuation_owners.len();
+    let delivered_coordination_continuation_occurrence_count = instruction_association
+        .coordination_issues
+        .iter()
+        .filter(|issue| issue.kind == SemanticCoordinationIssueKind::ContinuationOwnershipConflict)
+        .map(|issue| 2 * issue.continuation_markers.len())
+        .sum::<usize>();
+    let delivered_continuation_occurrence_count = 2 * delivered_continuation_owners.len()
+        + delivered_coordination_continuation_occurrence_count;
     assert_eq!(
         delivered_continuation_occurrence_count, owned_continuation_occurrence_count,
         "semantic document must deliver every continuation head and marker exactly once"
@@ -291,6 +303,7 @@ fn build_semantic_document(
                     consumed_upstream_spans.contains(&occurrence.term.provenance.source.span)
                 })
         })
+        && instruction_association.coordination_issues.is_empty()
         && instruction_association.relation_issues.is_empty();
     let ast = SemanticDocumentAst {
         ground,
@@ -316,6 +329,116 @@ fn build_semantic_document(
         owned_continuation_occurrence_count,
         delivered_continuation_occurrence_count,
     }
+}
+
+fn arbitrate_coordination_continuation_claims(
+    document: &NormalizedDdlDocument,
+    association: &mut SemanticInstructionAssociationResult,
+) -> usize {
+    let mut conflicts = Vec::new();
+    let mut owned_continuation_occurrences = 0;
+
+    for (group_index, group) in association.ast.coordinated_head_groups.iter().enumerate() {
+        let Some(edge_index) = association
+            .ast
+            .group_predicates
+            .iter()
+            .position(|edge| edge.group_index == group_index)
+        else {
+            continue;
+        };
+        let edge = association.ast.group_predicates[edge_index].clone();
+        if edge.action.is_none() && edge.position.is_none() {
+            continue;
+        }
+
+        let mut continuation_markers = Vec::new();
+        let mut candidate_instruction_indices = Vec::new();
+        for &member_index in &group.member_instruction_indices {
+            let mut claimant = association.ast.instructions[member_index].clone();
+            claimant.action = edge.action.clone();
+            claimant.position = edge.position.clone();
+            let Some(marker) = continuation_marker(document, association, &claimant) else {
+                continue;
+            };
+            if !has_continuation_predicate(&claimant) {
+                continue;
+            }
+            let member_candidates = association
+                .ast
+                .instructions
+                .iter()
+                .enumerate()
+                .take(member_index)
+                .filter(|(candidate_index, candidate)| {
+                    !group.member_instruction_indices.contains(candidate_index)
+                        && same_head_identity(&candidate.entity.head, &claimant.entity.head)
+                })
+                .map(|(candidate_index, _)| candidate_index)
+                .collect::<Vec<_>>();
+            if member_candidates.is_empty() {
+                continue;
+            }
+            continuation_markers.push(marker);
+            candidate_instruction_indices.extend(member_candidates);
+        }
+        if continuation_markers.is_empty() {
+            continue;
+        }
+        candidate_instruction_indices.sort_unstable();
+        candidate_instruction_indices.dedup();
+
+        let mut predicates = Vec::new();
+        if let Some(action) = edge.action {
+            predicates.push(SemanticInstructionOccurrence {
+                role: SemanticInstructionOccurrenceRole::Action,
+                term: action,
+            });
+            association.ast.group_predicates[edge_index].action = None;
+        }
+        if let Some(position) = edge.position {
+            predicates.push(SemanticInstructionOccurrence {
+                role: SemanticInstructionOccurrenceRole::Position,
+                term: position,
+            });
+            association.ast.group_predicates[edge_index].position = None;
+        }
+        let mut claim_spans = group
+            .markers
+            .iter()
+            .map(|marker| marker.span)
+            .chain(continuation_markers.iter().map(|marker| marker.span))
+            .chain(
+                predicates
+                    .iter()
+                    .map(|predicate| predicate.term.provenance.source.span),
+            )
+            .collect::<Vec<_>>();
+        claim_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+        claim_spans.dedup();
+        owned_continuation_occurrences += 2 * continuation_markers.len();
+        conflicts.push(SemanticCoordinationIssue {
+            kind: SemanticCoordinationIssueKind::ContinuationOwnershipConflict,
+            member_instruction_indices: group.member_instruction_indices.clone(),
+            candidate_instruction_indices,
+            markers: Vec::new(),
+            continuation_markers,
+            predicates,
+            claim_spans,
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+        });
+    }
+
+    association
+        .ast
+        .group_predicates
+        .retain(|edge| edge.action.is_some() || edge.position.is_some());
+    if !conflicts.is_empty() {
+        association.ast.complete = false;
+        association.canonical_bytes = None;
+        association.coordination_issues.extend(conflicts);
+    }
+    owned_continuation_occurrences
 }
 
 struct PendingContinuation {

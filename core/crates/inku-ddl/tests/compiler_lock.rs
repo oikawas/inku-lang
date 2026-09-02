@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v11.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -176,7 +176,7 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
         blocked
             .blocking_diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.kind == "ambiguous_coordination_boundary")
+            .filter(|diagnostic| diagnostic.kind == "blocked_coordination_boundary")
             .count(),
         2
     );
@@ -200,7 +200,7 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
         blocked
             .deliveries
             .iter()
-            .filter(|delivery| delivery.descriptor == "coordinated_head_marker")
+            .filter(|delivery| delivery.descriptor == "coordination_issue_marker")
             .count(),
         1
     );
@@ -213,6 +213,159 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
             .len(),
         blocked.deliveries.len()
     );
+}
+
+#[test]
+fn coordination_marker_and_continuation_claims_have_one_compiler_owner() {
+    for (language, source, expected_kind) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "and circle.",
+            "missing_left_coordination_head",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "circle and.",
+            "missing_right_coordination_head",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "赤と円。",
+            "missing_left_coordination_head",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "円と赤。",
+            "missing_right_coordination_head",
+        ),
+    ] {
+        let result = compile(source, language, &[], None, LIMITS);
+        let document = result.semantic_document.as_ref().unwrap();
+        assert_eq!(
+            document
+                .instruction_association
+                .owned_coordination_marker_count,
+            1
+        );
+        assert_eq!(
+            document
+                .instruction_association
+                .delivered_coordination_marker_count,
+            1
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.descriptor == "coordination_issue_marker")
+                .count(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .blocking_diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.kind == expected_kind)
+                .count(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .map(|delivery| delivery.id.as_str())
+                .collect::<HashSet<_>>()
+                .len(),
+            result.deliveries.len(),
+            "{source}"
+        );
+    }
+
+    let blocked = compile(
+        "place a circle and mystery line at the center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(blocked.deliveries.iter().any(|delivery| {
+        delivery
+            .descriptor
+            .contains("blocked_coordination_boundary|")
+            && delivery
+                .descriptor
+                .contains("cause=instruction_ownership_path:unknown:")
+    }));
+
+    let overlap = compile(
+        "line. place the line and a circle.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let document = overlap.semantic_document.as_ref().unwrap();
+    assert!(!document.ast.complete);
+    assert!(document.canonical_bytes.is_none());
+    assert_eq!(
+        overlap
+            .conflicts
+            .iter()
+            .filter(|conflict| { conflict.kind == "coordination_continuation_ownership_conflict" })
+            .count(),
+        1
+    );
+    let conflict = overlap
+        .conflicts
+        .iter()
+        .find(|conflict| conflict.kind == "coordination_continuation_ownership_conflict")
+        .unwrap();
+    assert!(
+        conflict
+            .candidate_identities
+            .iter()
+            .any(|candidate| candidate == "continuation_candidate=0")
+    );
+    assert!(
+        conflict
+            .candidate_identities
+            .iter()
+            .filter(|candidate| candidate.starts_with("claim="))
+            .count()
+            >= 3
+    );
+    assert_eq!(
+        overlap
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.descriptor == "coordinated_head_marker")
+            .count(),
+        1
+    );
+    assert_eq!(
+        overlap
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.descriptor == "continuation_subject_marker")
+            .count(),
+        1
+    );
+    assert_eq!(
+        overlap
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Action)
+            .count(),
+        0
+    );
+    assert_eq!(
+        overlap.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::BlockedConflict)
+    );
+    assert!(overlap.derived_seeds.is_empty());
+    assert!(overlap.macro_expansion.is_none());
 }
 
 #[test]
@@ -1935,12 +2088,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v11"
+        "inku.compiler-lock-visible-patch-fixture.v12"
     );
-    assert_eq!(fixture.version, 11);
+    assert_eq!(fixture.version, 12);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v12"
+        "inku.semantic-document.v13"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

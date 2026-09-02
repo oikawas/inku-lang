@@ -1,0 +1,531 @@
+{
+  "schema": "inku.semantic-instruction-association-fixture.v16",
+  "version": 16,
+  "cases": [
+    {
+      "id": "ja-position-order-one",
+      "language": "ja",
+      "source": "中央に円を八つ置く。",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "ja-position-order-two",
+      "language": "ja",
+      "source": "中央に、円を八つ置く。",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "en-position-order-one",
+      "language": "en",
+      "source": "place eight circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "en-position-order-two",
+      "language": "en",
+      "source": "place eight circle in center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "position-left-edge",
+      "language": "en",
+      "source": "place eight circle at left-edge.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "left_edge"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "position-unspecified-action",
+      "language": "en",
+      "source": "place eight circle.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 1
+    },
+    {
+      "id": "action-unspecified-position",
+      "language": "en",
+      "source": "center eight circle.",
+      "instruction_actions": [
+        null
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [
+        "position:ambiguous_position_ownership"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 1
+    },
+    {
+      "id": "action-and-position-unspecified",
+      "language": "en",
+      "source": "eight circle.",
+      "instruction_actions": [
+        null
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 0
+    },
+    {
+      "id": "action-line-up-position-unspecified",
+      "language": "en",
+      "source": "line-up eight circle.",
+      "instruction_actions": [
+        "line_up"
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 1
+    },
+    {
+      "id": "action-scatter-position-unspecified",
+      "language": "en",
+      "source": "scatter eight circle.",
+      "instruction_actions": [
+        "scatter"
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 1
+    },
+    {
+      "id": "conflicting-positions",
+      "language": "en",
+      "source": "place eight circle at center in left-edge.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [
+        "position:conflicting_positions"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 3
+    },
+    {
+      "id": "orphan-position",
+      "language": "en",
+      "source": "center.",
+      "instruction_actions": [],
+      "instruction_positions": [],
+      "association_issue_kinds": [],
+      "instruction_issues": [
+        "position:missing_position_entity"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 1
+    },
+    {
+      "id": "conflicting-actions-position-retained",
+      "language": "ja",
+      "source": "中央に円を置く散らす。",
+      "instruction_actions": [
+        null
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [
+        "action:conflicting_actions"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 3
+    },
+    {
+      "id": "multi-head-action-position",
+      "language": "en",
+      "source": "place center circle line.",
+      "instruction_actions": [
+        null,
+        null
+      ],
+      "instruction_positions": [
+        null,
+        null
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [
+        "action:ambiguous_action_ownership",
+        "position:ambiguous_position_ownership"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "regional-instruction-ownership",
+      "language": "en",
+      "source": "scatter circle at center. line-up line at left-edge.",
+      "instruction_actions": [
+        "scatter",
+        "line_up"
+      ],
+      "instruction_positions": [
+        "center",
+        "left_edge"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"scatter\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null},{\"action\":{\"category\":\"movement\",\"id\":\"line_up\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"left_edge\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 4
+    },
+    {
+      "id": "soft-line-break",
+      "language": "en",
+      "source": "place eight\ncircle at center.",
+      "instruction_actions": [
+        null
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "association_issue_kinds": [
+        "ambiguous_entity_ownership"
+      ],
+      "instruction_issues": [
+        "action:ambiguous_action_ownership",
+        "position:ambiguous_position_ownership"
+      ],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "upstream-conflict-retained",
+      "language": "en",
+      "source": "place circle at center Canon.Empty.Sub!",
+      "macro_locks": [
+        {
+          "qualified_name": "Canon.Empty",
+          "version": "1.0.0",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "qualified_name": "Canon.Empty.Sub",
+          "version": "1.0.0",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "association_issue_kinds": [
+        "upstream_conflict"
+      ],
+      "instruction_issues": [],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "unobserved-primitive-action-position-combination",
+      "language": "en",
+      "source": "fill twelve arc at corner.",
+      "instruction_actions": [
+        "fill"
+      ],
+      "instruction_positions": [
+        "corner"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"fill\"},\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":12,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":{\"category\":\"place\",\"id\":\"corner\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "style-fields-preserve-action-position",
+      "language": "en",
+      "source": "place eight pen dashed horizontal circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_touches": [
+        "pen"
+      ],
+      "instruction_continuities": [
+        "dashed"
+      ],
+      "instruction_angles": [
+        "horizontal"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":null,\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "style-conflict-preserves-action-position",
+      "language": "en",
+      "source": "place pen pencil dashed horizontal circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_touches": [
+        null
+      ],
+      "instruction_continuities": [
+        "dashed"
+      ],
+      "instruction_angles": [
+        "horizontal"
+      ],
+      "association_issue_kinds": [
+        "conflicting_touches"
+      ],
+      "instruction_issues": [],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "surface-fields-preserve-i588-and-action-position",
+      "language": "en",
+      "source": "place eight blue pen dashed horizontal flat dense circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_touches": [
+        "pen"
+      ],
+      "instruction_continuities": [
+        "dashed"
+      ],
+      "instruction_angles": [
+        "horizontal"
+      ],
+      "instruction_surface_qualities": [
+        "solid"
+      ],
+      "instruction_surface_intensities": [
+        "dense"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "surface-conflict-preserves-action-position",
+      "language": "en",
+      "source": "place flat grain circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_surface_qualities": [
+        null
+      ],
+      "instruction_surface_intensities": [
+        null
+      ],
+      "association_issue_kinds": [
+        "conflicting_surface_qualities"
+      ],
+      "instruction_issues": [],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "fluctuation-fields-preserve-i589-and-action-position",
+      "language": "en",
+      "source": "place eight blue pen dashed horizontal bleeding dense fine slowly blurring wide full-width crescent circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_touches": [
+        "pen"
+      ],
+      "instruction_continuities": [
+        "dashed"
+      ],
+      "instruction_angles": [
+        "horizontal"
+      ],
+      "instruction_surface_qualities": [
+        "bleed"
+      ],
+      "instruction_surface_intensities": [
+        "dense"
+      ],
+      "instruction_fluctuation_amplitudes": [
+        "fine"
+      ],
+      "instruction_fluctuation_frequencies": [
+        "slowly"
+      ],
+      "instruction_fluctuation_qualities": [
+        "blurring"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"entity\":{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"blurring\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":{\"category\":\"ratio\",\"id\":\"crescent\"},\"aspect\":{\"category\":\"ratio\",\"id\":\"wide\"},\"width_extent\":{\"category\":\"ratio\",\"id\":\"full_width\"}},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"bleed\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}},\"position\":{\"category\":\"place\",\"id\":\"center\"},\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2,
+      "instruction_proportion_aspects": [
+        "wide"
+      ],
+      "instruction_proportion_width_extents": [
+        "full_width"
+      ],
+      "instruction_proportion_arc_forms": [
+        "crescent"
+      ]
+    },
+    {
+      "id": "fluctuation-conflict-preserves-action-position",
+      "language": "en",
+      "source": "place fine large circle at center.",
+      "instruction_actions": [
+        "place"
+      ],
+      "instruction_positions": [
+        "center"
+      ],
+      "instruction_fluctuation_amplitudes": [
+        null
+      ],
+      "instruction_fluctuation_frequencies": [
+        null
+      ],
+      "instruction_fluctuation_qualities": [
+        null
+      ],
+      "association_issue_kinds": [
+        "conflicting_fluctuation_amplitudes"
+      ],
+      "instruction_issues": [],
+      "canonical": null,
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "en-core-thinness",
+      "language": "en",
+      "source": "thin line.",
+      "instruction_actions": [
+        null
+      ],
+      "instruction_positions": [
+        null
+      ],
+      "instruction_thinnesses": [
+        "fine"
+      ],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[],\"group_predicates\":[],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":\"fine\",\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 0
+    },
+    {
+      "id": "ja-coordinated-action-position",
+      "language": "ja",
+      "source": "円と線を中心に置く。",
+      "instruction_actions": [null, null],
+      "instruction_positions": [null, null],
+      "head_group_members": [[0, 1]],
+      "group_actions": ["place"],
+      "group_positions": ["center"],
+      "coordination_issues": [],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[{\"members\":[0,1]}],\"group_predicates\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"group\":0,\"position\":{\"category\":\"place\",\"id\":\"center\"}}],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null},{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    },
+    {
+      "id": "en-coordinated-action-position",
+      "language": "en",
+      "source": "place a circle and a line at the center.",
+      "instruction_actions": [null, null],
+      "instruction_positions": [null, null],
+      "head_group_members": [[0, 1]],
+      "group_actions": ["place"],
+      "group_positions": ["center"],
+      "coordination_issues": [],
+      "association_issue_kinds": [],
+      "instruction_issues": [],
+      "canonical": "{\"coordinated_head_groups\":[{\"members\":[0,1]}],\"group_predicates\":[{\"action\":{\"category\":\"movement\",\"id\":\"place\"},\"group\":0,\"position\":{\"category\":\"place\",\"id\":\"center\"}}],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null},{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-instruction-association.v16\"}",
+      "owned_instruction_occurrence_count": 2
+    }
+  ]
+}

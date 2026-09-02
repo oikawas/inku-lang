@@ -12,7 +12,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v12.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v13.json");
 
 #[test]
 fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
@@ -82,6 +82,58 @@ fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
     assert!(modified.continuation_issues.is_empty());
     assert_eq!(modified.ast.coordinated_head_groups.len(), 1);
     assert_eq!(modified.ast.group_predicates.len(), 1);
+}
+
+#[test]
+fn coordination_and_continuation_predicate_overlap_fails_closed() {
+    for (language, source) in [(
+        ResolvedInstructionLanguage::En,
+        "line. place the line and a circle.",
+    )] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+        let conflicts = result
+            .instruction_association
+            .coordination_issues
+            .iter()
+            .filter(|issue| issue.kind.as_str() == "coordination_continuation_ownership_conflict")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            conflicts.len(),
+            1,
+            "{source}: groups={:?} edges={:?} actions={:?} instruction_issues={:?} continuation={:?}",
+            result.ast.coordinated_head_groups,
+            result.ast.group_predicates,
+            result
+                .ast
+                .instructions
+                .iter()
+                .map(|instruction| instruction
+                    .action
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()))
+                .collect::<Vec<_>>(),
+            result
+                .instruction_association
+                .issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>(),
+            result
+                .continuation_issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(conflicts[0].predicates.len(), 1, "{source}");
+        assert!(
+            conflicts[0].member_instruction_indices.len() >= 2,
+            "{source}: conflict retains every group candidate"
+        );
+    }
 }
 
 #[test]
@@ -734,17 +786,17 @@ fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v12");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v13");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-entity-association.v13"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v15"
+        "inku.semantic-instruction-association.v16"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v12");
-    assert_eq!(fixture.version, 12);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v13");
+    assert_eq!(fixture.version, 13);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -976,7 +1028,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v12");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v13");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -1179,7 +1231,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v12");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v13");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

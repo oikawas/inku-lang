@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v15";
+    "inku.semantic-instruction-association.v16";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -60,8 +60,13 @@ pub struct SemanticGroupPredicateEdge {
 /// Stable fail-closed coordination ownership issue classes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticCoordinationIssueKind {
-    AmbiguousBoundary,
+    MissingLeftHead,
+    MissingRightHead,
+    MissingBothHeads,
+    BlockedBoundary,
+    OverlappingChain,
     PredicateOwnershipConflict,
+    ContinuationOwnershipConflict,
     ConflictingGroupActions,
     ConflictingGroupPositions,
 }
@@ -69,8 +74,13 @@ pub enum SemanticCoordinationIssueKind {
 impl SemanticCoordinationIssueKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::AmbiguousBoundary => "ambiguous_coordination_boundary",
+            Self::MissingLeftHead => "missing_left_coordination_head",
+            Self::MissingRightHead => "missing_right_coordination_head",
+            Self::MissingBothHeads => "missing_both_coordination_heads",
+            Self::BlockedBoundary => "blocked_coordination_boundary",
+            Self::OverlappingChain => "overlapping_coordination_chain",
             Self::PredicateOwnershipConflict => "conflicting_coordination_predicate_ownership",
+            Self::ContinuationOwnershipConflict => "coordination_continuation_ownership_conflict",
             Self::ConflictingGroupActions => "conflicting_group_actions",
             Self::ConflictingGroupPositions => "conflicting_group_positions",
         }
@@ -82,8 +92,12 @@ impl SemanticCoordinationIssueKind {
 pub struct SemanticCoordinationIssue {
     pub kind: SemanticCoordinationIssueKind,
     pub member_instruction_indices: Vec<usize>,
+    pub candidate_instruction_indices: Vec<usize>,
     pub markers: Vec<SourceOccurrence>,
+    pub continuation_markers: Vec<SourceOccurrence>,
     pub predicates: Vec<SemanticInstructionOccurrence>,
+    pub claim_spans: Vec<SourceSpan>,
+    pub causal_provenance: SemanticIssueCausalProvenance,
 }
 
 /// Partial or complete semantic instruction sequence in entity source order.
@@ -305,15 +319,29 @@ fn build_semantic_instructions(
             .push(occurrence.clone());
     }
 
-    let (coordinated_head_groups, mut coordination_issues) =
-        collect_coordinated_head_groups(document, &association);
-    let owned_coordination_marker_count = coordinated_head_groups
+    let coordination_evidence =
+        collect_coordination_marker_evidence(document, &association.clause_stream)
+            .into_iter()
+            .filter(|marker| marker.kind == CoordinationMarkerKind::HeadConjunction)
+            .collect::<Vec<_>>();
+    let owned_coordination_identities = coordination_evidence
         .iter()
-        .flat_map(|group| &group.markers)
-        .chain(coordination_issues.iter().flat_map(|issue| &issue.markers))
-        .map(|marker| (marker.span.start_byte, marker.span.end_byte))
-        .collect::<BTreeSet<_>>()
-        .len();
+        .map(|marker| {
+            (
+                marker.clause_index,
+                marker.source.start_byte,
+                marker.source.end_byte,
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        owned_coordination_identities.len(),
+        coordination_evidence.len(),
+        "accepted coordination evidence identities must be unique"
+    );
+    let owned_coordination_marker_count = coordination_evidence.len();
+    let (coordinated_head_groups, mut coordination_issues) =
+        collect_coordinated_head_groups(document, &association, &coordination_evidence);
     assign_ambiguous_boundary_predicates(&mut actions, &mut positions, &mut coordination_issues);
     let ownership =
         collect_instruction_ownership(&association, &actions, &positions, &coordinated_head_groups);
@@ -470,13 +498,28 @@ fn build_semantic_instructions(
         delivered_instruction_occurrence_count, owned_instruction_occurrence_count,
         "semantic instruction association must deliver every Action / Position occurrence exactly once"
     );
-    let delivered_coordination_marker_count = coordinated_head_groups
+    let delivered_coordination_identities = coordinated_head_groups
         .iter()
         .flat_map(|group| &group.markers)
         .chain(coordination_issues.iter().flat_map(|issue| &issue.markers))
-        .map(|marker| (marker.span.start_byte, marker.span.end_byte))
-        .collect::<BTreeSet<_>>()
-        .len();
+        .map(|marker| {
+            (
+                marker.clause_index,
+                marker.span.start_byte,
+                marker.span.end_byte,
+            )
+        })
+        .collect::<Vec<_>>();
+    let delivered_coordination_marker_count = delivered_coordination_identities.len();
+    assert_eq!(
+        delivered_coordination_identities
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>()
+            .len(),
+        delivered_coordination_marker_count,
+        "semantic instruction association must not duplicate a coordination marker owner"
+    );
     assert_eq!(
         delivered_coordination_marker_count, owned_coordination_marker_count,
         "semantic instruction association must deliver every coordinated-head marker exactly once"
@@ -539,18 +582,46 @@ fn take_owned_instruction_terms(
 fn collect_coordinated_head_groups(
     document: &NormalizedDdlDocument,
     association: &SemanticAssociationResult,
+    coordination_evidence: &[CoordinationMarkerEvidence],
 ) -> (
     Vec<SemanticCoordinatedHeadGroup>,
     Vec<SemanticCoordinationIssue>,
 ) {
     let entities = &association.ast.entities;
-    let mut links = BTreeMap::<usize, (usize, SourceOccurrence)>::new();
+    let mut candidate_links = Vec::<(usize, usize, SourceOccurrence)>::new();
     let mut issues = Vec::new();
+    let mut repeated_endpoint_markers =
+        BTreeMap::<(usize, usize), Vec<&CoordinationMarkerEvidence>>::new();
+    for marker in coordination_evidence {
+        let left = entities
+            .iter()
+            .enumerate()
+            .filter(|(_, entity)| {
+                let source = entity.head.source();
+                source.clause_index == marker.clause_index
+                    && source.span.end_byte <= marker.source.start_byte
+            })
+            .max_by_key(|(_, entity)| entity.head.source().span.end_byte)
+            .map(|(index, _)| index);
+        let right = entities
+            .iter()
+            .enumerate()
+            .filter(|(_, entity)| {
+                let source = entity.head.source();
+                source.clause_index == marker.clause_index
+                    && marker.source.end_byte <= source.span.start_byte
+            })
+            .min_by_key(|(_, entity)| entity.head.source().span.start_byte)
+            .map(|(index, _)| index);
+        if let (Some(left), Some(right)) = (left, right) {
+            repeated_endpoint_markers
+                .entry((left, right))
+                .or_default()
+                .push(marker);
+        }
+    }
 
-    for marker in collect_coordination_marker_evidence(document, &association.clause_stream)
-        .iter()
-        .filter(|marker| marker.kind == CoordinationMarkerKind::HeadConjunction)
-    {
+    for marker in coordination_evidence {
         let left = entities
             .iter()
             .enumerate()
@@ -569,36 +640,154 @@ fn collect_coordinated_head_groups(
                     && marker.source.end_byte <= source.span.start_byte
             })
             .min_by_key(|(_, entity)| entity.head.source().span.start_byte);
-        let (Some((left_index, left)), Some((right_index, right))) = (left, right) else {
-            continue;
-        };
         let occurrence = coordination_marker_occurrence(document, association, marker);
+        let member_instruction_indices = left
+            .iter()
+            .map(|(index, _)| *index)
+            .chain(right.iter().map(|(index, _)| *index))
+            .collect::<Vec<_>>();
+        let missing_kind = match (left.is_some(), right.is_some()) {
+            (false, false) => Some(SemanticCoordinationIssueKind::MissingBothHeads),
+            (false, true) => Some(SemanticCoordinationIssueKind::MissingLeftHead),
+            (true, false) => Some(SemanticCoordinationIssueKind::MissingRightHead),
+            (true, true) => None,
+        };
+        if let Some(kind) = missing_kind {
+            issues.push(SemanticCoordinationIssue {
+                kind,
+                member_instruction_indices,
+                candidate_instruction_indices: Vec::new(),
+                markers: vec![occurrence],
+                continuation_markers: Vec::new(),
+                predicates: Vec::new(),
+                claim_spans: Vec::new(),
+                causal_provenance: coordination_issue_causal_provenance(
+                    association,
+                    marker,
+                    left.map(|(_, entity)| entity),
+                    right.map(|(_, entity)| entity),
+                ),
+            });
+            continue;
+        }
+        let (Some((left_index, left)), Some((right_index, right))) = (left, right) else {
+            unreachable!("missing coordination side handled above")
+        };
         let member_instruction_indices = vec![left_index, right_index];
+        if let Some(repeated) = repeated_endpoint_markers.get(&(left_index, right_index))
+            && repeated.len() > 1
+        {
+            if repeated[0].source != marker.source {
+                continue;
+            }
+            issues.push(SemanticCoordinationIssue {
+                kind: SemanticCoordinationIssueKind::OverlappingChain,
+                member_instruction_indices,
+                candidate_instruction_indices: Vec::new(),
+                markers: repeated
+                    .iter()
+                    .map(|marker| coordination_marker_occurrence(document, association, marker))
+                    .collect(),
+                continuation_markers: Vec::new(),
+                predicates: Vec::new(),
+                claim_spans: Vec::new(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            });
+            continue;
+        }
         let clear = right_index == left_index + 1
             && left.head.source().region_index == right.head.source().region_index
             && coordination_gap_is_clear(association, left, right, marker.source);
         if !clear {
             issues.push(SemanticCoordinationIssue {
-                kind: SemanticCoordinationIssueKind::AmbiguousBoundary,
+                kind: SemanticCoordinationIssueKind::BlockedBoundary,
                 member_instruction_indices,
+                candidate_instruction_indices: Vec::new(),
                 markers: vec![occurrence],
+                continuation_markers: Vec::new(),
                 predicates: Vec::new(),
+                claim_spans: Vec::new(),
+                causal_provenance: coordination_issue_causal_provenance(
+                    association,
+                    marker,
+                    Some(left),
+                    Some(right),
+                ),
             });
             continue;
         }
-        if let Some((prior_right, prior_marker)) = links.remove(&left_index) {
-            let mut members = vec![left_index, prior_right, right_index];
-            members.sort_unstable();
-            members.dedup();
-            issues.push(SemanticCoordinationIssue {
-                kind: SemanticCoordinationIssueKind::AmbiguousBoundary,
-                member_instruction_indices: members,
-                markers: vec![prior_marker, occurrence],
-                predicates: Vec::new(),
-            });
-            continue;
+        candidate_links.push((left_index, right_index, occurrence));
+    }
+
+    let mut overlapping = BTreeSet::new();
+    for (index, (left, right, _)) in candidate_links.iter().enumerate() {
+        if candidate_links
+            .iter()
+            .enumerate()
+            .any(|(other_index, (other_left, other_right, _))| {
+                index != other_index && (left == other_left || right == other_right)
+            })
+        {
+            overlapping.insert(index);
         }
-        links.insert(left_index, (right_index, occurrence));
+    }
+    while let Some(first) = overlapping.iter().next().copied() {
+        let mut component = BTreeSet::from([first]);
+        loop {
+            let previous_len = component.len();
+            for candidate in overlapping.iter().copied() {
+                if component.iter().any(|member| {
+                    let (left, right, _) = &candidate_links[*member];
+                    let (candidate_left, candidate_right, _) = &candidate_links[candidate];
+                    left == candidate_left || right == candidate_right
+                }) {
+                    component.insert(candidate);
+                }
+            }
+            if component.len() == previous_len {
+                break;
+            }
+        }
+        let mut members = component
+            .iter()
+            .flat_map(|index| {
+                let (left, right, _) = candidate_links[*index];
+                [left, right]
+            })
+            .collect::<Vec<_>>();
+        members.sort_unstable();
+        members.dedup();
+        let markers = component
+            .iter()
+            .map(|index| candidate_links[*index].2.clone())
+            .collect::<Vec<_>>();
+        issues.push(SemanticCoordinationIssue {
+            kind: SemanticCoordinationIssueKind::OverlappingChain,
+            member_instruction_indices: members,
+            candidate_instruction_indices: Vec::new(),
+            markers,
+            continuation_markers: Vec::new(),
+            predicates: Vec::new(),
+            claim_spans: Vec::new(),
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+        });
+        for index in component {
+            overlapping.remove(&index);
+        }
+    }
+
+    let mut links = BTreeMap::<usize, (usize, SourceOccurrence)>::new();
+    for (index, (left, right, marker)) in candidate_links.into_iter().enumerate() {
+        if !issues.iter().any(|issue| {
+            issue.kind == SemanticCoordinationIssueKind::OverlappingChain
+                && issue
+                    .markers
+                    .iter()
+                    .any(|candidate| candidate.span == marker.span)
+        }) {
+            debug_assert!(!overlapping.contains(&index));
+            links.insert(left, (right, marker));
+        }
     }
 
     let mut groups = Vec::new();
@@ -625,6 +814,35 @@ fn collect_coordinated_head_groups(
     (groups, issues)
 }
 
+fn coordination_issue_causal_provenance(
+    association: &SemanticAssociationResult,
+    marker: &CoordinationMarkerEvidence,
+    left: Option<&SemanticEntity>,
+    right: Option<&SemanticEntity>,
+) -> SemanticIssueCausalProvenance {
+    let clause = &association.clause_stream.clauses[marker.clause_index];
+    let marker_atom_index = clause
+        .atoms
+        .iter()
+        .position(|atom| atom.span() == marker.source)
+        .expect("coordination evidence belongs to its accepted clause");
+    let left_atom_index = left.map(|entity| entity.head.source().atom_index);
+    let right_atom_index = right.map(|entity| entity.head.source().atom_index);
+    let (start_atom_index, end_atom_index) = match (left_atom_index, right_atom_index) {
+        (Some(left), Some(right)) => (left, right),
+        (Some(left), None) => (left, marker_atom_index),
+        (None, Some(right)) => (marker_atom_index, right),
+        (None, None) => return SemanticIssueCausalProvenance::Unattributed,
+    };
+    causal_provenance(diagnostic_causes_between(
+        &association.clause_stream,
+        marker.clause_index,
+        start_atom_index,
+        end_atom_index,
+        SemanticUpstreamCausalRelation::InstructionOwnershipPath,
+    ))
+}
+
 fn assign_ambiguous_boundary_predicates(
     actions: &mut Vec<SemanticTerm>,
     positions: &mut Vec<SemanticTerm>,
@@ -640,11 +858,17 @@ fn assign_ambiguous_boundary_predicates(
                 .iter()
                 .enumerate()
                 .filter(|(_, issue)| {
-                    issue.kind == SemanticCoordinationIssueKind::AmbiguousBoundary
-                        && issue.markers.iter().any(|marker| {
-                            marker.clause_index == term.provenance.source.clause_index
-                                && marker.region_index == term.provenance.source.region_index
-                        })
+                    matches!(
+                        issue.kind,
+                        SemanticCoordinationIssueKind::MissingLeftHead
+                            | SemanticCoordinationIssueKind::MissingRightHead
+                            | SemanticCoordinationIssueKind::MissingBothHeads
+                            | SemanticCoordinationIssueKind::BlockedBoundary
+                            | SemanticCoordinationIssueKind::OverlappingChain
+                    ) && issue.markers.iter().any(|marker| {
+                        marker.clause_index == term.provenance.source.clause_index
+                            && marker.region_index == term.provenance.source.region_index
+                    })
                 })
                 .map(|(index, _)| index)
                 .collect::<Vec<_>>();
@@ -884,14 +1108,25 @@ fn extract_group_role(
             }));
             members.sort_unstable();
             members.dedup();
+            let mut claim_spans = member_groups
+                .iter()
+                .flat_map(|group_index| {
+                    groups[*group_index]
+                        .markers
+                        .iter()
+                        .map(|marker| marker.span)
+                })
+                .collect::<Vec<_>>();
+            claim_spans.push(term.provenance.source.span);
             issues.push(SemanticCoordinationIssue {
                 kind: SemanticCoordinationIssueKind::PredicateOwnershipConflict,
                 member_instruction_indices: members,
-                markers: member_groups
-                    .iter()
-                    .flat_map(|group_index| groups[*group_index].markers.iter().cloned())
-                    .collect(),
+                candidate_instruction_indices: Vec::new(),
+                markers: Vec::new(),
+                continuation_markers: Vec::new(),
                 predicates: vec![SemanticInstructionOccurrence { role, term }],
+                claim_spans,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             });
             continue;
         }
@@ -917,15 +1152,25 @@ fn extract_group_role(
         members.extend(head_owner_indices);
         members.sort_unstable();
         members.dedup();
-        let markers = group_owners
+        let mut claim_spans = group_owners
             .iter()
-            .flat_map(|group_index| groups[*group_index].markers.iter().cloned())
-            .collect();
+            .flat_map(|group_index| {
+                groups[*group_index]
+                    .markers
+                    .iter()
+                    .map(|marker| marker.span)
+            })
+            .collect::<Vec<_>>();
+        claim_spans.push(term.provenance.source.span);
         issues.push(SemanticCoordinationIssue {
             kind: SemanticCoordinationIssueKind::PredicateOwnershipConflict,
             member_instruction_indices: members,
-            markers,
+            candidate_instruction_indices: Vec::new(),
+            markers: Vec::new(),
+            continuation_markers: Vec::new(),
             predicates: vec![SemanticInstructionOccurrence { role, term }],
+            claim_spans,
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
         });
     }
     *terms = remaining;
@@ -944,14 +1189,24 @@ fn select_group_role(
         0 => None,
         1 => terms.pop(),
         _ => {
+            let mut claim_spans = groups[group_index]
+                .markers
+                .iter()
+                .map(|marker| marker.span)
+                .collect::<Vec<_>>();
+            claim_spans.extend(terms.iter().map(|term| term.provenance.source.span));
             issues.push(SemanticCoordinationIssue {
                 kind: conflict_kind,
                 member_instruction_indices: groups[group_index].member_instruction_indices.clone(),
-                markers: groups[group_index].markers.clone(),
+                candidate_instruction_indices: Vec::new(),
+                markers: Vec::new(),
+                continuation_markers: Vec::new(),
                 predicates: terms
                     .into_iter()
                     .map(|term| SemanticInstructionOccurrence { role, term })
                     .collect(),
+                claim_spans,
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
             });
             None
         }

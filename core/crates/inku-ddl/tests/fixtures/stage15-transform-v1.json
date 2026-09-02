@@ -1,0 +1,64 @@
+{
+  "schema": "inku.stage15-transform-cross-platform-fixture.v1",
+  "version": 1,
+  "focus_order": [
+    "upper_right",
+    "upper_left",
+    "lower_right",
+    "lower_left",
+    "upper_edge",
+    "right_half"
+  ],
+  "cases": [
+    {
+      "id": "ja-center-baseline",
+      "source": "中心に、鉛筆の細い線をひとつ置く。",
+      "language": "ja",
+      "composition_seed": null,
+      "variation": null,
+      "expected_baseline_focus": "lower_left",
+      "expected_effective_focus": "lower_left",
+      "expected_effective_sha256": "2fd54c901f71bc57ec0144f097c4ee91548b01129a594043511f6bedb00cf5af"
+    },
+    {
+      "id": "en-center-baseline",
+      "source": "place one thin pencil line at the center",
+      "language": "en",
+      "composition_seed": null,
+      "variation": null,
+      "expected_baseline_focus": "lower_left",
+      "expected_effective_focus": "lower_left",
+      "expected_effective_sha256": "2fd54c901f71bc57ec0144f097c4ee91548b01129a594043511f6bedb00cf5af"
+    },
+    {
+      "id": "en-center-small-variation",
+      "source": "place one thin pencil line at the center",
+      "language": "en",
+      "composition_seed": null,
+      "variation": {"amplitude": "small", "seed": 7},
+      "expected_baseline_focus": "lower_left",
+      "expected_effective_focus": "upper_edge",
+      "expected_effective_sha256": "1472598a89d3e2adfbb2494ed6b8f95bb09358ab83e6988ff0f1da3b04921a8b"
+    },
+    {
+      "id": "en-center-medium-variation",
+      "source": "place one thin pencil line at the center",
+      "language": "en",
+      "composition_seed": null,
+      "variation": {"amplitude": "medium", "seed": 7},
+      "expected_baseline_focus": "lower_left",
+      "expected_effective_focus": "lower_right",
+      "expected_effective_sha256": "b065aea5b8bcbb82c8ada539fcb819097f7ddde2e480870213f5bc791287b975"
+    },
+    {
+      "id": "en-center-large-variation",
+      "source": "place one thin pencil line at the center",
+      "language": "en",
+      "composition_seed": null,
+      "variation": {"amplitude": "large", "seed": 7},
+      "expected_baseline_focus": "lower_left",
+      "expected_effective_focus": "upper_right",
+      "expected_effective_sha256": "acc30ad086e8a87c65759c9fcd3b546eee5b9797f55ef52b11b39916b261ff4c"
+    }
+  ]
+}

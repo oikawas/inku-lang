@@ -24,6 +24,7 @@ pub mod saijiki;
 pub mod semantic_association;
 pub mod semantic_document;
 pub mod semantic_instruction;
+pub mod stage15_transform;
 pub mod visible_patch;
 
 pub use attachment::{
@@ -169,6 +170,12 @@ pub use semantic_instruction::{
     SemanticInstructionOccurrenceRole, SemanticRelation, SemanticRelationIssue,
     SemanticRelationIssueKind, associate_semantic_instructions,
     associate_semantic_instructions_with_macro_binding,
+};
+pub use stage15_transform::{
+    FocusRegion, STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID,
+    Stage15MovedAxis, Stage15TargetPath, Stage15TargetProvenance, Stage15TargetTransformation,
+    Stage15TransformError, Stage15TransformationInput, Stage15TransformationResult,
+    Stage15Variation, Stage15VariationAmplitude, stage15_transformation_input, transform_stage15,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

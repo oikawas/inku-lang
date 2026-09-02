@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v10.json");
+const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v11.json");
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -20,6 +20,200 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_nodes_per_invocation: 100,
     max_total_nodes: 500,
 };
+
+#[test]
+fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
+    let mut canonical = Vec::new();
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "円と線を中心に置く。"),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a circle and a line at the center.",
+        ),
+    ] {
+        let result = compile(source, language, &[], None, LIMITS);
+        let document = result.semantic_document.as_ref().unwrap();
+        assert!(document.ast.complete, "{source}");
+        assert_eq!(document.ast.coordinated_head_groups.len(), 1, "{source}");
+        assert_eq!(document.ast.group_predicates.len(), 1, "{source}");
+        assert!(result.holes.is_empty(), "{source}");
+        assert!(result.conflicts.is_empty(), "{source}");
+        assert!(result.blocking_diagnostics.is_empty(), "{source}");
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Action)
+                .count(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Position)
+                .count(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .filter(|delivery| delivery.descriptor == "coordinated_head_marker")
+                .count(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .deliveries
+                .iter()
+                .map(|delivery| delivery.id.as_str())
+                .collect::<HashSet<_>>()
+                .len(),
+            result.deliveries.len(),
+            "{source}"
+        );
+        assert_eq!(
+            result.delivery_summary.recognized_but_ignored, 0,
+            "{source}"
+        );
+        canonical.push(document.canonical_bytes.clone().unwrap());
+    }
+    assert_eq!(canonical[0], canonical[1]);
+
+    let fixture = fixture();
+    let definition = fixture_definition(&fixture);
+    let macro_group = compile_locked(
+        "place circle and Canon.Empty at center.",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        None,
+        LIMITS,
+    );
+    let document = macro_group.semantic_document.as_ref().unwrap();
+    assert!(
+        document.ast.complete,
+        "association={:?} instruction={:?} coordination={:?} relation={:?} continuation={:?}",
+        document
+            .instruction_association
+            .association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        document
+            .instruction_association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        document
+            .instruction_association
+            .coordination_issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        document
+            .instruction_association
+            .relation_issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        document
+            .continuation_issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(document.ast.coordinated_head_groups.len(), 1);
+    assert!(matches!(
+        document.ast.instructions[0].entity.head,
+        SemanticHead::Primitive(_)
+    ));
+    assert!(matches!(
+        document.ast.instructions[1].entity.head,
+        SemanticHead::MacroInvocation(_)
+    ));
+    assert_eq!(document.ast.group_predicates.len(), 1);
+    assert_eq!(
+        macro_group
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Action)
+            .count(),
+        1
+    );
+    assert_eq!(
+        macro_group
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Position)
+            .count(),
+        1
+    );
+
+    let blocked = compile(
+        "place a circle and mystery line at the center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let blocked_document = blocked.semantic_document.as_ref().unwrap();
+    assert!(!blocked_document.ast.complete);
+    assert!(blocked_document.canonical_bytes.is_none());
+    assert!(blocked.derived_seeds.is_empty());
+    assert!(blocked.macro_expansion.is_none());
+    assert_eq!(
+        blocked
+            .blocking_diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.kind == "ambiguous_coordination_boundary")
+            .count(),
+        2
+    );
+    assert_eq!(
+        blocked
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Action)
+            .count(),
+        0
+    );
+    assert_eq!(
+        blocked
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::Position)
+            .count(),
+        0
+    );
+    assert_eq!(
+        blocked
+            .deliveries
+            .iter()
+            .filter(|delivery| delivery.descriptor == "coordinated_head_marker")
+            .count(),
+        1
+    );
+    assert_eq!(
+        blocked
+            .deliveries
+            .iter()
+            .map(|delivery| delivery.id.as_str())
+            .collect::<HashSet<_>>()
+            .len(),
+        blocked.deliveries.len()
+    );
+}
 
 #[test]
 fn compiler_chain_preserves_typed_causes_without_duplicate_deliveries() {
@@ -1741,12 +1935,12 @@ fn fixture_schema_and_closed_ids_are_stable() {
     let fixture = fixture();
     assert_eq!(
         fixture.schema,
-        "inku.compiler-lock-visible-patch-fixture.v10"
+        "inku.compiler-lock-visible-patch-fixture.v11"
     );
-    assert_eq!(fixture.version, 10);
+    assert_eq!(fixture.version, 11);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v11"
+        "inku.semantic-document.v12"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

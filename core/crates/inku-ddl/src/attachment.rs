@@ -6,7 +6,32 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected attachment evidence foundation.
-pub const ATTACHMENT_EVIDENCE_SCHEMA_ID: &str = "inku.attachment-evidence.v1";
+pub const ATTACHMENT_EVIDENCE_SCHEMA_ID: &str = "inku.attachment-evidence.v2";
+
+/// Language-independent identity of an explicit coordinated-head marker candidate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CoordinationMarkerKind {
+    HeadConjunction,
+}
+
+/// One accepted FunctionWord projected to language-independent coordination evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CoordinationMarkerEvidence {
+    pub kind: CoordinationMarkerKind,
+    pub source: SourceSpan,
+    pub clause_index: usize,
+    pub clause_span: SourceSpan,
+    pub left_atom_spans: Vec<SourceSpan>,
+    pub right_atom_spans: Vec<SourceSpan>,
+}
+
+impl CoordinationMarkerKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::HeadConjunction => "head_conjunction",
+        }
+    }
+}
 
 /// Canonical identity of one accepted Japanese attachment-marker function word.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -116,6 +141,7 @@ pub struct AttachmentEvidenceDiagnostic {
 pub struct AttachmentEvidenceResult {
     pub noun_phrase: EnglishNounPhraseEvidenceResult,
     pub evidence: Vec<AttachmentMarkerEvidence>,
+    pub coordination_evidence: Vec<CoordinationMarkerEvidence>,
     pub diagnostics: Vec<AttachmentEvidenceDiagnostic>,
 }
 
@@ -213,11 +239,55 @@ pub fn collect_attachment_evidence(
         }
     }
 
+    let coordination_evidence =
+        collect_coordination_marker_evidence(document, &noun_phrase.clause_stream);
     Ok(AttachmentEvidenceResult {
         noun_phrase,
         evidence,
+        coordination_evidence,
         diagnostics,
     })
+}
+
+pub(crate) fn collect_coordination_marker_evidence(
+    document: &NormalizedDdlDocument,
+    clause_stream: &crate::ClauseStream,
+) -> Vec<CoordinationMarkerEvidence> {
+    let mut evidence = Vec::new();
+    for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
+        for atom in &clause.atoms {
+            let ClauseAtom::FunctionWord { span, .. } = atom else {
+                continue;
+            };
+            let surface = &document.source()[span.start_byte..span.end_byte];
+            let recognized = match document.language() {
+                ResolvedInstructionLanguage::Ja => surface == "と",
+                ResolvedInstructionLanguage::En => surface.eq_ignore_ascii_case("and"),
+            };
+            if !recognized {
+                continue;
+            }
+            evidence.push(CoordinationMarkerEvidence {
+                kind: CoordinationMarkerKind::HeadConjunction,
+                source: *span,
+                clause_index,
+                clause_span: clause.span,
+                left_atom_spans: clause
+                    .atoms
+                    .iter()
+                    .filter(|candidate| candidate.span().end_byte <= span.start_byte)
+                    .map(ClauseAtom::span)
+                    .collect(),
+                right_atom_spans: clause
+                    .atoms
+                    .iter()
+                    .filter(|candidate| span.end_byte <= candidate.span().start_byte)
+                    .map(ClauseAtom::span)
+                    .collect(),
+            });
+        }
+    }
+    evidence
 }
 
 fn marker_from_surface(

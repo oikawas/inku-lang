@@ -29,7 +29,8 @@ pub mod visible_patch;
 pub use attachment::{
     ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnostic, AttachmentEvidenceDiagnosticKind,
     AttachmentEvidenceResult, AttachmentMarkerEvidence, AttachmentMarkerKind,
-    EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind, collect_attachment_evidence,
+    CoordinationMarkerEvidence, CoordinationMarkerKind, EnglishAttachmentMarkerKind,
+    JapaneseAttachmentMarkerKind, collect_attachment_evidence,
 };
 pub use clause::{
     CLAUSE_STREAM_SCHEMA_ID, ClauseAtom, ClauseSegment, ClauseSeparator, ClauseSeparatorKind,
@@ -160,10 +161,12 @@ pub use semantic_document::{
     associate_semantic_document, associate_semantic_document_with_macro_binding,
 };
 pub use semantic_instruction::{
-    SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticInstruction,
-    SemanticInstructionAssociationAst, SemanticInstructionAssociationResult,
-    SemanticInstructionIssue, SemanticInstructionIssueKind, SemanticRelation,
-    SemanticRelationIssue, SemanticRelationIssueKind, associate_semantic_instructions,
+    SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticCoordinatedHeadGroup,
+    SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticGroupPredicateEdge,
+    SemanticInstruction, SemanticInstructionAssociationAst, SemanticInstructionAssociationResult,
+    SemanticInstructionIssue, SemanticInstructionIssueKind, SemanticInstructionOccurrence,
+    SemanticInstructionOccurrenceRole, SemanticRelation, SemanticRelationIssue,
+    SemanticRelationIssueKind, associate_semantic_instructions,
     associate_semantic_instructions_with_macro_binding,
 };
 pub use visible_patch::{

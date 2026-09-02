@@ -11,7 +11,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v14.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v15.json");
 
 #[test]
 fn action_and_position_issues_retain_only_diagnostics_on_their_ownership_paths() {
@@ -79,6 +79,14 @@ struct Case {
     instruction_actions: Vec<Option<String>>,
     instruction_positions: Vec<Option<String>>,
     #[serde(default)]
+    head_group_members: Vec<Vec<usize>>,
+    #[serde(default)]
+    group_actions: Vec<Option<String>>,
+    #[serde(default)]
+    group_positions: Vec<Option<String>>,
+    #[serde(default)]
+    coordination_issues: Vec<String>,
+    #[serde(default)]
     instruction_touches: Vec<Option<String>>,
     #[serde(default)]
     instruction_thinnesses: Vec<Option<String>>,
@@ -144,6 +152,51 @@ fn fixture_associates_uniform_clause_local_actions_and_positions() {
         assert_eq!(
             result.schema_id, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
             "{}",
+            case.id
+        );
+        if !case.head_group_members.is_empty() {
+            assert_eq!(
+                result
+                    .ast
+                    .coordinated_head_groups
+                    .iter()
+                    .map(|group| group.member_instruction_indices.clone())
+                    .collect::<Vec<_>>(),
+                case.head_group_members,
+                "{}: source-ordered coordinated members",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .group_predicates
+                    .iter()
+                    .map(|edge| edge.action.as_ref().map(|term| term.identity.id.clone()))
+                    .collect::<Vec<_>>(),
+                case.group_actions,
+                "{}: group Action owners",
+                case.id
+            );
+            assert_eq!(
+                result
+                    .ast
+                    .group_predicates
+                    .iter()
+                    .map(|edge| edge.position.as_ref().map(|term| term.identity.id.clone()))
+                    .collect::<Vec<_>>(),
+                case.group_positions,
+                "{}: group Position owners",
+                case.id
+            );
+        }
+        assert_eq!(
+            result
+                .coordination_issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>(),
+            case.coordination_issues,
+            "{}: typed coordination issues",
             case.id
         );
         assert_eq!(
@@ -574,13 +627,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v14"
+        "inku.semantic-instruction-association.v15"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v14"
+        "inku.semantic-instruction-association-fixture.v15"
     );
-    assert_eq!(fixture.version, 14);
+    assert_eq!(fixture.version, 15);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -613,6 +666,8 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
         "surface-conflict-preserves-action-position",
         "fluctuation-fields-preserve-i589-and-action-position",
         "fluctuation-conflict-preserves-action-position",
+        "ja-coordinated-action-position",
+        "en-coordinated-action-position",
     ] {
         assert!(
             ids.contains(required),
@@ -1215,6 +1270,123 @@ fn load_fixture() -> Fixture {
     serde_json::from_str(FIXTURE).expect("fixture must be valid JSON")
 }
 
+#[test]
+fn coordinated_heads_have_one_shared_predicate_owner() {
+    let mut canonical = Vec::new();
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "円と線を中心に置く。"),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a circle and a line at the center.",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new())
+            .unwrap_or_else(|error| panic!("{source}: invalid document: {error}"));
+        let result = associate_semantic_instructions(&document)
+            .unwrap_or_else(|error| panic!("{source}: association failed: {error}"));
+
+        assert!(
+            result.issues.is_empty(),
+            "{source}: explicit coordination must own its predicate instead of remaining ambiguous: {:?}",
+            result
+                .issues
+                .iter()
+                .map(|issue| issue.kind.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(result.coordination_issues.is_empty(), "{source}");
+        assert_eq!(result.ast.instructions.len(), 2, "{source}");
+        assert!(
+            result.ast.instructions.iter().all(|instruction| {
+                instruction.action.is_none() && instruction.position.is_none()
+            })
+        );
+        assert_eq!(result.ast.coordinated_head_groups.len(), 1, "{source}");
+        let group = &result.ast.coordinated_head_groups[0];
+        assert_eq!(group.member_instruction_indices, [0, 1], "{source}");
+        assert_eq!(group.markers.len(), 1, "{source}");
+        assert_eq!(
+            group.markers[0].surface.to_ascii_lowercase(),
+            if language == ResolvedInstructionLanguage::Ja {
+                "と"
+            } else {
+                "and"
+            },
+            "{source}"
+        );
+        assert_eq!(result.ast.group_predicates.len(), 1, "{source}");
+        let edge = &result.ast.group_predicates[0];
+        assert_eq!(edge.group_index, 0, "{source}");
+        assert_eq!(
+            edge.action.as_ref().map(|term| term.identity.id.as_str()),
+            Some("place"),
+            "{source}"
+        );
+        assert_eq!(
+            edge.position.as_ref().map(|term| term.identity.id.as_str()),
+            Some("center"),
+            "{source}"
+        );
+        assert_eq!(result.owned_instruction_occurrence_count, 2, "{source}");
+        assert_eq!(result.delivered_instruction_occurrence_count, 2, "{source}");
+        assert_eq!(result.owned_coordination_marker_count, 1, "{source}");
+        assert_eq!(result.delivered_coordination_marker_count, 1, "{source}");
+        canonical.push(result.canonical_bytes.expect("group result is complete"));
+    }
+    assert_eq!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn coordinated_group_preserves_member_order_modifiers_and_fail_closed_boundaries() {
+    let associate = |source: &str| {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        associate_semantic_instructions(&document).unwrap()
+    };
+    let ordered = associate("place a red circle and a thin line at the center.");
+    assert!(ordered.ast.complete);
+    assert_eq!(
+        ordered.ast.coordinated_head_groups[0].member_instruction_indices,
+        [0, 1]
+    );
+    assert_eq!(
+        ordered.ast.instructions[0]
+            .entity
+            .color
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("red")
+    );
+    assert_eq!(
+        ordered.ast.instructions[1]
+            .entity
+            .thinness
+            .as_ref()
+            .map(|thinness| thinness.value.as_str()),
+        Some("fine")
+    );
+
+    let reversed = associate("place a thin line and a red circle at the center.");
+    assert!(reversed.ast.complete);
+    assert_ne!(ordered.canonical_bytes, reversed.canonical_bytes);
+
+    let blocked = associate("place a circle and mystery line at the center.");
+    assert!(blocked.ast.coordinated_head_groups.is_empty());
+    assert!(blocked.ast.group_predicates.is_empty());
+    let [issue] = blocked.coordination_issues.as_slice() else {
+        panic!("blocked coordination boundary has one typed issue");
+    };
+    assert_eq!(issue.kind.as_str(), "ambiguous_coordination_boundary");
+    assert_eq!(issue.member_instruction_indices, [0, 1]);
+    assert_eq!(issue.markers.len(), 1);
+    assert_eq!(issue.predicates.len(), 2);
+    assert_eq!(blocked.owned_instruction_occurrence_count, 2);
+    assert_eq!(blocked.delivered_instruction_occurrence_count, 2);
+    assert!(!blocked.ast.complete);
+    assert!(blocked.canonical_bytes.is_none());
+}
+
 fn parse_language(value: &str, case_id: &str) -> ResolvedInstructionLanguage {
     match value {
         "ja" => ResolvedInstructionLanguage::Ja,
@@ -1358,8 +1530,26 @@ fn assert_instruction_occurrence_join(case: &Case, result: &SemanticInstructionA
                         .map(|term| ("position", term.provenance.source.span)),
                 )
         })
+        .chain(result.ast.group_predicates.iter().flat_map(|edge| {
+            edge.action
+                .iter()
+                .map(|term| ("action", term.provenance.source.span))
+                .chain(
+                    edge.position
+                        .iter()
+                        .map(|term| ("position", term.provenance.source.span)),
+                )
+        }))
         .chain(result.issues.iter().flat_map(|issue| {
             issue.occurrences.iter().map(|occurrence| {
+                (
+                    occurrence.role.as_str(),
+                    occurrence.term.provenance.source.span,
+                )
+            })
+        }))
+        .chain(result.coordination_issues.iter().flat_map(|issue| {
+            issue.predicates.iter().map(|occurrence| {
                 (
                     occurrence.role.as_str(),
                     occurrence.term.provenance.source.span,
@@ -1435,7 +1625,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v14"
+        "inku.semantic-instruction-association.v15"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

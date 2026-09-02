@@ -1,6 +1,6 @@
 {
-  "schema": "inku.attachment-evidence-fixture.v1",
-  "version": 1,
+  "schema": "inku.attachment-evidence-fixture.v2",
+  "version": 2,
   "cases": [
     {
       "id": "ja-exact-eight",
@@ -72,6 +72,7 @@
       "expected_details": [],
       "noun_phrase_evidence_count": 3,
       "noun_phrase_diagnostic_count": 1,
+      "coordination_evidence_count": 1,
       "delivery_conservation_count": 8
     },
     {

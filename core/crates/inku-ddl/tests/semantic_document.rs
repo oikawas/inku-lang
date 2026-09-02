@@ -12,7 +12,77 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v11.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v12.json");
+
+#[test]
+fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
+    let mut canonical = Vec::new();
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "円と線を中心に置く。"),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a circle and a line at the center.",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+        assert!(result.ast.complete, "{source}");
+        assert!(result.issues.is_empty(), "{source}");
+        assert!(result.continuation_issues.is_empty(), "{source}");
+        assert_eq!(result.ast.instructions.len(), 2, "{source}");
+        assert_eq!(result.ast.coordinated_head_groups.len(), 1, "{source}");
+        assert_eq!(
+            result.ast.coordinated_head_groups[0].member_instruction_indices,
+            [0, 1],
+            "{source}"
+        );
+        assert_eq!(result.ast.group_predicates.len(), 1, "{source}");
+        let edge = &result.ast.group_predicates[0];
+        assert_eq!(edge.group_index, 0, "{source}");
+        assert_eq!(
+            edge.action.as_ref().map(|term| term.identity.id.as_str()),
+            Some("place"),
+            "{source}"
+        );
+        assert_eq!(
+            edge.position.as_ref().map(|term| term.identity.id.as_str()),
+            Some("center"),
+            "{source}"
+        );
+        canonical.push(result.canonical_bytes.expect("complete group document"));
+    }
+    assert_eq!(canonical[0], canonical[1]);
+
+    let source = "circle. the circle red. place a line and a square at the center.";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let remapped = associate_semantic_document(&document).unwrap();
+    assert!(remapped.ast.complete);
+    assert_eq!(remapped.ast.continuations.len(), 1);
+    assert_eq!(remapped.ast.instructions.len(), 3);
+    assert_eq!(remapped.ast.coordinated_head_groups.len(), 1);
+    assert_eq!(
+        remapped.ast.coordinated_head_groups[0].member_instruction_indices,
+        [1, 2]
+    );
+    assert!(
+        remapped.ast.coordinated_head_groups[0]
+            .member_instruction_indices
+            .iter()
+            .all(|index| *index < remapped.ast.instructions.len())
+    );
+
+    let modified_source = "place a red circle and a thin line at the center.";
+    let modified_document =
+        NormalizedDdlDocument::new(modified_source, ResolvedInstructionLanguage::En, Vec::new())
+            .unwrap();
+    let modified = associate_semantic_document(&modified_document).unwrap();
+    assert!(modified.ast.complete);
+    assert!(modified.ast.continuations.is_empty());
+    assert!(modified.continuation_issues.is_empty());
+    assert_eq!(modified.ast.coordinated_head_groups.len(), 1);
+    assert_eq!(modified.ast.group_predicates.len(), 1);
+}
 
 #[test]
 fn multi_head_continuation_predicate_occurrences_have_one_exclusive_owner() {
@@ -664,17 +734,17 @@ fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v11");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v12");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-entity-association.v13"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v14"
+        "inku.semantic-instruction-association.v15"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v11");
-    assert_eq!(fixture.version, 11);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v12");
+    assert_eq!(fixture.version, 12);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -906,7 +976,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v11");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v12");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -1109,7 +1179,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v11");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v12");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

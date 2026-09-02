@@ -1,0 +1,54 @@
+{
+  "schema": "inku.compiler-lock-visible-patch-fixture.v11",
+  "version": 11,
+  "definition": {
+    "schema": "inku.macro-definition.v1",
+    "namespace": "Canon",
+    "heading": "Empty",
+    "version": "1.0.0",
+    "parameters": {},
+    "components": {},
+    "body": []
+  },
+  "known_answers": {
+    "canonical_bytes": "{\"continuations\":[],\"coordinated_head_groups\":[],\"ground\":null,\"group_predicates\":[],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v12\"}",
+    "canonical_sha256": "17fcc12fd1f72063e9b614ecfe95d61539ccb04f983663b3263725dc54f307d9",
+    "seed_digest": "75649bf80700d36630e4ead0dd5480fcbea410cad7053f50262fa59d2aff79f8",
+    "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
+    "full_lock_digest": "16a7a520ff28dbbb06f4b494a0f92dea5fcb7eeb2c3f59395f9ba93856cb640a"
+  },
+  "delivery_case_ids": [
+    "explicit-and-syntax",
+    "core-thinness-explicit",
+    "core-relative-scale-explicit",
+    "relation-zero-hole",
+    "relation-exact-one",
+    "head-only-multiple-ready",
+    "parser-hole",
+    "unknown-blocking",
+    "macro-missing-hole",
+    "macro-ambiguous-conflict",
+    "expansion-diagnostic-hole"
+  ],
+  "patch_case_ids": [
+    "valid-single",
+    "valid-multiple",
+    "valid-subset",
+    "stale-source",
+    "stale-lock",
+    "span-mismatch",
+    "range-mismatch",
+    "out-of-bound",
+    "non-char-boundary",
+    "unordered",
+    "overlap",
+    "duplicate-hole",
+    "empty-replacement",
+    "explicit-target",
+    "unknown-target",
+    "conflict-base",
+    "unknown-base",
+    "unresolved-replacement",
+    "new-macro-without-lock"
+  ]
+}

@@ -1,6 +1,6 @@
 //! Document-global semantic ownership over the accepted instruction association.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
@@ -16,11 +16,14 @@ use crate::{
         causal_provenance, diagnostic_causes_in_source_range, project_semantic_term,
         semantic_identity_value, sentence_region_index,
     },
-    semantic_instruction::semantic_instruction_value,
+    semantic_instruction::{
+        semantic_coordinated_head_group_value, semantic_group_predicate_value,
+        semantic_instruction_value,
+    },
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v11";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v12";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,6 +52,8 @@ pub struct SemanticContinuationEdge {
 pub struct SemanticDocumentAst {
     pub ground: Option<SemanticTerm>,
     pub instructions: Vec<SemanticInstruction>,
+    pub coordinated_head_groups: Vec<crate::SemanticCoordinatedHeadGroup>,
+    pub group_predicates: Vec<crate::SemanticGroupPredicateEdge>,
     pub continuations: Vec<SemanticContinuationEdge>,
     pub complete: bool,
 }
@@ -206,8 +211,29 @@ fn build_semantic_document(
         "semantic document must deliver every Ground occurrence exactly once"
     );
 
-    let (instructions, continuations, continuation_issues, owned_continuation_occurrence_count) =
-        associate_continuations(document, &instruction_association);
+    let (
+        instructions,
+        continuations,
+        continuation_issues,
+        owned_continuation_occurrence_count,
+        instruction_index_map,
+    ) = associate_continuations(document, &instruction_association);
+    let coordinated_head_groups = instruction_association
+        .ast
+        .coordinated_head_groups
+        .iter()
+        .map(|group| crate::SemanticCoordinatedHeadGroup {
+            member_instruction_indices: group
+                .member_instruction_indices
+                .iter()
+                .map(|index| {
+                    instruction_index_map[*index]
+                        .expect("coordinated member is retained by document ownership")
+                })
+                .collect(),
+            markers: group.markers.clone(),
+        })
+        .collect();
     let mut delivered_continuation_owners = continuations
         .iter()
         .map(|edge| {
@@ -269,6 +295,8 @@ fn build_semantic_document(
     let ast = SemanticDocumentAst {
         ground,
         instructions,
+        coordinated_head_groups,
+        group_predicates: instruction_association.ast.group_predicates.clone(),
         continuations,
         complete: (instruction_association.ast.complete || upstream_complete)
             && issues.is_empty()
@@ -308,21 +336,36 @@ fn associate_continuations(
     Vec<SemanticContinuationEdge>,
     Vec<SemanticContinuationIssue>,
     usize,
+    Vec<Option<usize>>,
 ) {
     let mut instructions = Vec::new();
     let mut continuations = Vec::new();
     let mut issues = Vec::new();
     let mut pending = Vec::new();
     let mut owned = 0;
+    let mut instruction_index_map = vec![None; association.ast.instructions.len()];
+    let coordinated_members = association
+        .ast
+        .coordinated_head_groups
+        .iter()
+        .flat_map(|group| group.member_instruction_indices.iter().copied())
+        .collect::<BTreeSet<_>>();
 
-    for original_instruction in &association.ast.instructions {
+    for (original_index, original_instruction) in association.ast.instructions.iter().enumerate() {
+        if coordinated_members.contains(&original_index) {
+            instruction_index_map[original_index] = Some(instructions.len());
+            instructions.push(original_instruction.clone());
+            continue;
+        }
         let (instruction, consumed_upstream_spans) =
             continuation_predicate(association, original_instruction);
         let Some(marker) = continuation_marker(document, association, &instruction) else {
+            instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
             continue;
         };
         if !has_continuation_predicate(&instruction) {
+            instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
             continue;
         }
@@ -485,7 +528,13 @@ fn associate_continuations(
         });
     }
 
-    (instructions, continuations, issues, owned)
+    (
+        instructions,
+        continuations,
+        issues,
+        owned,
+        instruction_index_map,
+    )
 }
 
 fn continuation_boundary_is_blocked(
@@ -817,6 +866,15 @@ fn merge_option<T: Clone>(target: &mut Option<T>, continuation: &Option<T>) {
 fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     let mut root = BTreeMap::new();
     root.insert(
+        "coordinated_head_groups".to_owned(),
+        Value::Array(
+            ast.coordinated_head_groups
+                .iter()
+                .map(semantic_coordinated_head_group_value)
+                .collect(),
+        ),
+    );
+    root.insert(
         "continuations".to_owned(),
         Value::Array(
             ast.continuations
@@ -839,6 +897,15 @@ fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
             .as_ref()
             .map(|ground| semantic_identity_value(&ground.identity))
             .unwrap_or(Value::Null),
+    );
+    root.insert(
+        "group_predicates".to_owned(),
+        Value::Array(
+            ast.group_predicates
+                .iter()
+                .map(semantic_group_predicate_value)
+                .collect(),
+        ),
     );
     root.insert(
         "instructions".to_owned(),

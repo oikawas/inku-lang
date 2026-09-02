@@ -2,13 +2,13 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnosticKind, AttachmentMarkerKind,
-    ClauseAtom, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SourceSpan, collect_attachment_evidence,
+    ClauseAtom, CoordinationMarkerKind, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan, collect_attachment_evidence,
     collect_english_noun_phrase_evidence,
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/attachment-evidence-v1.json");
+const FIXTURE: &str = include_str!("fixtures/attachment-evidence-v2.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +31,8 @@ struct Case {
     noun_phrase_evidence_count: usize,
     noun_phrase_diagnostic_count: usize,
     delivery_conservation_count: usize,
+    #[serde(default)]
+    coordination_evidence_count: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -118,6 +120,9 @@ fn fixture_preserves_exact_markers_full_context_and_owned_i568_result() {
             "{}",
             case.id
         );
+        if let Some(expected) = case.coordination_evidence_count {
+            assert_eq!(result.coordination_evidence.len(), expected, "{}", case.id);
+        }
 
         let markers = result
             .evidence
@@ -219,6 +224,59 @@ fn fixture_preserves_exact_markers_full_context_and_owned_i568_result() {
                 case.id
             );
         }
+    }
+}
+
+#[test]
+fn ja_en_coordination_function_words_project_one_typed_identity() {
+    for (language, source, expected_surface) in [
+        (ResolvedInstructionLanguage::Ja, "円と線", "と"),
+        (ResolvedInstructionLanguage::En, "circle AND line", "AND"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = collect_attachment_evidence(&document).unwrap();
+        let [marker] = result.coordination_evidence.as_slice() else {
+            panic!("{source}: expected exactly one coordination marker");
+        };
+        assert_eq!(marker.kind, CoordinationMarkerKind::HeadConjunction);
+        assert_eq!(
+            &source[marker.source.start_byte..marker.source.end_byte],
+            expected_surface
+        );
+        assert_eq!(marker.clause_index, 0);
+        assert!(!marker.left_atom_spans.is_empty());
+        assert!(!marker.right_atom_spans.is_empty());
+        let left = marker.left_atom_spans.last().copied().unwrap();
+        let right = marker.right_atom_spans.first().copied().unwrap();
+        assert_eq!(
+            &source[left.start_byte..left.end_byte],
+            if language == ResolvedInstructionLanguage::Ja {
+                "円"
+            } else {
+                "circle"
+            }
+        );
+        assert_eq!(
+            &source[right.start_byte..right.end_byte],
+            if language == ResolvedInstructionLanguage::Ja {
+                "線"
+            } else {
+                "line"
+            }
+        );
+    }
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "円を線"),
+        (ResolvedInstructionLanguage::En, "circle with line"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        assert!(
+            collect_attachment_evidence(&document)
+                .unwrap()
+                .coordination_evidence
+                .is_empty(),
+            "{source}"
+        );
     }
 }
 
@@ -357,9 +415,9 @@ fn every_marker_is_exactly_once_and_atoms_remain_a_source_ordered_partition() {
 #[test]
 fn fixture_schema_and_required_neutral_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(ATTACHMENT_EVIDENCE_SCHEMA_ID, "inku.attachment-evidence.v1");
-    assert_eq!(fixture.schema, "inku.attachment-evidence-fixture.v1");
-    assert_eq!(fixture.version, 1);
+    assert_eq!(ATTACHMENT_EVIDENCE_SCHEMA_ID, "inku.attachment-evidence.v2");
+    assert_eq!(fixture.schema, "inku.attachment-evidence-fixture.v2");
+    assert_eq!(fixture.version, 2);
     assert_eq!(fixture.cases.len(), 8);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 

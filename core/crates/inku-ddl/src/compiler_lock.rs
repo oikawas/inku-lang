@@ -11,24 +11,24 @@ use crate::{
     MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
     MacroParameterBindingResult, MacroSeed, NormalizedDdlDocument, OwnedSemanticOccurrence,
     SemanticAssociationIssueKind, SemanticContinuationIssue, SemanticContinuationIssueKind,
-    SemanticContinuationTarget, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
-    SemanticInstruction, SemanticInstructionIssueKind, SemanticMacroParameterValue,
-    SemanticRelationIssueKind, SemanticTerm, SourceSpan,
-    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
-    expand_macros, project_macro_semantic_ref,
+    SemanticContinuationTarget, SemanticCoordinationIssueKind, SemanticDocumentIssueKind,
+    SemanticDocumentResult, SemanticHead, SemanticInstruction, SemanticInstructionIssueKind,
+    SemanticInstructionOccurrenceRole, SemanticMacroParameterValue, SemanticRelationIssueKind,
+    SemanticTerm, SourceSpan, associate_semantic_document_with_macro_binding,
+    bind_macro_parameters, derive_macro_seed, expand_macros, project_macro_semantic_ref,
     semantic_document::exclusive_continuation_issue_claim_spans,
 };
 
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v10";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v11";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v10";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v11";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v10";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v11";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -560,6 +560,33 @@ fn project_deliveries(
     for instruction in &semantic_document.ast.instructions {
         project_instruction(instruction, &mut projection);
     }
+    for edge in &semantic_document.ast.group_predicates {
+        if let Some(action) = &edge.action {
+            add_term_explicit(&mut projection, SemanticDeliveryOwner::Action, action);
+        }
+        if let Some(position) = &edge.position {
+            add_term_explicit(&mut projection, SemanticDeliveryOwner::Position, position);
+        }
+    }
+    let mut coordinated_marker_spans = semantic_document
+        .ast
+        .coordinated_head_groups
+        .iter()
+        .flat_map(|group| &group.markers)
+        .chain(
+            semantic_document
+                .instruction_association
+                .coordination_issues
+                .iter()
+                .flat_map(|issue| &issue.markers),
+        )
+        .map(|marker| marker.span)
+        .collect::<Vec<_>>();
+    coordinated_marker_spans.sort_by_key(|span| (span.start_byte, span.end_byte));
+    coordinated_marker_spans.dedup();
+    for span in coordinated_marker_spans {
+        add_syntax(&mut projection, span, "coordinated_head_marker");
+    }
     let mut restored_failed_heads = Vec::new();
     for issue in &semantic_document.continuation_issues {
         let head_span = issue.instruction.entity.head.source().span;
@@ -764,6 +791,59 @@ fn project_deliveries(
             SemanticInstructionIssueKind::MissingActionEntity
             | SemanticInstructionIssueKind::MissingPositionEntity => {
                 add_blocking(&mut projection, issue.kind.as_str(), span)
+            }
+        }
+    }
+
+    for issue in &semantic_document
+        .instruction_association
+        .coordination_issues
+    {
+        let mut members = issue
+            .member_instruction_indices
+            .iter()
+            .map(|index| format!("member={index}"))
+            .collect::<Vec<_>>();
+        members.extend(
+            issue.markers.iter().map(|marker| {
+                format!("marker={}:{}", marker.span.start_byte, marker.span.end_byte)
+            }),
+        );
+        if issue.predicates.is_empty() {
+            add_blocking_with_members(
+                &mut projection,
+                issue.kind.as_str(),
+                issue.markers.first().map(|marker| marker.span),
+                members,
+            );
+            continue;
+        }
+        for predicate in &issue.predicates {
+            let owner = match predicate.role {
+                SemanticInstructionOccurrenceRole::Action => SemanticDeliveryOwner::Action,
+                SemanticInstructionOccurrenceRole::Position => SemanticDeliveryOwner::Position,
+            };
+            let mut candidates = members.clone();
+            candidates.push(format!(
+                "owner={}:{}",
+                owner.as_str(),
+                term_key(&predicate.term)
+            ));
+            match issue.kind {
+                SemanticCoordinationIssueKind::AmbiguousBoundary => add_blocking_with_members(
+                    &mut projection,
+                    issue.kind.as_str(),
+                    Some(predicate.term.provenance.source.span),
+                    candidates,
+                ),
+                SemanticCoordinationIssueKind::PredicateOwnershipConflict
+                | SemanticCoordinationIssueKind::ConflictingGroupActions
+                | SemanticCoordinationIssueKind::ConflictingGroupPositions => add_ordered_conflict(
+                    &mut projection,
+                    issue.kind.as_str(),
+                    Some(predicate.term.provenance.source.span),
+                    candidates,
+                ),
             }
         }
     }

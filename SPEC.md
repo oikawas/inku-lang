@@ -67,7 +67,7 @@ rendered SVG as one performance of that work. The same description may be
 rendered again later, with controlled sway, while preserving the score (the
 JSON data).
 
-It stands at the intersection of three source ideas:
+It rests on three pillars of constraint:
 
 | Source idea | What inku drew from it |
 |---|---|
@@ -78,9 +78,10 @@ It stands at the intersection of three source ideas:
 ### 1.2 The Underlying Stance
 
 - **Do not assert, present** -- the author's feeling and reading must not
-  intrude into the work
+  intrude directly into the work (this does not deny the author's role as its
+  carrier)
 - **A short description is the essence** -- a long description leans toward
-  assertion. Brevity is what makes presentation possible
+  assertion. Brevity is what makes presentation of the essence possible
 - **The form pares away the ego** -- it is precisely because there is a fixed
   form and a constraint that the essence surfaces
 
@@ -96,15 +97,13 @@ It stands at the intersection of three source ideas:
 
 ## 2. Design Principles
 
-1. Descriptions must remain human-readable.
-2. Sway is part of the specification, not a bug. It exists at two scales: micro sway in line wobble, blur, grain, and texture; and macro sway in composition and placement resolved by the renderer.
-3. Emotional adjectives are excluded from core vocabulary.
-4. Physical, spatial, material, and motion words are preferred.
-5. Coordinates carry no absolute dimensions such as pixels, so one description applies to a wall as readily as to a screen. The aspect ratio is not fixed either: it is a constraint that shapes the world of the work, not a dimension the description carries.
-6. Output is still image SVG; the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
-7. The input language is constrained enough to support iteration.
-8. Optional concrete worlds belong in plugins, not the core language.
-9. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (see "Principles that outlast a version" in the [render engine version history](docs/spec/render-engine-history.md)).
+1. **Descriptions are human-readable** — they sit between natural language and a description language.
+2. **Sway is part of the specification** — architectural variation in an LLM is not eliminated as a bug. Sway exists at two scales, micro (line wobble and bleeding) and macro (composition and placement), and both are realized in the performance (Renderer) (Sections 13.8 / 14.4).
+3. **Emotional vocabulary is excluded** — use numbers and the vocabulary of physical materials rather than words such as "beautifully."
+4. **There is no fixed size** — size and position are expressed relative to a reference edge, not as absolute pixel values. The work scales to a wall as readily as to a screen. **The aspect ratio is not fixed either** — it is a constraint that shapes the world of the work, not a dimension the description carries.
+5. **Output is a still image** — the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
+6. **Prose is converted into normalized DDL and validated by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation.
+7. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (see "Principles that outlast a version" in the [render engine version history](docs/spec/render-engine-history.md)).
 
 DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
 should express such ideas through visible choices: number, placement, material,
@@ -138,7 +137,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 
-In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
+In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
 Pen, solid, empty, and black are historical baselines for comparison with legacy Score / coerce behavior, not defaults adopted by the typed DDL compiler. When visible DDL omits the corresponding field, the typed meaning is `unspecified`; the parser and semantic association do not insert those four values. Concrete defaults, type applicability, typed-hole blocking, and Score lowering remain undecided until the PLAN Step 10 candidate / visual-author gate. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
@@ -204,11 +203,9 @@ catalog definitions and exposes them through `/api/color-catalogs`; clients
 select a `catalog_id` rather than owning their own catalog tables.  When user
 instructions include color nuance, the system may preserve `color_hint` so
 Stage 2 and rendering can resolve the best catalog color without losing intent.
-The default catalog is a neutral baseline, not a cultural default.  Additional
-catalog ids use material-, light-, and technique-based names to avoid presenting
-a country, ethnicity, food, festival, empire, or tourism marker as a complete
-catalog identity: `ink_season`, `fresco_study`, `open_air_light`,
-`ink_porcelain`, `cool_material`, `dye_earth`, `vivid_material`,
+The default catalog is a neutral baseline, not a cultural default.  Catalog ids
+use material-, light-, and technique-based names: `ink_season`, `fresco_study`,
+`open_air_light`, `ink_porcelain`, `cool_material`, `dye_earth`, `vivid_material`,
 `weathered_heritage`, `sea_stone`, `moss_bark`, `neon_plate`, and
 `lantern_dew`.
 Catalog `map` values must preserve the meaning of the nine abstract colors;
@@ -260,7 +257,7 @@ snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier; what it is derived from, and why
 the build number and the Score-side seed stay out of it, is in "Separation From
-the Render Engine Pack" below.
+the Render Engine" below.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  From v2.13.14 the two may disagree: Stage 2 is told which paper it
@@ -292,37 +289,24 @@ In this section, a plugin means a data-only **vocabulary macro** invoked explici
 ### 4.1 Why the Plugin Model Is Designed From the Start
 
 DDL designs the plugin mechanism **from the beginning rather than adding it
-later**.  Three reasons:
+later**.  The reasons are:
 
 **To keep the core pure.**  Concrete vocabularies such as the Nature plugin
-(rain, leaf, water, wind) are already ruled out of the core.  That ruling holds
-only if a plugin mechanism exists from the start; otherwise it invites the
-compromise of "put it in the core for now and separate it later."
-
-**To settle the manner of extension first.**  Leaving other-language editions to
-the community works only once the manner of writing a plugin is defined.
-"Extend it freely" produces implementations that do not resemble one another.
+(rain, leaf, water, wind) are already ruled out of the core.  That ruling assumes
+that a plugin mechanism exists from the start.
 
 **To make the boundary with the core explicit.**  What is core and what is
 extension.  If that line is drawn late, the line itself becomes vague.
 
-### 4.2 The Emacs Lisp Lesson and the Go Stance
+### 4.2 The Emacs Lisp Lesson
 
 Freedom in a plugin system cuts both ways.
 
-**What Emacs pays for its extensibility**
+**The cost of free extensibility like Emacs's**
 - the boundary between core and package is vague
 - packages collide with each other
 - the core itself swells as extensions pull on it
 - the learning curve differs per person, which weakens it as common ground
-
-**Go's opposite stance**
-- language features are kept deliberately few
-- no macros, no metaprogramming
-- forcing "one way" means other people's code can be read
-
-If DDL aims at tanka, the **Go stance** is the fitting one.  Tanka has no
-"grammar of my own."  The common form is what lets individual expression exist.
 
 ### 4.3 Five Principles
 
@@ -367,26 +351,21 @@ The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old St
 
 The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion, but production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader are incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
-### 4.7 Separation From the Render Engine Pack
+### 4.7 Separation From the Render Engine
 
 A vocabulary plugin is a macro over core vocabulary; it is not a way to replace
-the drawing core.  Replacing the drawing core carries a heavier responsibility
-and is treated separately, as a **Render Engine Pack**.
+the drawing core.  The drawing core carries a heavier responsibility and is
+treated separately, as the **Render Engine**.
 
 A render engine is the boundary that takes `JSON Score + render options +
 server-owned color metadata` and returns `SVG + render metadata`.  The current
 `renderer.py` is the `default` engine.
 
-The boundary exists so that drawing strategy can later branch by model or by
-expressive goal:
+The deterministic layer is a single Rust package whose implementation is shared
+by the Linux container, iOS, and Android.  Android test implementation showed
+that, for a complex drawing core, a cross-platform approach other than a shared
+component is impractical.
 
-- an engine that favors stable SVG for display
-- an engine that favors editability in Illustrator or Affinity
-- an engine that strengthens one particular expression — geometric
-  construction, planes of color, material feel
-- an engine tuned to a particular Stage 2 model or prompt pack
-
-A render engine must not break the compatibility of the canonical DB record.
 The canonical metadata format read by history, the JSON tab, the CLI, and the
 benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
 text, input text, normalized DDL, and raw LLM responses are never part of the
@@ -404,14 +383,7 @@ Loading arbitrary external code is not implemented at this point.  The internal
 boundary and the metadata record come first; distribution format, safety, and
 dependencies get designed once a second real engine is actually needed.
 
-### 4.8 Correspondence With Bonsai
-
-The design agrees with the bonsai figure.  Bonsai does not invent a new plant;
-it makes a world out of the arrangement and combination of plants that already
-exist.  A plugin should have the same property.
-
-It does not add a feature.  It gives a name to a combination that is already
-there.  That is what a plugin is for.
+### 4.8 Retired
 
 ### 4.9 Reference Vocabulary Names
 
@@ -427,7 +399,6 @@ Every plugin carries a namespace:
 
 ```text
 Nature.雨
-Nature.風
 Human.目
 Water.さざ波
 ```
@@ -805,8 +776,6 @@ name.
 - the internationalization of haiku has already given the word some recognition
   among English speakers
 - it states plainly that the concept comes from Japan
-- leaving an untranslatable word untranslated agrees in itself with DDL's respect
-  for language
 - for an English speaker, the very act of opening a button labeled "Saijiki"
   becomes an experience of seeing vocabulary from another culture's point of view
 
@@ -829,8 +798,6 @@ proportions / relations.
 - it is not shown in the writing area
 - it is opened actively, from a `Saijiki` button in the UI
 - it stays closed while writing and opens only when the writer is unsure
-- it is designed so that Saijiki is not something you look at but something you
-  go to look at
 
 The Saijiki drawer is read-only (v1.98).  Clicking a vocabulary chip shows a
 preview rather than inserting the word; insertion happens only in the inline
@@ -1100,7 +1067,9 @@ Application."
 - chance is not too high, completion does not go too far, and yet it is not mere
   tracing
 
-### 9.2 Where the Needle Sits
+### 9.2 Output Balance
+
+The balance between completion and error correction at each Stage matters.
 
 ```text
 chance too high      ->  the author's intent is invisible  ->  motivation goes
@@ -1108,21 +1077,22 @@ completing too much  ->  it does not feel self-made        ->  no meaning in it
 mere tracing         ->  DDL was not needed for this       ->  no meaning in it
 ```
 
-The needle sits right when **the words the author wrote are realized a little
+The balance is right when **the words the author wrote are realized a little
 more intelligently than expected**.  That "a little" is what makes the next line
 worth writing.
 
 To support a tanka-like brevity, the writing surface carries only a non-blocking
-length hint.  Japanese input uses roughly 31 characters as a guide; English input
-uses roughly 12 words.  Input is never blocked.  The UI shows no copy that
+length hint (the box displays the count, but does not enforce the guide).
+Japanese input uses roughly 31 characters as a guide; English input uses roughly
+12 words.  Input is never blocked.  The UI shows no copy that
 denies a long description and no evaluative display — only a numeric counter and
 a faint change in density, so the form is quietly present without scolding the
 writer.
 
 ### 9.3 The First Line
 
-Not "what to draw" but "what is on your mind."  The LLM draws the work out of
-that.
+Not "what to draw" but "what has stayed in your mind."  From that, the LLM draws
+out the DDL.
 
 ---
 
@@ -1295,7 +1265,12 @@ SVG
 
 ### 12.2 Why One Stage Is Not Used
 
-With one stage the LLM would be doing two different jobs at once.
+A clear boundary between description and DDL generation structurally prevents
+unexpected meaning in an unexpected description from leaking through — for
+example, the nuance of "beautiful" influencing the engine during JSON generation.
+
+Given current LLM capabilities, assigning one kind of work to the LLM also
+improves accuracy.
 
 **Job 1: interpretation (semantic).**  Map the loose expressions of free
 natural language onto DDL's vocabulary space.
@@ -1365,7 +1340,7 @@ The continuation retains exact source spans and clause provenance for the reintr
 | Form | Why it was rejected |
 |---|---|
 | fully natural sentences ("place a thin line, with a slight sway, near the center") | leaves room for a second *interpretation* in stage two |
-| a structured list (YAML-like) | looks like code; it takes the pleasure out of describing |
+| a structured list (YAML-like) | looks like code; it takes the pleasure out of describing, and similar graphical description languages already exist |
 | function-call style (`place(subject=line, position=center)`) | too close to code |
 | a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). The exception is surface and ground texture, where only the fixed phrases 「面: ...」 and 「地: ...」 are separated onto their own line |
 

@@ -2,13 +2,13 @@
 
 Nothing in this repository checks documentation. ``npm run lint:i18n`` reads the
 web display strings and never opens a markdown file; CI regenerates the frozen
-corpora and runs neither ``pytest`` nor any document check. So the two ways the
-documents actually break have both been found by hand, after the fact:
+corpora and runs neither ``pytest`` nor any document check. So the three ways the
+documents actually break have all been found by hand, after the fact:
 
 * **the two language versions drift.** The rule is that ``*.ja.md`` is the
   original and the English version follows it. When only one side is edited the
-  break is invisible until a reader compares them. The English CHANGELOG is
-  missing 76 version entries today; nothing reported that.
+  break is invisible until a reader compares them. A shape mismatch reports the
+  first differing heading ordinal, level, and source line on both sides.
 * **a published document links to a path that is not published.** ``docs/`` is
   excluded by ``.gitignore`` except for the directories re-included by name, so
   a link into ``docs/`` or ``no-git-sync/`` resolves on the author's disk and
@@ -72,6 +72,7 @@ VERSION_PARITY_EXEMPT = frozenset({"CHANGELOG.ja.md"})
 #                    in each language but every version must appear in both.
 PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("README.ja.md", "README.md", "shape", None),
+    ("PLUGIN.ja.md", "PLUGIN.md", "shape", None),
     (
         "docs/spec/render-engine-history.ja.md",
         "docs/spec/render-engine-history.md",
@@ -312,10 +313,12 @@ def _tracked() -> set[str]:
     return set(out.split())
 
 
-def _heading_shape(path: pathlib.Path) -> list[int]:
-    shape = []
+def _headings(path: pathlib.Path) -> list[tuple[int, int]]:
+    headings = []
     fenced = False
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         if line.startswith("```"):
             fenced = not fenced
             continue
@@ -323,8 +326,42 @@ def _heading_shape(path: pathlib.Path) -> list[int]:
             continue
         match = HEADING.match(line)
         if match:
-            shape.append(len(match.group(1)))
-    return shape
+            headings.append((line_number, len(match.group(1))))
+    return headings
+
+
+def _heading_shape(path: pathlib.Path) -> list[int]:
+    return [level for _, level in _headings(path)]
+
+
+def _first_heading_difference(
+    ja_headings: list[tuple[int, int]],
+    en_headings: list[tuple[int, int]],
+    ja_name: str,
+    en_name: str,
+) -> str:
+    index = next(
+        (
+            index
+            for index, (ja_heading, en_heading) in enumerate(
+                zip(ja_headings, en_headings)
+            )
+            if ja_heading[1] != en_heading[1]
+        ),
+        min(len(ja_headings), len(en_headings)),
+    )
+
+    def describe(name: str, headings: list[tuple[int, int]]) -> str:
+        if index >= len(headings):
+            return f"{name}: <no heading>"
+        line_number, level = headings[index]
+        return f"{name}: h{level} at line {line_number}"
+
+    return (
+        f"    first difference: heading {index + 1}\n"
+        f"      {describe(ja_name, ja_headings)}\n"
+        f"      {describe(en_name, en_headings)}"
+    )
 
 
 def check_parity() -> list[str]:
@@ -351,13 +388,15 @@ def check_parity() -> list[str]:
             else:
                 problems.append(f"missing: {en_name}")
             continue
-        ja_shape, en_shape = _heading_shape(ja), _heading_shape(en)
+        ja_headings, en_headings = _headings(ja), _headings(en)
         if mode == "sections":
-            ja_shape = [level for level in ja_shape if level == 2]
-            en_shape = [level for level in en_shape if level == 2]
+            ja_headings = [heading for heading in ja_headings if heading[1] == 2]
+            en_headings = [heading for heading in en_headings if heading[1] == 2]
         elif mode == "entries":
-            ja_shape = [level for level in ja_shape if level == 3]
-            en_shape = [level for level in en_shape if level == 3]
+            ja_headings = [heading for heading in ja_headings if heading[1] == 3]
+            en_headings = [heading for heading in en_headings if heading[1] == 3]
+        ja_shape = [level for _, level in ja_headings]
+        en_shape = [level for _, level in en_headings]
         if ja_shape == en_shape:
             if exception:
                 problems.append(
@@ -372,6 +411,7 @@ def check_parity() -> list[str]:
             f"{ja_name} and {en_name} no longer have the same heading shape:\n"
             f"    {ja_name}: {len(ja_shape)} headings {_summarise(ja_shape)}\n"
             f"    {en_name}: {len(en_shape)} headings {_summarise(en_shape)}\n"
+            f"{_first_heading_difference(ja_headings, en_headings, ja_name, en_name)}\n"
             f"    The Japanese version is the original. Update the English one to "
             f"follow it, or declare the difference in PAIRS with a reason."
         )

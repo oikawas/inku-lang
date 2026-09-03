@@ -191,8 +191,9 @@ def test_the_thirteen_earlier_pairs_are_intact() -> None:
     ja_names = [pair[0] for pair in pairs]
     missing = [name for name in EXISTING_PAIRS if name not in ja_names]
     assert not missing, f"pairs that check_docs.py used to compare are gone: {missing}"
-    assert len(pairs) == 33, (
-        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, and 13 architecture pairs"
+    assert len(pairs) == 34, (
+        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, "
+        "13 architecture, and 1 plugin pair"
     )
 
 

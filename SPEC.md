@@ -9,11 +9,7 @@ the canonical source because the author works in Japanese.  When the
 specification changes, update `SPEC.ja.md` first, then refresh this English
 version.
 
-**By the author's ruling of 2026-08-02 the two language versions correspond
-section for section.**  Neither language holds a section the other lacks, so a
-number means the same thing in both.  This replaces the ruling of 2026-07-28,
-under which Japanese was canonical for the concepts and English carried the
-operational sections alone.  **Japanese remains the canonical source**: a change
+**The Japanese and English versions correspond section for section.** A change
 to the specification is written in `SPEC.ja.md` first and then reflected here.
 
 For ordinary development, start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
@@ -26,9 +22,10 @@ more detailed canonical notes in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 ## About This Document
 
 **inku** is the reference implementation project for DDL (Drawing Description
-Language).  DDL is the language specification; inku is its implementation.
+Language). DDL is the language specification; inku is the name for its
+implementations as a whole.
 
-This document records the **design philosophy, the language design, and the
+This document records the **design principles, the language design, and the
 current principal contracts**.  For ordinary development, read the short entry
 point [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) first and come back here only
 for the sections a task actually touches.  The chronological implementation and
@@ -37,10 +34,10 @@ design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 ### The Name "inku"
 
 - From インク, the Japanese reading of **ink**
-- The material of writing is itself the name -- structurally the same idea as
-  DDL's concept that the description is the work
+- The material of writing is itself the name -- structurally expressing DDL's
+  concept that the description is the work
 - The association with 墨 (sumi): the world of calligraphy and ink painting,
-  echoed by the "shades of sumi" of the color catalogs
+  echoed by the shades of ink that appear in the strokes
 - The `-lang` suffix places it as a language project, beside rust-lang, go-lang
   and the like
 
@@ -48,11 +45,11 @@ design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 
 Derived projects share the `inku-` prefix:
 
-- `inku-core` -- the core library
-- `inku-saijiki` -- the vocabulary dictionary
-- `inku-nature` -- the Nature plugin
-- `inku-web` -- the web UI implementation
-- `inku-android` -- the Android implementation
+- `inku-core` -- the shared cross-platform core: the Typed Compiler and Renderer implemented in Rust
+- `inku-saijiki` -- the vocabulary dictionary, aiming to be minimal yet sufficient
+- `inku-plugin` -- drawing-extension plugins; they do not extend the vocabulary and act as macro sets
+- `inku-web` -- the container-based web UI implementation
+- `inku-android` -- the single-user Android implementation, including camera features
 - `inku-cli` -- the command line tool
 
 ---
@@ -61,22 +58,22 @@ Derived projects share the `inku-` prefix:
 
 ### 1.1 A Language for Writing Visual Tanka
 
-DDL is not a language for describing pictures.  It is positioned as a language
+DDL is not merely a language for describing graphics. It is positioned as a language
 for **writing visual tanka**.
 
 `inku` is the reference implementation of DDL.  It is not a drawing program in
 the usual sense: it treats the written description as the durable work, and the
-rendered SVG as one performance of that work.  The same description may be
-rendered again later, with controlled sway, while preserving the underlying
-score.
+rendered SVG as one performance of that work. The same description may be
+rendered again later, with controlled sway, while preserving the score (the
+JSON data).
 
-It stands at the intersection of three traditions:
+It stands at the intersection of three source ideas:
 
-| Tradition | What it contributes to DDL |
+| Source idea | What inku drew from it |
 |---|---|
-| Sol LeWitt's instructions | the idea that the description itself is the work |
-| Bonsai | constraint is not limitation but condensation |
-| Tanka | do not assert, present. The form pares away the ego |
+| **Sol LeWitt's instructions** | The idea that the description itself is the work; the separation of the roles of description and drawing |
+| **Bonsai** | Unlimited vocabulary and specifications constrain the maker; limited choices foster better creation |
+| **Tanka** | The kind of writing to take as a target: writing that carries abundant meaning and belongs to an established tradition |
 
 ### 1.2 The Underlying Stance
 
@@ -431,8 +428,8 @@ Every plugin carries a namespace:
 ```text
 Nature.雨
 Nature.風
-Bamboo.竹
-Seasons.桜
+Human.目
+Water.さざ波
 ```
 
 So that:
@@ -639,8 +636,8 @@ demonstrably needs a core extension.
 
 ### 6.6 Why Developing in Two Languages Matters
 
-Developing in Japanese and English side by side works as a device for raising
-the quality of the design.
+Developing in Japanese and English side by side is a process of referring to
+each other's drawing results and raising the quality of the design.
 
 When the same concept is written in both and one of them comes out unnatural,
 that is the sign that the core's choice of words is leaning.  Only what can be
@@ -692,8 +689,8 @@ reactions without increasing overall density.
 
 ### 7.1 A UI That Assumes Repetition
 
-DDL is not finished in one pass.  The round trip — **description -> output ->
-description again** — is a premise of the design.
+DDL is not finished in one pass. The round trip — **description -> output ->
+revision** — is a premise of the design.
 
 ### 7.2 Screen Composition (in concept)
 
@@ -955,13 +952,13 @@ Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user
   menu, profile, settings, language and theme controls
-- Input panel: single drawing, batch drawing, and demo modes
-- DDL editor: editable normalized DDL embedded in the single drawing flow, with
+- Input panel: drawing, batch, and demo modes
+- DDL editor: editable normalized DDL embedded in the drawing flow, with
   Saijiki word highlighting and an expanded dialog editor
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
-  which facts are printed under each thumbnail** — up to two of generation, model, engine version
-  and file size, and **none is also an answer** (choose nothing and only the pictures are shown)
+  which information is printed under each thumbnail** — up to two of generation, model, engine version
+  and file size, and **zero may also be selected** (choose nothing and only the pictures are shown)
 - History manager: larger history view, trash, restore, permanent delete, star filter,
 a shared-only filter, and
 per-work sharing. The sharing dialog picks a recipient and a permission (read or write) and

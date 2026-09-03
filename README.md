@@ -155,7 +155,7 @@ cd web && npm install && npm run dev                              # → http://l
 
 At least one LLM provider is needed for Stage 1 and Stage 2 (`INKU_LLM_BACKEND` plus that provider's authentication and connection settings, or the model settings page in the web UI). A local [Ollama](https://ollama.com) can also be selected as a separately installed and operated provider after its models, connection, and stage assignments are configured. [SETUP.md](SETUP.md) gives the procedure and the measured Stage 1 / Stage 2 pair. Vision is available when a compatible model is configured separately and is not part of the standard local-model setup. There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters).
 
-Once you are logged in, write a short description. After generating, consult the Saijiki, read the ink-shaded interpretation feedback to see how your words were read, and refine the description if you like.
+Once you are logged in, write a short description. After generating, consult the Saijiki, see how it was converted into DDL, and refine the description if you like.
 
 The full environment variable list, per-provider configuration, and the CLI (`inku-cli`) are covered in [SETUP.md](SETUP.md).
 
@@ -182,7 +182,7 @@ The words land in fields of the score. In the second work above, "shoal" landed 
 
 Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and the LLM used can be selected per stage. In practice the model makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
 
-Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `composition_seed` / `render_hash` (work edition ID) let any saved work be reproduced. The specification, though, keeps moving: what a newer inku draws is never quite what an older one drew. As the block is discarded, past Renderers live only in the git history.
+Only two layers are nondeterministic: Stage 1 and Stage 2, where LLMs are involved. The conversion from DDL to JSON and the Renderer's performance are always deterministic, so a work can be reproduced from the information saved in its JSON. The inku specification itself, however, keeps moving, so a new inku always draws a different work from an old one.
 
 **The score itself, the vocabulary of each layer, and how surface and ground texture are handled are in [how it works](docs/guide/how-it-works.md).**
 

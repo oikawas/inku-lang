@@ -22,6 +22,7 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 struct Fixture {
     schema: String,
     version: u64,
+    transformation_schema: String,
     focus_order: Vec<String>,
     cases: Vec<FixtureCase>,
 }
@@ -65,7 +66,7 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     let fixture = fixture();
     assert_eq!(
         STAGE15_TRANSFORMATION_SCHEMA_ID,
-        "inku.typed-stage15-transformation.v2"
+        "inku.typed-stage15-transformation.v3"
     );
     assert_eq!(
         STAGE15_FOCUS_SELECTION_DOMAIN,
@@ -76,6 +77,10 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
         "inku.stage15-transform-cross-platform-fixture.v1"
     );
     assert_eq!(fixture.version, 1);
+    assert_eq!(
+        fixture.transformation_schema,
+        STAGE15_TRANSFORMATION_SCHEMA_ID
+    );
     assert_eq!(
         fixture.focus_order,
         FocusRegion::ALL
@@ -112,6 +117,16 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
             let canonical: serde_json::Value =
                 serde_json::from_slice(result.effective_canonical_bytes()).unwrap();
             assert_eq!(canonical["schema"], STAGE15_TRANSFORMATION_SCHEMA_ID);
+            assert_eq!(result.composition_seed(), case.composition_seed);
+            assert_eq!(
+                result.verified_effective_view().composition_seed(),
+                case.composition_seed
+            );
+            assert_eq!(
+                canonical["composition_seed"],
+                serde_json::json!(case.composition_seed)
+            );
+            assert_eq!(count_json_key(&canonical, "composition_seed"), 1);
             assert_eq!(
                 result.original_semantic_document(),
                 &original_semantic,
@@ -193,6 +208,71 @@ fn no_target_and_non_center_meaning_remain_effective_no_ops() {
 }
 
 #[test]
+fn no_focus_attested_seed_passthrough_is_lossless_and_identity_bound() {
+    let results = [None, Some(0), Some(42)].map(|composition_seed| {
+        let compilation = compile(
+            "thin circle",
+            ResolvedInstructionLanguage::En,
+            &[],
+            composition_seed,
+            LIMITS,
+        );
+        let without_variation =
+            transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+        let with_variation = transform_stage15(
+            stage15_transformation_input(&compilation).unwrap(),
+            Some(Stage15Variation {
+                amplitude: Stage15VariationAmplitude::Large,
+                seed: 9,
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(without_variation.composition_seed(), composition_seed);
+        assert_eq!(
+            without_variation
+                .verified_effective_view()
+                .composition_seed(),
+            composition_seed
+        );
+        let candidate =
+            inku_ddl::lower_verified_stage15_view(without_variation.verified_effective_view());
+        assert_eq!(
+            candidate.verified_effective_view().composition_seed(),
+            composition_seed
+        );
+        assert_eq!(
+            without_variation.effective_canonical_bytes(),
+            with_variation.effective_canonical_bytes(),
+            "a no-op variation changed effective identity for {composition_seed:?}"
+        );
+        let canonical: serde_json::Value =
+            serde_json::from_slice(without_variation.effective_canonical_bytes()).unwrap();
+        assert_eq!(
+            canonical["composition_seed"],
+            serde_json::json!(composition_seed)
+        );
+        assert_eq!(count_json_key(&canonical, "composition_seed"), 1);
+        assert!(canonical["focus_selection"].is_null());
+
+        without_variation
+    });
+
+    assert_ne!(
+        results[0].effective_canonical_digest(),
+        results[1].effective_canonical_digest()
+    );
+    assert_ne!(
+        results[0].effective_canonical_digest(),
+        results[2].effective_canonical_digest()
+    );
+    assert_ne!(
+        results[1].effective_canonical_digest(),
+        results[2].effective_canonical_digest()
+    );
+}
+
+#[test]
 fn omitted_and_explicit_zero_composition_seeds_keep_distinct_focus_provenance() {
     let source = "place one thin pencil line at the center";
     let omitted = compile(source, ResolvedInstructionLanguage::En, &[], None, LIMITS);
@@ -247,6 +327,22 @@ fn omitted_and_explicit_zero_composition_seeds_keep_distinct_focus_provenance() 
         transform_stage15(stage15_transformation_input(&omitted).unwrap(), None).unwrap();
     let explicit_result =
         transform_stage15(stage15_transformation_input(&explicit_zero).unwrap(), None).unwrap();
+    assert_eq!(omitted_result.composition_seed(), None);
+    assert_eq!(explicit_result.composition_seed(), Some(0));
+    assert_eq!(
+        omitted_result.verified_effective_view().composition_seed(),
+        None
+    );
+    assert_eq!(
+        explicit_result.verified_effective_view().composition_seed(),
+        Some(0)
+    );
+    for (result, expected) in [(&omitted_result, None), (&explicit_result, Some(0))] {
+        let canonical: serde_json::Value =
+            serde_json::from_slice(result.effective_canonical_bytes()).unwrap();
+        assert_eq!(canonical["composition_seed"], serde_json::json!(expected));
+        assert_eq!(count_json_key(&canonical, "composition_seed"), 1);
+    }
     assert_ne!(
         omitted_result.effective_canonical_bytes(),
         explicit_result.effective_canonical_bytes()
@@ -303,7 +399,7 @@ fn seed_zero_variation_amplitudes_resolve_to_three_distinct_non_baseline_focuses
         .unwrap()
         .baseline_focus()
         .unwrap();
-    let resolved = [
+    let results = [
         Stage15VariationAmplitude::Small,
         Stage15VariationAmplitude::Medium,
         Stage15VariationAmplitude::Large,
@@ -314,14 +410,39 @@ fn seed_zero_variation_amplitudes_resolve_to_three_distinct_non_baseline_focuses
             Some(Stage15Variation { amplitude, seed: 0 }),
         )
         .unwrap()
-        .resolved_focus()
-        .unwrap()
     });
+    let resolved = results.each_ref().map(|result| {
+        assert_eq!(result.composition_seed(), Some(0));
+        result.resolved_focus().unwrap()
+    });
+    let digests = results
+        .each_ref()
+        .map(|result| result.effective_canonical_digest().to_owned());
 
     assert!(resolved.iter().all(|focus| *focus != baseline));
     assert_ne!(resolved[0], resolved[1]);
     assert_ne!(resolved[0], resolved[2]);
     assert_ne!(resolved[1], resolved[2]);
+    assert_ne!(digests[0], digests[1]);
+    assert_ne!(digests[0], digests[2]);
+    assert_ne!(digests[1], digests[2]);
+}
+
+#[test]
+fn composition_seed_surface_is_read_only() {
+    let source = include_str!("../src/stage15_transform.rs");
+    let public_seed_surface = source
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("pub ") && line.contains("composition_seed"))
+        .collect::<Vec<_>>();
+    assert_eq!(public_seed_surface.len(), 3);
+    assert!(
+        public_seed_surface
+            .iter()
+            .all(|line| line.starts_with("pub const fn composition_seed(")),
+        "unexpected public seed surface: {public_seed_surface:?}"
+    );
 }
 
 #[test]
@@ -671,4 +792,20 @@ fn sha256(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+fn count_json_key(value: &serde_json::Value, key: &str) -> usize {
+    match value {
+        serde_json::Value::Array(values) => {
+            values.iter().map(|value| count_json_key(value, key)).sum()
+        }
+        serde_json::Value::Object(values) => {
+            usize::from(values.contains_key(key))
+                + values
+                    .values()
+                    .map(|value| count_json_key(value, key))
+                    .sum::<usize>()
+        }
+        _ => 0,
+    }
 }

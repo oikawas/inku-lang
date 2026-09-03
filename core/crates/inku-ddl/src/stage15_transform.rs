@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
-pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v2";
+pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v3";
 /// Framed hash domain for source-independent baseline focus selection.
 pub const STAGE15_FOCUS_SELECTION_DOMAIN: &[u8] = b"inku.typed-stage15-focus-selection.v1";
 
@@ -162,6 +162,7 @@ pub struct Stage15TransformationResult {
     original_expanded_invocations: Vec<ExpandedMacroInvocation>,
     original_pre_expansion_digest: String,
     original_expanded_meaning_digest: String,
+    composition_seed: Option<u64>,
     baseline_focus: Option<FocusRegion>,
     resolved_focus: Option<FocusRegion>,
     effective_variation: Option<Stage15Variation>,
@@ -190,6 +191,10 @@ impl Stage15TransformationResult {
 
     pub fn original_expanded_meaning_digest(&self) -> &str {
         &self.original_expanded_meaning_digest
+    }
+
+    pub const fn composition_seed(&self) -> Option<u64> {
+        self.composition_seed
     }
 
     pub const fn baseline_focus(&self) -> Option<FocusRegion> {
@@ -242,6 +247,10 @@ impl<'a> VerifiedStage15EffectiveView<'a> {
 
     pub fn original_expanded_invocations(self) -> &'a [ExpandedMacroInvocation] {
         self.result.original_expanded_invocations()
+    }
+
+    pub const fn composition_seed(self) -> Option<u64> {
+        self.result.composition_seed()
     }
 
     pub fn effective_canonical_bytes(self) -> &'a [u8] {
@@ -384,6 +393,7 @@ pub fn transform_stage15(
     input: Stage15TransformationInput,
     variation: Option<Stage15Variation>,
 ) -> Result<Stage15TransformationResult, Stage15TransformError> {
+    let composition_seed = input.composition_seed();
     let collected = collect_targets(&input)?;
     let baseline_focus = (!collected.is_empty()).then(|| select_baseline_focus(&input));
     let resolved_focus = baseline_focus.map(|baseline| {
@@ -412,6 +422,7 @@ pub fn transform_stage15(
     validate_targets(&input, &targets)?;
     let effective_canonical_bytes = effective_canonical_bytes(
         &input,
+        composition_seed,
         baseline_focus,
         resolved_focus,
         effective_variation,
@@ -425,6 +436,7 @@ pub fn transform_stage15(
         original_expanded_invocations: input.expanded_invocations,
         original_pre_expansion_digest: input.pre_expansion_digest,
         original_expanded_meaning_digest: input.expanded_meaning_digest,
+        composition_seed,
         baseline_focus,
         resolved_focus,
         effective_variation,
@@ -685,6 +697,7 @@ fn variation_offset(amplitude: Stage15VariationAmplitude, seed: u64) -> u64 {
 
 fn effective_canonical_bytes(
     input: &Stage15TransformationInput,
+    composition_seed: Option<u64>,
     baseline_focus: Option<FocusRegion>,
     resolved_focus: Option<FocusRegion>,
     effective_variation: Option<Stage15Variation>,
@@ -707,6 +720,10 @@ fn effective_canonical_bytes(
         ),
     );
     root.insert(
+        "composition_seed".to_owned(),
+        optional_seed_value(composition_seed),
+    );
+    root.insert(
         "focus_selection".to_owned(),
         match (baseline_focus, resolved_focus) {
             (Some(baseline), Some(effective)) => {
@@ -718,10 +735,6 @@ fn effective_canonical_bytes(
                             .expect("focus domain is ASCII")
                             .to_owned(),
                     ),
-                );
-                selection.insert(
-                    "composition_seed".to_owned(),
-                    optional_seed_value(input.composition_seed),
                 );
                 selection.insert(
                     "baseline".to_owned(),
@@ -772,18 +785,10 @@ fn identity_value(schema: &str, digest: &str) -> Value {
 }
 
 fn optional_seed_value(seed: Option<u64>) -> Value {
-    let mut value = BTreeMap::new();
     match seed {
-        Some(seed) => {
-            value.insert("presence".to_owned(), Value::String("present".to_owned()));
-            value.insert("value".to_owned(), Value::Number(Number::from(seed)));
-        }
-        None => {
-            value.insert("presence".to_owned(), Value::String("absent".to_owned()));
-            value.insert("value".to_owned(), Value::Null);
-        }
+        Some(seed) => Value::Number(Number::from(seed)),
+        None => Value::Null,
     }
-    Value::Object(value.into_iter().collect())
 }
 
 fn target_value(target: &Stage15TargetTransformation) -> Value {

@@ -35,13 +35,12 @@ inku uses several processing layers because it alternates nondeterministic LLMs 
 DDL is written in simple Japanese or English, so anyone can read it without prior knowledge. The maker can inspect the DDL that was generated and edit it. The idea of making pictures from words with an LLM first came to me in the spring of 2026, while viewing a Sol LeWitt exhibition at a museum: perhaps an LLM could take the place of the craftsperson who makes the actual drawing from a set of instructions.
 
 When I considered how this should differ from natural-language image generation — where the difference ought to lie — three ideas became its pillars.
-The project takes the following three ideas as its starting points.
 
 | Source idea | What inku drew from it |
 |---|---|
-| **Sol LeWitt's instructions** | The idea that the description itself is the work; the separation of the roles of description and drawing; the concept from which the application began |
+| **Sol LeWitt's instructions** | The idea that the description itself is the work; the separation of the roles of description and drawing |
 | **Bonsai** | Unlimited vocabulary and specifications constrain the maker; limited choices foster better creation |
-| **Tanka** | What kinds of writing to take as a target, and which traditions to draw upon |
+| **Tanka** | The kind of writing to take as a target: writing that carries abundant meaning and belongs to an established tradition |
 
 ---
 
@@ -205,9 +204,9 @@ The instructions can be edited by hand and drawn again. Selecting a word in the 
 
 ## Pursuing the work through revision
 
-The drawing that comes back from one sentence is not the finished piece. It is the **first generation**. You redraw from it, then redraw from what came back — **the work is made by accumulating generations**.
+The drawing that comes back from the first piece of writing is not the finished piece. It is the **first generation**. You redraw from it, then redraw from what came back — **the work is made by accumulating generations**.
 
-This is not pulling a lever until something good appears. Redrawing is split across five axes, and **you decide which one moves and which ones hold**. Then **you choose** among what comes back. That loop of variation and choice is what turns output into a work.
+This is not the same as redrawing until something good appears. (Though you may redraw that way too.) Revision is split across five axes, and **you decide which one moves and which ones hold**. Then **you choose** among what comes back. That loop of variation and choice makes a work rather than a mere output.
 
 None of them breaks default reproducibility; each acts only on your explicit request.
 
@@ -253,12 +252,12 @@ Only physical, observable words belong to the core. Emotional evaluation — "be
 ## Design principles
 
 1. Descriptions are human-readable, between natural language and code
-2. Sway is a feature, not a bug
-3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced
-4. No fixed size — coordinates carry no absolute dimensions and scale to any medium; the aspect ratio is not fixed either
-5. Output is still — the viewer moves, not the image
-6. Input is a constrained DSL, not free-form natural language
-7. The engine does not go backwards — like a woodblock being carved, the drawing engine only moves in one direction
+2. Variability is allowed as part of the specification — including nondeterminism introduced by an LLM and changes in drawing results as the engine evolves
+3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced — the maker chooses the visual expression that will carry emotion
+4. No fixed size — size and position are expressed relative to a reference side, never as absolute pixel values
+5. Output is still — motion should be expressible within a still image
+6. Descriptions may be written freely, but are not processed directly — they are converted into normalized DDL and validated by the Typed Compiler
+7. The engine does not go backwards — like a woodblock being carved, it moves in only one direction; replaying an old score through a new engine does not guarantee the identity of the work
 
 For the public English specification, see [SPEC.md](SPEC.md). The canonical Japanese source is [SPEC.ja.md](SPEC.ja.md).
 
@@ -266,16 +265,14 @@ For the public English specification, see [SPEC.md](SPEC.md). The canonical Japa
 
 ## The engine as a woodblock
 
-inku's drawing engine has **no past versions**. There is the current fifteenth generation and nothing else; the fourteenth cannot be selected. Its code is not kept either.
-
-This is a choice, not an omission.
+inku's drawing engine has **no past versions**. (One could, of course, trace the Git history.) The engine evolves. We chose not to load it with redundant code and conditional branches for backward compatibility. Even the oldest JSON data can be interpreted by the latest engine and rendered as SVG. The resulting picture, however, will differ from the old one. We hope it will be better.
 
 > The carving advances. The block only changes in one direction. The prints that came off it remain, but the block cannot be returned to what it was before the cut.
 > **If the application itself is thought of as a work, this is the implementation that follows.**
 
-A saved work is **a print**. The SVG itself persists, so the piece as it was can always be seen. The engine is **the block**, and only its carved-forward state exists. Redrawing pulls a fresh print from the current engine, and that is a new edition. Both are never warehoused at once.
+A saved work is **a print**. The SVG itself persists, so the piece as it was can always be seen. If we interpret it through the techniques of printmaking, the engine is **the block**, and only its carved-forward state exists. Redrawing pulls a fresh print from the current engine, and that is a new edition. Both are never warehoused at once.
 
-The block cannot be restored, but the prints can be kept. Each time a generation rises, the actual output from a fixed set of inputs is frozen (`server/reference/`, currently 610 cases). **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
+During development, we always move forward while comparing against older engines. The block cannot be restored, but the prints can be kept. Each time a generation rises, the actual output from a fixed set of inputs is frozen so that it remains comparable (`server/reference/`, currently 610 cases). **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
 
 ---
 
@@ -285,9 +282,9 @@ The block cannot be restored, but the prints can be kept. Each time a generation
 - **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle, cloudform; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges
-- **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core
-- **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs. A work belongs to whoever wrote it, and **can be shared one at a time with a chosen recipient and permission**
-- **Batch / CLI** — `inku-cli` supports login, painting, batch generation, contact sheets, and diversity analysis
+- **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they may expand only into core vocabulary and cannot modify the core
+- **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
+- **Batch / CLI** — designed for straightforward operation by AI agents, the CLI provides access to every inku API. `inku-cli` supports login, painting, batch generation, contact sheets, and everything else available through the GUI
 
 ---
 
@@ -295,9 +292,10 @@ The block cannot be restored, but the prints can be kept. Each time a generation
 
 - **Web version** — operational (Python FastAPI + SvelteKit; runs locally or on a server)
 - **CLI** — implemented as an independent `cli/` project; drives the API for login, drawing, batch generation, and benchmark output
-- **Android app** — `2.1.4-android.51`; its Kotlin drawing implements render engine 35 and follows the server's render engine 40 afterward
+- **Android app** — `2.1.4-android.51`; its Kotlin drawing implements render engine 35 and follows the server's render engine 40 afterward (the Renderer is now shared in Rust, and work is underway to share the core in Rust as well)
 
-The author maintains the **Japanese** and **English** versions of inku. Other language implementations are welcomed from the community as open-source contributions. The internal JSON Score layer is language-neutral (English keys), so only the surface description layer needs translation.
+The author maintains the **Japanese** and **English** versions of inku. Contributions for other languages are welcome as open source. We have learned that the DDL engine needs adjustments for the characteristics of each language, so making DDL native to a language other than Japanese or English may take more than replacing a language module. At present, there is no framework for adding DDL support for another language.
+The internal JSON Score layer is language-neutral and uses English keys. Language-specific UI data is separated, so the UI itself should be comparatively straightforward to localize.
 
 ---
 
@@ -305,9 +303,7 @@ The author maintains the **Japanese** and **English** versions of inku. Other la
 
 Conceived on April 2, 2026, at the Museum of Contemporary Art Tokyo, on the final day of the *Sol LeWitt: Open Structures* exhibition.
 
-Reaching into your own mind with words, and finding in what returns something that was always there — this is the experience inku attempts to make available in visual form.
-
-> *The fog of the mind is brushed away, and what was always there comes into view.*
+> *It felt as though the air had been let out: there was no imposition of ideas or emotion. There remained the faint touch of the hands of the craftsperson who had carried out the written rules, but the artist was no longer in this world.*
 
 ---
 

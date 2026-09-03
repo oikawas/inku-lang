@@ -1,6 +1,7 @@
 {
   "schema": "inku.stage15-transform-cross-platform-fixture.v1",
   "version": 1,
+  "transformation_schema": "inku.typed-stage15-transformation.v3",
   "focus_order": [
     "upper_right",
     "upper_left",
@@ -18,7 +19,7 @@
       "variation": null,
       "expected_baseline_focus": "lower_left",
       "expected_effective_focus": "lower_left",
-      "expected_effective_sha256": "61e62ae3af1cfa520dad76d241d5712cb4edb01bb1644d96623aa90935194bbd"
+      "expected_effective_sha256": "0755f162dade45f41aa0398b91c83d992fea24adacbd08fa3e5d50b38c2c17db"
     },
     {
       "id": "en-center-baseline",
@@ -28,7 +29,7 @@
       "variation": null,
       "expected_baseline_focus": "lower_left",
       "expected_effective_focus": "lower_left",
-      "expected_effective_sha256": "61e62ae3af1cfa520dad76d241d5712cb4edb01bb1644d96623aa90935194bbd"
+      "expected_effective_sha256": "0755f162dade45f41aa0398b91c83d992fea24adacbd08fa3e5d50b38c2c17db"
     },
     {
       "id": "en-center-small-variation",
@@ -38,7 +39,7 @@
       "variation": {"amplitude": "small", "seed": 7},
       "expected_baseline_focus": "lower_left",
       "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "4f6aceda73525345e44a2241ed2c861ccb32d6bbf1236bf4e2f26f14e68f85dc"
+      "expected_effective_sha256": "3bc8622c8d9144d1bff4f746fa8b67241753def324320394041415a5bf11b50b"
     },
     {
       "id": "en-center-medium-variation",
@@ -48,7 +49,7 @@
       "variation": {"amplitude": "medium", "seed": 7},
       "expected_baseline_focus": "lower_left",
       "expected_effective_focus": "upper_right",
-      "expected_effective_sha256": "78f8fc021a31da39dd5ef97704119139f4d147f5ac9c88520e4be4d8b6e4ffdc"
+      "expected_effective_sha256": "2ec56b4cb6128cd2677dd34f8e27653b2f45aaf1616605695331180c4b3550f6"
     },
     {
       "id": "en-center-large-variation",
@@ -58,7 +59,7 @@
       "variation": {"amplitude": "large", "seed": 7},
       "expected_baseline_focus": "lower_left",
       "expected_effective_focus": "lower_right",
-      "expected_effective_sha256": "53994f67ae43872f6a20a83831c57eebf5f7cabf7c335e234b1857679918cec7"
+      "expected_effective_sha256": "23ad242a2730b3b9ad79fce84bd5a4e4354f9487f72166311028d262cb37e87b"
     }
   ]
 }

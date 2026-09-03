@@ -8,10 +8,10 @@
 
 # inku
 
-**One sentence becomes a picture.**
+**Turn a sentence into a picture.**
 
-> **一文が、絵になる。**
-> `inku`（インク）は、短い記述から抽象的なベクターグラフィックを生み出す描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。絵画の経験や道具が無くても、自分のイメージを形に出来ます。心に残った光景をひとつ、短く書くことが始まりで、そこから作品を作っていくことが出来ます。
+> **一文を、絵にする。**
+> `inku`（インク）は、シンプルな文章から抽象的なベクターグラフィック（SVG形式）を生み出す、アプリケーションです。中核を成すのは、 オリジナルに作成した絵画言語DDL（Drawing Description Language）。DDLは、「中央に丸を置く」「クレヨンで緑の線を100本引く」といった自然言語を受け付ける、柔軟なスクリプティング言語です。
 > **日本語の全文は [日本語版 README](README.ja.md) にあります。**
 
 <table align="center">
@@ -22,25 +22,26 @@
 </tr>
 </table>
 
-`inku` is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the beginning — and from there you build the work up.
+`inku` is an application that turns simple writing into abstract vector graphics in SVG format. At its core is DDL (Drawing Description Language), an original language for drawing. DDL is a flexible scripting language that accepts natural-language instructions such as “Place a circle in the center” or “Draw one hundred green lines in crayon.”
 
 ```
 A blue line slowly loosens across the night water.
 ```
 
-That sentence is interpreted, becomes a score, and is performed into the form of a vector graphic until a picture appears. Draw again from the same sentence and the sway brings back a slightly different picture. Works are kept as lineage and saved generation by generation. You build variations on that first work, refine it, choose, and a new generation is born — **the back-and-forth of writing and choosing** is how creation works in inku. You may hold on to that first sentence and carry it all the way to a finished work, or forget it along the way. DDL implements no meaning and no feeling; what you make it carry is yours to decide.
+An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words into visual elements and converts them into normalized DDL. A Typed Compiler then converts the DDL into the JSON data underlying the vector graphic. This JSON data is a “score”: even as the application moves from one generation to another, it can continue to “perform” the work consistently as SVG. The computer generates the SVG image by having the Renderer interpret that JSON. Together, the LLM, Typed Compiler, and Renderer create a controllable environment for AI vector-graphic generation.
 
-inku began in a museum, standing in front of a Sol LeWitt exhibition and wondering whether such a mechanism was something one could build oneself. It starts mainly from the three ideas below.
+inku uses several processing layers because it alternates nondeterministic LLMs with deterministic programs. This accepts the variability of human expression while making creation predictable and reproducible. Works recorded in the database as JSON are managed as lineages and preserved generation by generation. From the first work, you create variations in composition, color, and handling, refine them, choose among them, and give rise to a new generation — **the back-and-forth of writing and choosing** is how creation works in inku. You may hold on to the first sentence and carry it through to a finished work, or leave its meaning behind and pursue what is visually compelling. DDL interprets only the language of drawing; words that express meaning or emotion are not implemented. What the drawing carries is for its maker to decide.
 
-| Culture / tradition | What it gives inku |
+DDL is written in simple Japanese or English, so anyone can read it without prior knowledge. The maker can inspect the DDL that was generated and edit it. The idea of making pictures from words with an LLM first came to me in the spring of 2026, while viewing a Sol LeWitt exhibition at a museum: perhaps an LLM could take the place of the craftsperson who makes the actual drawing from a set of instructions.
+
+When I considered how this should differ from natural-language image generation — where the difference ought to lie — three ideas became its pillars.
+The project takes the following three ideas as its starting points.
+
+| Source idea | What inku drew from it |
 |---|---|
-| **Sol LeWitt's instruction art** | The idea that the description itself is the work; the concept the application grew out of |
-| **Bonsai** | The practice that constraint is not limitation but concentration |
-| **Tanka** | The form in which the type silences the self, and presentation replaces assertion |
-
-As of 2026, generative image making hides its process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept splits the generation process into layers, alternating generative AI with deterministically programmed algorithms.
-
-inku is built on LLMs, but the elements an instruction is made of — vocabulary, primitives, coordinates — are placed under strict constraints, programmed to take up the author's intent while holding the form. Those constraints are not limits on what can be made. They are the instruments by which you make a work and render your intention visible.
+| **Sol LeWitt's instructions** | The idea that the description itself is the work; the separation of the roles of description and drawing; the concept from which the application began |
+| **Bonsai** | Unlimited vocabulary and specifications constrain the maker; limited choices foster better creation |
+| **Tanka** | What kinds of writing to take as a target, and which traditions to draw upon |
 
 ---
 

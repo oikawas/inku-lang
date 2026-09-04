@@ -15,6 +15,21 @@
 
 ---
 
+### 2026-09-04 — SPEC の current-contract 化と実装史の移設（docs only）
+
+SPEC.ja.md / SPEC.md を、現在の product semantics、runtime 接続済み挙動、受け入れ済みだが runtime 未接続の foundation、active compatibility だけを記す文書へ整理した。production code、runtime、schema、version、deploy は変更していない。
+
+- 初期 Phase 1/2 UI、語単位の解釈色・inline gloss、Stage 1/2 prompt sketch、最大3回 retry と別モデル fallback、逆順実装計画、将来の並列化を current contract から外した
+- Stage 1.5 の数学・音楽・絵画技法注入、relation 付加、構図族・色・タッチの選択、添景の三水準、七軸 variation、vary_seed、旧 Nature hard-coded authoring model を履歴へ戻した。現在は CanonicalReady typed meaning を入力とする無発明・焦点限定の変換で、完全な amplitude + variation_seed だけが焦点を動かす
+- coerce の視覚的事件・支点・近接反応・消失痕・密度 floor は現在契約ではない。coerce は明示内容の delivery / safety と invalid relation の警告付き drop に限定した
+- 完了済み PoC / phase checklist、版・Build ごとの洗練会計、言語比較 UI、旧固定寸法 calibration（circle 0.038、ellipse [0.06, 0.032]）を仕様本文から履歴へ移した。通常生成の言語自動判定は現行で、保存済み Stage 別言語と language_variation metadata は compatibility として残る
+- 現行 identity は rh3、保存済み rh2 は再計算しない legacy と明記した。history.tenkei、旧言語 metadata、legacy plugin artifact は read / replay compatibility のため残る
+- inku.macro-definition.v1 と sealed Rust Stage 1.5 v3 / geometry-resolution policy は受け入れ済みだが runtime 未接続であり、その成立を否定せず接続済み機能とも偽らない
+
+より古い導入・廃止の詳細は [v0.1〜v1.71](docs/history/changelog-v0.1-v1.71.ja.md) と [v1.72〜v2.4](docs/history/changelog-v1.72-v2.4.ja.md) を参照する。添景廃止は既存 v2.11.0、identity 移行は既存 rh3 導入、言語比較撤去は既存 manual language-comparison retirement の各記録が引き続き履歴正本である。
+
+---
+
 ### v2.5.0 — 演奏の脱・規則化と「暴れる」（render engine 12）（Build 706、2026-07-25）
 
 **engine 11 までの演奏は、揺らいでいるように見えて周期的だった。** 幅のエンベロープは `max(0, sin(pi t))` の固定した山で、**どのストロークも中点でいちばん太く、左右対称に細っていた**。補正イベントは `sin((i % 5) * pi / 2)` で **周期 5 の反復**を打っていた。閉じた輪郭は継ぎ目がやせて中央が太る定型を持ち、材質アウトラインは等間隔の破線と等間隔の粒で描かれていた。engine 12 はこの 4 つをすべて seed 由来の低周波雑音へ置き換え、さらに**中心線そのものに長さ基準のジェスチャ**を足す。

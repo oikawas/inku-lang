@@ -15,6 +15,46 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-04 — current-contract SPEC and relocation of implementation history (docs only)
+
+SPEC.ja.md and SPEC.md now state only current product semantics,
+runtime-connected behavior, accepted but runtime-disconnected foundations, and
+active compatibility. This changes no production code, runtime, schema,
+version, or deployment.
+
+- Removed the initial Phase 1/2 UI, per-word interpretation color and inline
+  gloss, Stage 1/2 prompt sketches, three-retry and alternate-model fallback,
+  back-to-front implementation plan, and future parallelism from the current
+  contract.
+- Returned Stage 1.5 technique injection from mathematics, music, and painting,
+  relation attachment, composition-family/color/touch selection, the three
+  staffage levels, seven variation axes, vary_seed, and the old hard-coded
+  Nature authoring model to history. Current Stage 1.5 takes CanonicalReady
+  typed meaning, invents nothing, and changes focus only; only a complete
+  amplitude plus variation_seed moves focus.
+- Visual-event, anchor, proximity-reaction, disappearance-trace, and density-floor
+  coerce branches are not current contract. Coerce is limited to explicit-content
+  delivery / safety and warned dropping of invalid relations.
+- Moved completed PoC / phase checklists, version- and Build-specific refinement
+  accounting, the language-comparison UI, and old fixed-dimension calibration
+  (circle 0.038, ellipse [0.06, 0.032]) from SPEC to history. Automatic
+  language detection remains current; saved per-stage language and
+  language_variation metadata remain compatibility data.
+- The current identity is rh3; stored rh2 remains legacy and is never
+  recalculated. history.tenkei, old language metadata, and legacy plugin
+  artifacts remain readable / replayable compatibility.
+- inku.macro-definition.v1, sealed Rust Stage 1.5 v3, and the geometry
+  resolution policy remain accepted but runtime-disconnected. Their validity is
+  preserved without presenting them as connected behavior.
+
+For older introduction and retirement details, see [v0.1 through
+v1.71](docs/history/changelog-v0.1-v1.71.ja.md) and [v1.72 through
+v2.4](docs/history/changelog-v1.72-v2.4.md). The existing v2.11.0 staffage
+retirement, rh3 introduction, and manual language-comparison retirement records
+remain the history authorities for those changes.
+
+---
+
 ### v2.5.0 — de-regularizing the performance, and "unleashed" (render engine 12) (Build 706, 2026-07-25)
 
 **Up to engine 11 the performance looked varied but was periodic.** The width envelope was a fixed `max(0, sin(pi t))` hump, so **every stroke was fattest exactly at its midpoint and thinned symmetrically to both ends**. The correction event beat with `sin((i % 5) * pi / 2)` — **a period of five**. Closed contours carried a thin seam opposite a fat middle, and the material outline was drawn with an even dash and evenly spaced specks. Engine 12 replaces all four with seeded low-frequency noise, and adds **a length-scaled gesture to the centreline itself**.

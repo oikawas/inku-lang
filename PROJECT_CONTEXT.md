@@ -70,9 +70,14 @@ modifiers, quantities, actions, positions, relations, coordination, and continua
 typed semantic document. A qualified macro invocation is lock-resolved to the generic
 `MacroDefinition`, its typed parameters are bound, and expansion to semantic nodes is deterministic
 under an attested `composition_seed` and caller-owned finite limits. The compiler lock attests source
-record integrity: source differences do not enter meaning selection, and alteration is rejected.
-Ambiguous ownership and unresolved meaning fail closed as typed issues; the compiler does not guess
-by first, nearest, or last.
+and provenance through its full digest, while canonical identity and focus selection use the meaning
+digest, so source differences do not enter meaning selection. Ambiguous ownership and unresolved
+meaning fail closed as typed issues; the compiler does not guess by first, nearest, or last.
+
+The accepted sealed Rust Stage 1.5 v4 takes lock-verified typed meaning and chooses focus from its
+meaning digest and an optional attested `composition_seed`. Explicit variation may move focus only.
+Equivalent meaning in inline and continuation forms, and their corresponding macro execution, are
+separated from source provenance; the full compiler-lock digest itself is not an input to focus.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
@@ -371,7 +376,8 @@ It carries drawing, history, plugin, reference-dump, administrative, and benchma
 not import server internals.
 **Feature tests use the surface that owns the changed behavior.** CLI/API drawing flows use
 `inku-cli`, Web or Android UI uses its respective UI, and backend contracts use focused API checks.
-When a required workflow lacks a flag, it is implemented in the CLI first and tested there.
+Only when a requested CLI workflow requires a missing flag is it implemented in the CLI first and
+tested there.
 **An unnamed key is not an error — it is filled with a default — so request fields are counted per
 sender** (`server/tests/test_cli_sender_census.py`).
 **The path that counts raster measurements counts the image it was handed, at the width it was

@@ -59,10 +59,15 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 continuationをtyped semantic documentへ組み立てるshared Rust compiler基盤がある。
 名前空間付きmacro呼出しは、汎用の`MacroDefinition`へlock解決し、typed parameterを
 bindingしてから、attestされた`composition_seed`と呼出側の有限上限のもとで決定的に
-semantic nodeへ展開する。compiler lockはsource recordの完全性をattestし、sourceの
-違いは意味選択に入れず、改変は拒否する。
+semantic nodeへ展開する。full compiler-lock digestはsource/provenanceを検証し、
+canonical identityとfocus選択はmeaning digestに基づくため、sourceの違いは意味選択に入れない。
 曖昧な所有先や未解決の意味は、先頭・最近傍・末尾を推測せずtyped issueとして
 fail closedする。
+
+受入済みのsealed Rust Stage 1.5 v4は、lock検証済みtyped meaningを入力に、meaning digestと
+attestされた任意の`composition_seed`からfocusを決める。明示変奏が動かせるのはfocusだけである。
+inline/continuationの等価meaningと対応するmacro executionはsource provenanceから分離し、
+full compiler-lock digest自体をfocusの材料にしない。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
@@ -296,7 +301,7 @@ router 既定より強いガード（`plugins` の管理者限定 7 本）を課
 描画・履歴・プラグイン・参照 dump・管理コマンド・ベンチマーク補助を持ち、server の内部モジュールを import しない。
 **機能テストは変更した挙動を所有するsurfaceを通す。** CLI/APIの描画flowは`inku-cli`、
 WebまたはAndroidのUIは各UI、backend contractはfocused API checkで検査する。
-必要なworkflowに旗が無いときは、まずCLIに実装してからテストする。
+要求されたCLI workflowに必要な旗が無いときだけ、まずCLIに実装してからテストする。
 **送らない鍵はエラーにならず既定で埋まるので、リクエストのフィールドは送り手ごとに数える**
 （`server/tests/test_cli_sender_census.py`）。
 **ラスタの判定量を数える経路は、渡された画像をその幅のまま数える。**

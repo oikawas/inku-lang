@@ -10,13 +10,17 @@ use crate::{
     ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, GeneratedNodeProvenance,
     SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticIdentity, SemanticTermProvenance,
     TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
+    compiler_lock::{
+        SemanticMacroExecutionOwners, expanded_meaning_canonical_bytes_with_owners,
+        semantic_macro_execution_owners,
+    },
     compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
-    expanded_meaning_canonical_bytes, semantic_document::canonical_ast_bytes,
+    semantic_document::canonical_ast_bytes,
     semantic_source_provenance_canonical_bytes,
 };
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
-pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v3";
+pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v4";
 /// Framed hash domain for source-independent baseline focus selection.
 pub const STAGE15_FOCUS_SELECTION_DOMAIN: &[u8] = b"inku.typed-stage15-focus-selection.v1";
 
@@ -130,6 +134,7 @@ pub struct Stage15TransformationInput {
     pre_expansion_digest: String,
     expanded_meaning_digest: String,
     composition_seed: Option<u64>,
+    execution_owners: SemanticMacroExecutionOwners,
 }
 
 impl Stage15TransformationInput {
@@ -366,7 +371,16 @@ pub fn stage15_transformation_input(
         .expanded_meaning_digest
         .as_ref()
         .ok_or(Stage15TransformError::MissingExpandedMeaningDigest)?;
-    if sha256_hex(&expanded_meaning_canonical_bytes(expansion)) != *expanded_meaning_digest {
+    let execution_owners =
+        semantic_macro_execution_owners(&semantic.ast, &expansion.parameter_binding)
+            .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
+    execution_owners
+        .validate_seed_identities(expansion, &lock.macro_seeds, lock.composition_seed)
+        .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
+    let expanded_meaning_bytes =
+        expanded_meaning_canonical_bytes_with_owners(&execution_owners, expansion)
+            .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
+    if sha256_hex(&expanded_meaning_bytes) != *expanded_meaning_digest {
         return Err(Stage15TransformError::ExpandedMeaningDigestMismatch);
     }
     let expanded_generated_provenance_digest =
@@ -385,6 +399,7 @@ pub fn stage15_transformation_input(
         pre_expansion_digest: pre_expansion_digest.clone(),
         expanded_meaning_digest: expanded_meaning_digest.clone(),
         composition_seed: lock.composition_seed,
+        execution_owners,
     })
 }
 
@@ -427,7 +442,7 @@ pub fn transform_stage15(
         resolved_focus,
         effective_variation,
         &targets,
-    );
+    )?;
     let effective_canonical_digest = sha256_hex(&effective_canonical_bytes);
 
     Ok(Stage15TransformationResult {
@@ -702,7 +717,7 @@ fn effective_canonical_bytes(
     resolved_focus: Option<FocusRegion>,
     effective_variation: Option<Stage15Variation>,
     targets: &[Stage15TargetTransformation],
-) -> Vec<u8> {
+) -> Result<Vec<u8>, Stage15TransformError> {
     let mut root = BTreeMap::new();
     root.insert(
         "schema".to_owned(),
@@ -772,9 +787,14 @@ fn effective_canonical_bytes(
     );
     root.insert(
         "targets".to_owned(),
-        Value::Array(targets.iter().map(target_value).collect()),
+        Value::Array(
+            targets
+                .iter()
+                .map(|target| target_value(target, &input.execution_owners))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
     );
-    serde_json::to_vec(&root).expect("closed Stage 1.5 values serialize")
+    Ok(serde_json::to_vec(&root).expect("closed Stage 1.5 values serialize"))
 }
 
 fn identity_value(schema: &str, digest: &str) -> Value {
@@ -791,9 +811,12 @@ fn optional_seed_value(seed: Option<u64>) -> Value {
     }
 }
 
-fn target_value(target: &Stage15TargetTransformation) -> Value {
+fn target_value(
+    target: &Stage15TargetTransformation,
+    owners: &SemanticMacroExecutionOwners,
+) -> Result<Value, Stage15TransformError> {
     let mut value = BTreeMap::new();
-    value.insert("path".to_owned(), target_path_value(&target.path));
+    value.insert("path".to_owned(), target_path_value(&target.path, owners)?);
     let mut original = BTreeMap::new();
     original.insert(
         "category".to_owned(),
@@ -808,10 +831,13 @@ fn target_value(target: &Stage15TargetTransformation) -> Value {
         "effective_focus".to_owned(),
         Value::String(target.effective_focus.as_str().to_owned()),
     );
-    Value::Object(value.into_iter().collect())
+    Ok(Value::Object(value.into_iter().collect()))
 }
 
-fn target_path_value(path: &Stage15TargetPath) -> Value {
+fn target_path_value(
+    path: &Stage15TargetPath,
+    owners: &SemanticMacroExecutionOwners,
+) -> Result<Value, Stage15TransformError> {
     let mut value = BTreeMap::new();
     match path {
         Stage15TargetPath::Instruction { instruction_index } => {
@@ -844,10 +870,14 @@ fn target_path_value(path: &Stage15TargetPath) -> Value {
             generated_ordinal,
             field,
         } => {
+            let Some(semantic_ordinal) = owners.semantic_ordinal_for_source(*invocation_ordinal)
+            else {
+                return Err(Stage15TransformError::MissingTarget(path.clone()));
+            };
             value.insert("kind".to_owned(), Value::String("macro_emit".to_owned()));
             value.insert(
                 "invocation_ordinal".to_owned(),
-                Value::Number(Number::from(*invocation_ordinal)),
+                Value::Number(Number::from(semantic_ordinal)),
             );
             value.insert(
                 "expansion_path".to_owned(),
@@ -860,7 +890,7 @@ fn target_path_value(path: &Stage15TargetPath) -> Value {
             value.insert("field".to_owned(), Value::String(field.clone()));
         }
     }
-    Value::Object(value.into_iter().collect())
+    Ok(Value::Object(value.into_iter().collect()))
 }
 
 fn path_segment_value(segment: &ExpansionPathSegment) -> Value {

@@ -12,7 +12,7 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("fixtures/semantic-document-v13.json");
+const FIXTURE: &str = include_str!("fixtures/semantic-document-v14.json");
 
 #[test]
 fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
@@ -755,6 +755,51 @@ fn marked_subject_predicate_continues_the_unique_prior_entity() {
 }
 
 #[test]
+fn inline_and_continuation_forms_share_primitive_canonical_meaning() {
+    let sources = ["赤い円を中心に置く。", "円を中心に置く。円は赤い。"];
+    let results = sources.map(|source| {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new())
+                .unwrap();
+        associate_semantic_document(&document).unwrap()
+    });
+
+    for result in &results {
+        assert!(result.ast.complete);
+        assert_eq!(result.ast.instructions.len(), 1);
+        assert_eq!(
+            result.ast.instructions[0]
+                .entity
+                .color
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("red")
+        );
+        assert_eq!(
+            result.ast.instructions[0]
+                .position
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("center")
+        );
+    }
+
+    assert!(results[0].ast.continuations.is_empty());
+    let continuation = &results[1].ast.continuations[0];
+    assert_eq!(continuation.target_instruction_index, 0);
+    assert_eq!(continuation.reintroduced_head.source().surface, "円");
+    assert_eq!(continuation.marker.surface, "は");
+    assert_eq!(
+        &sources[1][continuation.predicate_span.start_byte..continuation.predicate_span.end_byte],
+        "赤い"
+    );
+    assert_eq!(
+        results[0].canonical_bytes, results[1].canonical_bytes,
+        "surface continuation syntax must not change resolved canonical meaning"
+    );
+}
+
+#[test]
 fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallback() {
     for (source, expected) in [
         (
@@ -1015,7 +1060,7 @@ fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v13");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v14");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-entity-association.v13"
@@ -1024,8 +1069,8 @@ fn schema_fixture_and_required_document_boundaries_are_guarded() {
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
         "inku.semantic-instruction-association.v16"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v13");
-    assert_eq!(fixture.version, 13);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v14");
+    assert_eq!(fixture.version, 14);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1257,7 +1302,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v13");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v14");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -1460,7 +1505,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v13");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v14");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

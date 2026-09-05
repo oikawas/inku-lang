@@ -2613,8 +2613,8 @@ relation, or element count. The same lock-verified meaning and attested
 `composition_seed` reproduce the same effective meaning. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
-identity never presents changed bytes as an old identity; deciding the code
-version remains later D1 implementation scope.
+identity never presents changed bytes as an old identity; the D1 implementation
+milestone is reflected in typed v4 in §12.11 but is not connected to runtime.
 
 Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
 event is emitted as soon as interpretation completes (normalized DDL, models

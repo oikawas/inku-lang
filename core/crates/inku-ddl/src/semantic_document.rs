@@ -16,7 +16,8 @@ use crate::{
     associate_semantic_instructions_with_macro_binding,
     semantic_association::{
         causal_provenance, diagnostic_causes_in_source_range, project_semantic_term,
-        semantic_identity_value, sentence_region_index,
+        semantic_identity_value, semantic_macro_parameters_have_same_meaning,
+        sentence_region_index,
     },
     semantic_instruction::{
         semantic_coordinated_head_group_value, semantic_group_predicate_value,
@@ -627,7 +628,10 @@ fn associate_continuations(
             continue;
         }
 
-        if !predicate_is_compatible(
+        if !heads_have_same_parameter_meaning(
+            &instructions[candidate.target_instruction_index].entity.head,
+            &candidate.instruction.entity.head,
+        ) || !predicate_is_compatible(
             &instructions[candidate.target_instruction_index],
             &candidate.instruction,
         ) {
@@ -919,6 +923,16 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
 
 fn same_head_identity(left: &SemanticHead, right: &SemanticHead) -> bool {
     continuation_target(left) == continuation_target(right)
+}
+
+fn heads_have_same_parameter_meaning(left: &SemanticHead, right: &SemanticHead) -> bool {
+    match (left, right) {
+        (SemanticHead::Primitive(_), SemanticHead::Primitive(_)) => true,
+        (SemanticHead::MacroInvocation(left), SemanticHead::MacroInvocation(right)) => {
+            semantic_macro_parameters_have_same_meaning(&left.parameters, &right.parameters)
+        }
+        _ => false,
+    }
 }
 
 fn continuation_target(head: &SemanticHead) -> SemanticContinuationTarget {

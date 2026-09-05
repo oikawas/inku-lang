@@ -1664,7 +1664,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らないが、そのversion決定は後続D1実装のscopeに残す。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v4に反映済みだがruntimeには未接続である。
 
 v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
 

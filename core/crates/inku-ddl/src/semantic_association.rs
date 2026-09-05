@@ -188,6 +188,67 @@ pub struct SemanticMacroParameterBinding {
     pub canonical_surface_ja: Option<String>,
 }
 
+pub(crate) fn semantic_macro_parameters_have_same_meaning(
+    left: &[SemanticMacroParameterBinding],
+    right: &[SemanticMacroParameterBinding],
+) -> bool {
+    if left.len() != right.len()
+        || left
+            .iter()
+            .map(|parameter| &parameter.name)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != left.len()
+        || right
+            .iter()
+            .map(|parameter| &parameter.name)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != right.len()
+    {
+        return false;
+    }
+
+    left.iter().all(|parameter| {
+        right.iter().any(|candidate| {
+            candidate.name == parameter.name
+                && candidate.schema == parameter.schema
+                && candidate.value == parameter.value
+        })
+    })
+}
+
+pub(crate) fn semantic_macro_parameters_match_complete_binding(
+    parameters: &[SemanticMacroParameterBinding],
+    complete: &crate::CompleteMacroParameterBinding,
+) -> bool {
+    if parameters.len() != complete.parameters.len()
+        || parameters
+            .iter()
+            .map(|parameter| &parameter.name)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != parameters.len()
+        || complete
+            .parameters
+            .iter()
+            .map(|parameter| &parameter.parameter_name)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != complete.parameters.len()
+    {
+        return false;
+    }
+
+    parameters.iter().all(|parameter| {
+        complete.parameters.iter().any(|candidate| {
+            candidate.parameter_name == parameter.name
+                && candidate.parameter_schema == parameter.schema
+                && semantic_macro_parameter_value_from_bound(&candidate.value) == parameter.value
+        })
+    })
+}
+
 /// Source-only identity of one resolved visible macro invocation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticMacroInvocationProvenance {
@@ -1368,24 +1429,16 @@ fn semantic_macro_parameter(
         parameter.value.source_span(),
         "accepted I-581 parameter value retains its owned source span"
     );
-    let (value, source_asset_id, canonical_surface_ja) = match &parameter.value {
-        BoundMacroParameterValue::Integer { value, .. } => {
-            (SemanticMacroParameterValue::Integer(*value), None, None)
-        }
-        BoundMacroParameterValue::Number { value, .. } => {
-            (SemanticMacroParameterValue::Number(*value), None, None)
+    let value = semantic_macro_parameter_value_from_bound(&parameter.value);
+    let (source_asset_id, canonical_surface_ja) = match &parameter.value {
+        BoundMacroParameterValue::Integer { .. } | BoundMacroParameterValue::Number { .. } => {
+            (None, None)
         }
         BoundMacroParameterValue::SemanticRef {
-            category,
-            canonical_id,
             source_asset_id,
             canonical_surface_ja,
             ..
         } => (
-            SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
-                category: category.clone(),
-                id: canonical_id.clone(),
-            }),
             Some(source_asset_id.clone()),
             Some(canonical_surface_ja.clone()),
         ),
@@ -1403,6 +1456,27 @@ fn semantic_macro_parameter(
         ),
         source_asset_id,
         canonical_surface_ja,
+    }
+}
+
+fn semantic_macro_parameter_value_from_bound(
+    value: &BoundMacroParameterValue,
+) -> SemanticMacroParameterValue {
+    match value {
+        BoundMacroParameterValue::Integer { value, .. } => {
+            SemanticMacroParameterValue::Integer(*value)
+        }
+        BoundMacroParameterValue::Number { value, .. } => {
+            SemanticMacroParameterValue::Number(*value)
+        }
+        BoundMacroParameterValue::SemanticRef {
+            category,
+            canonical_id,
+            ..
+        } => SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
+            category: category.clone(),
+            id: canonical_id.clone(),
+        }),
     }
 }
 
@@ -2562,6 +2636,121 @@ pub(crate) fn semantic_identity_value(identity: &SemanticIdentity) -> Value {
 mod tests {
     use super::*;
     use crate::CanonicalRelationForm;
+
+    fn execution_owner_parameter(
+        name: &str,
+        schema: ParameterSchema,
+        value: SemanticMacroParameterValue,
+        span: SourceSpan,
+    ) -> SemanticMacroParameterBinding {
+        SemanticMacroParameterBinding {
+            name: name.to_owned(),
+            schema,
+            value,
+            provenance: SourceOccurrence {
+                span,
+                surface: format!("surface-{name}"),
+                language: ResolvedInstructionLanguage::En,
+                region_index: span.start_byte,
+                clause_index: span.start_byte,
+                atom_index: span.start_byte,
+            },
+            source_asset_id: Some(format!("asset-{name}")),
+            canonical_surface_ja: Some(format!("表示-{name}")),
+        }
+    }
+
+    #[test]
+    fn execution_owner_parameter_meaning_is_typed_and_source_independent() {
+        let original = vec![
+            execution_owner_parameter(
+                "count",
+                ParameterSchema::Integer,
+                SemanticMacroParameterValue::Integer(2),
+                SourceSpan {
+                    start_byte: 0,
+                    end_byte: 1,
+                },
+            ),
+            execution_owner_parameter(
+                "ratio",
+                ParameterSchema::Number,
+                SemanticMacroParameterValue::Number(0.5),
+                SourceSpan {
+                    start_byte: 2,
+                    end_byte: 3,
+                },
+            ),
+            execution_owner_parameter(
+                "tone",
+                ParameterSchema::SemanticRef {
+                    category: "color".to_owned(),
+                },
+                SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
+                    category: "color".to_owned(),
+                    id: "red".to_owned(),
+                }),
+                SourceSpan {
+                    start_byte: 4,
+                    end_byte: 5,
+                },
+            ),
+        ];
+        let mut source_only = original.clone();
+        for (index, parameter) in source_only.iter_mut().enumerate() {
+            parameter.provenance.span.start_byte += 10 + index;
+            parameter.provenance.span.end_byte += 10 + index;
+            parameter.provenance.surface.push('!');
+            parameter.provenance.region_index += 1;
+            parameter.provenance.clause_index += 1;
+            parameter.provenance.atom_index += 1;
+            parameter.source_asset_id = Some(format!("other-{index}"));
+            parameter.canonical_surface_ja = Some(format!("別-{index}"));
+        }
+        let mut reordered = source_only.clone();
+        reordered.reverse();
+        let mut integer_difference = original.clone();
+        integer_difference[0].value = SemanticMacroParameterValue::Integer(3);
+        let mut number_difference = original.clone();
+        number_difference[1].value = SemanticMacroParameterValue::Number(0.500_001);
+        let mut semantic_ref_difference = original.clone();
+        semantic_ref_difference[2].value =
+            SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
+                category: "color".to_owned(),
+                id: "blue".to_owned(),
+            });
+        let mut typed_difference = original.clone();
+        typed_difference[0].value = SemanticMacroParameterValue::Number(2.0);
+        let mut name_difference = original.clone();
+        name_difference[0].name = "other".to_owned();
+        let mut schema_difference = original.clone();
+        schema_difference[2].schema = ParameterSchema::SemanticRef {
+            category: "shape".to_owned(),
+        };
+        let mut duplicate_name = original.clone();
+        duplicate_name[1].name = "count".to_owned();
+        let mut fewer = original.clone();
+        fewer.pop();
+
+        for (label, candidate, expected) in [
+            ("source-only", source_only, true),
+            ("reordered", reordered, true),
+            ("integer-value", integer_difference, false),
+            ("number-value", number_difference, false),
+            ("semantic-ref-value", semantic_ref_difference, false),
+            ("typed-value", typed_difference, false),
+            ("name", name_difference, false),
+            ("schema", schema_difference, false),
+            ("duplicate-name", duplicate_name, false),
+            ("cardinality", fewer, false),
+        ] {
+            assert_eq!(
+                semantic_macro_parameters_have_same_meaning(&original, &candidate),
+                expected,
+                "{label}"
+            );
+        }
+    }
 
     #[test]
     fn contradictory_relation_identity_blocks_semantic_edge_and_canonical_bytes() {

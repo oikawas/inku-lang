@@ -46,8 +46,8 @@ instruction
   -> Stage 0.5: sketch from life (optional; rewrites the description as prose naming things)
   -> Stage 1: interpretation
   -> normalized DDL (which may contain namespaced plugin words)
-  -> declarative plugin expansion: deterministic writing-down to core DDL
-  -> Stage 1.5: deterministic expansion and relation assignment
+  -> legacy plugin expansion (compatibility path): deterministic writing-down to core DDL
+  -> Stage 1.5 (compatibility runtime): deterministic focus reframing and explicit variation
   -> Stage 2: JSON Score
   -> coerce / validation: boundary handling with a drop-only preference
   -> Render Engine: SVG performance
@@ -68,15 +68,16 @@ instruction
 visible normalized DDL with source spans and composes Japanese and English phrases, entities,
 modifiers, quantities, actions, positions, relations, coordination, and continuation into a
 typed semantic document. A qualified macro invocation is lock-resolved to the generic
-`MacroDefinition`, its typed parameters are bound, and expansion is deterministic under an
-explicit `composition_seed` and caller-owned finite limits. Ambiguous ownership and unresolved
-meaning fail closed as typed issues; the compiler does not guess by first, nearest, or last.
+`MacroDefinition`, its typed parameters are bound, and expansion to semantic nodes is deterministic
+under an attested `composition_seed` and caller-owned finite limits. The compiler lock attests source
+record integrity: source differences do not enter meaning selection, and alteration is rejected.
+Ambiguous ownership and unresolved meaning fail closed as typed issues; the compiler does not guess
+by first, nearest, or last.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
-above therefore remains the active runtime. Completion of Step 8 does not mean that Stage 1.5,
-Stage 2, coerce, JSON Score, the Renderer, the DB, or the API has been cut over. Score lowering,
-drawing defaults, quantity resolution, typed-hole blocking, and runtime cutover belong to later
-steps.
+above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
+compatibility paths, not the canonical semantic specification. Score lowering, drawing defaults,
+quantity resolution, typed-hole blocking, and runtime cutover remain at the unconnected boundary.
 
 ## Contracts That Must Remain Intact
 
@@ -176,7 +177,7 @@ fall back), and no record at all.
 **Refining from a marked work as the lineage parent asks once before it runs.**
 - **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
 The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.
-- **Plugin expansion** — writes a validated `.inku-plugin.md` down into core DDL deterministically,
+- **Plugin expansion (compatibility path)** — writes a validated `.inku-plugin.md` down into core DDL deterministically,
 immediately after Stage 1.
 Only a `fires_on` term that is namespace-qualified or named as an explicit subject fires; it never
 widens to metaphor or unknown subjects.
@@ -185,7 +186,7 @@ those units to place** (what one unit becomes is settled by the plugin document'
 seed; the body does not reach inside it). The count is read by `counts.py`, shared with coerce.
 **When the stated number times one unit exceeds a budget, the single unit stands and the decline is
 recorded rather than trimmed to fit.**
-- **Stage 1.5** — deterministic expansion and relation assignment.
+- **Stage 1.5 (compatibility runtime)** — deterministic focus reframing and explicit variation.
 It carries variation (three strengths), stored per work. **One axis moves — the focus — and this
 layer adds no sentence the description did not ask for.**
 - **Stage 2** — Score construction as JSON.
@@ -368,8 +369,9 @@ stage default — and never guesses.
 `inku-cli` uses only the public HTTP API.
 It carries drawing, history, plugin, reference-dump, administrative, and benchmark commands, and does
 not import server internals.
-**Feature tests run through this CLI.**
-When a flag does not exist yet, it is implemented in the CLI first and tested there.
+**Feature tests use the surface that owns the changed behavior.** CLI/API drawing flows use
+`inku-cli`, Web or Android UI uses its respective UI, and backend contracts use focused API checks.
+When a required workflow lacks a flag, it is implemented in the CLI first and tested there.
 **An unnamed key is not an error — it is filled with a default — so request fields are counted per
 sender** (`server/tests/test_cli_sender_census.py`).
 **The path that counts raster measurements counts the image it was handed, at the width it was
@@ -460,7 +462,10 @@ A separate developer-facing register holds them, with state.
 ## Documentation Update Rules
 
 - Update `SPEC.ja.md` first for a specification change, then carry **the same content, section for section**, into `SPEC.md`. Neither language may hold a section the other lacks (the author's ruling of 2026-08-02; **Japanese remains canonical**). `server/scripts/check_docs.py` is the only gate on this and must be run before merging. The same gate also reads the forbidden words on the English side (a backticked identifier is not checked).
-- When current architecture or a major contract changes, update both project-context files.
+- At the completion of each implementation Step (including when work stops there) and before moving
+to the next Step, compare both project-context files with the current implementation milestone,
+important contracts, and runtime integration state, then update both wherever they changed. Also
+update those passages when current architecture or an important contract changes within a Step.
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.
 - For Web behavior or UI changes, increment `web/BUILD_NUMBER`.

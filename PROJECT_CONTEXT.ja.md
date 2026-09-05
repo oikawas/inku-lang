@@ -34,8 +34,8 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
   -> Stage 0.5: 写生（任意・記述を物の言葉へ写した自然文にする）
   -> Stage 1: 解釈
   -> 正規化DDL（名前空間付きプラグイン語を含みうる）
-  -> 宣言的プラグイン展開: コアDDLへ決定的にwriting-down
-  -> Stage 1.5: 決定的な拡張・関係付与
+  -> legacy plugin展開（互換経路）: コアDDLへ決定的にwriting-down
+  -> Stage 1.5（互換runtime）: 決定的な焦点書換え・明示変奏
   -> Stage 2: JSON Score化
   -> coerce / validation: drop-onlyを優先する境界処理
   -> Render Engine: SVG演奏
@@ -58,15 +58,17 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 日本語／英語の句・entity・修飾・数量・action・position・relation・coordination・
 continuationをtyped semantic documentへ組み立てるshared Rust compiler基盤がある。
 名前空間付きmacro呼出しは、汎用の`MacroDefinition`へlock解決し、typed parameterを
-bindingしてから、明示的な`composition_seed`と有限上限のもとで決定的に展開する。
+bindingしてから、attestされた`composition_seed`と呼出側の有限上限のもとで決定的に
+semantic nodeへ展開する。compiler lockはsource recordの完全性をattestし、sourceの
+違いは意味選択に入れず、改変は拒否する。
 曖昧な所有先や未解決の意味は、先頭・最近傍・末尾を推測せずtyped issueとして
 fail closedする。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
-したがって上の「現行アーキテクチャ」が現在のruntimeであり、Step 8の完了は
-Stage 1.5、Stage 2、coerce、JSON Score、Renderer、DB、APIの切替完了を意味しない。
-Scoreへのlowering、描画既定値、数量解決、typed holeの停止範囲、runtime cutoverは
-後続Stepで決める。
+したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
+展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
+typed semantic pathのScoreへのlowering、描画既定値、数量解決、typed holeの停止範囲、
+runtime cutoverは未接続の境界として残る。
 
 ## 守るべき設計契約
 
@@ -155,12 +157,12 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 **印の付いた作品を系譜の親にして推敲するときは、実行の前に一度だけ尋ねる。**
 - **Stage 1（解釈）** — 指示文の言語を自動判定し、正規化 DDL を作る。
 プロンプトは歳時記から組み立てられ、固定文字列を持たない。
-- **プラグイン展開** — 検証済みの `.inku-plugin.md` を Stage 1 の直後にコア DDL へ決定的に writing-down する。
+- **プラグイン展開（互換経路）** — 検証済みの `.inku-plugin.md` を Stage 1 の直後にコア DDL へ決定的に writing-down する。
 名前空間が明示された語か、指示対象として明示された語の `fires_on` だけが発火し、比喩や未知の対象へは広げない。
 **プラグインが渡すのは 1 単位で、その参照を含む句に述べた数はその単位を何回置くかを指す**（1 単位の内訳は
 プラグイン文書の宣言と seed が決め、本文は中へ手を入れない）。数の読み手は coerce と共有の `counts.py` である。
 **述べた数 × 1 単位が上限を越えるときは、切り詰めずに 1 単位のまま据え置き、断りを記録に残す。**
-- **Stage 1.5** — 決定的な拡張と関係付与。
+- **Stage 1.5（互換runtime）** — 決定的な焦点書換えと明示変奏。
 変奏（強度 3 段）を持ち、作品ごとに保存される。**動く軸は焦点ひとつで、この層は記述に無い文を足さない。**
 - **Stage 2** — JSON Score 化。
 任意フィールドの充填率は tool schema の**宣言順に従属する**（末尾に置いた語ほど埋まる）。
@@ -292,8 +294,9 @@ router 既定より強いガード（`plugins` の管理者限定 7 本）を課
 
 `inku-cli` は公開 HTTP API だけを使う。
 描画・履歴・プラグイン・参照 dump・管理コマンド・ベンチマーク補助を持ち、server の内部モジュールを import しない。
-**機能テストはこの CLI を通す。**
-旗が無ければ、まず CLI に実装してからテストする。
+**機能テストは変更した挙動を所有するsurfaceを通す。** CLI/APIの描画flowは`inku-cli`、
+WebまたはAndroidのUIは各UI、backend contractはfocused API checkで検査する。
+必要なworkflowに旗が無いときは、まずCLIに実装してからテストする。
 **送らない鍵はエラーにならず既定で埋まるので、リクエストのフィールドは送り手ごとに数える**
 （`server/tests/test_cli_sender_census.py`）。
 **ラスタの判定量を数える経路は、渡された画像をその幅のまま数える。**
@@ -364,7 +367,9 @@ host CIでは代替しない）、
 片方にしか無い節は置かない（2026-08-02 裁定。**正本が日本語である点は変わらない**）。
 `server/scripts/check_docs.py` が見出し形状の一致を見る唯一のゲートで、マージ前に走らせる。
 同じゲートが英語側の禁止語も見る（バックティックで囲んだ識別子は対象外）。
-- 現行の構造や重要契約が変わる場合は、本書と `PROJECT_CONTEXT.md` も更新する。
+- 各実装Stepを完了したとき（そこで停止する場合を含む）と次のStepへ移る前に、日英の本書を
+現行実装の到達点・重要契約・runtime接続状態と照合し、変わった箇所を両方更新する。
+Stepの途中でも現行構造や重要契約が変わる場合は、同じ箇所を更新する。
 - リリース／Buildの履歴は `CHANGELOG.ja.md` を先に更新し、公開上必要な内容を `CHANGELOG.md` に反映する。
 - 実装だけの細部を仕様本文へ無制限に積み増さない。
 現行契約は仕様、時系列の記録は変更履歴へ置く。

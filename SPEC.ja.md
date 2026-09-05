@@ -183,11 +183,15 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わず、明示errorにする。
 
+同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seed、明示変奏なら、surface syntaxだけでmacro seed、focus、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
+
 この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
 ### 4.6 Generic MacroDefinition v1
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
+
+Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
 旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
@@ -811,6 +815,8 @@ Typed DDL compilerでは、この例の第二文は第二のdrawable entityを�
 
 Continuationはreintroduced head、subject marker / determiner、predicateの正確なsource spanとclause provenanceを保存する一方、canonical semantic bytesにはlocalized surfaceを含めない。Headとmarkerはcontinuation syntax、predicateの明示modifier / actionはtargetのstructured fieldとしてそれぞれexactly once配送され、元のquantity、position、relation、Ground、MacroInvocationを作り直さない。既存relationの`previous_one` / `previous_two`は明示relation edgeのtargetであり、このmarked-subject continuation targetとは別である。これはJSON Scoreより前のvisible typed semantic graphである。後節にあるJSON Score例はこのgraphそのものではなく、Score / Rendererへのloweringとdefault裁定はStep 10 gateの責務であり、本規則はそれらを開始しない。
 
+たとえば`赤い円を中心に置く。`と`円を中心に置く。円は赤い。`は、同じ対象と明示指示へ一意に解決されるなら同じsource-independent canonical meaningを持つ。前者のinlineと後者のcontinuationのsource span、rhythm、continuation edge / target、binding、provenanceはそれぞれ保存され、full compiler-lock attestationは一致しなくてよい。
+
 **却下した選択肢:**
 
 | 形式 | 却下理由 |
@@ -869,11 +875,11 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 原文、正規化 DDL、元の typed meaning、effective meaning、source / generated provenance を別々に保ち、元の意味や明示属性を上書きしない
 - 新しい sentence、entity、relation、technique、color、touch、primitive、content を発明しない
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
-- baseline の選択は compiler-lock digest、canonical-input digest、attested `composition_seed` に束縛する
+- baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v3 の typed foundation は受け入れ済みだが runtime には未接続である。現行 Python 経路は cutover までの互換実装であり、同じ無発明・焦点限定契約に従う。受け入れ済み primitive と runtime 接続済み機能を混同しない。
+sealed Rust Stage 1.5 v3 の typed foundation とR1 / R2は受け入れ済みだが runtime には未接続である。D1のinline / continuation canonical meaning、seed、effective identityの同期はコード修正待ちであり、本節の同期だけで達成済みまたはStep 9 COMPLETEとはしない。現行 Python 経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。受け入れ済み primitive と runtime 接続済み機能を混同しない。
 
 ### 12.12 添景と互換記録
 
@@ -881,9 +887,9 @@ sealed Rust Stage 1.5 v3 の typed foundation は受け入れ済みだが runtim
 
 ### 12.13 変奏（Stage 1.5）
 
-構図の同一性は attested `composition_seed` が担う。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点だけを選び直す。現行入力に `vary_seed` はない。
+構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点だけを選び直す。現行入力に `vary_seed` はない。
 
-明示変奏は amplitude（小・中・大）と `variation_seed` の組である。両方が揃った場合だけ焦点を動かし、同じ lock、canonical input、composition seed、amplitude、variation seed は同じ effective meaning を得る。構図族、色、タッチ、技法、relation、要素数は動かさない。
+明示変奏は amplitude（小・中・大）と `variation_seed` の組である。両方が揃った場合だけ焦点を動かし、同じlock検証済みmeaning、attested composition seed、amplitude、variation seedは同じeffective meaningを得る。構図族、色、タッチ、技法、relation、要素数は動かさない。
 
 Score と描画同一性の現行 domain は `rh3` である。`rh2` は保存済み作品を読むための legacy domain であり、新規生成の current identity として書かない。七軸から一軸へ畳んだ履歴は [CHANGELOG.ja.md](CHANGELOG.ja.md) に置く。
 
@@ -934,6 +940,8 @@ DB が保存するのは `history.svg` の `display` SVG だけである。編�
 写生文が変わっても解決される数は変わらない。
 **記述そのものは保存と表示に残る。** 作品は作者が書いたものであって、層が書いたものではない。
 
+この段落はcutover前のlegacy runtimeとその歴史的な説明である。新typed pipelineのmacro意味規範とfocus seed sourceは§4.5と§12.11に従い、原文や写生文をtyped macro seed sourceへ戻さない。
+
 **背景の番人を 1 つ撤去した**（v2.9.41）。「利用者が機械生成のプランを記述欄に貼った」ことを
 見抜く判定は、判じていたのが**文字列の出自**だったので、記述が coerce へ届かなくなると
 判ずる素性が残らない。残すと本番の DDL の普通の形に誤爆する — **本番の濃色 604 件で
@@ -964,6 +972,8 @@ DB が保存するのは `history.svg` の `display` SVG だけである。編�
 指示文の言語の 4 つを動かす。** したがって**その DDL を生んでいない文字列を記述の席へ座らせない** —
 作者が打った本文が記述であり、記述を後から貼り替える経路を入口は持たない。
 既存作品の記述を上書きして描き直す操作（推敲）は別の操作であって、出自の差し替えではない。
+
+ここで述べるprose-driven plugin発動、記述seed、Stage 1.5 contextはcutover前legacy runtimeの説明に限る。新typed pipelineの意味とseedの規範は§4.5と§12.11であり、この説明は原文や写生文をtyped macro seed sourceへ復活させない。
 
 **削ると何も残らない記述は受け付けない。** 行頭の連番と角括弧のコメントは記述者のもので
 描画のものではない（v2.9.40）が、**切った結果が空になる記述**は、後段に空文字から主題を
@@ -1654,7 +1664,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じ lock・canonical input・`composition_seed` は同じ effective meaning を再現する。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らないが、そのversion決定は後続D1実装のscopeに残す。
 
 v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
 

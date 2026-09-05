@@ -341,11 +341,15 @@ A vocabulary plugin is a data-only macro that gives a name to a combination of c
 
 Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is an explicit error, not a hidden LLM fallback.
 
+Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, attested seed, and explicit variation, surface sentence splitting or anaphoric syntax alone does not change a macro seed, focus, or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
+
 At this boundary the Renderer needs to know only core meaning, while a plugin cannot add primitives or syntax or rewrite core semantics. Plugins cannot depend on other plugins, so installation and removal remain independent.
 
 ### 4.6 Generic MacroDefinition v1
 
 `inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
+
+Macros execute in invocation order after meaning resolution. A mention used only for anaphora does not execute twice or shift the semantic ordinal of a later macro. Source occurrence ordinal remains separately for ownership and provenance. The original sentences and rhythm, source spans, continuation edge / target, all bindings, and source / generated provenance are retained and verified. A full compiler-lock digest that includes them is an attestation of source integrity; equivalent expressions need not have the same digest. Source-record differences do not enter meaning selection, while source alteration is rejected.
 
 The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
@@ -1247,6 +1251,8 @@ In the typed DDL compiler, the second sentence in this example does not create a
 
 The continuation retains exact source spans and clause provenance for the reintroduced head, subject marker or determiner, and predicate, while localized surfaces stay out of canonical semantic bytes. The head and marker are delivered exactly once as continuation syntax, and explicit predicate modifiers or actions are delivered exactly once as structured fields on the target. Existing quantity, position, relation, Ground, and MacroInvocation ownership is not rebuilt. Existing relation targets `previous_one` and `previous_two` belong to explicit relation edges; they are separate from this marked-subject continuation target. This is the visible typed semantic graph before JSON Score. JSON Score examples later in this specification are not the graph itself: lowering to Score or Renderer and deciding defaults belong to the Step 10 gate, and this rule does not begin either operation.
 
+For example, `赤い円を中心に置く。` and `円を中心に置く。円は赤い。` have the same source-independent canonical meaning when they resolve uniquely to the same subject and explicit instructions. The first form's inline record and the second form's continuation source spans, rhythm, continuation edge / target, bindings, and provenance remain distinct, so their full compiler-lock attestations need not match.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |
@@ -1349,8 +1355,10 @@ is the effective DDL / typed meaning consumed by Stage 2.
   or content
 - only `place:center` maps to one of a closed set of six focus candidates;
   every other place and explicit attribute passes through
-- baseline selection is bound to the compiler-lock digest, canonical-input
-  digest, and attested `composition_seed`
+- baseline focus selection is bound to lock-verified pre-expansion meaning and
+  expanded-meaning digests plus an attested optional `composition_seed`; absent
+  seed and present `Some(0)` differ, and the full compiler-lock digest is a
+  source-integrity attestation rather than focus material
 - explicit variation is complete only when both amplitude (`small`,
   `medium`, or `large`) and `variation_seed` are present, and it moves focus
   only; an incomplete request means no variation
@@ -1358,10 +1366,13 @@ is the effective DDL / typed meaning consumed by Stage 2.
   same meaning and never present bytes from another schema under the same
   identity
 
-The sealed Rust Stage 1.5 v3 typed foundation is accepted but not connected to
-runtime. The current Python path is a compatibility implementation until
-cutover and follows the same no-invention, focus-only contract. An accepted
-primitive must not be presented as runtime-connected behavior.
+The sealed Rust Stage 1.5 v3 typed foundation and R1 / R2 are accepted but not
+connected to runtime. D1 synchronization of inline / continuation canonical
+meaning, seed, and effective identity awaits code work; this documentation
+synchronization does not make it complete or make Step 9 COMPLETE. The current
+Python path is a compatibility implementation until cutover and follows the
+same no-invention, focus-only contract. An accepted primitive must not be
+presented as runtime-connected behavior.
 
 ### 12.12 Staffage and Compatibility Records
 
@@ -1375,15 +1386,18 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 
 ### 12.13 Variation (Stage 1.5)
 
-The attested `composition_seed` carries composition identity. "Another
-composition" reuses saved normalized DDL and selects only focus from the closed
-six candidates. There is no current `vary_seed` input.
+Lock-verified pre-expansion meaning, expanded meaning, and an attested optional
+`composition_seed` carry composition identity. The full compiler-lock digest
+attests source integrity and does not require equivalent expressions to have
+the same lock. "Another composition" reuses saved normalized DDL and selects
+only focus from the closed six candidates. There is no current `vary_seed`
+input.
 
 Explicit variation is the pair of amplitude (small, medium, or large) and
-`variation_seed`. Only a complete pair moves focus. The same lock, canonical
-input, composition seed, amplitude, and variation seed produce the same
-effective meaning. Composition family, color, touch, technique, relation, and
-element count do not move.
+`variation_seed`. Only a complete pair moves focus. The same lock-verified
+meaning, attested composition seed, amplitude, and variation seed produce the
+same effective meaning. Composition family, color, touch, technique, relation,
+and element count do not move.
 
 The current Score and render identity domain is `rh3`. `rh2` is a legacy
 domain for reading saved works and is not the current identity for new
@@ -1424,6 +1438,11 @@ the description**, not the prose: the same description resolves the same numbers
 changes.  **The description itself is kept for saving and display.**  The work is what the author
 wrote, not what the layer wrote.
 
+This paragraph is limited to the pre-cutover legacy runtime and its historical
+description. The typed pipeline's macro-meaning rule and focus seed source are
+defined by §§4.5 and 12.11; source text or sketch prose does not return as a
+typed macro seed source.
+
 **One background guard was withdrawn** (v2.9.41).  It recognised "the user pasted a
 machine-generated plan into the description box", and what it judged was the *provenance of a
 string*; once the description no longer reaches coerce there is no provenance left to judge, and
@@ -1461,6 +1480,11 @@ four things.**  A string that did not author the DDL is therefore never seated i
 description's chair: the description is the text the author typed, and no entry point offers a
 way to paste a different one over it afterwards.  Redrawing an existing work with a rewritten
 description (refinement) is a different operation, not a change of origin.
+
+The prose-driven plugin firing, description seed, and Stage 1.5 context here
+are limited to the pre-cutover legacy runtime. §§4.5 and 12.11 define the
+typed pipeline's meaning and seed rule; this explanation does not restore
+source text or sketch prose as a typed macro seed source.
 
 **A description the cut empties is not accepted.**  Leading numbers and bracketed notes belong
 to the author rather than to the drawing (v2.9.40), but **a description that is nothing but
@@ -2584,8 +2608,12 @@ performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** preserves saved normalized DDL,
 advances `composition_seed`, and reselects only focus from Stage 1.5's closed
 six candidates. It changes no composition family, technique, color, touch,
-relation, or element count. The same lock, canonical input, and
-`composition_seed` reproduce the same effective meaning.
+relation, or element count. The same lock-verified meaning and attested
+`composition_seed` reproduce the same effective meaning. Saved Score / expanded
+artifacts take precedence, source text remains saved, silent backfill does not
+occur, and no permanent old/new runtime switch is introduced. Semantic schema /
+identity never presents changed bytes as an old identity; deciding the code
+version remains later D1 implementation scope.
 
 Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
 event is emitted as soon as interpretation completes (normalized DDL, models

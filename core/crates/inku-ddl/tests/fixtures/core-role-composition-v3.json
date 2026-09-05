@@ -1,6 +1,6 @@
 {
-  "schema": "inku.core-role-composition-fixture.v3",
-  "version": 3,
+  "schema": "inku.core-role-composition-fixture.v4",
+  "version": 4,
   "cases": [
     {
       "id": "ja-exact-five",

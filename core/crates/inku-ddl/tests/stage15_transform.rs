@@ -1,11 +1,13 @@
 use inku_ddl::{
     CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroNode, FocusRegion,
-    MacroDefinition, MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroInvocationProvenance,
-    MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN,
-    STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticContinuationTarget, SemanticHead, SemanticIdentity,
-    Stage15TargetPath, Stage15TransformError, Stage15Variation, Stage15VariationAmplitude,
-    compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
-    expanded_meaning_canonical_bytes, stage15_transformation_input, transform_stage15,
+    GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionDiagnosticKind,
+    MacroExpansionLimits, MacroInvocationProvenance, MacroLock, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID,
+    SemanticContinuationTarget, SemanticHead, SemanticIdentity, Stage15TargetPath,
+    Stage15TransformError, Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl,
+    compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
+    expanded_meaning_canonical_bytes, geometry_resolution_policy_digest,
+    stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -24,6 +26,8 @@ struct Fixture {
     schema: String,
     version: u64,
     transformation_schema: String,
+    geometry_policy_id: String,
+    geometry_policy_digest: String,
     focus_order: Vec<String>,
     cases: Vec<FixtureCase>,
 }
@@ -67,7 +71,7 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     let fixture = fixture();
     assert_eq!(
         STAGE15_TRANSFORMATION_SCHEMA_ID,
-        "inku.typed-stage15-transformation.v4"
+        "inku.typed-stage15-transformation.v5"
     );
     assert_eq!(
         STAGE15_FOCUS_SELECTION_DOMAIN,
@@ -81,6 +85,11 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     assert_eq!(
         fixture.transformation_schema,
         STAGE15_TRANSFORMATION_SCHEMA_ID
+    );
+    assert_eq!(fixture.geometry_policy_id, GEOMETRY_RESOLUTION_POLICY_ID);
+    assert_eq!(
+        fixture.geometry_policy_digest,
+        geometry_resolution_policy_digest()
     );
     assert_eq!(
         fixture.focus_order,
@@ -115,6 +124,11 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
             )
             .unwrap();
             assert_eq!(result.schema_id(), STAGE15_TRANSFORMATION_SCHEMA_ID);
+            assert_eq!(result.geometry_policy_id(), fixture.geometry_policy_id);
+            assert_eq!(
+                result.geometry_policy_digest(),
+                fixture.geometry_policy_digest
+            );
             let canonical: serde_json::Value =
                 serde_json::from_slice(result.effective_canonical_bytes()).unwrap();
             assert_eq!(canonical["schema"], STAGE15_TRANSFORMATION_SCHEMA_ID);
@@ -197,6 +211,25 @@ fn step9i_input_boundary_rejects_visible_source_replacement() {
     assert_eq!(
         stage15_transformation_input(&red),
         Err(Stage15TransformError::CompilerLockDigestMismatch)
+    );
+}
+
+#[test]
+fn verified_stage15_input_rejects_a_self_consistent_foreign_geometry_policy() {
+    let mut compilation = compile(
+        "place one thin pencil line at the center",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let lock = compilation.compiler_lock.as_mut().unwrap();
+    lock.geometry_policy_digest = "foreign-policy-digest".to_owned();
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+
+    assert_eq!(
+        stage15_transformation_input(&compilation),
+        Err(Stage15TransformError::GeometryPolicyMismatch)
     );
 }
 

@@ -55,6 +55,12 @@ struct ExpectedToken {
     modifier_value: Option<String>,
     #[serde(default)]
     value: Option<u64>,
+    #[serde(default)]
+    geometry_keyword: Option<String>,
+    #[serde(default)]
+    decimal_coefficient: Option<i128>,
+    #[serde(default)]
+    decimal_scale: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -590,11 +596,11 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v5"
+        "inku.neutral-lexeme-parser.v6"
     );
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v5");
-    assert_eq!(fixture.version, 5);
-    assert_eq!(fixture.cases.len(), 30);
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v6");
+    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.cases.len(), 32);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -621,6 +627,8 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
         "ja-general-exact-cardinals",
         "en-general-exact-cardinals",
         "numeric-negative-forms",
+        "en-explicit-geometry-decimals",
+        "ja-explicit-geometry-decimals",
         "ja-supported-counter-and-unsupported-ordinal",
         "ja-core-thinness",
         "en-core-thinness-case-insensitive",
@@ -1070,6 +1078,9 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
         modifier_dimension: None,
         modifier_value: None,
         value: None,
+        geometry_keyword: None,
+        decimal_coefficient: None,
+        decimal_scale: None,
     };
     match &token.kind {
         NeutralTokenKind::CoreModifier(identity) => {
@@ -1102,6 +1113,15 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
                 .map(|reference| reference.as_str().to_owned());
         }
         NeutralTokenKind::FunctionWord => projected.kind = "function_word".to_owned(),
+        NeutralTokenKind::GeometryKeyword { keyword } => {
+            projected.kind = "geometry_keyword".to_owned();
+            projected.geometry_keyword = Some(keyword.as_str().to_owned());
+        }
+        NeutralTokenKind::ExactDecimal { value } => {
+            projected.kind = "exact_decimal".to_owned();
+            projected.decimal_coefficient = Some(value.coefficient());
+            projected.decimal_scale = Some(value.scale());
+        }
         NeutralTokenKind::ExactNumber { value } => {
             projected.kind = "exact_number".to_owned();
             projected.value = Some(*value);

@@ -1,7 +1,9 @@
 {
   "schema": "inku.stage15-transform-cross-platform-fixture.v1",
   "version": 1,
-  "transformation_schema": "inku.typed-stage15-transformation.v4",
+  "transformation_schema": "inku.typed-stage15-transformation.v5",
+  "geometry_policy_id": "inku.geometry-resolution-policy.v1",
+  "geometry_policy_digest": "53f34ed5674f60f1d39c1e8cd31d32426be58c4b9c8e6eb06303b5b4b8612117",
   "focus_order": [
     "upper_right",
     "upper_left",
@@ -17,9 +19,9 @@
       "language": "ja",
       "composition_seed": null,
       "variation": null,
-      "expected_baseline_focus": "lower_right",
-      "expected_effective_focus": "lower_right",
-      "expected_effective_sha256": "fb4eb401c645e9eaf5ea30bec7eedeefddbf8eaa3cb0ddec33e477f63863fa76"
+      "expected_baseline_focus": "upper_edge",
+      "expected_effective_focus": "upper_edge",
+      "expected_effective_sha256": "7698e78dce6e987cfa925b832b2db6aabe397d8089d649a073a0879480f474a0"
     },
     {
       "id": "en-center-baseline",
@@ -27,9 +29,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": null,
-      "expected_baseline_focus": "lower_right",
-      "expected_effective_focus": "lower_right",
-      "expected_effective_sha256": "fb4eb401c645e9eaf5ea30bec7eedeefddbf8eaa3cb0ddec33e477f63863fa76"
+      "expected_baseline_focus": "upper_edge",
+      "expected_effective_focus": "upper_edge",
+      "expected_effective_sha256": "7698e78dce6e987cfa925b832b2db6aabe397d8089d649a073a0879480f474a0"
     },
     {
       "id": "en-center-small-variation",
@@ -37,9 +39,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "small", "seed": 7},
-      "expected_baseline_focus": "lower_right",
-      "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "61e53a3e6cdd1fd03b7e2194a0ff919cb553848c614c4ce863f7a40f0e22b2c7"
+      "expected_baseline_focus": "upper_edge",
+      "expected_effective_focus": "lower_left",
+      "expected_effective_sha256": "50e223c1adb629af13280acb1803f2996c681c1a77f17a2a62b3d2cf2a33c526"
     },
     {
       "id": "en-center-medium-variation",
@@ -47,9 +49,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "medium", "seed": 7},
-      "expected_baseline_focus": "lower_right",
+      "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "upper_right",
-      "expected_effective_sha256": "a24258e98b5cdd98f3abd356c96331536261cec0aeb6f513aed102a091783307"
+      "expected_effective_sha256": "f46399cea28d1559fa41054664ad78d38c37d6f426df50e952f3f93718b06950"
     },
     {
       "id": "en-center-large-variation",
@@ -57,9 +59,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "large", "seed": 7},
-      "expected_baseline_focus": "lower_right",
-      "expected_effective_focus": "lower_left",
-      "expected_effective_sha256": "680ae0454726362b50e7ff5a7e41d62a2a94e9d468cb2e10e1f8d5c6f1518f1e"
+      "expected_baseline_focus": "upper_edge",
+      "expected_effective_focus": "lower_right",
+      "expected_effective_sha256": "032faae112f829f87621e4220c78cb608278bf0403251c7df6293246ee6ea9b2"
     }
   ]
 }

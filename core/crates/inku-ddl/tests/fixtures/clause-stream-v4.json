@@ -1,6 +1,6 @@
 {
-  "schema": "inku.clause-stream-fixture.v4",
-  "version": 4,
+  "schema": "inku.clause-stream-fixture.v5",
+  "version": 5,
   "cases": [
     {
       "id": "ja-all-atom-kinds",

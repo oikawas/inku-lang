@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     ClauseAtom, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
-    ExpansionPathSegment, GeneratedNodeProvenance, MacroDefinition, MacroExpansionDiagnosticKind,
-    MacroExpansionLimits, MacroExpansionResult, MacroInvocation,
+    ExpansionPathSegment, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, MacroDefinition,
+    MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult, MacroInvocation,
     MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
     MacroParameterBindingResult, MacroSeed, NeutralDiagnosticKind, NormalizedDdlDocument,
     OwnedSemanticOccurrence, SemanticAssociationIssueKind, SemanticContinuationIssue,
@@ -18,6 +18,7 @@ use crate::{
     SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroParameterValue,
     SemanticRelationIssueKind, SemanticTerm, SourceOccurrence, SourceSpan,
     associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    geometry_resolution_policy_digest,
     macro_expansion::{
         MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
     },
@@ -32,15 +33,15 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v13";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v14";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v14";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v15";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v14";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v15";
 /// Stable identity for source-bearing semantic provenance bytes.
-pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v2";
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v3";
 /// Stable identity for generated macro provenance bytes.
 pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
 /// Stable identity for source-independent expanded macro meaning bytes.
@@ -101,6 +102,8 @@ pub enum SemanticDeliveryOwner {
     Quantity,
     Thinness,
     RelativeScale,
+    ExplicitGeometry,
+    NumericPosition,
     Touch,
     Continuity,
     Angle,
@@ -130,6 +133,8 @@ impl SemanticDeliveryOwner {
             Self::Quantity => "quantity",
             Self::Thinness => "thinness",
             Self::RelativeScale => "relative_scale",
+            Self::ExplicitGeometry => "explicit_geometry",
+            Self::NumericPosition => "numeric_position",
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
@@ -353,6 +358,8 @@ pub struct TypedDdlCompilerLock {
     pub structured_semantic_occurrence_digest: String,
     pub canonical_pre_expansion_digest: Option<String>,
     pub semantic_source_provenance_digest: Option<String>,
+    pub geometry_policy_id: &'static str,
+    pub geometry_policy_digest: String,
     pub composition_seed: Option<u64>,
     pub definition_identities: Vec<CompilerDefinitionIdentity>,
     pub macro_seeds: Vec<CompilerSeedIdentity>,
@@ -925,6 +932,9 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::ConflictingQuantities
             | SemanticAssociationIssueKind::ConflictingThinness
             | SemanticAssociationIssueKind::ConflictingRelativeScales
+            | SemanticAssociationIssueKind::ConflictingExplicitGeometries
+            | SemanticAssociationIssueKind::ConflictingNumericPositions
+            | SemanticAssociationIssueKind::ConflictingRelativeAndExplicitGeometry
             | SemanticAssociationIssueKind::ConflictingTouches
             | SemanticAssociationIssueKind::ConflictingContinuities
             | SemanticAssociationIssueKind::ConflictingAngles
@@ -951,6 +961,9 @@ fn project_deliveries(
                 issue.occurrences.iter().map(owned_occurrence_key).collect(),
             ),
             SemanticAssociationIssueKind::MissingEntityHead
+            | SemanticAssociationIssueKind::IncompleteNumericGeometry
+            | SemanticAssociationIssueKind::IncompleteNumericPosition
+            | SemanticAssociationIssueKind::UnownedExactDecimal
             | SemanticAssociationIssueKind::UnknownSurfaceDimension
             | SemanticAssociationIssueKind::UnknownFluctuationDimension
             | SemanticAssociationIssueKind::UnknownProportionDimension
@@ -1573,6 +1586,22 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             relative_scale.value.as_str().to_owned(),
         );
     }
+    if let Some(geometry) = &instruction.entity.explicit_geometry {
+        add_explicit(
+            projection,
+            geometry.source().span,
+            SemanticDeliveryOwner::ExplicitGeometry,
+            compact_json(&crate::semantic_association::semantic_explicit_geometry_value(geometry)),
+        );
+    }
+    if let Some(position) = &instruction.entity.numeric_position {
+        add_explicit(
+            projection,
+            position.source().span,
+            SemanticDeliveryOwner::NumericPosition,
+            compact_json(&crate::semantic_association::semantic_numeric_position_value(position)),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -1642,6 +1671,14 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
         OwnedSemanticOccurrence::RelativeScale(relative_scale) => {
             format!("relative_scale:{}", relative_scale.value.as_str())
         }
+        OwnedSemanticOccurrence::ExplicitGeometry(geometry) => format!(
+            "explicit_geometry:{}",
+            compact_json(&crate::semantic_association::semantic_explicit_geometry_value(geometry))
+        ),
+        OwnedSemanticOccurrence::NumericPosition(position) => format!(
+            "numeric_position:{}",
+            compact_json(&crate::semantic_association::semantic_numeric_position_value(position))
+        ),
     }
 }
 
@@ -2058,6 +2095,8 @@ fn build_lock(
         structured_semantic_occurrence_digest,
         canonical_pre_expansion_digest,
         semantic_source_provenance_digest,
+        geometry_policy_id: GEOMETRY_RESOLUTION_POLICY_ID,
+        geometry_policy_digest: geometry_resolution_policy_digest(),
         composition_seed: if has_structured_meaning {
             composition_seed
         } else {
@@ -2103,6 +2142,8 @@ pub fn compiler_lock_hash_input(lock: &TypedDdlCompilerLock) -> Vec<u8> {
         &mut bytes,
         lock.semantic_source_provenance_digest.as_deref(),
     );
+    append_field(&mut bytes, lock.geometry_policy_id.as_bytes());
+    append_field(&mut bytes, lock.geometry_policy_digest.as_bytes());
     match lock.composition_seed {
         Some(seed) => {
             append_field(&mut bytes, b"present");
@@ -2530,6 +2571,55 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
                 .unwrap_or(Value::Null),
         );
     }
+    record.insert(
+        "explicit_geometry".to_owned(),
+        entity
+            .explicit_geometry
+            .as_ref()
+            .map(explicit_geometry_provenance_value)
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
+        "numeric_position".to_owned(),
+        entity
+            .numeric_position
+            .as_ref()
+            .map(numeric_position_provenance_value)
+            .unwrap_or(Value::Null),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn explicit_geometry_provenance_value(geometry: &crate::SemanticExplicitGeometry) -> Value {
+    let values = match geometry {
+        crate::SemanticExplicitGeometry::Radius(value)
+        | crate::SemanticExplicitGeometry::Diameter(value)
+        | crate::SemanticExplicitGeometry::Side(value) => vec![geometry_value_provenance(value)],
+        crate::SemanticExplicitGeometry::WidthHeight { width, height } => vec![
+            geometry_value_provenance(width),
+            geometry_value_provenance(height),
+        ],
+    };
+    Value::Array(values)
+}
+
+fn numeric_position_provenance_value(position: &crate::SemanticNumericPosition) -> Value {
+    Value::Array(vec![
+        geometry_value_provenance(&position.x),
+        geometry_value_provenance(&position.y),
+    ])
+}
+
+fn geometry_value_provenance(value: &crate::SemanticGeometryValue) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "keyword".to_owned(),
+        source_occurrence_value(&value.keyword_provenance),
+    );
+    record.insert(
+        "decimal".to_owned(),
+        source_occurrence_value(&value.decimal.provenance),
+    );
     Value::Object(record.into_iter().collect())
 }
 

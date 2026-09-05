@@ -187,20 +187,20 @@ fn atom_owned_punctuation_is_not_also_a_qualified_macro_separator() {
 }
 
 #[test]
-fn atom_owned_punctuation_is_not_also_an_unsupported_decimal_separator() {
+fn atom_owned_punctuation_is_not_also_an_exact_decimal_separator() {
     let source = "1.5.";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
     let Ok(stream) = parse_clause_stream(&document) else {
-        panic!("unsupported decimal punctuation should be atom-owned");
+        panic!("exact decimal punctuation should be atom-owned");
     };
 
     assert_eq!(stream.clauses.len(), 1);
     assert_eq!(stream.clauses[0].atoms.len(), 1);
     assert!(matches!(
         &stream.clauses[0].atoms[0],
-        ClauseAtom::UnresolvedDiagnostic(diagnostic)
-            if diagnostic.kind == NeutralDiagnosticKind::Hole && diagnostic.recognized
+        ClauseAtom::FunctionWord { exact_decimal: Some(value), .. }
+            if value.coefficient() == 15 && value.scale() == 1
     ));
     assert_eq!(stream.separators.len(), 1);
     assert_eq!(stream.separators[0].kind, ClauseSeparatorKind::SentenceEnd);
@@ -258,9 +258,9 @@ fn sentence_end_without_atoms_remains_a_separator() {
 #[test]
 fn fixture_schema_and_required_boundary_cases_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v4");
-    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v4");
-    assert_eq!(fixture.version, 4);
+    assert_eq!(CLAUSE_STREAM_SCHEMA_ID, "inku.clause-stream.v5");
+    assert_eq!(fixture.schema, "inku.clause-stream-fixture.v5");
+    assert_eq!(fixture.version, 5);
     assert_eq!(fixture.cases.len(), 9);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 

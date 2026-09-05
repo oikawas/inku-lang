@@ -23,6 +23,14 @@ const V13_FULL_LOCK_KNOWN_ANSWER: &str =
     "970707f4f2f8550fc158270d3b08723a4c031d7ade27f062a1032ea85210a51a";
 const V14_FULL_LOCK_KNOWN_ANSWER: &str =
     "ef2a9699a61bf10e2468428f8715f2d62d2b669749d85c133e327b73c619894e";
+const V15_CANONICAL_SHA256_KNOWN_ANSWER: &str =
+    "789fce44d31909ebfd74e0518a2316814d524c1fa857f1d25bdd36d889a89712";
+const V15_SEED_DIGEST_KNOWN_ANSWER: &str =
+    "288376a5394d3aa9d29056b983490f87b0a4697872aededc7213dfdfc114fb21";
+const V15_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
+    "20dabf80fa0a7e3a326fddd9e94f19bc95a01c74eb3f7c3329dc18804e479ab3";
+const V15_FULL_LOCK_KNOWN_ANSWER: &str =
+    "2cd1fc0b2ff5fc931cfc01f7ecae1c2faeea1bb5f647455e124b1546a9bb2f9b";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -1572,7 +1580,7 @@ fn failed_continuation_preserves_preexisting_explicit_fingerprints() {
 }
 
 #[test]
-fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
+fn historical_fixture_is_preserved_and_current_known_answers_bind_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
     let document = locked_document("Canon.Empty", ResolvedInstructionLanguage::En, &definition);
@@ -1615,17 +1623,8 @@ fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
         full_lock_digest: lock.full_digest.clone(),
     };
     assert_eq!(
-        actual.canonical_bytes,
-        fixture.known_answers.canonical_bytes
-    );
-    assert_eq!(
-        actual.canonical_sha256,
+        sha256(fixture.known_answers.canonical_bytes.as_bytes()),
         fixture.known_answers.canonical_sha256
-    );
-    assert_eq!(actual.seed_digest, fixture.known_answers.seed_digest);
-    assert_eq!(
-        actual.expanded_meaning_sha256,
-        fixture.known_answers.expanded_meaning_sha256
     );
     assert_eq!(
         fixture.known_answers.full_lock_digest,
@@ -1643,9 +1642,23 @@ fn canonical_known_answers_bind_seed_expand_and_lock_exactly() {
             .canonical_bytes
             .contains("semantic-document.v14")
     );
+    assert_ne!(
+        actual.canonical_bytes,
+        fixture.known_answers.canonical_bytes
+    );
+    assert!(actual.canonical_bytes.contains("semantic-document.v15"));
+    assert!(actual.canonical_bytes.contains("explicit_geometry"));
+    assert!(actual.canonical_bytes.contains("numeric_position"));
+    assert_eq!(actual.canonical_sha256, V15_CANONICAL_SHA256_KNOWN_ANSWER);
+    assert_eq!(actual.seed_digest, V15_SEED_DIGEST_KNOWN_ANSWER);
+    assert_eq!(
+        actual.expanded_meaning_sha256,
+        V15_EXPANDED_MEANING_SHA256_KNOWN_ANSWER
+    );
     assert_ne!(actual.full_lock_digest, V12_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V13_FULL_LOCK_KNOWN_ANSWER);
-    assert_eq!(actual.full_lock_digest, V14_FULL_LOCK_KNOWN_ANSWER);
+    assert_ne!(actual.full_lock_digest, V14_FULL_LOCK_KNOWN_ANSWER);
+    assert_eq!(actual.full_lock_digest, V15_FULL_LOCK_KNOWN_ANSWER);
     assert_eq!(
         lock.canonical_pre_expansion_digest,
         Some(actual.canonical_sha256)
@@ -2763,11 +2776,11 @@ fn fixture_schema_and_closed_ids_are_stable() {
     assert_eq!(fixture.version, 12);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v14"
+        "inku.semantic-document.v15"
     );
     assert_eq!(
         SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID,
-        "inku.semantic-source-provenance.v2"
+        "inku.semantic-source-provenance.v3"
     );
     assert_eq!(
         EXPANDED_MACRO_MEANING_SCHEMA_ID,
@@ -2775,11 +2788,11 @@ fn fixture_schema_and_closed_ids_are_stable() {
     );
     assert_eq!(
         TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
-        "inku.typed-ddl-compiler-lock.v14"
+        "inku.typed-ddl-compiler-lock.v15"
     );
     assert_eq!(
         TYPED_DDL_COMPILATION_SCHEMA_ID,
-        "inku.typed-ddl-compilation.v13"
+        "inku.typed-ddl-compilation.v14"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

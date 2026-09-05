@@ -12,13 +12,15 @@ use crate::{
     JapaneseAttachmentMarkerKind, MacroInvocationResolutionDiagnosticKind,
     MacroLockResolutionIdentity, MacroParameterBinding, MacroParameterBindingDiagnosticKind,
     MacroParameterBindingResult, NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument,
-    ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
-    collect_attachment_evidence, project_macro_semantic_ref,
+    ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    SemanticExplicitGeometry, SemanticNumericPosition, SourceSpan, collect_attachment_evidence,
+    geometry::{GeometrySyntaxIssueKind, analyze_clause_geometry},
+    project_macro_semantic_ref,
     saijiki::canonical_relation_identity_is_valid,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v13";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v14";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -322,6 +324,8 @@ pub struct SemanticEntity {
     pub quantity: Option<SemanticQuantity>,
     pub thinness: Option<SemanticThinness>,
     pub relative_scale: Option<SemanticRelativeScale>,
+    pub explicit_geometry: Option<SemanticExplicitGeometry>,
+    pub numeric_position: Option<SemanticNumericPosition>,
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
@@ -346,6 +350,8 @@ pub enum OwnedSemanticOccurrence {
     Quantity(SemanticQuantity),
     Thinness(SemanticThinness),
     RelativeScale(SemanticRelativeScale),
+    ExplicitGeometry(SemanticExplicitGeometry),
+    NumericPosition(SemanticNumericPosition),
     Touch(SemanticTerm),
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
@@ -370,6 +376,8 @@ impl OwnedSemanticOccurrence {
             Self::Quantity(quantity) => &quantity.provenance,
             Self::Thinness(thinness) => &thinness.provenance,
             Self::RelativeScale(relative_scale) => &relative_scale.provenance,
+            Self::ExplicitGeometry(geometry) => geometry.source(),
+            Self::NumericPosition(position) => position.source(),
         }
     }
 
@@ -381,6 +389,8 @@ impl OwnedSemanticOccurrence {
             | Self::Quantity(_)
             | Self::Thinness(_)
             | Self::RelativeScale(_)
+            | Self::ExplicitGeometry(_)
+            | Self::NumericPosition(_)
             | Self::Touch(_)
             | Self::Continuity(_)
             | Self::Angle(_)
@@ -400,6 +410,12 @@ pub enum SemanticAssociationIssueKind {
     ConflictingQuantities,
     ConflictingThinness,
     ConflictingRelativeScales,
+    ConflictingExplicitGeometries,
+    ConflictingNumericPositions,
+    ConflictingRelativeAndExplicitGeometry,
+    IncompleteNumericGeometry,
+    IncompleteNumericPosition,
+    UnownedExactDecimal,
     ConflictingTouches,
     ConflictingContinuities,
     ConflictingAngles,
@@ -430,6 +446,14 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingQuantities => "conflicting_quantities",
             Self::ConflictingThinness => "conflicting_thinness",
             Self::ConflictingRelativeScales => "conflicting_relative_scales",
+            Self::ConflictingExplicitGeometries => "conflicting_explicit_geometries",
+            Self::ConflictingNumericPositions => "conflicting_numeric_positions",
+            Self::ConflictingRelativeAndExplicitGeometry => {
+                "conflicting_relative_and_explicit_geometry"
+            }
+            Self::IncompleteNumericGeometry => "incomplete_numeric_geometry",
+            Self::IncompleteNumericPosition => "incomplete_numeric_position",
+            Self::UnownedExactDecimal => "unowned_exact_decimal",
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
             Self::ConflictingAngles => "conflicting_angles",
@@ -629,6 +653,8 @@ struct AssociationRegion {
     quantities: Vec<SemanticQuantity>,
     thinnesses: Vec<SemanticThinness>,
     relative_scales: Vec<SemanticRelativeScale>,
+    explicit_geometries: Vec<SemanticExplicitGeometry>,
+    numeric_positions: Vec<SemanticNumericPosition>,
     touches: Vec<SemanticTerm>,
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
@@ -1021,6 +1047,56 @@ fn build_semantic_entities(
     let mut explicit_previous_references = Vec::new();
 
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
+        let region_index = sentence_region_index(
+            &clause_stream,
+            clause
+                .atoms
+                .first()
+                .map(ClauseAtom::span)
+                .unwrap_or(clause.span),
+        );
+        let geometry_analysis =
+            analyze_clause_geometry(document, clause, clause_index, region_index);
+        let consumed_geometry_numbers = geometry_analysis.consumed_numeric_spans.clone();
+        owned_occurrence_count += geometry_analysis.geometries.len();
+        owned_occurrence_count += geometry_analysis.positions.len();
+        regions
+            .entry(region_index)
+            .or_default()
+            .explicit_geometries
+            .extend(geometry_analysis.geometries);
+        regions
+            .entry(region_index)
+            .or_default()
+            .numeric_positions
+            .extend(geometry_analysis.positions);
+        for geometry_issue in geometry_analysis.issues {
+            let kind = match geometry_issue.kind {
+                GeometrySyntaxIssueKind::IncompleteGeometry => {
+                    SemanticAssociationIssueKind::IncompleteNumericGeometry
+                }
+                GeometrySyntaxIssueKind::IncompletePosition => {
+                    SemanticAssociationIssueKind::IncompleteNumericPosition
+                }
+                GeometrySyntaxIssueKind::UnownedDecimal => {
+                    SemanticAssociationIssueKind::UnownedExactDecimal
+                }
+            };
+            issues.push(SemanticAssociationIssue {
+                kind,
+                region_index,
+                occurrences: Vec::new(),
+                upstream_diagnostic: Some(NeutralDiagnostic {
+                    span: geometry_issue.span,
+                    surface: document.source()
+                        [geometry_issue.span.start_byte..geometry_issue.span.end_byte]
+                        .to_owned(),
+                    kind: NeutralDiagnosticKind::Hole,
+                    recognized: true,
+                }),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            });
+        }
         for (atom_index, atom) in clause.atoms.iter().enumerate() {
             if macro_parameter_binding
                 .as_ref()
@@ -1028,7 +1104,6 @@ fn build_semantic_entities(
             {
                 continue;
             }
-            let region_index = sentence_region_index(&clause_stream, atom.span());
             let region = regions.entry(region_index).or_default();
             match atom {
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive => {
@@ -1133,6 +1208,11 @@ fn build_semantic_entities(
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::UnattachedExactNumber(quantity) => {
+                    if consumed_geometry_numbers
+                        .contains(&(quantity.span.start_byte, quantity.span.end_byte))
+                    {
+                        continue;
+                    }
                     region.quantities.push(SemanticQuantity {
                         value: quantity.value,
                         provenance: source_occurrence(
@@ -1657,6 +1737,18 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::RelativeScale),
             )
+            .chain(
+                region
+                    .explicit_geometries
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::ExplicitGeometry),
+            )
+            .chain(
+                region
+                    .numeric_positions
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericPosition),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -1709,6 +1801,18 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::RelativeScale),
             )
+            .chain(
+                region
+                    .explicit_geometries
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::ExplicitGeometry),
+            )
+            .chain(
+                region
+                    .numeric_positions
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericPosition),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -1738,6 +1842,12 @@ fn associate_region(
     let diagnostics = std::mem::take(&mut region.diagnostics);
     let head = region.heads.pop().expect("single head was checked");
     let mut owned_region = take_pre_head_region(&mut region, head, pre_head_ownership);
+    owned_region
+        .explicit_geometries
+        .append(&mut region.explicit_geometries);
+    owned_region
+        .numeric_positions
+        .append(&mut region.numeric_positions);
     let occurrences = take_all_modifier_occurrences(&mut region);
     if !occurrences.is_empty() {
         issues.push(SemanticAssociationIssue {
@@ -1796,7 +1906,7 @@ fn associate_region(
             None
         }
     };
-    let relative_scale = match owned_region.relative_scales.len() {
+    let mut relative_scale = match owned_region.relative_scales.len() {
         0 => None,
         1 => owned_region.relative_scales.pop(),
         _ => {
@@ -1814,6 +1924,60 @@ fn associate_region(
             None
         }
     };
+    let mut explicit_geometry = match owned_region.explicit_geometries.len() {
+        0 => None,
+        1 => owned_region.explicit_geometries.pop(),
+        _ => {
+            issues.push(SemanticAssociationIssue {
+                kind: SemanticAssociationIssueKind::ConflictingExplicitGeometries,
+                region_index,
+                occurrences: owned_region
+                    .explicit_geometries
+                    .into_iter()
+                    .map(OwnedSemanticOccurrence::ExplicitGeometry)
+                    .collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                upstream_diagnostic: None,
+            });
+            None
+        }
+    };
+    let numeric_position = match owned_region.numeric_positions.len() {
+        0 => None,
+        1 => owned_region.numeric_positions.pop(),
+        _ => {
+            issues.push(SemanticAssociationIssue {
+                kind: SemanticAssociationIssueKind::ConflictingNumericPositions,
+                region_index,
+                occurrences: owned_region
+                    .numeric_positions
+                    .into_iter()
+                    .map(OwnedSemanticOccurrence::NumericPosition)
+                    .collect(),
+                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                upstream_diagnostic: None,
+            });
+            None
+        }
+    };
+    if relative_scale.is_some() && explicit_geometry.is_some() {
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::ConflictingRelativeAndExplicitGeometry,
+            region_index,
+            occurrences: vec![
+                OwnedSemanticOccurrence::RelativeScale(
+                    relative_scale
+                        .take()
+                        .expect("checked explicit relative scale"),
+                ),
+                OwnedSemanticOccurrence::ExplicitGeometry(
+                    explicit_geometry.take().expect("checked explicit geometry"),
+                ),
+            ],
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            upstream_diagnostic: None,
+        });
+    }
     let touch = select_term(
         owned_region.touches,
         OwnedSemanticOccurrence::Touch,
@@ -1936,6 +2100,8 @@ fn associate_region(
         quantity,
         thinness,
         relative_scale,
+        explicit_geometry,
+        numeric_position,
         touch,
         continuity,
         angle,
@@ -1980,6 +2146,18 @@ fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSem
                 .drain(..)
                 .map(OwnedSemanticOccurrence::RelativeScale),
         )
+        .chain(
+            region
+                .explicit_geometries
+                .drain(..)
+                .map(OwnedSemanticOccurrence::ExplicitGeometry),
+        )
+        .chain(
+            region
+                .numeric_positions
+                .drain(..)
+                .map(OwnedSemanticOccurrence::NumericPosition),
+        )
         .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
         .chain(
             region
@@ -2006,6 +2184,8 @@ fn take_pre_head_region(
         quantities: take_owned_quantities(&mut region.quantities, &head, ownership),
         thinnesses: take_owned_thinnesses(&mut region.thinnesses, &head, ownership),
         relative_scales: take_owned_relative_scales(&mut region.relative_scales, &head, ownership),
+        explicit_geometries: Vec::new(),
+        numeric_positions: Vec::new(),
         touches: take_owned_terms(&mut region.touches, &head, ownership),
         continuities: take_owned_terms(&mut region.continuities, &head, ownership),
         angles: take_owned_terms(&mut region.angles, &head, ownership),
@@ -2384,6 +2564,8 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.quantity.is_some())
         + usize::from(entity.thinness.is_some())
         + usize::from(entity.relative_scale.is_some())
+        + usize::from(entity.explicit_geometry.is_some())
+        + usize::from(entity.numeric_position.is_some())
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
@@ -2439,10 +2621,26 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .unwrap_or(Value::Null),
     );
     record.insert(
+        "explicit_geometry".to_owned(),
+        entity
+            .explicit_geometry
+            .as_ref()
+            .map(semantic_explicit_geometry_value)
+            .unwrap_or(Value::Null),
+    );
+    record.insert(
         "fluctuation".to_owned(),
         semantic_fluctuation_value(&entity.fluctuation),
     );
     record.insert("head".to_owned(), semantic_head_value(&entity.head));
+    record.insert(
+        "numeric_position".to_owned(),
+        entity
+            .numeric_position
+            .as_ref()
+            .map(semantic_numeric_position_value)
+            .unwrap_or(Value::Null),
+    );
     record.insert(
         "proportion".to_owned(),
         semantic_proportion_value(&entity.proportion),
@@ -2483,6 +2681,76 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             .map(|quantity| Value::Number(Number::from(quantity.value)))
             .unwrap_or(Value::Null),
     );
+    Value::Object(record.into_iter().collect())
+}
+
+pub(crate) fn semantic_explicit_geometry_value(geometry: &SemanticExplicitGeometry) -> Value {
+    let mut record = BTreeMap::new();
+    match geometry {
+        SemanticExplicitGeometry::Radius(value) => {
+            record.insert("dimension".to_owned(), Value::String("radius".to_owned()));
+            record.insert(
+                "value".to_owned(),
+                semantic_decimal_value(value.decimal.value),
+            );
+        }
+        SemanticExplicitGeometry::Diameter(value) => {
+            record.insert("dimension".to_owned(), Value::String("diameter".to_owned()));
+            record.insert(
+                "value".to_owned(),
+                semantic_decimal_value(value.decimal.value),
+            );
+        }
+        SemanticExplicitGeometry::WidthHeight { width, height } => {
+            record.insert(
+                "dimension".to_owned(),
+                Value::String("width_height".to_owned()),
+            );
+            record.insert(
+                "height".to_owned(),
+                semantic_decimal_value(height.decimal.value),
+            );
+            record.insert(
+                "width".to_owned(),
+                semantic_decimal_value(width.decimal.value),
+            );
+        }
+        SemanticExplicitGeometry::Side(value) => {
+            record.insert("dimension".to_owned(), Value::String("side".to_owned()));
+            record.insert(
+                "value".to_owned(),
+                semantic_decimal_value(value.decimal.value),
+            );
+        }
+    }
+    record.insert(
+        "basis".to_owned(),
+        Value::String("canvas_short_edge".to_owned()),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+pub(crate) fn semantic_numeric_position_value(position: &SemanticNumericPosition) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert("basis".to_owned(), Value::String("canvas_axes".to_owned()));
+    record.insert(
+        "x".to_owned(),
+        semantic_decimal_value(position.x.decimal.value),
+    );
+    record.insert(
+        "y".to_owned(),
+        semantic_decimal_value(position.y.decimal.value),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+fn semantic_decimal_value(decimal: crate::ExactDecimal) -> Value {
+    let mut record = BTreeMap::new();
+    record.insert(
+        "coefficient".to_owned(),
+        Value::String(decimal.coefficient().to_string()),
+    );
+    record.insert("scale".to_owned(), Value::from(u64::from(decimal.scale())));
     Value::Object(record.into_iter().collect())
 }
 

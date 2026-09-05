@@ -232,6 +232,8 @@ mod tests {
                         start_byte: 0,
                         end_byte: 1,
                     },
+                    geometry_keyword: None,
+                    exact_decimal: None,
                 },
                 ClauseAtom::CoreRole(CoreRoleTerm {
                     role: CoreRoleKind::Primitive,

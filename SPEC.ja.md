@@ -1641,6 +1641,8 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、および対応するENの有限構造を受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewと、hostが明示したcanvas / backgroundが揃うときだけ、count=1でcolor / touch / continuity / empty surface / numeric geometry / numeric positionを明示したcircle、ellipse、cloudform、squareの独立instruction群をactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、既存candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
+
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 
 ### 数値の解像度（マスターグリッド）

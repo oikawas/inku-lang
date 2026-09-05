@@ -1060,17 +1060,17 @@ fn continuation_delivers_each_bounded_predicate_dimension_and_action_once() {
 #[test]
 fn schema_fixture_and_required_document_boundaries_are_guarded() {
     let fixture = load_fixture();
-    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v14");
+    assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v15");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v13"
+        "inku.semantic-entity-association.v14"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v16"
+        "inku.semantic-instruction-association.v17"
     );
-    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v14");
-    assert_eq!(fixture.version, 14);
+    assert_eq!(fixture.schema, "inku.semantic-document-fixture.v15");
+    assert_eq!(fixture.version, 15);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1302,7 +1302,7 @@ fn document_retains_ground_and_owned_relation_edge_without_reparse() {
             .expect("issue-free document canonical"),
     )
     .expect("document canonical JSON");
-    assert_eq!(canonical["schema"], "inku.semantic-document.v14");
+    assert_eq!(canonical["schema"], "inku.semantic-document.v15");
     assert_eq!(canonical["instructions"][1]["relation"]["kind"], "along");
     assert_eq!(
         canonical["instructions"][1]["relation"]["reference"],
@@ -1505,7 +1505,7 @@ fn macro_parameter_ground_is_not_redelivered_but_unbound_ground_reaches_document
             .expect("complete canonical"),
     )
     .unwrap();
-    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v14");
+    assert_eq!(bound_canonical["schema"], "inku.semantic-document.v15");
     assert!(bound_canonical["ground"].is_null());
 
     let outer_definition = document_macro_definition("Outer", serde_json::json!({}));

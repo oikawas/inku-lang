@@ -3,13 +3,14 @@
 use std::fmt;
 
 use crate::{
-    CanonicalRelationIdentity, CoreModifierTerm, CoreRoleTerm, NeutralDiagnostic, NeutralToken,
-    NeutralTokenKind, NormalizedDdlDocument, RemainingRoleTerm, SourceSpan, UnattachedExactNumber,
-    compose_core_roles, compose_remaining_roles, parse_neutral_lexemes,
+    CanonicalRelationIdentity, CoreModifierTerm, CoreRoleTerm, ExactDecimal, GeometryKeyword,
+    NeutralDiagnostic, NeutralToken, NeutralTokenKind, NormalizedDdlDocument, RemainingRoleTerm,
+    SourceSpan, UnattachedExactNumber, compose_core_roles, compose_remaining_roles,
+    parse_neutral_lexemes,
 };
 
 /// Stable identity for the runtime-disconnected clause-stream foundation.
-pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v4";
+pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v5";
 
 /// A source separator that ends one clause fragment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,6 +36,8 @@ pub enum ClauseAtom {
     FunctionWord {
         surface: String,
         span: SourceSpan,
+        geometry_keyword: Option<GeometryKeyword>,
+        exact_decimal: Option<ExactDecimal>,
     },
     SaijikiRelation {
         asset_id: String,
@@ -305,7 +308,24 @@ fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStr
         kind,
     } = token;
     match kind {
-        NeutralTokenKind::FunctionWord => Ok(ClauseAtom::FunctionWord { surface, span }),
+        NeutralTokenKind::FunctionWord => Ok(ClauseAtom::FunctionWord {
+            surface,
+            span,
+            geometry_keyword: None,
+            exact_decimal: None,
+        }),
+        NeutralTokenKind::GeometryKeyword { keyword } => Ok(ClauseAtom::FunctionWord {
+            surface,
+            span,
+            geometry_keyword: Some(keyword),
+            exact_decimal: None,
+        }),
+        NeutralTokenKind::ExactDecimal { value } => Ok(ClauseAtom::FunctionWord {
+            surface,
+            span,
+            geometry_keyword: None,
+            exact_decimal: Some(value),
+        }),
         NeutralTokenKind::SaijikiRelation {
             asset_id,
             relation_type,

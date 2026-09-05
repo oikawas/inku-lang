@@ -329,10 +329,10 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         REMAINING_ROLE_COMPOSITION_SCHEMA_ID,
-        "inku.remaining-role-composition.v3"
+        "inku.remaining-role-composition.v4"
     );
-    assert_eq!(fixture.schema, "inku.remaining-role-composition-fixture.v3");
-    assert_eq!(fixture.version, 3);
+    assert_eq!(fixture.schema, "inku.remaining-role-composition-fixture.v4");
+    assert_eq!(fixture.version, 4);
     assert_eq!(fixture.cases.len(), 7);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
@@ -454,6 +454,12 @@ fn project_deferred(token: &inku_ddl::NeutralToken) -> ExpectedDeferred {
             projected.relation_type = Some(relation_type.clone());
         }
         NeutralTokenKind::FunctionWord => projected.kind = "function_word".to_owned(),
+        NeutralTokenKind::GeometryKeyword { .. } => {
+            projected.kind = "geometry_keyword".to_owned();
+        }
+        NeutralTokenKind::ExactDecimal { .. } => {
+            projected.kind = "exact_decimal".to_owned();
+        }
         NeutralTokenKind::ExactNumber { value } => {
             projected.kind = "exact_number".to_owned();
             projected.value = Some(*value);

@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v14";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v15";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -755,6 +755,12 @@ fn apply_continuation_occurrence(
         OwnedSemanticOccurrence::RelativeScale(value) => {
             set_if_empty(&mut instruction.entity.relative_scale, value)
         }
+        OwnedSemanticOccurrence::ExplicitGeometry(value) => {
+            set_if_empty(&mut instruction.entity.explicit_geometry, value)
+        }
+        OwnedSemanticOccurrence::NumericPosition(value) => {
+            set_if_empty(&mut instruction.entity.numeric_position, value)
+        }
         OwnedSemanticOccurrence::Touch(term) => set_if_empty(&mut instruction.entity.touch, term),
         OwnedSemanticOccurrence::Continuity(term) => {
             set_if_empty(&mut instruction.entity.continuity, term)
@@ -913,6 +919,8 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.fluctuation.amplitude.is_some()
         || entity.fluctuation.frequency.is_some()
         || entity.fluctuation.quality.is_some()
+        || entity.explicit_geometry.is_some()
+        || entity.numeric_position.is_some()
         || entity.proportion.aspect.is_some()
         || entity.proportion.width_extent.is_some()
         || entity.proportion.arc_form.is_some()
@@ -957,6 +965,8 @@ fn predicate_is_compatible(
     option_is_mergeable(&left.color, &right.color)
         && option_is_mergeable(&left.thinness, &right.thinness)
         && option_is_mergeable(&left.relative_scale, &right.relative_scale)
+        && option_is_mergeable(&left.explicit_geometry, &right.explicit_geometry)
+        && option_is_mergeable(&left.numeric_position, &right.numeric_position)
         && option_is_mergeable(&left.touch, &right.touch)
         && option_is_mergeable(&left.continuity, &right.continuity)
         && option_is_mergeable(&left.angle, &right.angle)
@@ -984,6 +994,14 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     merge_option(
         &mut target.entity.relative_scale,
         &continuation.entity.relative_scale,
+    );
+    merge_option(
+        &mut target.entity.explicit_geometry,
+        &continuation.entity.explicit_geometry,
+    );
+    merge_option(
+        &mut target.entity.numeric_position,
+        &continuation.entity.numeric_position,
     );
     merge_option(&mut target.entity.touch, &continuation.entity.touch);
     merge_option(

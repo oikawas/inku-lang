@@ -6,10 +6,10 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected core-role composition foundation.
-pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v3";
+pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v4";
 
 /// Stable identity for the runtime-disconnected remaining-role composition foundation.
-pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v3";
+pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v4";
 
 /// One of the exact core drawing roles typed by this foundation slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -110,9 +110,11 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
         let role = match &token.kind {
             NeutralTokenKind::SaijikiWord { category_key, .. } => role_for_category(category_key),
             NeutralTokenKind::CoreModifier(_)
+            | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord
-            | NeutralTokenKind::ExactNumber { .. } => None,
+            | NeutralTokenKind::ExactNumber { .. }
+            | NeutralTokenKind::ExactDecimal { .. } => None,
         };
 
         let Some(role) = role else {
@@ -172,9 +174,11 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
                 remaining_role_for_category(category_key)
             }
             NeutralTokenKind::CoreModifier(_)
+            | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord
-            | NeutralTokenKind::ExactNumber { .. } => None,
+            | NeutralTokenKind::ExactNumber { .. }
+            | NeutralTokenKind::ExactDecimal { .. } => None,
         };
 
         if let Some(role) = role {

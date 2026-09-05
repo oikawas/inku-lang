@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
-pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v4";
+pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v5";
 /// Framed hash domain for source-independent baseline focus selection.
 pub const STAGE15_FOCUS_SELECTION_DOMAIN: &[u8] = b"inku.typed-stage15-focus-selection.v1";
 
@@ -135,6 +135,8 @@ pub struct Stage15TransformationInput {
     pre_expansion_digest: String,
     expanded_meaning_digest: String,
     composition_seed: Option<u64>,
+    geometry_policy_id: &'static str,
+    geometry_policy_digest: String,
     execution_owners: SemanticMacroExecutionOwners,
 }
 
@@ -158,6 +160,14 @@ impl Stage15TransformationInput {
     pub const fn composition_seed(&self) -> Option<u64> {
         self.composition_seed
     }
+
+    pub const fn geometry_policy_id(&self) -> &'static str {
+        self.geometry_policy_id
+    }
+
+    pub fn geometry_policy_digest(&self) -> &str {
+        &self.geometry_policy_digest
+    }
 }
 
 /// Original typed meaning plus a separate effective overlay and its canonical identity.
@@ -169,6 +179,8 @@ pub struct Stage15TransformationResult {
     original_pre_expansion_digest: String,
     original_expanded_meaning_digest: String,
     composition_seed: Option<u64>,
+    geometry_policy_id: &'static str,
+    geometry_policy_digest: String,
     baseline_focus: Option<FocusRegion>,
     resolved_focus: Option<FocusRegion>,
     effective_variation: Option<Stage15Variation>,
@@ -201,6 +213,14 @@ impl Stage15TransformationResult {
 
     pub const fn composition_seed(&self) -> Option<u64> {
         self.composition_seed
+    }
+
+    pub const fn geometry_policy_id(&self) -> &'static str {
+        self.geometry_policy_id
+    }
+
+    pub fn geometry_policy_digest(&self) -> &str {
+        &self.geometry_policy_digest
     }
 
     pub const fn baseline_focus(&self) -> Option<FocusRegion> {
@@ -259,6 +279,14 @@ impl<'a> VerifiedStage15EffectiveView<'a> {
         self.result.composition_seed()
     }
 
+    pub const fn geometry_policy_id(self) -> &'static str {
+        self.result.geometry_policy_id()
+    }
+
+    pub fn geometry_policy_digest(self) -> &'a str {
+        self.result.geometry_policy_digest()
+    }
+
     pub fn effective_canonical_bytes(self) -> &'a [u8] {
         self.result.effective_canonical_bytes()
     }
@@ -280,6 +308,7 @@ pub enum Stage15TransformError {
     CompilerLockSchema,
     CompilerState(CompilerLockState),
     CompilerLockDigestMismatch,
+    GeometryPolicyMismatch,
     CanonicalReadyInvariant,
     MissingSemanticDocument,
     IncompleteSemanticDocument,
@@ -319,6 +348,11 @@ pub fn stage15_transformation_input(
     }
     if sha256_hex(&compiler_lock_hash_input(lock)) != lock.full_digest {
         return Err(Stage15TransformError::CompilerLockDigestMismatch);
+    }
+    if lock.geometry_policy_id != crate::GEOMETRY_RESOLUTION_POLICY_ID
+        || lock.geometry_policy_digest != crate::geometry_resolution_policy_digest()
+    {
+        return Err(Stage15TransformError::GeometryPolicyMismatch);
     }
     if !compilation.holes.is_empty()
         || !compilation.conflicts.is_empty()
@@ -424,6 +458,8 @@ pub fn stage15_transformation_input(
         pre_expansion_digest: pre_expansion_digest.clone(),
         expanded_meaning_digest: expanded_meaning_digest.clone(),
         composition_seed: lock.composition_seed,
+        geometry_policy_id: lock.geometry_policy_id,
+        geometry_policy_digest: lock.geometry_policy_digest.clone(),
         execution_owners,
     })
 }
@@ -434,6 +470,8 @@ pub fn transform_stage15(
     variation: Option<Stage15Variation>,
 ) -> Result<Stage15TransformationResult, Stage15TransformError> {
     let composition_seed = input.composition_seed();
+    let geometry_policy_id = input.geometry_policy_id();
+    let geometry_policy_digest = input.geometry_policy_digest().to_owned();
     let collected = collect_targets(&input)?;
     let baseline_focus = (!collected.is_empty()).then(|| select_baseline_focus(&input));
     let resolved_focus = baseline_focus.map(|baseline| {
@@ -477,6 +515,8 @@ pub fn transform_stage15(
         original_pre_expansion_digest: input.pre_expansion_digest,
         original_expanded_meaning_digest: input.expanded_meaning_digest,
         composition_seed,
+        geometry_policy_id,
+        geometry_policy_digest,
         baseline_focus,
         resolved_focus,
         effective_variation,
@@ -747,6 +787,10 @@ fn effective_canonical_bytes(
     root.insert(
         "schema".to_owned(),
         Value::String(STAGE15_TRANSFORMATION_SCHEMA_ID.to_owned()),
+    );
+    root.insert(
+        "geometry_policy".to_owned(),
+        identity_value(input.geometry_policy_id, &input.geometry_policy_digest),
     );
     root.insert(
         "original_semantic".to_owned(),

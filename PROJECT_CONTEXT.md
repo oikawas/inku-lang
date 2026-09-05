@@ -74,7 +74,7 @@ and provenance through its full digest, while canonical identity and focus selec
 digest, so source differences do not enter meaning selection. Ambiguous ownership and unresolved
 meaning fail closed as typed issues; the compiler does not guess by first, nearest, or last.
 
-The accepted sealed Rust Stage 1.5 v4 takes lock-verified typed meaning and chooses focus from its
+The accepted sealed Rust Stage 1.5 v5 takes lock-verified typed meaning and chooses focus from its
 meaning digest and an optional attested `composition_seed`. Explicit variation may move focus only.
 Equivalent meaning in inline and continuation forms, and their corresponding macro execution, are
 separated from source provenance; the full compiler-lock digest itself is not an input to focus.
@@ -82,11 +82,16 @@ Stage 1.5 admission checks the actual visible source bytes, available language e
 sidecar including unused entries, and executed-macro definition identities against the lock before
 detaching source-independent input. It adds no condition when language evidence is absent and does
 not require an unused sidecar to resolve or execute.
+The same lock attests `inku.geometry-resolution-policy.v1`. From the verified view, the lowerer
+converts only fully explicit count-one circle, ellipse, cloudform, and square instructions into an
+actual Score with host-supplied canvas and background. It separates exact decimal meaning from
+source provenance and never reports a partial Score as successful when unsupported meaning remains.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
-compatibility paths, not the canonical semantic specification. Score lowering, drawing defaults,
-quantity resolution, typed-hole blocking, and runtime cutover remain at the unconnected boundary.
+compatibility paths, not the canonical semantic specification. Normal geometry and qualitative
+factors, repeated counts, remaining Score meaning, typed-hole blocking, and runtime cutover remain
+at the unconnected boundary.
 
 ## Contracts That Must Remain Intact
 

@@ -7,6 +7,8 @@ pub mod clause;
 pub mod compiler_lock;
 pub mod composition;
 pub mod document;
+pub mod exact_decimal;
+pub mod geometry;
 pub mod language;
 pub mod macro_definition;
 pub mod macro_expansion;
@@ -58,6 +60,12 @@ pub use composition::{
 
 pub use document::{
     DdlDocumentDiagnostic, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,
+};
+pub use exact_decimal::{ExactDecimal, ExactDecimalError};
+pub use geometry::{
+    GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword, SemanticExactDecimal, SemanticExplicitGeometry,
+    SemanticGeometryValue, SemanticNumericPosition, geometry_resolution_policy_canonical_bytes,
+    geometry_resolution_policy_digest,
 };
 
 pub use language::{
@@ -148,10 +156,11 @@ pub use saijiki::{
     saijiki_relation_literal_table, saijiki_score_wire_maps,
 };
 pub use score_lowering::{
-    ExactCountFieldCandidate, ExplicitSmallSizeFieldCandidate, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
-    ScoreFieldGap, ScoreInstructionFieldCandidate, ScoreLoweringCandidate,
-    ScorePrimitiveMappingError, lower_verified_stage15_view,
-    score_primitive_from_semantic_identity,
+    EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitScoreLoweringResult,
+    ExplicitSmallSizeFieldCandidate, SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreFieldGap,
+    ScoreInstructionFieldCandidate, ScoreLoweringCandidate, ScoreLoweringContext,
+    ScoreLoweringContextError, ScorePrimitiveMappingError, lower_verified_stage15_score,
+    lower_verified_stage15_view, score_primitive_from_semantic_identity,
 };
 pub use semantic_association::{
     ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,

@@ -627,13 +627,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v16"
+        "inku.semantic-instruction-association.v17"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v16"
+        "inku.semantic-instruction-association-fixture.v17"
     );
-    assert_eq!(fixture.version, 16);
+    assert_eq!(fixture.version, 17);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1703,7 +1703,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v16"
+        "inku.semantic-instruction-association.v17"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

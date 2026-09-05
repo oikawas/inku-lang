@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v16";
+    "inku.semantic-instruction-association.v17";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1743,6 +1743,14 @@ fn japanese_entity_segment_is_clear(
         .all(|atom| match atom {
             ClauseAtom::CoreRole(term) => term.role != CoreRoleKind::Ground,
             ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::FunctionWord {
+                geometry_keyword: Some(_),
+                ..
+            }
+            | ClauseAtom::FunctionWord {
+                exact_decimal: Some(_),
+                ..
+            } => true,
             ClauseAtom::RemainingRole(term) => term.role != RemainingRoleKind::Motion,
             ClauseAtom::FunctionWord { span, .. } => matches!(
                 attachment_marker_at(association, clause_index, span.start_byte),
@@ -1769,6 +1777,14 @@ fn japanese_predicate_segment_is_clear(
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
         .all(|atom| match atom {
             ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::FunctionWord {
+                geometry_keyword: Some(_),
+                ..
+            }
+            | ClauseAtom::FunctionWord {
+                exact_decimal: Some(_),
+                ..
+            } => true,
             ClauseAtom::RemainingRole(term) => {
                 matches!(
                     term.role,
@@ -1805,6 +1821,14 @@ fn english_entity_prefix_is_clear(
                 CoreRoleKind::Color | CoreRoleKind::Touch | CoreRoleKind::Surface
             ),
             ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            ClauseAtom::FunctionWord {
+                geometry_keyword: Some(_),
+                ..
+            }
+            | ClauseAtom::FunctionWord {
+                exact_decimal: Some(_),
+                ..
+            } => true,
             ClauseAtom::RemainingRole(term) => matches!(
                 term.role,
                 RemainingRoleKind::Angle
@@ -1838,6 +1862,14 @@ fn english_entity_to_marker_gap_is_clear(
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
         .all(|atom| match atom {
             ClauseAtom::RemainingRole(term) => term.role == RemainingRoleKind::Place,
+            ClauseAtom::FunctionWord {
+                geometry_keyword: Some(_),
+                ..
+            }
+            | ClauseAtom::FunctionWord {
+                exact_decimal: Some(_),
+                ..
+            } => true,
             ClauseAtom::FunctionWord { span, .. } => {
                 association
                     .clause_topology

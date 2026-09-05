@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v5",
-  "version": 5,
+  "schema": "inku.neutral-lexeme-parser-fixture.v6",
+  "version": 6,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",
@@ -233,11 +233,12 @@
       "id": "numeric-negative-forms",
       "language": "en",
       "source": "-1 +2 1.5 1-3 first twenty-first half 18446744073709551616",
-      "expected_tokens": [],
+      "expected_tokens": [
+        {"kind": "exact_decimal", "surface": "1.5", "start_byte": 6, "end_byte": 9, "decimal_coefficient": 15, "decimal_scale": 1}
+      ],
       "expected_diagnostics": [
         {"kind": "hole", "surface": "-1", "start_byte": 0, "end_byte": 2, "recognized": true},
         {"kind": "hole", "surface": "+2", "start_byte": 3, "end_byte": 5, "recognized": true},
-        {"kind": "hole", "surface": "1.5", "start_byte": 6, "end_byte": 9, "recognized": true},
         {"kind": "hole", "surface": "1-3", "start_byte": 10, "end_byte": 13, "recognized": true},
         {"kind": "unknown", "surface": "first", "start_byte": 14, "end_byte": 19, "recognized": false},
         {"kind": "unknown", "surface": "twenty", "start_byte": 20, "end_byte": 26, "recognized": false},
@@ -406,6 +407,36 @@
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 2
+    },
+    {
+      "id": "en-explicit-geometry-decimals",
+      "language": "en",
+      "source": "radius 0.50 horizontal 0.5 vertical 0.500",
+      "expected_tokens": [
+        {"kind": "geometry_keyword", "surface": "radius", "start_byte": 0, "end_byte": 6, "geometry_keyword": "radius"},
+        {"kind": "exact_decimal", "surface": "0.50", "start_byte": 7, "end_byte": 11, "decimal_coefficient": 5, "decimal_scale": 1},
+        {"kind": "geometry_keyword", "surface": "horizontal", "start_byte": 12, "end_byte": 22, "geometry_keyword": "axis_x"},
+        {"kind": "exact_decimal", "surface": "0.5", "start_byte": 23, "end_byte": 26, "decimal_coefficient": 5, "decimal_scale": 1},
+        {"kind": "geometry_keyword", "surface": "vertical", "start_byte": 27, "end_byte": 35, "geometry_keyword": "axis_y"},
+        {"kind": "exact_decimal", "surface": "0.500", "start_byte": 36, "end_byte": 41, "decimal_coefficient": 5, "decimal_scale": 1}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 6
+    },
+    {
+      "id": "ja-explicit-geometry-decimals",
+      "language": "ja",
+      "source": "半径0.50 横0.5 縦0.500",
+      "expected_tokens": [
+        {"kind": "geometry_keyword", "surface": "半径", "start_byte": 0, "end_byte": 6, "geometry_keyword": "radius"},
+        {"kind": "exact_decimal", "surface": "0.50", "start_byte": 6, "end_byte": 10, "decimal_coefficient": 5, "decimal_scale": 1},
+        {"kind": "geometry_keyword", "surface": "横", "start_byte": 11, "end_byte": 14, "geometry_keyword": "axis_x"},
+        {"kind": "exact_decimal", "surface": "0.5", "start_byte": 14, "end_byte": 17, "decimal_coefficient": 5, "decimal_scale": 1},
+        {"kind": "geometry_keyword", "surface": "縦", "start_byte": 18, "end_byte": 21, "geometry_keyword": "axis_y"},
+        {"kind": "exact_decimal", "surface": "0.500", "start_byte": 21, "end_byte": 26, "decimal_coefficient": 5, "decimal_scale": 1}
+      ],
+      "expected_diagnostics": [],
+      "recognized_delivery_count": 6
     }
   ]
 }

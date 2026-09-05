@@ -64,18 +64,21 @@ canonical identityとfocus選択はmeaning digestに基づくため、sourceの�
 曖昧な所有先や未解決の意味は、先頭・最近傍・末尾を推測せずtyped issueとして
 fail closedする。
 
-受入済みのsealed Rust Stage 1.5 v4は、lock検証済みtyped meaningを入力に、meaning digestと
+受入済みのsealed Rust Stage 1.5 v5は、lock検証済みtyped meaningを入力に、meaning digestと
 attestされた任意の`composition_seed`からfocusを決める。明示変奏が動かせるのはfocusだけである。
 inline/continuationの等価meaningと対応するmacro executionはsource provenanceから分離し、
 full compiler-lock digest自体をfocusの材料にしない。
 Stage 1.5の入場では、実際のvisible source bytes、存在する言語証跡、未使用分を含む全sidecar、
 実行macroのdefinition identityをlockと照合してからsource-independent入力を切り離す。
 言語証跡のない入力へ条件を足さず、未使用sidecarの解決や実行を要求しない。
+同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
+canvas / backgroundと完全指定されたcount=1のcircle / ellipse / cloudform / squareだけをactual
+Scoreへ変換する。Exact decimalとsource provenanceを分け、未対応意味が残る文書はpartial Scoreにしない。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-typed semantic pathのScoreへのlowering、描画既定値、数量解決、typed holeの停止範囲、
+Normal geometry / qualitative factors、repeated count、残るScore意味、typed holeの停止範囲、
 runtime cutoverは未接続の境界として残る。
 
 ## 守るべき設計契約

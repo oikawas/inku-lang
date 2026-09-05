@@ -564,13 +564,13 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v13"
+        "inku.semantic-entity-association.v14"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-entity-association-fixture.v13"
+        "inku.semantic-entity-association-fixture.v14"
     );
-    assert_eq!(fixture.version, 13);
+    assert_eq!(fixture.version, 14);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1898,6 +1898,8 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             OwnedSemanticOccurrence::RelativeScale(relative_scale) => {
                 relative_scale.provenance.span
             }
+            OwnedSemanticOccurrence::ExplicitGeometry(geometry) => geometry.source().span,
+            OwnedSemanticOccurrence::NumericPosition(position) => position.source().span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)

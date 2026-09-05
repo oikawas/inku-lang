@@ -2556,6 +2556,18 @@ An exact coordinate is not a Stage 1.5 focus target and is never silently moved,
 clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
+Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
+`一辺N`, and `画面の横X、縦Yの位置`, together with their corresponding EN forms.
+A decimal retains its original spelling and source span as provenance while its
+meaning is normalized to a signed base-10 coefficient and scale. Only a
+lock-verified Stage 1.5 v5 view plus explicit host canvas and background context
+may lower independent circle, ellipse, cloudform, and square instructions into an
+actual `Score`. Each instruction must explicitly state count=1, color, touch,
+continuity, empty surface, numeric geometry, and numeric position. Any unsupported
+meaning in the document prevents a partial `Score` from being reported as success;
+the existing candidate evidence and typed gaps remain available. This Rust path is
+not yet connected to the product runtime.
+
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation
 or the short edge. Circles remain aspect-correct and ellipses retain their stated

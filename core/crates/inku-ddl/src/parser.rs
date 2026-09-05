@@ -3,14 +3,14 @@
 use std::collections::HashSet;
 
 use crate::{
-    CanonicalRelationForm, CanonicalRelationIdentity, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    CanonicalRelationForm, CanonicalRelationIdentity, ExactDecimal, GeometryKeyword,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
     saijiki::{canonical_relation_identity, parser_candidate_surfaces},
     saijiki_asset,
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v5";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v6";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,8 +81,14 @@ pub enum NeutralTokenKind {
         canonical_identity: CanonicalRelationIdentity,
     },
     FunctionWord,
+    GeometryKeyword {
+        keyword: GeometryKeyword,
+    },
     ExactNumber {
         value: u64,
+    },
+    ExactDecimal {
+        value: ExactDecimal,
     },
 }
 
@@ -242,6 +248,21 @@ fn selection_at(
     language: ResolvedInstructionLanguage,
 ) -> Option<Selection> {
     let source = document.source();
+    if let Some((end_byte, keyword)) = geometry_keyword_at(source, start_byte, language) {
+        return Some(Selection::Token {
+            end_byte,
+            kind: NeutralTokenKind::GeometryKeyword { keyword },
+        });
+    }
+    if let Some(end_byte) = exact_decimal_end(source, start_byte, language) {
+        return Some(match ExactDecimal::parse(&source[start_byte..end_byte]) {
+            Ok(value) => Selection::Token {
+                end_byte,
+                kind: NeutralTokenKind::ExactDecimal { value },
+            },
+            Err(_) => Selection::Hole { end_byte },
+        });
+    }
     if let Some(end_byte) = unsupported_numeric_end(source, start_byte) {
         return Some(Selection::Hole { end_byte });
     }
@@ -621,6 +642,162 @@ fn candidates_at(
     }
 
     candidates
+}
+
+fn geometry_keyword_at(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<(usize, GeometryKeyword)> {
+    let candidates: &[(&str, GeometryKeyword)] = match language {
+        ResolvedInstructionLanguage::Ja => &[
+            ("画面の", GeometryKeyword::Canvas),
+            ("位置に", GeometryKeyword::Position),
+            ("半径", GeometryKeyword::Radius),
+            ("直径", GeometryKeyword::Diameter),
+            ("高さ", GeometryKeyword::Height),
+            ("一辺", GeometryKeyword::Side),
+            ("画面", GeometryKeyword::Canvas),
+            ("位置", GeometryKeyword::Position),
+            ("幅", GeometryKeyword::Width),
+            ("横", GeometryKeyword::AxisX),
+            ("縦", GeometryKeyword::AxisY),
+        ],
+        ResolvedInstructionLanguage::En => &[
+            ("side length", GeometryKeyword::Side),
+            ("horizontal", GeometryKeyword::AxisX),
+            ("vertical", GeometryKeyword::AxisY),
+            ("diameter", GeometryKeyword::Diameter),
+            ("position", GeometryKeyword::Position),
+            ("radius", GeometryKeyword::Radius),
+            ("height", GeometryKeyword::Height),
+            ("canvas", GeometryKeyword::Canvas),
+            ("width", GeometryKeyword::Width),
+        ],
+    };
+    for (surface, keyword) in candidates {
+        let end_byte = start_byte.checked_add(surface.len())?;
+        let Some(actual) = source.get(start_byte..end_byte) else {
+            continue;
+        };
+        let matches = match language {
+            ResolvedInstructionLanguage::Ja => actual == *surface,
+            ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
+        };
+        if !matches || !geometry_keyword_left_boundary(source, start_byte, language) {
+            continue;
+        }
+        if language == ResolvedInstructionLanguage::En
+            && source[end_byte..]
+                .chars()
+                .next()
+                .is_some_and(|character| character.is_ascii_alphanumeric())
+        {
+            continue;
+        }
+        if (*keyword == GeometryKeyword::Canvas
+            && axis_x_follows_context(source, end_byte, language))
+            || *keyword == GeometryKeyword::Position
+            || numeric_follows_keyword(source, end_byte)
+        {
+            return Some((end_byte, *keyword));
+        }
+    }
+    None
+}
+
+fn axis_x_follows_context(
+    source: &str,
+    end_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
+    let remainder = source[end_byte..].trim_start_matches(is_separator);
+    match language {
+        ResolvedInstructionLanguage::Ja => remainder.starts_with('横'),
+        ResolvedInstructionLanguage::En => remainder
+            .get(.."horizontal".len())
+            .is_some_and(|surface| surface.eq_ignore_ascii_case("horizontal")),
+    }
+}
+
+fn geometry_keyword_left_boundary(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
+    let Some(previous) = source[..start_byte].chars().next_back() else {
+        return true;
+    };
+    match language {
+        ResolvedInstructionLanguage::En => !previous.is_ascii_alphanumeric(),
+        ResolvedInstructionLanguage::Ja => {
+            is_separator(previous)
+                || matches!(
+                    previous,
+                    'を' | 'に' | 'で' | 'の' | 'は' | 'が' | 'へ' | 'と'
+                )
+        }
+    }
+}
+
+fn numeric_follows_keyword(source: &str, end_byte: usize) -> bool {
+    source[end_byte..]
+        .char_indices()
+        .find(|(_, character)| !character.is_whitespace())
+        .and_then(|(offset, _)| source.as_bytes().get(end_byte + offset))
+        .is_some_and(|byte| byte.is_ascii_digit() || matches!(byte, b'+' | b'-'))
+}
+
+fn exact_decimal_end(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut cursor = start_byte;
+    let mut signed = false;
+    if matches!(bytes.get(cursor), Some(b'+' | b'-')) {
+        signed = true;
+        cursor += 1;
+    }
+    let integer_start = cursor;
+    while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+        cursor += 1;
+    }
+    if cursor == integer_start {
+        return None;
+    }
+    let mut decimal = false;
+    if bytes.get(cursor) == Some(&b'.') && bytes.get(cursor + 1).is_some_and(u8::is_ascii_digit) {
+        decimal = true;
+        cursor += 2;
+        while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+            cursor += 1;
+        }
+    }
+    (decimal || (signed && signed_integer_has_geometry_prefix(source, start_byte, language)))
+        .then_some(cursor)
+}
+
+fn signed_integer_has_geometry_prefix(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
+    let prefix = source[..start_byte].trim_end();
+    let surfaces: &[&str] = match language {
+        ResolvedInstructionLanguage::Ja => &["半径", "直径", "高さ", "一辺", "幅", "横", "縦"],
+        ResolvedInstructionLanguage::En => &[
+            "side length",
+            "horizontal",
+            "vertical",
+            "diameter",
+            "radius",
+            "height",
+            "width",
+        ],
+    };
+    surfaces.iter().any(|surface| prefix.ends_with(surface))
 }
 
 fn has_japanese_recognized_left_boundary(source: &str, start_byte: usize) -> bool {

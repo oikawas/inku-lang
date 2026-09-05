@@ -375,7 +375,12 @@ pub fn stage15_transformation_input(
         semantic_macro_execution_owners(&semantic.ast, &expansion.parameter_binding)
             .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
     execution_owners
-        .validate_seed_identities(expansion, &lock.macro_seeds, lock.composition_seed)
+        .validate_seed_identities(
+            semantic_bytes,
+            expansion,
+            &lock.macro_seeds,
+            lock.composition_seed,
+        )
         .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
     let expanded_meaning_bytes =
         expanded_meaning_canonical_bytes_with_owners(&execution_owners, expansion)

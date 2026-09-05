@@ -288,11 +288,14 @@ impl SemanticMacroExecutionOwners {
 
     pub(crate) fn validate_seed_identities(
         &self,
+        canonical_bytes: &[u8],
         expansion: &MacroExpansionResult,
         seeds: &[CompilerSeedIdentity],
         composition_seed: Option<u64>,
     ) -> Result<(), MacroExpansionDiagnosticKind> {
         validate_expanded_execution_owners(self, expansion)?;
+        let canonical = std::str::from_utf8(canonical_bytes)
+            .map_err(|_| MacroExpansionDiagnosticKind::MismatchedSeed)?;
         if seeds.len() != self.owners.len() {
             return Err(MacroExpansionDiagnosticKind::MismatchedSeed);
         }
@@ -304,10 +307,27 @@ impl SemanticMacroExecutionOwners {
             else {
                 return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
             };
+            let Some(resolved) = expansion
+                .parameter_binding
+                .macro_resolution
+                .resolved
+                .get(binding.invocation_index)
+            else {
+                return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+            };
+            let semantic_invocation = MacroInvocation::new(
+                resolved.invocation.namespace(),
+                resolved.invocation.heading(),
+                owner.semantic_ordinal,
+            )
+            .map_err(|_| MacroExpansionDiagnosticKind::MismatchedSeed)?;
+            let expected = derive_macro_seed(canonical, &semantic_invocation, composition_seed);
             let provenance = &invocation.provenance;
             if seed.qualified_name != binding.definition_identity.qualified_name()
                 || seed.ordinal != owner.semantic_ordinal
                 || seed.scheme_id != crate::MACRO_SEED_SCHEME_ID
+                || seed.full_digest != expected.full_digest_hex()
+                || seed.resolved_seed != expected.resolved_seed()
                 || seed.scheme_id != provenance.seed_scheme_id
                 || seed.full_digest != provenance.seed_full_digest
                 || seed.resolved_seed != provenance.resolved_seed
@@ -3201,7 +3221,12 @@ mod execution_owner_join_tests {
             .clone();
         seeds[1].ordinal = 2;
         assert_eq!(
-            owners.validate_seed_identities(expansion, &seeds, Some(19)),
+            owners.validate_seed_identities(
+                compilation.pre_expansion_canonical_bytes().unwrap(),
+                expansion,
+                &seeds,
+                Some(19),
+            ),
             Err(MacroExpansionDiagnosticKind::MismatchedSeed)
         );
     }

@@ -1,11 +1,11 @@
 use inku_ddl::{
-    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, FocusRegion, MacroDefinition,
-    MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticContinuationTarget,
-    SemanticHead, SemanticIdentity, Stage15TargetPath, Stage15TransformError, Stage15Variation,
-    Stage15VariationAmplitude, compile_typed_ddl, compiler_lock_hash_input,
-    expanded_generated_provenance_canonical_bytes, expanded_meaning_canonical_bytes,
-    stage15_transformation_input, transform_stage15,
+    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroNode, FocusRegion,
+    MacroDefinition, MacroExpansionLimits, MacroInvocationProvenance, MacroLock,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN,
+    STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticContinuationTarget, SemanticHead, SemanticIdentity,
+    Stage15TargetPath, Stage15TransformError, Stage15Variation, Stage15VariationAmplitude,
+    compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
+    expanded_meaning_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -861,6 +861,49 @@ fn continuation_target_and_execution_mapping_tampering_fail_closed_before_transf
 }
 
 #[test]
+fn coupled_seed_and_generated_provenance_tamper_is_rejected() {
+    let definition = center_emit_definition();
+    let mut coupled = compile_locked(
+        "Focus.Center",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    let tampered_full_digest = "0000000000000000000000000000000000000000000000000000000000000001";
+    let tampered_resolved_seed = coupled.compiler_lock.as_ref().unwrap().macro_seeds[0]
+        .resolved_seed
+        .wrapping_add(1);
+    {
+        let seed = &mut coupled.compiler_lock.as_mut().unwrap().macro_seeds[0];
+        seed.full_digest = tampered_full_digest.to_owned();
+        seed.resolved_seed = tampered_resolved_seed;
+    }
+    {
+        let invocation = &mut coupled.macro_expansion.as_mut().unwrap().expanded[0];
+        rewrite_seed_provenance(
+            &mut invocation.provenance,
+            tampered_full_digest,
+            tampered_resolved_seed,
+        );
+        for node in &mut invocation.nodes {
+            rewrite_node_seed_provenance(node, tampered_full_digest, tampered_resolved_seed);
+        }
+    }
+    let generated_provenance_digest = sha256(&expanded_generated_provenance_canonical_bytes(
+        coupled.macro_expansion.as_ref().unwrap(),
+    ));
+    let lock = coupled.compiler_lock.as_mut().unwrap();
+    lock.expanded_generated_provenance_digest = Some(generated_provenance_digest);
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+
+    assert_eq!(
+        stage15_transformation_input(&coupled),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+}
+
+#[test]
 fn definite_imperative_object_groups_do_not_reach_stage15() {
     for source in ["place the circle and a line.", "place the circle and line."] {
         let compilation = compile(
@@ -1059,6 +1102,40 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
 
 fn fixture() -> Fixture {
     serde_json::from_str(FIXTURE).unwrap()
+}
+
+fn rewrite_seed_provenance(
+    provenance: &mut MacroInvocationProvenance,
+    full_digest: &str,
+    resolved_seed: u64,
+) {
+    provenance.seed_full_digest = full_digest.to_owned();
+    provenance.resolved_seed = resolved_seed;
+}
+
+fn rewrite_node_seed_provenance(
+    node: &mut ExpandedMacroNode,
+    full_digest: &str,
+    resolved_seed: u64,
+) {
+    match node {
+        ExpandedMacroNode::Emit { provenance, .. }
+        | ExpandedMacroNode::Anchor { provenance, .. }
+        | ExpandedMacroNode::Relation { provenance, .. } => {
+            rewrite_seed_provenance(&mut provenance.invocation, full_digest, resolved_seed);
+        }
+        ExpandedMacroNode::Group {
+            body, provenance, ..
+        }
+        | ExpandedMacroNode::Transform {
+            body, provenance, ..
+        } => {
+            rewrite_seed_provenance(&mut provenance.invocation, full_digest, resolved_seed);
+            for child in body {
+                rewrite_node_seed_provenance(child, full_digest, resolved_seed);
+            }
+        }
+    }
 }
 
 fn language(value: &str) -> ResolvedInstructionLanguage {

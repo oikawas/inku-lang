@@ -2799,6 +2799,76 @@ fn macro_head_matches_target(
     )
 }
 
+#[cfg(test)]
+mod execution_owner_join_tests {
+    use super::*;
+    use crate::{MacroLock, ResolvedInstructionLanguage};
+
+    const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
+        max_invocations: 16,
+        max_depth: 16,
+        max_evaluation_steps: 1_000,
+        max_nodes_per_invocation: 100,
+        max_total_nodes: 500,
+    };
+
+    #[test]
+    fn execution_owner_join_rejects_mutated_semantic_source_identity_as_blocking() {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+        )
+        .unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document =
+            NormalizedDdlDocument::new("Focus.Center", ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap();
+        let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        let semantic = associate_semantic_document_with_macro_binding(&document, binding.clone());
+        assert!(semantic.ast.complete);
+
+        let accepted = semantic_macro_execution_selection(&semantic.ast, &binding);
+        assert!(accepted.is_valid_for(binding.complete.len()));
+        assert_eq!(accepted.execution_binding_indices(), [0]);
+
+        let mut corrupted_ast = semantic.ast;
+        let SemanticHead::MacroInvocation(head) = &mut corrupted_ast.instructions[0].entity.head
+        else {
+            panic!("locked Focus.Center remains a semantic macro head");
+        };
+        head.provenance.source.span.end_byte -= 1;
+
+        let rejected = semantic_macro_execution_selection(&corrupted_ast, &binding);
+        assert!(!rejected.is_valid_for(binding.complete.len()));
+        let expansion = expand_selected_macros(
+            binding.clone(),
+            std::slice::from_ref(&definition),
+            &[],
+            LIMITS,
+            rejected,
+        );
+        assert_eq!(expansion.parameter_binding, binding);
+        assert!(expansion.expanded.is_empty());
+        assert_eq!(expansion.diagnostics.len(), 1);
+        assert_eq!(
+            expansion.diagnostics[0].kind,
+            MacroExpansionDiagnosticKind::BindingOwnershipMismatch
+        );
+
+        let mut projection = Projection::default();
+        project_expansion_diagnostics(&document, &expansion, &mut projection);
+        assert!(projection.holes.is_empty());
+        assert!(projection.conflicts.is_empty());
+        assert_eq!(projection.blocking.len(), 1);
+        assert_eq!(projection.blocking[0].kind, "expansion_binding_ownership");
+    }
+}
+
 fn valid_limits(limits: MacroExpansionLimits) -> bool {
     limits.max_invocations != 0
         && limits.max_depth != 0

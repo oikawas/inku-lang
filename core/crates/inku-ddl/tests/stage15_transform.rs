@@ -1,9 +1,9 @@
 use inku_ddl::{
     CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, FocusRegion, MacroDefinition,
     MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID, Stage15TargetPath,
-    Stage15TransformError, Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl,
-    compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
+    STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticHead,
+    Stage15TargetPath, Stage15TransformError, Stage15Variation, Stage15VariationAmplitude,
+    compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
     expanded_meaning_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
@@ -537,6 +537,94 @@ fn source_group_and_macro_targets_are_ordered_once_with_lossless_provenance() {
 }
 
 #[test]
+fn noun_introduction_reaches_stage15_with_distinct_entity_and_macro_provenance() {
+    let source = "circle. place a red circle.";
+    let compilation = compile(
+        source,
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    assert_eq!(
+        compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::CanonicalReady
+    );
+    let semantic = compilation.semantic_document.as_ref().unwrap();
+    assert_eq!(semantic.ast.instructions.len(), 2);
+    assert!(semantic.ast.instructions[0].entity.color.is_none());
+    assert_eq!(
+        semantic.ast.instructions[1]
+            .entity
+            .color
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("red")
+    );
+    assert_eq!(
+        semantic.ast.instructions[1]
+            .action
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("place")
+    );
+    for instruction in &semantic.ast.instructions {
+        let occurrence = instruction.entity.head.source();
+        assert_eq!(
+            &source[occurrence.span.start_byte..occurrence.span.end_byte],
+            occurrence.surface
+        );
+    }
+    let transformed =
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    assert_eq!(transformed.original_semantic_document(), &semantic.ast);
+
+    let definition = center_emit_definition();
+    let macro_source = "a Focus.Center";
+    let macro_compilation = compile_locked(
+        macro_source,
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(17),
+        LIMITS,
+    );
+    assert_eq!(
+        macro_compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::CanonicalReady
+    );
+    let macro_semantic = macro_compilation.semantic_document.as_ref().unwrap();
+    assert_eq!(macro_semantic.ast.instructions.len(), 1);
+    let SemanticHead::MacroInvocation(head) = &macro_semantic.ast.instructions[0].entity.head
+    else {
+        panic!("locked synthetic macro remains a semantic noun introduction");
+    };
+    assert_eq!(head.qualified_name, "Focus.Center");
+    assert_eq!(head.provenance.source.surface, "Focus.Center");
+    assert_eq!(
+        &macro_source[head.provenance.source.span.start_byte..head.provenance.source.span.end_byte],
+        "Focus.Center"
+    );
+    let macro_transformed = transform_stage15(
+        stage15_transformation_input(&macro_compilation).unwrap(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        macro_transformed.original_semantic_document(),
+        &macro_semantic.ast
+    );
+    assert_eq!(
+        macro_transformed.original_expanded_invocations(),
+        macro_compilation
+            .macro_expansion
+            .as_ref()
+            .unwrap()
+            .expanded
+            .as_slice()
+    );
+}
+
+#[test]
 fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
     let definition = center_emit_definition();
     let compilation = compile_locked(
@@ -586,6 +674,10 @@ fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
 fn canonical_ready_gate_and_target_integrity_fail_closed() {
     for (source, expected_state) in [
         ("many", CompilerLockState::IncompleteKnownHole),
+        (
+            "line. place the line.",
+            CompilerLockState::BlockedDiagnostic,
+        ),
         (
             "line. place the line and a circle.",
             CompilerLockState::BlockedConflict,

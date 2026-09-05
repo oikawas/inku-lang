@@ -289,10 +289,6 @@ pub enum Stage15TransformError {
     SemanticCanonicalDigestMismatch,
     MissingSemanticSourceProvenanceDigest,
     SemanticSourceProvenanceDigestMismatch,
-    VisibleSourceDigestMismatch,
-    SemanticSourceLanguageMismatch,
-    DefinitionIdentityProjectionMismatch,
-    ConsumedDefinitionIdentityMismatch,
     MissingMacroExpansion,
     ExpansionDiagnostic,
     MissingExpandedMeaningDigest,
@@ -387,17 +383,15 @@ pub fn stage15_transformation_input(
         &execution_owners,
     )
     .map_err(|error| match error {
-        Stage15InputBoundaryError::VisibleSourceDigest => {
-            Stage15TransformError::VisibleSourceDigestMismatch
+        Stage15InputBoundaryError::VisibleSourceDigest
+        | Stage15InputBoundaryError::DefinitionProjection => {
+            Stage15TransformError::CompilerLockDigestMismatch
         }
         Stage15InputBoundaryError::SourceLanguage => {
-            Stage15TransformError::SemanticSourceLanguageMismatch
-        }
-        Stage15InputBoundaryError::DefinitionProjection => {
-            Stage15TransformError::DefinitionIdentityProjectionMismatch
+            Stage15TransformError::SemanticSourceProvenanceDigestMismatch
         }
         Stage15InputBoundaryError::ConsumedDefinitionIdentity => {
-            Stage15TransformError::ConsumedDefinitionIdentityMismatch
+            Stage15TransformError::ExpansionDiagnostic
         }
     })?;
     execution_owners

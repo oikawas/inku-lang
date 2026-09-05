@@ -196,7 +196,7 @@ fn step9i_input_boundary_rejects_visible_source_replacement() {
     red.document = blue.document.clone();
     assert_eq!(
         stage15_transformation_input(&red),
-        Err(Stage15TransformError::VisibleSourceDigestMismatch)
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
     );
 }
 
@@ -214,7 +214,7 @@ fn step9i_input_boundary_checks_language_evidence_but_allows_empty_source() {
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     assert_eq!(
         stage15_transformation_input(&language_mismatch),
-        Err(Stage15TransformError::SemanticSourceLanguageMismatch)
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
     );
 
     let empty = compile("", ResolvedInstructionLanguage::En, &[], Some(0), LIMITS);
@@ -263,7 +263,7 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     refresh_full_lock(&mut missing_projection);
     assert_eq!(
         stage15_transformation_input(&missing_projection),
-        Err(Stage15TransformError::DefinitionIdentityProjectionMismatch)
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
     );
 
     let mut extra_projection = control.clone();
@@ -283,7 +283,7 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     refresh_full_lock(&mut extra_projection);
     assert_eq!(
         stage15_transformation_input(&extra_projection),
-        Err(Stage15TransformError::DefinitionIdentityProjectionMismatch)
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
     );
 
     let mut changed_projection = control.clone();
@@ -297,7 +297,7 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     refresh_full_lock(&mut changed_projection);
     assert_eq!(
         stage15_transformation_input(&changed_projection),
-        Err(Stage15TransformError::DefinitionIdentityProjectionMismatch)
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
     );
 
     let replacement = replacement_center_definition();
@@ -324,7 +324,7 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
     refresh_full_lock(&mut stale_consumer);
     assert_eq!(
         stage15_transformation_input(&stale_consumer),
-        Err(Stage15TransformError::ConsumedDefinitionIdentityMismatch)
+        Err(Stage15TransformError::ExpansionDiagnostic)
     );
 }
 

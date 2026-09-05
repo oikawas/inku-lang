@@ -2150,6 +2150,181 @@ fn definition_identities(
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Stage15InputBoundaryError {
+    VisibleSourceDigest,
+    SourceLanguage,
+    DefinitionProjection,
+    ConsumedDefinitionIdentity,
+}
+
+pub(crate) fn validate_stage15_input_boundary(
+    document: &NormalizedDdlDocument,
+    ast: &SemanticDocumentAst,
+    lock: &TypedDdlCompilerLock,
+    binding: &MacroParameterBindingResult,
+    execution_owners: &SemanticMacroExecutionOwners,
+) -> Result<(), Stage15InputBoundaryError> {
+    if sha256_hex(document.source().as_bytes()) != lock.visible_source_digest {
+        return Err(Stage15InputBoundaryError::VisibleSourceDigest);
+    }
+    if semantic_source_occurrences(ast)
+        .iter()
+        .any(|occurrence| occurrence.language != document.language())
+    {
+        return Err(Stage15InputBoundaryError::SourceLanguage);
+    }
+    if document.macro_locks().len() != lock.definition_identities.len()
+        || document
+            .macro_locks()
+            .iter()
+            .zip(&lock.definition_identities)
+            .any(|(sidecar, projected)| {
+                sidecar.qualified_name() != projected.qualified_name
+                    || sidecar.version() != projected.version
+                    || sidecar.digest() != projected.sidecar_digest
+            })
+    {
+        return Err(Stage15InputBoundaryError::DefinitionProjection);
+    }
+
+    for owner in execution_owners.owners() {
+        let Some(complete) = binding.complete.get(owner.binding_index) else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let Some(resolved) = binding
+            .macro_resolution
+            .resolved
+            .get(complete.invocation_index)
+        else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let qualified_name = complete.definition_identity.qualified_name();
+        let Some(sidecar) = document
+            .macro_locks()
+            .iter()
+            .find(|sidecar| sidecar.qualified_name() == qualified_name)
+        else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let Some(projected) = lock
+            .definition_identities
+            .iter()
+            .find(|identity| identity.qualified_name == qualified_name)
+        else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let resolved_digest = complete.definition_identity.full_digest_hex();
+        let sidecar_digest = format!("sha256:{resolved_digest}");
+        if resolved.definition_identity != complete.definition_identity
+            || resolved.lock.qualified_name != sidecar.qualified_name()
+            || resolved.lock.version != sidecar.version()
+            || resolved.lock.digest != sidecar.digest()
+            || sidecar.version() != complete.definition_identity.version()
+            || sidecar.digest() != sidecar_digest
+            || projected.version != complete.definition_identity.version()
+            || projected.sidecar_digest != sidecar_digest
+            || projected.resolved_definition_digest.as_deref() != Some(resolved_digest)
+        {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&SourceOccurrence> {
+    fn push_term<'a>(occurrences: &mut Vec<&'a SourceOccurrence>, term: &'a SemanticTerm) {
+        occurrences.push(&term.provenance.source);
+    }
+
+    fn push_head<'a>(occurrences: &mut Vec<&'a SourceOccurrence>, head: &'a SemanticHead) {
+        match head {
+            SemanticHead::Primitive(term) => push_term(occurrences, term),
+            SemanticHead::MacroInvocation(head) => {
+                occurrences.push(&head.provenance.source);
+                occurrences.extend(
+                    head.parameters
+                        .iter()
+                        .map(|parameter| &parameter.provenance),
+                );
+            }
+        }
+    }
+
+    fn push_entity<'a>(
+        occurrences: &mut Vec<&'a SourceOccurrence>,
+        entity: &'a crate::SemanticEntity,
+    ) {
+        push_head(occurrences, &entity.head);
+        for term in [
+            entity.color.as_ref(),
+            entity.touch.as_ref(),
+            entity.continuity.as_ref(),
+            entity.angle.as_ref(),
+            entity.surface.quality.as_ref(),
+            entity.surface.intensity.as_ref(),
+            entity.fluctuation.amplitude.as_ref(),
+            entity.fluctuation.frequency.as_ref(),
+            entity.fluctuation.quality.as_ref(),
+            entity.proportion.aspect.as_ref(),
+            entity.proportion.width_extent.as_ref(),
+            entity.proportion.arc_form.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            push_term(occurrences, term);
+        }
+        occurrences.extend(
+            [
+                entity.quantity.as_ref().map(|value| &value.provenance),
+                entity.thinness.as_ref().map(|value| &value.provenance),
+                entity
+                    .relative_scale
+                    .as_ref()
+                    .map(|value| &value.provenance),
+            ]
+            .into_iter()
+            .flatten(),
+        );
+    }
+
+    let mut occurrences = Vec::new();
+    if let Some(ground) = &ast.ground {
+        push_term(&mut occurrences, ground);
+    }
+    for instruction in &ast.instructions {
+        push_entity(&mut occurrences, &instruction.entity);
+        if let Some(action) = &instruction.action {
+            push_term(&mut occurrences, action);
+        }
+        if let Some(position) = &instruction.position {
+            push_term(&mut occurrences, position);
+        }
+        if let Some(relation) = &instruction.relation {
+            occurrences.push(&relation.provenance);
+        }
+    }
+    occurrences.extend(
+        ast.coordinated_head_groups
+            .iter()
+            .flat_map(|group| group.markers.iter()),
+    );
+    for edge in &ast.group_predicates {
+        if let Some(action) = &edge.action {
+            push_term(&mut occurrences, action);
+        }
+        if let Some(position) = &edge.position {
+            push_term(&mut occurrences, position);
+        }
+    }
+    for edge in &ast.continuations {
+        push_head(&mut occurrences, &edge.reintroduced_head);
+        occurrences.push(&edge.marker);
+    }
+    occurrences
+}
+
 /// Canonical source-bearing provenance for the complete returned semantic graph.
 pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     let mut root = BTreeMap::new();
@@ -3094,6 +3269,83 @@ mod execution_owner_join_tests {
         max_nodes_per_invocation: 100,
         max_total_nodes: 500,
     };
+
+    #[test]
+    fn stage15_source_occurrence_traversal_covers_serialized_language_evidence() {
+        fn language_field_count(value: &Value) -> usize {
+            match value {
+                Value::Array(values) => values.iter().map(language_field_count).sum(),
+                Value::Object(values) => {
+                    usize::from(values.contains_key("language"))
+                        + values.values().map(language_field_count).sum::<usize>()
+                }
+                _ => 0,
+            }
+        }
+
+        let mut compilations = [
+            (
+                "place one thin pencil line at the center",
+                ResolvedInstructionLanguage::En,
+            ),
+            (
+                "place a circle and a line at the center.",
+                ResolvedInstructionLanguage::En,
+            ),
+            (
+                "円を中心に置く。円は赤い。",
+                ResolvedInstructionLanguage::Ja,
+            ),
+        ]
+        .map(|(source, language)| {
+            compile_typed_ddl(
+                NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+                &[],
+                None,
+                LIMITS,
+            )
+        })
+        .into_iter()
+        .collect::<Vec<_>>();
+
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Review","heading":"Tint","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
+        )
+        .unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        compilations.push(compile_typed_ddl(
+            NormalizedDdlDocument::new(
+                "Review.Tint red",
+                ResolvedInstructionLanguage::En,
+                vec![lock],
+            )
+            .unwrap(),
+            std::slice::from_ref(&definition),
+            None,
+            LIMITS,
+        ));
+
+        for compilation in compilations {
+            let ast = &compilation.semantic_document.as_ref().unwrap().ast;
+            assert!(ast.complete, "{}", compilation.document.source());
+            let before = semantic_source_provenance_canonical_bytes(ast);
+            let occurrences = semantic_source_occurrences(ast);
+            let serialized: Value = serde_json::from_slice(&before).unwrap();
+            assert_eq!(occurrences.len(), language_field_count(&serialized));
+            assert!(
+                occurrences
+                    .iter()
+                    .all(|occurrence| occurrence.language == compilation.document.language())
+            );
+            assert_eq!(before, semantic_source_provenance_canonical_bytes(ast));
+        }
+    }
 
     #[test]
     fn execution_owner_join_rejects_parameter_drift_from_retained_bindings() {

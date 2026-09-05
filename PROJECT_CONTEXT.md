@@ -78,6 +78,10 @@ The accepted sealed Rust Stage 1.5 v4 takes lock-verified typed meaning and choo
 meaning digest and an optional attested `composition_seed`. Explicit variation may move focus only.
 Equivalent meaning in inline and continuation forms, and their corresponding macro execution, are
 separated from source provenance; the full compiler-lock digest itself is not an input to focus.
+Stage 1.5 admission checks the actual visible source bytes, available language evidence, every
+sidecar including unused entries, and executed-macro definition identities against the lock before
+detaching source-independent input. It adds no condition when language evidence is absent and does
+not require an unused sidecar to resolve or execute.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are

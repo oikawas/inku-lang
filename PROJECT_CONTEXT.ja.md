@@ -68,6 +68,9 @@ fail closedする。
 attestされた任意の`composition_seed`からfocusを決める。明示変奏が動かせるのはfocusだけである。
 inline/continuationの等価meaningと対応するmacro executionはsource provenanceから分離し、
 full compiler-lock digest自体をfocusの材料にしない。
+Stage 1.5の入場では、実際のvisible source bytes、存在する言語証跡、未使用分を含む全sidecar、
+実行macroのdefinition identityをlockと照合してからsource-independent入力を切り離す。
+言語証跡のない入力へ条件を足さず、未使用sidecarの解決や実行を要求しない。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin

@@ -498,13 +498,14 @@ pub(crate) struct ClauseTopologyEvidence {
     pub english_determiner_phrases: Vec<EnglishDeterminerPhraseEvidence>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct EnglishDeterminerPhraseEvidence {
     pub kind: EnglishDeterminerKind,
     pub clause_index: usize,
     pub determiner_span: SourceSpan,
     pub candidate_region_span: SourceSpan,
     pub head_candidate_span: Option<SourceSpan>,
+    pub canonical_candidate_spans: Vec<SourceSpan>,
 }
 
 impl ClauseTopologyEvidence {
@@ -530,6 +531,30 @@ impl ClauseTopologyEvidence {
                         .head_candidate
                         .as_ref()
                         .map(|candidate| candidate.span),
+                    canonical_candidate_spans: evidence
+                        .head_candidate
+                        .as_ref()
+                        .map(|candidate| vec![candidate.span])
+                        .unwrap_or_else(|| {
+                            attachment
+                                .noun_phrase
+                                .diagnostics
+                                .iter()
+                                .find(|diagnostic| {
+                                    diagnostic.clause_index == evidence.clause_index
+                                        && diagnostic.determiner_span == evidence.determiner.span
+                                        && diagnostic.candidate_region_span
+                                            == evidence.candidate_region_span
+                                })
+                                .map(|diagnostic| {
+                                    diagnostic
+                                        .candidates
+                                        .iter()
+                                        .map(|candidate| candidate.span)
+                                        .collect()
+                                })
+                                .unwrap_or_default()
+                        }),
                 })
                 .collect(),
         }

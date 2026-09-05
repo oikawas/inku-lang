@@ -358,7 +358,8 @@ fn arbitrate_coordination_continuation_claims(
             let mut claimant = association.ast.instructions[member_index].clone();
             claimant.action = edge.action.clone();
             claimant.position = edge.position.clone();
-            let Some(admission) = continuation_marker(document, association, &claimant) else {
+            let Some(admission) = continuation_marker(document, association, &claimant, true)
+            else {
                 continue;
             };
             if !has_continuation_predicate(&claimant) {
@@ -376,7 +377,9 @@ fn arbitrate_coordination_continuation_claims(
                 })
                 .map(|(candidate_index, _)| candidate_index)
                 .collect::<Vec<_>>();
-            if member_candidates.is_empty() {
+            if admission.role != ContinuationPhraseRole::UnsupportedDefiniteObject
+                && member_candidates.is_empty()
+            {
                 continue;
             }
             continuation_markers.push(admission.marker);
@@ -482,7 +485,8 @@ fn associate_continuations(
         }
         let (instruction, consumed_upstream_spans) =
             continuation_predicate(association, original_instruction);
-        let Some(admission) = continuation_marker(document, association, &instruction) else {
+        let Some(admission) = continuation_marker(document, association, &instruction, false)
+        else {
             instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
             continue;
@@ -818,6 +822,7 @@ fn continuation_marker(
     document: &NormalizedDdlDocument,
     result: &SemanticInstructionAssociationResult,
     instruction: &SemanticInstruction,
+    allow_shared_determiner_candidate: bool,
 ) -> Option<ContinuationAdmission> {
     let head = instruction.entity.head.source();
     let clause = result
@@ -856,6 +861,8 @@ fn continuation_marker(
                     phrase.kind == EnglishDeterminerKind::The
                         && phrase.clause_index == head.clause_index
                         && (phrase.head_candidate_span == Some(head.span)
+                            || (allow_shared_determiner_candidate
+                                && phrase.canonical_candidate_spans.contains(&head.span))
                             || (matches!(
                                 instruction.entity.head,
                                 SemanticHead::MacroInvocation(_)

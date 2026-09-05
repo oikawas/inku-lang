@@ -137,6 +137,74 @@ fn coordination_and_continuation_predicate_overlap_fails_closed() {
 }
 
 #[test]
+fn coordinated_definite_imperative_object_is_blocked_without_prior_target() {
+    for (source, expected_instruction_count, expected_continuation_markers) in [
+        ("place the circle and a line.", 2, 1),
+        ("ellipse. place the circle and a line.", 3, 1),
+        ("circle. place the circle and a line.", 3, 1),
+        ("place the circle and line.", 2, 2),
+        ("circle. place the circle and line.", 3, 2),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert_eq!(
+            result.ast.instructions.len(),
+            expected_instruction_count,
+            "{source}"
+        );
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        let conflicts = result
+            .instruction_association
+            .coordination_issues
+            .iter()
+            .filter(|issue| issue.kind.as_str() == "coordination_continuation_ownership_conflict")
+            .collect::<Vec<_>>();
+        assert_eq!(conflicts.len(), 1, "{source}");
+        let conflict = conflicts[0];
+        assert_eq!(
+            conflict.continuation_markers.len(),
+            expected_continuation_markers,
+            "{source}"
+        );
+        assert!(
+            conflict
+                .continuation_markers
+                .iter()
+                .all(|marker| marker.surface == "the"),
+            "{source}"
+        );
+        assert_eq!(conflict.member_instruction_indices.len(), 2, "{source}");
+        let member_surfaces = conflict
+            .member_instruction_indices
+            .iter()
+            .map(|index| {
+                result.instruction_association.ast.instructions[*index]
+                    .entity
+                    .head
+                    .source()
+                    .surface
+                    .as_str()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(member_surfaces, ["circle", "line"], "{source}");
+        assert_eq!(conflict.predicates.len(), 1, "{source}");
+        assert_eq!(conflict.predicates[0].term.identity.id, "place", "{source}");
+        assert!(
+            conflict
+                .claim_spans
+                .iter()
+                .any(|span| { &source[span.start_byte..span.end_byte] == "place" }),
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn indefinite_article_introduces_a_distinct_entity() {
     for (source, expected_action) in [
         ("circle. a red circle.", None),
@@ -248,32 +316,53 @@ fn indefinite_articles_keep_single_introductions_and_ja_meaning_parity() {
 
 #[test]
 fn definite_imperative_object_is_blocked_as_an_unsupported_role() {
-    let source = "line. place the line.";
-    let document =
-        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
-    let result = associate_semantic_document(&document).unwrap();
+    for (source, expected_instruction_count, expected_candidate_count) in [
+        ("place the circle.", 0, 0),
+        ("ellipse. place the circle.", 1, 0),
+        ("circle. place the circle.", 1, 1),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_document(&document).unwrap();
 
-    assert_eq!(result.ast.instructions.len(), 1);
-    assert!(result.ast.continuations.is_empty());
-    assert_eq!(result.continuation_issues.len(), 1);
-    let issue = &result.continuation_issues[0];
-    assert_eq!(
-        issue.kind,
-        SemanticContinuationIssueKind::UnsupportedPredicate
-    );
-    assert_eq!(issue.marker.surface, "the");
-    assert_eq!(
-        issue
-            .instruction
-            .action
-            .as_ref()
-            .map(|term| term.identity.id.as_str()),
-        Some("place")
-    );
-    let head = issue.instruction.entity.head.source();
-    assert_eq!(&source[head.span.start_byte..head.span.end_byte], "line");
-    assert!(!result.ast.complete);
-    assert!(result.canonical_bytes.is_none());
+        assert_eq!(
+            result.ast.instructions.len(),
+            expected_instruction_count,
+            "{source}"
+        );
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert_eq!(result.continuation_issues.len(), 1, "{source}");
+        let issue = &result.continuation_issues[0];
+        assert_eq!(
+            issue.kind,
+            SemanticContinuationIssueKind::UnsupportedPredicate,
+            "{source}"
+        );
+        assert_eq!(issue.marker.surface, "the", "{source}");
+        assert_eq!(
+            issue
+                .instruction
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("place"),
+            "{source}"
+        );
+        let head = issue.instruction.entity.head.source();
+        assert_eq!(
+            &source[head.span.start_byte..head.span.end_byte],
+            "circle",
+            "{source}"
+        );
+        assert_eq!(
+            issue.candidate_targets.len(),
+            expected_candidate_count,
+            "{source}"
+        );
+        assert!(!result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_none(), "{source}");
+    }
 }
 
 #[test]

@@ -15,9 +15,11 @@ use crate::{
     SemanticContinuationTarget, SemanticCoordinationIssueKind, SemanticDocumentAst,
     SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead, SemanticInstruction,
     SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole, SemanticIssueCausalProvenance,
-    SemanticMacroParameterValue, SemanticRelationIssueKind, SemanticTerm, SourceOccurrence,
-    SourceSpan, associate_semantic_document_with_macro_binding, bind_macro_parameters,
-    derive_macro_seed, expand_macros, project_macro_semantic_ref,
+    SemanticMacroInvocationHead, SemanticMacroParameterValue, SemanticRelationIssueKind,
+    SemanticTerm, SourceOccurrence, SourceSpan, associate_semantic_document_with_macro_binding,
+    bind_macro_parameters, derive_macro_seed,
+    macro_expansion::{MacroExpansionSelection, expand_selected_macros},
+    project_macro_semantic_ref,
     semantic_document::exclusive_continuation_issue_claim_spans,
 };
 
@@ -394,15 +396,27 @@ pub fn compile_typed_ddl(
                 .expect("complete semantic document has canonical bytes"),
         )
         .expect("I-595 canonical JSON is UTF-8");
-        for complete in &binding.complete {
-            let resolved = &binding.macro_resolution.resolved[complete.invocation_index];
-            seeds.push(derive_macro_seed(
-                canonical,
-                &resolved.invocation,
-                composition_seed,
-            ));
+        let selection = semantic_macro_execution_selection(&semantic_document.ast, &binding);
+        if selection.is_valid_for(binding.complete.len()) {
+            for &binding_index in selection.execution_binding_indices() {
+                let Some(complete) = binding.complete.get(binding_index) else {
+                    continue;
+                };
+                let Some(resolved) = binding
+                    .macro_resolution
+                    .resolved
+                    .get(complete.invocation_index)
+                else {
+                    continue;
+                };
+                seeds.push(derive_macro_seed(
+                    canonical,
+                    &resolved.invocation,
+                    composition_seed,
+                ));
+            }
         }
-        let expanded = expand_macros(binding, definitions, &seeds, limits);
+        let expanded = expand_selected_macros(binding, definitions, &seeds, limits, selection);
         project_expansion_diagnostics(&document, &expanded, &mut projection);
         project_expanded_deliveries(&expanded, &mut projection);
         expansion = Some(expanded);
@@ -2690,6 +2704,99 @@ fn macro_expansion_kind(kind: MacroExpansionDiagnosticKind) -> &'static str {
             "expansion_provenance_ownership"
         }
     }
+}
+
+fn semantic_macro_execution_selection(
+    ast: &SemanticDocumentAst,
+    binding: &MacroParameterBindingResult,
+) -> MacroExpansionSelection {
+    let mut execution_binding_indices = Vec::new();
+    let mut explained_binding_indices = Vec::new();
+
+    for instruction in &ast.instructions {
+        let SemanticHead::MacroInvocation(head) = &instruction.entity.head else {
+            continue;
+        };
+        let Some(binding_index) = exact_macro_binding_index(head, binding) else {
+            return MacroExpansionSelection::invalid_owner_join();
+        };
+        execution_binding_indices.push(binding_index);
+        explained_binding_indices.push(binding_index);
+    }
+
+    for edge in &ast.continuations {
+        let SemanticHead::MacroInvocation(head) = &edge.reintroduced_head else {
+            continue;
+        };
+        let Some(target_instruction) = ast.instructions.get(edge.target_instruction_index) else {
+            return MacroExpansionSelection::invalid_owner_join();
+        };
+        let SemanticHead::MacroInvocation(target_head) = &target_instruction.entity.head else {
+            return MacroExpansionSelection::invalid_owner_join();
+        };
+        if !macro_head_matches_target(head, &edge.target)
+            || !macro_head_matches_target(target_head, &edge.target)
+        {
+            return MacroExpansionSelection::invalid_owner_join();
+        }
+        let Some(binding_index) = exact_macro_binding_index(head, binding) else {
+            return MacroExpansionSelection::invalid_owner_join();
+        };
+        explained_binding_indices.push(binding_index);
+    }
+
+    MacroExpansionSelection::exact(execution_binding_indices, explained_binding_indices)
+}
+
+fn exact_macro_binding_index(
+    head: &SemanticMacroInvocationHead,
+    binding: &MacroParameterBindingResult,
+) -> Option<usize> {
+    let mut matches =
+        binding
+            .complete
+            .iter()
+            .enumerate()
+            .filter_map(|(binding_index, complete)| {
+                let resolved = binding
+                    .macro_resolution
+                    .resolved
+                    .get(complete.invocation_index)?;
+                (complete.invocation_ordinal == head.provenance.ordinal
+                    && complete.clause_index == head.provenance.source.clause_index
+                    && complete.atom_index == head.provenance.source.atom_index
+                    && resolved.invocation.ordinal() == head.provenance.ordinal
+                    && resolved.span == head.provenance.source.span
+                    && resolved.clause_index == head.provenance.source.clause_index
+                    && resolved.atom_index == head.provenance.source.atom_index
+                    && resolved.invocation.qualified_name() == head.qualified_name
+                    && head.provenance.qualified_name.as_deref()
+                        == Some(head.qualified_name.as_str())
+                    && resolved.definition_identity == complete.definition_identity
+                    && complete.definition_identity.qualified_name() == head.qualified_name
+                    && complete.definition_identity.version() == head.definition_version
+                    && complete.definition_identity.full_digest_hex() == head.definition_digest
+                    && resolved.lock == head.lock)
+                    .then_some(binding_index)
+            });
+    let binding_index = matches.next()?;
+    matches.next().is_none().then_some(binding_index)
+}
+
+fn macro_head_matches_target(
+    head: &SemanticMacroInvocationHead,
+    target: &SemanticContinuationTarget,
+) -> bool {
+    matches!(
+        target,
+        SemanticContinuationTarget::MacroInvocation {
+            qualified_name,
+            definition_version,
+            definition_digest,
+        } if qualified_name == &head.qualified_name
+            && definition_version == &head.definition_version
+            && definition_digest == &head.definition_digest
+    )
 }
 
 fn valid_limits(limits: MacroExpansionLimits) -> bool {

@@ -3,11 +3,12 @@ use std::collections::HashSet;
 use inku_ddl::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, CompilerLockState, MacroDefinition, MacroExpansionLimits,
     MacroLock, NormalizedDdlDocument, RelationReferenceEvidenceAvailability,
-    ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDeliveryOwner, SemanticHead,
-    SemanticIssueCausalProvenance, SemanticUpstreamCausalRelation, TYPED_DDL_COMPILATION_SCHEMA_ID,
+    ResolvedInstructionLanguage, SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticContinuationTarget,
+    SemanticDeliveryOwner, SemanticHead, SemanticIssueCausalProvenance,
+    SemanticUpstreamCausalRelation, Stage15TargetPath, TYPED_DDL_COMPILATION_SCHEMA_ID,
     TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters, compile_typed_ddl,
     expanded_generated_provenance_canonical_bytes, expanded_meaning_canonical_bytes, saijiki_asset,
-    semantic_source_provenance_canonical_bytes,
+    semantic_source_provenance_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -2060,6 +2061,254 @@ fn successful_expanded_nodes_are_explicit_deliveries_without_entering_pre_expans
 }
 
 #[test]
+fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_delivery() {
+    let definition = center_emit_definition();
+    let cases = [
+        ("a red Focus.Center", 1, 0, vec![0], 3, 2),
+        ("a Focus.Center; the red Focus.Center", 1, 1, vec![0], 3, 2),
+        ("a Focus.Center; a red Focus.Center", 2, 0, vec![0, 1], 6, 4),
+        (
+            "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+            2,
+            1,
+            vec![0, 2],
+            6,
+            4,
+        ),
+    ];
+
+    for (source, instruction_count, continuation_count, execution_ordinals, emits, targets) in cases
+    {
+        let document = locked_document(source, ResolvedInstructionLanguage::En, &definition);
+        let accepted = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        let binding_ordinals = accepted
+            .complete
+            .iter()
+            .map(|binding| binding.invocation_ordinal)
+            .collect::<Vec<_>>();
+        let expected_binding_ordinals = match source {
+            "a red Focus.Center" => vec![0],
+            "a Focus.Center; the red Focus.Center" => vec![0, 1],
+            "a Focus.Center; a red Focus.Center" => vec![0, 1],
+            "a Focus.Center; the red Focus.Center; a blue Focus.Center" => vec![0, 1, 2],
+            _ => unreachable!(),
+        };
+        assert_eq!(binding_ordinals, expected_binding_ordinals, "{source}");
+
+        let result = compile_typed_ddl(
+            document,
+            std::slice::from_ref(&definition),
+            Some(19),
+            LIMITS,
+        );
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        assert!(result.holes.is_empty(), "{source}");
+        assert!(result.conflicts.is_empty(), "{source}");
+        assert!(result.blocking_diagnostics.is_empty(), "{source}");
+        assert_eq!(
+            result.accepted_parameter_binding(),
+            Some(&accepted),
+            "{source}"
+        );
+
+        let semantic = result.semantic_document.as_ref().unwrap();
+        assert_eq!(
+            semantic.ast.instructions.len(),
+            instruction_count,
+            "{source}"
+        );
+        assert_eq!(
+            semantic.ast.continuations.len(),
+            continuation_count,
+            "{source}"
+        );
+        if let Some(edge) = semantic.ast.continuations.first() {
+            assert_eq!(edge.target_instruction_index, 0, "{source}");
+            assert_eq!(edge.marker.surface, "the", "{source}");
+            assert_eq!(
+                &source[edge.marker.span.start_byte..edge.marker.span.end_byte],
+                "the",
+                "{source}"
+            );
+            assert_eq!(
+                edge.reintroduced_head.source().surface,
+                "Focus.Center",
+                "{source}"
+            );
+            assert!(
+                matches!(
+                    &edge.target,
+                    SemanticContinuationTarget::MacroInvocation {
+                        qualified_name,
+                        definition_version,
+                        definition_digest,
+                    } if qualified_name == "Focus.Center"
+                        && definition_version == "1.0.0"
+                        && definition_digest == definition.identity().unwrap().full_digest_hex()
+                ),
+                "{source}"
+            );
+            assert_eq!(
+                &source[edge.reintroduced_head.source().span.start_byte
+                    ..edge.reintroduced_head.source().span.end_byte],
+                "Focus.Center",
+                "{source}"
+            );
+            assert!(
+                source[edge.predicate_span.start_byte..edge.predicate_span.end_byte]
+                    .contains("red"),
+                "{source}"
+            );
+        }
+        assert_eq!(
+            semantic
+                .ast
+                .instructions
+                .iter()
+                .filter(|instruction| {
+                    instruction
+                        .entity
+                        .color
+                        .as_ref()
+                        .is_some_and(|color| color.identity.id == "red")
+                })
+                .count(),
+            1,
+            "{source}"
+        );
+        if continuation_count == 1 {
+            assert_eq!(
+                semantic.ast.instructions[0]
+                    .entity
+                    .color
+                    .as_ref()
+                    .map(|color| color.identity.id.as_str()),
+                Some("red"),
+                "{source}"
+            );
+        }
+
+        let expansion = result.macro_expansion.as_ref().unwrap();
+        assert_eq!(&expansion.parameter_binding, &accepted, "{source}");
+        assert!(expansion.diagnostics.is_empty(), "{source}");
+        assert_eq!(
+            result
+                .derived_seeds
+                .iter()
+                .map(|seed| seed.ordinal())
+                .collect::<Vec<_>>(),
+            execution_ordinals,
+            "{source}"
+        );
+        assert_eq!(
+            expansion
+                .expanded
+                .iter()
+                .map(|invocation| invocation.provenance.invocation_ordinal)
+                .collect::<Vec<_>>(),
+            execution_ordinals,
+            "{source}"
+        );
+        assert_eq!(
+            expansion
+                .expanded
+                .iter()
+                .map(|invocation| invocation.nodes.len())
+                .sum::<usize>(),
+            emits,
+            "{source}"
+        );
+        assert!(expansion.expanded.iter().all(|invocation| {
+            &source[invocation.provenance.source_span.start_byte
+                ..invocation.provenance.source_span.end_byte]
+                == "Focus.Center"
+        }));
+
+        let lock = result.compiler_lock.as_ref().unwrap();
+        let definition_identity = definition.identity().unwrap();
+        assert_eq!(lock.definition_identities.len(), 1, "{source}");
+        assert_eq!(
+            lock.definition_identities[0].qualified_name,
+            definition_identity.qualified_name(),
+            "{source}"
+        );
+        assert_eq!(
+            lock.definition_identities[0].version,
+            definition_identity.version(),
+            "{source}"
+        );
+        assert_eq!(
+            lock.definition_identities[0].resolved_definition_digest,
+            Some(definition_identity.full_digest_hex().to_owned()),
+            "{source}"
+        );
+        assert_eq!(
+            lock.macro_seeds
+                .iter()
+                .map(|seed| seed.ordinal)
+                .collect::<Vec<_>>(),
+            execution_ordinals,
+            "{source}"
+        );
+        assert_eq!(
+            lock.semantic_source_provenance_digest,
+            Some(sha256(&semantic_source_provenance_canonical_bytes(
+                &semantic.ast,
+            ))),
+            "{source}"
+        );
+        assert_eq!(
+            lock.expanded_generated_provenance_digest,
+            Some(sha256(&expanded_generated_provenance_canonical_bytes(
+                expansion,
+            ))),
+            "{source}"
+        );
+
+        let transformed =
+            transform_stage15(stage15_transformation_input(&result).unwrap(), None).unwrap();
+        assert_eq!(
+            transformed.original_semantic_document(),
+            &semantic.ast,
+            "{source}"
+        );
+        assert_eq!(
+            transformed.original_expanded_invocations(),
+            expansion.expanded.as_slice(),
+            "{source}"
+        );
+        assert_eq!(transformed.targets().len(), targets, "{source}");
+        let target_ordinals = transformed
+            .targets()
+            .iter()
+            .map(|target| match &target.path {
+                Stage15TargetPath::MacroEmit {
+                    invocation_ordinal,
+                    generated_ordinal,
+                    field,
+                    ..
+                } if field == "place" && matches!(generated_ordinal, 0 | 1) => *invocation_ordinal,
+                other => panic!("unexpected Focus.Center target {other:?}: {source}"),
+            })
+            .collect::<Vec<_>>();
+        for ordinal in execution_ordinals {
+            assert_eq!(
+                target_ordinals
+                    .iter()
+                    .filter(|candidate| **candidate == ordinal)
+                    .count(),
+                2,
+                "{source}: ordinal {ordinal}"
+            );
+        }
+    }
+}
+
+#[test]
 fn incomplete_structured_document_retains_binding_and_does_not_seed_or_expand() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
@@ -2162,6 +2411,12 @@ fn fixture_definition(fixture: &Fixture) -> MacroDefinition {
 
 fn definition_from(value: &str) -> MacroDefinition {
     MacroDefinition::from_json(value).unwrap()
+}
+
+fn center_emit_definition() -> MacroDefinition {
+    definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+    )
 }
 
 fn compile(

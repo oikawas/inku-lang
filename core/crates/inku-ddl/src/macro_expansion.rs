@@ -203,6 +203,70 @@ pub struct MacroExpansionResult {
     pub diagnostics: Vec<MacroExpansionDiagnostic>,
 }
 
+/// Compiler-private selection over the complete accepted binding set. Every binding remains
+/// explained even when a continuation mention is not an execution owner.
+#[derive(Clone, Debug)]
+pub(crate) struct MacroExpansionSelection {
+    execution_binding_indices: Vec<usize>,
+    explained_binding_indices: Vec<usize>,
+    valid_owner_join: bool,
+}
+
+impl MacroExpansionSelection {
+    pub(crate) fn all_complete(binding_count: usize) -> Self {
+        let indices = (0..binding_count).collect::<Vec<_>>();
+        Self {
+            execution_binding_indices: indices.clone(),
+            explained_binding_indices: indices,
+            valid_owner_join: true,
+        }
+    }
+
+    pub(crate) fn exact(
+        execution_binding_indices: Vec<usize>,
+        explained_binding_indices: Vec<usize>,
+    ) -> Self {
+        Self {
+            execution_binding_indices,
+            explained_binding_indices,
+            valid_owner_join: true,
+        }
+    }
+
+    pub(crate) fn invalid_owner_join() -> Self {
+        Self {
+            execution_binding_indices: Vec::new(),
+            explained_binding_indices: Vec::new(),
+            valid_owner_join: false,
+        }
+    }
+
+    pub(crate) fn execution_binding_indices(&self) -> &[usize] {
+        &self.execution_binding_indices
+    }
+
+    pub(crate) fn is_valid_for(&self, binding_count: usize) -> bool {
+        if !self.valid_owner_join {
+            return false;
+        }
+        let execution = self
+            .execution_binding_indices
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let explained = self
+            .explained_binding_indices
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        execution.len() == self.execution_binding_indices.len()
+            && explained.len() == self.explained_binding_indices.len()
+            && explained.len() == binding_count
+            && explained.iter().copied().eq(0..binding_count)
+            && execution.iter().all(|index| explained.contains(index))
+    }
+}
+
 /// Expand complete I-581 bindings using only exact caller definitions, seeds, and limits.
 pub fn expand_macros(
     parameter_binding: MacroParameterBindingResult,
@@ -210,10 +274,39 @@ pub fn expand_macros(
     seeds: &[MacroSeed],
     limits: MacroExpansionLimits,
 ) -> MacroExpansionResult {
+    let selection = MacroExpansionSelection::all_complete(parameter_binding.complete.len());
+    expand_macros_with_selection(parameter_binding, definitions, seeds, limits, selection)
+}
+
+/// Compiler-only expansion entry. The accepted binding is retained whole while only selected
+/// semantic execution owners receive seeds and evaluate definition bodies.
+pub(crate) fn expand_selected_macros(
+    parameter_binding: MacroParameterBindingResult,
+    definitions: &[MacroDefinition],
+    seeds: &[MacroSeed],
+    limits: MacroExpansionLimits,
+    selection: MacroExpansionSelection,
+) -> MacroExpansionResult {
+    expand_macros_with_selection(parameter_binding, definitions, seeds, limits, selection)
+}
+
+fn expand_macros_with_selection(
+    parameter_binding: MacroParameterBindingResult,
+    definitions: &[MacroDefinition],
+    seeds: &[MacroSeed],
+    limits: MacroExpansionLimits,
+    selection: MacroExpansionSelection,
+) -> MacroExpansionResult {
     let mut diagnostics = Vec::new();
     if !limits.is_valid() {
         diagnostics.push(global_diagnostic(
             MacroExpansionDiagnosticKind::InvalidLimits,
+        ));
+        return result(parameter_binding, Vec::new(), diagnostics);
+    }
+    if !selection.is_valid_for(parameter_binding.complete.len()) {
+        diagnostics.push(global_diagnostic(
+            MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
         ));
         return result(parameter_binding, Vec::new(), diagnostics);
     }
@@ -242,24 +335,54 @@ pub fn expand_macros(
     let mut accounted_seed_indices = BTreeSet::new();
     let mut seen_invocations = BTreeSet::new();
     let mut total_nodes = 0_u64;
+    let selected_binding_indices = selection
+        .execution_binding_indices
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut validated_bindings = Vec::with_capacity(parameter_binding.complete.len());
 
     for (binding_index, binding) in parameter_binding.complete.iter().enumerate() {
-        for (seed_index, seed) in seeds.iter().enumerate() {
-            if seed_matches_binding(seed, binding) {
-                accounted_seed_indices.insert(seed_index);
-            }
-        }
         if !seen_invocations.insert(binding.invocation_index) {
             diagnostics.push(invocation_diagnostic(
                 MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
                 binding,
                 Vec::new(),
             ));
+            validated_bindings.push(None);
             continue;
         }
+        match validate_binding_identity(&parameter_binding, binding_index, definitions) {
+            Ok(validated) => {
+                if !selected_binding_indices.contains(&binding_index) {
+                    let definition = &definitions[validated.definition_index];
+                    if let Err(error) = root_environment(&parameter_binding, binding, definition) {
+                        diagnostics.push(invocation_diagnostic(error.kind, binding, error.path));
+                    }
+                }
+                validated_bindings.push(Some(validated));
+            }
+            Err(error) => {
+                diagnostics.push(invocation_diagnostic(error.kind, binding, error.path));
+                validated_bindings.push(None);
+            }
+        }
+    }
+
+    for &binding_index in &selection.execution_binding_indices {
+        let binding = &parameter_binding.complete[binding_index];
+        for (seed_index, seed) in seeds.iter().enumerate() {
+            if seed_matches_binding(seed, binding) {
+                accounted_seed_indices.insert(seed_index);
+            }
+        }
+        let Some(validated) = &validated_bindings[binding_index] else {
+            continue;
+        };
         match prepare_invocation(
             &parameter_binding,
             binding_index,
+            validated,
             definitions,
             seeds,
             limits,
@@ -345,13 +468,17 @@ struct PreparedInvocation {
     identity: MacroDefinitionIdentity,
 }
 
-fn prepare_invocation(
+#[derive(Clone, Debug)]
+struct ValidatedBinding {
+    definition_index: usize,
+    identity: MacroDefinitionIdentity,
+}
+
+fn validate_binding_identity(
     parameter_binding: &MacroParameterBindingResult,
     binding_index: usize,
     definitions: &[MacroDefinition],
-    seeds: &[MacroSeed],
-    limits: MacroExpansionLimits,
-) -> Result<PreparedInvocation, EvalError> {
+) -> Result<ValidatedBinding, EvalError> {
     let binding = &parameter_binding.complete[binding_index];
     let resolved = parameter_binding
         .macro_resolution
@@ -401,6 +528,25 @@ fn prepare_invocation(
         ));
     };
 
+    Ok(ValidatedBinding {
+        definition_index: *definition_index,
+        identity: (*identity).clone(),
+    })
+}
+
+fn prepare_invocation(
+    parameter_binding: &MacroParameterBindingResult,
+    binding_index: usize,
+    validated: &ValidatedBinding,
+    definitions: &[MacroDefinition],
+    seeds: &[MacroSeed],
+    limits: MacroExpansionLimits,
+) -> Result<PreparedInvocation, EvalError> {
+    let binding = &parameter_binding.complete[binding_index];
+    let resolved = &parameter_binding.macro_resolution.resolved[binding.invocation_index];
+    let definition_index = validated.definition_index;
+    let identity = &validated.identity;
+
     let matching_seed_indices = seeds
         .iter()
         .enumerate()
@@ -428,7 +574,7 @@ fn prepare_invocation(
         }
     };
 
-    let definition = &definitions[*definition_index];
+    let definition = &definitions[definition_index];
     let environment = root_environment(parameter_binding, binding, definition)?;
     let provenance = invocation_provenance(binding, resolved.span, identity, &seeds[seed_index]);
     let mut evaluator = Evaluator::new(definition, &seeds[seed_index], limits, provenance, false);
@@ -436,7 +582,7 @@ fn prepare_invocation(
 
     Ok(PreparedInvocation {
         binding_index,
-        definition_index: *definition_index,
+        definition_index,
         seed_index,
         node_count: evaluator.nodes,
         identity: identity.clone(),
@@ -1285,4 +1431,155 @@ pub fn macro_vary_choice_hash_input(
 fn append_length_prefixed(output: &mut Vec<u8>, value: &[u8]) {
     output.extend_from_slice(&(value.len() as u64).to_be_bytes());
     output.extend_from_slice(value);
+}
+
+#[cfg(test)]
+mod execution_owner_tests {
+    use super::*;
+    use crate::{
+        MacroInvocation, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
+        bind_macro_parameters, derive_macro_seed,
+    };
+
+    const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
+        max_invocations: 16,
+        max_depth: 16,
+        max_evaluation_steps: 1_000,
+        max_nodes_per_invocation: 100,
+        max_total_nodes: 500,
+    };
+
+    #[test]
+    fn execution_owner_selection_blocks_invalid_duplicate_and_mismatched_ownership() {
+        let (binding, definition, seed) = fixture("Focus.Center");
+        for selection in [
+            MacroExpansionSelection::exact(vec![1], vec![0]),
+            MacroExpansionSelection::exact(vec![0, 0], vec![0]),
+            MacroExpansionSelection::exact(vec![0], Vec::new()),
+            MacroExpansionSelection::invalid_owner_join(),
+        ] {
+            let result = expand_selected_macros(
+                binding.clone(),
+                std::slice::from_ref(&definition),
+                std::slice::from_ref(&seed),
+                LIMITS,
+                selection,
+            );
+            assert!(result.expanded.is_empty());
+            assert!(has_diagnostic(
+                &result,
+                MacroExpansionDiagnosticKind::BindingOwnershipMismatch
+            ));
+        }
+
+        let mut mismatched = binding.clone();
+        mismatched.complete[0].invocation_ordinal += 1;
+        let result = expand_selected_macros(
+            mismatched,
+            std::slice::from_ref(&definition),
+            std::slice::from_ref(&seed),
+            LIMITS,
+            MacroExpansionSelection::all_complete(1),
+        );
+        assert!(result.expanded.is_empty());
+        assert!(has_diagnostic(
+            &result,
+            MacroExpansionDiagnosticKind::BindingOwnershipMismatch
+        ));
+    }
+
+    #[test]
+    fn execution_owner_selection_requires_exact_seeds_and_retains_source_invocation_budget() {
+        let (binding, definition, seed) = fixture("Focus.Center");
+        let missing = expand_selected_macros(
+            binding.clone(),
+            std::slice::from_ref(&definition),
+            &[],
+            LIMITS,
+            MacroExpansionSelection::all_complete(1),
+        );
+        assert!(missing.expanded.is_empty());
+        assert!(has_diagnostic(
+            &missing,
+            MacroExpansionDiagnosticKind::MissingSeed
+        ));
+
+        let duplicate = expand_selected_macros(
+            binding.clone(),
+            std::slice::from_ref(&definition),
+            &[seed.clone(), seed.clone()],
+            LIMITS,
+            MacroExpansionSelection::all_complete(1),
+        );
+        assert!(duplicate.expanded.is_empty());
+        assert!(has_diagnostic(
+            &duplicate,
+            MacroExpansionDiagnosticKind::DuplicateSeed
+        ));
+
+        let other = MacroInvocation::new("Other", "Center", 0).unwrap();
+        let crossed = derive_macro_seed("Focus.Center", &other, Some(19));
+        let mismatched = expand_selected_macros(
+            binding.clone(),
+            std::slice::from_ref(&definition),
+            &[seed.clone(), crossed],
+            LIMITS,
+            MacroExpansionSelection::all_complete(1),
+        );
+        assert!(mismatched.expanded.is_empty());
+        assert!(has_diagnostic(
+            &mismatched,
+            MacroExpansionDiagnosticKind::MismatchedSeed
+        ));
+
+        let (referenced_binding, referenced_definition, referenced_seed) =
+            fixture("Focus.Center; the Focus.Center");
+        assert_eq!(
+            referenced_binding
+                .macro_resolution
+                .recognized_occurrence_count,
+            2
+        );
+        assert_eq!(referenced_binding.complete.len(), 2);
+        let budgeted = expand_selected_macros(
+            referenced_binding,
+            std::slice::from_ref(&referenced_definition),
+            std::slice::from_ref(&referenced_seed),
+            MacroExpansionLimits {
+                max_invocations: 1,
+                ..LIMITS
+            },
+            MacroExpansionSelection::exact(vec![0], vec![0, 1]),
+        );
+        assert!(budgeted.expanded.is_empty());
+        assert!(has_diagnostic(
+            &budgeted,
+            MacroExpansionDiagnosticKind::InvocationBudget
+        ));
+    }
+
+    fn fixture(source: &str) -> (MacroParameterBindingResult, MacroDefinition, MacroSeed) {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}"#,
+        )
+        .unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap();
+        let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        let resolved = &binding.macro_resolution.resolved[0];
+        let seed = derive_macro_seed(source, &resolved.invocation, Some(19));
+        (binding, definition, seed)
+    }
+
+    fn has_diagnostic(result: &MacroExpansionResult, kind: MacroExpansionDiagnosticKind) -> bool {
+        result.diagnostics.iter().any(|item| item.kind == kind)
+    }
 }

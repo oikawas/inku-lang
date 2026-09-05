@@ -7,7 +7,7 @@ use inku_ddl::{
     Stage15TransformError, Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl,
     compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
     expanded_meaning_canonical_bytes, geometry_resolution_policy_digest,
-    stage15_transformation_input, transform_stage15,
+    semantic_source_provenance_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -255,6 +255,57 @@ fn step9i_input_boundary_checks_language_evidence_but_allows_empty_source() {
     let result = transform_stage15(input, None).unwrap();
     assert!(result.targets().is_empty());
     assert_eq!(result.composition_seed(), Some(0));
+}
+
+#[test]
+fn explicit_geometry_and_numeric_position_language_evidence_is_checked() {
+    let source =
+        "place one red pen solid empty circle with radius 0.25 at horizontal 0.5, vertical 0.5.";
+    let control = compile(source, ResolvedInstructionLanguage::En, &[], None, LIMITS);
+    assert!(stage15_transformation_input(&control).is_ok());
+
+    let mut geometry_mismatch = control.clone();
+    let geometry = geometry_mismatch
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .entity
+        .explicit_geometry
+        .as_mut()
+        .unwrap();
+    let inku_ddl::SemanticExplicitGeometry::Radius(value) = geometry else {
+        panic!("control has radius geometry");
+    };
+    value.keyword_provenance.language = ResolvedInstructionLanguage::Ja;
+    value.decimal.provenance.language = ResolvedInstructionLanguage::Ja;
+    refresh_semantic_source_provenance_and_full_lock(&mut geometry_mismatch);
+    assert_eq!(
+        stage15_transformation_input(&geometry_mismatch),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
+    );
+
+    let mut position_mismatch = control;
+    let position = position_mismatch
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .entity
+        .numeric_position
+        .as_mut()
+        .unwrap();
+    position.x.keyword_provenance.language = ResolvedInstructionLanguage::Ja;
+    position.x.decimal.provenance.language = ResolvedInstructionLanguage::Ja;
+    position.y.keyword_provenance.language = ResolvedInstructionLanguage::Ja;
+    position.y.decimal.provenance.language = ResolvedInstructionLanguage::Ja;
+    refresh_semantic_source_provenance_and_full_lock(&mut position_mismatch);
+    assert_eq!(
+        stage15_transformation_input(&position_mismatch),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
+    );
 }
 
 #[test]
@@ -1469,6 +1520,16 @@ fn replacement_center_definition() -> MacroDefinition {
 
 fn refresh_full_lock(compilation: &mut inku_ddl::TypedDdlCompilation) {
     let lock = compilation.compiler_lock.as_mut().unwrap();
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+}
+
+fn refresh_semantic_source_provenance_and_full_lock(
+    compilation: &mut inku_ddl::TypedDdlCompilation,
+) {
+    let semantic = compilation.semantic_document.as_ref().unwrap();
+    let digest = sha256(&semantic_source_provenance_canonical_bytes(&semantic.ast));
+    let lock = compilation.compiler_lock.as_mut().unwrap();
+    lock.semantic_source_provenance_digest = Some(digest);
     lock.full_digest = sha256(&compiler_lock_hash_input(lock));
 }
 

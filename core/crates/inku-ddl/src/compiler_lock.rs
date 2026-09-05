@@ -2292,6 +2292,14 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         }
     }
 
+    fn push_geometry_value<'a>(
+        occurrences: &mut Vec<&'a SourceOccurrence>,
+        value: &'a crate::SemanticGeometryValue,
+    ) {
+        occurrences.push(&value.keyword_provenance);
+        occurrences.push(&value.decimal.provenance);
+    }
+
     fn push_entity<'a>(
         occurrences: &mut Vec<&'a SourceOccurrence>,
         entity: &'a crate::SemanticEntity,
@@ -2328,6 +2336,23 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             .into_iter()
             .flatten(),
         );
+        if let Some(geometry) = &entity.explicit_geometry {
+            match geometry {
+                crate::SemanticExplicitGeometry::Radius(value)
+                | crate::SemanticExplicitGeometry::Diameter(value)
+                | crate::SemanticExplicitGeometry::Side(value) => {
+                    push_geometry_value(occurrences, value);
+                }
+                crate::SemanticExplicitGeometry::WidthHeight { width, height } => {
+                    push_geometry_value(occurrences, width);
+                    push_geometry_value(occurrences, height);
+                }
+            }
+        }
+        if let Some(position) = &entity.numeric_position {
+            push_geometry_value(occurrences, &position.x);
+            push_geometry_value(occurrences, &position.y);
+        }
     }
 
     let mut occurrences = Vec::new();

@@ -45,7 +45,7 @@ design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 
 Derived projects share the `inku-` prefix:
 
-- `inku-core` -- the shared cross-platform core: the Typed Compiler and Renderer implemented in Rust
+- `inku-core` -- the shared Rust core. The server uses its Renderer in the current runtime; the Typed Compiler is an accepted foundation that is not yet connected to the runtime
 - `inku-saijiki` -- the vocabulary dictionary, aiming to be minimal yet sufficient
 - `inku-plugin` -- drawing-extension plugins; they do not extend the vocabulary and act as macro sets
 - `inku-web` -- the container-based web UI implementation
@@ -102,7 +102,7 @@ It rests on three pillars of constraint:
 3. **Emotional vocabulary is excluded** — use numbers and the vocabulary of physical materials rather than words such as "beautifully."
 4. **There is no fixed size** — size and position are expressed relative to a reference edge, not as absolute pixel values. The work scales to a wall as readily as to a screen. **The aspect ratio is not fixed either** — it is a constraint that shapes the world of the work, not a dimension the description carries.
 5. **Output is a still image** — the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
-6. **Prose is converted into normalized DDL and validated by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation.
+6. **The design converts prose into normalized DDL for validation by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation. The Typed Compiler foundation is accepted but is not yet connected to the current runtime; §12 describes the active generation path.
 7. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (see "Principles that outlast a version" in the [render engine version history](docs/spec/render-engine-history.md)).
 
 DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
@@ -333,7 +333,7 @@ is shorthand, not a new capability.
 
 The canonical owner of Canvas is the shared-core `inku.canvas-format-registry.v1`, not a vocabulary plugin or a system plugin. Canvas selection is a resolved host option outside visible DDL and MacroInvocation / MacroDefinition. The same DDL can be used on different canvases. A host boundary with no selection may choose `square` as its host default, but that does not mean the DDL compiler inserts `square` as a semantic fact. The host carries the selection through Score / render context / history, and the Renderer resolves SVG `width`, `height`, and `viewBox` (§19).
 
-The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls are read-compatibility surfaces, not semantic authority or a new authoring / loading API. Their retirement and the runtime / UI cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as legacy compatibility operations. They permit reads as well as updates to legacy plugin documents and enabled state. That does not make them semantic authority or a new MacroDefinition authoring / loading API. Their retirement and the runtime / UI cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
 
 ### 4.5 Expansion Through MacroDefinition
 
@@ -358,13 +358,15 @@ the drawing core.  The drawing core carries a heavier responsibility and is
 treated separately, as the **Render Engine**.
 
 A render engine is the boundary that takes `JSON Score + render options +
-server-owned color metadata` and returns `SVG + render metadata`.  The current
-`renderer.py` is the `default` engine.
+server-owned color metadata` and returns `SVG + render metadata`.  In the
+current server runtime, `renderer.py` is an SVG-only compatibility facade over
+the default engine; a thin adapter sends one request containing the validated
+Score and resolved options to the native `inku_render` binding.
 
-The deterministic layer is a single Rust package whose implementation is shared
-by the Linux container, iOS, and Android.  Android test implementation showed
-that, for a complex drawing core, a cross-platform approach other than a shared
-component is impractical.
+The deterministic rendering core is the Rust crate `core/crates/inku-render`.
+It is accepted as a portability boundary that hosts can share, while each host
+binding and runtime cutover is established separately.  The portability intent
+alone does not claim that another execution path is installed or live.
 
 The canonical metadata format read by history, the JSON tab, the CLI, and the
 benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
@@ -460,9 +462,11 @@ writes         interprets       expands        structures    draws
 - **Description**: the human layer.  Written as natural sentences in the
   author's own language; tanka-like brevity is encouraged.  It is a poetic
   layer standing one step above the executable specification.
-- **Normalized DDL**: the executable specification, in core vocabulary only.
-  Stage 1 transcribes it from the description (there is also an entrance for
-  writing DDL directly).
+- **Normalized DDL**: the executable specification Stage 1 transcribes from
+  the description (there is also an entrance for writing DDL directly). An
+  enabled vocabulary plugin may appear here as a qualified `Namespace.Heading`
+  term. Plugin expansion deterministically writes that term down to core DDL
+  immediately after Stage 1; Stage 1.5 and Stage 2 read the expanded DDL.
 - **JSON Score**: the score in between.  Language-independent and
   machine-readable.
 - **SVG**: the result of the performance.  It happens once.  The description
@@ -543,9 +547,9 @@ What to do about DDL in Japanese, in English, and in other languages.
 
 | Layer | Language |
 |---|---|
-| DDL text (the layer humans write) | the author's own language (Japanese, English, others) |
+| DDL text (the layer humans write) | Japanese and English are implemented. Another language is accepted only after its support is added to the Instruction Language Registry. |
 | JSON Score (the layer machines read) | English keys throughout |
-| LLM (the converting layer) | multilingual understanding |
+| LLM (the converting layer) | uses the Stage 1 / Stage 2 prompts of the registered language |
 
 ### 6.3 Why the Design Is That Way
 
@@ -840,11 +844,11 @@ The web app is the current reference interface. v1.72 makes refinement and model
 
 Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser.
 
-Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog.
+Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. **Touch is an exception: the writer enters words for the touch and receives one candidate only. The same words produce the same touch seed, so four touch candidates are not offered.**
 
 Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover.
 
-Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates.
+Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. A touch candidate derives its seed from the words the writer enters. Display rendering makes touch-seed changes visible without changing canonical composition coordinates.
 
 A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs.
 
@@ -854,15 +858,16 @@ Adjustment candidates are temporary state owned by their source work: explicitly
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
-Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: drawing elements, description, DDL, model, autonomous refinement, and moving the work to trash (item labels are shortened to the target noun). The dialogs opened by the two comparison actions are titled "Edit drawing elements" and "Edit models". Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The two comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
+Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: Edit drawing parameters, Edit the description, Edit instructions, Change the sketch-from-life grain, Change models, and Autonomous refinement process. DDL-authored works omit Edit the description, Change the sketch-from-life grain, and Change models. Edit drawing parameters and Change models target the selected card and open the corresponding existing Refine subview without duplicating comparison logic. Description and instruction editing open dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry.
 
 Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user
   menu, profile, settings, language and theme controls
 - Input panel: drawing, batch, and demo modes
-- DDL editor: editable normalized DDL embedded in the drawing flow, with
-  Saijiki word highlighting and an expanded dialog editor
+- DDL display and editing: read-only normalized DDL in the drawing flow, with
+  word highlighting, expanded DDL display, and `Draw from DDL`; editing happens
+  in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
   which information is printed under each thumbnail** — up to two of generation, model, engine version
@@ -998,6 +1003,10 @@ touch, composition as layout, and interpretation as reading.  How the Refine tab
 realizes this — the five refinement kinds, model comparison, and the Lineage
 card menu — is in §7.8, "The Reference Web
 Application."
+
+Touch refinement is the exception to the one-or-four candidate control: the
+writer enters words for the touch, and the same words produce the same touch
+seed, so it produces one candidate only.
 
 ---
 
@@ -2206,11 +2215,11 @@ point of the chain and as information.
 
 A relation that cannot be resolved — the preceding element is a background fill
 with no contour, say — is dropped by the validator or by coerce, with a warning
-recorded.  Unresolvability that becomes apparent only at performance time
-(degenerate geometry, grid placement, a preceding element with no endpoints) is
-likewise dropped by the renderer with a warning recorded (v1.94).  The
-instruction is then drawn with ordinary placement and no relation — graceful
-degradation.
+recorded. Unresolvability that becomes apparent only at performance drops the
+relation and leaves ordinary placement. Warning-class failures, such as a grid
+layout consuming a relation, record a structured warning. Canonically silent
+fallbacks, including missing prior bounds and designated degenerate geometry,
+drop the relation without a warning.
 
 ### 14.5 The Owner of Relations
 
@@ -2472,7 +2481,7 @@ in `color_hint` for catalog-based rendering.
 
 Relations are sequential. `along`, `not_touching`, `cutting`, and `touching` refer to the immediately previous instruction; `between` refers to the previous two. There are no arbitrary ids, forward references, or repair governors for relations. Invalid relations are dropped by validation or coercion with a recorded warning, and the instruction is rendered normally without the relation. The coerce layer may remove invalid relations but must not add new ones. JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, `前の二つの間に` / `between the previous two`, and the explicit contact phrases `前の線に触れる` / `touching the previous line` or `前の弧に両端で触れる` / `touching the previous arc at both ends`. Touching is never added spontaneously. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
 
-An instruction that carries both a region (`at`) and a relation (such as plugin-member double arcs) is placed by its region first and then resolved by its relation (v1.94); for touching, the previous instruction’s endpoints decide the final position, so the region acts as chain-start information. Unresolvable relations discovered only at performance time (degenerate geometry, grid layouts, endpointless priors) are likewise dropped with a recorded warning.
+An instruction that carries both a region (`at`) and a relation (such as plugin-member double arcs) is placed by its region first and then resolved by its relation (v1.94); for touching, the previous instruction’s endpoints decide the final position, so the region acts as chain-start information. Relations discovered unresolvable only at performance are dropped. Warning-class failures, such as a grid layout consuming a relation, record a structured warning; canonically silent fallbacks, including missing prior bounds and designated degenerate geometry, drop the relation without a warning.
 
 For `touching`, both the current and previous instruction must be a line or arc. The renderer takes the previous instruction’s performed endpoints and pins the current endpoints to them. For an arc with chord length `c` and signed performed sagitta `b`, it reconstructs the minor arc with `r=c²/(8|b|)+|b|/2`; its center lies opposite the bulge, and a previous arc makes the new arc bulge to the opposite side by default. Minor-arc winding uses the same shared convention as SVG arc rendering. Sway and stroke performance keep both endpoints fixed and act only on the interior. Closed forms and endpointless targets are rejected drop-only with a recorded warning. Degenerate performed geometry also drops the relation at render time; no coordinate repair or governor is introduced.
 
@@ -2525,33 +2534,18 @@ of their axes. This decision follows the single
 
 ### The Resolution of a Number (the Master Grid)
 
-**Every number written into an SVG attribute carries six decimal places.**  SVG
-scales freely, but the numbers written into it are fixed-point, so this is the
-master resolution of a performance (1e-9 of the canvas on a 1000-unit canvas).
-The digits are not decided at each place that writes one: they are **forced at a
-single point on the way out**, over every attribute.  Only `version`, `class`,
-and `id` are exempt, because those are identifiers rather than measurements.
+The Renderer’s shared `format_number` boundary rounds a number to six fractional
+places, normalizes `-0.0` to `0`, and removes trailing zeroes and a dangling
+decimal point. The representation is therefore not fixed-width: an emitted
+value has at most six fractional digits and may be an integer. The current
+contract defines numeric rounding, not a fixed-width lexical form or a
+`-?\d+\.\d{6}` guarantee.
 
-- **The floor is reproducibility.**  The difference between platform libm
-  implementations is 1e-13 on a 1000-unit coordinate, four digits below this
-  grid, so every machine performs the same string.
-- **The ceiling is physical.**  Blown up to a 100m wall the step is 100nm, finer
-  than the wavelength of visible light.
-- **Trailing zeros are not trimmed** (author's ruling, 2026-07-24).  With the
-  width fixed, every number in an artifact matches `-?\d+\.\d{6}`, so sitting on
-  the grid is machine-checkable with one regular expression.  Trimmed, the
-  output no longer distinguishes a value that was rounded from a raw float.
-
-**Six is the specification; the digits are not lowered to write fewer bytes**
-(author's ruling, 2026-08-16).  **The grid covers the settings of the texture
-filters as well as coordinates, so lowering it changes the picture.**  Measured
-on a production-scale work at 1618px, three decimals moved 19.52 percent of the
-pixels; holding the filter values at six brought that down to 0.50 percent.  At
-two decimals the coordinates move on their own -- 17.52 percent of the pixels in
-a fill, 48.57 percent in the production work -- because a coarse grid gathers
-onto shared points the marks the hand had scattered.  **What moves is where the
-grain sits, not how much ink there is.**  What lowering the digits buys is bytes:
-31.9 percent of the gzipped transfer at three decimals, 44.1 percent at two.
+**Keep the precision of rounding to six fractional places; do not lower it to
+write fewer bytes.** Reducing numeric precision in coordinates or texture-filter
+settings can change the drawing, unlike removing trailing zeroes to write the
+same value more compactly. Historical precision-comparison measurements are
+recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -2560,13 +2554,13 @@ grain sits, not how much ink there is.**  What lowering the digits buys is bytes
 ### Single Drawing
 
 The user writes one instruction and runs the full pipeline.  The resulting DDL
-can be edited directly.  Replaying from DDL skips Stage 1 and calls Stage 2 /
-renderer again.
+is inspected in a read-only interpretation box and edited directly in the DDL
+editor dialog. Replaying from DDL skips Stage 1 and calls Stage 2 / renderer
+again.
 
-The normalized DDL appears as an interpretation box under the single drawing
-input.  The box supports two editing paths:
+The normalized DDL appears as a **read-only interpretation box** under the
+single drawing input.
 
-- direct inline editing in the highlighted interpretation box
 - the `Saijiki` toggle, placed on the canvas toolbar since v1.98, opens the
   side drawer as a browse-only vocabulary reference: clicking a word chip
   shows its preview instead of inserting it
@@ -2574,23 +2568,16 @@ input.  The box supports two editing paths:
   two-column Saijiki vocabulary panel, and a short DDL syntax guide; since
   v1.98 word insertion happens only through this dialog's inline Saijiki,
   which also lists loaded plugin vocabulary
-- the `auto repair` checkbox controls whether the server applies deterministic
-  JSON Score repair after Stage 2. It is enabled by default. When disabled,
+- `auto repair` is controlled in settings. It is enabled by default. When disabled,
   Stage 2 output is rendered without the broader `coerce_score()` repair pass,
   while hard contract guards may still remove instructions that violate the
   requested primitive/color contract.
 
 The same `Draw from DDL` action is also available below the interpretation box
 for quick replay without opening the dialog. Candidate metadata shows render,
-composition, variation, and interpretation seeds where applicable. The dialog
-itself does not start drawing, so drawing actions remain concentrated in the
-main single-drawing panel.
-
-If the user edits DDL directly and then presses the normal `draw` button, inku
-warns that the DDL edit will be lost.  The choices are `cancel`, `OK`, and
-`draw from DDL`.  `OK` reruns Stage 1 from the natural-language prompt, while
-`draw from DDL` preserves the edited DDL and runs Stage 2 / rendering only.
-The natural-language prompt is not reinterpreted by `Draw from DDL`.
+composition, variation, and interpretation seeds where applicable. `Draw` in
+the DDL editor dialog preserves the edited DDL, runs Stage 2 / rendering only,
+and does not reinterpret the natural-language description.
 
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
@@ -2719,7 +2706,7 @@ context.
 History is stored in the server DB.  The DB record is the source of truth for:
 
 - original input
-- normalized DDL
+- input-side normalized DDL (Stage 1 `ddl`) and effective Stage 1.5 DDL (`expanded_ddl`, the Stage 2 input)
 - JSON Score
 - SVG rendered by the server
 - model metadata
@@ -3113,6 +3100,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── web/                               # the SvelteKit 2 + Svelte 5 frontend
 ├── cli/                               # inku-cli (an HTTP API client, managed with uv)
 ├── shared/                            # the analysis package the server and CLI share (inku_analysis)
+├── core/                              # shared Rust core (DDL compiler / render engine / score / SVG raster)
+├── persistence/                       # logical SQLite persistence contract shared by Server and Android
 ├── docs/                              # published documents (architecture / spec / guide / history / i18n)
 ├── manual/ja|en/                      # the user manual (seven Japanese/English pairs)
 └── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.ja.md)
@@ -3163,7 +3152,7 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
 
 - `Random automatic refinement` randomly chooses each generation's variation kind from the enabled reading, color-catalog, layout, touch, and variation elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
-- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
+- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
 
 Either method may include variation (§12.13) among the enabled refinement elements (up to five). Only while variation is enabled, an amplitude choice (small/medium/large, default medium) is shown; the chosen amplitude applies to every variation generation in the run, and seeds are server-issued.
 

@@ -169,6 +169,166 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
 }
 
 #[test]
+fn step9i_input_boundary_rejects_visible_source_replacement() {
+    let mut red = compile(
+        "a red circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let blue = compile(
+        "a blue square",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+
+    let red_result = transform_stage15(stage15_transformation_input(&red).unwrap(), None).unwrap();
+    let blue_result =
+        transform_stage15(stage15_transformation_input(&blue).unwrap(), None).unwrap();
+    assert_ne!(
+        red_result.effective_canonical_bytes(),
+        blue_result.effective_canonical_bytes()
+    );
+
+    red.document = blue.document.clone();
+    assert_eq!(
+        stage15_transformation_input(&red),
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
+    );
+}
+
+#[test]
+fn step9i_input_boundary_checks_language_evidence_but_allows_empty_source() {
+    let source = "place one thin pencil line at the center";
+    let mut language_mismatch = compile(
+        source,
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    language_mismatch.document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    assert_eq!(
+        stage15_transformation_input(&language_mismatch),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
+    );
+
+    let empty = compile("", ResolvedInstructionLanguage::En, &[], Some(0), LIMITS);
+    let input = stage15_transformation_input(&empty).unwrap();
+    let result = transform_stage15(input, None).unwrap();
+    assert!(result.targets().is_empty());
+    assert_eq!(result.composition_seed(), Some(0));
+}
+
+#[test]
+fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() {
+    let used = center_emit_definition();
+    let unused = unused_sidecar_definition();
+    let locks = vec![lock_for(&used), lock_for(&unused)];
+    let control = compile_typed_ddl(
+        NormalizedDdlDocument::new(
+            "Focus.Center",
+            ResolvedInstructionLanguage::En,
+            locks.clone(),
+        )
+        .unwrap(),
+        std::slice::from_ref(&used),
+        Some(19),
+        LIMITS,
+    );
+    let control_lock = control.compiler_lock.as_ref().unwrap();
+    assert_eq!(control_lock.definition_identities.len(), 2);
+    assert!(
+        control_lock
+            .definition_identities
+            .iter()
+            .find(|identity| identity.qualified_name == "Spare.Unused")
+            .unwrap()
+            .resolved_definition_digest
+            .is_none()
+    );
+    assert!(stage15_transformation_input(&control).is_ok());
+
+    let mut missing_projection = control.clone();
+    missing_projection
+        .compiler_lock
+        .as_mut()
+        .unwrap()
+        .definition_identities
+        .pop();
+    refresh_full_lock(&mut missing_projection);
+    assert_eq!(
+        stage15_transformation_input(&missing_projection),
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
+    );
+
+    let mut extra_projection = control.clone();
+    let extra = extra_sidecar_definition();
+    let extra_identity = extra.identity().unwrap();
+    extra_projection
+        .compiler_lock
+        .as_mut()
+        .unwrap()
+        .definition_identities
+        .push(inku_ddl::CompilerDefinitionIdentity {
+            qualified_name: extra_identity.qualified_name().to_owned(),
+            version: extra_identity.version().to_owned(),
+            sidecar_digest: format!("sha256:{}", extra_identity.full_digest_hex()),
+            resolved_definition_digest: None,
+        });
+    refresh_full_lock(&mut extra_projection);
+    assert_eq!(
+        stage15_transformation_input(&extra_projection),
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
+    );
+
+    let mut changed_projection = control.clone();
+    changed_projection
+        .compiler_lock
+        .as_mut()
+        .unwrap()
+        .definition_identities[0]
+        .sidecar_digest =
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_owned();
+    refresh_full_lock(&mut changed_projection);
+    assert_eq!(
+        stage15_transformation_input(&changed_projection),
+        Err(Stage15TransformError::CompilerLockDigestMismatch)
+    );
+
+    let replacement = replacement_center_definition();
+    let replacement_lock = lock_for(&replacement);
+    let replacement_identity = replacement.identity().unwrap();
+    let mut stale_consumer = control;
+    stale_consumer.document = NormalizedDdlDocument::new(
+        "Focus.Center",
+        ResolvedInstructionLanguage::En,
+        vec![replacement_lock, lock_for(&unused)],
+    )
+    .unwrap();
+    let projected = stale_consumer
+        .compiler_lock
+        .as_mut()
+        .unwrap()
+        .definition_identities
+        .iter_mut()
+        .find(|identity| identity.qualified_name == "Focus.Center")
+        .unwrap();
+    projected.version = replacement_identity.version().to_owned();
+    projected.sidecar_digest = format!("sha256:{}", replacement_identity.full_digest_hex());
+    projected.resolved_definition_digest = Some(replacement_identity.full_digest_hex().to_owned());
+    refresh_full_lock(&mut stale_consumer);
+    assert_eq!(
+        stage15_transformation_input(&stale_consumer),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+}
+
+#[test]
 fn no_target_and_non_center_meaning_remain_effective_no_ops() {
     for source in ["thin circle", "place eight circle at left-edge."] {
         let compilation = compile(
@@ -1251,6 +1411,32 @@ fn center_emit_definition() -> MacroDefinition {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
     )
     .unwrap()
+}
+
+fn unused_sidecar_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Spare","heading":"Unused","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn extra_sidecar_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Spare","heading":"Extra","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn replacement_center_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"2.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn refresh_full_lock(compilation: &mut inku_ddl::TypedDdlCompilation) {
+    let lock = compilation.compiler_lock.as_mut().unwrap();
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
 }
 
 fn named_target_definition() -> MacroDefinition {

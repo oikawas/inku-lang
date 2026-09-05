@@ -11,8 +11,9 @@ use crate::{
     SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticDocumentAst, SemanticIdentity, SemanticTermProvenance,
     TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
     compiler_lock::{
-        SemanticMacroExecutionOwners, expanded_meaning_canonical_bytes_with_owners,
-        semantic_macro_execution_owners,
+        SemanticMacroExecutionOwners, Stage15InputBoundaryError,
+        expanded_meaning_canonical_bytes_with_owners, semantic_macro_execution_owners,
+        validate_stage15_input_boundary,
     },
     compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
     semantic_document::canonical_ast_bytes,
@@ -374,6 +375,25 @@ pub fn stage15_transformation_input(
     let execution_owners =
         semantic_macro_execution_owners(&semantic.ast, &expansion.parameter_binding)
             .map_err(|_| Stage15TransformError::ExpansionDiagnostic)?;
+    validate_stage15_input_boundary(
+        &compilation.document,
+        &semantic.ast,
+        lock,
+        &expansion.parameter_binding,
+        &execution_owners,
+    )
+    .map_err(|error| match error {
+        Stage15InputBoundaryError::VisibleSourceDigest
+        | Stage15InputBoundaryError::DefinitionProjection => {
+            Stage15TransformError::CompilerLockDigestMismatch
+        }
+        Stage15InputBoundaryError::SourceLanguage => {
+            Stage15TransformError::SemanticSourceProvenanceDigestMismatch
+        }
+        Stage15InputBoundaryError::ConsumedDefinitionIdentity => {
+            Stage15TransformError::ExpansionDiagnostic
+        }
+    })?;
     execution_owners
         .validate_seed_identities(
             semantic_bytes,

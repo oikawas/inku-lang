@@ -1359,6 +1359,13 @@ is the effective DDL / typed meaning consumed by Stage 2.
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
   source-integrity attestation rather than focus material
+- before detaching the Stage 1.5 input, admission checks the actual visible
+  DDL UTF-8 bytes, language evidence retained by semantic source occurrences,
+  every macro-sidecar triple including unused entries, and each executed
+  macro's resolved, binding, and semantic-head identity against the compiler
+  lock. An input with no `SourceOccurrence` gains no language condition, and
+  an unused sidecar need not resolve or execute. Source and provenance are
+  admission-integrity evidence, not meaning or focus material
 - explicit variation is complete only when both amplitude (`small`,
   `medium`, or `large`) and `variation_seed` are present, and it moves focus
   only; an incomplete request means no variation

@@ -22,6 +22,10 @@ use crate::{
         MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
     },
     project_macro_semantic_ref,
+    semantic_association::{
+        semantic_macro_parameters_have_same_meaning,
+        semantic_macro_parameters_match_complete_binding,
+    },
     semantic_document::{continuation_target_value, exclusive_continuation_issue_claim_spans},
 };
 
@@ -2659,9 +2663,8 @@ fn validate_expanded_invocation_owner(
         || provenance.definition_full_digest != binding.definition_identity.full_digest_hex()
         || owners.semantic_ordinal_for_source(provenance.invocation_ordinal)
             != Some(owner.semantic_ordinal)
-        || invocation
-            .nodes
-            .iter()
+        || flatten_nodes(&invocation.nodes)
+            .into_iter()
             .any(|node| node.provenance().invocation != *provenance)
     {
         return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
@@ -2971,6 +2974,9 @@ pub(crate) fn semantic_macro_execution_owners(
         let Some(complete) = binding.complete.get(binding_index) else {
             return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
+        if !semantic_macro_parameters_match_complete_binding(&head.parameters, complete) {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        }
         let Ok(semantic_ordinal) = u64::try_from(owners.len()) else {
             return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
@@ -2995,12 +3001,22 @@ pub(crate) fn semantic_macro_execution_owners(
         };
         if !macro_head_matches_target(head, &edge.target)
             || !macro_head_matches_target(target_head, &edge.target)
+            || !semantic_macro_parameters_have_same_meaning(
+                &head.parameters,
+                &target_head.parameters,
+            )
         {
             return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         }
         let Some(binding_index) = exact_macro_binding_index(head, binding) else {
             return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
+        let Some(complete) = binding.complete.get(binding_index) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        if !semantic_macro_parameters_match_complete_binding(&head.parameters, complete) {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        }
         explained_binding_indices.push(binding_index);
     }
 
@@ -3069,7 +3085,7 @@ fn macro_head_matches_target(
 #[cfg(test)]
 mod execution_owner_join_tests {
     use super::*;
-    use crate::{MacroLock, ResolvedInstructionLanguage};
+    use crate::{MacroLock, ParameterSchema, ResolvedInstructionLanguage};
 
     const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
         max_invocations: 16,
@@ -3078,6 +3094,85 @@ mod execution_owner_join_tests {
         max_nodes_per_invocation: 100,
         max_total_nodes: 500,
     };
+
+    #[test]
+    fn execution_owner_join_rejects_parameter_drift_from_retained_bindings() {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Review","heading":"Tint","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
+        )
+        .unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document = NormalizedDdlDocument::new(
+            "Review.Tint red. the Review.Tint red swaying",
+            ResolvedInstructionLanguage::En,
+            vec![lock],
+        )
+        .unwrap();
+        let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        let semantic = associate_semantic_document_with_macro_binding(&document, binding.clone());
+        assert!(semantic.ast.complete);
+        assert!(semantic_macro_execution_owners(&semantic.ast, &binding).is_ok());
+
+        let blue = SemanticMacroParameterValue::SemanticRef(crate::SemanticIdentity {
+            category: "color".to_owned(),
+            id: "blue".to_owned(),
+        });
+        let mut head_only = semantic.ast.clone();
+        let SemanticHead::MacroInvocation(head) = &mut head_only.instructions[0].entity.head else {
+            panic!("Tint fixture retains its semantic macro head");
+        };
+        head.parameters[0].value = blue.clone();
+        assert_eq!(
+            semantic_macro_execution_owners(&head_only, &binding),
+            Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+        );
+
+        let mut coupled_heads = semantic.ast.clone();
+        let SemanticHead::MacroInvocation(head) = &mut coupled_heads.instructions[0].entity.head
+        else {
+            panic!("Tint fixture retains its target semantic macro head");
+        };
+        head.parameters[0].value = blue.clone();
+        let SemanticHead::MacroInvocation(head) =
+            &mut coupled_heads.continuations[0].reintroduced_head
+        else {
+            panic!("Tint fixture retains its continuation semantic macro head");
+        };
+        head.parameters[0].value = blue;
+        assert_eq!(
+            semantic_macro_execution_owners(&coupled_heads, &binding),
+            Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+        );
+
+        for mutation in ["missing", "extra", "name", "schema", "duplicate"] {
+            let mut ast = semantic.ast.clone();
+            let SemanticHead::MacroInvocation(head) = &mut ast.instructions[0].entity.head else {
+                unreachable!()
+            };
+            match mutation {
+                "missing" => head.parameters.clear(),
+                "extra" => head.parameters.push(head.parameters[0].clone()),
+                "name" => head.parameters[0].name = "other".to_owned(),
+                "schema" => head.parameters[0].schema = ParameterSchema::Number,
+                "duplicate" => {
+                    let duplicate = head.parameters[0].clone();
+                    head.parameters.push(duplicate);
+                }
+                _ => unreachable!(),
+            }
+            assert_eq!(
+                semantic_macro_execution_owners(&ast, &binding),
+                Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch),
+                "{mutation}"
+            );
+        }
+    }
 
     #[test]
     fn execution_owner_join_rejects_mutated_semantic_source_identity_as_blocking() {

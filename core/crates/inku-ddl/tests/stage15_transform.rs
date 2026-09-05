@@ -1,7 +1,7 @@
 use inku_ddl::{
     CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroNode, FocusRegion,
-    MacroDefinition, MacroExpansionLimits, MacroInvocationProvenance, MacroLock,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN,
+    MacroDefinition, MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroInvocationProvenance,
+    MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN,
     STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticContinuationTarget, SemanticHead, SemanticIdentity,
     Stage15TargetPath, Stage15TransformError, Stage15Variation, Stage15VariationAmplitude,
     compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
@@ -856,6 +856,54 @@ fn continuation_target_and_execution_mapping_tampering_fail_closed_before_transf
     target.invocation_ordinal += 99;
     assert_eq!(
         stage15_transformation_input(&unmapped),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+}
+
+#[test]
+fn step9h_nested_coupled_provenance_tamper_is_rejected() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Review","heading":"Nested","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"group","body":[{"op":"transform","transform":{"translate_x":{"expr":"number","value":0.25},"translate_y":null,"scale_x":null,"scale_y":null,"rotate_degrees":null},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}]}]}"#,
+    )
+    .unwrap();
+    let mut coupled = compile_locked(
+        "Review.Nested",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    assert!(stage15_transformation_input(&coupled).is_ok());
+
+    let ExpandedMacroNode::Group { body, .. } =
+        &mut coupled.macro_expansion.as_mut().unwrap().expanded[0].nodes[0]
+    else {
+        panic!("nested fixture starts with a generated group");
+    };
+    let ExpandedMacroNode::Transform { body, .. } = &mut body[0] else {
+        panic!("nested fixture group contains a generated transform");
+    };
+    let ExpandedMacroNode::Emit { provenance, .. } = &mut body[0] else {
+        panic!("nested fixture transform contains a generated emit");
+    };
+    provenance.invocation.invocation_ordinal += 1;
+    assert_eq!(
+        expanded_meaning_canonical_bytes(
+            &coupled.semantic_document.as_ref().unwrap().ast,
+            coupled.macro_expansion.as_ref().unwrap(),
+        ),
+        Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch)
+    );
+
+    let generated_provenance_digest = sha256(&expanded_generated_provenance_canonical_bytes(
+        coupled.macro_expansion.as_ref().unwrap(),
+    ));
+    let lock = coupled.compiler_lock.as_mut().unwrap();
+    lock.expanded_generated_provenance_digest = Some(generated_provenance_digest);
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+
+    assert_eq!(
+        stage15_transformation_input(&coupled),
         Err(Stage15TransformError::ExpansionDiagnostic)
     );
 }

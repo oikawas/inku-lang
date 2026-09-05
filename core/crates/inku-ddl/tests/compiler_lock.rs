@@ -2075,6 +2075,178 @@ fn successful_expanded_nodes_are_explicit_deliveries_without_entering_pre_expans
 }
 
 #[test]
+fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meaning() {
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Review","heading":"Tint","version":"1.0.0","parameters":{"value":{"type":"semantic_ref","category":"color"}},"components":{},"body":[]}"#,
+    );
+    let inline = compile_locked(
+        "swaying Review.Tint red",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    let equal = compile_locked(
+        "Review.Tint red. the Review.Tint red swaying",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    for (source, result) in [("inline", &inline), ("equal", &equal)] {
+        assert_eq!(
+            result.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        assert_eq!(
+            result
+                .semantic_document
+                .as_ref()
+                .unwrap()
+                .ast
+                .instructions
+                .len(),
+            1,
+            "{source}"
+        );
+        assert_eq!(
+            result.macro_expansion.as_ref().unwrap().expanded.len(),
+            1,
+            "{source}"
+        );
+        assert_eq!(result.derived_seeds.len(), 1, "{source}");
+    }
+    assert_eq!(
+        inline.accepted_parameter_binding().unwrap().complete.len(),
+        1
+    );
+    assert_eq!(
+        equal.accepted_parameter_binding().unwrap().complete.len(),
+        2
+    );
+    assert_eq!(
+        equal
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .continuations
+            .len(),
+        1
+    );
+    assert_eq!(
+        inline.pre_expansion_canonical_bytes(),
+        equal.pre_expansion_canonical_bytes()
+    );
+    assert_eq!(inline.derived_seeds, equal.derived_seeds);
+    assert_eq!(
+        inline
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .expanded_meaning_digest,
+        equal
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .expanded_meaning_digest
+    );
+    let inline_effective =
+        transform_stage15(stage15_transformation_input(&inline).unwrap(), None).unwrap();
+    let equal_effective =
+        transform_stage15(stage15_transformation_input(&equal).unwrap(), None).unwrap();
+    assert_eq!(
+        inline_effective.effective_canonical_bytes(),
+        equal_effective.effective_canonical_bytes()
+    );
+    assert_ne!(
+        inline
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .semantic_source_provenance_digest,
+        equal
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .semantic_source_provenance_digest
+    );
+
+    let different = compile_locked(
+        "Review.Tint red. the Review.Tint blue swaying",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+
+    assert_eq!(
+        different.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::BlockedConflict)
+    );
+    assert!(
+        different
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .canonical_bytes
+            .is_none()
+    );
+    assert!(different.macro_expansion.is_none());
+    assert!(different.derived_seeds.is_empty());
+    assert!(stage15_transformation_input(&different).is_err());
+
+    let distinct = compile_locked(
+        "Review.Tint red. Review.Tint blue",
+        ResolvedInstructionLanguage::En,
+        &[definition],
+        Some(19),
+        LIMITS,
+    );
+    assert_eq!(
+        distinct.compiler_lock.as_ref().map(|lock| lock.state),
+        Some(CompilerLockState::CanonicalReady)
+    );
+    assert_eq!(
+        distinct
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .instructions
+            .len(),
+        2
+    );
+    assert!(
+        distinct
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .continuations
+            .is_empty()
+    );
+    assert_eq!(
+        distinct
+            .accepted_parameter_binding()
+            .unwrap()
+            .complete
+            .len(),
+        2
+    );
+    assert_eq!(distinct.macro_expansion.as_ref().unwrap().expanded.len(), 2);
+    assert_eq!(
+        distinct
+            .derived_seeds
+            .iter()
+            .map(|seed| seed.ordinal())
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+}
+
+#[test]
 fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_delivery() {
     let definition = center_emit_definition();
     let cases = [

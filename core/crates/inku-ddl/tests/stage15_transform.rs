@@ -671,6 +671,62 @@ fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
 }
 
 #[test]
+fn definite_imperative_object_groups_do_not_reach_stage15() {
+    for source in ["place the circle and a line.", "place the circle and line."] {
+        let compilation = compile(
+            source,
+            ResolvedInstructionLanguage::En,
+            &[],
+            Some(0),
+            LIMITS,
+        );
+        let state = compilation.compiler_lock.as_ref().unwrap().state;
+        assert_ne!(state, CompilerLockState::CanonicalReady, "{source}");
+        assert!(
+            compilation
+                .semantic_document
+                .as_ref()
+                .unwrap()
+                .canonical_bytes
+                .is_none(),
+            "{source}"
+        );
+        assert_eq!(
+            stage15_transformation_input(&compilation),
+            Err(Stage15TransformError::CompilerState(state)),
+            "{source}"
+        );
+    }
+
+    let definition = center_emit_definition();
+    let source = "place the Focus.Center and a line.";
+    let compilation = compile_locked(
+        source,
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(0),
+        LIMITS,
+    );
+    let state = compilation.compiler_lock.as_ref().unwrap().state;
+    assert_ne!(state, CompilerLockState::CanonicalReady);
+    let semantic = compilation.semantic_document.as_ref().unwrap();
+    assert_eq!(semantic.ast.instructions.len(), 2);
+    assert!(matches!(
+        semantic.ast.instructions[0].entity.head,
+        SemanticHead::MacroInvocation(_)
+    ));
+    assert_eq!(
+        semantic.ast.instructions[0].entity.head.source().surface,
+        "Focus.Center"
+    );
+    assert!(semantic.canonical_bytes.is_none());
+    assert_eq!(
+        stage15_transformation_input(&compilation),
+        Err(Stage15TransformError::CompilerState(state))
+    );
+}
+
+#[test]
 fn canonical_ready_gate_and_target_integrity_fail_closed() {
     for (source, expected_state) in [
         ("many", CompilerLockState::IncompleteKnownHole),

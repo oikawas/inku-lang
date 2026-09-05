@@ -1,7 +1,8 @@
 use inku_ddl::{
-    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, FocusRegion, MacroDefinition,
-    MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticHead,
+    CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroNode, FocusRegion,
+    MacroDefinition, MacroExpansionLimits, MacroInvocationProvenance, MacroLock,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_FOCUS_SELECTION_DOMAIN,
+    STAGE15_TRANSFORMATION_SCHEMA_ID, SemanticContinuationTarget, SemanticHead, SemanticIdentity,
     Stage15TargetPath, Stage15TransformError, Stage15Variation, Stage15VariationAmplitude,
     compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
     expanded_meaning_canonical_bytes, stage15_transformation_input, transform_stage15,
@@ -66,7 +67,7 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     let fixture = fixture();
     assert_eq!(
         STAGE15_TRANSFORMATION_SCHEMA_ID,
-        "inku.typed-stage15-transformation.v3"
+        "inku.typed-stage15-transformation.v4"
     );
     assert_eq!(
         STAGE15_FOCUS_SELECTION_DOMAIN,
@@ -671,6 +672,238 @@ fn source_instruction_group_and_macro_targets_share_one_ordered_overlay() {
 }
 
 #[test]
+fn primitive_inline_and_continuation_share_baseline_and_complete_variation_identity() {
+    let compilations = ["赤い円を中心に置く。", "円を中心に置く。円は赤い。"].map(|source| {
+        compile(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            &[],
+            Some(41),
+            LIMITS,
+        )
+    });
+    assert_eq!(
+        compilations[0].pre_expansion_canonical_bytes(),
+        compilations[1].pre_expansion_canonical_bytes()
+    );
+    let baseline = compilations.each_ref().map(|compilation| {
+        transform_stage15(stage15_transformation_input(compilation).unwrap(), None).unwrap()
+    });
+    assert_eq!(baseline[0].baseline_focus(), baseline[1].baseline_focus());
+    assert_eq!(
+        baseline[0].effective_canonical_bytes(),
+        baseline[1].effective_canonical_bytes()
+    );
+
+    for amplitude in Stage15VariationAmplitude::ALL {
+        let varied = compilations.each_ref().map(|compilation| {
+            transform_stage15(
+                stage15_transformation_input(compilation).unwrap(),
+                Some(Stage15Variation {
+                    amplitude,
+                    seed: 13,
+                }),
+            )
+            .unwrap()
+        });
+        assert_eq!(varied[0].resolved_focus(), varied[1].resolved_focus());
+        assert_eq!(
+            varied[0].effective_canonical_bytes(),
+            varied[1].effective_canonical_bytes()
+        );
+    }
+}
+
+#[test]
+fn macro_source_gap_keeps_source_paths_and_projects_effective_paths_to_semantic_ordinals() {
+    let definition = center_emit_definition();
+    let compilations = [
+        "a red Focus.Center; a blue Focus.Center",
+        "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+    ]
+    .map(|source| {
+        compile_locked(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+            Some(19),
+            LIMITS,
+        )
+    });
+    let transformed = compilations.each_ref().map(|compilation| {
+        transform_stage15(
+            stage15_transformation_input(compilation).unwrap(),
+            Some(Stage15Variation {
+                amplitude: Stage15VariationAmplitude::Large,
+                seed: 7,
+            }),
+        )
+        .unwrap()
+    });
+    let source_ordinals = transformed.each_ref().map(|result| {
+        result
+            .targets()
+            .iter()
+            .filter_map(|target| match &target.path {
+                Stage15TargetPath::MacroEmit {
+                    invocation_ordinal, ..
+                } => Some(*invocation_ordinal),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(source_ordinals[0], [0, 0, 1, 1]);
+    assert_eq!(source_ordinals[1], [0, 0, 2, 2]);
+    assert_eq!(
+        transformed[0].effective_canonical_bytes(),
+        transformed[1].effective_canonical_bytes()
+    );
+    let canonical: serde_json::Value =
+        serde_json::from_slice(transformed[1].effective_canonical_bytes()).unwrap();
+    let semantic_ordinals = canonical["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|target| target["path"]["invocation_ordinal"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(semantic_ordinals, [0, 0, 1, 1]);
+}
+
+#[test]
+fn continuation_target_and_execution_mapping_tampering_fail_closed_before_transform() {
+    let mut target_tamper = compile(
+        "円を中心に置く。円は赤い。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        Some(41),
+        LIMITS,
+    );
+    let semantic = target_tamper.semantic_document.as_mut().unwrap();
+    assert!(
+        !std::str::from_utf8(semantic.canonical_bytes.as_ref().unwrap())
+            .unwrap()
+            .contains("continuations")
+    );
+    semantic.ast.continuations[0].target =
+        SemanticContinuationTarget::Primitive(SemanticIdentity {
+            category: "shape".to_owned(),
+            id: "line".to_owned(),
+        });
+    assert_eq!(
+        stage15_transformation_input(&target_tamper),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
+    );
+
+    let definition = center_emit_definition();
+    let compilation = compile_locked(
+        "a Focus.Center; the red Focus.Center; a blue Focus.Center",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    let mut missing = compilation.clone();
+    missing.macro_expansion.as_mut().unwrap().expanded.pop();
+    assert_eq!(
+        stage15_transformation_input(&missing),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+
+    let mut duplicate = compilation.clone();
+    let first = duplicate.macro_expansion.as_ref().unwrap().expanded[0].clone();
+    duplicate.macro_expansion.as_mut().unwrap().expanded[1] = first;
+    assert_eq!(
+        stage15_transformation_input(&duplicate),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+
+    let mut reordered = compilation.clone();
+    reordered
+        .macro_expansion
+        .as_mut()
+        .unwrap()
+        .expanded
+        .swap(0, 1);
+    assert_eq!(
+        stage15_transformation_input(&reordered),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+
+    let mut seed_mismatch = compilation.clone();
+    let lock = seed_mismatch.compiler_lock.as_mut().unwrap();
+    lock.macro_seeds[1].ordinal = 2;
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+    assert_eq!(
+        stage15_transformation_input(&seed_mismatch),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+
+    let named = named_target_definition();
+    let mut unmapped = compile_locked(
+        "a Focus.Named; the red Focus.Named; a blue Focus.Named",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&named),
+        Some(19),
+        LIMITS,
+    );
+    let inku_ddl::ExpandedMacroNode::Emit {
+        binding: Some(target),
+        ..
+    } = &mut unmapped.macro_expansion.as_mut().unwrap().expanded[1].nodes[1]
+    else {
+        panic!("named fixture retains the generated target owner");
+    };
+    target.invocation_ordinal += 99;
+    assert_eq!(
+        stage15_transformation_input(&unmapped),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+}
+
+#[test]
+fn coupled_seed_and_generated_provenance_tamper_is_rejected() {
+    let definition = center_emit_definition();
+    let mut coupled = compile_locked(
+        "Focus.Center",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+        Some(19),
+        LIMITS,
+    );
+    let tampered_full_digest = "0000000000000000000000000000000000000000000000000000000000000001";
+    let tampered_resolved_seed = coupled.compiler_lock.as_ref().unwrap().macro_seeds[0]
+        .resolved_seed
+        .wrapping_add(1);
+    {
+        let seed = &mut coupled.compiler_lock.as_mut().unwrap().macro_seeds[0];
+        seed.full_digest = tampered_full_digest.to_owned();
+        seed.resolved_seed = tampered_resolved_seed;
+    }
+    {
+        let invocation = &mut coupled.macro_expansion.as_mut().unwrap().expanded[0];
+        rewrite_seed_provenance(
+            &mut invocation.provenance,
+            tampered_full_digest,
+            tampered_resolved_seed,
+        );
+        for node in &mut invocation.nodes {
+            rewrite_node_seed_provenance(node, tampered_full_digest, tampered_resolved_seed);
+        }
+    }
+    let generated_provenance_digest = sha256(&expanded_generated_provenance_canonical_bytes(
+        coupled.macro_expansion.as_ref().unwrap(),
+    ));
+    let lock = coupled.compiler_lock.as_mut().unwrap();
+    lock.expanded_generated_provenance_digest = Some(generated_provenance_digest);
+    lock.full_digest = sha256(&compiler_lock_hash_input(lock));
+
+    assert_eq!(
+        stage15_transformation_input(&coupled),
+        Err(Stage15TransformError::ExpansionDiagnostic)
+    );
+}
+
+#[test]
 fn definite_imperative_object_groups_do_not_reach_stage15() {
     for source in ["place the circle and a line.", "place the circle and line."] {
         let compilation = compile(
@@ -846,11 +1079,14 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
         Some(5),
         LIMITS,
     );
+    let semantic_ast = duplicate.semantic_document.as_ref().unwrap().ast.clone();
     let expansion = duplicate.macro_expansion.as_mut().unwrap();
     let duplicated_node = expansion.expanded[0].nodes[0].clone();
     expansion.expanded[0].nodes.push(duplicated_node);
     let lock = duplicate.compiler_lock.as_mut().unwrap();
-    lock.expanded_meaning_digest = Some(sha256(&expanded_meaning_canonical_bytes(expansion)));
+    lock.expanded_meaning_digest = Some(sha256(
+        &expanded_meaning_canonical_bytes(&semantic_ast, expansion).unwrap(),
+    ));
     lock.expanded_generated_provenance_digest = Some(sha256(
         &expanded_generated_provenance_canonical_bytes(expansion),
     ));
@@ -866,6 +1102,40 @@ fn canonical_ready_gate_and_target_integrity_fail_closed() {
 
 fn fixture() -> Fixture {
     serde_json::from_str(FIXTURE).unwrap()
+}
+
+fn rewrite_seed_provenance(
+    provenance: &mut MacroInvocationProvenance,
+    full_digest: &str,
+    resolved_seed: u64,
+) {
+    provenance.seed_full_digest = full_digest.to_owned();
+    provenance.resolved_seed = resolved_seed;
+}
+
+fn rewrite_node_seed_provenance(
+    node: &mut ExpandedMacroNode,
+    full_digest: &str,
+    resolved_seed: u64,
+) {
+    match node {
+        ExpandedMacroNode::Emit { provenance, .. }
+        | ExpandedMacroNode::Anchor { provenance, .. }
+        | ExpandedMacroNode::Relation { provenance, .. } => {
+            rewrite_seed_provenance(&mut provenance.invocation, full_digest, resolved_seed);
+        }
+        ExpandedMacroNode::Group {
+            body, provenance, ..
+        }
+        | ExpandedMacroNode::Transform {
+            body, provenance, ..
+        } => {
+            rewrite_seed_provenance(&mut provenance.invocation, full_digest, resolved_seed);
+            for child in body {
+                rewrite_node_seed_provenance(child, full_digest, resolved_seed);
+            }
+        }
+    }
 }
 
 fn language(value: &str) -> ResolvedInstructionLanguage {
@@ -931,6 +1201,13 @@ fn lock_for(definition: &MacroDefinition) -> MacroLock {
 fn center_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn named_target_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Named","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"anchor","name":"origin"},{"op":"emit","binding":"center","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"relation","kind":"touching","from":"origin","to":"center"}]}"#,
     )
     .unwrap()
 }

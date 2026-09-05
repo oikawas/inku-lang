@@ -1366,12 +1366,13 @@ is the effective DDL / typed meaning consumed by Stage 2.
   same meaning and never present bytes from another schema under the same
   identity
 
-The sealed Rust Stage 1.5 v3 typed foundation and R1 / R2 are accepted but not
-connected to runtime. D1 synchronization of inline / continuation canonical
-meaning, seed, and effective identity awaits code work; this documentation
-synchronization does not make it complete or make Step 9 COMPLETE. The current
-Python path is a compatibility implementation until cutover and follows the
-same no-invention, focus-only contract. An accepted primitive must not be
+The sealed Rust Stage 1.5 v4 typed foundation and R1 / R2 / D1 are implemented
+but not connected to runtime. D1 synchronizes inline / continuation canonical
+meaning, post-resolution macro execution ordinals, and expanded / effective
+identity while retaining source / generated provenance separately. This code
+milestone does not make Step 9 COMPLETE before its independent review. The
+current Python path is a compatibility implementation until cutover and follows
+the same no-invention, focus-only contract. An accepted primitive must not be
 presented as runtime-connected behavior.
 
 ### 12.12 Staffage and Compatibility Records

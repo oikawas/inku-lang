@@ -1,6 +1,6 @@
 //! Runtime-disconnected typed delivery, canonical compiler identity, and lock construction.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
@@ -8,37 +8,39 @@ use sha2::{Digest, Sha256};
 use crate::{
     ClauseAtom, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
     ExpansionPathSegment, GeneratedNodeProvenance, MacroDefinition, MacroExpansionDiagnosticKind,
-    MacroExpansionLimits, MacroExpansionResult, MacroInvocationResolutionDiagnosticKind,
-    MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, MacroSeed,
-    NeutralDiagnosticKind, NormalizedDdlDocument, OwnedSemanticOccurrence,
-    SemanticAssociationIssueKind, SemanticContinuationIssue, SemanticContinuationIssueKind,
-    SemanticContinuationTarget, SemanticCoordinationIssueKind, SemanticDocumentAst,
-    SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead, SemanticInstruction,
-    SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole, SemanticIssueCausalProvenance,
-    SemanticMacroInvocationHead, SemanticMacroParameterValue, SemanticRelationIssueKind,
-    SemanticTerm, SourceOccurrence, SourceSpan, associate_semantic_document_with_macro_binding,
-    bind_macro_parameters, derive_macro_seed,
-    macro_expansion::{MacroExpansionSelection, expand_selected_macros},
+    MacroExpansionLimits, MacroExpansionResult, MacroInvocation,
+    MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
+    MacroParameterBindingResult, MacroSeed, NeutralDiagnosticKind, NormalizedDdlDocument,
+    OwnedSemanticOccurrence, SemanticAssociationIssueKind, SemanticContinuationIssue,
+    SemanticContinuationIssueKind, SemanticContinuationTarget, SemanticCoordinationIssueKind,
+    SemanticDocumentAst, SemanticDocumentIssueKind, SemanticDocumentResult, SemanticHead,
+    SemanticInstruction, SemanticInstructionIssueKind, SemanticInstructionOccurrenceRole,
+    SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroParameterValue,
+    SemanticRelationIssueKind, SemanticTerm, SourceOccurrence, SourceSpan,
+    associate_semantic_document_with_macro_binding, bind_macro_parameters, derive_macro_seed,
+    macro_expansion::{
+        MacroExpansionExecutionOwner, MacroExpansionSelection, expand_selected_macros,
+    },
     project_macro_semantic_ref,
-    semantic_document::exclusive_continuation_issue_claim_spans,
+    semantic_document::{continuation_target_value, exclusive_continuation_issue_claim_spans},
 };
 
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v12";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v13";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v13";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v14";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v13";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v14";
 /// Stable identity for source-bearing semantic provenance bytes.
-pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v1";
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v2";
 /// Stable identity for generated macro provenance bytes.
 pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
 /// Stable identity for source-independent expanded macro meaning bytes.
-pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v1";
+pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v2";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -229,7 +231,8 @@ pub struct CompilerDefinitionIdentity {
     pub resolved_definition_digest: Option<String>,
 }
 
-/// One exact I-533 seed identity.
+/// One exact I-533 seed identity. `ordinal` is the post-resolution semantic execution ordinal
+/// hashed by the compiler, distinct from the retained source occurrence ordinal.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerSeedIdentity {
     pub qualified_name: String,
@@ -237,6 +240,104 @@ pub struct CompilerSeedIdentity {
     pub scheme_id: &'static str,
     pub full_digest: String,
     pub resolved_seed: u64,
+}
+
+/// One validated bridge between retained source ownership and meaning execution order.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct SemanticMacroExecutionOwner {
+    pub(crate) binding_index: usize,
+    pub(crate) source_invocation_index: usize,
+    pub(crate) source_ordinal: u64,
+    pub(crate) semantic_ordinal: u64,
+}
+
+/// The sole exact owner mapping reused by compiler seeds and meaning projections.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct SemanticMacroExecutionOwners {
+    owners: Vec<SemanticMacroExecutionOwner>,
+    explained_binding_indices: Vec<usize>,
+}
+
+impl SemanticMacroExecutionOwners {
+    pub(crate) fn owners(&self) -> &[SemanticMacroExecutionOwner] {
+        &self.owners
+    }
+
+    pub(crate) fn semantic_ordinal_for_source(&self, source_ordinal: u64) -> Option<u64> {
+        let mut matches = self
+            .owners
+            .iter()
+            .filter(|owner| owner.source_ordinal == source_ordinal)
+            .map(|owner| owner.semantic_ordinal);
+        let ordinal = matches.next()?;
+        matches.next().is_none().then_some(ordinal)
+    }
+
+    fn expansion_selection(&self) -> MacroExpansionSelection {
+        MacroExpansionSelection::exact(
+            self.owners
+                .iter()
+                .map(|owner| MacroExpansionExecutionOwner {
+                    binding_index: owner.binding_index,
+                    seed_ordinal: owner.semantic_ordinal,
+                })
+                .collect(),
+            self.explained_binding_indices.clone(),
+        )
+    }
+
+    pub(crate) fn validate_seed_identities(
+        &self,
+        canonical_bytes: &[u8],
+        expansion: &MacroExpansionResult,
+        seeds: &[CompilerSeedIdentity],
+        composition_seed: Option<u64>,
+    ) -> Result<(), MacroExpansionDiagnosticKind> {
+        validate_expanded_execution_owners(self, expansion)?;
+        let canonical = std::str::from_utf8(canonical_bytes)
+            .map_err(|_| MacroExpansionDiagnosticKind::MismatchedSeed)?;
+        if seeds.len() != self.owners.len() {
+            return Err(MacroExpansionDiagnosticKind::MismatchedSeed);
+        }
+        for ((owner, invocation), seed) in self.owners.iter().zip(&expansion.expanded).zip(seeds) {
+            let Some(binding) = expansion
+                .parameter_binding
+                .complete
+                .get(owner.binding_index)
+            else {
+                return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+            };
+            let Some(resolved) = expansion
+                .parameter_binding
+                .macro_resolution
+                .resolved
+                .get(binding.invocation_index)
+            else {
+                return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+            };
+            let semantic_invocation = MacroInvocation::new(
+                resolved.invocation.namespace(),
+                resolved.invocation.heading(),
+                owner.semantic_ordinal,
+            )
+            .map_err(|_| MacroExpansionDiagnosticKind::MismatchedSeed)?;
+            let expected = derive_macro_seed(canonical, &semantic_invocation, composition_seed);
+            let provenance = &invocation.provenance;
+            if seed.qualified_name != binding.definition_identity.qualified_name()
+                || seed.ordinal != owner.semantic_ordinal
+                || seed.scheme_id != crate::MACRO_SEED_SCHEME_ID
+                || seed.full_digest != expected.full_digest_hex()
+                || seed.resolved_seed != expected.resolved_seed()
+                || seed.scheme_id != provenance.seed_scheme_id
+                || seed.full_digest != provenance.seed_full_digest
+                || seed.resolved_seed != provenance.resolved_seed
+                || provenance.effective_composition_seed != composition_seed.unwrap_or(0)
+            {
+                return Err(MacroExpansionDiagnosticKind::MismatchedSeed);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Complete deterministic identity for one integrity-valid compilation attempt.
@@ -381,6 +482,7 @@ pub fn compile_typed_ddl(
     let canonical_ready = semantic_document.canonical_bytes.is_some();
     let mut seeds = Vec::new();
     let mut expansion = None;
+    let mut expanded_meaning_bytes = None;
 
     if canonical_ready {
         let binding = semantic_document
@@ -396,38 +498,59 @@ pub fn compile_typed_ddl(
                 .expect("complete semantic document has canonical bytes"),
         )
         .expect("I-595 canonical JSON is UTF-8");
-        let selection = semantic_macro_execution_selection(&semantic_document.ast, &binding);
-        if selection.is_valid_for(binding.complete.len()) {
-            for &binding_index in selection.execution_binding_indices() {
-                let Some(complete) = binding.complete.get(binding_index) else {
-                    continue;
+        let execution_owners = semantic_macro_execution_owners(&semantic_document.ast, &binding);
+        let mut selection = execution_owners
+            .as_ref()
+            .map(SemanticMacroExecutionOwners::expansion_selection)
+            .unwrap_or_else(|_| MacroExpansionSelection::invalid_owner_join());
+        if let Ok(owners) = &execution_owners {
+            for owner in owners.owners() {
+                let Some(complete) = binding.complete.get(owner.binding_index) else {
+                    selection = MacroExpansionSelection::invalid_owner_join();
+                    seeds.clear();
+                    break;
                 };
                 let Some(resolved) = binding
                     .macro_resolution
                     .resolved
                     .get(complete.invocation_index)
                 else {
-                    continue;
+                    selection = MacroExpansionSelection::invalid_owner_join();
+                    seeds.clear();
+                    break;
                 };
-                seeds.push(derive_macro_seed(
-                    canonical,
-                    &resolved.invocation,
-                    composition_seed,
-                ));
+                let Ok(invocation) = MacroInvocation::new(
+                    resolved.invocation.namespace(),
+                    resolved.invocation.heading(),
+                    owner.semantic_ordinal,
+                ) else {
+                    selection = MacroExpansionSelection::invalid_owner_join();
+                    seeds.clear();
+                    break;
+                };
+                seeds.push(derive_macro_seed(canonical, &invocation, composition_seed));
             }
         }
         let expanded = expand_selected_macros(binding, definitions, &seeds, limits, selection);
         project_expansion_diagnostics(&document, &expanded, &mut projection);
-        project_expanded_deliveries(&expanded, &mut projection);
+        if let Ok(owners) = &execution_owners {
+            if expanded.diagnostics.is_empty() {
+                match expanded_meaning_canonical_bytes_with_owners(owners, &expanded) {
+                    Ok(bytes) => expanded_meaning_bytes = Some(bytes),
+                    Err(kind) => add_blocking(&mut projection, macro_expansion_kind(kind), None),
+                }
+            }
+            if let Err(kind) = project_expanded_deliveries(&expanded, owners, &mut projection) {
+                add_blocking(&mut projection, macro_expansion_kind(kind), None);
+            }
+        }
         expansion = Some(expanded);
         sort_projection(&mut projection);
     }
 
     let state = compiler_state(&projection);
     let expanded_digest = if state == CompilerLockState::CanonicalReady {
-        expansion
-            .as_ref()
-            .map(|value| sha256_hex(&expanded_meaning_canonical_bytes(value)))
+        expanded_meaning_bytes.as_deref().map(sha256_hex)
     } else {
         None
     };
@@ -1571,10 +1694,28 @@ fn project_expansion_diagnostics(
     }
 }
 
-fn project_expanded_deliveries(expansion: &MacroExpansionResult, projection: &mut Projection) {
+fn project_expanded_deliveries(
+    expansion: &MacroExpansionResult,
+    owners: &SemanticMacroExecutionOwners,
+    projection: &mut Projection,
+) -> Result<(), MacroExpansionDiagnosticKind> {
+    let mut seen_semantic_ordinals = BTreeSet::new();
     for invocation in &expansion.expanded {
+        let mut matches = owners.owners().iter().filter(|owner| {
+            owner.source_invocation_index == invocation.provenance.invocation_index
+                && owner.source_ordinal == invocation.provenance.invocation_ordinal
+        });
+        let Some(owner) = matches.next() else {
+            return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
+        };
+        if matches.next().is_some()
+            || !seen_semantic_ordinals.insert(owner.semantic_ordinal)
+            || validate_expanded_invocation_owner(owners, owner, invocation, expansion).is_err()
+        {
+            return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
+        }
         for node in flatten_nodes(&invocation.nodes) {
-            let descriptor = compact_json(&node_value(node));
+            let descriptor = compact_json(&node_value(node, owners, owner)?);
             let provenance = node.provenance();
             let mut identity_bytes = Vec::new();
             append_field(
@@ -1606,6 +1747,7 @@ fn project_expanded_deliveries(expansion: &MacroExpansionResult, projection: &mu
             });
         }
     }
+    Ok(())
 }
 
 fn flatten_nodes(nodes: &[ExpandedMacroNode]) -> Vec<&ExpandedMacroNode> {
@@ -2090,6 +2232,7 @@ pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> 
                 .iter()
                 .map(|edge| {
                     let mut record = BTreeMap::new();
+                    record.insert("target".to_owned(), continuation_target_value(&edge.target));
                     record.insert(
                         "target_instruction_index".to_owned(),
                         Value::Number(Number::from(edge.target_instruction_index as u64)),
@@ -2460,35 +2603,117 @@ fn macro_invocation_provenance_value(provenance: &crate::MacroInvocationProvenan
     Value::Object(record.into_iter().collect())
 }
 
-/// Canonical expanded meaning bytes with all display and provenance fields excluded.
-pub fn expanded_meaning_canonical_bytes(expansion: &MacroExpansionResult) -> Vec<u8> {
-    let mut invocations = expansion
-        .expanded
+/// Canonical expanded meaning bytes with source locators projected through the exact semantic
+/// execution-owner mapping. Display and provenance fields remain excluded.
+pub fn expanded_meaning_canonical_bytes(
+    ast: &SemanticDocumentAst,
+    expansion: &MacroExpansionResult,
+) -> Result<Vec<u8>, MacroExpansionDiagnosticKind> {
+    let owners = semantic_macro_execution_owners(ast, &expansion.parameter_binding)?;
+    expanded_meaning_canonical_bytes_with_owners(&owners, expansion)
+}
+
+fn validate_expanded_execution_owners(
+    owners: &SemanticMacroExecutionOwners,
+    expansion: &MacroExpansionResult,
+) -> Result<(), MacroExpansionDiagnosticKind> {
+    if expansion.expanded.len() != owners.owners().len() {
+        return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+    }
+    for (owner, invocation) in owners.owners().iter().zip(&expansion.expanded) {
+        validate_expanded_invocation_owner(owners, owner, invocation, expansion)?;
+    }
+    Ok(())
+}
+
+fn validate_expanded_invocation_owner(
+    owners: &SemanticMacroExecutionOwners,
+    owner: &SemanticMacroExecutionOwner,
+    invocation: &ExpandedMacroInvocation,
+    expansion: &MacroExpansionResult,
+) -> Result<(), MacroExpansionDiagnosticKind> {
+    let Some(binding) = expansion
+        .parameter_binding
+        .complete
+        .get(owner.binding_index)
+    else {
+        return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+    };
+    let Some(resolved) = expansion
+        .parameter_binding
+        .macro_resolution
+        .resolved
+        .get(binding.invocation_index)
+    else {
+        return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+    };
+    let provenance = &invocation.provenance;
+    if owner.source_invocation_index != binding.invocation_index
+        || owner.source_ordinal != binding.invocation_ordinal
+        || provenance.schema_id != crate::MACRO_EXPANSION_SCHEMA_ID
+        || provenance.invocation_index != owner.source_invocation_index
+        || provenance.invocation_ordinal != owner.source_ordinal
+        || provenance.source_span != resolved.span
+        || provenance.definition_qualified_name != binding.definition_identity.qualified_name()
+        || provenance.definition_version != binding.definition_identity.version()
+        || provenance.definition_full_digest != binding.definition_identity.full_digest_hex()
+        || owners.semantic_ordinal_for_source(provenance.invocation_ordinal)
+            != Some(owner.semantic_ordinal)
+        || invocation
+            .nodes
+            .iter()
+            .any(|node| node.provenance().invocation != *provenance)
+    {
+        return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
+    }
+    Ok(())
+}
+
+pub(crate) fn expanded_meaning_canonical_bytes_with_owners(
+    owners: &SemanticMacroExecutionOwners,
+    expansion: &MacroExpansionResult,
+) -> Result<Vec<u8>, MacroExpansionDiagnosticKind> {
+    if let Some(diagnostic) = expansion.diagnostics.first() {
+        return Err(diagnostic.kind);
+    }
+    validate_expanded_execution_owners(owners, expansion)?;
+    let invocations = owners
+        .owners()
         .iter()
-        .map(|invocation| {
+        .zip(&expansion.expanded)
+        .map(|(owner, invocation)| {
             let mut record = BTreeMap::new();
             record.insert(
                 "invocation_ordinal".to_owned(),
-                Value::Number(Number::from(invocation.provenance.invocation_ordinal)),
+                Value::Number(Number::from(owner.semantic_ordinal)),
             );
             record.insert(
                 "nodes".to_owned(),
-                Value::Array(invocation.nodes.iter().map(node_value).collect()),
+                Value::Array(
+                    invocation
+                        .nodes
+                        .iter()
+                        .map(|node| node_value(node, owners, owner))
+                        .collect::<Result<Vec<_>, _>>()?,
+                ),
             );
-            Value::Object(record.into_iter().collect())
+            Ok(Value::Object(record.into_iter().collect()))
         })
-        .collect::<Vec<_>>();
-    invocations.sort_by_key(compact_json);
+        .collect::<Result<Vec<_>, MacroExpansionDiagnosticKind>>()?;
     let mut root = BTreeMap::new();
     root.insert("invocations".to_owned(), Value::Array(invocations));
     root.insert(
         "schema".to_owned(),
         Value::String(EXPANDED_MACRO_MEANING_SCHEMA_ID.to_owned()),
     );
-    serde_json::to_vec(&root).expect("closed expanded values serialize")
+    Ok(serde_json::to_vec(&root).expect("closed expanded values serialize"))
 }
 
-fn node_value(node: &ExpandedMacroNode) -> Value {
+fn node_value(
+    node: &ExpandedMacroNode,
+    owners: &SemanticMacroExecutionOwners,
+    owner: &SemanticMacroExecutionOwner,
+) -> Result<Value, MacroExpansionDiagnosticKind> {
     let mut record = BTreeMap::new();
     match node {
         ExpandedMacroNode::Emit {
@@ -2497,7 +2722,11 @@ fn node_value(node: &ExpandedMacroNode) -> Value {
             record.insert("kind".to_owned(), Value::String("emit".to_owned()));
             record.insert(
                 "binding".to_owned(),
-                binding.as_ref().map(target_value).unwrap_or(Value::Null),
+                binding
+                    .as_ref()
+                    .map(|target| target_value(target, owners, owner))
+                    .transpose()?
+                    .unwrap_or(Value::Null),
             );
             record.insert(
                 "fields".to_owned(),
@@ -2513,18 +2742,22 @@ fn node_value(node: &ExpandedMacroNode) -> Value {
             record.insert("kind".to_owned(), Value::String("group".to_owned()));
             record.insert(
                 "body".to_owned(),
-                Value::Array(body.iter().map(node_value).collect()),
+                Value::Array(
+                    body.iter()
+                        .map(|node| node_value(node, owners, owner))
+                        .collect::<Result<Vec<_>, _>>()?,
+                ),
             );
         }
         ExpandedMacroNode::Anchor { target, .. } => {
             record.insert("kind".to_owned(), Value::String("anchor".to_owned()));
-            record.insert("target".to_owned(), target_value(target));
+            record.insert("target".to_owned(), target_value(target, owners, owner)?);
         }
         ExpandedMacroNode::Relation { kind, from, to, .. } => {
             record.insert("kind".to_owned(), Value::String("relation".to_owned()));
             record.insert("relation".to_owned(), Value::String(kind.clone()));
-            record.insert("from".to_owned(), target_value(from));
-            record.insert("to".to_owned(), target_value(to));
+            record.insert("from".to_owned(), target_value(from, owners, owner)?);
+            record.insert("to".to_owned(), target_value(to, owners, owner)?);
         }
         ExpandedMacroNode::Transform {
             transform, body, ..
@@ -2551,11 +2784,15 @@ fn node_value(node: &ExpandedMacroNode) -> Value {
             );
             record.insert(
                 "body".to_owned(),
-                Value::Array(body.iter().map(node_value).collect()),
+                Value::Array(
+                    body.iter()
+                        .map(|node| node_value(node, owners, owner))
+                        .collect::<Result<Vec<_>, _>>()?,
+                ),
             );
         }
     }
-    Value::Object(record.into_iter().collect())
+    Ok(Value::Object(record.into_iter().collect()))
 }
 
 fn expanded_value(value: &ExpandedMacroValue) -> Value {
@@ -2589,11 +2826,22 @@ fn expanded_value(value: &ExpandedMacroValue) -> Value {
     Value::Object(record.into_iter().collect())
 }
 
-fn target_value(target: &crate::GeneratedTargetId) -> Value {
+fn target_value(
+    target: &crate::GeneratedTargetId,
+    owners: &SemanticMacroExecutionOwners,
+    owner: &SemanticMacroExecutionOwner,
+) -> Result<Value, MacroExpansionDiagnosticKind> {
+    if target.invocation_ordinal != owner.source_ordinal {
+        return Err(MacroExpansionDiagnosticKind::TargetOwnershipMismatch);
+    }
+    let Some(semantic_ordinal) = owners.semantic_ordinal_for_source(target.invocation_ordinal)
+    else {
+        return Err(MacroExpansionDiagnosticKind::TargetOwnershipMismatch);
+    };
     let mut record = BTreeMap::new();
     record.insert(
         "invocation_ordinal".to_owned(),
-        Value::Number(Number::from(target.invocation_ordinal)),
+        Value::Number(Number::from(semantic_ordinal)),
     );
     record.insert(
         "local_name".to_owned(),
@@ -2603,7 +2851,7 @@ fn target_value(target: &crate::GeneratedTargetId) -> Value {
         "path".to_owned(),
         Value::Array(target.expansion_path.iter().map(path_value).collect()),
     );
-    Value::Object(record.into_iter().collect())
+    Ok(Value::Object(record.into_iter().collect()))
 }
 
 fn path_value(segment: &ExpansionPathSegment) -> Value {
@@ -2706,11 +2954,11 @@ fn macro_expansion_kind(kind: MacroExpansionDiagnosticKind) -> &'static str {
     }
 }
 
-fn semantic_macro_execution_selection(
+pub(crate) fn semantic_macro_execution_owners(
     ast: &SemanticDocumentAst,
     binding: &MacroParameterBindingResult,
-) -> MacroExpansionSelection {
-    let mut execution_binding_indices = Vec::new();
+) -> Result<SemanticMacroExecutionOwners, MacroExpansionDiagnosticKind> {
+    let mut owners = Vec::new();
     let mut explained_binding_indices = Vec::new();
 
     for instruction in &ast.instructions {
@@ -2718,9 +2966,20 @@ fn semantic_macro_execution_selection(
             continue;
         };
         let Some(binding_index) = exact_macro_binding_index(head, binding) else {
-            return MacroExpansionSelection::invalid_owner_join();
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
-        execution_binding_indices.push(binding_index);
+        let Some(complete) = binding.complete.get(binding_index) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        let Ok(semantic_ordinal) = u64::try_from(owners.len()) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        owners.push(SemanticMacroExecutionOwner {
+            binding_index,
+            source_invocation_index: complete.invocation_index,
+            source_ordinal: complete.invocation_ordinal,
+            semantic_ordinal,
+        });
         explained_binding_indices.push(binding_index);
     }
 
@@ -2729,23 +2988,31 @@ fn semantic_macro_execution_selection(
             continue;
         };
         let Some(target_instruction) = ast.instructions.get(edge.target_instruction_index) else {
-            return MacroExpansionSelection::invalid_owner_join();
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
         let SemanticHead::MacroInvocation(target_head) = &target_instruction.entity.head else {
-            return MacroExpansionSelection::invalid_owner_join();
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
         if !macro_head_matches_target(head, &edge.target)
             || !macro_head_matches_target(target_head, &edge.target)
         {
-            return MacroExpansionSelection::invalid_owner_join();
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         }
         let Some(binding_index) = exact_macro_binding_index(head, binding) else {
-            return MacroExpansionSelection::invalid_owner_join();
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
         };
         explained_binding_indices.push(binding_index);
     }
 
-    MacroExpansionSelection::exact(execution_binding_indices, explained_binding_indices)
+    let mapping = SemanticMacroExecutionOwners {
+        owners,
+        explained_binding_indices,
+    };
+    mapping
+        .expansion_selection()
+        .is_valid_for(binding.complete.len())
+        .then_some(mapping)
+        .ok_or(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
 }
 
 fn exact_macro_binding_index(
@@ -2832,9 +3099,16 @@ mod execution_owner_join_tests {
         let semantic = associate_semantic_document_with_macro_binding(&document, binding.clone());
         assert!(semantic.ast.complete);
 
-        let accepted = semantic_macro_execution_selection(&semantic.ast, &binding);
-        assert!(accepted.is_valid_for(binding.complete.len()));
-        assert_eq!(accepted.execution_binding_indices(), [0]);
+        let accepted = semantic_macro_execution_owners(&semantic.ast, &binding).unwrap();
+        assert_eq!(
+            accepted.owners(),
+            [SemanticMacroExecutionOwner {
+                binding_index: 0,
+                source_invocation_index: 0,
+                source_ordinal: 0,
+                semantic_ordinal: 0,
+            }]
+        );
 
         let mut corrupted_ast = semantic.ast;
         let SemanticHead::MacroInvocation(head) = &mut corrupted_ast.instructions[0].entity.head
@@ -2843,14 +3117,17 @@ mod execution_owner_join_tests {
         };
         head.provenance.source.span.end_byte -= 1;
 
-        let rejected = semantic_macro_execution_selection(&corrupted_ast, &binding);
-        assert!(!rejected.is_valid_for(binding.complete.len()));
+        let rejected = semantic_macro_execution_owners(&corrupted_ast, &binding);
+        assert_eq!(
+            rejected,
+            Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+        );
         let expansion = expand_selected_macros(
             binding.clone(),
             std::slice::from_ref(&definition),
             &[],
             LIMITS,
-            rejected,
+            MacroExpansionSelection::invalid_owner_join(),
         );
         assert_eq!(expansion.parameter_binding, binding);
         assert!(expansion.expanded.is_empty());
@@ -2866,6 +3143,92 @@ mod execution_owner_join_tests {
         assert!(projection.conflicts.is_empty());
         assert_eq!(projection.blocking.len(), 1);
         assert_eq!(projection.blocking[0].kind, "expansion_binding_ownership");
+    }
+
+    #[test]
+    fn execution_owner_projector_rejects_missing_duplicate_reordered_and_unmapped_outputs() {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Named","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"anchor","name":"origin"},{"op":"emit","binding":"center","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"relation","kind":"touching","from":"origin","to":"center"}]}"#,
+        )
+        .unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document = NormalizedDdlDocument::new(
+            "a Focus.Named; the red Focus.Named; a blue Focus.Named",
+            ResolvedInstructionLanguage::En,
+            vec![lock],
+        )
+        .unwrap();
+        let compilation = compile_typed_ddl(
+            document,
+            std::slice::from_ref(&definition),
+            Some(19),
+            LIMITS,
+        );
+        let ast = &compilation.semantic_document.as_ref().unwrap().ast;
+        let expansion = compilation.macro_expansion.as_ref().unwrap();
+        let owners = semantic_macro_execution_owners(ast, &expansion.parameter_binding).unwrap();
+        assert!(expanded_meaning_canonical_bytes(ast, expansion).is_ok());
+
+        let mut missing = expansion.clone();
+        missing.expanded.pop();
+        assert_eq!(
+            expanded_meaning_canonical_bytes(ast, &missing),
+            Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+        );
+        let mut partial_projection = Projection::default();
+        assert!(project_expanded_deliveries(&missing, &owners, &mut partial_projection).is_ok());
+        assert_eq!(partial_projection.deliveries.len(), 3);
+
+        let mut duplicate = expansion.clone();
+        duplicate.expanded[1] = duplicate.expanded[0].clone();
+        assert_eq!(
+            expanded_meaning_canonical_bytes(ast, &duplicate),
+            Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch)
+        );
+
+        let mut reordered = expansion.clone();
+        reordered.expanded.swap(0, 1);
+        assert_eq!(
+            expanded_meaning_canonical_bytes(ast, &reordered),
+            Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch)
+        );
+
+        let mut unmapped = expansion.clone();
+        let ExpandedMacroNode::Emit {
+            binding: Some(target),
+            ..
+        } = &mut unmapped.expanded[1].nodes[1]
+        else {
+            panic!("named fixture retains the source-owned generated target");
+        };
+        target.invocation_ordinal += 99;
+        assert_eq!(
+            expanded_meaning_canonical_bytes(ast, &unmapped),
+            Err(MacroExpansionDiagnosticKind::TargetOwnershipMismatch)
+        );
+
+        let mut seeds = compilation
+            .compiler_lock
+            .as_ref()
+            .unwrap()
+            .macro_seeds
+            .clone();
+        seeds[1].ordinal = 2;
+        assert_eq!(
+            owners.validate_seed_identities(
+                compilation.pre_expansion_canonical_bytes().unwrap(),
+                expansion,
+                &seeds,
+                Some(19),
+            ),
+            Err(MacroExpansionDiagnosticKind::MismatchedSeed)
+        );
     }
 }
 

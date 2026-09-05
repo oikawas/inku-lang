@@ -879,7 +879,7 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v3 の typed foundation とR1 / R2は受け入れ済みだが runtime には未接続である。D1のinline / continuation canonical meaning、seed、effective identityの同期はコード修正待ちであり、本節の同期だけで達成済みまたはStep 9 COMPLETEとはしない。現行 Python 経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。受け入れ済み primitive と runtime 接続済み機能を混同しない。
+sealed Rust Stage 1.5 v4 の typed foundation とR1 / R2 / D1は実装済みだが runtime には未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。このコード到達を独立review前のStep 9 COMPLETEとはしない。現行 Python 経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。受け入れ済み primitive と runtime 接続済み機能を混同しない。
 
 ### 12.12 添景と互換記録
 

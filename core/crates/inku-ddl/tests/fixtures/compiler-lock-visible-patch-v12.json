@@ -11,10 +11,10 @@
     "body": []
   },
   "known_answers": {
-    "canonical_bytes": "{\"continuations\":[],\"coordinated_head_groups\":[],\"ground\":null,\"group_predicates\":[],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v13\"}",
-    "canonical_sha256": "238e3ff149acf75d1414a09dc28c3bdcd600bdf544a411e8c4e5277201cd113a",
-    "seed_digest": "fa716b43ece7cb3f065eedbf969640bed08e87bb1ebf0426712a39909172ba3f",
-    "expanded_meaning_sha256": "46be97a07c49e55c32e539d905b1c663a90c37e3a3ba2e00a8016d78a92a9b09",
+    "canonical_bytes": "{\"coordinated_head_groups\":[],\"ground\":null,\"group_predicates\":[],\"instructions\":[{\"action\":null,\"entity\":{\"angle\":null,\"color\":null,\"continuity\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"definition_digest\":\"d970836265b8ee9d30af0c36e456d37bc1860166915c2cf965c3c28909b1329f\",\"definition_version\":\"1.0.0\",\"kind\":\"macro_invocation\",\"parameters\":[],\"qualified_name\":\"Canon.Empty\"},\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},\"position\":null,\"relation\":null}],\"schema\":\"inku.semantic-document.v14\"}",
+    "canonical_sha256": "9403ca4e7339e6ed3d6089f7394d8ef4cb604f72462846080d9649baa3ec7998",
+    "seed_digest": "f83780ae23bd95791c4128796368b7932f74ed7b04427bd05bbc5946521bff80",
+    "expanded_meaning_sha256": "20dabf80fa0a7e3a326fddd9e94f19bc95a01c74eb3f7c3329dc18804e479ab3",
     "full_lock_digest": "ae73dd825955efda06dd344fb464ae56c8d89ef8d38810ec99fb1ccf92cfe449"
   },
   "delivery_case_ids": [

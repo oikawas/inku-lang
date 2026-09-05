@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v13";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v14";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1030,23 +1030,6 @@ pub(crate) fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
         ),
     );
     root.insert(
-        "continuations".to_owned(),
-        Value::Array(
-            ast.continuations
-                .iter()
-                .map(|edge| {
-                    let mut value = BTreeMap::new();
-                    value.insert(
-                        "kind".to_owned(),
-                        Value::String("subject_predicate".to_owned()),
-                    );
-                    value.insert("target".to_owned(), continuation_target_value(&edge.target));
-                    Value::Object(value.into_iter().collect())
-                })
-                .collect(),
-        ),
-    );
-    root.insert(
         "ground".to_owned(),
         ast.ground
             .as_ref()
@@ -1078,7 +1061,7 @@ pub(crate) fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     serde_json::to_vec(&root).expect("closed semantic document AST serializes")
 }
 
-fn continuation_target_value(target: &SemanticContinuationTarget) -> Value {
+pub(crate) fn continuation_target_value(target: &SemanticContinuationTarget) -> Value {
     match target {
         SemanticContinuationTarget::Primitive(identity) => semantic_identity_value(identity),
         SemanticContinuationTarget::MacroInvocation {

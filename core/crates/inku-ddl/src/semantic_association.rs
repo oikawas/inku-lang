@@ -8,12 +8,13 @@ use crate::{
     AttachmentEvidenceResult, AttachmentMarkerEvidence, AttachmentMarkerKind,
     BoundMacroParameterValue, CanonicalPreviousReference, CanonicalRelationIdentity,
     CanonicalRelationKind, ClauseAtom, ClauseSeparatorKind, ClauseStream, ClauseStreamError,
-    CoreModifierValue, CoreRoleKind, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
-    MacroInvocationResolutionDiagnosticKind, MacroLockResolutionIdentity, MacroParameterBinding,
-    MacroParameterBindingDiagnosticKind, MacroParameterBindingResult, NeutralDiagnostic,
-    NeutralDiagnosticKind, NormalizedDdlDocument, ParameterSchema, RemainingRoleKind,
-    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, collect_attachment_evidence,
-    project_macro_semantic_ref, saijiki::canonical_relation_identity_is_valid,
+    CoreModifierValue, CoreRoleKind, EnglishAttachmentMarkerKind, EnglishDeterminerKind,
+    JapaneseAttachmentMarkerKind, MacroInvocationResolutionDiagnosticKind,
+    MacroLockResolutionIdentity, MacroParameterBinding, MacroParameterBindingDiagnosticKind,
+    MacroParameterBindingResult, NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument,
+    ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
+    collect_attachment_evidence, project_macro_semantic_ref,
+    saijiki::canonical_relation_identity_is_valid,
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
@@ -494,6 +495,16 @@ impl SemanticAssociationResult {
 pub(crate) struct ClauseTopologyEvidence {
     pub attachment_markers: Vec<AttachmentMarkerEvidence>,
     pub determiner_starts: BTreeSet<usize>,
+    pub english_determiner_phrases: Vec<EnglishDeterminerPhraseEvidence>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EnglishDeterminerPhraseEvidence {
+    pub kind: EnglishDeterminerKind,
+    pub clause_index: usize,
+    pub determiner_span: SourceSpan,
+    pub candidate_region_span: SourceSpan,
+    pub head_candidate_span: Option<SourceSpan>,
 }
 
 impl ClauseTopologyEvidence {
@@ -505,6 +516,21 @@ impl ClauseTopologyEvidence {
                 .evidence
                 .iter()
                 .map(|evidence| evidence.determiner.span.start_byte)
+                .collect(),
+            english_determiner_phrases: attachment
+                .noun_phrase
+                .evidence
+                .iter()
+                .map(|evidence| EnglishDeterminerPhraseEvidence {
+                    kind: evidence.determiner.kind,
+                    clause_index: evidence.clause_index,
+                    determiner_span: evidence.determiner.span,
+                    candidate_region_span: evidence.candidate_region_span,
+                    head_candidate_span: evidence
+                        .head_candidate
+                        .as_ref()
+                        .map(|candidate| candidate.span),
+                })
                 .collect(),
         }
     }

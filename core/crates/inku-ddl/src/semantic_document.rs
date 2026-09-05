@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use crate::{
-    AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind,
+    AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind, EnglishDeterminerKind,
     JapaneseAttachmentMarkerKind, MacroParameterBindingResult, NormalizedDdlDocument,
     OwnedSemanticOccurrence, ResolvedInstructionLanguage, SemanticAssociationIssueKind,
     SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticHead, SemanticIdentity,
@@ -358,7 +358,7 @@ fn arbitrate_coordination_continuation_claims(
             let mut claimant = association.ast.instructions[member_index].clone();
             claimant.action = edge.action.clone();
             claimant.position = edge.position.clone();
-            let Some(marker) = continuation_marker(document, association, &claimant) else {
+            let Some(admission) = continuation_marker(document, association, &claimant) else {
                 continue;
             };
             if !has_continuation_predicate(&claimant) {
@@ -379,7 +379,7 @@ fn arbitrate_coordination_continuation_claims(
             if member_candidates.is_empty() {
                 continue;
             }
-            continuation_markers.push(marker);
+            continuation_markers.push(admission.marker);
             candidate_instruction_indices.extend(member_candidates);
         }
         if continuation_markers.is_empty() {
@@ -482,7 +482,7 @@ fn associate_continuations(
         }
         let (instruction, consumed_upstream_spans) =
             continuation_predicate(association, original_instruction);
-        let Some(marker) = continuation_marker(document, association, &instruction) else {
+        let Some(admission) = continuation_marker(document, association, &instruction) else {
             instruction_index_map[original_index] = Some(instructions.len());
             instructions.push(original_instruction.clone());
             continue;
@@ -492,6 +492,7 @@ fn associate_continuations(
             instructions.push(original_instruction.clone());
             continue;
         }
+        let ContinuationAdmission { marker, role } = admission;
 
         owned += 2;
         let clause = &association.association.clause_stream.clauses[marker.clause_index];
@@ -508,7 +509,8 @@ fn associate_continuations(
             .map(|(index, candidate)| (index, continuation_target(&candidate.entity.head)))
             .collect::<Vec<_>>();
 
-        let issue_kind = if instruction.entity.quantity.is_some()
+        let issue_kind = if role == ContinuationPhraseRole::UnsupportedDefiniteObject
+            || instruction.entity.quantity.is_some()
             || instruction.position.is_some()
             || instruction.relation.is_some()
         {
@@ -801,66 +803,89 @@ pub(crate) fn exclusive_continuation_issue_claim_spans(
     Some(&issue.consumed_upstream_spans)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ContinuationPhraseRole {
+    SupportedMarkedSubject,
+    UnsupportedDefiniteObject,
+}
+
+struct ContinuationAdmission {
+    marker: SourceOccurrence,
+    role: ContinuationPhraseRole,
+}
+
 fn continuation_marker(
     document: &NormalizedDdlDocument,
     result: &SemanticInstructionAssociationResult,
     instruction: &SemanticInstruction,
-) -> Option<SourceOccurrence> {
+) -> Option<ContinuationAdmission> {
     let head = instruction.entity.head.source();
     let clause = result
         .association
         .clause_stream
         .clauses
         .get(head.clause_index)?;
-    let marker_span = match document.language() {
-        ResolvedInstructionLanguage::Ja => result
-            .association
-            .clause_topology
-            .attachment_markers
-            .iter()
-            .filter(|marker| {
-                marker.clause_index == head.clause_index
-                    && matches!(
-                        marker.marker,
-                        AttachmentMarkerKind::Japanese(
-                            JapaneseAttachmentMarkerKind::Wa | JapaneseAttachmentMarkerKind::Ga
+    let (marker_span, role) = match document.language() {
+        ResolvedInstructionLanguage::Ja => (
+            result
+                .association
+                .clause_topology
+                .attachment_markers
+                .iter()
+                .filter(|marker| {
+                    marker.clause_index == head.clause_index
+                        && matches!(
+                            marker.marker,
+                            AttachmentMarkerKind::Japanese(
+                                JapaneseAttachmentMarkerKind::Wa | JapaneseAttachmentMarkerKind::Ga
+                            )
                         )
-                    )
-                    && marker.left_atom_spans.last() == Some(&head.span)
-            })
-            .map(|marker| marker.span)
-            .next(),
-        ResolvedInstructionLanguage::En => result
-            .association
-            .clause_topology
-            .determiner_starts
-            .iter()
-            .copied()
-            .filter(|start| {
-                clause.span.start_byte <= *start
-                    && *start < head.span.start_byte
-                    && !clause.atoms.iter().any(|atom| {
-                        matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive)
-                            && *start < atom.span().start_byte
-                            && atom.span().end_byte <= head.span.start_byte
-                            && atom.span() != head.span
-                    })
-            })
-            .max()
-            .and_then(|start| clause.atoms.iter().find(|atom| atom.span().start_byte == start))
-            .map(ClauseAtom::span),
-    }?;
+                        && marker.left_atom_spans.last() == Some(&head.span)
+                })
+                .map(|marker| marker.span)
+                .next()?,
+            ContinuationPhraseRole::SupportedMarkedSubject,
+        ),
+        ResolvedInstructionLanguage::En => {
+            let phrase = result
+                .association
+                .clause_topology
+                .english_determiner_phrases
+                .iter()
+                .find(|phrase| {
+                    phrase.kind == EnglishDeterminerKind::The
+                        && phrase.clause_index == head.clause_index
+                        && (phrase.head_candidate_span == Some(head.span)
+                            || (matches!(
+                                instruction.entity.head,
+                                SemanticHead::MacroInvocation(_)
+                            ) && phrase.determiner_span.end_byte <= head.span.start_byte
+                                && head.span.end_byte <= phrase.candidate_region_span.end_byte))
+                })?;
+            let role = if instruction.action.as_ref().is_some_and(|action| {
+                action.provenance.source.span.end_byte <= phrase.determiner_span.start_byte
+            }) {
+                ContinuationPhraseRole::UnsupportedDefiniteObject
+            } else {
+                ContinuationPhraseRole::SupportedMarkedSubject
+            };
+            (phrase.determiner_span, role)
+        }
+    };
     let atom_index = clause
         .atoms
         .iter()
         .position(|atom| atom.span() == marker_span)?;
-    Some(SourceOccurrence {
-        span: marker_span,
-        surface: document.source()[marker_span.start_byte..marker_span.end_byte].to_owned(),
-        language: document.language(),
-        region_index: sentence_region_index(&result.association.clause_stream, marker_span),
-        clause_index: head.clause_index,
-        atom_index,
+    Some(ContinuationAdmission {
+        marker: SourceOccurrence {
+            span: marker_span,
+            surface: document.source()[marker_span.start_byte..marker_span.end_byte].to_owned(),
+            language: document.language(),
+            region_index: sentence_region_index(&result.association.clause_stream, marker_span),
+            clause_index: head.clause_index,
+            atom_index,
+        },
+        role,
     })
 }
 

@@ -137,6 +137,146 @@ fn coordination_and_continuation_predicate_overlap_fails_closed() {
 }
 
 #[test]
+fn indefinite_article_introduces_a_distinct_entity() {
+    for (source, expected_action) in [
+        ("circle. a red circle.", None),
+        ("circle. place a red circle.", Some("place")),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap();
+        let result = associate_semantic_document(&document).unwrap();
+
+        assert_eq!(
+            result.ast.instructions.len(),
+            2,
+            "an indefinite noun phrase introduces a new entity: {source}"
+        );
+        assert!(
+            result.ast.instructions[0].entity.color.is_none(),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[1]
+                .entity
+                .color
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("red"),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[1]
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            expected_action,
+            "{source}"
+        );
+        for instruction in &result.ast.instructions {
+            let occurrence = instruction.entity.head.source();
+            assert_eq!(
+                &source[occurrence.span.start_byte..occurrence.span.end_byte],
+                occurrence.surface,
+                "{source}"
+            );
+        }
+        assert!(result.ast.continuations.is_empty(), "{source}");
+        assert!(result.continuation_issues.is_empty(), "{source}");
+        assert!(result.ast.complete, "{source}");
+        assert!(result.canonical_bytes.is_some(), "{source}");
+    }
+}
+
+#[test]
+fn indefinite_articles_keep_single_introductions_and_ja_meaning_parity() {
+    for (en, ja, expected_head, expected_position) in [
+        ("place a circle.", "円を置く。", "circle", None),
+        ("place an ellipse.", "楕円を置く。", "ellipse", None),
+        (
+            "place a circle at the center.",
+            "円を中心に置く。",
+            "circle",
+            Some("center"),
+        ),
+    ] {
+        let results = [
+            (ResolvedInstructionLanguage::En, en),
+            (ResolvedInstructionLanguage::Ja, ja),
+        ]
+        .map(|(language, source)| {
+            let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+            associate_semantic_document(&document).unwrap()
+        });
+
+        for result in &results {
+            assert_eq!(result.ast.instructions.len(), 1, "{en}");
+            assert_eq!(
+                match &result.ast.instructions[0].entity.head {
+                    SemanticHead::Primitive(term) => term.identity.id.as_str(),
+                    SemanticHead::MacroInvocation(_) => "macro",
+                },
+                expected_head,
+                "{en}"
+            );
+            assert_eq!(
+                result.ast.instructions[0]
+                    .action
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()),
+                Some("place"),
+                "{en}"
+            );
+            assert_eq!(
+                result.ast.instructions[0]
+                    .position
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()),
+                expected_position,
+                "{en}"
+            );
+            assert!(result.ast.continuations.is_empty(), "{en}");
+            assert!(result.continuation_issues.is_empty(), "{en}");
+            assert!(result.ast.complete, "{en}");
+        }
+        assert_eq!(
+            results[0].canonical_bytes, results[1].canonical_bytes,
+            "{en}"
+        );
+    }
+}
+
+#[test]
+fn definite_imperative_object_is_blocked_as_an_unsupported_role() {
+    let source = "line. place the line.";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap();
+    let result = associate_semantic_document(&document).unwrap();
+
+    assert_eq!(result.ast.instructions.len(), 1);
+    assert!(result.ast.continuations.is_empty());
+    assert_eq!(result.continuation_issues.len(), 1);
+    let issue = &result.continuation_issues[0];
+    assert_eq!(
+        issue.kind,
+        SemanticContinuationIssueKind::UnsupportedPredicate
+    );
+    assert_eq!(issue.marker.surface, "the");
+    assert_eq!(
+        issue
+            .instruction
+            .action
+            .as_ref()
+            .map(|term| term.identity.id.as_str()),
+        Some("place")
+    );
+    let head = issue.instruction.entity.head.source();
+    assert_eq!(&source[head.span.start_byte..head.span.end_byte], "line");
+    assert!(!result.ast.complete);
+    assert!(result.canonical_bytes.is_none());
+}
+
+#[test]
 fn multi_head_continuation_predicate_occurrences_have_one_exclusive_owner() {
     for (language, source, expected_claims) in [
         (

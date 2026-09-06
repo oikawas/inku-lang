@@ -536,7 +536,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "393b0f0cffc6538c3a657d598c88d80c29160be27006037f575d07bd895d1985"
+            "3ba520eb2111a46f4b83e4fed397dcf368894cac83a82fe8979533c4fe9026f7"
         );
     }
 }

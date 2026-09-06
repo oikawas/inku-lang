@@ -15,7 +15,8 @@ use inku_render::placement::region_in_short_side_units;
 use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
 use inku_score::{
-    Color, LineStyle, Point, Primitive, ResolvedPaletteColor, ResolvedPaletteContext, Weight,
+    Canvas, Color, GroundMaterial, LineStyle, Point, Primitive, ResolvedPaletteColor,
+    ResolvedPaletteContext, SurfaceTexture, Weight,
 };
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -778,33 +779,134 @@ fn ordinary_surface_intensity_omits_only_that_field_and_keeps_quality() {
             ..
         }] if spans.len() == 1
     ));
+}
 
-    let unsupported_quality = stage15(
-        "place one red bleeding circle at center.",
+#[test]
+fn explicit_surface_and_ground_reach_the_actual_score() {
+    let result = stage15(
+        "paper. place one red bleeding circle at center.",
         ResolvedInstructionLanguage::En,
     );
-    let unsupported_quality = lower_verified_stage15_score_with_policy(
-        unsupported_quality.verified_effective_view(),
-        context,
-        ScoreErrorPolicy::OmitAndContinue,
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
     );
-    assert!(unsupported_quality.score().unwrap().instructions[0].filled);
+
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(
+        lowered.diagnostics().is_empty(),
+        "{:?}",
+        lowered.diagnostics()
+    );
+    let score = lowered.score().unwrap();
     assert!(matches!(
-        unsupported_quality.diagnostics(),
-        [inku_ddl::ScoreLoweringDiagnostic {
-            owner: ScoreDiagnosticOwner::SourceInstruction {
-                field: Some(ScoreAppearanceField::SurfaceQuality),
-                spans,
-                ..
-            },
-            disposition: ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::AppearanceField {
-                    field: ScoreAppearanceField::SurfaceQuality
-                },
-                appearance_resolution: Some(ScoreAppearanceResolution::Filled),
-            },
-            ..
-        }] if spans.len() == 1
+        &score.canvas,
+        Canvas::Spec(spec)
+            if spec.aspect == "wide"
+                && matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Paper && ground.seed.is_none())
+    ));
+    assert_eq!(
+        score.instructions[0].surface.as_ref().unwrap().texture,
+        SurfaceTexture::Bleed
+    );
+    assert!(
+        score.instructions[0]
+            .surface
+            .as_ref()
+            .unwrap()
+            .seed
+            .is_none()
+    );
+}
+
+#[test]
+fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (surface, expected_texture) in [
+        ("wash", SurfaceTexture::Wash),
+        ("grain", SurfaceTexture::Grain),
+        ("stipple", SurfaceTexture::Stipple),
+        ("hatch", SurfaceTexture::Hatch),
+        ("crosshatch", SurfaceTexture::Crosshatch),
+        ("bleed", SurfaceTexture::Bleed),
+        ("aquatint", SurfaceTexture::Aquatint),
+    ] {
+        let definition = surface_emit_definition(surface);
+        let result = stage15_locked(
+            "Draw.Surface",
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{surface}"
+        );
+        assert!(
+            lowered.diagnostics().is_empty(),
+            "{surface}: {:?}",
+            lowered.diagnostics()
+        );
+        let spec = lowered.score().unwrap().instructions[0]
+            .surface
+            .as_ref()
+            .unwrap();
+        assert_eq!(spec.texture, expected_texture, "{surface}");
+        assert!(spec.seed.is_none(), "{surface}");
+    }
+
+    let definition = surface_emit_definition("bleed");
+    let paired = stage15_locked(
+        "place one red bleeding circle at center; Draw.Surface",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let paired = lower_verified_stage15_score(paired.verified_effective_view(), context);
+    let instructions = &paired.score().unwrap().instructions;
+    assert_eq!(instructions[0], instructions[1]);
+    assert!(matches!(
+        paired.instruction_origins(),
+        [
+            ScoreInstructionOrigin::SourceInstruction { .. },
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ]
+    ));
+}
+
+#[test]
+fn delivered_ground_ids_use_shared_defaults_in_english_and_japanese() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (source, material) in [
+        ("paper.", GroundMaterial::Paper),
+        ("washi.", GroundMaterial::Washi),
+        ("ink wash ground.", GroundMaterial::InkWash),
+        ("charcoal ground.", GroundMaterial::CharcoalGround),
+        ("canvas.", GroundMaterial::Canvas),
+        ("drawing paper.", GroundMaterial::DrawingPaper),
+        ("mezzotint.", GroundMaterial::Mezzotint),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}"
+        );
+        assert!(matches!(
+            &lowered.score().unwrap().canvas,
+            Canvas::Spec(spec)
+                if spec.aspect == "wide"
+                    && matches!(spec.ground.as_ref(), Some(ground) if ground.material == material && ground.seed.is_none())
+        ));
+    }
+
+    let japanese = stage15("和紙。", ResolvedInstructionLanguage::Ja);
+    let japanese = lower_verified_stage15_score(japanese.verified_effective_view(), context);
+    assert!(matches!(
+        &japanese.score().unwrap().canvas,
+        Canvas::Spec(spec)
+            if matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Washi)
     ));
 }
 
@@ -1623,45 +1725,31 @@ fn continue_omits_macro_emit_and_structural_subtree_but_keeps_flat_siblings() {
 }
 
 #[test]
-fn flat_macro_appearance_field_uses_the_same_omission_default() {
-    let definition = unsupported_surface_emit_definition();
+fn flat_macro_surface_uses_the_same_shared_lowerer() {
+    let definition = surface_emit_definition("bleed");
     let result = stage15_locked(
-        "Draw.Bleeding",
+        "Draw.Surface",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    assert!(
-        lower_verified_stage15_score(result.verified_effective_view(), context)
-            .score()
-            .is_none()
-    );
-
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert!(continued.score().unwrap().instructions[0].filled);
-    assert!(matches!(
-        continued.diagnostics(),
-        [inku_ddl::ScoreLoweringDiagnostic {
-            owner: ScoreDiagnosticOwner::GeneratedNode {
-                invocation_ordinal: 0,
-                generated_ordinal: 0,
-                key: Some(key),
-                spans,
-                ..
-            },
-            disposition: ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::AppearanceField {
-                    field: ScoreAppearanceField::SurfaceQuality
-                },
-                appearance_resolution: Some(ScoreAppearanceResolution::Filled),
-            },
-            ..
-        }] if key == "surface" && spans.len() == 1
-    ));
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(stop.score(), continued.score());
+    assert!(stop.diagnostics().is_empty());
+    assert_eq!(
+        stop.score().unwrap().instructions[0]
+            .surface
+            .as_ref()
+            .unwrap()
+            .texture,
+        SurfaceTexture::Bleed
+    );
 }
 
 #[test]
@@ -1678,16 +1766,12 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
         ScoreErrorPolicy::OmitAndContinue,
     );
     assert_eq!(grounded.score().unwrap().instructions.len(), 1);
-    assert!(grounded.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition),
-        (
-            ScoreDiagnosticOwner::Ground { spans },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::Ground,
-                ..
-            }
-        ) if spans.len() == 1
-    )));
+    assert!(matches!(
+        &grounded.score().unwrap().canvas,
+        Canvas::Spec(spec)
+            if matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Paper)
+    ));
+    assert!(grounded.diagnostics().is_empty());
 
     let grouped = stage15(
         concat!(
@@ -1754,7 +1838,7 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
 }
 
 #[test]
-fn continue_stops_when_every_drawing_unit_is_omitted() {
+fn ground_only_is_a_complete_canvas_score() {
     let result = stage15("paper.", ResolvedInstructionLanguage::En);
     let lowered = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
@@ -1762,16 +1846,10 @@ fn continue_stops_when_every_drawing_unit_is_omitted() {
         ScoreErrorPolicy::OmitAndContinue,
     );
 
-    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(lowered.score().is_none());
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(lowered.score().is_some());
     assert!(lowered.instruction_origins().is_empty());
-    assert!(matches!(
-        lowered.diagnostics()[0].disposition,
-        ScoreDiagnosticDisposition::Omitted {
-            unit: ScoreOmissionUnit::Ground,
-            ..
-        }
-    ));
+    assert!(lowered.diagnostics().is_empty());
 }
 
 fn resolved_palette(
@@ -1904,10 +1982,10 @@ fn mixed_omission_definition() -> MacroDefinition {
     .unwrap()
 }
 
-fn unsupported_surface_emit_definition() -> MacroDefinition {
-    MacroDefinition::from_json(
-        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Bleeding","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"surface":{"expr":"semantic_ref","category":"surface","id":"bleed"}}}]}"#,
-    )
+fn surface_emit_definition(surface: &str) -> MacroDefinition {
+    MacroDefinition::from_json(&format!(
+        r#"{{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Surface","version":"1.0.0","parameters":{{}},"components":{{}},"body":[{{"op":"emit","binding":null,"fields":{{"shape":{{"expr":"semantic_ref","category":"shape","id":"circle"}},"movement":{{"expr":"semantic_ref","category":"movement","id":"place"}},"place":{{"expr":"semantic_ref","category":"place","id":"center"}},"color":{{"expr":"semantic_ref","category":"color","id":"red"}},"surface":{{"expr":"semantic_ref","category":"surface","id":"{surface}"}}}}}}]}}"#
+    ))
     .unwrap()
 }
 

@@ -3,8 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
-    AtRegion, Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point,
-    Primitive, ResolvedPaletteContext, Score, Weight, lookup_canvas_format,
+    AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color, GroundMaterial,
+    Instruction, InstructionMode, LineStyle, Point, Primitive, ResolvedPaletteContext, Score,
+    SurfaceSpec, SurfaceTexture, Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -909,21 +910,27 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
     let mut diagnostics = Vec::new();
     let mut omitted_group_members = BTreeSet::new();
 
-    if let Some(ground) = &document.ground {
-        let reason = ScoreFieldGap::UnsupportedGround;
-        diagnostics.push(ScoreLoweringDiagnostic {
-            owner: ScoreDiagnosticOwner::Ground {
-                spans: vec![ground.provenance.source.span],
-            },
-            disposition: diagnostic_disposition(
-                error_policy,
-                &reason,
-                ScoreOmissionUnit::Ground,
-                None,
-            ),
-            reason,
+    let ground =
+        document.ground.as_ref().and_then(|ground| {
+            match canvas_ground_spec_from_identity(&ground.identity) {
+                Ok(spec) => Some(spec),
+                Err(reason) => {
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: ScoreDiagnosticOwner::Ground {
+                            spans: vec![ground.provenance.source.span],
+                        },
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            &reason,
+                            ScoreOmissionUnit::Ground,
+                            None,
+                        ),
+                        reason,
+                    });
+                    None
+                }
+            }
         });
-    }
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         omitted_group_members.extend(group.member_instruction_indices.iter().copied());
         let group_index = candidate
@@ -1062,7 +1069,8 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
             ScoreDiagnosticDisposition::Omitted { .. }
         )
     });
-    let outcome = if stopped || (omitted && instructions.is_empty()) {
+    let has_drawable_content = !instructions.is_empty() || ground.is_some();
+    let outcome = if stopped || (omitted && !has_drawable_content) {
         ScoreLoweringOutcome::Stopped
     } else if omitted {
         ScoreLoweringOutcome::CompleteWithOmissions
@@ -1071,7 +1079,15 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
     };
     let score = (outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: score_wire_version(),
-        canvas: Canvas::Id(context.canvas_format.id.to_owned()),
+        canvas: ground.map_or_else(
+            || Canvas::Id(context.canvas_format.id.to_owned()),
+            |ground| {
+                Canvas::Spec(CanvasSpec {
+                    aspect: context.canvas_format.id.to_owned(),
+                    ground: Some(ground),
+                })
+            },
+        ),
         background: context.background,
         presence: None,
         instructions,
@@ -1587,17 +1603,17 @@ fn lower_complete_instruction(
         Some(_) => map_score_enum::<LineStyle>(input.continuity, "continuity", &mut gaps),
         None => Some(LineStyle::Solid),
     };
-    let filled = match input.surface {
-        Some(identity) if identity.category == "surface" && identity.id == "none" => false,
-        Some(identity) if identity.category == "surface" && identity.id == "solid" => true,
-        Some(identity) => {
-            gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
-                category: identity.category.to_owned(),
-                id: identity.id.to_owned(),
-            });
-            false
-        }
-        None => true,
+    let (filled, surface) = match input.surface {
+        Some(identity) if identity.category == "surface" && identity.id == "none" => (false, None),
+        Some(identity) if identity.category == "surface" && identity.id == "solid" => (true, None),
+        Some(identity) => match surface_spec_from_identity(identity) {
+            Ok(spec) => (true, Some(spec)),
+            Err(gap) => {
+                gaps.push(gap);
+                (false, None)
+            }
+        },
+        None => (true, None),
     };
     if let Some(identity) = input.surface_intensity {
         gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensity {
@@ -1689,8 +1705,52 @@ fn lower_complete_instruction(
         at: geometric.at,
         relation: None,
         thinness: None,
-        surface: None,
+        surface,
     })
+}
+
+fn surface_spec_from_identity(
+    identity: SemanticInputIdentity<'_>,
+) -> Result<SurfaceSpec, ScoreFieldGap> {
+    let texture: SurfaceTexture = match (identity.category, identity.id) {
+        (
+            "surface",
+            "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
+        ) => serde_json::from_value(serde_json::Value::String(identity.id.to_owned())).map_err(
+            |_| ScoreFieldGap::UnsupportedSurfaceIdentity {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            },
+        )?,
+        _ => {
+            return Err(ScoreFieldGap::UnsupportedSurfaceIdentity {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+        }
+    };
+    Ok(
+        serde_json::from_value(serde_json::json!({ "texture": texture }))
+            .expect("shared SurfaceSpec defaults accept a supported texture"),
+    )
+}
+
+fn canvas_ground_spec_from_identity(
+    identity: &SemanticIdentity,
+) -> Result<CanvasGroundSpec, ScoreFieldGap> {
+    let material: GroundMaterial = match (identity.category.as_str(), identity.id.as_str()) {
+        (
+            "ground",
+            "paper" | "washi" | "ink_wash" | "charcoal_ground" | "canvas" | "drawing_paper"
+            | "mezzotint",
+        ) => serde_json::from_value(serde_json::Value::String(identity.id.clone()))
+            .map_err(|_| ScoreFieldGap::UnsupportedGround)?,
+        _ => return Err(ScoreFieldGap::UnsupportedGround),
+    };
+    Ok(
+        serde_json::from_value(serde_json::json!({ "material": material }))
+            .expect("shared CanvasGroundSpec defaults accept a supported material"),
+    )
 }
 
 fn resolve_omitted_color(

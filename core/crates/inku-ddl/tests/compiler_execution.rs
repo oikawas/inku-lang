@@ -5,7 +5,7 @@ use inku_ddl::{
     ScoreLoweringOutcome, compile_ddl_to_score, compile_typed_ddl, saijiki_asset,
     stage15_transformation_input,
 };
-use inku_score::{Color, Primitive};
+use inku_score::{Canvas, Color, GroundMaterial, Primitive};
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 8,
@@ -30,6 +30,75 @@ fn canonical_input_preserves_the_existing_score_in_both_modes() {
         stop.compilation().compiler_lock.as_ref().unwrap().state,
         CompilerLockState::CanonicalReady
     );
+}
+
+#[test]
+fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let ground_only = execute("paper.", &[], LIMITS, policy);
+        assert_eq!(
+            ground_only.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{policy:?}"
+        );
+        assert!(matches!(
+            &ground_only.score().unwrap().canvas,
+            Canvas::Spec(spec)
+                if matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Paper)
+        ));
+
+        let ground_and_instruction = execute(
+            "paper. place one red circle at center.",
+            &[],
+            LIMITS,
+            policy,
+        );
+        assert_eq!(
+            ground_and_instruction.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{policy:?}"
+        );
+        assert_eq!(
+            ground_and_instruction.score().unwrap().instructions.len(),
+            1
+        );
+    }
+
+    let continued = execute(
+        "paper. place many red circle at center.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert!(continued.score().unwrap().instructions.is_empty());
+    assert!(matches!(
+        &continued.score().unwrap().canvas,
+        Canvas::Spec(spec)
+            if matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Paper)
+    ));
+    assert!(!continued.upstream_diagnostics().is_empty());
+
+    let stopped = execute(
+        "paper. place many red circle at center.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stopped.score().is_none());
+
+    let all_omitted = execute(
+        "paper washi. place many red circle at center.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(all_omitted.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(all_omitted.score().is_none());
 }
 
 #[test]

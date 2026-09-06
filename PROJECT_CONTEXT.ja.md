@@ -78,22 +78,26 @@ circle / ellipse / cloudform / squareでは、明示numeric geometryに加え、
 日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
-Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換し、未対応意味が残る文書は
-partial Scoreにしない。
+Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは
+Stopを既定、OmitAndContinueを明示選択とする。Stopは未対応意味が一つでもあればScoreを返さず、
+Continueは元meaningを変えず、独立appearance fieldまたは成立しないtyped実行単位だけを省略する。
+結果はcomplete / omissions / stopped、元gap、実際の処置、source / generated ownerとspanを区別する。
 
 Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
 `use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは4つのclosed shape、明示`place`、
-exact `center`、任意の同名category属性、count省略またはInteger 1である。未結合caller fact、
-構造node、不完全・未知・型不一致のEmitは文書全体をgapにし、partial Scoreを返さない。
+exact `center`、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
+構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
+field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
+外側meaningはinvocation単位で省略する。無関係なflat siblingと元ordinal欠番は保持する。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
 Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
-残るprimitive / surface / ground / relation / caller / structural Score意味、typed holeの停止範囲、runtime cutoverは
-未接続の境界として残る。Step10Hの到達は
-Step10全体の完了を意味しない。
+残るprimitive等のdelivery拡張、上流NonCanonicalReady回復、typed holeの停止範囲、runtime cutoverは
+未接続の境界として残る。Step10Iの到達はStep10全体の完了を意味しない。製品UI / API / 保存経路は
+まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
 
 ## 守るべき設計契約
 

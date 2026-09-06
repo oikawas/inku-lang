@@ -67,14 +67,27 @@ complete Emits keeps its order, including Emits already flattened through
 `touch`, `continuity`, and `surface`. Omitted drawing attributes and normal
 count-one geometry use the same defaults as ordinary DDL.
 
-Incomplete Emits, unknown keys, mismatched value types or categories, unbound
-caller facts, repeated outer counts, and expanded `group`, `transform`,
-`anchor`, or `relation` nodes stop the whole document without a partial Score.
-An unused parameter or an unreferenced Emit binding ID does not fail merely for
-being unused. The finite consumer recognizes only an omitted count or an
-integer count of one; it never treats a floating-point `1.0` as that integer.
-The current authoring schema does not expose `count` as an Emit field, so a
-Score-ready definition currently omits it and receives normal count-one.
+Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
+value types or categories, unbound caller facts, repeated outer counts, and
+expanded `group`, `transform`, `anchor`, or `relation` nodes stop the entire
+Score. Under explicit OmitAndContinue, a supported appearance problem omits
+only that field and uses the ordinary default; an invalid flat Emit omits that
+Emit; and an unsupported structural node omits its whole subtree without
+extracting child Emits. Invalid outer placement, size, count, relation, or other
+caller meaning omits the invocation. Unrelated flat siblings retain source and
+generated-provenance order. Diagnostics identify source or generated ownership,
+spans, invocation, expansion path, generated ordinal, field key, and the actual
+omission unit. If no drawing target remains, the result is stopped.
+
+Meaning bound through declared parameters is read from the expanded Emit. An
+unbound caller appearance field does not fan out or override generated values;
+OmitAndContinue drops that caller field and preserves the definition's color,
+touch, continuity, or surface. An unused parameter or an unreferenced Emit
+binding ID does not fail merely for being unused. The finite consumer recognizes
+only an omitted count or an integer count of one; it never treats a
+floating-point `1.0` as that integer. The current authoring schema does not
+expose `count` as an Emit field, so a Score-ready definition currently omits it
+and receives normal count-one.
 
 ## Resolution, Expansion, and LLM Boundary
 
@@ -113,10 +126,14 @@ O(count) allocation or materialization.
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
 and deterministically expand MacroDefinition v1 values. Its finite flat Emit
 subset also reaches an actual Score through the same lowerer used by ordinary
-DDL. Production runtime integration, an installable package catalog, preview,
-legacy cutover, and a general user-package loader are not complete. This guide
-therefore does not claim that arbitrary packages can currently be installed or
-loaded.
+DDL, with shared Stop / OmitAndContinue outcomes and typed omission diagnostics.
+Missing or duplicate execution owners and focus joins stop both modes. The
+Score wire, canonical meaning, seed, focus, geometry policy, and generated
+provenance are unchanged. Production runtime integration, UI / API / persistence
+selection, upstream NonCanonicalReady recovery, an installable package catalog,
+preview, legacy cutover, and a general user-package loader are not complete.
+This guide therefore does not claim that arbitrary packages can currently be
+installed or loaded or that legacy coerce / LLM fallback has been replaced.
 
 `Nature` and `Bamboo` are future or explanatory reference-vocabulary names,
 not installed packages or entries in an official registry. The v1.70

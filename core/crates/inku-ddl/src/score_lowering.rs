@@ -1,6 +1,6 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
     AtRegion, Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point,
@@ -13,16 +13,18 @@ use crate::geometry::{
 };
 use crate::{
     CoreModifierValue, ExactDecimal, ExactDecimalError, ExpandedMacroInvocation, ExpandedMacroNode,
-    ExpandedMacroValue, ExpansionPathSegment, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID,
-    GeneratedNodeProvenance, GeneratedTargetId, SemanticExplicitGeometry, SemanticHead,
+    ExpandedMacroValue, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance,
+    GeneratedTargetId, ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
+    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreLoweringDiagnostic,
+    ScoreLoweringOutcome, ScoreOmissionUnit, SemanticExplicitGeometry, SemanticHead,
     SemanticIdentity, SemanticInstruction, SemanticMacroInvocationHead, SemanticNumericPosition,
-    Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
+    SourceSpan, Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
     geometry_resolution_policy_digest,
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
 pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v3";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v4";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -84,115 +86,6 @@ impl ExactCountFieldCandidate {
             Self::Repeated(value) => value,
         }
     }
-}
-
-/// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ScoreFieldGap {
-    UnsupportedPrimitiveIdentity {
-        category: String,
-        id: String,
-    },
-    MacroInvocationHead,
-    ExactCountZero {
-        value: u64,
-    },
-    ExactCountExceedsScoreRange {
-        value: u64,
-    },
-    UnsupportedRelativeScalePrimitive {
-        primitive: Primitive,
-    },
-    UnsupportedRelativeScaleValue {
-        value: CoreModifierValue,
-    },
-    MissingExactCount,
-    RepeatedCountUnsupported {
-        value: u32,
-    },
-    MissingExplicitGeometry,
-    MissingNumericPosition,
-    MissingColor,
-    MissingResolvedPaletteContext,
-    MissingTouch,
-    MissingContinuity,
-    MissingEmptySurface,
-    MissingPlaceAction,
-    UnsupportedPrimitiveForExplicitGeometry {
-        primitive: Primitive,
-    },
-    GeometryDimensionMismatch {
-        primitive: Primitive,
-    },
-    UnsupportedColorIdentity {
-        category: String,
-        id: String,
-    },
-    UnsupportedTouchIdentity {
-        category: String,
-        id: String,
-    },
-    UnsupportedContinuityIdentity {
-        category: String,
-        id: String,
-    },
-    UnsupportedSurfaceIdentity {
-        category: String,
-        id: String,
-    },
-    UnsupportedActionIdentity {
-        category: String,
-        id: String,
-    },
-    NamedAndNumericPositionConflict,
-    UnsupportedNamedPosition,
-    UnsupportedInstructionMeaning,
-    UnsupportedDocumentMeaning,
-    UnboundMacroCallerMeaning,
-    MissingMacroExpansionOwner {
-        invocation_ordinal: u64,
-    },
-    DuplicateMacroExpansionOwner {
-        invocation_ordinal: u64,
-    },
-    UnsupportedMacroStructure,
-    MissingMacroEmitField {
-        key: String,
-    },
-    UnknownMacroEmitField {
-        key: String,
-    },
-    MacroEmitFieldTypeMismatch {
-        key: String,
-    },
-    MacroEmitIntegerOutOfRange {
-        key: String,
-        value: i64,
-    },
-    MacroEmitFieldCategoryMismatch {
-        key: String,
-        expected: String,
-        actual: String,
-    },
-    UnsupportedMacroEmitIdentity {
-        key: String,
-        category: String,
-        id: String,
-    },
-    MissingMacroEmitFocusTarget {
-        invocation_ordinal: u64,
-        expansion_path: Vec<ExpansionPathSegment>,
-        generated_ordinal: u64,
-    },
-    DuplicateMacroEmitFocusTarget {
-        invocation_ordinal: u64,
-        expansion_path: Vec<ExpansionPathSegment>,
-        generated_ordinal: u64,
-    },
-    NonPositiveDimension,
-    PositionOutOfRange,
-    GeometryExtentOutOfBounds,
-    GeometryRepresentationLimit,
 }
 
 /// Explicit host-owned context. Canvas identity is resolved through the shared registry.
@@ -307,6 +200,12 @@ fn project_source_instruction<'a>(
             .quality
             .as_ref()
             .map(|term| (&term.identity).into()),
+        surface_intensity: instruction
+            .entity
+            .surface
+            .intensity
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         action: instruction
             .action
             .as_ref()
@@ -322,14 +221,12 @@ fn project_source_instruction<'a>(
             .map(|scale| scale.value),
         has_unsupported_meaning: instruction.entity.thinness.is_some()
             || instruction.entity.angle.is_some()
-            || instruction.entity.surface.intensity.is_some()
             || instruction.entity.fluctuation.amplitude.is_some()
             || instruction.entity.fluctuation.frequency.is_some()
             || instruction.entity.fluctuation.quality.is_some()
             || instruction.entity.proportion.aspect.is_some()
             || instruction.entity.proportion.width_extent.is_some()
-            || instruction.entity.proportion.arc_form.is_some()
-            || instruction.relation.is_some(),
+            || instruction.entity.proportion.arc_form.is_some(),
     })
 }
 
@@ -340,15 +237,34 @@ fn lower_macro_instruction(
     instruction: &SemanticInstruction,
     head: &SemanticMacroInvocationHead,
     context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
     instructions: &mut Vec<Instruction>,
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
-    gaps: &mut Vec<ScoreFieldGap>,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
 ) {
-    append_macro_caller_gaps(instruction, gaps);
+    let caller_invalid = append_macro_caller_diagnostics(
+        source_instruction_index,
+        instruction,
+        head,
+        error_policy,
+        diagnostics,
+    );
+    if caller_invalid && error_policy == ScoreErrorPolicy::OmitAndContinue {
+        return;
+    }
     let expansion = match exact_macro_expansion(view, head) {
         Ok(expansion) => expansion,
-        Err(gap) => {
-            gaps.push(gap);
+        Err(reason) => {
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: macro_invocation_owner(source_instruction_index, head, None),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &reason,
+                    macro_invocation_unit(source_instruction_index, head),
+                    None,
+                ),
+                reason,
+            });
             return;
         }
     };
@@ -360,33 +276,147 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
-            gaps.push(ScoreFieldGap::UnsupportedMacroStructure);
+            let provenance = node.provenance();
+            let reason = ScoreFieldGap::UnsupportedMacroStructure;
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(source_instruction_index, provenance, None),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &reason,
+                    ScoreOmissionUnit::MacroStructuralSubtree {
+                        source_instruction_index,
+                        invocation_ordinal: provenance.invocation.invocation_ordinal,
+                        expansion_path: provenance.expansion_path.clone(),
+                        generated_ordinal: provenance.generated_ordinal,
+                    },
+                    None,
+                ),
+                reason,
+            });
             continue;
         };
-        let mut input = match project_macro_emit(fields) {
+        let mut input = match project_macro_emit(fields, &[]) {
             Ok(input) => input,
-            Err(mut emit_gaps) => {
-                gaps.append(&mut emit_gaps);
-                continue;
+            Err(emit_gaps) => {
+                let recoverable = emit_gaps
+                    .iter()
+                    .filter_map(|gap| {
+                        appearance_field_for_macro_projection_gap(gap)
+                            .map(|field| (gap.clone(), field))
+                    })
+                    .collect::<Vec<_>>();
+                let remaining = emit_gaps
+                    .iter()
+                    .filter(|gap| appearance_field_for_macro_projection_gap(gap).is_none())
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for (reason, field) in &recoverable {
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: generated_owner(
+                            source_instruction_index,
+                            provenance,
+                            macro_key_for_appearance(*field).map(str::to_owned),
+                        ),
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            reason,
+                            ScoreOmissionUnit::AppearanceField { field: *field },
+                            Some(default_resolution(*field, false)),
+                        ),
+                        reason: reason.clone(),
+                    });
+                }
+                for reason in &remaining {
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: generated_owner(
+                            source_instruction_index,
+                            provenance,
+                            macro_key_for_gap(reason),
+                        ),
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            reason,
+                            macro_emit_unit(source_instruction_index, provenance),
+                            None,
+                        ),
+                        reason: reason.clone(),
+                    });
+                }
+                if error_policy != ScoreErrorPolicy::OmitAndContinue || !remaining.is_empty() {
+                    continue;
+                }
+                let omitted = recoverable
+                    .iter()
+                    .map(|(_, field)| *field)
+                    .collect::<Vec<_>>();
+                match project_macro_emit(fields, &omitted) {
+                    Ok(input) => input,
+                    Err(_) => unreachable!("removing only optional appearance fields is complete"),
+                }
             }
         };
         input.effective_focus = match exact_macro_emit_focus(view, provenance) {
             Ok(focus) => Some(focus),
-            Err(gap) => {
-                gaps.push(gap);
+            Err(reason) => {
+                diagnostics.push(ScoreLoweringDiagnostic {
+                    owner: generated_owner(
+                        source_instruction_index,
+                        provenance,
+                        Some("place".to_owned()),
+                    ),
+                    disposition: diagnostic_disposition(
+                        error_policy,
+                        &reason,
+                        macro_emit_unit(source_instruction_index, provenance),
+                        None,
+                    ),
+                    reason,
+                });
                 continue;
             }
         };
-        match lower_complete_instruction(input, context) {
-            Ok(score_instruction) => {
-                instructions.push(score_instruction);
-                instruction_origins.push(ScoreInstructionOrigin::MacroEmit {
+        let attempt = lower_projected_instruction(input, context, error_policy);
+        for omission in attempt.appearance_omissions {
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(
                     source_instruction_index,
-                    binding: binding.clone(),
-                    provenance: provenance.clone(),
-                });
-            }
-            Err(mut emit_gaps) => gaps.append(&mut emit_gaps),
+                    provenance,
+                    macro_key_for_appearance(omission.field).map(str::to_owned),
+                ),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &omission.reason,
+                    ScoreOmissionUnit::AppearanceField {
+                        field: omission.field,
+                    },
+                    Some(omission.resolution),
+                ),
+                reason: omission.reason,
+            });
+        }
+        for reason in attempt.remaining_gaps {
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(
+                    source_instruction_index,
+                    provenance,
+                    macro_key_for_gap(&reason),
+                ),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &reason,
+                    macro_emit_unit(source_instruction_index, provenance),
+                    None,
+                ),
+                reason,
+            });
+        }
+        if let Some(score_instruction) = attempt.instruction {
+            instructions.push(score_instruction);
+            instruction_origins.push(ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index,
+                binding: binding.clone(),
+                provenance: provenance.clone(),
+            });
         }
     }
 }
@@ -418,7 +448,14 @@ fn exact_macro_expansion<'a>(
     Ok(expansion)
 }
 
-fn append_macro_caller_gaps(instruction: &SemanticInstruction, gaps: &mut Vec<ScoreFieldGap>) {
+fn append_macro_caller_diagnostics(
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    error_policy: ScoreErrorPolicy,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) -> bool {
+    let mut invalid = false;
     match instruction
         .entity
         .quantity
@@ -426,24 +463,81 @@ fn append_macro_caller_gaps(instruction: &SemanticInstruction, gaps: &mut Vec<Sc
         .map(|value| value.value)
     {
         None | Some(1) => {}
-        Some(0) => gaps.push(ScoreFieldGap::ExactCountZero { value: 0 }),
-        Some(value) if value <= u64::from(u32::MAX) => {
-            gaps.push(ScoreFieldGap::RepeatedCountUnsupported {
-                value: value as u32,
-            });
+        Some(0) => {
+            invalid = true;
+            append_macro_invocation_diagnostic(
+                source_instruction_index,
+                head,
+                ScoreFieldGap::ExactCountZero { value: 0 },
+                error_policy,
+                diagnostics,
+            );
         }
-        Some(value) => gaps.push(ScoreFieldGap::ExactCountExceedsScoreRange { value }),
+        Some(value) if value <= u64::from(u32::MAX) => {
+            invalid = true;
+            append_macro_invocation_diagnostic(
+                source_instruction_index,
+                head,
+                ScoreFieldGap::RepeatedCountUnsupported {
+                    value: value as u32,
+                },
+                error_policy,
+                diagnostics,
+            );
+        }
+        Some(value) => {
+            invalid = true;
+            append_macro_invocation_diagnostic(
+                source_instruction_index,
+                head,
+                ScoreFieldGap::ExactCountExceedsScoreRange { value },
+                error_policy,
+                diagnostics,
+            );
+        }
     }
-    if instruction.entity.color.is_some()
-        || instruction.entity.thinness.is_some()
+    for (field, present) in [
+        (
+            ScoreAppearanceField::Color,
+            instruction.entity.color.is_some(),
+        ),
+        (
+            ScoreAppearanceField::Touch,
+            instruction.entity.touch.is_some(),
+        ),
+        (
+            ScoreAppearanceField::Continuity,
+            instruction.entity.continuity.is_some(),
+        ),
+        (
+            ScoreAppearanceField::SurfaceQuality,
+            instruction.entity.surface.quality.is_some(),
+        ),
+        (
+            ScoreAppearanceField::SurfaceIntensity,
+            instruction.entity.surface.intensity.is_some(),
+        ),
+    ] {
+        if !present {
+            continue;
+        }
+        let reason = ScoreFieldGap::UnboundMacroCallerMeaning;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: macro_caller_owner(source_instruction_index, instruction, head, field),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::AppearanceField { field },
+                Some(ScoreAppearanceResolution::PreserveGeneratedValue),
+            ),
+            reason,
+        });
+    }
+    if instruction.entity.thinness.is_some()
         || instruction.entity.relative_scale.is_some()
         || instruction.entity.explicit_geometry.is_some()
         || instruction.entity.numeric_position.is_some()
-        || instruction.entity.touch.is_some()
-        || instruction.entity.continuity.is_some()
         || instruction.entity.angle.is_some()
-        || instruction.entity.surface.quality.is_some()
-        || instruction.entity.surface.intensity.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
         || instruction.entity.fluctuation.quality.is_some()
@@ -452,10 +546,17 @@ fn append_macro_caller_gaps(instruction: &SemanticInstruction, gaps: &mut Vec<Sc
         || instruction.entity.proportion.arc_form.is_some()
         || instruction.action.is_some()
         || instruction.position.is_some()
-        || instruction.relation.is_some()
     {
-        gaps.push(ScoreFieldGap::UnboundMacroCallerMeaning);
+        invalid = true;
+        append_macro_invocation_diagnostic(
+            source_instruction_index,
+            head,
+            ScoreFieldGap::UnboundMacroCallerMeaning,
+            error_policy,
+            diagnostics,
+        );
     }
+    invalid
 }
 
 fn exact_macro_emit_focus(
@@ -511,6 +612,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 8] = [
 
 fn project_macro_emit<'a>(
     fields: &'a BTreeMap<String, ExpandedMacroValue>,
+    omitted_appearance: &[ScoreAppearanceField],
 ) -> Result<ScoreLoweringInput<'a>, Vec<ScoreFieldGap>> {
     let mut gaps = fields
         .keys()
@@ -520,10 +622,18 @@ fn project_macro_emit<'a>(
     let primitive = macro_semantic_field(fields, "shape", "shape", true, &mut gaps);
     let action = macro_semantic_field(fields, "movement", "movement", true, &mut gaps);
     let place = macro_semantic_field(fields, "place", "place", true, &mut gaps);
-    let color = macro_semantic_field(fields, "color", "color", false, &mut gaps);
-    let touch = macro_semantic_field(fields, "touch", "touch", false, &mut gaps);
-    let continuity = macro_semantic_field(fields, "continuity", "continuity", false, &mut gaps);
-    let surface = macro_semantic_field(fields, "surface", "surface", false, &mut gaps);
+    let color = (!omitted_appearance.contains(&ScoreAppearanceField::Color))
+        .then(|| macro_semantic_field(fields, "color", "color", false, &mut gaps))
+        .flatten();
+    let touch = (!omitted_appearance.contains(&ScoreAppearanceField::Touch))
+        .then(|| macro_semantic_field(fields, "touch", "touch", false, &mut gaps))
+        .flatten();
+    let continuity = (!omitted_appearance.contains(&ScoreAppearanceField::Continuity))
+        .then(|| macro_semantic_field(fields, "continuity", "continuity", false, &mut gaps))
+        .flatten();
+    let surface = (!omitted_appearance.contains(&ScoreAppearanceField::SurfaceQuality))
+        .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
+        .flatten();
     let count = match fields.get("count") {
         None => None,
         Some(ExpandedMacroValue::Integer(value)) if *value >= 0 => Some(*value as u64),
@@ -580,6 +690,7 @@ fn project_macro_emit<'a>(
         touch,
         continuity,
         surface,
+        surface_intensity: None,
         action,
         numeric_position: None,
         has_named_position: place.is_some(),
@@ -629,15 +740,18 @@ pub enum ScoreLoweringContextError {
     InvalidResolvedPaletteLightness,
 }
 
-/// Candidate evidence plus an all-or-nothing actual Score outcome.
+/// Candidate evidence plus the selected policy, diagnostics, and actual Score outcome.
 #[derive(Clone, Debug)]
 pub struct ExplicitScoreLoweringResult<'a> {
     candidate: ScoreLoweringCandidate<'a>,
     context: ScoreLoweringContext,
     policy_digest: String,
+    error_policy: ScoreErrorPolicy,
+    outcome: ScoreLoweringOutcome,
     score: Option<Score>,
     instruction_origins: Vec<ScoreInstructionOrigin>,
     gaps: Vec<ScoreFieldGap>,
+    diagnostics: Vec<ScoreLoweringDiagnostic>,
 }
 
 impl<'a> ExplicitScoreLoweringResult<'a> {
@@ -661,6 +775,14 @@ impl<'a> ExplicitScoreLoweringResult<'a> {
         &self.policy_digest
     }
 
+    pub const fn error_policy(&self) -> ScoreErrorPolicy {
+        self.error_policy
+    }
+
+    pub const fn outcome(&self) -> ScoreLoweringOutcome {
+        self.outcome
+    }
+
     pub const fn score(&self) -> Option<&Score> {
         self.score.as_ref()
     }
@@ -671,6 +793,10 @@ impl<'a> ExplicitScoreLoweringResult<'a> {
 
     pub fn gaps(&self) -> &[ScoreFieldGap] {
         &self.gaps
+    }
+
+    pub fn diagnostics(&self) -> &[ScoreLoweringDiagnostic] {
+        &self.diagnostics
     }
 }
 
@@ -759,33 +885,118 @@ pub fn lower_verified_stage15_view<'a>(
     }
 }
 
-/// Lower only a document whose every instruction has a complete supported finite input.
+/// Lower with the historical all-or-nothing behavior.
 pub fn lower_verified_stage15_score<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
+) -> ExplicitScoreLoweringResult<'a> {
+    lower_verified_stage15_score_with_policy(view, context, ScoreErrorPolicy::Stop)
+}
+
+/// Lower with an explicit shared policy for ordinary instructions and macro expansions.
+pub fn lower_verified_stage15_score_with_policy<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
 ) -> ExplicitScoreLoweringResult<'a> {
     let candidate = lower_verified_stage15_view(view);
     let document = candidate
         .verified_effective_view()
         .original_semantic_document();
-    let mut gaps = candidate
-        .instructions()
-        .iter()
-        .flat_map(|instruction| instruction.gaps().iter())
-        .filter(|gap| !matches!(gap, ScoreFieldGap::MacroInvocationHead))
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut diagnostics = Vec::new();
+    let mut omitted_group_members = BTreeSet::new();
 
-    if document.ground.is_some()
-        || !document.coordinated_head_groups.is_empty()
-        || !document.group_predicates.is_empty()
-    {
-        gaps.push(ScoreFieldGap::UnsupportedDocumentMeaning);
+    if let Some(ground) = &document.ground {
+        let reason = ScoreFieldGap::UnsupportedGround;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::Ground {
+                spans: vec![ground.provenance.source.span],
+            },
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::Ground,
+                None,
+            ),
+            reason,
+        });
+    }
+    for (group_index, group) in document.coordinated_head_groups.iter().enumerate() {
+        omitted_group_members.extend(group.member_instruction_indices.iter().copied());
+        let mut spans = group
+            .member_instruction_indices
+            .iter()
+            .filter_map(|index| document.instructions.get(*index))
+            .map(|instruction| instruction.entity.head.source().span)
+            .collect::<Vec<_>>();
+        spans.extend(group.markers.iter().map(|marker| marker.span));
+        if let Some(predicate) = document
+            .group_predicates
+            .iter()
+            .find(|predicate| predicate.group_index == group_index)
+        {
+            spans.extend(
+                predicate
+                    .action
+                    .iter()
+                    .chain(predicate.position.iter())
+                    .map(|term| term.provenance.source.span),
+            );
+        }
+        let reason = ScoreFieldGap::UnsupportedCoordinatedGroup;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::CoordinatedGroup {
+                group_index,
+                member_instruction_indices: group.member_instruction_indices.clone(),
+                spans,
+            },
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::CoordinatedGroup {
+                    group_index,
+                    member_instruction_indices: group.member_instruction_indices.clone(),
+                },
+                None,
+            ),
+            reason,
+        });
     }
 
     let mut instructions = Vec::new();
     let mut instruction_origins = Vec::new();
     for (instruction_index, instruction) in document.instructions.iter().enumerate() {
+        if omitted_group_members.contains(&instruction_index) {
+            continue;
+        }
+        if let Some(relation) = &instruction.relation {
+            let reason = ScoreFieldGap::UnsupportedRelation;
+            let (owner, unit) = match &instruction.entity.head {
+                SemanticHead::Primitive(_) => (
+                    ScoreDiagnosticOwner::SourceInstruction {
+                        instruction_index,
+                        field: None,
+                        spans: vec![relation.provenance.span],
+                    },
+                    ScoreOmissionUnit::RelationInstruction { instruction_index },
+                ),
+                SemanticHead::MacroInvocation(head) => (
+                    ScoreDiagnosticOwner::MacroInvocation {
+                        source_instruction_index: instruction_index,
+                        invocation_ordinal: head.provenance.ordinal,
+                        field: None,
+                        spans: vec![relation.provenance.span, head.provenance.source.span],
+                    },
+                    macro_invocation_unit(instruction_index, head),
+                ),
+            };
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner,
+                disposition: diagnostic_disposition(error_policy, &reason, unit, None),
+                reason,
+            });
+            continue;
+        }
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
                 let effective_focus = direct_instruction_focus(
@@ -794,14 +1005,16 @@ pub fn lower_verified_stage15_score<'a>(
                 );
                 let input = project_source_instruction(instruction, effective_focus)
                     .expect("source projection is called only for primitive heads");
-                match lower_complete_instruction(input, context) {
-                    Ok(score_instruction) => {
-                        instructions.push(score_instruction);
-                        instruction_origins
-                            .push(ScoreInstructionOrigin::SourceInstruction { instruction_index });
-                    }
-                    Err(mut instruction_gaps) => gaps.append(&mut instruction_gaps),
-                }
+                lower_source_instruction_with_policy(
+                    instruction_index,
+                    instruction,
+                    input,
+                    context,
+                    error_policy,
+                    &mut instructions,
+                    &mut instruction_origins,
+                    &mut diagnostics,
+                );
             }
             SemanticHead::MacroInvocation(head) => {
                 lower_macro_instruction(
@@ -810,15 +1023,32 @@ pub fn lower_verified_stage15_score<'a>(
                     instruction,
                     head,
                     context,
+                    error_policy,
                     &mut instructions,
                     &mut instruction_origins,
-                    &mut gaps,
+                    &mut diagnostics,
                 );
             }
         }
     }
 
-    let score = gaps.is_empty().then(|| Score {
+    let stopped = diagnostics
+        .iter()
+        .any(|diagnostic| matches!(diagnostic.disposition, ScoreDiagnosticDisposition::Stopped));
+    let omitted = diagnostics.iter().any(|diagnostic| {
+        matches!(
+            diagnostic.disposition,
+            ScoreDiagnosticDisposition::Omitted { .. }
+        )
+    });
+    let outcome = if stopped || (omitted && instructions.is_empty()) {
+        ScoreLoweringOutcome::Stopped
+    } else if omitted {
+        ScoreLoweringOutcome::CompleteWithOmissions
+    } else {
+        ScoreLoweringOutcome::Complete
+    };
+    let score = (outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: score_wire_version(),
         canvas: Canvas::Id(context.canvas_format.id.to_owned()),
         background: context.background,
@@ -828,13 +1058,428 @@ pub fn lower_verified_stage15_score<'a>(
     if score.is_none() {
         instruction_origins.clear();
     }
+    let gaps = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.reason.clone())
+        .collect();
     ExplicitScoreLoweringResult {
         candidate,
         context,
         policy_digest: geometry_resolution_policy_digest(),
+        error_policy,
+        outcome,
         score,
         instruction_origins,
         gaps,
+        diagnostics,
+    }
+}
+
+#[derive(Clone, Debug)]
+struct AppearanceOmission {
+    reason: ScoreFieldGap,
+    field: ScoreAppearanceField,
+    resolution: ScoreAppearanceResolution,
+}
+
+#[derive(Clone, Debug)]
+struct InstructionLoweringAttempt {
+    instruction: Option<Instruction>,
+    appearance_omissions: Vec<AppearanceOmission>,
+    remaining_gaps: Vec<ScoreFieldGap>,
+}
+
+fn lower_projected_instruction(
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+) -> InstructionLoweringAttempt {
+    let first_gaps = match lower_complete_instruction(input, context) {
+        Ok(instruction) => {
+            return InstructionLoweringAttempt {
+                instruction: Some(instruction),
+                appearance_omissions: Vec::new(),
+                remaining_gaps: Vec::new(),
+            };
+        }
+        Err(gaps) => gaps,
+    };
+    if error_policy == ScoreErrorPolicy::Stop {
+        return InstructionLoweringAttempt {
+            instruction: None,
+            appearance_omissions: Vec::new(),
+            remaining_gaps: first_gaps,
+        };
+    }
+
+    let appearance_fields = first_gaps
+        .iter()
+        .filter_map(appearance_field_for_gap)
+        .collect::<Vec<_>>();
+    let surface_quality_survives = input.surface.is_some()
+        && !appearance_fields.contains(&ScoreAppearanceField::SurfaceQuality);
+    let mut projected = input;
+    let mut appearance_omissions = Vec::new();
+    let mut remaining_gaps = Vec::new();
+    for reason in first_gaps {
+        if let Some(field) = appearance_field_for_gap(&reason) {
+            omit_appearance_field(&mut projected, field);
+            appearance_omissions.push(AppearanceOmission {
+                reason,
+                field,
+                resolution: default_resolution(field, surface_quality_survives),
+            });
+        } else {
+            remaining_gaps.push(reason);
+        }
+    }
+    if !remaining_gaps.is_empty() {
+        return InstructionLoweringAttempt {
+            instruction: None,
+            appearance_omissions,
+            remaining_gaps,
+        };
+    }
+    match lower_complete_instruction(projected, context) {
+        Ok(instruction) => InstructionLoweringAttempt {
+            instruction: Some(instruction),
+            appearance_omissions,
+            remaining_gaps,
+        },
+        Err(gaps) => InstructionLoweringAttempt {
+            instruction: None,
+            appearance_omissions,
+            remaining_gaps: gaps,
+        },
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_source_instruction_with_policy(
+    instruction_index: usize,
+    instruction: &SemanticInstruction,
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    instructions: &mut Vec<Instruction>,
+    instruction_origins: &mut Vec<ScoreInstructionOrigin>,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) {
+    let attempt = lower_projected_instruction(input, context, error_policy);
+    for omission in attempt.appearance_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::AppearanceField {
+                    field: omission.field,
+                },
+                Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for reason in attempt.remaining_gaps {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::SourceInstruction { instruction_index },
+                None,
+            ),
+            reason,
+        });
+    }
+    if let Some(score_instruction) = attempt.instruction {
+        instructions.push(score_instruction);
+        instruction_origins.push(ScoreInstructionOrigin::SourceInstruction { instruction_index });
+    }
+}
+
+fn diagnostic_disposition(
+    error_policy: ScoreErrorPolicy,
+    reason: &ScoreFieldGap,
+    unit: ScoreOmissionUnit,
+    appearance_resolution: Option<ScoreAppearanceResolution>,
+) -> ScoreDiagnosticDisposition {
+    if error_policy == ScoreErrorPolicy::OmitAndContinue && !reason.is_integrity_failure() {
+        ScoreDiagnosticDisposition::Omitted {
+            unit,
+            appearance_resolution,
+        }
+    } else {
+        ScoreDiagnosticDisposition::Stopped
+    }
+}
+
+fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField> {
+    match gap {
+        ScoreFieldGap::UnsupportedColorIdentity { .. } => Some(ScoreAppearanceField::Color),
+        ScoreFieldGap::UnsupportedTouchIdentity { .. } => Some(ScoreAppearanceField::Touch),
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. } => {
+            Some(ScoreAppearanceField::Continuity)
+        }
+        ScoreFieldGap::UnsupportedSurfaceIdentity { .. } => {
+            Some(ScoreAppearanceField::SurfaceQuality)
+        }
+        ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => {
+            Some(ScoreAppearanceField::SurfaceIntensity)
+        }
+        _ => None,
+    }
+}
+
+fn omit_appearance_field(input: &mut ScoreLoweringInput<'_>, field: ScoreAppearanceField) {
+    match field {
+        ScoreAppearanceField::Color => input.color = None,
+        ScoreAppearanceField::Touch => input.touch = None,
+        ScoreAppearanceField::Continuity => input.continuity = None,
+        ScoreAppearanceField::SurfaceQuality => input.surface = None,
+        ScoreAppearanceField::SurfaceIntensity => input.surface_intensity = None,
+    }
+}
+
+fn default_resolution(
+    field: ScoreAppearanceField,
+    surface_quality_survives: bool,
+) -> ScoreAppearanceResolution {
+    match field {
+        ScoreAppearanceField::Color => ScoreAppearanceResolution::ContrastColor,
+        ScoreAppearanceField::Touch => ScoreAppearanceResolution::Pen,
+        ScoreAppearanceField::Continuity => ScoreAppearanceResolution::Solid,
+        ScoreAppearanceField::SurfaceQuality => ScoreAppearanceResolution::Filled,
+        ScoreAppearanceField::SurfaceIntensity if surface_quality_survives => {
+            ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
+        }
+        ScoreAppearanceField::SurfaceIntensity => ScoreAppearanceResolution::Filled,
+    }
+}
+
+fn source_owner_for_gap(
+    instruction_index: usize,
+    instruction: &SemanticInstruction,
+    gap: &ScoreFieldGap,
+) -> ScoreDiagnosticOwner {
+    let field = appearance_field_for_gap(gap);
+    ScoreDiagnosticOwner::SourceInstruction {
+        instruction_index,
+        field,
+        spans: vec![source_span_for_gap(instruction, gap, field)],
+    }
+}
+
+fn source_span_for_gap(
+    instruction: &SemanticInstruction,
+    gap: &ScoreFieldGap,
+    field: Option<ScoreAppearanceField>,
+) -> SourceSpan {
+    if let Some(field) = field {
+        return source_span_for_appearance(instruction, field)
+            .unwrap_or(instruction.entity.head.source().span);
+    }
+    match gap {
+        ScoreFieldGap::ExactCountZero { .. }
+        | ScoreFieldGap::ExactCountExceedsScoreRange { .. }
+        | ScoreFieldGap::RepeatedCountUnsupported { .. } => instruction
+            .entity
+            .quantity
+            .as_ref()
+            .map(|quantity| quantity.provenance.span),
+        ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
+            instruction
+                .action
+                .as_ref()
+                .map(|action| action.provenance.source.span)
+        }
+        ScoreFieldGap::NamedAndNumericPositionConflict
+        | ScoreFieldGap::UnsupportedNamedPosition
+        | ScoreFieldGap::MissingNumericPosition
+        | ScoreFieldGap::PositionOutOfRange
+        | ScoreFieldGap::GeometryExtentOutOfBounds => instruction
+            .position
+            .as_ref()
+            .map(|position| position.provenance.source.span)
+            .or_else(|| {
+                instruction
+                    .entity
+                    .numeric_position
+                    .as_ref()
+                    .map(|position| position.source().span)
+            }),
+        ScoreFieldGap::NonPositiveDimension
+        | ScoreFieldGap::GeometryRepresentationLimit
+        | ScoreFieldGap::GeometryDimensionMismatch { .. }
+        | ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { .. } => instruction
+            .entity
+            .explicit_geometry
+            .as_ref()
+            .map(|geometry| geometry.source().span),
+        _ => None,
+    }
+    .unwrap_or(instruction.entity.head.source().span)
+}
+
+fn source_span_for_appearance(
+    instruction: &SemanticInstruction,
+    field: ScoreAppearanceField,
+) -> Option<SourceSpan> {
+    match field {
+        ScoreAppearanceField::Color => instruction.entity.color.as_ref(),
+        ScoreAppearanceField::Touch => instruction.entity.touch.as_ref(),
+        ScoreAppearanceField::Continuity => instruction.entity.continuity.as_ref(),
+        ScoreAppearanceField::SurfaceQuality => instruction.entity.surface.quality.as_ref(),
+        ScoreAppearanceField::SurfaceIntensity => instruction.entity.surface.intensity.as_ref(),
+    }
+    .map(|term| term.provenance.source.span)
+}
+
+fn macro_invocation_owner(
+    source_instruction_index: usize,
+    head: &SemanticMacroInvocationHead,
+    field: Option<ScoreAppearanceField>,
+) -> ScoreDiagnosticOwner {
+    ScoreDiagnosticOwner::MacroInvocation {
+        source_instruction_index,
+        invocation_ordinal: head.provenance.ordinal,
+        field,
+        spans: vec![head.provenance.source.span],
+    }
+}
+
+fn macro_caller_owner(
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    field: ScoreAppearanceField,
+) -> ScoreDiagnosticOwner {
+    ScoreDiagnosticOwner::MacroInvocation {
+        source_instruction_index,
+        invocation_ordinal: head.provenance.ordinal,
+        field: Some(field),
+        spans: vec![
+            source_span_for_appearance(instruction, field).unwrap_or(head.provenance.source.span),
+        ],
+    }
+}
+
+fn macro_invocation_unit(
+    source_instruction_index: usize,
+    head: &SemanticMacroInvocationHead,
+) -> ScoreOmissionUnit {
+    ScoreOmissionUnit::MacroInvocation {
+        source_instruction_index,
+        invocation_ordinal: head.provenance.ordinal,
+    }
+}
+
+fn append_macro_invocation_diagnostic(
+    source_instruction_index: usize,
+    head: &SemanticMacroInvocationHead,
+    reason: ScoreFieldGap,
+    error_policy: ScoreErrorPolicy,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) {
+    diagnostics.push(ScoreLoweringDiagnostic {
+        owner: macro_invocation_owner(source_instruction_index, head, None),
+        disposition: diagnostic_disposition(
+            error_policy,
+            &reason,
+            macro_invocation_unit(source_instruction_index, head),
+            None,
+        ),
+        reason,
+    });
+}
+
+fn generated_owner(
+    source_instruction_index: usize,
+    provenance: &GeneratedNodeProvenance,
+    key: Option<String>,
+) -> ScoreDiagnosticOwner {
+    ScoreDiagnosticOwner::GeneratedNode {
+        source_instruction_index,
+        invocation_ordinal: provenance.invocation.invocation_ordinal,
+        expansion_path: provenance.expansion_path.clone(),
+        generated_ordinal: provenance.generated_ordinal,
+        key,
+        spans: vec![provenance.invocation.source_span],
+    }
+}
+
+fn macro_emit_unit(
+    source_instruction_index: usize,
+    provenance: &GeneratedNodeProvenance,
+) -> ScoreOmissionUnit {
+    ScoreOmissionUnit::MacroEmit {
+        source_instruction_index,
+        invocation_ordinal: provenance.invocation.invocation_ordinal,
+        expansion_path: provenance.expansion_path.clone(),
+        generated_ordinal: provenance.generated_ordinal,
+    }
+}
+
+fn macro_key_for_appearance(field: ScoreAppearanceField) -> Option<&'static str> {
+    match field {
+        ScoreAppearanceField::Color => Some("color"),
+        ScoreAppearanceField::Touch => Some("touch"),
+        ScoreAppearanceField::Continuity => Some("continuity"),
+        ScoreAppearanceField::SurfaceQuality => Some("surface"),
+        ScoreAppearanceField::SurfaceIntensity => None,
+    }
+}
+
+fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
+    match gap {
+        ScoreFieldGap::MissingMacroEmitField { key }
+        | ScoreFieldGap::UnknownMacroEmitField { key }
+        | ScoreFieldGap::MacroEmitFieldTypeMismatch { key }
+        | ScoreFieldGap::MacroEmitIntegerOutOfRange { key, .. }
+        | ScoreFieldGap::MacroEmitFieldCategoryMismatch { key, .. }
+        | ScoreFieldGap::UnsupportedMacroEmitIdentity { key, .. } => Some(key.clone()),
+        ScoreFieldGap::UnsupportedPrimitiveIdentity { .. }
+        | ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { .. } => Some("shape".to_owned()),
+        ScoreFieldGap::UnsupportedColorIdentity { .. }
+        | ScoreFieldGap::MissingColor
+        | ScoreFieldGap::MissingResolvedPaletteContext => Some("color".to_owned()),
+        ScoreFieldGap::UnsupportedTouchIdentity { .. } | ScoreFieldGap::MissingTouch => {
+            Some("touch".to_owned())
+        }
+        ScoreFieldGap::UnsupportedContinuityIdentity { .. } | ScoreFieldGap::MissingContinuity => {
+            Some("continuity".to_owned())
+        }
+        ScoreFieldGap::UnsupportedSurfaceIdentity { .. } | ScoreFieldGap::MissingEmptySurface => {
+            Some("surface".to_owned())
+        }
+        ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
+            Some("movement".to_owned())
+        }
+        ScoreFieldGap::MissingMacroEmitFocusTarget { .. }
+        | ScoreFieldGap::DuplicateMacroEmitFocusTarget { .. }
+        | ScoreFieldGap::MissingNumericPosition
+        | ScoreFieldGap::UnsupportedNamedPosition => Some("place".to_owned()),
+        ScoreFieldGap::ExactCountZero { .. }
+        | ScoreFieldGap::ExactCountExceedsScoreRange { .. }
+        | ScoreFieldGap::RepeatedCountUnsupported { .. }
+        | ScoreFieldGap::MissingExactCount => Some("count".to_owned()),
+        _ => None,
+    }
+}
+
+fn appearance_field_for_macro_projection_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField> {
+    let key = match gap {
+        ScoreFieldGap::MacroEmitFieldTypeMismatch { key }
+        | ScoreFieldGap::MacroEmitFieldCategoryMismatch { key, .. }
+        | ScoreFieldGap::UnsupportedMacroEmitIdentity { key, .. } => key.as_str(),
+        _ => return None,
+    };
+    match key {
+        "color" => Some(ScoreAppearanceField::Color),
+        "touch" => Some(ScoreAppearanceField::Touch),
+        "continuity" => Some(ScoreAppearanceField::Continuity),
+        "surface" => Some(ScoreAppearanceField::SurfaceQuality),
+        _ => None,
     }
 }
 
@@ -861,6 +1506,7 @@ struct ScoreLoweringInput<'a> {
     touch: Option<SemanticInputIdentity<'a>>,
     continuity: Option<SemanticInputIdentity<'a>>,
     surface: Option<SemanticInputIdentity<'a>>,
+    surface_intensity: Option<SemanticInputIdentity<'a>>,
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
     has_named_position: bool,
@@ -932,6 +1578,12 @@ fn lower_complete_instruction(
         }
         None => true,
     };
+    if let Some(identity) = input.surface_intensity {
+        gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensity {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     match input.action {
         Some(identity) if identity.category == "movement" && identity.id == "place" => {}
         Some(identity) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
@@ -1500,15 +2152,53 @@ mod tests {
     fn macro_count_requires_an_integer_without_reinterpreting_number() {
         let mut fields = complete_macro_fields();
         fields.insert("count".to_owned(), ExpandedMacroValue::Integer(1));
-        assert_eq!(project_macro_emit(&fields).unwrap().count, Some(1));
+        assert_eq!(project_macro_emit(&fields, &[]).unwrap().count, Some(1));
 
         fields.insert("count".to_owned(), ExpandedMacroValue::Number(1.0));
         assert_eq!(
-            project_macro_emit(&fields).unwrap_err(),
+            project_macro_emit(&fields, &[]).unwrap_err(),
             [ScoreFieldGap::MacroEmitFieldTypeMismatch {
                 key: "count".to_owned(),
             }]
         );
+    }
+
+    #[test]
+    fn owner_and_focus_integrity_failures_stop_both_error_modes() {
+        let failures = [
+            ScoreFieldGap::MissingMacroExpansionOwner {
+                invocation_ordinal: 3,
+            },
+            ScoreFieldGap::DuplicateMacroExpansionOwner {
+                invocation_ordinal: 3,
+            },
+            ScoreFieldGap::MissingMacroEmitFocusTarget {
+                invocation_ordinal: 3,
+                expansion_path: Vec::new(),
+                generated_ordinal: 5,
+            },
+            ScoreFieldGap::DuplicateMacroEmitFocusTarget {
+                invocation_ordinal: 3,
+                expansion_path: Vec::new(),
+                generated_ordinal: 5,
+            },
+        ];
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            for reason in &failures {
+                assert_eq!(
+                    diagnostic_disposition(
+                        policy,
+                        reason,
+                        ScoreOmissionUnit::MacroInvocation {
+                            source_instruction_index: 0,
+                            invocation_ordinal: 3,
+                        },
+                        None,
+                    ),
+                    ScoreDiagnosticDisposition::Stopped
+                );
+            }
+        }
     }
 
     fn complete_macro_fields() -> BTreeMap<String, ExpandedMacroValue> {

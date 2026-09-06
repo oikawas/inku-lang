@@ -139,7 +139,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current Step10G subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. Stop is the default; only explicit OmitAndContinue omits an independent appearance field or invalid execution unit with a typed diagnostic. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
 Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
@@ -345,6 +345,8 @@ Every domain uses the single versioned `inku.macro-definition.v1`. There are no 
 
 Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, attested seed, and explicit variation, surface sentence splitting or anaphoric syntax alone does not change a macro seed, focus, or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
 
+Meaning bound to a declared parameter is read from the expansion result. Attributes left on the outside of an invocation become source-owned diagnostics without reimplementing parameter binding. When OmitAndContinue omits only an unbound appearance field, existing color, touch, continuity, and surface values in the MacroDefinition remain. Unused parameters stay accepted; this adds no parameter defaults, optional parameters, or new whole-invocation conversion semantics.
+
 At this boundary the Renderer needs to know only core meaning, while a plugin cannot add primitives or syntax or rewrite core semantics. Plugins cannot depend on other plugins, so installation and removal remain independent.
 
 ### 4.6 Generic MacroDefinition v1
@@ -353,7 +355,7 @@ At this boundary the Renderer needs to know only core meaning, while a plugin ca
 
 The current finite consumer that reaches an actual Score projects each complete flat `emit` as one instruction into the same semantic input used by ordinary DDL. `shape` is limited to `circle` / `ellipse` / `cloudform` / `square`, `movement` must explicitly be `place`, and `place` must be `center` with its exact generated focus target. `color` / `touch` / `continuity` / `surface` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
 
-The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Each `place` uses only the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. An incomplete Emit, unknown key, category or type mismatch, unbound caller fact, repeated outer count, or expanded `group` / `transform` / `anchor` / `relation` makes the whole document a gap. No child Emit is extracted and no partial Score is returned. An unused parameter or unreferenced Emit binding ID alone is not rejected.
+The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Each `place` uses only the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Under the default Stop mode, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, repeated outer count, or expanded `group` / `transform` / `anchor` / `relation` stops the entire Score. Under explicit OmitAndContinue, an independent appearance field omits only that field, an invalid flat Emit omits that Emit, an unsupported structural node omits that subtree, and invalid outer caller meaning omits the invocation; unrelated flat siblings remain in source and generated-provenance order. No child Emit is extracted from a structural subtree and no new Emit key is added. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
 Macros execute in invocation order after meaning resolution. A mention used only for anaphora does not execute twice or shift the semantic ordinal of a later macro. Source occurrence ordinal remains separately for ownership and provenance. The original sentences and rhythm, source spans, continuation edge / target, all bindings, and source / generated provenance are retained and verified. A full compiler-lock digest that includes them is an attestation of source integrity; equivalent expressions need not have the same digest. Source-record differences do not enter meaning selection, while source alteration is rejected.
 
@@ -1098,6 +1100,8 @@ drop, an explicit failure, or a read-compatibility path; its meaning is not
 guessed and repaired. Repair is neither a quality floor nor a minimum firing
 rate and must not create a recurring stock part.
 
+The shared boundary from lock-verified Stage 1.5 to an actual Score has only the author-selected Stop and OmitAndContinue modes. Stop is the default and returns no Score when any meaning cannot be drawn. OmitAndContinue leaves original meaning intact and narrows only the execution projection, recording the actual omitted appearance field, source instruction, Macro Emit / subtree / invocation, Ground, coordinated group, or relation instruction with source or generated owner and spans. It stops when all drawing units are omitted or when owner / focus joins or host context fail integrity. Neither mode uses an LLM, guesses values, clamps them, or resolves previous-one / two relations against compressed post-omission indices.
+
 
 ---
 
@@ -1282,7 +1286,7 @@ For example, `赤い円を中心に置く。` and `円を中心に置く。円�
 - when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
 - writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- in the Step10G actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, and cloudform instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`; unsupported meaning or missing required color-catalog context remains a typed gap, and no partial Score is reported as success. This Rust path is not yet connected to the product runtime
+- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, and cloudform instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. This Rust path is not yet connected to the product runtime
 
 ### 12.5 Splitting the Model by Stage
 
@@ -1319,6 +1323,8 @@ delivered fails clearly instead of silently becoming something else.
 Vocabulary and relation mappings come from the Saijiki and typed-lowering
 authorities; historical prompt sketches are not the current contract.
 
+On the lock-verified typed path, the Stage 2 consumer selects either Stop, the default, or OmitAndContinue. Continue does not convert undeliverable meaning into a Score field. It removes a typed unit from the execution projection and returns the remaining instructions in original owner order. The result distinguishes complete, complete with omissions, and stopped.
+
 ### 12.8 Error Recovery
 
 Each LLM stage retries an empty, too-short, or schema-invalid response once with
@@ -1332,6 +1338,8 @@ used, and provider-failure classification; the UI identifies the affected
 layer. `interpret_fallback` and `compose_fallback` distinguish a reason,
 `"none"`, and absence from records created before the field. Refining from a
 marked parent asks once before execution, and existing works are not backfilled.
+
+In the runtime-disconnected shared compiler consumer, Stop and OmitAndContinue are deterministic execution policies over the same verified input rather than LLM fallbacks. Continue omits an appearance field only when the existing default can resolve it; otherwise it omits the invalid instruction, Emit, invocation, or structural subtree, or the unsupported Ground, group, or relation as its typed unit. Integrity failures stop both modes, and omitting every unit is not reported as a successful empty work.
 
 ### 12.9 Where Implementation History Lives
 
@@ -1385,17 +1393,18 @@ is the effective DDL / typed meaning consumed by Stage 2.
   same meaning and never present bytes from another schema under the same
   identity
 
-The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, the Step10G direct
-instruction subset, and the Step10H subset that carries finite flat Macro Emits
-through the same lowerer into an actual Score are implemented but not connected
-to runtime. D1 synchronizes inline / continuation canonical meaning,
-post-resolution macro execution ordinals, and expanded / effective identity
-while retaining source / generated provenance separately. A source-only field
-candidate can retain the MacroInvocation head and focus overlay while the actual
-side resolves its corresponding complete Emits. The current Python path remains
-a compatibility implementation until cutover. Retirement of plugin-specific
-delivery and remaining position, primitive, surface, ground, caller, and
-structural meaning are not complete.
+The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, direct normal and
+explicit geometry, finite flat Macro Emits, and the shared default Stop / explicit
+OmitAndContinue error policy are implemented through the actual Score lowerer but
+not connected to runtime. Its result carries the mode; complete, complete with
+omissions, or stopped outcome; original gaps; typed omission units; and diagnostics
+with source-instruction / group / ground or generated invocation / path / ordinal /
+key ownership plus source spans. Missing or duplicate execution-owner and focus
+joins and invalid host context remain stopping failures in Continue. D1 meaning,
+seed, focus, source-ordinal gaps, generated provenance, the geometry policy digest,
+and the Score wire are unchanged. The current Python coerce and LLM fallback have
+not been replaced by this mode; runtime / UI / API / persistence connection and
+upstream NonCanonicalReady recovery remain later work.
 
 ### 12.12 Staffage and Compatibility Records
 
@@ -2489,7 +2498,7 @@ current runtime is compatibility behavior, not semantic authority to change the
 canonical count into another value.
 
 **Size has three authorities.** Unspecified, explicit qualitative, and explicit
-numeric geometry remain distinct. In the current Step10G subset, an unallocated
+numeric geometry remain distinct. In the current subset, an unallocated
 count-one circle, square, ellipse, or cloudform uses `6/25` (0.24) of the canvas
 short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
 of width. Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
@@ -2532,7 +2541,7 @@ a promise that no coordinate adjustment occurs or that the whole shape always
 stays on the paper. Renderer semantics for the same Score and options do not
 change.
 
-Within the current Step10G subset, only an omitted count resolves to one; zero,
+Within the current subset, only an omitted count resolves to one; zero,
 repeated, and qualitative counts are not materialized. Omitted touch resolves to
 pen, omitted continuity to solid, and an omitted closed surface to filled.
 Explicit empty stays unfilled, while explicit solid reaches the same existing
@@ -2541,10 +2550,17 @@ background, black, and white RGB and OKLCH L values from the same Renderer
 `work_color_assignment` / `resolve_color` path. The single `inku-ddl` policy
 chooses whichever of black and white has the larger lightness distance from the
 background, choosing black on a tie. An explicit color needs no color-catalog context
-and remains unchanged. Explicit fields win independently, and any unsupported
-meaning anywhere in the document prevents an actual Score. The lowering result
-retains the canvas, background, resolved color context, and policy digest it
-used, while source semantics, canonical meaning, and provenance remain free of
+and remains unchanged. Explicit fields win independently. Stop, the default,
+returns no actual Score when any meaning is unsupported. OmitAndContinue omits
+unsupported color, touch, continuity, surface quality, or intensity as an
+independent field and records the contrast color, pen, solid, fill, or retained
+explicit quality actually used. Other failures omit the smallest source
+instruction, Macro Emit / structural subtree / invocation, Ground, coordinated
+group, or relation-instruction unit. Previous-one / two relation meaning keeps
+its original source indices and is never rebound to compressed post-omission
+indices. The lowering result retains canvas, background, resolved color context,
+geometry-policy digest, mode, outcome, gaps, owners, spans, and dispositions,
+while source semantics, canonical meaning, and provenance remain free of
 defaults and focus injection.
 
 The quiet-density governor, which thins repetition for still, membranous, or
@@ -2617,11 +2633,13 @@ signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage
 resolved color-catalog context only when color is omitted. Independent circle,
 ellipse, cloudform, and square instructions with resolved numeric position or an
 original `place:center` owned by a verified direct instruction target, plus a
-place action, can lower explicit numeric geometry or Step10G normal / qualitative
+place action, can lower explicit numeric geometry or the current normal / qualitative
 geometry, together with omitted count-one, pen, solid, fill, and contrast color, into an
-actual `Score`. Any unsupported meaning in the document prevents a partial Score
-from being reported as success; symbolic candidate evidence and typed gaps remain
-available. This Rust path is not yet connected to the product runtime.
+actual `Score`. The default Stop mode rejects the entire Score when the document
+contains unsupported meaning. Explicit OmitAndContinue records the original owner
+and spans plus the actual omitted field or execution unit, and reports a remaining
+Score only when a drawing target survives. Integrity failure or omission of every
+target is stopped. This Rust path is not yet connected to the product runtime.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

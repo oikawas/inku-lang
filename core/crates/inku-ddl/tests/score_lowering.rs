@@ -2,11 +2,13 @@ use inku_ddl::{
     CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, FocusRegion,
     GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
-    ScoreFieldGap, ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
+    ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
+    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin,
+    ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
     SemanticHead, SemanticIdentity, Stage15TransformationResult, VerifiedStage15EffectiveView,
     compile_typed_ddl, geometry_resolution_policy_digest, lower_verified_stage15_score,
-    lower_verified_stage15_view, score_primitive_from_semantic_identity,
-    stage15_transformation_input, transform_stage15,
+    lower_verified_stage15_score_with_policy, lower_verified_stage15_view,
+    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -663,6 +665,150 @@ fn unsupported_instruction_among_independent_instructions_never_yields_partial_s
 }
 
 #[test]
+fn omit_and_continue_keeps_supported_instruction_when_a_sibling_cannot_lower() {
+    let result = stage15(
+        concat!(
+            "place red circle at center. ",
+            "place two blue square at horizontal 0.7, vertical 0.5."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let instructions = &lowered
+        .score()
+        .expect("OmitAndContinue should preserve the supported sibling")
+        .instructions;
+    assert_eq!(instructions.len(), 1);
+    assert_eq!(instructions[0].primitive, Primitive::Circle);
+    assert_eq!(
+        lowered.instruction_origins(),
+        [ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 0
+        }]
+    );
+    assert!(matches!(
+        lowered.diagnostics(),
+        [inku_ddl::ScoreLoweringDiagnostic {
+            reason: ScoreFieldGap::RepeatedCountUnsupported { value: 2 },
+            owner: ScoreDiagnosticOwner::SourceInstruction {
+                instruction_index: 1,
+                spans,
+                ..
+            },
+            disposition: ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::SourceInstruction {
+                    instruction_index: 1
+                },
+                appearance_resolution: None,
+            },
+        }] if spans.len() == 1
+    ));
+}
+
+#[test]
+fn supported_input_is_identical_under_both_error_modes() {
+    let result = stage15(
+        "place one red circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(stop.error_policy(), ScoreErrorPolicy::Stop);
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(continued.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(stop.score(), continued.score());
+    assert_eq!(stop.instruction_origins(), continued.instruction_origins());
+    assert_eq!(stop.policy_digest(), continued.policy_digest());
+    assert!(stop.diagnostics().is_empty());
+    assert!(continued.diagnostics().is_empty());
+}
+
+#[test]
+fn ordinary_surface_intensity_omits_only_that_field_and_keeps_quality() {
+    let result = stage15(
+        "place one red flat dense circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stop.score().is_none());
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert!(continued.score().unwrap().instructions[0].filled);
+    assert!(matches!(
+        continued.diagnostics(),
+        [inku_ddl::ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::SourceInstruction {
+                instruction_index: 0,
+                field: Some(ScoreAppearanceField::SurfaceIntensity),
+                spans,
+            },
+            disposition: ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::AppearanceField {
+                    field: ScoreAppearanceField::SurfaceIntensity
+                },
+                appearance_resolution: Some(
+                    ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
+                ),
+            },
+            ..
+        }] if spans.len() == 1
+    ));
+
+    let unsupported_quality = stage15(
+        "place one red bleeding circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let unsupported_quality = lower_verified_stage15_score_with_policy(
+        unsupported_quality.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert!(unsupported_quality.score().unwrap().instructions[0].filled);
+    assert!(matches!(
+        unsupported_quality.diagnostics(),
+        [inku_ddl::ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::SourceInstruction {
+                field: Some(ScoreAppearanceField::SurfaceQuality),
+                spans,
+                ..
+            },
+            disposition: ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::AppearanceField {
+                    field: ScoreAppearanceField::SurfaceQuality
+                },
+                appearance_resolution: Some(ScoreAppearanceResolution::Filled),
+            },
+            ..
+        }] if spans.len() == 1
+    ));
+}
+
+#[test]
 fn qualitative_count_remains_a_typed_hole_instead_of_becoming_one() {
     let compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(
@@ -1082,6 +1228,7 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
     );
     assert!(empty_lowered.gaps().is_empty());
+    assert_eq!(empty_lowered.outcome(), ScoreLoweringOutcome::Complete);
     assert!(empty_lowered.score().unwrap().instructions.is_empty());
     assert!(empty_lowered.instruction_origins().is_empty());
 }
@@ -1148,6 +1295,57 @@ fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundar
     assert_eq!(lowered.gaps(), [ScoreFieldGap::UnboundMacroCallerMeaning]);
     assert!(lowered.score().is_none());
     assert!(lowered.instruction_origins().is_empty());
+
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(
+        continued
+            .score()
+            .unwrap()
+            .instructions
+            .iter()
+            .map(|instruction| instruction.color)
+            .collect::<Vec<_>>(),
+        [Color::Red, Color::Blue, Color::Red, Color::Blue]
+    );
+    assert_eq!(
+        continued
+            .instruction_origins()
+            .iter()
+            .map(|origin| match origin {
+                ScoreInstructionOrigin::MacroEmit { provenance, .. } => {
+                    provenance.invocation.invocation_ordinal
+                }
+                other => panic!("unexpected direct origin: {other:?}"),
+            })
+            .collect::<Vec<_>>(),
+        [0, 0, 2, 2]
+    );
+    assert!(matches!(
+        continued.diagnostics(),
+        [inku_ddl::ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::MacroInvocation {
+                invocation_ordinal: 0,
+                field: Some(ScoreAppearanceField::Color),
+                spans,
+                ..
+            },
+            disposition: ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::AppearanceField {
+                    field: ScoreAppearanceField::Color
+                },
+                appearance_resolution: Some(ScoreAppearanceResolution::PreserveGeneratedValue),
+            },
+            ..
+        }] if spans.len() == 1
+    ));
 }
 
 #[test]
@@ -1360,6 +1558,222 @@ fn unsupported_emit_and_caller_meaning_never_returns_a_partial_score() {
     }
 }
 
+#[test]
+fn continue_omits_macro_emit_and_structural_subtree_but_keeps_flat_siblings() {
+    let definition = mixed_omission_definition();
+    let result = stage15_locked(
+        "Mixed.Omissions",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stop.score().is_none());
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(
+        continued
+            .score()
+            .unwrap()
+            .instructions
+            .iter()
+            .map(|instruction| instruction.primitive)
+            .collect::<Vec<_>>(),
+        [Primitive::Circle, Primitive::Square]
+    );
+    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::GeneratedNode {
+                invocation_ordinal: 0,
+                key: None,
+                spans,
+                ..
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::MacroStructuralSubtree { .. },
+                ..
+            }
+        ) if spans.len() == 1
+    )));
+    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::GeneratedNode {
+                invocation_ordinal: 0,
+                key: Some(key),
+                spans,
+                ..
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::MacroEmit { .. },
+                ..
+            }
+        ) if key == "movement" && spans.len() == 1
+    )));
+}
+
+#[test]
+fn flat_macro_appearance_field_uses_the_same_omission_default() {
+    let definition = unsupported_surface_emit_definition();
+    let result = stage15_locked(
+        "Draw.Bleeding",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    assert!(
+        lower_verified_stage15_score(result.verified_effective_view(), context)
+            .score()
+            .is_none()
+    );
+
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert!(continued.score().unwrap().instructions[0].filled);
+    assert!(matches!(
+        continued.diagnostics(),
+        [inku_ddl::ScoreLoweringDiagnostic {
+            owner: ScoreDiagnosticOwner::GeneratedNode {
+                invocation_ordinal: 0,
+                generated_ordinal: 0,
+                key: Some(key),
+                spans,
+                ..
+            },
+            disposition: ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::AppearanceField {
+                    field: ScoreAppearanceField::SurfaceQuality
+                },
+                appearance_resolution: Some(ScoreAppearanceResolution::Filled),
+            },
+            ..
+        }] if key == "surface" && spans.len() == 1
+    ));
+}
+
+#[test]
+fn continue_uses_root_group_and_full_typed_relation_omission_units() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+
+    let grounded = stage15(
+        "paper. place one red circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let grounded = lower_verified_stage15_score_with_policy(
+        grounded.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(grounded.score().unwrap().instructions.len(), 1);
+    assert!(grounded.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::Ground { spans },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::Ground,
+                ..
+            }
+        ) if spans.len() == 1
+    )));
+
+    let grouped = stage15(
+        concat!(
+            "place one green circle at center. ",
+            "place a red circle and a blue square at the center."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let grouped = lower_verified_stage15_score_with_policy(
+        grouped.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(grouped.score().unwrap().instructions.len(), 1);
+    assert!(grouped.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::CoordinatedGroup {
+                group_index: 0,
+                member_instruction_indices,
+                spans,
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::CoordinatedGroup { .. },
+                ..
+            }
+        ) if member_instruction_indices == &[1, 2] && !spans.is_empty()
+    )));
+
+    let related = stage15(
+        concat!(
+            "place one green circle at center. ",
+            "line. circle along the previous line."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    assert!(
+        related.original_semantic_document().instructions[2]
+            .relation
+            .is_some()
+    );
+    let related = lower_verified_stage15_score_with_policy(
+        related.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(related.score().unwrap().instructions.len(), 1);
+    assert!(related.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::SourceInstruction {
+                instruction_index: 2,
+                spans,
+                ..
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::RelationInstruction {
+                    instruction_index: 2
+                },
+                ..
+            }
+        ) if spans.len() == 1
+    )));
+}
+
+#[test]
+fn continue_stops_when_every_drawing_unit_is_omitted() {
+    let result = stage15("paper.", ResolvedInstructionLanguage::En);
+    let lowered = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(lowered.score().is_none());
+    assert!(lowered.instruction_origins().is_empty());
+    assert!(matches!(
+        lowered.diagnostics()[0].disposition,
+        ScoreDiagnosticDisposition::Omitted {
+            unit: ScoreOmissionUnit::Ground,
+            ..
+        }
+    ));
+}
+
 fn resolved_palette(
     background: Color,
     background_lightness: f64,
@@ -1479,6 +1893,20 @@ fn unsupported_angle_definition() -> MacroDefinition {
 fn structural_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Structure","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"group","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}]}"#,
+    )
+    .unwrap()
+}
+
+fn mixed_omission_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Mixed","heading":"Omissions","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"group","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"cloudform"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn unsupported_surface_emit_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Bleeding","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"surface":{"expr":"semantic_ref","category":"surface","id":"bleed"}}}]}"#,
     )
     .unwrap()
 }

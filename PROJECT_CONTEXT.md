@@ -91,24 +91,31 @@ bilingual seven-class size scale, together with omitted count-one, pen, solid, f
 background-contrast color, into an actual Score. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
-Defaults never enter semantic meaning, exact rationals cross to `f64`
-only at the final boundary, and unsupported meaning anywhere prevents a partial Score.
+Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final
+boundary. The shared lowerer uses Stop by default and exposes OmitAndContinue explicitly. Stop
+returns no Score when any unsupported meaning remains. Continue leaves original meaning intact
+and omits only an independent appearance field or invalid typed execution unit. The result
+distinguishes complete, complete with omissions, and stopped, retaining original gaps, actual
+treatment, source or generated owners, and spans.
 
 Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
 ordinary DDL after an exact join to the execution owner and generated focus. One Emit is one
 instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
 their order. The current subset covers the four closed shapes, explicit `place`, exact `center`,
-optional attributes from their same-named categories, and omitted count or Integer one. An unbound
-caller fact, structural node, incomplete or unknown Emit, or type mismatch makes the whole document
-a gap rather than returning a partial Score.
+optional attributes from their same-named categories, and omitted count or Integer one. Under Stop,
+an unbound caller fact, structural node, incomplete or unknown Emit, or type mismatch stops the
+entire Score. Under Continue, an unbound caller appearance field is omitted while definition values
+remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted as its typed
+unit. Unrelated flat siblings and original ordinal gaps remain.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
 compatibility paths, not the canonical semantic specification. Unspecified and non-center named
 placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
-primitives, surfaces, grounds, relations, caller and structural Score meaning, typed-hole blocking,
-and runtime cutover remain at the unconnected boundary. Reaching Step10H does not complete Step10 as
-a whole.
+delivery for remaining primitives, upstream NonCanonicalReady recovery, typed-hole blocking, and
+runtime cutover remain at the unconnected boundary. Reaching Step10I does not complete Step10 as a
+whole. Product UI, API, and persistence do not yet select this mode, and legacy coerce / LLM fallback
+has not been replaced by it.
 
 ## Contracts That Must Remain Intact
 

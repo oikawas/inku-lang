@@ -6,10 +6,11 @@ use inku_ddl::{
     ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin,
     ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
     SemanticHead, SemanticIdentity, SemanticPreviousReference, SemanticRelationKind,
-    Stage15TransformationResult, VerifiedStage15EffectiveView, compile_typed_ddl,
-    geometry_resolution_policy_digest, lower_verified_stage15_score,
-    lower_verified_stage15_score_with_policy, lower_verified_stage15_view,
-    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
+    Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
+    VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
+    lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
+    lower_verified_stage15_view, score_primitive_from_semantic_identity,
+    stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -88,6 +89,87 @@ fn omitted_count_size_and_drawing_attributes_resolve_to_an_actual_score() {
     assert_eq!(instruction.weight, Weight::Pen);
     assert_eq!(instruction.style, LineStyle::Solid);
     assert!(instruction.filled);
+}
+
+#[test]
+fn direct_horizontal_angle_reaches_actual_score_rotation() {
+    let result = stage15(
+        "place one red horizontal circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(
+        result.original_semantic_document().instructions[0]
+            .entity
+            .angle
+            .as_ref()
+            .map(|angle| angle.identity.id.as_str()),
+        Some("horizontal")
+    );
+
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    assert_eq!(lowered.score().unwrap().instructions[0].rotation, Some(0.0));
+}
+
+#[test]
+fn seeded_angles_are_reproducible_bilingual_and_stage15_variation_invariant() {
+    let source = "place one red diagonal circle at center.";
+    let compilation = compile_typed_ddl(
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap(),
+        &[],
+        Some(41),
+        LIMITS,
+    );
+    let baseline =
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let varied = transform_stage15(
+        stage15_transformation_input(&compilation).unwrap(),
+        Some(Stage15Variation {
+            amplitude: Stage15VariationAmplitude::Large,
+            seed: 99,
+        }),
+    )
+    .unwrap();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let baseline_lowered =
+        lower_verified_stage15_score(baseline.verified_effective_view(), context);
+    let varied_lowered = lower_verified_stage15_score(varied.verified_effective_view(), context);
+    let baseline_score = baseline_lowered.score().unwrap();
+    let varied_score = varied_lowered.score().unwrap();
+    let rotation = baseline_score.instructions[0].rotation.unwrap();
+    assert!([45.0, 135.0, 225.0, 315.0].contains(&rotation));
+    assert_eq!(varied_score.instructions[0].rotation, Some(rotation));
+
+    let japanese = stage15_seeded(
+        "赤い左上がりの円を中心に置く。",
+        ResolvedInstructionLanguage::Ja,
+        Some(41),
+    );
+    let japanese = lower_verified_stage15_score(japanese.verified_effective_view(), context);
+    assert_eq!(japanese.outcome(), ScoreLoweringOutcome::Complete);
+    assert!((203.0..=217.0).contains(&japanese.score().unwrap().instructions[0].rotation.unwrap()));
+
+    let english = stage15_seeded(
+        "place one red left-falling circle at center.",
+        ResolvedInstructionLanguage::En,
+        Some(41),
+    );
+    assert_eq!(
+        english.original_semantic_document().instructions[0]
+            .entity
+            .angle
+            .as_ref()
+            .map(|angle| angle.identity.id.as_str()),
+        Some("left_falling")
+    );
+    let english = lower_verified_stage15_score(english.verified_effective_view(), context);
+    assert_eq!(english.outcome(), ScoreLoweringOutcome::Complete);
+    assert!((143.0..=157.0).contains(&english.score().unwrap().instructions[0].rotation.unwrap()));
 }
 
 #[test]
@@ -750,11 +832,11 @@ fn multiple_independent_count_one_instructions_preserve_count_and_source_order()
 #[test]
 fn inline_and_continuation_explicit_geometry_share_one_score_meaning() {
     let inline = stage15(
-        "place one red pen solid empty circle with radius 0.25 at horizontal 0.5, vertical 0.5.",
+        "place one red pen solid empty diagonal circle with radius 0.25 at horizontal 0.5, vertical 0.5.",
         ResolvedInstructionLanguage::En,
     );
     let continuation = stage15(
-        "one red pen solid empty circle. the circle radius 0.25 horizontal 0.5 vertical 0.5 place.",
+        "one red pen solid empty diagonal circle. the circle radius 0.25 horizontal 0.5 vertical 0.5 place.",
         ResolvedInstructionLanguage::En,
     );
     assert_eq!(
@@ -768,6 +850,152 @@ fn inline_and_continuation_explicit_geometry_share_one_score_meaning() {
     assert_eq!(
         lower_verified_stage15_score(inline.verified_effective_view(), context).score(),
         lower_verified_stage15_score(continuation.verified_effective_view(), context).score()
+    );
+}
+
+#[test]
+fn rotated_numeric_bounds_use_the_physical_declared_envelope() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let unrotated = stage15(
+        "place one red ellipse with width 0.2 height 0.8 at horizontal 0.5, vertical 0.2.",
+        ResolvedInstructionLanguage::En,
+    );
+    let vertical = stage15(
+        "place one red vertical ellipse with width 0.2 height 0.8 at horizontal 0.5, vertical 0.2.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert!(
+        lower_verified_stage15_score(unrotated.verified_effective_view(), context)
+            .gaps()
+            .contains(&ScoreFieldGap::GeometryExtentOutOfBounds)
+    );
+    let vertical = lower_verified_stage15_score(vertical.verified_effective_view(), context);
+    assert_eq!(vertical.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(
+        vertical.score().unwrap().instructions[0].rotation,
+        Some(90.0)
+    );
+
+    let circle = stage15(
+        "place one red diagonal circle with radius 0.2 at horizontal 0.2, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let circle = lower_verified_stage15_score(circle.verified_effective_view(), context);
+    assert_eq!(circle.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(circle.score().unwrap().instructions[0].radius, Some(0.2));
+
+    let ideal_ellipse = stage15(
+        "place one red diagonal ellipse with width 0.8 height 0.2 at horizontal 0.5, vertical 0.3.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(
+        lower_verified_stage15_score(ideal_ellipse.verified_effective_view(), context).outcome(),
+        ScoreLoweringOutcome::Complete,
+        "the ideal ellipse extent must not be replaced by its rectangular envelope"
+    );
+
+    let unrotated_cloud = stage15(
+        "place one red cloudform with width 0.8 height 0.2 at horizontal 0.5, vertical 0.2.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(
+        lower_verified_stage15_score(unrotated_cloud.verified_effective_view(), context).outcome(),
+        ScoreLoweringOutcome::Complete
+    );
+
+    let cloud = stage15(
+        concat!(
+            "place one red diagonal cloudform with width 0.8 height 0.2 at horizontal 0.5, vertical 0.2. ",
+            "place one blue circle at horizontal 0.7, vertical 0.7."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let stop = lower_verified_stage15_score(cloud.verified_effective_view(), context);
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stop.score().is_none());
+    let continued = lower_verified_stage15_score_with_policy(
+        cloud.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert_eq!(
+        continued.score().unwrap().instructions[0].primitive,
+        Primitive::Circle
+    );
+    assert!(
+        continued
+            .gaps()
+            .contains(&ScoreFieldGap::GeometryExtentOutOfBounds)
+    );
+
+    let named = stage15(
+        "place one red diagonal ellipse at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let named = lower_verified_stage15_score(named.verified_effective_view(), context);
+    let named = &named.score().unwrap().instructions[0];
+    assert_eq!(named.size, Some(Point::new(0.24, 0.144)));
+    assert!(named.at.is_some());
+    assert!(named.rotation.is_some());
+}
+
+#[test]
+fn square_angle_is_explicitly_unsupported_in_both_modes_without_affecting_plain_square() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let result = stage15(
+        concat!(
+            "place one red horizontal square at center. ",
+            "place one blue circle at horizontal 0.7, vertical 0.7."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    assert!(stop.score().is_none());
+    assert!(
+        stop.gaps()
+            .contains(&ScoreFieldGap::UnsupportedAngleForPrimitive {
+                primitive: Primitive::Square,
+            })
+    );
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert_eq!(
+        continued.score().unwrap().instructions[0].primitive,
+        Primitive::Circle
+    );
+    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition),
+        (
+            ScoreDiagnosticOwner::SourceInstruction {
+                instruction_index: 0,
+                spans,
+                ..
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::SourceInstruction {
+                    instruction_index: 0
+                },
+                ..
+            }
+        ) if spans.len() == 1
+    )));
+
+    let plain = stage15(
+        "place one red square at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(
+        lower_verified_stage15_score(plain.verified_effective_view(), context).outcome(),
+        ScoreLoweringOutcome::Complete
     );
 }
 
@@ -1857,6 +2085,93 @@ fn japanese_and_english_four_shape_macro_uses_shared_defaults_and_geometry() {
 }
 
 #[test]
+fn flat_macro_angle_uses_the_shared_resolver_and_square_boundary() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let horizontal = angle_emit_definition("circle", "horizontal");
+    let macro_horizontal = stage15_locked(
+        "Angle.Mark",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&horizontal),
+    );
+    let direct_horizontal = stage15(
+        "place one red horizontal circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    for lowered in [
+        lower_verified_stage15_score(macro_horizontal.verified_effective_view(), context),
+        lower_verified_stage15_score(direct_horizontal.verified_effective_view(), context),
+    ] {
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.primitive, Primitive::Circle);
+        assert_eq!(instruction.color, Color::Red);
+        assert_eq!(instruction.rotation, Some(0.0));
+    }
+
+    let circle = angle_emit_definition("circle", "rotated");
+    let result = stage15_locked(
+        "Angle.Mark",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&circle),
+    );
+    let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let rotation = lowered
+        .score()
+        .unwrap_or_else(|| {
+            panic!(
+                "gaps={:#?}; expanded={:#?}",
+                lowered.gaps(),
+                result.original_expanded_invocations()
+            )
+        })
+        .instructions[0]
+        .rotation
+        .unwrap_or_else(|| panic!("expanded={:#?}", result.original_expanded_invocations()));
+    let circular_distance = (0..8)
+        .map(|multiple| (rotation - f64::from(multiple * 45)).abs())
+        .map(|distance| distance.min(360.0 - distance))
+        .fold(f64::INFINITY, f64::min);
+    assert!(circular_distance > 5.0);
+
+    let left_facing = angle_emit_definition("circle", "left_rising");
+    let result = stage15_locked(
+        "Angle.Mark",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&left_facing),
+    );
+    let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert!((203.0..=217.0).contains(&lowered.score().unwrap().instructions[0].rotation.unwrap()));
+
+    let square = angle_emit_definition("square", "horizontal");
+    let result = stage15_locked(
+        "place one green circle at center. Angle.Mark",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&square),
+    );
+    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    assert!(stop.score().is_none());
+    let continued = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
+        (&diagnostic.owner, &diagnostic.disposition, &diagnostic.reason),
+        (
+            ScoreDiagnosticOwner::GeneratedNode { key: Some(key), .. },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::MacroEmit { .. },
+                ..
+            },
+            ScoreFieldGap::UnsupportedAngleForPrimitive {
+                primitive: Primitive::Square
+            }
+        ) if key == "angle"
+    )));
+}
+
+#[test]
 fn parameter_bound_fields_and_an_unused_parameter_lower_once() {
     let definition = parameter_bound_definition();
     let result = stage15_locked(
@@ -1927,13 +2242,6 @@ fn unsupported_emit_and_caller_meaning_never_returns_a_partial_score() {
             "Bad.MissingMovement",
             ScoreFieldGap::MissingMacroEmitField {
                 key: "movement".to_owned(),
-            },
-        ),
-        (
-            unsupported_angle_definition(),
-            "Bad.Angle",
-            ScoreFieldGap::UnknownMacroEmitField {
-                key: "angle".to_owned(),
             },
         ),
         (
@@ -2175,10 +2483,18 @@ fn resolved_palette(
 }
 
 fn stage15(source: &str, language: ResolvedInstructionLanguage) -> Stage15TransformationResult {
+    stage15_seeded(source, language, None)
+}
+
+fn stage15_seeded(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    composition_seed: Option<u64>,
+) -> Stage15TransformationResult {
     let compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
         &[],
-        None,
+        composition_seed,
         LIMITS,
     );
     let input = stage15_transformation_input(&compilation).unwrap_or_else(|error| {
@@ -2270,10 +2586,10 @@ fn missing_movement_definition() -> MacroDefinition {
     .unwrap()
 }
 
-fn unsupported_angle_definition() -> MacroDefinition {
-    MacroDefinition::from_json(
-        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Angle","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"angle":{"expr":"semantic_ref","category":"angle","id":"horizontal"}}}]}"#,
-    )
+fn angle_emit_definition(shape: &str, angle: &str) -> MacroDefinition {
+    MacroDefinition::from_json(&format!(
+        r#"{{"schema":"inku.macro-definition.v1","namespace":"Angle","heading":"Mark","version":"1.0.0","parameters":{{}},"components":{{}},"body":[{{"op":"emit","binding":null,"fields":{{"shape":{{"expr":"semantic_ref","category":"shape","id":"{shape}"}},"movement":{{"expr":"semantic_ref","category":"movement","id":"place"}},"place":{{"expr":"semantic_ref","category":"place","id":"center"}},"color":{{"expr":"semantic_ref","category":"color","id":"red"}},"angle":{{"expr":"semantic_ref","category":"angle","id":"{angle}"}}}}}}]}}"#,
+    ))
     .unwrap()
 }
 

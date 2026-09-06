@@ -108,6 +108,17 @@ and omits only an independent appearance field or invalid typed execution unit. 
 distinguishes complete, complete with omissions, and stopped, retaining original gaps, actual
 treatment, source or generated owners, and spans.
 
+The same policy's angle resolver frames the lock-verified original pre- and expanded-meaning
+digests, tagged optional `composition_seed`, logical occurrence, and angle identity in an
+angle-specific SHA-256 domain and resolves an explicitly authored angle exactly once into actual
+`Score.rotation`. Horizontal and vertical are 0 and 90; diagonal uses four directions; rising,
+falling, and their left-facing forms use the author-approved integer ranges; rotated uses the
+finite set more than five degrees from every 45-degree boundary. Numeric circle, ellipse, and
+cloudform placement checks the rotated declared extent in physical short-edge units, while named
+focus keeps its dimensions and `at.region`. Angled square is explicitly unsupported in both modes
+because of the known Renderer unit seam; unangled square remains supported. Renderer and Score wire
+are unchanged.
+
 Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
 ordinary DDL after an exact join to the execution owner and generated focus. One Emit is one
 instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
@@ -117,6 +128,10 @@ an unbound caller fact, structural node, incomplete or unknown Emit, or type mis
 entire Score. Under Continue, an unbound caller appearance field is omitted while definition values
 remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted as its typed
 unit. Unrelated flat siblings and original ordinal gaps remain.
+
+Flat Emit `angle: semantic_ref` uses the same resolver. A caller angle does not fan out to or
+override Emits; the selection key uses the Macro semantic ordinal and existing expansion path /
+generated ordinal.
 
 The runtime-disconnected `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
@@ -134,7 +149,7 @@ compatibility paths, not the canonical semantic specification. Unspecified and n
 placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
 delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
 public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
-compilation. Reaching Step10J does not complete Step10 as a whole. Product UI, API, and persistence
+compilation. Reaching Step10N does not complete Step10 as a whole. Product UI, API, and persistence
 do not yet select this mode, and legacy coerce / LLM fallback
 has not been replaced by it.
 

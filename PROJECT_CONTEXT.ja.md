@@ -91,6 +91,14 @@ Stopを既定、OmitAndContinueを明示選択とする。Stopは未対応意味
 Continueは元meaningを変えず、独立appearance fieldまたは成立しないtyped実行単位だけを省略する。
 結果はcomplete / omissions / stopped、元gap、実際の処置、source / generated ownerとspanを区別する。
 
+同じpolicyのangle resolverは、lock検証済みoriginal pre / expanded meaning、tag付きoptional
+`composition_seed`、logical occurrence、angle identityをSHA-256の専用domainへframeし、作者が明示した
+かたむきをactual `Score.rotation`へ一度だけ解決する。horizontal / verticalは0 / 90、diagonalは4方向、
+rising / fallingと左右版は裁定済み整数範囲、rotatedは45度境界から5度超の有限集合を使う。
+Circle / ellipse / cloudformの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
+従来の寸法と`at.region`を保つ。Angle付きsquareはRendererの既知unit seamのため両modeで明示未対応、
+angleなしsquareは既存どおりである。RendererとScore wireは変更しない。
+
 Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
 `use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは4つのclosed shape、明示`place`、
@@ -98,6 +106,9 @@ exact `center`、任意の同名category属性、count省略またはInteger 1�
 構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
 field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
 外側meaningはinvocation単位で省略する。無関係なflat siblingと元ordinal欠番は保持する。
+
+Flat Emitの`angle: semantic_ref`も同じresolverを通る。Caller angleはEmitへfan-out / overrideせず、
+Macroのsemantic ordinalと既存expansion path / generated ordinalを選択keyにする。
 
 Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
 そのcompilationとsource / state / lock / issuesを結果に保持する。既定のStopは上流のhole / conflictで
@@ -112,7 +123,7 @@ drawをやり直さない。Global budgetとsource / lock / owner / definition /
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
 Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
 残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
-`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Jの到達は
+`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Nの到達は
 Step10全体の完了を意味しない。製品UI / API / 保存経路は
 まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
 

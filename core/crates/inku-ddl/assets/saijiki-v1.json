@@ -32,6 +32,8 @@
         {"surface_ja": "斜め", "surface_en": "diagonal", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "右上がり", "surface_en": "rising", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "右下がり", "surface_en": "falling", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "左上がり", "surface_en": "left-rising", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "左下がり", "surface_en": "left-falling", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "回転", "surface_en": "rotated", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,

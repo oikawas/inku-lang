@@ -46,6 +46,14 @@ _LANGS = ("ja", "en")
 
 
 @dataclass(frozen=True)
+class _EnglishGrammar:
+    lemma: str
+    lexical_class: str
+    canonical_form: str
+    permitted_forms: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SaijikiWord:
     surface_ja: str
     surface_en: str | None
@@ -55,6 +63,7 @@ class SaijikiWord:
     marker: bool | None = None  # 閉包マーカー所属 (None = prompt に従う)
     score_value: str | None = None  # Weight / Color / SurfaceTexture の Score enum 値
     semantic_alias: str | None = None  # localized wire IDとは別のtyped semantic identity
+    english_grammar: _EnglishGrammar | None = None  # Rust assetと同期する非公開metadata
     # マーカー表面の言語別上書き。en「line-up」は従来マーカー「arrange」を保つ。
     marker_surfaces_ja: tuple[str, ...] | None = None
     marker_surfaces_en: tuple[str, ...] | None = None
@@ -144,6 +153,8 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("斜め", "diagonal"),
             _w("右上がり", "rising"),
             _w("右下がり", "falling"),
+            _w("左上がり", "left-rising", **_HIDDEN_MARKER),
+            _w("左下がり", "left-falling", **_HIDDEN_MARKER),
             _w("回転", "rotated"),
         ),
     ),
@@ -245,13 +256,49 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_en="movements",
         marker_class="variation",
         words=(
-            _w("細かく", "fine"),
+            _w(
+                "細かく",
+                "fine",
+                english_grammar=_EnglishGrammar(
+                    lemma="fine",
+                    lexical_class="adjective",
+                    canonical_form="base",
+                    permitted_forms=("adverb",),
+                ),
+            ),
             _w("大きく", "large"),
             _w("ゆっくり", "slowly"),
             _w("速く", "quickly"),
-            _w("揺れる", "swaying"),
-            _w("波打つ", "undulating"),
-            _w("震える", "trembling"),
+            _w(
+                "揺れる",
+                "swaying",
+                english_grammar=_EnglishGrammar(
+                    lemma="sway",
+                    lexical_class="verb",
+                    canonical_form="present_participle",
+                    permitted_forms=("third_person_singular",),
+                ),
+            ),
+            _w(
+                "波打つ",
+                "undulating",
+                english_grammar=_EnglishGrammar(
+                    lemma="undulate",
+                    lexical_class="verb",
+                    canonical_form="present_participle",
+                    permitted_forms=("third_person_singular",),
+                ),
+            ),
+            _w(
+                "震える",
+                "trembling",
+                english_grammar=_EnglishGrammar(
+                    lemma="tremble",
+                    lexical_class="verb",
+                    canonical_form="present_participle",
+                    permitted_forms=("third_person_singular",),
+                ),
+            ),
             _w("滲む", "blurring"),
         ),
     ),

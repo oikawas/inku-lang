@@ -100,6 +100,8 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる |
 
+`左上がり` / `left-rising` と `左下がり` / `left-falling` は、typed direct DDLとMacro参照で左右の意味を保つhidden markerである。現時点ではStage 1 promptと歳時記表示へ公開せず、既存の六つの表示語を変えない。
+
 ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する現行subsetだけは、数値位置、またはverified Stage 1.5でdirect `Instruction { instruction_index }`へ解決済みの元`place:center`と、place actionを持つcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決やeffective focusをsource meaningへ書き戻さない。Stopを既定とし、明示したOmitAndContinueだけが独立appearance fieldまたは成立しない実行単位をtyped診断つきで省略する。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
 図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
@@ -599,9 +601,9 @@ PNG 書き出しの選択肢は、設定モーダルの書き出しタブでユ�
 | 段 | 名称 | 変わるもの | コスト |
 |---|---|---|---|
 | 演奏 | 別の演奏 | performance seed による領域・関係・配置位相の解決（§13.8 / §14.4） | LLM 呼び出しなし（再レンダリングのみ） |
-| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択（§12.11） | Stage 2 の1回（保存済み正規化 DDL は不変） |
+| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択と、作者が明示したかたむきの具体角度選択（§12.11 / §18） | Stage 2 の1回（保存済み正規化 DDL は不変） |
 
-別の構図が変えるのは閉じた六つの焦点候補の選択だけである。構図族、技法、色、タッチ、relation、要素数を Stage 1.5 が発明・再選択してはならない。明示変奏は、強度（小・中・大）と variation seed が揃ったときだけ同じ焦点軸を動かし、不完全な指定は変奏なしとして扱う。記述、正規化 DDL、明示属性は変えない。
+別の構図が選び直すのは閉じた六つの焦点候補と、記述にかたむきがあるときの具体角度である。Stage 1.5 transformation自体はfocus-onlyを保ち、角度の数値化はStage 2 consumerが同じ`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏と明示変奏は確定した角度を保つ。明示変奏は、強度（小・中・大）と variation seed が揃ったときだけ焦点軸を動かし、不完全な指定は変奏なしとして扱う。記述、正規化 DDL、明示属性は変えない。
 
 この二段が §8.2 の「事後選択を中心にする」の実体である。分散の広い生成系では外れも増えるが、外れの処理は governor による事前の平均化ではなく、並んだものから選ぶという人間の行為に委ねる。選ぶことは記述を推敲することと並ぶ創作の一部である。品質の最終判定もこの事後選択に属し、judge metric は受け入れゲートではなく回帰検知の参考値として扱う。
 
@@ -867,6 +869,8 @@ Stage 2 は effective DDL / typed meaning を閉じた JSON Score schema へ構�
 
 Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既定）またはOmitAndContinueとして明示する。Continueは届かない意味をScore fieldへ変換せず、execution projectionからtyped単位を省略し、残った命令と元owner順序を返す。結果は完全成功、省略付き成功、停止を区別する。
 
+作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。Stage 2はeffective focus、variation seed、render seed、source spellingをこの選択へ混ぜない。
+
 ### 12.8 エラー回復戦略
 
 各 LLM 段は、空・短すぎる・schema 不適合の応答に対して理由を明示した再試行を一度だけ行う。再試行後も使えない場合は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。
@@ -892,19 +896,22 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
 - verified viewをactual Scoreへ下ろすときは、元のtyped instructionと同じindexを持つdirect `Instruction { instruction_index }` targetだけがそのinstructionを所有する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
 - baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
+- 明示angleは元のtyped meaningのまま通し、center-only target集合や変奏軸へ追加しない。具体角度はStage 2が同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
 - Stage 1.5の入力を切り離す前に、実際のvisible DDLのUTF-8 bytes、semantic source occurrenceに残る言語証跡、未使用分を含む全macro sidecarの三項、実行macroのresolved / binding / semantic head identityをcompiler lockと照合する。SourceOccurrenceがない入力へ新しい言語条件を課さず、未使用sidecarにresolutionや実行を要求しない。Sourceとprovenanceは入場時のintegrity証拠であり、meaningやfocusの材料ではない
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
 sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通のStop（既定）/ OmitAndContinue error policyはactual Scoreまで実装済みだがruntimeには未接続である。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。Stopは上流hole / conflictでScoreを返さない。明示Continueだけが同じcompilationのtyped owner / dependencyに従うsealed projectionから独立命令を届け、全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenance、geometry policy digest、Score wireは変えず、現行Python経路のcoerceやLLM fallbackが置換済みとはみなさない。Runtime / UI / API / 保存接続は後続の責務である。
 
+このruntime未接続subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudformのactual `Score.rotation`まで共有lowererで配達する。Angle付きsquareは既知のRenderer単位seamがあるため明示未対応で、angleなしsquareの既存配達は保つ。この到達はwhole Step 10の完了ではない。
+
 ### 12.12 添景と互換記録
 
-現行生成に添景レベルはない。Stage 1.5 と coerce は記述にない要素を足さず、明示内容を配達する限定修復だけを行う。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
+現行生成に添景レベルはない。Stage 1.5 と coerce は記述にない要素を足さず、明示内容を配達する限定修復だけを行う。明示angleの数値解決も新しい添景や視覚要素を足す処理ではなく、元のtyped identityを既存`rotation`へ配達する処理である。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
 
 ### 12.13 変奏（Stage 1.5）
 
-構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点だけを選び直す。現行入力に `vary_seed` はない。
+構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点を選び直し、明示angleがあれば同じidentity材料から具体角度も選び直す。現行入力に `vary_seed` はない。
 
 明示変奏は amplitude（小・中・大）と `variation_seed` の組である。両方が揃った場合だけ焦点を動かし、同じlock検証済みmeaning、attested composition seed、amplitude、variation seedは同じeffective meaningを得る。構図族、色、タッチ、技法、relation、要素数は動かさない。
 
@@ -1613,6 +1620,10 @@ Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / 
 
 Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、そのidentity / digestは`inku.geometry-resolution-policy.v1`である。Compiler lockはこのidentity / digestを参照・attestし、`ddl_engine_version`はactivation metadataに限定する。`size_rule_version`や二重ownerを作らない。
 
+同じpolicyは明示angleも所有する。`horizontal=0`、`vertical=90`、`diagonal`は`45 / 135 / 225 / 315`、`rising` / `falling`はそれぞれ整数度`[-37,-23]` / `[23,37]`、`left_rising` / `left_falling`は`[203,217]` / `[143,157]`、`rotated`は各45度境界から5度を超えて離れた整数度を有限一様に選ぶ。SHA-256のangle専用domainへ、lock検証済みoriginal pre / expanded meaning digest、tag付きoptional `composition_seed`、logical occurrence、angle identityをframeして選ぶ。同じmeaningのinline / continuationは同じ選択になり、真の別occurrenceは別keyを持つ。effective focus、variation seed、render seed、raw source bytes、full-lock digestは材料にしない。
+
+Circleの回転extentは同じ半径、ellipseは理想楕円、cloudformは宣言width / heightの矩形envelopeを使う。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named focusは従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Squareは既存Rendererの非正方canvasにおけるanchor / pivot単位不整合を直さないため、angle付きは`horizontal`を含めStopでno Score、Continueでそのsource instructionまたはEmitを明示省略する。Angleなしsquareは従来どおりであり、RendererとScore wireは変更しない。
+
 同じpolicyがeffective focusを`at.region`へ写す六値も所有する: `upper_right=[0.60,0.18,0.82,0.40]`、`upper_left=[0.18,0.18,0.40,0.40]`、`lower_right=[0.60,0.60,0.82,0.82]`、`lower_left=[0.18,0.60,0.40,0.82]`、`upper_edge=[0.39,0.07,0.61,0.29]`、`right_half=[0.61,0.39,0.83,0.61]`である。Named Score instructionは`center` / `position`を持たず、解決済みの`radius` / `size`と`at.region`を持つ。数値positionだけはanchorのunit intervalとshape extentのmust-fitを検査する。Named経路はregionをshape-safe範囲と交差させず、寸法の縮小、fit目的の再配置・再抽選、空intersection停止を行わない。
 
 作者A裁定では見切れを許す。既存Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。同じScore / optionsに対するRenderer semanticsは変えない。
@@ -1693,7 +1704,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v5に反映済みだがruntimeには未接続である。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点を選び直し、明示angleがあればStage 2で具体角度も選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度を再現する。別の演奏と明示変奏は確定角度を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v5に反映済みだがruntimeには未接続である。
 
 v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
 

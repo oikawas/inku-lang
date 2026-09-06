@@ -74,6 +74,12 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
         ["material", "color", "variation", "angle", "ratio", "place"]
     );
     assert_eq!(marker_classes[0].markers[0], "silverpoint");
+    let angles = marker_classes
+        .iter()
+        .find(|row| row.marker_class == "angle")
+        .unwrap();
+    assert!(angles.markers.iter().any(|marker| marker == "left-rising"));
+    assert!(angles.markers.iter().any(|marker| marker == "left-falling"));
 
     let relations = saijiki_relation_literal_table();
     assert_eq!(
@@ -88,6 +94,20 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
 
     let ja = saijiki_derived_projection(ResolvedInstructionLanguage::Ja).unwrap();
     let en = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
+    assert!(!en.prompt_block.contains("left-rising"));
+    assert!(!en.prompt_block.contains("left-falling"));
+    let angle_display = en
+        .display_categories
+        .iter()
+        .find(|category| category.key == "katamuki")
+        .unwrap();
+    assert!(!angle_display.words.iter().any(|word| word == "left-rising"));
+    assert!(
+        !angle_display
+            .words
+            .iter()
+            .any(|word| word == "left-falling")
+    );
     assert!(
         !ja.reference_categories[9]
             .words

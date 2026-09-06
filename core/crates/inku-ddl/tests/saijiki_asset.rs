@@ -43,7 +43,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        88
+        90
     );
     assert_eq!(asset.relations.len(), 5);
     assert_eq!(
@@ -115,6 +115,24 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         })
         .collect::<Vec<_>>();
     assert_eq!(aliases, [("中心", "center")]);
+
+    let angles = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katamuki")
+        .unwrap();
+    for (ja, en) in [("左上がり", "left-rising"), ("左下がり", "left-falling")] {
+        let word = angles
+            .words
+            .iter()
+            .find(|word| word.surface_ja == ja)
+            .unwrap();
+        assert_eq!(word.surface_en.as_deref(), Some(en));
+        assert!(!word.prompt);
+        assert!(!word.display);
+        assert_eq!(word.marker, Some(true));
+        assert!(word.score_value.is_none());
+    }
 }
 
 #[test]

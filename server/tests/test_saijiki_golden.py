@@ -451,6 +451,13 @@ def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
     }
     if word.semantic_alias is not None:
         result["semantic_alias"] = word.semantic_alias
+    if word.english_grammar is not None:
+        result["english_grammar"] = {
+            "lemma": word.english_grammar.lemma,
+            "lexical_class": word.english_grammar.lexical_class,
+            "canonical_form": word.english_grammar.canonical_form,
+            "permitted_forms": list(word.english_grammar.permitted_forms),
+        }
     return result
 
 

@@ -27,6 +27,7 @@ pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
+mod score_angle;
 pub mod score_diagnostics;
 pub mod score_lowering;
 pub mod semantic_association;

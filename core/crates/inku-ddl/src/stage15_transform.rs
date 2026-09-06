@@ -184,6 +184,7 @@ pub struct Stage15TransformationResult {
     composition_seed: Option<u64>,
     geometry_policy_id: &'static str,
     geometry_policy_digest: String,
+    execution_owners: SemanticMacroExecutionOwners,
     baseline_focus: Option<FocusRegion>,
     resolved_focus: Option<FocusRegion>,
     effective_variation: Option<Stage15Variation>,
@@ -282,6 +283,20 @@ impl<'a> VerifiedStage15EffectiveView<'a> {
 
     pub const fn composition_seed(self) -> Option<u64> {
         self.result.composition_seed()
+    }
+
+    pub(crate) fn original_pre_expansion_digest(self) -> &'a str {
+        self.result.original_pre_expansion_digest()
+    }
+
+    pub(crate) fn original_expanded_meaning_digest(self) -> &'a str {
+        self.result.original_expanded_meaning_digest()
+    }
+
+    pub(crate) fn macro_semantic_ordinal(self, source_ordinal: u64) -> Option<u64> {
+        self.result
+            .execution_owners
+            .semantic_ordinal_for_source(source_ordinal)
     }
 
     pub const fn geometry_policy_id(self) -> &'static str {
@@ -555,6 +570,7 @@ pub fn transform_stage15(
         composition_seed,
         geometry_policy_id,
         geometry_policy_digest,
+        execution_owners: input.execution_owners,
         baseline_focus,
         resolved_focus,
         effective_variation,

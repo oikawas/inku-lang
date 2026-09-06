@@ -14,7 +14,9 @@ use crate::{
 pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy.v1";
 
 const GEOMETRY_RESOLUTION_POLICY_PREFIX: &str = concat!(
-    "{\"anchor\":{\"closed_primitive\":\"center\",\"square_score\":\"top_left_from_center\"},",
+    "{\"anchor\":{\"closed_primitive\":\"center\",\"square_score\":\"top_left_from_center\"},"
+);
+const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"author_resolved_omission\":{\"color\":{\"choice\":\"max_oklch_lightness_distance\",",
     "\"tie\":\"black\"},\"continuity\":\"solid\",\"count\":1,",
     "\"surface\":\"filled\",\"touch\":\"pen\"},",
@@ -75,6 +77,8 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
     CANONICAL_JSON
         .get_or_init(|| {
             let mut canonical = String::from(GEOMETRY_RESOLUTION_POLICY_PREFIX);
+            crate::score_angle::write_angle_policy_json(&mut canonical);
+            canonical.push_str(GEOMETRY_RESOLUTION_POLICY_MIDDLE);
             for (index, (focus, bounds)) in FOCUS_REGION_BOUNDS_HUNDREDTHS.iter().enumerate() {
                 if index > 0 {
                     canonical.push(',');
@@ -489,6 +493,29 @@ mod tests {
         assert_eq!(payload["anchor"]["square_score"], "top_left_from_center");
         assert_eq!(payload["bounds"]["numeric"]["extent"], "must_fit");
         assert_eq!(payload["bounds"]["named"]["extent"], "not_must_fit");
+        assert_eq!(payload["angle"]["choices"]["horizontal"], 0);
+        assert_eq!(payload["angle"]["choices"]["vertical"], 90);
+        assert_eq!(
+            payload["angle"]["choices"]["diagonal"],
+            serde_json::json!([45, 135, 225, 315])
+        );
+        assert_eq!(
+            payload["angle"]["seed"]["scheme"],
+            crate::score_angle::SCORE_ANGLE_SELECTION_SCHEME_ID
+        );
+        assert_eq!(
+            payload["angle"]["bounds"]["square"],
+            "unsupported_when_angle_present"
+        );
+        assert_eq!(payload["angle"]["bounds"]["circle"], "radius");
+        assert_eq!(
+            payload["angle"]["bounds"]["ellipse"],
+            "rotated_ideal_ellipse"
+        );
+        assert_eq!(
+            payload["angle"]["bounds"]["cloudform"],
+            "rotated_declared_rectangle"
+        );
         assert_eq!(payload["unimplemented"], serde_json::json!([]));
         for (focus, expected) in [
             (FocusRegion::UpperRight, [0.60, 0.18, 0.82, 0.40]),
@@ -508,7 +535,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "2485cacd3df46a645b5ad01d9966768ebb5e9ff897e0b1232377c17d0de4164d"
+            "393b0f0cffc6538c3a657d598c88d80c29160be27006037f575d07bd895d1985"
         );
     }
 }

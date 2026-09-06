@@ -108,13 +108,24 @@ entire Score. Under Continue, an unbound caller appearance field is omitted whil
 remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted as its typed
 unit. Unrelated flat siblings and original ordinal gaps remain.
 
+The runtime-disconnected `compile_ddl_to_score` facade compiles the original
+`NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
+lock, and issues, in the result. Default Stop returns no Score for an upstream hole or conflict.
+Explicit Continue alone builds a sealed execution projection from the same compilation's typed
+ownership and dependencies and delivers independent instructions to an actual Score. For canonical
+pre-meaning it reuses the exact subset of successful macro output with the original seed, source
+ordinal, and generated provenance, without re-expansion. For a noncanonical projection it finalizes
+omissions before one seed derivation and expansion and never retries a draw after a local failure.
+Global budgets and source, lock, owner, definition, or provenance integrity failures stop both modes.
+
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
 compatibility paths, not the canonical semantic specification. Unspecified and non-center named
 placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
-delivery for remaining primitives, upstream NonCanonicalReady recovery, typed-hole blocking, and
-runtime cutover remain at the unconnected boundary. Reaching Step10I does not complete Step10 as a
-whole. Product UI, API, and persistence do not yet select this mode, and legacy coerce / LLM fallback
+delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
+public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
+compilation. Reaching Step10J does not complete Step10 as a whole. Product UI, API, and persistence
+do not yet select this mode, and legacy coerce / LLM fallback
 has not been replaced by it.
 
 ## Contracts That Must Remain Intact

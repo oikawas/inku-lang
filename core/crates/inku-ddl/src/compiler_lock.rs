@@ -282,7 +282,7 @@ impl SemanticMacroExecutionOwners {
         matches.next().is_none().then_some(ordinal)
     }
 
-    fn expansion_selection(&self) -> MacroExpansionSelection {
+    pub(crate) fn expansion_selection(&self) -> MacroExpansionSelection {
         MacroExpansionSelection::exact(
             self.owners
                 .iter()
@@ -293,6 +293,13 @@ impl SemanticMacroExecutionOwners {
                 .collect(),
             self.explained_binding_indices.clone(),
         )
+    }
+
+    pub(crate) fn source_semantic_ordinals(&self) -> BTreeMap<u64, u64> {
+        self.owners
+            .iter()
+            .map(|owner| (owner.source_ordinal, owner.semantic_ordinal))
+            .collect()
     }
 
     pub(crate) fn validate_seed_identities(
@@ -346,6 +353,16 @@ impl SemanticMacroExecutionOwners {
             }
         }
         Ok(())
+    }
+}
+
+pub(crate) fn compiler_seed_identity(seed: &MacroSeed) -> CompilerSeedIdentity {
+    CompilerSeedIdentity {
+        qualified_name: seed.qualified_macro_name().to_owned(),
+        ordinal: seed.ordinal(),
+        scheme_id: seed.scheme_id(),
+        full_digest: seed.full_digest_hex().to_owned(),
+        resolved_seed: seed.resolved_seed(),
     }
 }
 
@@ -2273,6 +2290,67 @@ pub(crate) fn validate_stage15_input_boundary(
     Ok(())
 }
 
+pub(crate) fn validate_execution_projection_boundary(
+    document: &NormalizedDdlDocument,
+    ast: &SemanticDocumentAst,
+    lock: &TypedDdlCompilerLock,
+    binding: &MacroParameterBindingResult,
+    execution_owners: &SemanticMacroExecutionOwners,
+    definitions: &[MacroDefinition],
+) -> Result<(), Stage15InputBoundaryError> {
+    if sha256_hex(document.source().as_bytes()) != lock.visible_source_digest {
+        return Err(Stage15InputBoundaryError::VisibleSourceDigest);
+    }
+    if semantic_source_occurrences(ast)
+        .iter()
+        .any(|occurrence| occurrence.language != document.language())
+    {
+        return Err(Stage15InputBoundaryError::SourceLanguage);
+    }
+    for sidecar in document.macro_locks() {
+        let Some(identity) = definitions
+            .iter()
+            .filter_map(|definition| definition.identity().ok())
+            .find(|identity| identity.qualified_name() == sidecar.qualified_name())
+        else {
+            return Err(Stage15InputBoundaryError::DefinitionProjection);
+        };
+        if identity.version() != sidecar.version()
+            || format!("sha256:{}", identity.full_digest_hex()) != sidecar.digest()
+        {
+            return Err(Stage15InputBoundaryError::DefinitionProjection);
+        }
+    }
+    for owner in execution_owners.owners() {
+        let Some(complete) = binding.complete.get(owner.binding_index) else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let Some(resolved) = binding
+            .macro_resolution
+            .resolved
+            .get(complete.invocation_index)
+        else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        let Some(sidecar) = document.macro_locks().iter().find(|sidecar| {
+            sidecar.qualified_name() == complete.definition_identity.qualified_name()
+        }) else {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        };
+        if resolved.definition_identity != complete.definition_identity
+            || resolved.lock.qualified_name != sidecar.qualified_name()
+            || resolved.lock.version != sidecar.version()
+            || resolved.lock.digest != sidecar.digest()
+            || complete.definition_identity.version() != sidecar.version()
+            || format!("sha256:{}", complete.definition_identity.full_digest_hex())
+                != sidecar.digest()
+        {
+            return Err(Stage15InputBoundaryError::ConsumedDefinitionIdentity);
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&SourceOccurrence> {
     fn push_term<'a>(occurrences: &mut Vec<&'a SourceOccurrence>, term: &'a SemanticTerm) {
         occurrences.push(&term.provenance.source);
@@ -3310,6 +3388,71 @@ pub(crate) fn semantic_macro_execution_owners(
         explained_binding_indices.push(binding_index);
     }
 
+    let mapping = SemanticMacroExecutionOwners {
+        owners,
+        explained_binding_indices,
+    };
+    mapping
+        .expansion_selection()
+        .is_valid_for(binding.complete.len())
+        .then_some(mapping)
+        .ok_or(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+}
+
+pub(crate) fn semantic_macro_execution_owners_for_projection(
+    ast: &SemanticDocumentAst,
+    binding: &MacroParameterBindingResult,
+    retained_semantic_ordinals: Option<&BTreeMap<u64, u64>>,
+    omitted_binding_indices: &BTreeSet<usize>,
+) -> Result<SemanticMacroExecutionOwners, MacroExpansionDiagnosticKind> {
+    let mut owners = Vec::new();
+    let mut explained_binding_indices = omitted_binding_indices.iter().copied().collect::<Vec<_>>();
+
+    for instruction in &ast.instructions {
+        let SemanticHead::MacroInvocation(head) = &instruction.entity.head else {
+            continue;
+        };
+        let Some(binding_index) = exact_macro_binding_index(head, binding) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        let Some(complete) = binding.complete.get(binding_index) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        if omitted_binding_indices.contains(&binding_index)
+            || !semantic_macro_parameters_match_complete_binding(&head.parameters, complete)
+        {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        }
+        let semantic_ordinal = match retained_semantic_ordinals {
+            Some(ordinals) => *ordinals
+                .get(&complete.invocation_ordinal)
+                .ok_or(MacroExpansionDiagnosticKind::BindingOwnershipMismatch)?,
+            None => u64::try_from(owners.len())
+                .map_err(|_| MacroExpansionDiagnosticKind::BindingOwnershipMismatch)?,
+        };
+        owners.push(SemanticMacroExecutionOwner {
+            binding_index,
+            source_invocation_index: complete.invocation_index,
+            source_ordinal: complete.invocation_ordinal,
+            semantic_ordinal,
+        });
+        explained_binding_indices.push(binding_index);
+    }
+
+    for edge in &ast.continuations {
+        let SemanticHead::MacroInvocation(head) = &edge.reintroduced_head else {
+            continue;
+        };
+        let Some(binding_index) = exact_macro_binding_index(head, binding) else {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        };
+        if omitted_binding_indices.contains(&binding_index) {
+            return Err(MacroExpansionDiagnosticKind::BindingOwnershipMismatch);
+        }
+        explained_binding_indices.push(binding_index);
+    }
+
+    explained_binding_indices.sort_unstable();
     let mapping = SemanticMacroExecutionOwners {
         owners,
         explained_binding_indices,

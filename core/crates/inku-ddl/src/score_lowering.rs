@@ -875,7 +875,10 @@ pub fn lower_verified_stage15_view<'a>(
         .instructions
         .iter()
         .enumerate()
-        .map(|(instruction_index, instruction)| {
+        .map(|(projected_index, instruction)| {
+            let instruction_index = view
+                .source_instruction_index(projected_index)
+                .expect("verified Stage 1.5 view maps every projected instruction");
             lower_source_instruction(instruction_index, instruction)
         })
         .collect();
@@ -921,8 +924,22 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
             reason,
         });
     }
-    for (group_index, group) in document.coordinated_head_groups.iter().enumerate() {
+    for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         omitted_group_members.extend(group.member_instruction_indices.iter().copied());
+        let group_index = candidate
+            .verified_effective_view()
+            .source_group_index(projected_group_index)
+            .expect("verified Stage 1.5 view maps every projected group");
+        let source_member_instruction_indices = group
+            .member_instruction_indices
+            .iter()
+            .map(|index| {
+                candidate
+                    .verified_effective_view()
+                    .source_instruction_index(*index)
+                    .expect("verified Stage 1.5 view maps every group member")
+            })
+            .collect::<Vec<_>>();
         let mut spans = group
             .member_instruction_indices
             .iter()
@@ -933,7 +950,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
         if let Some(predicate) = document
             .group_predicates
             .iter()
-            .find(|predicate| predicate.group_index == group_index)
+            .find(|predicate| predicate.group_index == projected_group_index)
         {
             spans.extend(
                 predicate
@@ -947,7 +964,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: ScoreDiagnosticOwner::CoordinatedGroup {
                 group_index,
-                member_instruction_indices: group.member_instruction_indices.clone(),
+                member_instruction_indices: source_member_instruction_indices.clone(),
                 spans,
             },
             disposition: diagnostic_disposition(
@@ -955,7 +972,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                 &reason,
                 ScoreOmissionUnit::CoordinatedGroup {
                     group_index,
-                    member_instruction_indices: group.member_instruction_indices.clone(),
+                    member_instruction_indices: source_member_instruction_indices,
                 },
                 None,
             ),
@@ -965,10 +982,14 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
 
     let mut instructions = Vec::new();
     let mut instruction_origins = Vec::new();
-    for (instruction_index, instruction) in document.instructions.iter().enumerate() {
-        if omitted_group_members.contains(&instruction_index) {
+    for (projected_index, instruction) in document.instructions.iter().enumerate() {
+        if omitted_group_members.contains(&projected_index) {
             continue;
         }
+        let instruction_index = candidate
+            .verified_effective_view()
+            .source_instruction_index(projected_index)
+            .expect("verified Stage 1.5 view maps every projected instruction");
         if let Some(relation) = &instruction.relation {
             let reason = ScoreFieldGap::UnsupportedRelation;
             let (owner, unit) = match &instruction.entity.head {

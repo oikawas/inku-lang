@@ -91,12 +91,21 @@ exact `center`、任意の同名category属性、count省略またはInteger 1�
 field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
 外側meaningはinvocation単位で省略する。無関係なflat siblingと元ordinal欠番は保持する。
 
+Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
+そのcompilationとsource / state / lock / issuesを結果に保持する。既定のStopは上流のhole / conflictで
+Scoreを返さない。明示したContinueだけが、同じcompilationのtyped ownershipとdependencyからsealedな
+execution projectionを作り、独立した命令をactual Scoreへ届ける。Canonicalなpre-meaningでは成功済み
+macro outputと元seed / source ordinal / generated provenanceをexact subsetとして再利用し、再展開しない。
+NonCanonicalなprojectionでは省略単位を先に確定してから一度だけseed導出・展開し、local failure後に
+drawをやり直さない。Global budgetとsource / lock / owner / definition / provenance整合性不良は両modeを止める。
+
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
 Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
-残るprimitive等のdelivery拡張、上流NonCanonicalReady回復、typed holeの停止範囲、runtime cutoverは
-未接続の境界として残る。Step10Iの到達はStep10全体の完了を意味しない。製品UI / API / 保存経路は
+残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
+`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Jの到達は
+Step10全体の完了を意味しない。製品UI / API / 保存経路は
 まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
 
 ## 守るべき設計契約

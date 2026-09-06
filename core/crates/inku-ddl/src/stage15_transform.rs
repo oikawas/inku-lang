@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
+use crate::execution_projection::ExecutionProjection;
 use crate::{
     CompilerLockState, EXPANDED_MACRO_MEANING_SCHEMA_ID, ExpandedMacroInvocation,
     ExpandedMacroNode, ExpandedMacroValue, ExpansionPathSegment, GeneratedNodeProvenance,
@@ -138,6 +139,8 @@ pub struct Stage15TransformationInput {
     geometry_policy_id: &'static str,
     geometry_policy_digest: String,
     execution_owners: SemanticMacroExecutionOwners,
+    source_instruction_indices: Vec<usize>,
+    source_group_indices: Vec<usize>,
 }
 
 impl Stage15TransformationInput {
@@ -188,6 +191,8 @@ pub struct Stage15TransformationResult {
     moved_axes: Vec<Stage15MovedAxis>,
     effective_canonical_bytes: Vec<u8>,
     effective_canonical_digest: String,
+    source_instruction_indices: Vec<usize>,
+    source_group_indices: Vec<usize>,
 }
 
 impl Stage15TransformationResult {
@@ -297,6 +302,20 @@ impl<'a> VerifiedStage15EffectiveView<'a> {
 
     pub fn pending_focus_targets(self) -> &'a [Stage15TargetTransformation] {
         self.result.targets()
+    }
+
+    pub(crate) fn source_instruction_index(self, projected_index: usize) -> Option<usize> {
+        self.result
+            .source_instruction_indices
+            .get(projected_index)
+            .copied()
+    }
+
+    pub(crate) fn source_group_index(self, projected_index: usize) -> Option<usize> {
+        self.result
+            .source_group_indices
+            .get(projected_index)
+            .copied()
     }
 }
 
@@ -461,7 +480,26 @@ pub fn stage15_transformation_input(
         geometry_policy_id: lock.geometry_policy_id,
         geometry_policy_digest: lock.geometry_policy_digest.clone(),
         execution_owners,
+        source_instruction_indices: (0..semantic.ast.instructions.len()).collect(),
+        source_group_indices: (0..semantic.ast.coordinated_head_groups.len()).collect(),
     })
+}
+
+pub(crate) fn stage15_execution_projection_input(
+    projection: ExecutionProjection,
+) -> Stage15TransformationInput {
+    Stage15TransformationInput {
+        semantic_document: projection.semantic_document,
+        expanded_invocations: projection.expanded_invocations,
+        pre_expansion_digest: projection.pre_expansion_digest,
+        expanded_meaning_digest: projection.expanded_meaning_digest,
+        composition_seed: projection.composition_seed,
+        geometry_policy_id: projection.geometry_policy_id,
+        geometry_policy_digest: projection.geometry_policy_digest,
+        execution_owners: projection.execution_owners,
+        source_instruction_indices: projection.source_instruction_indices,
+        source_group_indices: projection.source_group_indices,
+    }
 }
 
 /// Apply one deterministic focus overlay without changing the original typed graph.
@@ -524,6 +562,8 @@ pub fn transform_stage15(
         moved_axes,
         effective_canonical_bytes,
         effective_canonical_digest,
+        source_instruction_indices: input.source_instruction_indices,
+        source_group_indices: input.source_group_indices,
     })
 }
 
@@ -538,13 +578,13 @@ fn collect_targets(
     input: &Stage15TransformationInput,
 ) -> Result<Vec<CollectedTarget>, Stage15TransformError> {
     let mut targets = Vec::new();
-    for (instruction_index, instruction) in input.semantic_document.instructions.iter().enumerate()
-    {
+    for (projected_index, instruction) in input.semantic_document.instructions.iter().enumerate() {
         if let Some(position) = instruction
             .position
             .as_ref()
             .filter(|term| is_center(&term.identity))
         {
+            let instruction_index = input.source_instruction_indices[projected_index];
             targets.push(CollectedTarget {
                 path: Stage15TargetPath::Instruction { instruction_index },
                 original: position.identity.clone(),
@@ -558,10 +598,11 @@ fn collect_targets(
             .as_ref()
             .filter(|term| is_center(&term.identity))
         {
+            let group_index = input.source_group_indices[edge.group_index];
             targets.push(CollectedTarget {
                 path: Stage15TargetPath::GroupPredicate {
                     edge_index,
-                    group_index: edge.group_index,
+                    group_index,
                 },
                 original: position.identity.clone(),
                 provenance: Stage15TargetProvenance::Source(position.provenance.clone()),
@@ -648,9 +689,10 @@ fn original_targets_at_path(
 ) -> Vec<(SemanticIdentity, Stage15TargetProvenance)> {
     match path {
         Stage15TargetPath::Instruction { instruction_index } => input
-            .semantic_document
-            .instructions
-            .get(*instruction_index)
+            .source_instruction_indices
+            .iter()
+            .position(|source_index| source_index == instruction_index)
+            .and_then(|projected_index| input.semantic_document.instructions.get(projected_index))
             .and_then(|instruction| instruction.position.as_ref())
             .map(|term| {
                 vec![(
@@ -666,7 +708,7 @@ fn original_targets_at_path(
             .semantic_document
             .group_predicates
             .get(*edge_index)
-            .filter(|edge| edge.group_index == *group_index)
+            .filter(|edge| input.source_group_indices.get(edge.group_index) == Some(group_index))
             .and_then(|edge| edge.position.as_ref())
             .map(|term| {
                 vec![(

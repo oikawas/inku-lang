@@ -506,7 +506,7 @@ mod tests {
         );
         assert_eq!(
             payload["angle"]["bounds"]["square"],
-            "unsupported_when_angle_present"
+            "rotated_declared_rectangle"
         );
         assert_eq!(payload["angle"]["bounds"]["circle"], "radius");
         assert_eq!(

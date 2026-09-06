@@ -1427,10 +1427,10 @@ have not been replaced by this facade; runtime / UI / API / persistence connecti
 remains later work.
 
 This runtime-disconnected subset now delivers direct and flat-Macro angles for
-circle, ellipse, and cloudform through the shared lowerer to actual
-`Score.rotation`. An angled square remains explicitly unsupported because of
-the known Renderer unit seam, while an unangled square retains its existing
-delivery. This does not complete Step 10 as a whole.
+circle, ellipse, cloudform, and square through the shared lowerer to actual
+`Score.rotation`. Square uses the same angle resolver for direct and flat Macro
+Emit input. Only numeric placement must fit the rotated declared rectangle;
+named focus adds no must-fit check. This does not complete Step 10 as a whole.
 
 ### 12.12 Staffage and Compatibility Records
 
@@ -1470,7 +1470,7 @@ generation. The history of reducing seven variation axes to one lives in
 The Renderer performs a validated JSON Score into SVG. It realizes coordinates,
 materials, sway, primitives, texture, and canvas ratio without inventing visual
 content absent from Score. The current authority is the platform-independent
-Rust `inku-render` core (Render Engine 41); Python and Android are hosts that
+Rust `inku-render` core (Render Engine 42); Python and Android are hosts that
 pass resolved options into the same core. Native rasterization belongs to the
 separate `inku-svg-raster` boundary.
 
@@ -2588,16 +2588,14 @@ Effective focus, variation seed, render seed, raw source bytes, and the full
 lock digest are excluded.
 
 A circle keeps the same radial extent under rotation. An ellipse uses its ideal
-rotated ellipse extent, and cloudform uses the rotated rectangular envelope of
+rotated ellipse extent, and cloudform and square use the rotated rectangular envelope of
 its declared width and height. Numeric placement rotates short-edge units in
 physical space, converts the result back to each canvas axis, and applies
 must-fit only to the rotated extent; it does not reject the unrotated box first,
 relocate, shrink, reduce count, or retry another angle. Named focus keeps the
-existing size and `at.region` without a must-fit check. Because the existing
-Renderer has a square anchor/pivot unit seam on non-square canvases, any angled
-square, including `horizontal`, yields no Score under Stop and omits that source
-instruction or Emit under Continue. An unangled square remains supported. The
-Renderer and Score wire are unchanged.
+existing size and `at.region` without a must-fit check. Square angles use the
+same resolver for direct instructions and flat Macro Emits and reach
+`Score.rotation`. The shape of the Renderer and Score wire is unchanged.
 
 The same policy owns the six mappings from effective focus to `at.region`:
 `upper_right=[0.60,0.18,0.82,0.40]`,
@@ -2615,8 +2613,13 @@ The author's A ruling allows clipping. The Renderer retains its existing
 short-edge conversion of region extents, performance-seed anchor selection, and
 unit-interval base-point clamp, including a square's top-left point. This is not
 a promise that no coordinate adjustment occurs or that the whole shape always
-stays on the paper. Renderer semantics for the same Score and options do not
-change.
+stays on the paper. Engine 42 preserves the existing wire in which points use
+normalized canvas axes while size, radius, and gap use the canvas short edge.
+It computes square and triangle semantic centers, movement, rotation pivots,
+performed bounds, relations, composite offsets, and arrangement fitting in one
+physical short-edge coordinate family before converting back to each axis.
+Public helpers called without a canvas keep their prior normalized-coordinate
+compatibility.
 
 Within the current subset, only an omitted count resolves to one; zero,
 repeated, and qualitative counts are not materialized. Omitted touch resolves to

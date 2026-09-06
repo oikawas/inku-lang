@@ -24,7 +24,8 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
     "\"numeric\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
-    "\"cloudform_width_height\",\"square_side\",\"axis_position\"],",
+    "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
+    "\"axis_position\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
 );

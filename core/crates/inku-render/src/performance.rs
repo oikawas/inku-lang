@@ -1,9 +1,11 @@
 //! Score-level performance planning and composite-group expansion.
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::geometry::{point_from_short_side_units, point_to_short_side_units};
 use crate::planning::{
-    PlanningWarning, ensure_line_coordinates, instruction_anchor, move_anchor_to,
-    resolve_at_region, resolve_relation, scale_instruction,
+    PlanningWarning, ensure_line_coordinates, instruction_anchor_on_canvas,
+    move_anchor_to_on_canvas, resolve_at_region, resolve_relation_on_canvas,
+    scale_instruction_on_canvas,
 };
 use crate::types::{CanvasSize, Color, Instruction, Layout, Point, Score, Seed};
 
@@ -41,9 +43,12 @@ fn composite_member_copy(
     rotation_delta: f64,
     scale: f64,
     color: Option<Color>,
+    canvas: Option<CanvasSize>,
 ) -> Instruction {
-    let scaled = scale_instruction(member, scale);
-    let member_anchor = instruction_anchor(&scaled);
+    let scaled = scale_instruction_on_canvas(member, scale, canvas);
+    let member_anchor =
+        point_to_short_side_units(instruction_anchor_on_canvas(&scaled, canvas), canvas);
+    let source_anchor = point_to_short_side_units(source_anchor, canvas);
     let delta = Point::new(
         member_anchor.x - source_anchor.x,
         member_anchor.y - source_anchor.y,
@@ -53,11 +58,16 @@ fn composite_member_copy(
         delta.x * radians.cos() - delta.y * radians.sin(),
         delta.x * radians.sin() + delta.y * radians.cos(),
     );
-    let target_anchor = instruction_anchor(target_head);
-    let mut moved = move_anchor_to(
+    let target_anchor =
+        point_to_short_side_units(instruction_anchor_on_canvas(target_head, canvas), canvas);
+    let mut moved = move_anchor_to_on_canvas(
         &scaled,
-        Point::new(target_anchor.x + rotated.x, target_anchor.y + rotated.y),
+        point_from_short_side_units(
+            Point::new(target_anchor.x + rotated.x, target_anchor.y + rotated.y),
+            canvas,
+        ),
         true,
+        canvas,
     );
     moved.arrangement = None;
     if rotation_delta != 0.0 {
@@ -102,7 +112,7 @@ fn expand_composite_groups(
             performance_seed,
             canvas,
         });
-        let source_anchor = instruction_anchor(&prepared_head);
+        let source_anchor = instruction_anchor_on_canvas(&prepared_head, canvas);
         let source_rotation = prepared_head.rotation.unwrap_or(0.0);
         let source_extent = instruction_extent(&prepared_head);
         let cycles_color = !arrangement.color_cycle.is_empty();
@@ -119,6 +129,7 @@ fn expand_composite_groups(
                     rotation_delta,
                     scale,
                     color,
+                    canvas,
                 ));
             }
         }
@@ -163,7 +174,8 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
             }
         } else {
             instruction = resolve_at_region(&instruction, seed, index, request.canvas);
-            let relation = resolve_relation(&instruction, &resolved, seed, index);
+            let relation =
+                resolve_relation_on_canvas(&instruction, &resolved, seed, index, request.canvas);
             instruction = relation.instruction;
             if let Some(warning) = relation.warning {
                 warnings.push(warning);

@@ -569,6 +569,34 @@ pub fn points_center(path: &[Point]) -> Point {
     )
 }
 
+/// Per-axis factors that express a short-side distance in normalized canvas axes.
+#[must_use]
+pub fn short_side_scales(canvas: Option<CanvasSize>) -> Point {
+    canvas.map_or(Point::new(1.0, 1.0), |canvas| {
+        Point::new(canvas.unit() / canvas.width, canvas.unit() / canvas.height)
+    })
+}
+
+/// Convert an axes-normalized point into coordinates measured on the canvas short side.
+#[must_use]
+pub fn point_to_short_side_units(point: Point, canvas: Option<CanvasSize>) -> Point {
+    let scale = short_side_scales(canvas);
+    Point::new(point.x / scale.x, point.y / scale.y)
+}
+
+/// Convert a point measured on the canvas short side into normalized canvas axes.
+#[must_use]
+pub fn point_from_short_side_units(point: Point, canvas: Option<CanvasSize>) -> Point {
+    let scale = short_side_scales(canvas);
+    Point::new(point.x * scale.x, point.y * scale.y)
+}
+
+/// Express a short-side-sized vector in normalized canvas axes.
+#[must_use]
+pub fn size_in_normalized_axes(size: Point, canvas: Option<CanvasSize>) -> Point {
+    point_from_short_side_units(size, canvas)
+}
+
 #[must_use]
 pub fn point_to_pixels(point: Point, canvas: CanvasSize) -> Point {
     Point::new(point.x * canvas.width, point.y * canvas.height)

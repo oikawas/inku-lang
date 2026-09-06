@@ -1,8 +1,10 @@
+use inku_render::geometry::point_to_short_side_units;
 use inku_render::planning::{
-    ensure_line_coordinates, instruction_anchor, move_anchor_to, resolve_at_region,
-    resolve_relation,
+    ensure_line_coordinates, instruction_anchor, move_anchor_to,
+    performed_instruction_bounds_on_canvas, resolve_at_region, resolve_relation,
+    resolve_relation_on_canvas,
 };
-use inku_render::types::{Instruction, Point, Score};
+use inku_render::types::{CanvasSize, Instruction, Point, Score};
 
 fn instruction(json: &str) -> Instruction {
     let score: Score = serde_json::from_str(&format!(r#"{{"instructions":[{json}]}}"#)).unwrap();
@@ -31,6 +33,65 @@ fn region_resolution_consumes_at_but_preserves_relation() {
     let anchor = instruction_anchor(&resolved);
     assert!((0.6..=0.9).contains(&anchor.x));
     assert!((0.2..=0.4).contains(&anchor.y));
+}
+
+#[test]
+fn wide_canvas_square_region_resolution_preserves_the_physical_anchor() {
+    let circle = instruction(
+        r#"{"primitive":"circle","center":[0.2,0.2],"radius":0.1,
+        "at":{"region":[0.39,0.39,0.61,0.61]}}"#,
+    );
+    let square = instruction(
+        r#"{"primitive":"square","position":[0.1,0.1],"size":[0.2,0.2],
+        "at":{"region":[0.39,0.39,0.61,0.61]}}"#,
+    );
+
+    for canvas in [
+        CanvasSize::new(1_000.0, 500.0),
+        CanvasSize::new(500.0, 1_000.0),
+        CanvasSize::new(500.0, 500.0),
+    ] {
+        let target = resolve_at_region(&circle, 37, 0, Some(canvas))
+            .center
+            .unwrap();
+        let resolved = resolve_at_region(&square, 37, 0, Some(canvas));
+        let position = resolved.position.unwrap();
+        let size = resolved.size.unwrap();
+        let physical_anchor = Point::new(
+            position.x + size.x * canvas.unit() / canvas.width / 2.0,
+            position.y + size.y * canvas.unit() / canvas.height / 2.0,
+        );
+
+        assert!((physical_anchor.x - target.x).abs() < 1.0e-12);
+        assert!((physical_anchor.y - target.y).abs() < 1.0e-12);
+    }
+}
+
+#[test]
+fn wide_canvas_relation_uses_physical_square_bounds() {
+    let canvas = CanvasSize::new(1_000.0, 500.0);
+    let prior = instruction(r#"{"primitive":"square","position":[0.45,0.4],"size":[0.2,0.2]}"#);
+    let current = instruction(
+        r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.04,
+        "relation":{"type":"not_touching","gap":"narrow"}}"#,
+    );
+    let result = resolve_relation_on_canvas(&current, &[prior.clone()], 17, 1, Some(canvas));
+    assert!(result.warning.is_none());
+    let prior_bounds =
+        performed_instruction_bounds_on_canvas(&prior, Some(17), 0, Some(canvas)).unwrap();
+    let current_bounds =
+        performed_instruction_bounds_on_canvas(&result.instruction, Some(17), 1, Some(canvas))
+            .unwrap();
+    let delta = Point::new(
+        current_bounds.center().x - prior_bounds.center().x,
+        current_bounds.center().y - prior_bounds.center().y,
+    );
+    let distance = delta.x.hypot(delta.y);
+    assert!(distance > prior_bounds.radius() + current_bounds.radius());
+    assert_eq!(
+        point_to_short_side_units(result.instruction.center.unwrap(), Some(canvas)),
+        current_bounds.center()
+    );
 }
 
 #[test]

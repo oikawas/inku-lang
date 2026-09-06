@@ -945,7 +945,7 @@ fn rotated_numeric_bounds_use_the_physical_declared_envelope() {
 }
 
 #[test]
-fn square_angle_is_explicitly_unsupported_in_both_modes_without_affecting_plain_square() {
+fn square_angle_is_delivered_in_both_modes_and_numeric_rotation_must_fit() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let result = stage15(
         concat!(
@@ -955,15 +955,33 @@ fn square_angle_is_explicitly_unsupported_in_both_modes_without_affecting_plain_
         ResolvedInstructionLanguage::En,
     );
     let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
-    assert!(stop.score().is_none());
-    assert!(
-        stop.gaps()
-            .contains(&ScoreFieldGap::UnsupportedAngleForPrimitive {
-                primitive: Primitive::Square,
-            })
-    );
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(stop.score().unwrap().instructions.len(), 2);
+    assert_eq!(stop.score().unwrap().instructions[0].rotation, Some(0.0));
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(continued.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(continued.score(), stop.score());
+
+    let out_of_bounds = stage15(
+        concat!(
+            "place one red diagonal square with side length 0.4 at horizontal 0.5, vertical 0.25. ",
+            "place one blue circle at horizontal 0.7, vertical 0.7."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let stopped = lower_verified_stage15_score(out_of_bounds.verified_effective_view(), context);
+    assert!(stopped.score().is_none());
+    assert!(
+        stopped
+            .gaps()
+            .contains(&ScoreFieldGap::GeometryExtentOutOfBounds)
+    );
+    let continued = lower_verified_stage15_score_with_policy(
+        out_of_bounds.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
@@ -972,22 +990,6 @@ fn square_angle_is_explicitly_unsupported_in_both_modes_without_affecting_plain_
         continued.score().unwrap().instructions[0].primitive,
         Primitive::Circle
     );
-    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition),
-        (
-            ScoreDiagnosticOwner::SourceInstruction {
-                instruction_index: 0,
-                spans,
-                ..
-            },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::SourceInstruction {
-                    instruction_index: 0
-                },
-                ..
-            }
-        ) if spans.len() == 1
-    )));
 
     let plain = stage15(
         "place one red square at center.",
@@ -2085,7 +2087,7 @@ fn japanese_and_english_four_shape_macro_uses_shared_defaults_and_geometry() {
 }
 
 #[test]
-fn flat_macro_angle_uses_the_shared_resolver_and_square_boundary() {
+fn flat_macro_angle_uses_the_shared_resolver_for_square() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let horizontal = angle_emit_definition("circle", "horizontal");
     let macro_horizontal = stage15_locked(
@@ -2148,27 +2150,13 @@ fn flat_macro_angle_uses_the_shared_resolver_and_square_boundary() {
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&square),
     );
-    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
-    assert!(stop.score().is_none());
-    let continued = lower_verified_stage15_score_with_policy(
-        result.verified_effective_view(),
-        context,
-        ScoreErrorPolicy::OmitAndContinue,
-    );
-    assert_eq!(continued.score().unwrap().instructions.len(), 1);
-    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition, &diagnostic.reason),
-        (
-            ScoreDiagnosticOwner::GeneratedNode { key: Some(key), .. },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::MacroEmit { .. },
-                ..
-            },
-            ScoreFieldGap::UnsupportedAngleForPrimitive {
-                primitive: Primitive::Square
-            }
-        ) if key == "angle"
-    )));
+    let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(lowered.diagnostics().is_empty());
+    assert_eq!(lowered.score().unwrap().instructions.len(), 2);
+    let instruction = &lowered.score().unwrap().instructions[1];
+    assert_eq!(instruction.primitive, Primitive::Square);
+    assert_eq!(instruction.rotation, Some(0.0));
 }
 
 #[test]

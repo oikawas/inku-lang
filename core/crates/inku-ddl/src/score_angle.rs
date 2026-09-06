@@ -162,7 +162,7 @@ pub(crate) fn write_angle_policy_json(output: &mut String) {
         "\"ellipse\":\"rotated_ideal_ellipse\",\"named\":\"not_must_fit\",",
         "\"numeric\":\"must_fit\",",
         "\"physical_units\":\"short_edge_then_canvas_axes\",",
-        "\"square\":\"unsupported_when_angle_present\"},",
+        "\"square\":\"rotated_declared_rectangle\"},",
         "\"choices\":{\"diagonal\":["
     ));
     for (index, degrees) in DIAGONAL_DEGREES.iter().enumerate() {

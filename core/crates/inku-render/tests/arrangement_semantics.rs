@@ -1,5 +1,5 @@
 use inku_render::arrangement::{ArrangementRequest, expand_arrangement, quantize_instruction};
-use inku_render::planning::instruction_anchor;
+use inku_render::planning::{instruction_anchor, instruction_anchor_on_canvas};
 use inku_render::types::{CanvasSize, Instruction, Score};
 
 fn instruction(json: &str) -> Instruction {
@@ -92,4 +92,24 @@ fn expansion_moves_only_the_geometry_owned_by_the_primitive() {
         expanded.iter().any(|item| item.center != original.center),
         "the circle center should still receive the arrangement shift"
     );
+}
+
+#[test]
+fn vertical_square_arrangement_preserves_the_declared_physical_x_anchor() {
+    let canvas = CanvasSize::new(1_000.0, 500.0);
+    let original = instruction(
+        r#"{"primitive":"square","position":[0.45,0.4],"size":[0.2,0.2],
+        "arrangement":{"count":3,"layout":"vertical","margin":0.1}}"#,
+    );
+    let expected = instruction_anchor_on_canvas(&original, Some(canvas)).x;
+    let expanded = expand_arrangement(ArrangementRequest {
+        instruction: &original,
+        placement_seed: Some(17),
+        performance_seed: Some(431),
+        canvas: Some(canvas),
+    });
+    assert_eq!(expanded.len(), 3);
+    assert!(expanded.iter().all(|item| {
+        (instruction_anchor_on_canvas(item, Some(canvas)).x - expected).abs() < 1.0e-6
+    }));
 }

@@ -67,6 +67,41 @@ fn composite_arrangement_copies_the_ordered_instruction_unit() {
 }
 
 #[test]
+fn composite_square_members_keep_their_physical_offset_on_a_wide_canvas() {
+    let canvas = CanvasSize::new(1_000.0, 500.0);
+    let input = score(
+        r#"{"instructions":[
+        {"primitive":"square","position":[0.35,0.4],"size":[0.2,0.2],
+         "arrangement":{"count":2,"group_size":2,"layout":"horizontal"}},
+        {"primitive":"circle","center":[0.45,0.5],"radius":0.03}
+        ]}"#,
+    );
+    let result = resolve_performance(PerformanceRequest {
+        score: &input,
+        performance_seed: None,
+        composition_seed: Some(17),
+        canvas: Some(canvas),
+    });
+    assert_eq!(result.score.instructions.len(), 4);
+    for pair in result.score.instructions.chunks_exact(2) {
+        let square = &pair[0];
+        let circle = &pair[1];
+        let position = square.position.unwrap();
+        let size = square.size.unwrap();
+        let square_center_x = position.x * canvas.width + size.x * canvas.unit() / 2.0;
+        let square_center_y = position.y * canvas.height + size.y * canvas.unit() / 2.0;
+        let circle_center = circle.center.unwrap();
+        let offset_x = circle_center.x * canvas.width - square_center_x;
+        let offset_y = circle_center.y * canvas.height - square_center_y;
+        let physical_offset = offset_x.hypot(offset_y);
+        assert!(
+            (physical_offset - 50.0).abs() < 1.0e-5,
+            "physical offset was {physical_offset}"
+        );
+    }
+}
+
+#[test]
 fn grid_relation_is_dropped_with_structured_warning() {
     let input = score(
         r#"{"instructions":[{"primitive":"square","position":[0.4,0.4],"size":[0.1,0.1],

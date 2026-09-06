@@ -72,17 +72,21 @@ Stage 1.5の入場では、実際のvisible source bytes、存在する言語証
 実行macroのdefinition identityをlockと照合してからsource-independent入力を切り離す。
 言語証跡のない入力へ条件を足さず、未使用sidecarの解決や実行を要求しない。
 同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
-canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置とplace actionが
-解決済みのcircle / ellipse / cloudform / squareでは、明示numeric geometryに加え、count1のnormal
-geometryと日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。
+canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
+direct `Instruction { instruction_index }` ownerを持つ元`place:center`と、place actionが解決済みの
+circle / ellipse / cloudform / squareでは、明示numeric geometryに加え、count1のnormal geometryと
+日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。
+Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
+must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換し、未対応意味が残る文書は
 partial Scoreにしない。
 
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Named / unspecified placement、action省略、repeated allocation、残るprimitive / surface / ground /
-relation / Score意味、typed holeの停止範囲、runtime cutoverは未接続の境界として残る。Step10Eの到達は
+Unspecified / 非center named placement、Macro EmitのScore結合、action省略、repeated allocation、
+残るprimitive / surface / ground / relation / Score意味、typed holeの停止範囲、runtime cutoverは
+未接続の境界として残る。Step10Gの到達は
 Step10全体の完了を意味しない。
 
 ## 守るべき設計契約

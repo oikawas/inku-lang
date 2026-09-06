@@ -139,7 +139,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current Step10E subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with numeric position and a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and none of these resolutions is written back into source meaning. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current Step10G subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
 Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
@@ -1278,7 +1278,7 @@ For example, `赤い円を中心に置く。` and `円を中心に置く。円�
 - when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
 - writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- in the Step10E actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, and cloudform instructions whose numeric position and place action are resolved. Unsupported meaning or missing required color-catalog context remains a typed gap, and no partial Score is reported as success. This Rust path is not yet connected to the product runtime
+- in the Step10G actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, and cloudform instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`; unsupported meaning or missing required color-catalog context remains a typed gap, and no partial Score is reported as success. This Rust path is not yet connected to the product runtime
 
 ### 12.5 Splitting the Model by Stage
 
@@ -1358,6 +1358,11 @@ is the effective DDL / typed meaning consumed by Stage 2.
   or content
 - only `place:center` maps to one of a closed set of six focus candidates;
   every other place and explicit attribute passes through
+- when the verified view lowers to an actual Score, only a direct
+  `Instruction { instruction_index }` target with the same index owns that
+  instruction. `GroupPredicate` and `MacroEmit` are not treated as same-index
+  owners, numeric positions are not focus targets, and original center is not
+  rewritten to a provisional `(0.5,0.5)`
 - baseline focus selection is bound to lock-verified pre-expansion meaning and
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
@@ -1376,14 +1381,16 @@ is the effective DDL / typed meaning consumed by Stage 2.
   same meaning and never present bytes from another schema under the same
   identity
 
-The sealed Rust Stage 1.5 v4 typed foundation and R1 / R2 / D1 are implemented
-but not connected to runtime. D1 synchronizes inline / continuation canonical
-meaning, post-resolution macro execution ordinals, and expanded / effective
-identity while retaining source / generated provenance separately. This code
-milestone does not make Step 9 COMPLETE before its independent review. The
-current Python path is a compatibility implementation until cutover and follows
-the same no-invention, focus-only contract. An accepted primitive must not be
-presented as runtime-connected behavior.
+The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, and the Step10G
+subset that carries a direct instruction's effective focus into an actual Score
+are implemented but not connected to runtime. D1 synchronizes inline /
+continuation canonical meaning, post-resolution macro execution ordinals, and
+expanded / effective identity while retaining source / generated provenance
+separately. A source-only field candidate observing the focus overlay is distinct
+from a successful effective Score. The current Python path remains a compatibility
+implementation until cutover. Macro Emit joining, parity, retirement of
+plugin-specific delivery, and remaining position, primitive, surface, and ground
+meaning are not complete.
 
 ### 12.12 Staffage and Compatibility Records
 
@@ -2477,7 +2484,7 @@ current runtime is compatibility behavior, not semantic authority to change the
 canonical count into another value.
 
 **Size has three authorities.** Unspecified, explicit qualitative, and explicit
-numeric geometry remain distinct. In the current Step10E subset, an unallocated
+numeric geometry remain distinct. In the current Step10G subset, an unallocated
 count-one circle, square, ellipse, or cloudform uses `6/25` (0.24) of the canvas
 short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
 of width. Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
@@ -2501,7 +2508,26 @@ identity / digest is `inku.geometry-resolution-policy.v1`. The compiler lock
 references and attests that identity / digest, while `ddl_engine_version` is
 activation metadata only. There is no `size_rule_version` or second owner.
 
-Within the current Step10E subset, only an omitted count resolves to one; zero,
+The same policy owns the six mappings from effective focus to `at.region`:
+`upper_right=[0.60,0.18,0.82,0.40]`,
+`upper_left=[0.18,0.18,0.40,0.40]`,
+`lower_right=[0.60,0.60,0.82,0.82]`,
+`lower_left=[0.18,0.60,0.40,0.82]`,
+`upper_edge=[0.39,0.07,0.61,0.29]`, and
+`right_half=[0.61,0.39,0.83,0.61]`. A named Score instruction has no `center`
+or `position`; it carries its resolved `radius` or `size` and `at.region`.
+Only numeric position applies the unit-interval anchor and shape-extent must-fit
+checks. The named path does not intersect the region with shape-safe bounds,
+shrink dimensions, relocate or resample to fit, or stop on an empty intersection.
+
+The author's A ruling allows clipping. The Renderer retains its existing
+short-edge conversion of region extents, performance-seed anchor selection, and
+unit-interval base-point clamp, including a square's top-left point. This is not
+a promise that no coordinate adjustment occurs or that the whole shape always
+stays on the paper. Renderer semantics for the same Score and options do not
+change.
+
+Within the current Step10G subset, only an omitted count resolves to one; zero,
 repeated, and qualitative counts are not materialized. Omitted touch resolves to
 pen, omitted continuity to solid, and an omitted closed surface to filled.
 Explicit empty stays unfilled, while explicit solid reaches the same existing
@@ -2514,7 +2540,7 @@ and remains unchanged. Explicit fields win independently, and any unsupported
 meaning anywhere in the document prevents an actual Score. The lowering result
 retains the canvas, background, resolved color context, and policy digest it
 used, while source semantics, canonical meaning, and provenance remain free of
-defaults.
+defaults and focus injection.
 
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
@@ -2584,9 +2610,10 @@ spelling and source span as provenance while its meaning is normalized to a
 signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage
 1.5 v5 view and explicit host canvas and background, requiring the corresponding
 resolved color-catalog context only when color is omitted. Independent circle,
-ellipse, cloudform, and square instructions with resolved numeric position and a
-place action can lower explicit numeric geometry or Step10E normal / qualitative
-geometry, plus omitted count-one, pen, solid, fill, and contrast color, into an
+ellipse, cloudform, and square instructions with resolved numeric position or an
+original `place:center` owned by a verified direct instruction target, plus a
+place action, can lower explicit numeric geometry or Step10G normal / qualitative
+geometry, together with omitted count-one, pen, solid, fill, and contrast color, into an
 actual `Score`. Any unsupported meaning in the document prevents a partial Score
 from being reported as success; symbolic candidate evidence and typed gaps remain
 available. This Rust path is not yet connected to the product runtime.
@@ -2656,7 +2683,7 @@ relation, or element count. The same lock-verified meaning and attested
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
 identity never presents changed bytes as an old identity; the D1 implementation
-milestone is reflected in typed v4 in §12.11 but is not connected to runtime.
+milestone is reflected in typed v5 in §12.11 but is not connected to runtime.
 
 Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
 event is emitted as soon as interpretation completes (normalized DDL, models

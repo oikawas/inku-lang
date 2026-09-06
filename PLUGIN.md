@@ -127,11 +127,16 @@ The shared Rust compiler foundation can parse, validate, identify, lock, bind,
 and deterministically expand MacroDefinition v1 values. Its finite flat Emit
 subset also reaches an actual Score through the same lowerer used by ordinary
 DDL, with shared Stop / OmitAndContinue outcomes and typed omission diagnostics.
-Missing or duplicate execution owners and focus joins stop both modes. The
-Score wire, canonical meaning, seed, focus, geometry policy, and generated
-provenance are unchanged. Production runtime integration, UI / API / persistence
-selection, upstream NonCanonicalReady recovery, an installable package catalog,
-preview, legacy cutover, and a general user-package loader are not complete.
+The compile-once facade retains the original document, compiler state, lock, and
+issues. Explicit Continue can omit typed upstream holes, conflicts, and dependent
+units in a sealed execution projection while preserving independent instructions.
+Canonical macro output reuses its original seed, semantic ordinal, and generated
+provenance without expansion retry. Missing or duplicate execution owners, focus
+joins, global budgets, and integrity failures stop both modes. The public Stage 1.5
+API remains strict. The Score wire, canonical meaning, seed, focus, geometry policy,
+and generated provenance are unchanged. Production runtime integration, UI / API /
+persistence selection, an installable package catalog, preview, legacy cutover, and
+a general user-package loader are not complete.
 This guide therefore does not claim that arbitrary packages can currently be
 installed or loaded or that legacy coerce / LLM fallback has been replaced.
 

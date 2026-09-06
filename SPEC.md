@@ -1395,16 +1395,23 @@ is the effective DDL / typed meaning consumed by Stage 2.
 
 The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, direct normal and
 explicit geometry, finite flat Macro Emits, and the shared default Stop / explicit
-OmitAndContinue error policy are implemented through the actual Score lowerer but
-not connected to runtime. Its result carries the mode; complete, complete with
-omissions, or stopped outcome; original gaps; typed omission units; and diagnostics
-with source-instruction / group / ground or generated invocation / path / ordinal /
-key ownership plus source spans. Missing or duplicate execution-owner and focus
-joins and invalid host context remain stopping failures in Continue. D1 meaning,
-seed, focus, source-ordinal gaps, generated provenance, the geometry policy digest,
-and the Score wire are unchanged. The current Python coerce and LLM fallback have
-not been replaced by this mode; runtime / UI / API / persistence connection and
-upstream NonCanonicalReady recovery remain later work.
+OmitAndContinue error policy are implemented through an actual Score but are not
+connected to runtime. The `compile_ddl_to_score` facade compiles the original
+`NormalizedDdlDocument` exactly once and retains its source, state, lock, and issues.
+Stop returns no Score for upstream holes or conflicts. Explicit Continue alone uses
+the same compilation's typed owners and dependencies to build a sealed projection
+and deliver independent instructions; omitting every drawing unit is stopped.
+Canonical pre-meaning reuses the exact subset of successful macro output with its
+original binding, source and semantic ordinals, seed, and provenance, without
+reseeding or re-expansion. A noncanonical pre-expansion projection finalizes its
+omissions before one seed derivation and expansion and never retries a draw after a
+local failure. Global budgets and source, lock, owner, definition, or provenance
+integrity failures stop both modes. The public Stage 1.5 API remains
+`CanonicalReady`-only and cannot recover an arbitrary mutable compilation. D1
+meaning, seed, focus, source-ordinal gaps, generated provenance, the geometry policy
+digest, and the Score wire are unchanged. The current Python coerce and LLM fallback
+have not been replaced by this facade; runtime / UI / API / persistence connection
+remains later work.
 
 ### 12.12 Staffage and Compatibility Records
 

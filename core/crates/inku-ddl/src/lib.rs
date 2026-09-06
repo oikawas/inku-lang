@@ -4,11 +4,14 @@
 
 pub mod attachment;
 pub mod clause;
+pub mod compiler_execution;
 pub mod compiler_lock;
 pub mod composition;
 pub mod document;
 pub mod error_policy;
 pub mod exact_decimal;
+pub mod execution_diagnostics;
+mod execution_projection;
 pub mod geometry;
 pub mod language;
 pub mod macro_definition;
@@ -43,6 +46,9 @@ pub use clause::{
     ClauseStream, ClauseStreamError, parse_clause_stream,
 };
 
+pub use compiler_execution::{
+    COMPILER_EXECUTION_SCHEMA_ID, CompilerExecutionResult, compile_ddl_to_score,
+};
 pub use compiler_lock::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, COMPILER_LOCK_DIGEST_DOMAIN, CompilerBlockingDiagnostic,
     CompilerConflict, CompilerDefinitionIdentity, CompilerLockState, CompilerSeedIdentity,
@@ -65,6 +71,10 @@ pub use document::{
 };
 pub use error_policy::{ScoreErrorPolicy, ScoreLoweringOutcome};
 pub use exact_decimal::{ExactDecimal, ExactDecimalError};
+pub use execution_diagnostics::{
+    CompilerExecutionDiagnostic, CompilerExecutionDisposition, CompilerExecutionIssueKind,
+    CompilerExecutionOmissionUnit,
+};
 pub use geometry::{
     GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword, SemanticExactDecimal, SemanticExplicitGeometry,
     SemanticGeometryValue, SemanticNumericPosition, geometry_resolution_policy_canonical_bytes,

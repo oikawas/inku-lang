@@ -186,6 +186,24 @@ pub enum MacroExpansionDiagnosticKind {
     ProvenanceOwnershipMismatch,
 }
 
+impl MacroExpansionDiagnosticKind {
+    pub(crate) const fn stops_all_execution(self) -> bool {
+        matches!(
+            self,
+            Self::InvalidLimits
+                | Self::InvocationBudget
+                | Self::TotalNodeBudget
+                | Self::MissingSeed
+                | Self::DuplicateSeed
+                | Self::MismatchedSeed
+                | Self::DefinitionOwnershipMismatch
+                | Self::BindingOwnershipMismatch
+                | Self::TargetOwnershipMismatch
+                | Self::ProvenanceOwnershipMismatch
+        )
+    }
+}
+
 /// One global or invocation-local stable diagnostic.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MacroExpansionDiagnostic {
@@ -306,6 +324,31 @@ pub(crate) fn expand_selected_macros(
     selection: MacroExpansionSelection,
 ) -> MacroExpansionResult {
     expand_macros_with_selection(parameter_binding, definitions, seeds, limits, selection)
+}
+
+pub(crate) fn exact_successful_expansion_subset(
+    expansion: &MacroExpansionResult,
+    retained_source_ordinals: &BTreeSet<u64>,
+) -> Result<MacroExpansionResult, MacroExpansionDiagnosticKind> {
+    let mut seen = BTreeSet::new();
+    let mut expanded = Vec::new();
+    for invocation in &expansion.expanded {
+        let ordinal = invocation.provenance.invocation_ordinal;
+        if !seen.insert(ordinal) {
+            return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
+        }
+        if retained_source_ordinals.contains(&ordinal) {
+            expanded.push(invocation.clone());
+        }
+    }
+    if seen.intersection(retained_source_ordinals).count() != retained_source_ordinals.len() {
+        return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
+    }
+    Ok(MacroExpansionResult {
+        parameter_binding: expansion.parameter_binding.clone(),
+        expanded,
+        diagnostics: Vec::new(),
+    })
 }
 
 fn expand_macros_with_selection(

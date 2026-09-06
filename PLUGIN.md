@@ -34,19 +34,47 @@ filesystem, network, clock, or environment access, recursion or component
 cycles, external macro dependencies, raw SVG or Score data, Renderer
 instructions, or plugin-specific parsers, grammars, or renderers.
 
-This is the smallest accepted definition:
+This small definition reaches the current runtime-disconnected Score lowerer:
 
 ```json
 {
   "schema": "inku.macro-definition.v1",
   "namespace": "Example",
-  "heading": "QuietMark",
+  "heading": "QuietCircle",
   "version": "1.0.0",
   "parameters": {},
   "components": {},
-  "body": []
+  "body": [
+    {
+      "op": "emit",
+      "binding": null,
+      "fields": {
+        "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+        "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+        "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+        "color": {"expr": "semantic_ref", "category": "color", "id": "black"}
+      }
+    }
+  ]
 }
 ```
+
+Each complete flat Emit becomes one ordinary Score instruction. A sequence of
+complete Emits keeps its order, including Emits already flattened through
+`use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
+(`circle`, `ellipse`, `cloudform`, or `square`), explicit
+`movement:place`, exact `place:center`, and optional same-category `color`,
+`touch`, `continuity`, and `surface`. Omitted drawing attributes and normal
+count-one geometry use the same defaults as ordinary DDL.
+
+Incomplete Emits, unknown keys, mismatched value types or categories, unbound
+caller facts, repeated outer counts, and expanded `group`, `transform`,
+`anchor`, or `relation` nodes stop the whole document without a partial Score.
+An unused parameter or an unreferenced Emit binding ID does not fail merely for
+being unused. The finite consumer recognizes only an omitted count or an
+integer count of one; it never treats a floating-point `1.0` as that integer.
+The current authoring schema does not expose `count` as an Emit field, so a
+Score-ready definition currently omits it and receives normal count-one.
 
 ## Resolution, Expansion, and LLM Boundary
 
@@ -83,10 +111,12 @@ O(count) allocation or materialization.
 ## Current Implementation Status
 
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
-and deterministically expand MacroDefinition v1 values. Production runtime
-integration, an installable package catalog, preview, legacy cutover, and a
-general user-package loader are not complete. This guide therefore does not
-claim that arbitrary packages can currently be installed or loaded.
+and deterministically expand MacroDefinition v1 values. Its finite flat Emit
+subset also reaches an actual Score through the same lowerer used by ordinary
+DDL. Production runtime integration, an installable package catalog, preview,
+legacy cutover, and a general user-package loader are not complete. This guide
+therefore does not claim that arbitrary packages can currently be installed or
+loaded.
 
 `Nature` and `Bamboo` are future or explanatory reference-vocabulary names,
 not installed packages or entries in an official registry. The v1.70

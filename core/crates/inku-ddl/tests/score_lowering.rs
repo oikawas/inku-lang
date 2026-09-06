@@ -2,10 +2,11 @@ use inku_ddl::{
     CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, FocusRegion,
     GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
-    ScoreFieldGap, ScoreLoweringCandidate, ScoreLoweringContext, SemanticHead, SemanticIdentity,
-    Stage15TransformationResult, VerifiedStage15EffectiveView, compile_typed_ddl,
-    geometry_resolution_policy_digest, lower_verified_stage15_score, lower_verified_stage15_view,
-    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
+    ScoreFieldGap, ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
+    SemanticHead, SemanticIdentity, Stage15TransformationResult, VerifiedStage15EffectiveView,
+    compile_typed_ddl, geometry_resolution_policy_digest, lower_verified_stage15_score,
+    lower_verified_stage15_view, score_primitive_from_semantic_identity,
+    stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -1031,6 +1032,270 @@ fn mixed_owner_view_keeps_expansion_and_focus_overlay_pending_with_exact_identit
     ));
 }
 
+#[test]
+fn complete_flat_macro_sequence_reaches_actual_score() {
+    let definition = complete_flat_emit_definition();
+    let result = stage15_locked(
+        "one Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+
+    assert_eq!(result.original_expanded_invocations().len(), 1);
+    assert_eq!(result.original_expanded_invocations()[0].nodes.len(), 2);
+    assert_eq!(result.targets().len(), 2);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instructions = &lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 2);
+    assert_eq!(instructions[0].primitive, Primitive::Circle);
+    assert_eq!(instructions[0].color, Color::Red);
+    assert_eq!(instructions[1].primitive, Primitive::Square);
+    assert_eq!(instructions[1].color, Color::Blue);
+    assert!(lowered.instruction_origins().iter().enumerate().all(
+        |(expected_generated_ordinal, origin)| matches!(
+            origin,
+            ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index: 0,
+                binding: None,
+                provenance,
+            } if provenance.invocation.invocation_ordinal == 0
+                && provenance.generated_ordinal == expected_generated_ordinal as u64
+        )
+    ));
+
+    let empty_definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Empty","version":"1.0.0","parameters":{},"components":{},"body":[]}"#,
+    )
+    .unwrap();
+    let empty = stage15_locked(
+        "Draw.Empty",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&empty_definition),
+    );
+    let empty_lowered = lower_verified_stage15_score(
+        empty.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert!(empty_lowered.gaps().is_empty());
+    assert!(empty_lowered.score().unwrap().instructions.is_empty());
+    assert!(empty_lowered.instruction_origins().is_empty());
+}
+
+#[test]
+fn direct_macro_direct_order_and_same_effective_input_share_the_lowerer() {
+    let definition = complete_flat_emit_definition();
+    let result = stage15_locked(
+        concat!(
+            "place one red circle at center; ",
+            "Draw.Pair; ",
+            "place one blue square at center"
+        ),
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instructions = &lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 4);
+    assert_eq!(instructions[0], instructions[1]);
+    assert_eq!(instructions[2], instructions[3]);
+    assert!(matches!(
+        lowered.instruction_origins(),
+        [
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            },
+            ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index: 1,
+                ..
+            },
+            ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index: 1,
+                ..
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            }
+        ]
+    ));
+    for origin in &lowered.instruction_origins()[1..3] {
+        assert!(matches!(
+            origin,
+            ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index: 1,
+                provenance,
+                ..
+            } if provenance.invocation.invocation_ordinal == 0
+        ));
+    }
+}
+
+#[test]
+fn japanese_and_english_four_shape_macro_uses_shared_defaults_and_geometry() {
+    let definition = four_shape_default_definition();
+    let color_map = default_color_map();
+    let palette = work_palette_context(&color_map, None, None, Color::White).unwrap();
+    let context =
+        ScoreLoweringContext::resolve_with_palette("wide", Color::White, palette).unwrap();
+    let ja = stage15_locked(
+        "Draw.Defaults",
+        ResolvedInstructionLanguage::Ja,
+        std::slice::from_ref(&definition),
+    );
+    let en = stage15_locked(
+        "Draw.Defaults",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let ja_lowered = lower_verified_stage15_score(ja.verified_effective_view(), context);
+    let en_lowered = lower_verified_stage15_score(en.verified_effective_view(), context);
+
+    assert!(ja_lowered.gaps().is_empty(), "{:?}", ja_lowered.gaps());
+    assert_eq!(ja_lowered.score(), en_lowered.score());
+    let instructions = &ja_lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 4);
+    for (instruction, expected_primitive, expected_radius, expected_size) in instructions
+        .iter()
+        .zip([
+            (Primitive::Circle, Some(0.12), None),
+            (Primitive::Ellipse, None, Some(Point::new(0.24, 0.144))),
+            (Primitive::Cloudform, None, Some(Point::new(0.24, 0.144))),
+            (Primitive::Square, None, Some(Point::new(0.24, 0.24))),
+        ])
+        .map(|(instruction, expected)| (instruction, expected.0, expected.1, expected.2))
+    {
+        assert_eq!(instruction.primitive, expected_primitive);
+        assert_eq!(instruction.radius, expected_radius);
+        assert_eq!(instruction.size, expected_size);
+        assert_eq!(instruction.color, Color::Black);
+        assert_eq!(instruction.weight, Weight::Pen);
+        assert_eq!(instruction.style, LineStyle::Solid);
+        assert!(instruction.filled);
+    }
+}
+
+#[test]
+fn parameter_bound_fields_and_an_unused_parameter_lower_once() {
+    let definition = parameter_bound_definition();
+    let result = stage15_locked(
+        "Param.One red place center pencil",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(instruction.primitive, Primitive::Circle);
+    assert_eq!(instruction.color, Color::Red);
+    assert_eq!(instruction.weight, Weight::Pen);
+}
+
+#[test]
+fn flat_use_repeat_and_vary_emits_are_consumed_without_origin_rejection() {
+    let definition = flat_operator_definition();
+    let result = stage15_locked(
+        "Flat.Operators",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    assert_eq!(result.original_expanded_invocations()[0].nodes.len(), 3);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    assert_eq!(lowered.score().unwrap().instructions.len(), 3);
+    let paths = lowered
+        .instruction_origins()
+        .iter()
+        .map(|origin| match origin {
+            ScoreInstructionOrigin::MacroEmit { provenance, .. } => {
+                provenance.expansion_path.as_slice()
+            }
+            other => panic!("unexpected source instruction: {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        paths[0]
+            .iter()
+            .any(|segment| matches!(segment, inku_ddl::ExpansionPathSegment::ComponentUse { .. }))
+    );
+    assert!(
+        paths[1]
+            .iter()
+            .any(|segment| matches!(segment, inku_ddl::ExpansionPathSegment::Repeat { .. }))
+    );
+    assert!(
+        paths[2]
+            .iter()
+            .any(|segment| matches!(segment, inku_ddl::ExpansionPathSegment::Vary { .. }))
+    );
+}
+
+#[test]
+fn unsupported_emit_and_caller_meaning_never_returns_a_partial_score() {
+    let cases = [
+        (
+            missing_movement_definition(),
+            "Bad.MissingMovement",
+            ScoreFieldGap::MissingMacroEmitField {
+                key: "movement".to_owned(),
+            },
+        ),
+        (
+            unsupported_angle_definition(),
+            "Bad.Angle",
+            ScoreFieldGap::UnknownMacroEmitField {
+                key: "angle".to_owned(),
+            },
+        ),
+        (
+            structural_definition(),
+            "Bad.Structure",
+            ScoreFieldGap::UnsupportedMacroStructure,
+        ),
+        (
+            complete_flat_emit_definition(),
+            "red Draw.Pair",
+            ScoreFieldGap::UnboundMacroCallerMeaning,
+        ),
+    ];
+
+    for (definition, macro_source, expected_gap) in cases {
+        let source = format!("place one green circle at center. {macro_source}");
+        let result = stage15_locked(
+            &source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+        assert!(lowered.score().is_none(), "{macro_source}");
+        assert!(lowered.instruction_origins().is_empty(), "{macro_source}");
+        assert!(
+            lowered.gaps().contains(&expected_gap),
+            "{macro_source}: {:?}",
+            lowered.gaps()
+        );
+    }
+}
+
 fn resolved_palette(
     background: Color,
     background_lightness: f64,
@@ -1072,7 +1337,13 @@ fn stage15_locked(
         Some(19),
         LIMITS,
     );
-    transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap()
+    let input = stage15_transformation_input(&compilation).unwrap_or_else(|error| {
+        panic!(
+            "{source}: {error:?}; holes={:?}; conflicts={:?}; blocking={:?}",
+            compilation.holes, compilation.conflicts, compilation.blocking_diagnostics
+        )
+    });
+    transform_stage15(input, None).unwrap()
 }
 
 fn lock_for(definition: &MacroDefinition) -> MacroLock {
@@ -1088,6 +1359,55 @@ fn lock_for(definition: &MacroDefinition) -> MacroLock {
 fn center_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn complete_flat_emit_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn four_shape_default_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Defaults","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"cloudform"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn parameter_bound_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Param","heading":"One","version":"1.0.0","parameters":{"tone":{"type":"semantic_ref","category":"color"},"action":{"type":"semantic_ref","category":"movement"},"target":{"type":"semantic_ref","category":"place"},"unused":{"type":"semantic_ref","category":"touch"}},"components":{},"body":[{"op":"emit","binding":"mark","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"parameter","name":"action"},"place":{"expr":"parameter","name":"target"},"color":{"expr":"parameter","name":"tone"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn flat_operator_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Flat","heading":"Operators","version":"1.0.0","parameters":{},"components":{"mark":{"parameters":{},"body":[{"op":"emit","binding":"unused_id","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}}]}},"body":[{"op":"use","component":"mark","arguments":{}},{"op":"repeat","count":{"expr":"integer","value":1},"maximum":1,"index":"ordinal","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]},{"op":"vary","binding":"tone","domain":"tone","choices":[{"expr":"semantic_ref","category":"color","id":"green"},{"expr":"semantic_ref","category":"color","id":"gray"}],"range":null,"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"cloudform"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"local","name":"tone"}}}]}]}"#,
+    )
+    .unwrap()
+}
+
+fn missing_movement_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"MissingMovement","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn unsupported_angle_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Angle","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"angle":{"expr":"semantic_ref","category":"angle","id":"horizontal"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn structural_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Structure","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"group","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}]}"#,
     )
     .unwrap()
 }

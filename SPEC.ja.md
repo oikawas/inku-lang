@@ -193,11 +193,15 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
+Actual Scoreへ届く現行finite consumerは、flatな完成`emit`だけを一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`circle` / `ellipse` / `cloudform` / `square`、`movement`は明示`place`、`place`はexact generated focus targetを持つ`center`に限る。`color` / `touch` / `continuity` / `surface`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
+
+Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。一方、不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / `relation`は文書全体のgapであり、子Emitの抽出やpartial Scoreを行わない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
+
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
 旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
-Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionまで存在するが、production runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
+Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite flat Emitを通常lowerer経由でactual Scoreへ届ける。ただしproduction runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
 ### 4.7 Render Engine との分離
 
@@ -884,7 +888,7 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、およびdirect instructionのeffective focusをactual Scoreへ運ぶStep10G subsetは実装済みだがruntimeには未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。Source-only field candidateがfocus overlayを観測できることと、effective Scoreの成功は別である。現行Python経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。Macro Emit結合、parity、plugin-specific deliveryのretire、残るposition / primitive / surface / ground等を完了済みとしない。
+sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのStep10G subset、およびfinite flat Macro Emitを同じlowererでactual Scoreへ運ぶStep10H subsetは実装済みだがruntimeには未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。Source-only field candidateがMacroInvocation headとfocus overlayを保持することと、actual側で対応する完成Emitが解決されることは両立する。現行Python経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。Plugin-specific deliveryのretire、残るposition / primitive / surface / ground / caller fact / structural meaning等を完了済みとしない。
 
 ### 12.12 添景と互換記録
 

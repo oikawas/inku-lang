@@ -351,11 +351,15 @@ At this boundary the Renderer needs to know only core meaning, while a plugin ca
 
 `inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
 
+The current finite consumer that reaches an actual Score projects each complete flat `emit` as one instruction into the same semantic input used by ordinary DDL. `shape` is limited to `circle` / `ellipse` / `cloudform` / `square`, `movement` must explicitly be `place`, and `place` must be `center` with its exact generated focus target. `color` / `touch` / `continuity` / `surface` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
+
+The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Each `place` uses only the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. An incomplete Emit, unknown key, category or type mismatch, unbound caller fact, repeated outer count, or expanded `group` / `transform` / `anchor` / `relation` makes the whole document a gap. No child Emit is extracted and no partial Score is returned. An unused parameter or unreferenced Emit binding ID alone is not rejected.
+
 Macros execute in invocation order after meaning resolution. A mention used only for anaphora does not execute twice or shift the semantic ordinal of a later macro. Source occurrence ordinal remains separately for ownership and provenance. The original sentences and rhythm, source spans, continuation edge / target, all bindings, and source / generated provenance are retained and verified. A full compiler-lock digest that includes them is an attestation of source integrity; equivalent expressions need not have the same digest. Source-record differences do not enter meaning selection, while source alteration is rejected.
 
 The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
-The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion, but production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader are incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
+The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite flat Emit subset above through the ordinary lowerer to an actual Score. Production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader remain incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
 ### 4.7 Separation From the Render Engine
 
@@ -1381,16 +1385,17 @@ is the effective DDL / typed meaning consumed by Stage 2.
   same meaning and never present bytes from another schema under the same
   identity
 
-The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, and the Step10G
-subset that carries a direct instruction's effective focus into an actual Score
-are implemented but not connected to runtime. D1 synchronizes inline /
-continuation canonical meaning, post-resolution macro execution ordinals, and
-expanded / effective identity while retaining source / generated provenance
-separately. A source-only field candidate observing the focus overlay is distinct
-from a successful effective Score. The current Python path remains a compatibility
-implementation until cutover. Macro Emit joining, parity, retirement of
-plugin-specific delivery, and remaining position, primitive, surface, and ground
-meaning are not complete.
+The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, the Step10G direct
+instruction subset, and the Step10H subset that carries finite flat Macro Emits
+through the same lowerer into an actual Score are implemented but not connected
+to runtime. D1 synchronizes inline / continuation canonical meaning,
+post-resolution macro execution ordinals, and expanded / effective identity
+while retaining source / generated provenance separately. A source-only field
+candidate can retain the MacroInvocation head and focus overlay while the actual
+side resolves its corresponding complete Emits. The current Python path remains
+a compatibility implementation until cutover. Retirement of plugin-specific
+delivery and remaining position, primitive, surface, ground, caller, and
+structural meaning are not complete.
 
 ### 12.12 Staffage and Compatibility Records
 

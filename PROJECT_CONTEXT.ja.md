@@ -81,12 +81,18 @@ must-fitを課さない。既存Rendererがperformance seedでregion内のanchor
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換し、未対応意味が残る文書は
 partial Scoreにしない。
 
+Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
+semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
+`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは4つのclosed shape、明示`place`、
+exact `center`、任意の同名category属性、count省略またはInteger 1である。未結合caller fact、
+構造node、不完全・未知・型不一致のEmitは文書全体をgapにし、partial Scoreを返さない。
+
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Unspecified / 非center named placement、Macro EmitのScore結合、action省略、repeated allocation、
-残るprimitive / surface / ground / relation / Score意味、typed holeの停止範囲、runtime cutoverは
-未接続の境界として残る。Step10Gの到達は
+Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
+残るprimitive / surface / ground / relation / caller / structural Score意味、typed holeの停止範囲、runtime cutoverは
+未接続の境界として残る。Step10Hの到達は
 Step10全体の完了を意味しない。
 
 ## 守るべき設計契約

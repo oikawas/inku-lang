@@ -1087,6 +1087,70 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
 }
 
 #[test]
+fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundary() {
+    let definition = complete_focus_emit_definition();
+    let result = stage15_locked(
+        "a Focus.Center; the red Focus.Center; a Focus.Center",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+
+    assert_eq!(result.original_semantic_document().instructions.len(), 2);
+    assert_eq!(result.original_semantic_document().continuations.len(), 1);
+    assert_eq!(result.original_expanded_invocations().len(), 2);
+    assert_eq!(
+        result
+            .original_expanded_invocations()
+            .iter()
+            .map(|invocation| invocation.provenance.invocation_ordinal)
+            .collect::<Vec<_>>(),
+        [0, 2]
+    );
+    assert!(
+        result
+            .original_expanded_invocations()
+            .iter()
+            .all(|invocation| invocation.nodes.len() == 2)
+    );
+
+    let resolved_focus = result.resolved_focus().unwrap();
+    let generated_focus = result
+        .targets()
+        .iter()
+        .map(|target| match &target.path {
+            inku_ddl::Stage15TargetPath::MacroEmit {
+                invocation_ordinal,
+                generated_ordinal,
+                field,
+                ..
+            } if field == "place" => (
+                *invocation_ordinal,
+                *generated_ordinal,
+                target.effective_focus,
+            ),
+            other => panic!("unexpected Focus.Center target: {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        generated_focus,
+        [
+            (0, 0, resolved_focus),
+            (0, 1, resolved_focus),
+            (2, 0, resolved_focus),
+            (2, 1, resolved_focus),
+        ]
+    );
+
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert_eq!(lowered.gaps(), [ScoreFieldGap::UnboundMacroCallerMeaning]);
+    assert!(lowered.score().is_none());
+    assert!(lowered.instruction_origins().is_empty());
+}
+
+#[test]
 fn direct_macro_direct_order_and_same_effective_input_share_the_lowerer() {
     let definition = complete_flat_emit_definition();
     let result = stage15_locked(
@@ -1366,6 +1430,13 @@ fn center_emit_definition() -> MacroDefinition {
 fn complete_flat_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn complete_focus_emit_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
     )
     .unwrap()
 }

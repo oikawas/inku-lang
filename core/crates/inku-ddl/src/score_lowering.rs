@@ -12,6 +12,7 @@ use crate::geometry::{
     NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, focus_region_bounds,
     relative_scale_factor,
 };
+use crate::score_angle::{ScoreAngleContext, ScoreAngleOccurrence, resolve_score_angle};
 use crate::{
     CoreModifierValue, ExactDecimal, ExactDecimalError, ExpandedMacroInvocation, ExpandedMacroNode,
     ExpandedMacroValue, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance,
@@ -168,6 +169,8 @@ fn direct_instruction_focus(
 }
 
 fn project_source_instruction<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    instruction_index: usize,
     instruction: &'a SemanticInstruction,
     effective_focus: Option<FocusRegion>,
 ) -> Option<ScoreLoweringInput<'a>> {
@@ -221,8 +224,24 @@ fn project_source_instruction<'a>(
             .relative_scale
             .as_ref()
             .map(|scale| scale.value),
+        angle: instruction
+            .entity
+            .angle
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        angle_context: instruction
+            .entity
+            .angle
+            .as_ref()
+            .map(|_| ScoreAngleContext {
+                composition_seed: view.composition_seed(),
+                original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                occurrence: ScoreAngleOccurrence::Direct {
+                    logical_ordinal: instruction_index as u64,
+                },
+            }),
         has_unsupported_meaning: instruction.entity.thinness.is_some()
-            || instruction.entity.angle.is_some()
             || instruction.entity.fluctuation.amplitude.is_some()
             || instruction.entity.fluctuation.frequency.is_some()
             || instruction.entity.fluctuation.quality.is_some()
@@ -377,6 +396,18 @@ fn lower_macro_instruction(
                 continue;
             }
         };
+        input.angle_context = input.angle.map(|_| ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::MacroEmit {
+                macro_semantic_ordinal: view
+                    .macro_semantic_ordinal(provenance.invocation.invocation_ordinal)
+                    .expect("verified Stage 1.5 view preserves every Macro semantic ordinal"),
+                expansion_path: &provenance.expansion_path,
+                generated_ordinal: provenance.generated_ordinal,
+            },
+        });
         let attempt = lower_projected_instruction(input, context, error_policy);
         for omission in attempt.appearance_omissions {
             diagnostics.push(ScoreLoweringDiagnostic {
@@ -601,7 +632,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 8] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 9] = [
     "shape",
     "movement",
     "place",
@@ -610,6 +641,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 8] = [
     "continuity",
     "surface",
     "count",
+    "angle",
 ];
 
 fn project_macro_emit<'a>(
@@ -636,6 +668,7 @@ fn project_macro_emit<'a>(
     let surface = (!omitted_appearance.contains(&ScoreAppearanceField::SurfaceQuality))
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
         .flatten();
+    let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
     let count = match fields.get("count") {
         None => None,
         Some(ExpandedMacroValue::Integer(value)) if *value >= 0 => Some(*value as u64),
@@ -699,6 +732,8 @@ fn project_macro_emit<'a>(
         effective_focus: None,
         explicit_geometry: None,
         relative_scale: None,
+        angle,
+        angle_context: None,
         has_unsupported_meaning: false,
     })
 }
@@ -1004,8 +1039,13 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                     candidate.verified_effective_view(),
                     instruction_index,
                 );
-                let input = project_source_instruction(instruction, effective_focus)
-                    .expect("source projection is called only for primitive heads");
+                let input = project_source_instruction(
+                    candidate.verified_effective_view(),
+                    instruction_index,
+                    instruction,
+                    effective_focus,
+                )
+                .expect("source projection is called only for primitive heads");
                 if let Some(relation) = &instruction.relation {
                     let score_relation = direct_score_relation(
                         instruction_index,
@@ -1530,6 +1570,12 @@ fn source_span_for_gap(
             .explicit_geometry
             .as_ref()
             .map(|geometry| geometry.source().span),
+        ScoreFieldGap::UnsupportedAngleIdentity { .. }
+        | ScoreFieldGap::UnsupportedAngleForPrimitive { .. } => instruction
+            .entity
+            .angle
+            .as_ref()
+            .map(|angle| angle.provenance.source.span),
         _ => None,
     }
     .unwrap_or(instruction.entity.head.source().span)
@@ -1669,6 +1715,8 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
             Some("movement".to_owned())
         }
+        ScoreFieldGap::UnsupportedAngleIdentity { .. }
+        | ScoreFieldGap::UnsupportedAngleForPrimitive { .. } => Some("angle".to_owned()),
         ScoreFieldGap::MissingMacroEmitFocusTarget { .. }
         | ScoreFieldGap::DuplicateMacroEmitFocusTarget { .. }
         | ScoreFieldGap::MissingNumericPosition
@@ -1727,6 +1775,8 @@ struct ScoreLoweringInput<'a> {
     effective_focus: Option<FocusRegion>,
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
     relative_scale: Option<CoreModifierValue>,
+    angle: Option<SemanticInputIdentity<'a>>,
+    angle_context: Option<ScoreAngleContext<'a>>,
     has_unsupported_meaning: bool,
 }
 
@@ -1744,6 +1794,33 @@ fn lower_complete_instruction(
             });
             return Err(gaps);
         }
+    };
+    let rotation = match input.angle {
+        None => None,
+        Some(identity) if identity.category != "angle" => {
+            gaps.push(ScoreFieldGap::UnsupportedAngleIdentity {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+            None
+        }
+        Some(_) if primitive == Primitive::Square => {
+            gaps.push(ScoreFieldGap::UnsupportedAngleForPrimitive { primitive });
+            None
+        }
+        Some(identity) => match input
+            .angle_context
+            .and_then(|context| resolve_score_angle(identity.id, context))
+        {
+            Some(rotation) => Some(rotation),
+            None => {
+                gaps.push(ScoreFieldGap::UnsupportedAngleIdentity {
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
+                });
+                None
+            }
+        },
     };
     let count = match input.count {
         Some(0) => {
@@ -1854,6 +1931,7 @@ fn lower_complete_instruction(
         input.relative_scale,
         placement,
         context.canvas_format,
+        rotation,
     )
     .map_err(|gap| vec![gap])?;
 
@@ -1869,7 +1947,7 @@ fn lower_complete_instruction(
         size: geometric.size,
         angle_start: None,
         angle_end: None,
-        rotation: None,
+        rotation,
         filled,
         style: style.expect("checked continuity"),
         weight: weight.expect("checked touch"),
@@ -2013,10 +2091,13 @@ fn lower_geometry(
     relative_scale: Option<CoreModifierValue>,
     placement: ScorePlacement<'_>,
     canvas: CanvasFormat,
+    rotation: Option<f64>,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
     let dimensions = resolve_geometry_dimensions(primitive, geometry, relative_scale)?;
     match placement {
-        ScorePlacement::Numeric(position) => lower_numeric_geometry(dimensions, position, canvas),
+        ScorePlacement::Numeric(position) => {
+            lower_numeric_geometry(primitive, dimensions, position, canvas, rotation)
+        }
         ScorePlacement::Named(focus) => lower_named_geometry(dimensions, focus),
     }
 }
@@ -2089,9 +2170,11 @@ fn resolve_normal_dimensions(
 }
 
 fn lower_numeric_geometry(
+    primitive: Primitive,
     dimensions: ResolvedGeometryDimensions,
     position: &crate::SemanticNumericPosition,
     canvas: CanvasFormat,
+    rotation: Option<f64>,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
     let x = Rational::from_decimal(position.x.decimal.value)?;
     let y = Rational::from_decimal(position.y.decimal.value)?;
@@ -2114,14 +2197,16 @@ fn lower_numeric_geometry(
             })
         }
         ResolvedGeometryDimensions::CenteredSize { width, height } => {
-            ensure_centered_extent(
+            ensure_rotated_centered_extent(
+                primitive,
                 x,
                 y,
-                width.div_i128(2)?,
-                height.div_i128(2)?,
+                width,
+                height,
                 width_units,
                 height_units,
                 short_units,
+                rotation,
             )?;
             Ok(LoweredGeometry {
                 center: Some(center),
@@ -2155,6 +2240,73 @@ fn lower_numeric_geometry(
             })
         }
     }
+}
+
+fn ensure_rotated_centered_extent(
+    primitive: Primitive,
+    x: Rational,
+    y: Rational,
+    width: Rational,
+    height: Rational,
+    width_units: u32,
+    height_units: u32,
+    short_units: u32,
+    rotation: Option<f64>,
+) -> Result<(), ScoreFieldGap> {
+    let normalized = rotation.unwrap_or(0.0).rem_euclid(360.0);
+    if normalized == 0.0 || normalized == 180.0 {
+        return ensure_centered_extent(
+            x,
+            y,
+            width.div_i128(2)?,
+            height.div_i128(2)?,
+            width_units,
+            height_units,
+            short_units,
+        );
+    }
+    if normalized == 90.0 || normalized == 270.0 {
+        return ensure_centered_extent(
+            x,
+            y,
+            height.div_i128(2)?,
+            width.div_i128(2)?,
+            width_units,
+            height_units,
+            short_units,
+        );
+    }
+
+    let radians = normalized.to_radians();
+    let cosine = radians.cos().abs();
+    let sine = radians.sin().abs();
+    let half_width = width.to_f64()? * f64::from(short_units) / 2.0;
+    let half_height = height.to_f64()? * f64::from(short_units) / 2.0;
+    let (physical_extent_x, physical_extent_y) = match primitive {
+        Primitive::Ellipse => (
+            (half_width * cosine).hypot(half_height * sine),
+            (half_width * sine).hypot(half_height * cosine),
+        ),
+        Primitive::Cloudform => (
+            cosine * half_width + sine * half_height,
+            sine * half_width + cosine * half_height,
+        ),
+        _ => unreachable!("only centered ellipse and cloudform dimensions use rotated extents"),
+    };
+    let extent_x = physical_extent_x / f64::from(width_units);
+    let extent_y = physical_extent_y / f64::from(height_units);
+    let center_x = x.to_f64()?;
+    let center_y = y.to_f64()?;
+    if !extent_x.is_finite()
+        || !extent_y.is_finite()
+        || !(0.0..=1.0).contains(&(center_x - extent_x))
+        || !(0.0..=1.0).contains(&(center_x + extent_x))
+        || !(0.0..=1.0).contains(&(center_y - extent_y))
+        || !(0.0..=1.0).contains(&(center_y + extent_y))
+    {
+        return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
+    }
+    Ok(())
 }
 
 fn lower_named_geometry(

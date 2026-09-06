@@ -64,7 +64,10 @@ complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
 (`circle`, `ellipse`, `cloudform`, or `square`), explicit
 `movement:place`, exact `place:center`, and optional same-category `color`,
-`touch`, `continuity`, and `surface`. Existing fill behavior for omitted, `none`,
+`touch`, `continuity`, `surface`, and `angle`. Angle uses the same seeded resolver
+as ordinary DDL and reaches `Score.rotation` for circle, ellipse, and cloudform;
+an angled square is an invalid Emit because of the known Renderer unit seam.
+Existing fill behavior for omitted, `none`,
 and `solid` surface remains; the seven positive surface qualities use the same
 existing `SurfaceSpec` defaults as ordinary DDL. A Macro does not author a
 document Ground. A verified document-owned Ground reaches the same lowerer as a
@@ -92,6 +95,9 @@ only an omitted count or an integer count of one; it never treats a
 floating-point `1.0` as that integer. The current authoring schema does not
 expose `count` as an Emit field, so a Score-ready definition currently omits it
 and receives normal count-one.
+
+An angle written on the Macro caller is unbound caller meaning. It does not fan
+out to or override angles authored by individual Emits.
 
 ## Resolution, Expansion, and LLM Boundary
 

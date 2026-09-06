@@ -137,6 +137,8 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 
+`left-rising` / `左上がり` and `left-falling` / `左下がり` are hidden markers that retain distinct left/right meaning for typed direct DDL and Macro references. They are not yet exposed in the Stage 1 prompt or Saijiki display, and the existing six displayed angle words remain unchanged.
+
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
 Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. Stop is the default; only explicit OmitAndContinue omits an independent appearance field or invalid execution unit with a typed diagnostic. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
@@ -990,14 +992,18 @@ and both change only on an explicit action.
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
 | Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
-| Composition | Another composition | Stage 1.5's focus selection from the composition seed (§12.11) | one Stage 2 call (the saved normalized DDL is unchanged) |
+| Composition | Another composition | Stage 1.5's focus selection and the concrete angle for an explicitly authored angle, both from the composition seed (§12.11 / §18) | one Stage 2 call (the saved normalized DDL is unchanged) |
 
-Another composition changes only the choice among the closed six focus
-candidates. Stage 1.5 must not invent or reselect a composition family,
-technique, color, touch, relation, or element count. Explicit variation moves
-that same focus axis only when both amplitude (small, medium, or large) and a
-variation seed are present; an incomplete request means no variation. The
-description, normalized DDL, and explicit attributes remain unchanged.
+Another composition reselects among the closed six focus candidates and, when
+the description has an angle, reselects its concrete angle. The Stage 1.5
+transformation remains focus-only; the Stage 2 consumer resolves the angle from
+the same `composition_seed`. It must not invent or reselect a composition
+family, technique, color, touch, relation, or element count. Another
+performance and explicit variation preserve the resolved angle. Explicit
+variation moves the focus axis only when both amplitude (small, medium, or
+large) and a variation seed are present; an incomplete request means no
+variation. The description, normalized DDL, and explicit attributes remain
+unchanged.
 
 These two stages are the substance of §8.2's "put the weight on the choices made
 afterwards."  A generator with wide dispersion also produces more misses, but a
@@ -1325,6 +1331,8 @@ authorities; historical prompt sketches are not the current contract.
 
 On the lock-verified typed path, the Stage 2 consumer selects either Stop, the default, or OmitAndContinue. Continue does not convert undeliverable meaning into a Score field. It removes a typed unit from the execution projection and returns the remaining instructions in original owner order. The result distinguishes complete, complete with omissions, and stopped.
 
+An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; effective focus, variation seed, render seed, and source spelling are excluded.
+
 ### 12.8 Error Recovery
 
 Each LLM stage retries an empty, too-short, or schema-invalid response once with
@@ -1379,6 +1387,11 @@ is the effective DDL / typed meaning consumed by Stage 2.
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
   source-integrity attestation rather than focus material
+- an explicit angle passes through as original typed meaning and does not join
+  the center-only target set or variation axis. Stage 2 selects its concrete
+  angle from the same verified pre- and expanded-meaning digests, tagged
+  optional `composition_seed`, and either the direct original logical ordinal
+  or the Macro semantic ordinal, expansion path, and generated ordinal
 - before detaching the Stage 1.5 input, admission checks the actual visible
   DDL UTF-8 bytes, language evidence retained by semantic source occurrences,
   every macro-sidecar triple including unused entries, and each executed
@@ -1413,11 +1426,19 @@ digest, and the Score wire are unchanged. The current Python coerce and LLM fall
 have not been replaced by this facade; runtime / UI / API / persistence connection
 remains later work.
 
+This runtime-disconnected subset now delivers direct and flat-Macro angles for
+circle, ellipse, and cloudform through the shared lowerer to actual
+`Score.rotation`. An angled square remains explicitly unsupported because of
+the known Renderer unit seam, while an unangled square retains its existing
+delivery. This does not complete Step 10 as a whole.
+
 ### 12.12 Staffage and Compatibility Records
 
 Current generation has no staffage level. Stage 1.5 and coerce do not add
 elements absent from the description; coerce is limited to delivering explicit
-content. Historical `history.tenkei` and API `tenkei` remain readable for
+content. Resolving an explicit angle does not add staffage or visual content;
+it delivers an existing typed identity into `rotation`. Historical
+`history.tenkei` and API `tenkei` remain readable for
 compatibility but do not affect the generation contract for new works. The
 introduction, retirement, and historical counts live in
 [CHANGELOG.md](CHANGELOG.md) and the [public history
@@ -1429,7 +1450,8 @@ Lock-verified pre-expansion meaning, expanded meaning, and an attested optional
 `composition_seed` carry composition identity. The full compiler-lock digest
 attests source integrity and does not require equivalent expressions to have
 the same lock. "Another composition" reuses saved normalized DDL and selects
-only focus from the closed six candidates. There is no current `vary_seed`
+focus from the closed six candidates, and also reselects the concrete angle
+when an explicit angle identity is present. There is no current `vary_seed`
 input.
 
 Explicit variation is the pair of amplitude (small, medium, or large) and
@@ -2553,6 +2575,30 @@ identity / digest is `inku.geometry-resolution-policy.v1`. The compiler lock
 references and attests that identity / digest, while `ddl_engine_version` is
 activation metadata only. There is no `size_rule_version` or second owner.
 
+The same policy owns explicit angles. `horizontal=0`, `vertical=90`, and
+`diagonal` selects from `45 / 135 / 225 / 315`. `rising` and `falling` select
+integer degrees in `[-37,-23]` and `[23,37]`; `left_rising` and `left_falling`
+select in `[203,217]` and `[143,157]`. `rotated` makes a finite uniform choice
+among integer degrees more than five degrees from every 45-degree boundary.
+The angle-specific SHA-256 domain frames the lock-verified original pre- and
+expanded-meaning digests, tagged optional `composition_seed`, logical
+occurrence, and angle identity. Equivalent inline and continuation meaning
+selects the same angle; distinct true occurrences have distinct keys.
+Effective focus, variation seed, render seed, raw source bytes, and the full
+lock digest are excluded.
+
+A circle keeps the same radial extent under rotation. An ellipse uses its ideal
+rotated ellipse extent, and cloudform uses the rotated rectangular envelope of
+its declared width and height. Numeric placement rotates short-edge units in
+physical space, converts the result back to each canvas axis, and applies
+must-fit only to the rotated extent; it does not reject the unrotated box first,
+relocate, shrink, reduce count, or retry another angle. Named focus keeps the
+existing size and `at.region` without a must-fit check. Because the existing
+Renderer has a square anchor/pivot unit seam on non-square canvases, any angled
+square, including `horizontal`, yields no Score under Stop and omits that source
+instruction or Emit under Continue. An unangled square remains supported. The
+Renderer and Score wire are unchanged.
+
 The same policy owns the six mappings from effective focus to `at.region`:
 `upper_right=[0.60,0.18,0.82,0.40]`,
 `upper_left=[0.18,0.18,0.40,0.40]`,
@@ -2738,10 +2784,12 @@ and does not reinterpret the natural-language description.
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** preserves saved normalized DDL,
-advances `composition_seed`, and reselects only focus from Stage 1.5's closed
-six candidates. It changes no composition family, technique, color, touch,
+advances `composition_seed`, reselects focus from Stage 1.5's closed six
+candidates, and reselects the concrete angle in Stage 2 when an explicit angle
+is present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
-`composition_seed` reproduce the same effective meaning. Saved Score / expanded
+`composition_seed` reproduce the same effective meaning and angle. Another
+performance and explicit variation preserve the resolved angle. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
 identity never presents changed bytes as an old identity; the D1 implementation

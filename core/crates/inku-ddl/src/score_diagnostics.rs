@@ -64,6 +64,13 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
+    UnsupportedAngleIdentity {
+        category: String,
+        id: String,
+    },
+    UnsupportedAngleForPrimitive {
+        primitive: inku_score::Primitive,
+    },
     NamedAndNumericPositionConflict,
     UnsupportedNamedPosition,
     UnsupportedInstructionMeaning,

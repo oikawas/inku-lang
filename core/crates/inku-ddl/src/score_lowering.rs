@@ -1,5 +1,7 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
+use std::collections::BTreeMap;
+
 use inku_score::{
     AtRegion, Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point,
     Primitive, ResolvedPaletteContext, Score, Weight, lookup_canvas_format,
@@ -10,14 +12,17 @@ use crate::geometry::{
     relative_scale_factor,
 };
 use crate::{
-    CoreModifierValue, ExactDecimal, ExactDecimalError, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID,
-    SemanticExplicitGeometry, SemanticHead, SemanticIdentity, SemanticInstruction,
-    Stage15TargetPath, VerifiedStage15EffectiveView, geometry_resolution_policy_digest,
+    CoreModifierValue, ExactDecimal, ExactDecimalError, ExpandedMacroInvocation, ExpandedMacroNode,
+    ExpandedMacroValue, ExpansionPathSegment, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID,
+    GeneratedNodeProvenance, GeneratedTargetId, SemanticExplicitGeometry, SemanticHead,
+    SemanticIdentity, SemanticInstruction, SemanticMacroInvocationHead, SemanticNumericPosition,
+    Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
+    geometry_resolution_policy_digest,
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
 pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v2";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v3";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,7 +45,13 @@ impl ScorePrimitiveMappingError {
 pub fn score_primitive_from_semantic_identity(
     identity: &SemanticIdentity,
 ) -> Result<Primitive, ScorePrimitiveMappingError> {
-    let primitive = match (identity.category.as_str(), identity.id.as_str()) {
+    score_primitive_from_identity(identity.into())
+}
+
+fn score_primitive_from_identity(
+    identity: SemanticInputIdentity<'_>,
+) -> Result<Primitive, ScorePrimitiveMappingError> {
+    let primitive = match (identity.category, identity.id) {
         ("shape", "line") => Primitive::Line,
         ("shape", "circle") => Primitive::Circle,
         ("shape", "ellipse") => Primitive::Ellipse,
@@ -51,8 +62,8 @@ pub fn score_primitive_from_semantic_identity(
         ("shape", "cloudform") => Primitive::Cloudform,
         _ => {
             return Err(ScorePrimitiveMappingError {
-                category: identity.category.clone(),
-                id: identity.id.clone(),
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
             });
         }
     };
@@ -78,14 +89,27 @@ impl ExactCountFieldCandidate {
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreFieldGap {
-    UnsupportedPrimitiveIdentity { category: String, id: String },
+    UnsupportedPrimitiveIdentity {
+        category: String,
+        id: String,
+    },
     MacroInvocationHead,
-    ExactCountZero { value: u64 },
-    ExactCountExceedsScoreRange { value: u64 },
-    UnsupportedRelativeScalePrimitive { primitive: Primitive },
-    UnsupportedRelativeScaleValue { value: CoreModifierValue },
+    ExactCountZero {
+        value: u64,
+    },
+    ExactCountExceedsScoreRange {
+        value: u64,
+    },
+    UnsupportedRelativeScalePrimitive {
+        primitive: Primitive,
+    },
+    UnsupportedRelativeScaleValue {
+        value: CoreModifierValue,
+    },
     MissingExactCount,
-    RepeatedCountUnsupported { value: u32 },
+    RepeatedCountUnsupported {
+        value: u32,
+    },
     MissingExplicitGeometry,
     MissingNumericPosition,
     MissingColor,
@@ -94,17 +118,77 @@ pub enum ScoreFieldGap {
     MissingContinuity,
     MissingEmptySurface,
     MissingPlaceAction,
-    UnsupportedPrimitiveForExplicitGeometry { primitive: Primitive },
-    GeometryDimensionMismatch { primitive: Primitive },
-    UnsupportedColorIdentity { category: String, id: String },
-    UnsupportedTouchIdentity { category: String, id: String },
-    UnsupportedContinuityIdentity { category: String, id: String },
-    UnsupportedSurfaceIdentity { category: String, id: String },
-    UnsupportedActionIdentity { category: String, id: String },
+    UnsupportedPrimitiveForExplicitGeometry {
+        primitive: Primitive,
+    },
+    GeometryDimensionMismatch {
+        primitive: Primitive,
+    },
+    UnsupportedColorIdentity {
+        category: String,
+        id: String,
+    },
+    UnsupportedTouchIdentity {
+        category: String,
+        id: String,
+    },
+    UnsupportedContinuityIdentity {
+        category: String,
+        id: String,
+    },
+    UnsupportedSurfaceIdentity {
+        category: String,
+        id: String,
+    },
+    UnsupportedActionIdentity {
+        category: String,
+        id: String,
+    },
     NamedAndNumericPositionConflict,
     UnsupportedNamedPosition,
     UnsupportedInstructionMeaning,
     UnsupportedDocumentMeaning,
+    UnboundMacroCallerMeaning,
+    MissingMacroExpansionOwner {
+        invocation_ordinal: u64,
+    },
+    DuplicateMacroExpansionOwner {
+        invocation_ordinal: u64,
+    },
+    UnsupportedMacroStructure,
+    MissingMacroEmitField {
+        key: String,
+    },
+    UnknownMacroEmitField {
+        key: String,
+    },
+    MacroEmitFieldTypeMismatch {
+        key: String,
+    },
+    MacroEmitIntegerOutOfRange {
+        key: String,
+        value: i64,
+    },
+    MacroEmitFieldCategoryMismatch {
+        key: String,
+        expected: String,
+        actual: String,
+    },
+    UnsupportedMacroEmitIdentity {
+        key: String,
+        category: String,
+        id: String,
+    },
+    MissingMacroEmitFocusTarget {
+        invocation_ordinal: u64,
+        expansion_path: Vec<ExpansionPathSegment>,
+        generated_ordinal: u64,
+    },
+    DuplicateMacroEmitFocusTarget {
+        invocation_ordinal: u64,
+        expansion_path: Vec<ExpansionPathSegment>,
+        generated_ordinal: u64,
+    },
     NonPositiveDimension,
     PositionOutOfRange,
     GeometryExtentOutOfBounds,
@@ -172,6 +256,372 @@ impl ScoreLoweringContext {
     }
 }
 
+fn direct_instruction_focus(
+    view: VerifiedStage15EffectiveView<'_>,
+    instruction_index: usize,
+) -> Option<FocusRegion> {
+    view.pending_focus_targets()
+        .iter()
+        .find_map(|target| match &target.path {
+            Stage15TargetPath::Instruction {
+                instruction_index: target_index,
+            } if *target_index == instruction_index => Some(target.effective_focus),
+            Stage15TargetPath::Instruction { .. }
+            | Stage15TargetPath::GroupPredicate { .. }
+            | Stage15TargetPath::MacroEmit { .. } => None,
+        })
+}
+
+fn project_source_instruction<'a>(
+    instruction: &'a SemanticInstruction,
+    effective_focus: Option<FocusRegion>,
+) -> Option<ScoreLoweringInput<'a>> {
+    let SemanticHead::Primitive(term) = &instruction.entity.head else {
+        return None;
+    };
+    Some(ScoreLoweringInput {
+        primitive: (&term.identity).into(),
+        count: instruction
+            .entity
+            .quantity
+            .as_ref()
+            .map(|value| value.value),
+        color: instruction
+            .entity
+            .color
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        touch: instruction
+            .entity
+            .touch
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        continuity: instruction
+            .entity
+            .continuity
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        surface: instruction
+            .entity
+            .surface
+            .quality
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        action: instruction
+            .action
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        numeric_position: instruction.entity.numeric_position.as_ref(),
+        has_named_position: instruction.position.is_some(),
+        effective_focus,
+        explicit_geometry: instruction.entity.explicit_geometry.as_ref(),
+        relative_scale: instruction
+            .entity
+            .relative_scale
+            .as_ref()
+            .map(|scale| scale.value),
+        has_unsupported_meaning: instruction.entity.thinness.is_some()
+            || instruction.entity.angle.is_some()
+            || instruction.entity.surface.intensity.is_some()
+            || instruction.entity.fluctuation.amplitude.is_some()
+            || instruction.entity.fluctuation.frequency.is_some()
+            || instruction.entity.fluctuation.quality.is_some()
+            || instruction.entity.proportion.aspect.is_some()
+            || instruction.entity.proportion.width_extent.is_some()
+            || instruction.entity.proportion.arc_form.is_some()
+            || instruction.relation.is_some(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_macro_instruction(
+    view: VerifiedStage15EffectiveView<'_>,
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    context: ScoreLoweringContext,
+    instructions: &mut Vec<Instruction>,
+    instruction_origins: &mut Vec<ScoreInstructionOrigin>,
+    gaps: &mut Vec<ScoreFieldGap>,
+) {
+    append_macro_caller_gaps(instruction, gaps);
+    let expansion = match exact_macro_expansion(view, head) {
+        Ok(expansion) => expansion,
+        Err(gap) => {
+            gaps.push(gap);
+            return;
+        }
+    };
+
+    for node in &expansion.nodes {
+        let ExpandedMacroNode::Emit {
+            binding,
+            fields,
+            provenance,
+        } = node
+        else {
+            gaps.push(ScoreFieldGap::UnsupportedMacroStructure);
+            continue;
+        };
+        let mut input = match project_macro_emit(fields) {
+            Ok(input) => input,
+            Err(mut emit_gaps) => {
+                gaps.append(&mut emit_gaps);
+                continue;
+            }
+        };
+        input.effective_focus = match exact_macro_emit_focus(view, provenance) {
+            Ok(focus) => Some(focus),
+            Err(gap) => {
+                gaps.push(gap);
+                continue;
+            }
+        };
+        match lower_complete_instruction(input, context) {
+            Ok(score_instruction) => {
+                instructions.push(score_instruction);
+                instruction_origins.push(ScoreInstructionOrigin::MacroEmit {
+                    source_instruction_index,
+                    binding: binding.clone(),
+                    provenance: provenance.clone(),
+                });
+            }
+            Err(mut emit_gaps) => gaps.append(&mut emit_gaps),
+        }
+    }
+}
+
+fn exact_macro_expansion<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    head: &SemanticMacroInvocationHead,
+) -> Result<&'a ExpandedMacroInvocation, ScoreFieldGap> {
+    let mut matches = view
+        .original_expanded_invocations()
+        .iter()
+        .filter(|invocation| {
+            invocation.provenance.invocation_ordinal == head.provenance.ordinal
+                && invocation.provenance.source_span == head.provenance.source.span
+                && invocation.provenance.definition_qualified_name == head.qualified_name
+                && invocation.provenance.definition_version == head.definition_version
+                && invocation.provenance.definition_full_digest == head.definition_digest
+        });
+    let Some(expansion) = matches.next() else {
+        return Err(ScoreFieldGap::MissingMacroExpansionOwner {
+            invocation_ordinal: head.provenance.ordinal,
+        });
+    };
+    if matches.next().is_some() {
+        return Err(ScoreFieldGap::DuplicateMacroExpansionOwner {
+            invocation_ordinal: head.provenance.ordinal,
+        });
+    }
+    Ok(expansion)
+}
+
+fn append_macro_caller_gaps(instruction: &SemanticInstruction, gaps: &mut Vec<ScoreFieldGap>) {
+    match instruction
+        .entity
+        .quantity
+        .as_ref()
+        .map(|value| value.value)
+    {
+        None | Some(1) => {}
+        Some(0) => gaps.push(ScoreFieldGap::ExactCountZero { value: 0 }),
+        Some(value) if value <= u64::from(u32::MAX) => {
+            gaps.push(ScoreFieldGap::RepeatedCountUnsupported {
+                value: value as u32,
+            });
+        }
+        Some(value) => gaps.push(ScoreFieldGap::ExactCountExceedsScoreRange { value }),
+    }
+    if instruction.entity.color.is_some()
+        || instruction.entity.thinness.is_some()
+        || instruction.entity.relative_scale.is_some()
+        || instruction.entity.explicit_geometry.is_some()
+        || instruction.entity.numeric_position.is_some()
+        || instruction.entity.touch.is_some()
+        || instruction.entity.continuity.is_some()
+        || instruction.entity.angle.is_some()
+        || instruction.entity.surface.quality.is_some()
+        || instruction.entity.surface.intensity.is_some()
+        || instruction.entity.fluctuation.amplitude.is_some()
+        || instruction.entity.fluctuation.frequency.is_some()
+        || instruction.entity.fluctuation.quality.is_some()
+        || instruction.entity.proportion.aspect.is_some()
+        || instruction.entity.proportion.width_extent.is_some()
+        || instruction.entity.proportion.arc_form.is_some()
+        || instruction.action.is_some()
+        || instruction.position.is_some()
+        || instruction.relation.is_some()
+    {
+        gaps.push(ScoreFieldGap::UnboundMacroCallerMeaning);
+    }
+}
+
+fn exact_macro_emit_focus(
+    view: VerifiedStage15EffectiveView<'_>,
+    provenance: &GeneratedNodeProvenance,
+) -> Result<FocusRegion, ScoreFieldGap> {
+    let mut matches = view.pending_focus_targets().iter().filter(|target| {
+        matches!(
+            &target.path,
+            Stage15TargetPath::MacroEmit {
+                invocation_ordinal,
+                expansion_path,
+                generated_ordinal,
+                field,
+            } if *invocation_ordinal == provenance.invocation.invocation_ordinal
+                && expansion_path == &provenance.expansion_path
+                && *generated_ordinal == provenance.generated_ordinal
+                && field == "place"
+                && matches!(
+                    &target.provenance,
+                    Stage15TargetProvenance::Generated(target_provenance)
+                        if target_provenance == provenance
+                )
+        )
+    });
+    let Some(target) = matches.next() else {
+        return Err(ScoreFieldGap::MissingMacroEmitFocusTarget {
+            invocation_ordinal: provenance.invocation.invocation_ordinal,
+            expansion_path: provenance.expansion_path.clone(),
+            generated_ordinal: provenance.generated_ordinal,
+        });
+    };
+    if matches.next().is_some() {
+        return Err(ScoreFieldGap::DuplicateMacroEmitFocusTarget {
+            invocation_ordinal: provenance.invocation.invocation_ordinal,
+            expansion_path: provenance.expansion_path.clone(),
+            generated_ordinal: provenance.generated_ordinal,
+        });
+    }
+    Ok(target.effective_focus)
+}
+
+const MACRO_SCORE_FIELD_KEYS: [&str; 8] = [
+    "shape",
+    "movement",
+    "place",
+    "color",
+    "touch",
+    "continuity",
+    "surface",
+    "count",
+];
+
+fn project_macro_emit<'a>(
+    fields: &'a BTreeMap<String, ExpandedMacroValue>,
+) -> Result<ScoreLoweringInput<'a>, Vec<ScoreFieldGap>> {
+    let mut gaps = fields
+        .keys()
+        .filter(|key| !MACRO_SCORE_FIELD_KEYS.contains(&key.as_str()))
+        .map(|key| ScoreFieldGap::UnknownMacroEmitField { key: key.clone() })
+        .collect::<Vec<_>>();
+    let primitive = macro_semantic_field(fields, "shape", "shape", true, &mut gaps);
+    let action = macro_semantic_field(fields, "movement", "movement", true, &mut gaps);
+    let place = macro_semantic_field(fields, "place", "place", true, &mut gaps);
+    let color = macro_semantic_field(fields, "color", "color", false, &mut gaps);
+    let touch = macro_semantic_field(fields, "touch", "touch", false, &mut gaps);
+    let continuity = macro_semantic_field(fields, "continuity", "continuity", false, &mut gaps);
+    let surface = macro_semantic_field(fields, "surface", "surface", false, &mut gaps);
+    let count = match fields.get("count") {
+        None => None,
+        Some(ExpandedMacroValue::Integer(value)) if *value >= 0 => Some(*value as u64),
+        Some(ExpandedMacroValue::Integer(value)) => {
+            gaps.push(ScoreFieldGap::MacroEmitIntegerOutOfRange {
+                key: "count".to_owned(),
+                value: *value,
+            });
+            None
+        }
+        Some(_) => {
+            gaps.push(ScoreFieldGap::MacroEmitFieldTypeMismatch {
+                key: "count".to_owned(),
+            });
+            None
+        }
+    };
+
+    if let Some(identity) = primitive
+        && !matches!(identity.id, "circle" | "ellipse" | "cloudform" | "square")
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "shape".to_owned(),
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
+    if let Some(identity) = action
+        && identity.id != "place"
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "movement".to_owned(),
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
+    if let Some(identity) = place
+        && identity.id != "center"
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "place".to_owned(),
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
+    if !gaps.is_empty() {
+        return Err(gaps);
+    }
+
+    Ok(ScoreLoweringInput {
+        primitive: primitive.expect("required macro shape field checked"),
+        count,
+        color,
+        touch,
+        continuity,
+        surface,
+        action,
+        numeric_position: None,
+        has_named_position: place.is_some(),
+        effective_focus: None,
+        explicit_geometry: None,
+        relative_scale: None,
+        has_unsupported_meaning: false,
+    })
+}
+
+fn macro_semantic_field<'a>(
+    fields: &'a BTreeMap<String, ExpandedMacroValue>,
+    key: &str,
+    expected_category: &str,
+    required: bool,
+    gaps: &mut Vec<ScoreFieldGap>,
+) -> Option<SemanticInputIdentity<'a>> {
+    let Some(value) = fields.get(key) else {
+        if required {
+            gaps.push(ScoreFieldGap::MissingMacroEmitField {
+                key: key.to_owned(),
+            });
+        }
+        return None;
+    };
+    let ExpandedMacroValue::SemanticRef { category, id } = value else {
+        gaps.push(ScoreFieldGap::MacroEmitFieldTypeMismatch {
+            key: key.to_owned(),
+        });
+        return None;
+    };
+    if category != expected_category {
+        gaps.push(ScoreFieldGap::MacroEmitFieldCategoryMismatch {
+            key: key.to_owned(),
+            expected: expected_category.to_owned(),
+            actual: category.clone(),
+        });
+        return None;
+    }
+    Some(SemanticInputIdentity { category, id })
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScoreLoweringContextError {
     UnknownCanvasFormat,
@@ -186,6 +636,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     context: ScoreLoweringContext,
     policy_digest: String,
     score: Option<Score>,
+    instruction_origins: Vec<ScoreInstructionOrigin>,
     gaps: Vec<ScoreFieldGap>,
 }
 
@@ -214,9 +665,26 @@ impl<'a> ExplicitScoreLoweringResult<'a> {
         self.score.as_ref()
     }
 
+    pub fn instruction_origins(&self) -> &[ScoreInstructionOrigin] {
+        &self.instruction_origins
+    }
+
     pub fn gaps(&self) -> &[ScoreFieldGap] {
         &self.gaps
     }
+}
+
+/// Exact source or generated owner for one instruction in a successful Score.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ScoreInstructionOrigin {
+    SourceInstruction {
+        instruction_index: usize,
+    },
+    MacroEmit {
+        source_instruction_index: usize,
+        binding: Option<GeneratedTargetId>,
+        provenance: GeneratedNodeProvenance,
+    },
 }
 
 /// Score fields owned by one source instruction; all other Score fields remain absent.
@@ -291,7 +759,7 @@ pub fn lower_verified_stage15_view<'a>(
     }
 }
 
-/// Lower only a document whose every instruction has the complete supported Step 10G subset.
+/// Lower only a document whose every instruction has a complete supported finite input.
 pub fn lower_verified_stage15_score<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
@@ -303,7 +771,9 @@ pub fn lower_verified_stage15_score<'a>(
     let mut gaps = candidate
         .instructions()
         .iter()
-        .flat_map(|instruction| instruction.gaps().iter().cloned())
+        .flat_map(|instruction| instruction.gaps().iter())
+        .filter(|gap| !matches!(gap, ScoreFieldGap::MacroInvocationHead))
+        .cloned()
         .collect::<Vec<_>>();
 
     if document.ground.is_some()
@@ -313,23 +783,38 @@ pub fn lower_verified_stage15_score<'a>(
         gaps.push(ScoreFieldGap::UnsupportedDocumentMeaning);
     }
 
-    let mut instructions = Vec::with_capacity(document.instructions.len());
+    let mut instructions = Vec::new();
+    let mut instruction_origins = Vec::new();
     for (instruction_index, instruction) in document.instructions.iter().enumerate() {
-        let effective_focus = candidate
-            .verified_effective_view()
-            .pending_focus_targets()
-            .iter()
-            .find_map(|target| match &target.path {
-                Stage15TargetPath::Instruction {
-                    instruction_index: target_index,
-                } if *target_index == instruction_index => Some(target.effective_focus),
-                Stage15TargetPath::Instruction { .. }
-                | Stage15TargetPath::GroupPredicate { .. }
-                | Stage15TargetPath::MacroEmit { .. } => None,
-            });
-        match lower_complete_instruction(instruction, effective_focus, context) {
-            Ok(score_instruction) => instructions.push(score_instruction),
-            Err(mut instruction_gaps) => gaps.append(&mut instruction_gaps),
+        match &instruction.entity.head {
+            SemanticHead::Primitive(_) => {
+                let effective_focus = direct_instruction_focus(
+                    candidate.verified_effective_view(),
+                    instruction_index,
+                );
+                let input = project_source_instruction(instruction, effective_focus)
+                    .expect("source projection is called only for primitive heads");
+                match lower_complete_instruction(input, context) {
+                    Ok(score_instruction) => {
+                        instructions.push(score_instruction);
+                        instruction_origins
+                            .push(ScoreInstructionOrigin::SourceInstruction { instruction_index });
+                    }
+                    Err(mut instruction_gaps) => gaps.append(&mut instruction_gaps),
+                }
+            }
+            SemanticHead::MacroInvocation(head) => {
+                lower_macro_instruction(
+                    candidate.verified_effective_view(),
+                    instruction_index,
+                    instruction,
+                    head,
+                    context,
+                    &mut instructions,
+                    &mut instruction_origins,
+                    &mut gaps,
+                );
+            }
         }
     }
 
@@ -340,42 +825,71 @@ pub fn lower_verified_stage15_score<'a>(
         presence: None,
         instructions,
     });
+    if score.is_none() {
+        instruction_origins.clear();
+    }
     ExplicitScoreLoweringResult {
         candidate,
         context,
         policy_digest: geometry_resolution_policy_digest(),
         score,
+        instruction_origins,
         gaps,
     }
 }
 
-fn lower_complete_instruction(
-    instruction: &SemanticInstruction,
+#[derive(Clone, Copy, Debug)]
+struct SemanticInputIdentity<'a> {
+    category: &'a str,
+    id: &'a str,
+}
+
+impl<'a> From<&'a SemanticIdentity> for SemanticInputIdentity<'a> {
+    fn from(identity: &'a SemanticIdentity) -> Self {
+        Self {
+            category: &identity.category,
+            id: &identity.id,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScoreLoweringInput<'a> {
+    primitive: SemanticInputIdentity<'a>,
+    count: Option<u64>,
+    color: Option<SemanticInputIdentity<'a>>,
+    touch: Option<SemanticInputIdentity<'a>>,
+    continuity: Option<SemanticInputIdentity<'a>>,
+    surface: Option<SemanticInputIdentity<'a>>,
+    action: Option<SemanticInputIdentity<'a>>,
+    numeric_position: Option<&'a SemanticNumericPosition>,
+    has_named_position: bool,
     effective_focus: Option<FocusRegion>,
+    explicit_geometry: Option<&'a SemanticExplicitGeometry>,
+    relative_scale: Option<CoreModifierValue>,
+    has_unsupported_meaning: bool,
+}
+
+fn lower_complete_instruction(
+    input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
 ) -> Result<Instruction, Vec<ScoreFieldGap>> {
     let mut gaps = Vec::new();
-    let primitive = match &instruction.entity.head {
-        SemanticHead::Primitive(term) => {
-            match score_primitive_from_semantic_identity(&term.identity) {
-                Ok(primitive) => primitive,
-                Err(error) => {
-                    gaps.push(ScoreFieldGap::UnsupportedPrimitiveIdentity {
-                        category: error.category,
-                        id: error.id,
-                    });
-                    return Err(gaps);
-                }
-            }
+    let primitive = match score_primitive_from_identity(input.primitive) {
+        Ok(primitive) => primitive,
+        Err(error) => {
+            gaps.push(ScoreFieldGap::UnsupportedPrimitiveIdentity {
+                category: error.category,
+                id: error.id,
+            });
+            return Err(gaps);
         }
-        SemanticHead::MacroInvocation(_) => return Err(vec![ScoreFieldGap::MacroInvocationHead]),
     };
-    let count = match instruction
-        .entity
-        .quantity
-        .as_ref()
-        .map(|quantity| quantity.value)
-    {
+    let count = match input.count {
+        Some(0) => {
+            gaps.push(ScoreFieldGap::ExactCountZero { value: 0 });
+            0
+        }
         Some(1) => 1,
         Some(value) if value <= u64::from(u32::MAX) => {
             gaps.push(ScoreFieldGap::RepeatedCountUnsupported {
@@ -389,107 +903,89 @@ fn lower_complete_instruction(
         }
         None => 1,
     };
-    debug_assert!(count <= 1, "Step 10G never materializes repeated count");
+    debug_assert!(
+        count <= 1,
+        "finite lowering never materializes repeated count"
+    );
 
-    let color = match instruction.entity.color.as_ref() {
-        Some(_) => map_score_enum::<Color>(instruction.entity.color.as_ref(), "color", &mut gaps),
+    let color = match input.color {
+        Some(_) => map_score_enum::<Color>(input.color, "color", &mut gaps),
         None => resolve_omitted_color(context, &mut gaps),
     };
-    let weight = match instruction.entity.touch.as_ref() {
-        Some(_) => map_score_enum::<Weight>(instruction.entity.touch.as_ref(), "touch", &mut gaps),
+    let weight = match input.touch {
+        Some(_) => map_score_enum::<Weight>(input.touch, "touch", &mut gaps),
         None => Some(Weight::Pen),
     };
-    let style = match instruction.entity.continuity.as_ref() {
-        Some(_) => map_score_enum::<LineStyle>(
-            instruction.entity.continuity.as_ref(),
-            "continuity",
-            &mut gaps,
-        ),
+    let style = match input.continuity {
+        Some(_) => map_score_enum::<LineStyle>(input.continuity, "continuity", &mut gaps),
         None => Some(LineStyle::Solid),
     };
-    let filled = match instruction.entity.surface.quality.as_ref() {
-        Some(term) if term.identity.category == "surface" && term.identity.id == "none" => false,
-        Some(term) if term.identity.category == "surface" && term.identity.id == "solid" => true,
-        Some(term) => {
+    let filled = match input.surface {
+        Some(identity) if identity.category == "surface" && identity.id == "none" => false,
+        Some(identity) if identity.category == "surface" && identity.id == "solid" => true,
+        Some(identity) => {
             gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
-                category: term.identity.category.clone(),
-                id: term.identity.id.clone(),
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
             });
             false
         }
         None => true,
     };
-    match instruction.action.as_ref() {
-        Some(term) if term.identity.category == "movement" && term.identity.id == "place" => {}
-        Some(term) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
-            category: term.identity.category.clone(),
-            id: term.identity.id.clone(),
+    match input.action {
+        Some(identity) if identity.category == "movement" && identity.id == "place" => {}
+        Some(identity) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
         }),
         None => gaps.push(ScoreFieldGap::MissingPlaceAction),
     }
-    let named_focus =
-        if instruction.position.is_some() && instruction.entity.numeric_position.is_some() {
-            gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
-            None
-        } else if instruction.position.is_some() {
-            if let Some(focus) = effective_focus {
-                Some(focus)
-            } else {
-                gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
-                None
-            }
-        } else if instruction.entity.numeric_position.is_none() {
-            gaps.push(ScoreFieldGap::MissingNumericPosition);
-            None
+    let named_focus = if input.has_named_position && input.numeric_position.is_some() {
+        gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
+        None
+    } else if input.has_named_position {
+        if let Some(focus) = input.effective_focus {
+            Some(focus)
         } else {
+            gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
             None
-        };
-    if instruction.entity.explicit_geometry.is_some() && instruction.entity.relative_scale.is_some()
-    {
+        }
+    } else if input.numeric_position.is_none() {
+        gaps.push(ScoreFieldGap::MissingNumericPosition);
+        None
+    } else {
+        None
+    };
+    if input.explicit_geometry.is_some() && input.relative_scale.is_some() {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
-    } else if instruction.entity.explicit_geometry.is_none()
+    } else if input.explicit_geometry.is_none()
         && !matches!(
             primitive,
             Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square
         )
     {
-        if instruction.entity.relative_scale.is_some() {
+        if input.relative_scale.is_some() {
             gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });
         } else {
             gaps.push(ScoreFieldGap::MissingExplicitGeometry);
         }
     }
-    if instruction.entity.thinness.is_some()
-        || instruction.entity.angle.is_some()
-        || instruction.entity.surface.intensity.is_some()
-        || instruction.entity.fluctuation.amplitude.is_some()
-        || instruction.entity.fluctuation.frequency.is_some()
-        || instruction.entity.fluctuation.quality.is_some()
-        || instruction.entity.proportion.aspect.is_some()
-        || instruction.entity.proportion.width_extent.is_some()
-        || instruction.entity.proportion.arc_form.is_some()
-        || instruction.relation.is_some()
-    {
+    if input.has_unsupported_meaning {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
     if !gaps.is_empty() {
         return Err(gaps);
     }
 
-    let placement = match (instruction.entity.numeric_position.as_ref(), named_focus) {
+    let placement = match (input.numeric_position, named_focus) {
         (Some(position), None) => ScorePlacement::Numeric(position),
         (None, Some(focus)) => ScorePlacement::Named(focus),
         _ => unreachable!("checked position authority"),
     };
-    let relative_scale = instruction
-        .entity
-        .relative_scale
-        .as_ref()
-        .map(|relative_scale| relative_scale.value);
     let geometric = lower_geometry(
         primitive,
-        instruction.entity.explicit_geometry.as_ref(),
-        relative_scale,
+        input.explicit_geometry,
+        input.relative_scale,
         placement,
         context.canvas_format,
     )
@@ -543,11 +1039,11 @@ fn resolve_omitted_color(
 }
 
 fn map_score_enum<T: serde::de::DeserializeOwned>(
-    term: Option<&crate::SemanticTerm>,
+    identity: Option<SemanticInputIdentity<'_>>,
     owner: &str,
     gaps: &mut Vec<ScoreFieldGap>,
 ) -> Option<T> {
-    let Some(term) = term else {
+    let Some(identity) = identity else {
         gaps.push(match owner {
             "color" => ScoreFieldGap::MissingColor,
             "touch" => ScoreFieldGap::MissingTouch,
@@ -556,21 +1052,21 @@ fn map_score_enum<T: serde::de::DeserializeOwned>(
         });
         return None;
     };
-    match serde_json::from_value(serde_json::Value::String(term.identity.id.clone())) {
+    match serde_json::from_value(serde_json::Value::String(identity.id.to_owned())) {
         Ok(value) => Some(value),
         Err(_) => {
             gaps.push(match owner {
                 "color" => ScoreFieldGap::UnsupportedColorIdentity {
-                    category: term.identity.category.clone(),
-                    id: term.identity.id.clone(),
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
                 },
                 "touch" => ScoreFieldGap::UnsupportedTouchIdentity {
-                    category: term.identity.category.clone(),
-                    id: term.identity.id.clone(),
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
                 },
                 "continuity" => ScoreFieldGap::UnsupportedContinuityIdentity {
-                    category: term.identity.category.clone(),
-                    id: term.identity.id.clone(),
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
                 },
                 _ => unreachable!(),
             });
@@ -993,5 +1489,44 @@ fn lower_source_instruction(
         exact_count,
         relative_scale,
         gaps,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn macro_count_requires_an_integer_without_reinterpreting_number() {
+        let mut fields = complete_macro_fields();
+        fields.insert("count".to_owned(), ExpandedMacroValue::Integer(1));
+        assert_eq!(project_macro_emit(&fields).unwrap().count, Some(1));
+
+        fields.insert("count".to_owned(), ExpandedMacroValue::Number(1.0));
+        assert_eq!(
+            project_macro_emit(&fields).unwrap_err(),
+            [ScoreFieldGap::MacroEmitFieldTypeMismatch {
+                key: "count".to_owned(),
+            }]
+        );
+    }
+
+    fn complete_macro_fields() -> BTreeMap<String, ExpandedMacroValue> {
+        [
+            ("shape", "shape", "circle"),
+            ("movement", "movement", "place"),
+            ("place", "place", "center"),
+        ]
+        .into_iter()
+        .map(|(key, category, id)| {
+            (
+                key.to_owned(),
+                ExpandedMacroValue::SemanticRef {
+                    category: category.to_owned(),
+                    id: id.to_owned(),
+                },
+            )
+        })
+        .collect()
     }
 }

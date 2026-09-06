@@ -158,9 +158,9 @@ pub use saijiki::{
 pub use score_lowering::{
     EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitScoreLoweringResult,
     SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreFieldGap, ScoreInstructionFieldCandidate,
-    ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringContextError,
-    ScorePrimitiveMappingError, lower_verified_stage15_score, lower_verified_stage15_view,
-    score_primitive_from_semantic_identity,
+    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
+    ScoreLoweringContextError, ScorePrimitiveMappingError, lower_verified_stage15_score,
+    lower_verified_stage15_view, score_primitive_from_semantic_identity,
 };
 pub use semantic_association::{
     ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,

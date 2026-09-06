@@ -34,6 +34,48 @@ fn region_resolution_consumes_at_but_preserves_relation() {
 }
 
 #[test]
+fn named_region_then_direct_relation_resolves_lowerer_shaped_instructions() {
+    let prior_one =
+        instruction(r#"{"primitive":"circle","center":[0.2,0.3],"radius":0.08,"color":"red"}"#);
+    let prior_two = instruction(
+        r#"{"primitive":"ellipse","center":[0.7,0.6],"size":[0.24,0.12],"color":"blue"}"#,
+    );
+
+    for (relation, priors, index) in [
+        (
+            r#"{"type":"not_touching","gap":"medium"}"#,
+            vec![prior_one.clone()],
+            1,
+        ),
+        (
+            r#"{"type":"between","gap":"medium"}"#,
+            vec![prior_one.clone(), prior_two.clone()],
+            2,
+        ),
+    ] {
+        let current = instruction(&format!(
+            r#"{{"primitive":"circle","radius":0.06,"color":"green",
+            "at":{{"region":[0.39,0.39,0.61,0.61]}},"relation":{relation}}}"#
+        ));
+        assert_eq!(current.center, None);
+        let prior_snapshot = priors.clone();
+
+        let region_resolved = resolve_at_region(&current, 37, index, None);
+        assert!(region_resolved.center.is_some());
+        assert_eq!(region_resolved.radius, Some(0.06));
+        assert!(region_resolved.at.is_none());
+        assert!(region_resolved.relation.is_some());
+
+        let related = resolve_relation(&region_resolved, &priors, 37, index);
+        assert!(related.warning.is_none());
+        assert!(related.instruction.center.is_some());
+        assert_eq!(related.instruction.radius, Some(0.06));
+        assert!(related.instruction.relation.is_none());
+        assert_eq!(priors, prior_snapshot);
+    }
+}
+
+#[test]
 fn touching_line_reuses_the_rotated_prior_endpoints() {
     let mut prior =
         instruction(r#"{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"rotation":90}"#);

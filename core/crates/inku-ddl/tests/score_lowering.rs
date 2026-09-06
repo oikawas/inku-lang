@@ -5,8 +5,9 @@ use inku_ddl::{
     ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
     ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin,
     ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
-    SemanticHead, SemanticIdentity, Stage15TransformationResult, VerifiedStage15EffectiveView,
-    compile_typed_ddl, geometry_resolution_policy_digest, lower_verified_stage15_score,
+    SemanticHead, SemanticIdentity, SemanticPreviousReference, SemanticRelationKind,
+    Stage15TransformationResult, VerifiedStage15EffectiveView, compile_typed_ddl,
+    geometry_resolution_policy_digest, lower_verified_stage15_score,
     lower_verified_stage15_score_with_policy, lower_verified_stage15_view,
     score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
@@ -15,8 +16,8 @@ use inku_render::placement::region_in_short_side_units;
 use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
 use inku_score::{
-    Canvas, Color, GroundMaterial, LineStyle, Point, Primitive, ResolvedPaletteColor,
-    ResolvedPaletteContext, SurfaceTexture, Weight,
+    Canvas, Color, GroundMaterial, LineStyle, Point, Primitive, RelationGap, RelationType,
+    ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture, Weight,
 };
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -111,6 +112,314 @@ fn resolved_center_focus_reaches_the_owned_actual_score_instruction() {
     assert_eq!(instruction.radius, Some(0.12));
     assert_eq!(instruction.center, None);
     assert_eq!(instruction.position, None);
+}
+
+#[test]
+fn direct_not_touching_relation_reaches_the_actual_score() {
+    for (source, language) in [
+        (
+            concat!(
+                "place one red circle at center. ",
+                "place one blue square at center not touching the previous shape."
+            ),
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "赤い円を中心に置く。\n前の形に触れない\n青い四角を中心に置く。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+    ] {
+        let result = stage15(source, language);
+        let current = &result.original_semantic_document().instructions[1];
+        assert_eq!(
+            current
+                .position
+                .as_ref()
+                .map(|position| position.identity.id.as_str()),
+            Some("center")
+        );
+        assert!(current.relation.is_some());
+
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}"
+        );
+        let score = lowered
+            .score()
+            .expect("supported direct relation reaches Score");
+        assert_eq!(score.instructions.len(), 2);
+        assert!(score.instructions[1].at.is_some());
+        let relation = score.instructions[1]
+            .relation
+            .as_ref()
+            .expect("current instruction keeps its explicit relation");
+        assert_eq!(relation.kind, RelationType::NotTouching);
+        assert_eq!(relation.gap, RelationGap::Medium);
+    }
+}
+
+#[test]
+fn direct_between_relation_preserves_focus_geometry_and_origins() {
+    let source = concat!(
+        "place one red circle at horizontal 0.2, vertical 0.3. ",
+        "place one blue ellipse at center. ",
+        "place one small green square at center between the previous two."
+    );
+    let result = stage15(source, ResolvedInstructionLanguage::En);
+    let expected_region = expected_focus_region(result.targets()[1].effective_focus);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(
+        lowered.instruction_origins(),
+        &[
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 1
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
+        ]
+    );
+    let score = lowered.score().unwrap();
+    assert_eq!(score.instructions[0].center, Some(Point::new(0.2, 0.3)));
+    let current = &score.instructions[2];
+    assert_eq!(current.center, None);
+    assert_eq!(current.position, None);
+    assert_eq!(current.size, Some(Point::new(0.12, 0.12)));
+    assert_eq!(
+        current.at.as_ref().map(|at| at.region),
+        Some(expected_region)
+    );
+    let relation = current.relation.as_ref().unwrap();
+    assert_eq!(relation.kind, RelationType::Between);
+    assert_eq!(relation.gap, RelationGap::Medium);
+
+    let ja_source = concat!(
+        "赤い円を中心に置く。\n",
+        "青い四角を中心に置く。\n",
+        "前の二つの間に\n",
+        "黒い円を中心に置く。"
+    );
+    let ja = stage15(ja_source, ResolvedInstructionLanguage::Ja);
+    let ja_current = &ja.original_semantic_document().instructions[2];
+    assert_eq!(
+        ja_current
+            .position
+            .as_ref()
+            .map(|position| position.identity.id.as_str()),
+        Some("center")
+    );
+    assert!(matches!(
+        ja_current.relation.as_ref(),
+        Some(relation)
+            if relation.kind == SemanticRelationKind::Between
+                && relation.reference == SemanticPreviousReference::PreviousTwo
+    ));
+    let ja_lowered = lower_verified_stage15_score(
+        ja.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert_eq!(ja_lowered.outcome(), ScoreLoweringOutcome::Complete);
+    let ja_score = ja_lowered.score().unwrap();
+    assert_eq!(ja_score.instructions.len(), 3);
+    assert!(ja_score.instructions[2].at.is_some());
+    assert_eq!(
+        ja_score.instructions[2].relation.as_ref().unwrap().kind,
+        RelationType::Between
+    );
+}
+
+#[test]
+fn relation_requires_original_surviving_direct_referents_and_omits_dependents() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let definition = complete_flat_emit_definition();
+
+    let macro_before_direct_referents = stage15_locked(
+        concat!(
+            "Draw.Pair! ",
+            "place one red circle at center. ",
+            "place one blue ellipse at center. ",
+            "place one green square at center between the previous two."
+        ),
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let delivered = lower_verified_stage15_score(
+        macro_before_direct_referents.verified_effective_view(),
+        context,
+    );
+    assert_eq!(delivered.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(delivered.score().unwrap().instructions.len(), 5);
+    assert_eq!(
+        delivered.score().unwrap().instructions[4]
+            .relation
+            .as_ref()
+            .unwrap()
+            .kind,
+        RelationType::Between
+    );
+
+    let macro_referent = stage15_locked(
+        "Draw.Pair! place one green square at center not touching the previous shape.",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let stopped = lower_verified_stage15_score(macro_referent.verified_effective_view(), context);
+    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stopped.score().is_none());
+    let macro_referent = lower_verified_stage15_score_with_policy(
+        macro_referent.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        macro_referent.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(macro_referent.score().unwrap().instructions.len(), 2);
+    assert!(
+        macro_referent
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                (&diagnostic.reason, &diagnostic.disposition),
+                (
+                    ScoreFieldGap::UnavailableRelationReference {
+                        kind: SemanticRelationKind::NotTouching,
+                        reference: SemanticPreviousReference::PreviousOne,
+                        dependency_instruction_indices,
+                    },
+                    ScoreDiagnosticDisposition::Omitted {
+                        unit: ScoreOmissionUnit::RelationInstruction {
+                            instruction_index: 1
+                        },
+                        ..
+                    }
+                ) if dependency_instruction_indices == &[0]
+            ))
+    );
+
+    let cascading = stage15(
+        concat!(
+            "paper. ",
+            "place two red circle at center. ",
+            "place one blue circle at center not touching the previous shape. ",
+            "place one green square at center not touching the previous shape. ",
+            "place one gray ellipse at horizontal 0.8, vertical 0.8."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let cascading = lower_verified_stage15_score_with_policy(
+        cascading.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        cascading.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let score = cascading.score().unwrap();
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Ellipse);
+    assert!(matches!(
+        &score.canvas,
+        Canvas::Spec(spec)
+            if matches!(spec.ground.as_ref(), Some(ground) if ground.material == GroundMaterial::Paper)
+    ));
+    assert_eq!(
+        cascading.instruction_origins(),
+        &[ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 3
+        }]
+    );
+    let unavailable = cascading
+        .diagnostics()
+        .iter()
+        .filter_map(|diagnostic| match &diagnostic.reason {
+            ScoreFieldGap::UnavailableRelationReference {
+                dependency_instruction_indices,
+                ..
+            } => Some(dependency_instruction_indices.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(unavailable, vec![vec![0], vec![1]]);
+}
+
+#[test]
+fn relation_accepts_a_numeric_prior_but_rejects_numeric_or_noncenter_current_position() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let numeric_prior = stage15(
+        concat!(
+            "place one red circle at horizontal 0.2, vertical 0.3. ",
+            "place one blue square at center not touching the previous shape."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let numeric_prior =
+        lower_verified_stage15_score(numeric_prior.verified_effective_view(), context);
+    assert_eq!(numeric_prior.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(
+        numeric_prior.score().unwrap().instructions[1]
+            .relation
+            .is_some()
+    );
+
+    for source in [
+        concat!(
+            "place one red circle at center. ",
+            "place one blue square at horizontal 0.7, vertical 0.7 not touching the previous shape."
+        ),
+        concat!(
+            "place one red circle at center. ",
+            "place one blue square at left-edge not touching the previous shape."
+        ),
+        concat!(
+            "place one red circle at center. ",
+            "blue square not touching the previous shape."
+        ),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score_with_policy(
+            result.verified_effective_view(),
+            context,
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert_eq!(lowered.score().unwrap().instructions.len(), 1);
+        assert!(lowered.diagnostics().iter().any(|diagnostic| matches!(
+            (&diagnostic.reason, &diagnostic.disposition),
+            (
+                ScoreFieldGap::UnsupportedRelation {
+                    kind: SemanticRelationKind::NotTouching,
+                    reference: SemanticPreviousReference::PreviousOne,
+                    dependency_instruction_indices,
+                },
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::RelationInstruction {
+                        instruction_index: 1
+                    },
+                    ..
+                }
+            ) if dependency_instruction_indices == &[0]
+        )));
+    }
 }
 
 #[test]

@@ -2276,6 +2276,30 @@ the relation afterwards (v1.94).  Under `touching` the preceding element's
 performed endpoints settle the position, so the region is treated as the starting
 point of the chain and as information.
 
+In the runtime-disconnected typed compiler consumer, `not_touching` and
+`between` on ordinary source-owned direct primitives reach an actual Score. The
+current instruction is limited to the existing lowerer's circle, ellipse,
+cloudform, or square subset, omitted or one count, explicit `place`, and a
+verified named focus derived from its original exact `place:center`. The
+compiler uses the existing Score `medium` gap and does not choose distance,
+anchor, or randomness. A relation survives only when every original source
+instruction named by typed previous-one or previous-two survives as exactly one
+direct primitive Score instruction and those source origins are the actual
+immediate predecessors in their original order. A projected index, the last
+Emit of a Macro, or the nearest surviving shape is never substituted.
+
+Stop returns no Score when the current instruction or its referents fall outside
+that subset. OmitAndContinue removes the current instruction as one
+`RelationInstruction`; it does not erase the relation and keep an independent
+shape. If downstream lowering omits a referent, dependent relations are omitted
+in source order. A numeric, unspecified, or non-center named position on the
+current instruction, the other three relations, a Macro current, and a Macro
+referent remain unsupported. An otherwise lowerable numeric position on a prior
+referent is preserved. The renderer still resolves the region first and performs
+the relation second. This delivery carries the type and original references into
+Score; it does not add a guarantee of geometric non-contact for every shape and
+seed beyond the renderer's existing clamps and degenerate-case drops.
+
 A relation that cannot be resolved — the preceding element is a background fill
 with no contour, say — is dropped by the validator or by coerce, with a warning
 recorded. Unresolvability that becomes apparent only at performance drops the

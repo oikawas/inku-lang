@@ -1,11 +1,12 @@
 use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
     MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, ScoreErrorPolicy, ScoreInstructionOrigin, ScoreLoweringContext,
-    ScoreLoweringOutcome, compile_ddl_to_score, compile_typed_ddl, saijiki_asset,
-    stage15_transformation_input,
+    ResolvedInstructionLanguage, ScoreDiagnosticDisposition, ScoreErrorPolicy, ScoreFieldGap,
+    ScoreInstructionOrigin, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
+    SemanticPreviousReference, SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl,
+    saijiki_asset, stage15_transformation_input,
 };
-use inku_score::{Canvas, Color, GroundMaterial, Primitive};
+use inku_score::{Canvas, Color, GroundMaterial, Primitive, RelationType};
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 8,
@@ -292,6 +293,93 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
                     unit: CompilerExecutionOmissionUnit::RelationInstruction { .. }
                 }
             ))
+    );
+}
+
+#[test]
+fn canonical_ready_lowering_omits_a_relation_whose_direct_referent_is_a_macro_slot() {
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Good","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}}]}"#,
+    );
+    let result = execute_locked(
+        "Good.Mark! place one green square at center not touching the previous shape.",
+        std::slice::from_ref(&definition),
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(
+        result.compilation().compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::CanonicalReady
+    );
+    assert!(result.upstream_diagnostics().is_empty());
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(result.score().unwrap().instructions.len(), 1);
+    assert!(
+        result
+            .downstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                (&diagnostic.reason, &diagnostic.disposition),
+                (
+                    ScoreFieldGap::UnavailableRelationReference {
+                        kind: SemanticRelationKind::NotTouching,
+                        reference: SemanticPreviousReference::PreviousOne,
+                        dependency_instruction_indices,
+                    },
+                    ScoreDiagnosticDisposition::Omitted {
+                        unit: ScoreOmissionUnit::RelationInstruction {
+                            instruction_index: 1
+                        },
+                        ..
+                    }
+                ) if dependency_instruction_indices == &[0]
+            ))
+    );
+}
+
+#[test]
+fn projected_lowering_keeps_original_direct_referents_after_an_older_omission() {
+    let result = execute(
+        concat!(
+            "place many red circle at center. ",
+            "place one blue circle at center. ",
+            "place one green ellipse at center. ",
+            "place one gray square at center between the previous two."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert!(!result.upstream_diagnostics().is_empty());
+    assert!(result.downstream_diagnostics().is_empty());
+    assert_eq!(
+        result.instruction_origins(),
+        &[
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 1
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 3
+            },
+        ]
+    );
+    let score = result.score().unwrap();
+    assert_eq!(score.instructions.len(), 3);
+    assert_eq!(
+        score.instructions[2].relation.as_ref().unwrap().kind,
+        RelationType::Between
     );
 }
 

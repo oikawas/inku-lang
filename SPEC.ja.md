@@ -1470,6 +1470,10 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 
 region（`at`）と relation を両方持つ instruction（プラグイン member 由来の双弧など）は、region 配置を先に適用した後で relation を解決する（v1.94）。touching では直前要素の演奏後端点が位置を確定するため、region は連鎖の起点・情報として扱われる。
 
+runtime未接続のtyped compiler consumerでは、通常sourceのdirect primitiveについて、`not_touching`と`between`をactual Scoreへ届ける。currentは既存lowererが扱うcircle / ellipse / cloudform / square、count省略または1、明示`place`、元のexact `place:center`から得たverified named focusに限る。`gap`は既存Scoreの`medium`を用い、compilerは距離・anchor・乱数を決めない。typed previous-one / previous-twoが指す元source instructionがそれぞれdirect primitiveとして一つのScore instructionに生存し、current直前のactual source originと元順序のまま一致するときだけrelationを残す。projection後のindex、Macroの最後のEmit、最寄りの生存図形へ参照を読み替えない。
+
+Stopではcurrentまたは参照がこのsubsetを満たさなければScoreを返さない。OmitAndContinueではcurrentを`RelationInstruction`単位で省略し、relationだけを消した独立図形へ変えない。参照先が下流で省略されれば後続relationもsource順に省略する。currentの数値位置、位置省略、noncenter named position、残る3 relation、Macro current / Macro referentは未対応である。参照prior自身の既存lowerableな数値位置は保持してよい。Rendererは従来どおりregionを先に解決し、その後relationを演奏する。このdeliveryは型と参照をScoreへ運ぶ契約であり、既存clampや退化時dropを越えて全形状・全seedの幾何的非接触を保証するものではない。
+
 解決不能な関係（例: 直前要素が背景塗りで輪郭を持たない）は、validator / coerce が relation を drop し、警告記録を残す。演奏時にのみ判明する解決不能はrelationをdropし、instructionはrelationなしの通常配置で描画される。grid layoutがrelationを消費する場合などwarning-classの失敗はstructured warningを記録する。一方、prior boundsの不足やcanonical-silentな退化幾何のfallbackは警告なしでrelationをdropする。
 
 ### 14.5 relation の owner

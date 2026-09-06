@@ -91,9 +91,14 @@ bilingual seven-class size scale, together with omitted count-one, pen, solid, f
 background-contrast color, into an actual Score. Existing fill behavior for `none`, `solid`, and omitted surface
 remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
 Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
-material numeric defaults or seeds. Surface intensity, non-center or unspecified placement, normal geometry for
-other primitives, count allocation, relation / group, Macro structure / numeric input, whole-parity and retirement
-remain, and this path is not connected to the runtime. Effective focus maps through the single policy's
+material numeric defaults or seeds. For ordinary source-owned direct primitives, the same four-shape, count-one,
+explicit-place, original exact-center named-focus subset carries NotTouching and Between into the existing Score
+relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
+each produce one instruction and remain the current instruction's actual immediate source origins in original order;
+Continue omits dependent currents as `RelationInstruction` units when a referent disappears. Surface intensity,
+numeric, non-center, or unspecified placement on the current instruction, normal geometry for other primitives,
+count allocation, the other three relations / group, Macro relation / structure / numeric input, whole-parity and
+retirement remain, and this path is not connected to the runtime. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
 Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final

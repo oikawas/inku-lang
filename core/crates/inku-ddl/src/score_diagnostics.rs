@@ -1,6 +1,6 @@
 //! Typed ownership and execution dispositions for Score lowering diagnostics.
 
-use crate::{ExpansionPathSegment, SourceSpan};
+use crate::{ExpansionPathSegment, SemanticPreviousReference, SemanticRelationKind, SourceSpan};
 
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -67,7 +67,16 @@ pub enum ScoreFieldGap {
     NamedAndNumericPositionConflict,
     UnsupportedNamedPosition,
     UnsupportedInstructionMeaning,
-    UnsupportedRelation,
+    UnsupportedRelation {
+        kind: SemanticRelationKind,
+        reference: SemanticPreviousReference,
+        dependency_instruction_indices: Vec<usize>,
+    },
+    UnavailableRelationReference {
+        kind: SemanticRelationKind,
+        reference: SemanticPreviousReference,
+        dependency_instruction_indices: Vec<usize>,
+    },
     UnsupportedGround,
     UnsupportedCoordinatedGroup,
     UnsupportedDocumentMeaning,

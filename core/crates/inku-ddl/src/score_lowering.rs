@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
     AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color, GroundMaterial,
-    Instruction, InstructionMode, LineStyle, Point, Primitive, ResolvedPaletteContext, Score,
-    SurfaceSpec, SurfaceTexture, Weight, lookup_canvas_format,
+    Instruction, InstructionMode, LineStyle, Point, Primitive, Relation, RelationGap, RelationType,
+    ResolvedPaletteContext, Score, SurfaceSpec, SurfaceTexture, Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -19,7 +19,8 @@ use crate::{
     ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreLoweringDiagnostic,
     ScoreLoweringOutcome, ScoreOmissionUnit, SemanticExplicitGeometry, SemanticHead,
     SemanticIdentity, SemanticInstruction, SemanticMacroInvocationHead, SemanticNumericPosition,
-    SourceSpan, Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
+    SemanticPreviousReference, SemanticRelation, SemanticRelationKind, SourceSpan,
+    Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
     geometry_resolution_policy_digest,
 };
 
@@ -997,34 +998,6 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
             .verified_effective_view()
             .source_instruction_index(projected_index)
             .expect("verified Stage 1.5 view maps every projected instruction");
-        if let Some(relation) = &instruction.relation {
-            let reason = ScoreFieldGap::UnsupportedRelation;
-            let (owner, unit) = match &instruction.entity.head {
-                SemanticHead::Primitive(_) => (
-                    ScoreDiagnosticOwner::SourceInstruction {
-                        instruction_index,
-                        field: None,
-                        spans: vec![relation.provenance.span],
-                    },
-                    ScoreOmissionUnit::RelationInstruction { instruction_index },
-                ),
-                SemanticHead::MacroInvocation(head) => (
-                    ScoreDiagnosticOwner::MacroInvocation {
-                        source_instruction_index: instruction_index,
-                        invocation_ordinal: head.provenance.ordinal,
-                        field: None,
-                        spans: vec![relation.provenance.span, head.provenance.source.span],
-                    },
-                    macro_invocation_unit(instruction_index, head),
-                ),
-            };
-            diagnostics.push(ScoreLoweringDiagnostic {
-                owner,
-                disposition: diagnostic_disposition(error_policy, &reason, unit, None),
-                reason,
-            });
-            continue;
-        }
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
                 let effective_focus = direct_instruction_focus(
@@ -1033,18 +1006,74 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                 );
                 let input = project_source_instruction(instruction, effective_focus)
                     .expect("source projection is called only for primitive heads");
-                lower_source_instruction_with_policy(
-                    instruction_index,
-                    instruction,
-                    input,
-                    context,
-                    error_policy,
-                    &mut instructions,
-                    &mut instruction_origins,
-                    &mut diagnostics,
-                );
+                if let Some(relation) = &instruction.relation {
+                    let score_relation = direct_score_relation(
+                        instruction_index,
+                        instruction,
+                        relation,
+                        effective_focus,
+                        &instruction_origins,
+                    );
+                    match score_relation {
+                        Ok(score_relation) => lower_source_relation_instruction_with_policy(
+                            instruction_index,
+                            instruction,
+                            input,
+                            score_relation,
+                            context,
+                            error_policy,
+                            &mut instructions,
+                            &mut instruction_origins,
+                            &mut diagnostics,
+                        ),
+                        Err(reason) => diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: ScoreDiagnosticOwner::SourceInstruction {
+                                instruction_index,
+                                field: None,
+                                spans: vec![relation.provenance.span],
+                            },
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                ScoreOmissionUnit::RelationInstruction { instruction_index },
+                                None,
+                            ),
+                            reason,
+                        }),
+                    }
+                } else {
+                    lower_source_instruction_with_policy(
+                        instruction_index,
+                        instruction,
+                        input,
+                        context,
+                        error_policy,
+                        &mut instructions,
+                        &mut instruction_origins,
+                        &mut diagnostics,
+                    );
+                }
             }
             SemanticHead::MacroInvocation(head) => {
+                if let Some(relation) = &instruction.relation {
+                    let reason = unsupported_relation_reason(instruction_index, relation);
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: ScoreDiagnosticOwner::MacroInvocation {
+                            source_instruction_index: instruction_index,
+                            invocation_ordinal: head.provenance.ordinal,
+                            field: None,
+                            spans: vec![relation.provenance.span, head.provenance.source.span],
+                        },
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            &reason,
+                            macro_invocation_unit(instruction_index, head),
+                            None,
+                        ),
+                        reason,
+                    });
+                    continue;
+                }
                 lower_macro_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
@@ -1110,6 +1139,108 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
         gaps,
         diagnostics,
     }
+}
+
+fn relation_dependency_instruction_indices(
+    instruction_index: usize,
+    reference: SemanticPreviousReference,
+) -> Vec<usize> {
+    let required = match reference {
+        SemanticPreviousReference::PreviousOne => 1,
+        SemanticPreviousReference::PreviousTwo => 2,
+    };
+    instruction_index
+        .checked_sub(required)
+        .map_or_else(Vec::new, |first| (first..instruction_index).collect())
+}
+
+fn unsupported_relation_reason(
+    instruction_index: usize,
+    relation: &SemanticRelation,
+) -> ScoreFieldGap {
+    ScoreFieldGap::UnsupportedRelation {
+        kind: relation.kind,
+        reference: relation.reference,
+        dependency_instruction_indices: relation_dependency_instruction_indices(
+            instruction_index,
+            relation.reference,
+        ),
+    }
+}
+
+fn direct_score_relation(
+    instruction_index: usize,
+    instruction: &SemanticInstruction,
+    relation: &SemanticRelation,
+    effective_focus: Option<FocusRegion>,
+    instruction_origins: &[ScoreInstructionOrigin],
+) -> Result<Relation, ScoreFieldGap> {
+    let supported_kind_and_reference = matches!(
+        (relation.kind, relation.reference),
+        (
+            SemanticRelationKind::NotTouching,
+            SemanticPreviousReference::PreviousOne
+        ) | (
+            SemanticRelationKind::Between,
+            SemanticPreviousReference::PreviousTwo
+        )
+    );
+    let has_exact_center = instruction.position.as_ref().is_some_and(|position| {
+        position.identity.category == "place" && position.identity.id == "center"
+    });
+    if !supported_kind_and_reference
+        || instruction.entity.numeric_position.is_some()
+        || !has_exact_center
+        || effective_focus.is_none()
+    {
+        return Err(unsupported_relation_reason(instruction_index, relation));
+    }
+
+    let required = match relation.reference {
+        SemanticPreviousReference::PreviousOne => 1,
+        SemanticPreviousReference::PreviousTwo => 2,
+    };
+    let dependency_instruction_indices =
+        relation_dependency_instruction_indices(instruction_index, relation.reference);
+    if dependency_instruction_indices.len() != required {
+        return Err(ScoreFieldGap::UnavailableRelationReference {
+            kind: relation.kind,
+            reference: relation.reference,
+            dependency_instruction_indices: Vec::new(),
+        });
+    }
+    let actual_dependencies_match = instruction_origins
+        .get(instruction_origins.len().saturating_sub(required)..)
+        .is_some_and(|origins| {
+            origins.len() == required
+                && origins.iter().zip(&dependency_instruction_indices).all(
+                    |(origin, expected_index)| {
+                        matches!(
+                            origin,
+                            ScoreInstructionOrigin::SourceInstruction { instruction_index }
+                                if instruction_index == expected_index
+                        )
+                    },
+                )
+        });
+    if !actual_dependencies_match {
+        return Err(ScoreFieldGap::UnavailableRelationReference {
+            kind: relation.kind,
+            reference: relation.reference,
+            dependency_instruction_indices,
+        });
+    }
+
+    Ok(Relation {
+        kind: match relation.kind {
+            SemanticRelationKind::NotTouching => RelationType::NotTouching,
+            SemanticRelationKind::Between => RelationType::Between,
+            SemanticRelationKind::Along
+            | SemanticRelationKind::Cutting
+            | SemanticRelationKind::Touching => unreachable!("supported relation checked"),
+        },
+        gap: RelationGap::Medium,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -1230,6 +1361,52 @@ fn lower_source_instruction_with_policy(
         });
     }
     if let Some(score_instruction) = attempt.instruction {
+        instructions.push(score_instruction);
+        instruction_origins.push(ScoreInstructionOrigin::SourceInstruction { instruction_index });
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_source_relation_instruction_with_policy(
+    instruction_index: usize,
+    instruction: &SemanticInstruction,
+    input: ScoreLoweringInput<'_>,
+    relation: Relation,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    instructions: &mut Vec<Instruction>,
+    instruction_origins: &mut Vec<ScoreInstructionOrigin>,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) {
+    let attempt = lower_projected_instruction(input, context, error_policy);
+    for omission in attempt.appearance_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::AppearanceField {
+                    field: omission.field,
+                },
+                Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for reason in attempt.remaining_gaps {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::RelationInstruction { instruction_index },
+                None,
+            ),
+            reason,
+        });
+    }
+    if let Some(mut score_instruction) = attempt.instruction {
+        score_instruction.relation = Some(relation);
         instructions.push(score_instruction);
         instruction_origins.push(ScoreInstructionOrigin::SourceInstruction { instruction_index });
     }

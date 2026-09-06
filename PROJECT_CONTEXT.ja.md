@@ -78,8 +78,12 @@ circle / ellipse / cloudform / squareでは、明示numeric geometryに加え、
 日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
 `solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
 7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
-数値defaultやseedを作らない。Surface intensity、非center/未指定配置、他primitiveのnormal、count allocation、
-relation / group、Macro構造 / numeric、全体parity / retireは残り、runtime未接続である。
+数値defaultやseedを作らない。通常sourceのdirect primitiveでは、同じ4shape / count1 / 明示place / 元のexact
+center由来named focusの範囲で、NotTouchingとBetweenを既存Medium gapのScore relationへ届ける。typedな
+previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
+一致する場合だけ参照を保つ。Continueは参照消失時にcurrentをRelationInstruction単位で連鎖省略する。
+Surface intensity、currentの数値・noncenter・未指定配置、他primitiveのnormal、count allocation、残る3 relation /
+group、Macro relation / 構造 / numeric、全体parity / retireは残り、runtime未接続である。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは

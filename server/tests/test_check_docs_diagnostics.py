@@ -55,3 +55,34 @@ def test_first_excess_heading_reports_the_other_side_as_absent(
     assert "first difference: heading 3" in problem
     assert "ja.md: h3 at line 3" in problem
     assert "en.md: <no heading>" in problem
+
+
+def test_relative_link_that_escapes_repository_root_is_reported(
+    tmp_path: pathlib.Path,
+) -> None:
+    module = _check_docs()
+    module.REPO_ROOT = tmp_path
+    (tmp_path / "README.md").write_text("# Root\n", encoding="utf-8")
+    (tmp_path / "guide.md").write_text(
+        "[escape](../../README.md)\n", encoding="utf-8"
+    )
+
+    problems = module.check_links({"README.md", "guide.md"})
+
+    assert problems == [
+        "guide.md:1: relative link escapes the repository root: ../../README.md"
+    ]
+
+
+def test_relative_link_to_a_normal_parent_path_is_accepted(
+    tmp_path: pathlib.Path,
+) -> None:
+    module = _check_docs()
+    module.REPO_ROOT = tmp_path
+    (tmp_path / "README.md").write_text("# Root\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/guide.md").write_text(
+        "[root](../README.md)\n", encoding="utf-8"
+    )
+
+    assert module.check_links({"README.md", "docs/guide.md"}) == []

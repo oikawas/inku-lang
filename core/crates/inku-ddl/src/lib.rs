@@ -7,6 +7,7 @@ pub mod clause;
 pub mod compiler_lock;
 pub mod composition;
 pub mod document;
+pub mod error_policy;
 pub mod exact_decimal;
 pub mod geometry;
 pub mod language;
@@ -23,6 +24,7 @@ pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
 pub mod saijiki;
+pub mod score_diagnostics;
 pub mod score_lowering;
 pub mod semantic_association;
 pub mod semantic_document;
@@ -61,6 +63,7 @@ pub use composition::{
 pub use document::{
     DdlDocumentDiagnostic, MacroLock, NORMALIZED_DDL_DOCUMENT_SCHEMA_ID, NormalizedDdlDocument,
 };
+pub use error_policy::{ScoreErrorPolicy, ScoreLoweringOutcome};
 pub use exact_decimal::{ExactDecimal, ExactDecimalError};
 pub use geometry::{
     GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword, SemanticExactDecimal, SemanticExplicitGeometry,
@@ -155,12 +158,17 @@ pub use saijiki::{
     saijiki_derived_projection_from_asset, saijiki_marker_class_table,
     saijiki_relation_literal_table, saijiki_score_wire_maps,
 };
+pub use score_diagnostics::{
+    ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
+    ScoreDiagnosticOwner, ScoreFieldGap, ScoreLoweringDiagnostic, ScoreOmissionUnit,
+};
 pub use score_lowering::{
     EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitScoreLoweringResult,
-    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreFieldGap, ScoreInstructionFieldCandidate,
-    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
-    ScoreLoweringContextError, ScorePrimitiveMappingError, lower_verified_stage15_score,
-    lower_verified_stage15_view, score_primitive_from_semantic_identity,
+    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreInstructionFieldCandidate, ScoreInstructionOrigin,
+    ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringContextError,
+    ScorePrimitiveMappingError, lower_verified_stage15_score,
+    lower_verified_stage15_score_with_policy, lower_verified_stage15_view,
+    score_primitive_from_semantic_identity,
 };
 pub use semantic_association::{
     ExplicitPreviousReferenceOccurrence, OwnedSemanticOccurrence,

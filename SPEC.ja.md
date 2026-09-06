@@ -100,7 +100,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる |
 
-ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決するStep10Gの現行subsetだけは、数値位置、またはverified Stage 1.5でdirect `Instruction { instruction_index }`へ解決済みの元`place:center`と、place actionを持つcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決やeffective focusをsource meaningへ書き戻さない。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
+ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する現行subsetだけは、数値位置、またはverified Stage 1.5でdirect `Instruction { instruction_index }`へ解決済みの元`place:center`と、place actionを持つcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決やeffective focusをsource meaningへ書き戻さない。Stopを既定とし、明示したOmitAndContinueだけが独立appearance fieldまたは成立しない実行単位をtyped診断つきで省略する。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
 図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
 
@@ -187,6 +187,8 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seed、明示変奏なら、surface syntaxだけでmacro seed、focus、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
 
+宣言済みparameterへbindingされたmeaningは展開結果から読む。呼出し外側に残った属性はparameter bindingを再実装せずsource-owned診断とし、OmitAndContinueで未結合appearance fieldだけを省略した場合もMacroDefinition内の既存配色・touch・continuity・surfaceを保持する。未使用parameterは従来どおり受け入れ、parameter default / optionalや呼出し全体の新しい変換意味を追加しない。
+
 この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
 ### 4.6 Generic MacroDefinition v1
@@ -195,7 +197,7 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 Actual Scoreへ届く現行finite consumerは、flatな完成`emit`だけを一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`circle` / `ellipse` / `cloudform` / `square`、`movement`は明示`place`、`place`はexact generated focus targetを持つ`center`に限る。`color` / `touch` / `continuity` / `surface`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
 
-Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。一方、不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / `relation`は文書全体のgapであり、子Emitの抽出やpartial Scoreを行わない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
+Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / `relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のflat EmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、無関係なflat siblingをsource / generated provenance順に残す。Structural subtreeから子Emitだけを抜き出さず、新しいEmit keyを足さない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
@@ -698,6 +700,8 @@ coerce は記述と typed meaning に明示された内容を Score へ届ける
 
 無効値や解決不能な関係は、意味を推測して補わず、警告付きの drop、明示的な failure、または読み取り互換の経路として区別する。補修を品質の底上げや発火率の floor に使わず、同じ定型部品が現れる経路を作らない。
 
+Lock検証済みStage 1.5からactual Scoreへ下ろす共有境界は、作者が選ぶStopとOmitAndContinueの二modeだけを持つ。Stopは既定で、描画不能な意味が一つでもあればScoreを返さない。OmitAndContinueは元meaningを削らずexecution projectionだけを縮め、appearance field、source instruction、Macro Emit / subtree / invocation、Ground、coordinated group、relation instructionの実際の省略単位をsource / generated ownerとspan付き診断へ残す。全単位が省略された場合と、owner / focus joinまたはhost contextの整合性が壊れた場合は停止する。どちらのmodeもLLM、推測、clamp、index再圧縮によるrelation再解決を使わない。
+
 
 ---
 
@@ -842,7 +846,7 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 - 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり等の省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
 - 図形の大小は普通 / 小さい / 大きいと弱・標準・強を組み合わせた有限7classの局所modifierとして記し、明示normalと省略を区別する。数値geometryとqualitative sizeの併記、unknown degree、曖昧なownerはtyped conflict / issueにする
 - ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
-- Step10Gのactual Score lowererは、数値位置、またはverified Stage 1.5のdirect instruction ownerへ解決済みの元`place:center`と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったままeffective focusを`at.region`へ置き、対象外の意味や必要なpalette contextの欠落はtyped gapにしてpartial Scoreを成功扱いしない。このRust経路は製品runtimeにはまだ接続しない
+- 現行actual Score lowererは、数値位置、またはverified Stage 1.5のdirect instruction ownerへ解決済みの元`place:center`と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったままeffective focusを`at.region`へ置く。Stopは対象外の意味や必要なpalette contextの欠落でScore全体を止め、明示OmitAndContinueは独立fieldまたはtyped実行単位だけを省略して残存Scoreと診断を返す。両modeとも元meaningを変更せず、このRust経路は製品runtimeにはまだ接続しない
 
 ### 12.5 モデル分割
 
@@ -861,11 +865,15 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 
 Stage 2 は effective DDL / typed meaning を閉じた JSON Score schema へ構造化する。色、素材、数量、運動、配置 path、回転、canvas、明示 relation を保ち、届かない明示要素は黙って別の意味へ変えず失敗として扱う。語彙と relation の対応は Saijiki と typed lowering の正本から導出し、履歴上の prompt sketch を現行契約にはしない。
 
+Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既定）またはOmitAndContinueとして明示する。Continueは届かない意味をScore fieldへ変換せず、execution projectionからtyped単位を省略し、残った命令と元owner順序を返す。結果は完全成功、省略付き成功、停止を区別する。
+
 ### 12.8 エラー回復戦略
 
 各 LLM 段は、空・短すぎる・schema 不適合の応答に対して理由を明示した再試行を一度だけ行う。再試行後も使えない場合は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。
 
 応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
+
+Runtime未接続のshared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合だけfield単位で省略し、成立しないinstruction / Emit / call / structural subtree、Ground、group、relationをそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
 
 ### 12.9 実装史の所在
 
@@ -888,7 +896,7 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのStep10G subset、およびfinite flat Macro Emitを同じlowererでactual Scoreへ運ぶStep10H subsetは実装済みだがruntimeには未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。Source-only field candidateがMacroInvocation headとfocus overlayを保持することと、actual側で対応する完成Emitが解決されることは両立する。現行Python経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。Plugin-specific deliveryのretire、残るposition / primitive / surface / ground / caller fact / structural meaning等を完了済みとしない。
+sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通のStop（既定）/ OmitAndContinue error policyはactual Score lowererまで実装済みだがruntimeには未接続である。Resultはmode、complete / omissions / stopped、元gap、typed省略単位、source instruction / group / groundまたはgenerated invocation / path / ordinal / keyとsource spanを持つ診断を返す。Missing / duplicate execution owner・focus joinと無効host contextはContinueでも回避しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenance、geometry policy digest、Score wireは変えない。現行Python経路のcoerceやLLM fallbackがこのmodeへ置換済みとはみなさず、runtime / UI / API / 保存接続と上流NonCanonicalReady回復は後続の責務である。
 
 ### 12.12 添景と互換記録
 
@@ -1595,7 +1603,7 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行Step10G subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
@@ -1605,7 +1613,7 @@ Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、�
 
 作者A裁定では見切れを許す。既存Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。同じScore / optionsに対するRenderer semanticsは変えない。
 
-現行Step10G subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先し、未対応意味が一つでも残る文書はactual Scoreを返さない。Lowering resultは使ったcanvas / background / resolved palette contextとpolicy digestを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
+現行subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先する。Stop（既定）は未対応意味が一つでもあればactual Scoreを返さない。OmitAndContinueはunsupportedなcolor / touch / continuity / surface quality / intensityを独立fieldとして省略し、実際に使ったcontrast color / pen / solid / fill、または保持した明示qualityを診断する。それ以外はsource instruction、Macro Emit / structural subtree / invocation、Ground、coordinated group、relation instructionの最小成立単位で省略する。Relationのprevious-one / twoは元source indexの意味を保持し、省略後の圧縮indexへ付け替えない。Lowering resultは使ったcanvas / background / resolved palette contextとgeometry policy digest、mode、outcome、gap、owner / span / dispositionを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
 
@@ -1655,7 +1663,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたはStep10Gのnormal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、symbolic candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。既定のStopは文書内の未対応意味でScore全体を止める。明示OmitAndContinueはtyped診断へ元owner / spanと実際のfieldまたは実行単位の省略を残し、描画対象が残る場合だけそのScoreを成功として返す。整合性不良または全省略はstoppedである。このRust経路はruntimeにはまだ接続しない。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 

@@ -1,6 +1,6 @@
 //! Compile-once facade from one source-owned normalized document to an actual Score.
 
-use inku_score::Score;
+use inku_score::{Canvas, Score};
 
 use crate::{
     CompilerExecutionDiagnostic, CompilerLockState, MacroDefinition, MacroExpansionLimits,
@@ -180,11 +180,15 @@ fn execute_compilation(
                 error_policy,
             );
             let upstream_omitted = !ready.diagnostics.is_empty();
-            let score_has_instructions = lowered
-                .score()
-                .is_some_and(|score| !score.instructions.is_empty());
+            let score_has_drawable_content = lowered.score().is_some_and(|score| {
+                !score.instructions.is_empty()
+                    || matches!(
+                        &score.canvas,
+                        Canvas::Spec(spec) if spec.ground.is_some()
+                    )
+            });
             let outcome = if lowered.outcome() == ScoreLoweringOutcome::Stopped
-                || (upstream_omitted && !score_has_instructions)
+                || (upstream_omitted && !score_has_drawable_content)
             {
                 ScoreLoweringOutcome::Stopped
             } else if upstream_omitted

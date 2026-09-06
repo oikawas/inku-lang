@@ -64,8 +64,12 @@ complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
 (`circle`, `ellipse`, `cloudform`, or `square`), explicit
 `movement:place`, exact `place:center`, and optional same-category `color`,
-`touch`, `continuity`, and `surface`. Omitted drawing attributes and normal
-count-one geometry use the same defaults as ordinary DDL.
+`touch`, `continuity`, and `surface`. Existing fill behavior for omitted, `none`,
+and `solid` surface remains; the seven positive surface qualities use the same
+existing `SurfaceSpec` defaults as ordinary DDL. A Macro does not author a
+document Ground. A verified document-owned Ground reaches the same lowerer as a
+`CanvasGroundSpec` with the host-resolved aspect. Omitted drawing attributes and
+normal count-one geometry use the same defaults as ordinary DDL.
 
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and

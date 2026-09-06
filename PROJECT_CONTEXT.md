@@ -88,7 +88,12 @@ For circle, ellipse, cloudform, and square instructions with a resolved numeric 
 original `place:center` owned by a verified direct `Instruction { instruction_index }` target, plus
 a place action, it lowers explicit numeric geometry or count-one normal geometry and the finite
 bilingual seven-class size scale, together with omitted count-one, pen, solid, fill, and
-background-contrast color, into an actual Score. Effective focus maps through the single policy's
+background-contrast color, into an actual Score. Existing fill behavior for `none`, `solid`, and omitted surface
+remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
+Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
+material numeric defaults or seeds. Surface intensity, non-center or unspecified placement, normal geometry for
+other primitives, count allocation, relation / group, Macro structure / numeric input, whole-parity and retirement
+remain, and this path is not connected to the runtime. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
 Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final

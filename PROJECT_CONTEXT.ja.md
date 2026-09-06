@@ -75,7 +75,11 @@ Stage 1.5の入場では、実際のvisible source bytes、存在する言語証
 canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
 direct `Instruction { instruction_index }` ownerを持つ元`place:center`と、place actionが解決済みの
 circle / ellipse / cloudform / squareでは、明示numeric geometryに加え、count1のnormal geometryと
-日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。
+日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
+`solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
+7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
+数値defaultやseedを作らない。Surface intensity、非center/未指定配置、他primitiveのnormal、count allocation、
+relation / group、Macro構造 / numeric、全体parity / retireは残り、runtime未接続である。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは

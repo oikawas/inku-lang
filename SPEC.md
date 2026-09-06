@@ -2642,11 +2642,19 @@ ellipse, cloudform, and square instructions with resolved numeric position or an
 original `place:center` owned by a verified direct instruction target, plus a
 place action, can lower explicit numeric geometry or the current normal / qualitative
 geometry, together with omitted count-one, pen, solid, fill, and contrast color, into an
-actual `Score`. The default Stop mode rejects the entire Score when the document
-contains unsupported meaning. Explicit OmitAndContinue records the original owner
-and spans plus the actual omitted field or execution unit, and reports a remaining
-Score only when a drawing target survives. Integrity failure or omission of every
-target is stopped. This Rust path is not yet connected to the product runtime.
+actual `Score`. Existing fill behavior for `none`, `solid`, and omitted surface remains;
+`wash`, `grain`, `stipple`, `hatch`, `crosshatch`, `bleed`, and `aquatint` reach the
+existing Renderer `SurfaceSpec`, while verified `paper`, `washi`, `ink_wash`,
+`charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach the existing
+`CanvasGroundSpec` in a `Canvas::Spec` carrying the host-resolved aspect. The compiler
+does not create texture or material numeric defaults or seeds. Surface intensity remains
+unsupported: Stop stops and Continue omits intensity while retaining quality. Ground alone
+is drawable content, and Continue retaining Ground preserves its original omission
+diagnostics. The default Stop mode rejects the entire Score when the document contains
+unsupported meaning. Explicit OmitAndContinue records the original owner and spans plus
+the actual omitted field or execution unit, and reports a remaining Score only when a
+drawing target survives. Integrity failure or omission of every target is stopped. This
+Rust path is not yet connected to the product runtime.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

@@ -95,6 +95,81 @@ string_enum!(Color {
     Orange,
     Purple,
 });
+
+/// One concrete work-palette observation used before Score materialization.
+///
+/// This is a non-wire DTO: Score keeps abstract colors, while the DDL resolver
+/// needs the exact resolved RGB and the renderer's existing OKLCH lightness.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResolvedPaletteColor {
+    abstract_color: Color,
+    concrete_rgb: [u8; 3],
+    oklch_lightness: f64,
+}
+
+impl ResolvedPaletteColor {
+    #[must_use]
+    pub const fn new(abstract_color: Color, concrete_rgb: [u8; 3], oklch_lightness: f64) -> Self {
+        Self {
+            abstract_color,
+            concrete_rgb,
+            oklch_lightness,
+        }
+    }
+
+    #[must_use]
+    pub const fn abstract_color(self) -> Color {
+        self.abstract_color
+    }
+
+    #[must_use]
+    pub const fn concrete_rgb(self) -> [u8; 3] {
+        self.concrete_rgb
+    }
+
+    #[must_use]
+    pub const fn oklch_lightness(self) -> f64 {
+        self.oklch_lightness
+    }
+}
+
+/// The resolved background, black, and white observations for one work palette.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResolvedPaletteContext {
+    background: ResolvedPaletteColor,
+    black: ResolvedPaletteColor,
+    white: ResolvedPaletteColor,
+}
+
+impl ResolvedPaletteContext {
+    #[must_use]
+    pub const fn new(
+        background: ResolvedPaletteColor,
+        black: ResolvedPaletteColor,
+        white: ResolvedPaletteColor,
+    ) -> Self {
+        Self {
+            background,
+            black,
+            white,
+        }
+    }
+
+    #[must_use]
+    pub const fn background(self) -> ResolvedPaletteColor {
+        self.background
+    }
+
+    #[must_use]
+    pub const fn black(self) -> ResolvedPaletteColor {
+        self.black
+    }
+
+    #[must_use]
+    pub const fn white(self) -> ResolvedPaletteColor {
+        self.white
+    }
+}
 string_enum!(SurfaceTexture {
     None,
     Solid,

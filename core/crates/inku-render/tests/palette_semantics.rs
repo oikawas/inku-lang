@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use inku_render::palette::{render_effect_hint, resolve_color, work_color_assignment};
+use inku_render::palette::{
+    PaletteObservationError, default_color_map, render_effect_hint, resolve_color,
+    work_color_assignment, work_palette_context,
+};
 use inku_render::types::Color;
 
 fn map() -> BTreeMap<String, String> {
@@ -55,4 +58,44 @@ fn nuance_and_effect_hints_keep_distinct_ownership() {
         Some("soft light; reflection".to_owned())
     );
     assert_eq!(render_effect_hint(Some("青緑の霧")), Some("霧".to_owned()));
+}
+
+#[test]
+fn score_lowering_palette_context_observes_the_existing_actual_assignment() {
+    let colors = map();
+    let context = work_palette_context(&colors, Some(431), Some("fixture"), Color::Red).unwrap();
+    assert_eq!(context.background().abstract_color(), Color::Red);
+    assert_eq!(context.background().concrete_rgb(), [0xee, 0x22, 0x00]);
+    assert_eq!(context.black().abstract_color(), Color::Black);
+    assert_eq!(context.black().concrete_rgb(), [0x10, 0x10, 0x10]);
+    assert_eq!(context.white().abstract_color(), Color::White);
+    assert_eq!(context.white().concrete_rgb(), [0xf8, 0xf8, 0xf8]);
+    for lightness in [
+        context.background().oklch_lightness(),
+        context.black().oklch_lightness(),
+        context.white().oklch_lightness(),
+    ] {
+        assert!(lightness.is_finite() && (0.0..=1.0).contains(&lightness));
+    }
+
+    let neutral = default_color_map();
+    let neutral_context = work_palette_context(&neutral, None, None, Color::White).unwrap();
+    assert_eq!(
+        neutral_context.background().concrete_rgb(),
+        [0xff, 0xff, 0xff]
+    );
+    assert_eq!(neutral_context.black().concrete_rgb(), [0x11, 0x11, 0x11]);
+    assert_eq!(neutral_context.white().concrete_rgb(), [0xff, 0xff, 0xff]);
+}
+
+#[test]
+fn score_lowering_palette_context_rejects_an_unobservable_concrete_color() {
+    let mut colors = default_color_map();
+    colors.insert("black".to_owned(), "not-a-color".to_owned());
+    assert_eq!(
+        work_palette_context(&colors, None, None, Color::White),
+        Err(PaletteObservationError::InvalidResolvedColor {
+            abstract_color: Color::Black,
+        })
+    );
 }

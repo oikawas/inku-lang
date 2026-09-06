@@ -823,11 +823,115 @@ fn core_thinness_respects_ja_and_en_word_boundaries() {
 
 #[test]
 fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
-    for (source, language, expected_surface) in [
-        ("小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
-        ("青小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
-        ("青 小さな円", ResolvedInstructionLanguage::Ja, "小さな"),
-        ("SMALL circle", ResolvedInstructionLanguage::En, "SMALL"),
+    for (source, language, expected_surface, expected_value) in [
+        (
+            "小さめの円",
+            ResolvedInstructionLanguage::Ja,
+            "小さめ",
+            "slightly_small",
+        ),
+        (
+            "小さな円",
+            ResolvedInstructionLanguage::Ja,
+            "小さな",
+            "small",
+        ),
+        (
+            "小さい円",
+            ResolvedInstructionLanguage::Ja,
+            "小さい",
+            "small",
+        ),
+        (
+            "とても小さな円",
+            ResolvedInstructionLanguage::Ja,
+            "とても小さな",
+            "very_small",
+        ),
+        (
+            "普通の大きさの円",
+            ResolvedInstructionLanguage::Ja,
+            "普通の大きさ",
+            "normal",
+        ),
+        (
+            "大きめの円",
+            ResolvedInstructionLanguage::Ja,
+            "大きめ",
+            "slightly_large",
+        ),
+        (
+            "大きな円",
+            ResolvedInstructionLanguage::Ja,
+            "大きな",
+            "large",
+        ),
+        (
+            "大きい円",
+            ResolvedInstructionLanguage::Ja,
+            "大きい",
+            "large",
+        ),
+        (
+            "とても大きな円",
+            ResolvedInstructionLanguage::Ja,
+            "とても大きな",
+            "very_large",
+        ),
+        (
+            "slightly small circle",
+            ResolvedInstructionLanguage::En,
+            "slightly small",
+            "slightly_small",
+        ),
+        (
+            "SMALL circle",
+            ResolvedInstructionLanguage::En,
+            "SMALL",
+            "small",
+        ),
+        (
+            "very small circle",
+            ResolvedInstructionLanguage::En,
+            "very small",
+            "very_small",
+        ),
+        (
+            "normal-sized circle",
+            ResolvedInstructionLanguage::En,
+            "normal-sized",
+            "normal",
+        ),
+        (
+            "slightly large circle",
+            ResolvedInstructionLanguage::En,
+            "slightly large",
+            "slightly_large",
+        ),
+        (
+            "large circle",
+            ResolvedInstructionLanguage::En,
+            "large",
+            "large",
+        ),
+        (
+            "very large circle",
+            ResolvedInstructionLanguage::En,
+            "very large",
+            "very_large",
+        ),
+        (
+            "小さめの赤いペンの円",
+            ResolvedInstructionLanguage::Ja,
+            "小さめ",
+            "slightly_small",
+        ),
+        (
+            "slightly large red pen circle",
+            ResolvedInstructionLanguage::En,
+            "slightly large",
+            "slightly_large",
+        ),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
         let result = parse_neutral_lexemes(&document);
@@ -843,7 +947,7 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(modifiers, [(expected_surface, "small")], "{source}");
+        assert_eq!(modifiers, [(expected_surface, expected_value)], "{source}");
     }
 
     for (source, language) in [
@@ -854,6 +958,7 @@ fn core_relative_scale_uses_closed_bilingual_boundaries_and_ja_head_context() {
         ("小さな", ResolvedInstructionLanguage::Ja),
         ("小さな紙", ResolvedInstructionLanguage::Ja),
         ("smallish circle", ResolvedInstructionLanguage::En),
+        ("larger circle", ResolvedInstructionLanguage::En),
         ("Nature.small circle", ResolvedInstructionLanguage::En),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();

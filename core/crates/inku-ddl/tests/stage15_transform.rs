@@ -183,6 +183,36 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
 }
 
 #[test]
+fn verified_stage15_view_preserves_finite_size_identity_and_source_provenance() {
+    let compilation = compile(
+        "very large circle",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    let result =
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let scale = result.original_semantic_document().instructions[0]
+        .entity
+        .relative_scale
+        .as_ref()
+        .expect("explicit finite size survives Stage 1.5");
+    assert_eq!(scale.value.as_str(), "very_large");
+    assert_eq!(scale.provenance.surface, "very large");
+    assert_eq!(
+        result
+            .verified_effective_view()
+            .original_semantic_document(),
+        result.original_semantic_document()
+    );
+    assert_eq!(
+        result.verified_effective_view().geometry_policy_digest(),
+        geometry_resolution_policy_digest()
+    );
+}
+
+#[test]
 fn step9i_input_boundary_rejects_visible_source_replacement() {
     let mut red = compile(
         "a red circle",

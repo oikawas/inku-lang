@@ -139,7 +139,9 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black are historical baselines for comparison with legacy Score / coerce behavior, not defaults adopted by the typed DDL compiler. When visible DDL omits the corresponding field, the typed meaning is `unspecified`; the parser and semantic association do not insert those four values. Concrete defaults, type applicability, typed-hole blocking, and Score lowering remain undecided until the PLAN Step 10 candidate / visual-author gate. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current Step10E subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, and cloudform instructions with numeric position and a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and none of these resolutions is written back into source meaning. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+
+Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
 Canvas format is neither vocabulary nor a plugin. It is a resolved host option owned by the shared-core `inku.canvas-format-registry.v1`. Its eleven formats are `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor`, and it is not written into visible DDL or macro definitions (§19).
 
@@ -1273,9 +1275,10 @@ For example, `赤い円を中心に置く。` and `円を中心に置く。円�
 - **is designed on the assumption that the author will see it** (it is shown
   in the interpretation-feedback UI)
 - when Stage 1 interprets a material from the description, writes that choice explicitly into visible normalized DDL; a material the input states explicitly is preserved
-- when an author writes direct DDL or edits generated DDL, permits touch to be omitted and retains the typed meaning as `unspecified`; it does not infer or insert a hidden touch from texture / context, primitive type, word order, or the current Score default
+- when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
+- writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- leaves the choice of lowering `unspecified` to a default, typed hole, or blocking diagnostic to the Step 10 gate; this correction alone neither stops work generation nor changes Renderer fallbacks
+- in the Step10E actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, and cloudform instructions whose numeric position and place action are resolved. Unsupported meaning or missing required color-catalog context remains a typed gap, and no partial Score is reported as success. This Rust path is not yet connected to the product runtime
 
 ### 12.5 Splitting the Model by Stage
 
@@ -2474,26 +2477,44 @@ current runtime is compatibility behavior, not semantic authority to change the
 canonical count into another value.
 
 **Size has three authorities.** Unspecified, explicit qualitative, and explicit
-numeric geometry remain distinct. Composition decides an unspecified normal
-from canvas, count, placement, typed role, and the attested composition seed.
-Explicit qualitative size applies a shared, versioned relative factor for small
-and large against that normal; an explicit "normal size" is not folded into
-unspecified. On the Description path, Stage 1 normalizes surface intensifiers
-such as "quite", "very", and their language-specific equivalents into a finite,
-language-independent intensity class, and the deterministic compiler decides
-the dimension. An unknown or ambiguous degree in direct DDL is an explicit
-error, never a hidden LLM completion.
+numeric geometry remain distinct. In the current Step10E subset, an unallocated
+count-one circle, square, ellipse, or cloudform uses `6/25` (0.24) of the canvas
+short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
+of width. Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
+standard, and strong small; `5/4`, `3/2`, and `7/4` for the corresponding large
+classes; and `1` for normal. One exact rational factor is applied once to the
+normal geometry. Existing `small` means standard-small, while an explicit
+"normal size" remains distinct from unspecified. Explicit numeric geometry is
+unchanged by qualitative size, and stating both is a conflict. Unspecified
+normal outside this subset remains undecided and is not completed through
+free-form degree synonyms or a hidden LLM.
 
 Explicit numeric geometry retains dimension, basis, canonical base-10
 coefficient / scale, and source-spelling provenance. Conversion to Score `f64`
 happens at one deterministic lowering boundary only, with no silent clamp or
-rescale. Past fixed-dimension calibration is not a current universal normal or
-final size rule; its values and rationale live in the changelog.
+rescale. Past fixed calibration of circle `0.038` and ellipse `0.06×0.032` is no
+longer an active candidate. Before context is available, a candidate retains
+symbolic size intent. The old values and rationale remain in the changelog.
 
 The single canonical owner for resolving size and position is `inku-ddl`; its
 identity / digest is `inku.geometry-resolution-policy.v1`. The compiler lock
 references and attests that identity / digest, while `ddl_engine_version` is
 activation metadata only. There is no `size_rule_version` or second owner.
+
+Within the current Step10E subset, only an omitted count resolves to one; zero,
+repeated, and qualitative counts are not materialized. Omitted touch resolves to
+pen, omitted continuity to solid, and an omitted closed surface to filled.
+Explicit empty stays unfilled, while explicit solid reaches the same existing
+fill path. An omitted color requires explicit observations of the actual
+background, black, and white RGB and OKLCH L values from the same Renderer
+`work_color_assignment` / `resolve_color` path. The single `inku-ddl` policy
+chooses whichever of black and white has the larger lightness distance from the
+background, choosing black on a tie. An explicit color needs no color-catalog context
+and remains unchanged. Explicit fields win independently, and any unsupported
+meaning anywhere in the document prevents an actual Score. The lowering result
+retains the canvas, background, resolved color context, and policy digest it
+used, while source semantics, canonical meaning, and provenance remain free of
+defaults.
 
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
@@ -2557,16 +2578,18 @@ clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
 Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
-`一辺N`, and `画面の横X、縦Yの位置`, together with their corresponding EN forms.
-A decimal retains its original spelling and source span as provenance while its
-meaning is normalized to a signed base-10 coefficient and scale. Only a
-lock-verified Stage 1.5 v5 view plus explicit host canvas and background context
-may lower independent circle, ellipse, cloudform, and square instructions into an
-actual `Score`. Each instruction must explicitly state count=1, color, touch,
-continuity, empty surface, numeric geometry, and numeric position. Any unsupported
-meaning in the document prevents a partial `Score` from being reported as success;
-the existing candidate evidence and typed gaps remain available. This Rust path is
-not yet connected to the product runtime.
+`一辺N`, and `画面の横X、縦Yの位置`, their corresponding EN forms, and the finite
+seven-class size modifiers in both languages. A decimal retains its original
+spelling and source span as provenance while its meaning is normalized to a
+signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage
+1.5 v5 view and explicit host canvas and background, requiring the corresponding
+resolved color-catalog context only when color is omitted. Independent circle,
+ellipse, cloudform, and square instructions with resolved numeric position and a
+place action can lower explicit numeric geometry or Step10E normal / qualitative
+geometry, plus omitted count-one, pen, solid, fill, and contrast color, into an
+actual `Score`. Any unsupported meaning in the document prevents a partial Score
+from being reported as success; symbolic candidate evidence and typed gaps remain
+available. This Rust path is not yet connected to the product runtime.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation

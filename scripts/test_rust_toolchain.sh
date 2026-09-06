@@ -12,11 +12,12 @@ trap 'rm -rf "$TEST_DIR"' EXIT
     exit 1
 }
 
-FAKE_HOME="$TEST_DIR/home"
-RUSTUP_HOME="$TEST_DIR/rustup"
+FAKE_HOME="$TEST_DIR/cargo home"
+RUSTUP_HOME="$TEST_DIR/rustup home"
 TOOLCHAIN_BIN="$RUSTUP_HOME/toolchains/1.95.0-fake/bin"
 BREW_BIN="$TEST_DIR/homebrew/bin"
 LOG="$TEST_DIR/cargo.log"
+VALIDATION_LOG="$TEST_DIR/validation.log"
 BREW_MARKER="$TEST_DIR/homebrew-used"
 mkdir -p "$FAKE_HOME/.cargo/bin" "$TOOLCHAIN_BIN" "$BREW_BIN"
 
@@ -27,6 +28,7 @@ set -eu
 [ "$2" = --toolchain ]
 [ "$3" = 1.95.0 ]
 tool="$4"
+printf 'which %s\n' "$tool" >> "$INKU_RUST_VALIDATION_LOG"
 printf '%s/toolchains/1.95.0-fake/bin/%s\n' "$RUSTUP_HOME" "$tool"
 FAKE_RUSTUP
 
@@ -34,6 +36,7 @@ cat > "$TOOLCHAIN_BIN/cargo" <<'FAKE_CARGO'
 #!/bin/sh
 set -eu
 if [ "${1:-}" = --version ]; then
+    printf 'cargo version\n' >> "$INKU_RUST_VALIDATION_LOG"
     printf 'cargo 1.95.0 (pinned-test)\n'
     exit 0
 fi
@@ -43,13 +46,16 @@ fi
     printf 'path_head=%s\n' "${PATH%%:*}"
     printf 'pwd=%s\n' "$PWD"
     printf 'args=%s\n' "$*"
-} > "$INKU_RUST_GUARD_TEST_LOG"
+    for arg do printf 'arg=<%s>\n' "$arg"; done
+} >> "$INKU_RUST_GUARD_TEST_LOG"
+if [ "${1:-}" = fail ]; then exit 37; fi
 FAKE_CARGO
 
 cat > "$TOOLCHAIN_BIN/rustc" <<'FAKE_RUSTC'
 #!/bin/sh
 set -eu
 if [ "${1:-}" = --version ]; then
+    printf 'rustc version\n' >> "$INKU_RUST_VALIDATION_LOG"
     printf 'rustc 1.95.0 (pinned-test)\n'
     exit 0
 fi
@@ -70,10 +76,11 @@ FAKE_HOMEBREW
 done
 chmod +x "$FAKE_HOME/.cargo/bin/rustup" "$TOOLCHAIN_BIN"/* "$BREW_BIN"/*
 
-HOME="$FAKE_HOME" \
+CARGO_HOME="$FAKE_HOME/.cargo" \
 RUSTUP_HOME="$RUSTUP_HOME" \
 INKU_RUSTUP_BIN="$FAKE_HOME/.cargo/bin/rustup" \
 INKU_RUST_GUARD_TEST_LOG="$LOG" \
+INKU_RUST_VALIDATION_LOG="$VALIDATION_LOG" \
 INKU_RUST_GUARD_BREW_MARKER="$BREW_MARKER" \
 RUSTC="$BREW_BIN/rustc" \
 PATH="$BREW_BIN:/usr/bin:/bin" \
@@ -97,7 +104,7 @@ FAKE_BAD_RUSTUP
 chmod +x "$BAD_RUSTUP"
 
 set +e
-HOME="$FAKE_HOME" RUSTUP_HOME="$RUSTUP_HOME" INKU_RUSTUP_BIN="$BAD_RUSTUP" \
+CARGO_HOME="$FAKE_HOME/.cargo" RUSTUP_HOME="$RUSTUP_HOME" INKU_RUSTUP_BIN="$BAD_RUSTUP" \
 PATH="$BREW_BIN:/usr/bin:/bin" "$RUNNER" check > "$TEST_DIR/rejected.txt" 2>&1
 REJECTED_STATUS=$?
 set -e
@@ -106,5 +113,60 @@ set -e
     exit 1
 }
 grep -F 'refusing Rust tool outside rustup toolchains' "$TEST_DIR/rejected.txt" >/dev/null
+
+run_wrapper() {
+    CARGO_HOME="$FAKE_HOME/.cargo" RUSTUP_HOME="$RUSTUP_HOME" \
+    INKU_RUSTUP_BIN="$FAKE_HOME/.cargo/bin/rustup" \
+    INKU_RUST_GUARD_TEST_LOG="$LOG" INKU_RUST_VALIDATION_LOG="$VALIDATION_LOG" \
+    PATH="$BREW_BIN:/usr/bin:/bin" "$RUNNER" "$@"
+}
+
+# Wrapper help does not require Rust; Cargo help still goes through the guard.
+INKU_RUSTUP_BIN="$TEST_DIR/missing" "$RUNNER" --wrapper-help > "$TEST_DIR/help.txt"
+grep -F -- '--batch' "$TEST_DIR/help.txt" >/dev/null
+: > "$LOG"
+run_wrapper --help
+grep -Fx 'args=--help' "$LOG" >/dev/null
+
+# One validation for multiple commands, with exact argument boundaries retained.
+: > "$LOG"
+: > "$VALIDATION_LOG"
+run_wrapper --batch fmt --all ::: test -p example -- 'a filter with spaces' ''
+[[ "$(wc -l < "$VALIDATION_LOG" | tr -d ' ')" == 5 ]]
+grep '^args=' "$LOG" > "$TEST_DIR/actual-order.txt"
+printf '%s\n' 'args=fmt --all' 'args=test -p example -- a filter with spaces ' > "$TEST_DIR/expected-order.txt"
+cmp "$TEST_DIR/expected-order.txt" "$TEST_DIR/actual-order.txt"
+grep -Fx 'arg=<a filter with spaces>' "$LOG" >/dev/null
+grep -Fx 'arg=<>' "$LOG" >/dev/null
+
+# Preserve the first failing exit code and never execute later commands.
+: > "$LOG"
+status=0
+run_wrapper --batch check ::: fail ::: never-run || status=$?
+[[ "$status" == 37 ]]
+[[ "$(grep -c '^args=' "$LOG")" == 2 ]]
+! grep -F 'never-run' "$LOG"
+status=0
+run_wrapper fail || status=$?
+[[ "$status" == 37 ]]
+
+# Validate the complete batch before any Cargo side effects.
+for malformed in empty leading trailing consecutive; do
+    : > "$LOG"
+    case "$malformed" in
+        empty) set -- --batch ;;
+        leading) set -- --batch ::: check ;;
+        trailing) set -- --batch check ::: ;;
+        consecutive) set -- --batch check ::: ::: test ;;
+    esac
+    status=0
+    run_wrapper "$@" > "$TEST_DIR/invalid.txt" 2>&1 || status=$?
+    [[ "$status" == 2 && ! -s "$LOG" ]]
+done
+
+# A separator remains a literal argument outside explicit batch mode.
+: > "$LOG"
+run_wrapper test -- :::
+grep -Fx 'arg=<:::>' "$LOG" >/dev/null
 
 printf 'rust-toolchain guard regression: PASS\n'

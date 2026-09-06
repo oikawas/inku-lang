@@ -84,18 +84,22 @@ detaching source-independent input. It adds no condition when language evidence 
 not require an unused sidecar to resolve or execute.
 The same lock attests `inku.geometry-resolution-policy.v1`. From the verified view, the lowerer
 takes host-supplied canvas and background plus actual color-catalog observations when color is omitted.
-For circle, ellipse, cloudform, and square instructions with resolved numeric position and a place
-action, it lowers explicit numeric geometry or count-one normal geometry and the finite bilingual
-seven-class size scale, together with omitted count-one, pen, solid, fill, and background-contrast
-color, into an actual Score. Defaults never enter semantic meaning, exact rationals cross to `f64`
+For circle, ellipse, cloudform, and square instructions with a resolved numeric position or an
+original `place:center` owned by a verified direct `Instruction { instruction_index }` target, plus
+a place action, it lowers explicit numeric geometry or count-one normal geometry and the finite
+bilingual seven-class size scale, together with omitted count-one, pen, solid, fill, and
+background-contrast color, into an actual Score. Effective focus maps through the single policy's
+six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
+while the existing Renderer selects a region anchor from the performance seed and clamps base points.
+Defaults never enter semantic meaning, exact rationals cross to `f64`
 only at the final boundary, and unsupported meaning anywhere prevents a partial Score.
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
-compatibility paths, not the canonical semantic specification. Named or unspecified placement,
-omitted action, repeated allocation, remaining primitives, surfaces, grounds, relations and Score
-meaning, typed-hole blocking, and runtime cutover remain at the unconnected boundary. Reaching
-Step10E does not complete Step10 as a whole.
+compatibility paths, not the canonical semantic specification. Unspecified and non-center named
+placement, Macro Emit joining to Score, omitted action, repeated allocation, remaining primitives,
+surfaces, grounds, relations and Score meaning, typed-hole blocking, and runtime cutover remain at
+the unconnected boundary. Reaching Step10G does not complete Step10 as a whole.
 
 ## Contracts That Must Remain Intact
 

@@ -1,5 +1,5 @@
 use inku_ddl::{
-    CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate,
+    CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, FocusRegion,
     GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
     ScoreFieldGap, ScoreLoweringCandidate, ScoreLoweringContext, SemanticHead, SemanticIdentity,
@@ -8,6 +8,9 @@ use inku_ddl::{
     score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
+use inku_render::placement::region_in_short_side_units;
+use inku_render::planning::{instruction_anchor, resolve_at_region};
+use inku_render::types::CanvasSize;
 use inku_score::{
     Color, LineStyle, Point, Primitive, ResolvedPaletteColor, ResolvedPaletteContext, Weight,
 };
@@ -80,6 +83,178 @@ fn omitted_count_size_and_drawing_attributes_resolve_to_an_actual_score() {
     assert_eq!(instruction.weight, Weight::Pen);
     assert_eq!(instruction.style, LineStyle::Solid);
     assert!(instruction.filled);
+}
+
+#[test]
+fn resolved_center_focus_reaches_the_owned_actual_score_instruction() {
+    let result = stage15(
+        "place one red circle at the center.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(result.targets().len(), 1);
+    let expected_region = expected_focus_region(result.targets()[0].effective_focus);
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(
+        instruction.at.as_ref().map(|at| at.region),
+        Some(expected_region)
+    );
+    assert_eq!(instruction.radius, Some(0.12));
+    assert_eq!(instruction.center, None);
+    assert_eq!(instruction.position, None);
+}
+
+#[test]
+fn named_focus_reuses_dimensions_for_all_four_supported_closed_shapes() {
+    for (source, expected_radius, expected_size) in [
+        ("place one small red circle at center.", Some(0.06), None),
+        (
+            "place one small red ellipse at center.",
+            None,
+            Some(Point::new(0.12, 0.072)),
+        ),
+        (
+            "place one small red cloudform at center.",
+            None,
+            Some(Point::new(0.12, 0.072)),
+        ),
+        (
+            "place one small red square at center.",
+            None,
+            Some(Point::new(0.12, 0.12)),
+        ),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("a4", Color::White).unwrap(),
+        );
+
+        assert!(lowered.gaps().is_empty(), "{source}: {:?}", lowered.gaps());
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.radius, expected_radius, "{source}");
+        assert_eq!(instruction.size, expected_size, "{source}");
+        assert!(instruction.center.is_none(), "{source}");
+        assert!(instruction.position.is_none(), "{source}");
+        assert_eq!(
+            instruction.at.as_ref().map(|at| at.region),
+            Some(expected_focus_region(result.targets()[0].effective_focus)),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn japanese_and_english_center_meaning_lower_to_the_same_effective_score() {
+    let ja = stage15("赤い円を中心に置く。", ResolvedInstructionLanguage::Ja);
+    let en = stage15(
+        "place a red circle at the center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let ja_lowered = lower_verified_stage15_score(ja.verified_effective_view(), context);
+    let en_lowered = lower_verified_stage15_score(en.verified_effective_view(), context);
+
+    assert_eq!(
+        ja.original_pre_expansion_digest(),
+        en.original_pre_expansion_digest()
+    );
+    assert_eq!(
+        ja.targets()[0].effective_focus,
+        en.targets()[0].effective_focus
+    );
+    assert_eq!(ja_lowered.score(), en_lowered.score());
+    assert!(ja_lowered.gaps().is_empty());
+    assert!(en_lowered.gaps().is_empty());
+}
+
+#[test]
+fn mixed_numeric_and_center_focus_use_their_exact_instruction_owners_in_order() {
+    let result = stage15(
+        concat!(
+            "place one red circle at horizontal 0.3, vertical 0.5. ",
+            "place one blue square at center."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    assert_eq!(result.targets().len(), 1);
+    assert!(matches!(
+        result.targets()[0].path,
+        inku_ddl::Stage15TargetPath::Instruction {
+            instruction_index: 1
+        }
+    ));
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instructions = &lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 2);
+    assert_eq!(instructions[0].primitive, Primitive::Circle);
+    assert_eq!(instructions[0].center, Some(Point::new(0.3, 0.5)));
+    assert!(instructions[0].at.is_none());
+    assert_eq!(instructions[1].primitive, Primitive::Square);
+    assert!(instructions[1].position.is_none());
+    assert_eq!(
+        instructions[1].at.as_ref().map(|at| at.region),
+        Some(expected_focus_region(result.targets()[0].effective_focus))
+    );
+}
+
+#[test]
+fn actual_named_score_reaches_existing_non_square_planning_without_shape_fit() {
+    let circle_result = stage15(
+        "place one red circle radius 0.9 at the center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let square_result = stage15(
+        "place one blue square side length 0.9 at the center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let circle_lowered = lower_verified_stage15_score(
+        circle_result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    let square_lowered = lower_verified_stage15_score(
+        square_result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert!(
+        circle_lowered.gaps().is_empty(),
+        "{:?}",
+        circle_lowered.gaps()
+    );
+    assert!(
+        square_lowered.gaps().is_empty(),
+        "{:?}",
+        square_lowered.gaps()
+    );
+    let circle = &circle_lowered.score().unwrap().instructions[0];
+    let square = &square_lowered.score().unwrap().instructions[0];
+    let canvas = Some(CanvasSize::new(200.0, 1000.0));
+
+    let original_region = circle.at.as_ref().unwrap().region;
+    let performed_region = region_in_short_side_units(original_region, canvas);
+    let planned_circle = resolve_at_region(circle, -7, 0, canvas);
+    let circle_anchor = instruction_anchor(&planned_circle);
+    assert!(planned_circle.at.is_none());
+    assert_eq!(planned_circle.radius, Some(0.9));
+    assert!((performed_region[0]..=performed_region[2]).contains(&circle_anchor.x));
+    assert!((performed_region[1]..=performed_region[3]).contains(&circle_anchor.y));
+
+    let planned_square = resolve_at_region(square, -7, 1, canvas);
+    assert!(planned_square.at.is_none());
+    assert_eq!(planned_square.size, Some(Point::new(0.9, 0.9)));
+    let top_left = planned_square.position.unwrap();
+    assert!((0.0..=1.0).contains(&top_left.x));
+    assert!((0.0..=1.0).contains(&top_left.y));
 }
 
 #[test]
@@ -469,7 +644,7 @@ fn omission_color_uses_actual_palette_contrast_with_black_tie_and_explicit_value
 fn unsupported_instruction_among_independent_instructions_never_yields_partial_score() {
     let result = stage15(
         concat!(
-            "place red circle at horizontal 0.3, vertical 0.5. ",
+            "place red circle at center. ",
             "place two blue square at horizontal 0.7, vertical 0.5."
         ),
         ResolvedInstructionLanguage::En,
@@ -599,7 +774,7 @@ fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_sco
             ScoreFieldGap::GeometryExtentOutOfBounds,
         ),
         (
-            "place one red pen solid empty circle radius 0.1 at the center.",
+            "place one red pen solid empty circle radius 0.1 at left-edge.",
             Primitive::Circle,
             ScoreFieldGap::UnsupportedNamedPosition,
         ),
@@ -915,4 +1090,15 @@ fn center_emit_definition() -> MacroDefinition {
         r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"place":{"expr":"semantic_ref","category":"place","id":"left_edge"}}}]}"#,
     )
     .unwrap()
+}
+
+fn expected_focus_region(focus: FocusRegion) -> [f64; 4] {
+    match focus {
+        FocusRegion::UpperRight => [0.60, 0.18, 0.82, 0.40],
+        FocusRegion::UpperLeft => [0.18, 0.18, 0.40, 0.40],
+        FocusRegion::LowerRight => [0.60, 0.60, 0.82, 0.82],
+        FocusRegion::LowerLeft => [0.18, 0.60, 0.40, 0.82],
+        FocusRegion::UpperEdge => [0.39, 0.07, 0.61, 0.29],
+        FocusRegion::RightHalf => [0.61, 0.39, 0.83, 0.61],
+    }
 }

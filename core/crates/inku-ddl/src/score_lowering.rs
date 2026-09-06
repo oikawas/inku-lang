@@ -1,17 +1,18 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
 use inku_score::{
-    Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point, Primitive,
-    ResolvedPaletteContext, Score, Weight, lookup_canvas_format,
+    AtRegion, Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point,
+    Primitive, ResolvedPaletteContext, Score, Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
-    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, relative_scale_factor,
+    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, focus_region_bounds,
+    relative_scale_factor,
 };
 use crate::{
-    CoreModifierValue, ExactDecimal, ExactDecimalError, GEOMETRY_RESOLUTION_POLICY_ID,
+    CoreModifierValue, ExactDecimal, ExactDecimalError, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID,
     SemanticExplicitGeometry, SemanticHead, SemanticIdentity, SemanticInstruction,
-    VerifiedStage15EffectiveView, geometry_resolution_policy_digest,
+    Stage15TargetPath, VerifiedStage15EffectiveView, geometry_resolution_policy_digest,
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
@@ -290,7 +291,7 @@ pub fn lower_verified_stage15_view<'a>(
     }
 }
 
-/// Lower only a document whose every instruction has the complete explicit Step 10C subset.
+/// Lower only a document whose every instruction has the complete supported Step 10G subset.
 pub fn lower_verified_stage15_score<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
@@ -313,8 +314,20 @@ pub fn lower_verified_stage15_score<'a>(
     }
 
     let mut instructions = Vec::with_capacity(document.instructions.len());
-    for instruction in &document.instructions {
-        match lower_complete_instruction(instruction, context) {
+    for (instruction_index, instruction) in document.instructions.iter().enumerate() {
+        let effective_focus = candidate
+            .verified_effective_view()
+            .pending_focus_targets()
+            .iter()
+            .find_map(|target| match &target.path {
+                Stage15TargetPath::Instruction {
+                    instruction_index: target_index,
+                } if *target_index == instruction_index => Some(target.effective_focus),
+                Stage15TargetPath::Instruction { .. }
+                | Stage15TargetPath::GroupPredicate { .. }
+                | Stage15TargetPath::MacroEmit { .. } => None,
+            });
+        match lower_complete_instruction(instruction, effective_focus, context) {
             Ok(score_instruction) => instructions.push(score_instruction),
             Err(mut instruction_gaps) => gaps.append(&mut instruction_gaps),
         }
@@ -338,6 +351,7 @@ pub fn lower_verified_stage15_score<'a>(
 
 fn lower_complete_instruction(
     instruction: &SemanticInstruction,
+    effective_focus: Option<FocusRegion>,
     context: ScoreLoweringContext,
 ) -> Result<Instruction, Vec<ScoreFieldGap>> {
     let mut gaps = Vec::new();
@@ -375,7 +389,7 @@ fn lower_complete_instruction(
         }
         None => 1,
     };
-    debug_assert!(count <= 1, "Step 10E never materializes repeated count");
+    debug_assert!(count <= 1, "Step 10G never materializes repeated count");
 
     let color = match instruction.entity.color.as_ref() {
         Some(_) => map_score_enum::<Color>(instruction.entity.color.as_ref(), "color", &mut gaps),
@@ -413,13 +427,23 @@ fn lower_complete_instruction(
         }),
         None => gaps.push(ScoreFieldGap::MissingPlaceAction),
     }
-    if instruction.position.is_some() && instruction.entity.numeric_position.is_some() {
-        gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
-    } else if instruction.position.is_some() {
-        gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
-    } else if instruction.entity.numeric_position.is_none() {
-        gaps.push(ScoreFieldGap::MissingNumericPosition);
-    }
+    let named_focus =
+        if instruction.position.is_some() && instruction.entity.numeric_position.is_some() {
+            gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
+            None
+        } else if instruction.position.is_some() {
+            if let Some(focus) = effective_focus {
+                Some(focus)
+            } else {
+                gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
+                None
+            }
+        } else if instruction.entity.numeric_position.is_none() {
+            gaps.push(ScoreFieldGap::MissingNumericPosition);
+            None
+        } else {
+            None
+        };
     if instruction.entity.explicit_geometry.is_some() && instruction.entity.relative_scale.is_some()
     {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
@@ -452,11 +476,11 @@ fn lower_complete_instruction(
         return Err(gaps);
     }
 
-    let position = instruction
-        .entity
-        .numeric_position
-        .as_ref()
-        .expect("checked position");
+    let placement = match (instruction.entity.numeric_position.as_ref(), named_focus) {
+        (Some(position), None) => ScorePlacement::Numeric(position),
+        (None, Some(focus)) => ScorePlacement::Named(focus),
+        _ => unreachable!("checked position authority"),
+    };
     let relative_scale = instruction
         .entity
         .relative_scale
@@ -466,7 +490,7 @@ fn lower_complete_instruction(
         primitive,
         instruction.entity.explicit_geometry.as_ref(),
         relative_scale,
-        position,
+        placement,
         context.canvas_format,
     )
     .map_err(|gap| vec![gap])?;
@@ -493,7 +517,7 @@ fn lower_complete_instruction(
         color_hint: None,
         variation: None,
         arrangement: None,
-        at: None,
+        at: geometric.at,
         relation: None,
         thinness: None,
         surface: None,
@@ -555,18 +579,111 @@ fn map_score_enum<T: serde::de::DeserializeOwned>(
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct LoweredGeometry {
     center: Option<Point>,
     radius: Option<f64>,
     position: Option<Point>,
     size: Option<Point>,
+    at: Option<AtRegion>,
+}
+
+#[derive(Clone, Copy)]
+enum ScorePlacement<'a> {
+    Numeric(&'a crate::SemanticNumericPosition),
+    Named(FocusRegion),
+}
+
+#[derive(Clone, Copy)]
+enum ResolvedGeometryDimensions {
+    Circle { radius: Rational },
+    CenteredSize { width: Rational, height: Rational },
+    Square { side: Rational },
 }
 
 fn lower_geometry(
     primitive: Primitive,
     geometry: Option<&SemanticExplicitGeometry>,
     relative_scale: Option<CoreModifierValue>,
+    placement: ScorePlacement<'_>,
+    canvas: CanvasFormat,
+) -> Result<LoweredGeometry, ScoreFieldGap> {
+    let dimensions = resolve_geometry_dimensions(primitive, geometry, relative_scale)?;
+    match placement {
+        ScorePlacement::Numeric(position) => lower_numeric_geometry(dimensions, position, canvas),
+        ScorePlacement::Named(focus) => lower_named_geometry(dimensions, focus),
+    }
+}
+
+fn resolve_geometry_dimensions(
+    primitive: Primitive,
+    geometry: Option<&SemanticExplicitGeometry>,
+    relative_scale: Option<CoreModifierValue>,
+) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
+    let Some(geometry) = geometry else {
+        return resolve_normal_dimensions(
+            primitive,
+            relative_scale.unwrap_or(CoreModifierValue::Normal),
+        );
+    };
+
+    match (primitive, geometry) {
+        (Primitive::Circle, SemanticExplicitGeometry::Radius(value))
+        | (Primitive::Circle, SemanticExplicitGeometry::Diameter(value)) => {
+            let mut radius = positive(value.decimal.value)?;
+            if matches!(geometry, SemanticExplicitGeometry::Diameter(_)) {
+                radius = radius.div_i128(2)?;
+            }
+            Ok(ResolvedGeometryDimensions::Circle { radius })
+        }
+        (
+            Primitive::Ellipse | Primitive::Cloudform,
+            SemanticExplicitGeometry::WidthHeight { width, height },
+        ) => Ok(ResolvedGeometryDimensions::CenteredSize {
+            width: positive(width.decimal.value)?,
+            height: positive(height.decimal.value)?,
+        }),
+        (Primitive::Square, SemanticExplicitGeometry::Side(value)) => {
+            Ok(ResolvedGeometryDimensions::Square {
+                side: positive(value.decimal.value)?,
+            })
+        }
+        (Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square, _) => {
+            Err(ScoreFieldGap::GeometryDimensionMismatch { primitive })
+        }
+        _ => Err(ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { primitive }),
+    }
+}
+
+fn resolve_normal_dimensions(
+    primitive: Primitive,
+    relative_scale: CoreModifierValue,
+) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
+    let (factor_numerator, factor_denominator) = relative_scale_factor(relative_scale).ok_or(
+        ScoreFieldGap::UnsupportedRelativeScaleValue {
+            value: relative_scale,
+        },
+    )?;
+    let normal = Rational::from_ratio(NORMAL_SHORT_EDGE_RATIO.0, NORMAL_SHORT_EDGE_RATIO.1)?;
+    let width = normal.mul_ratio(factor_numerator, factor_denominator)?;
+    match primitive {
+        Primitive::Circle => Ok(ResolvedGeometryDimensions::Circle {
+            radius: width.div_i128(2)?,
+        }),
+        Primitive::Ellipse | Primitive::Cloudform => Ok(ResolvedGeometryDimensions::CenteredSize {
+            width,
+            height: width.mul_ratio(
+                NORMAL_ELLIPTICAL_ASPECT_RATIO.0,
+                NORMAL_ELLIPTICAL_ASPECT_RATIO.1,
+            )?,
+        }),
+        Primitive::Square => Ok(ResolvedGeometryDimensions::Square { side: width }),
+        _ => Err(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive }),
+    }
+}
+
+fn lower_numeric_geometry(
+    dimensions: ResolvedGeometryDimensions,
     position: &crate::SemanticNumericPosition,
     canvas: CanvasFormat,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
@@ -579,40 +696,18 @@ fn lower_geometry(
     let (width_units, height_units) = canvas.integer_ratio();
     let short_units = width_units.min(height_units);
 
-    let Some(geometry) = geometry else {
-        return lower_normal_geometry(
-            primitive,
-            relative_scale.unwrap_or(CoreModifierValue::Normal),
-            x,
-            y,
-            center,
-            width_units,
-            height_units,
-            short_units,
-        );
-    };
-
-    match (primitive, geometry) {
-        (Primitive::Circle, SemanticExplicitGeometry::Radius(value))
-        | (Primitive::Circle, SemanticExplicitGeometry::Diameter(value)) => {
-            let mut radius = positive(value.decimal.value)?;
-            if matches!(geometry, SemanticExplicitGeometry::Diameter(_)) {
-                radius = radius.div_i128(2)?;
-            }
+    match dimensions {
+        ResolvedGeometryDimensions::Circle { radius } => {
             ensure_centered_extent(x, y, radius, radius, width_units, height_units, short_units)?;
             Ok(LoweredGeometry {
                 center: Some(center),
                 radius: Some(radius.to_f64()?),
                 position: None,
                 size: None,
+                at: None,
             })
         }
-        (
-            Primitive::Ellipse | Primitive::Cloudform,
-            SemanticExplicitGeometry::WidthHeight { width, height },
-        ) => {
-            let width = positive(width.decimal.value)?;
-            let height = positive(height.decimal.value)?;
+        ResolvedGeometryDimensions::CenteredSize { width, height } => {
             ensure_centered_extent(
                 x,
                 y,
@@ -627,10 +722,10 @@ fn lower_geometry(
                 radius: None,
                 position: None,
                 size: Some(Point::new(width.to_f64()?, height.to_f64()?)),
+                at: None,
             })
         }
-        (Primitive::Square, SemanticExplicitGeometry::Side(value)) => {
-            let side = positive(value.decimal.value)?;
+        ResolvedGeometryDimensions::Square { side } => {
             let half = side.div_i128(2)?;
             let extent_x = half.mul_ratio(i128::from(short_units), i128::from(width_units))?;
             let extent_y = half.mul_ratio(i128::from(short_units), i128::from(height_units))?;
@@ -650,87 +745,34 @@ fn lower_geometry(
                 radius: None,
                 position: Some(Point::new(top_left_x.to_f64()?, top_left_y.to_f64()?)),
                 size: Some(Point::new(side.to_f64()?, side.to_f64()?)),
+                at: None,
             })
         }
-        (Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square, _) => {
-            Err(ScoreFieldGap::GeometryDimensionMismatch { primitive })
-        }
-        _ => Err(ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { primitive }),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_normal_geometry(
-    primitive: Primitive,
-    relative_scale: CoreModifierValue,
-    x: Rational,
-    y: Rational,
-    center: Point,
-    width_units: u32,
-    height_units: u32,
-    short_units: u32,
+fn lower_named_geometry(
+    dimensions: ResolvedGeometryDimensions,
+    focus: FocusRegion,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
-    let (factor_numerator, factor_denominator) = relative_scale_factor(relative_scale).ok_or(
-        ScoreFieldGap::UnsupportedRelativeScaleValue {
-            value: relative_scale,
-        },
-    )?;
-    let normal = Rational::from_ratio(NORMAL_SHORT_EDGE_RATIO.0, NORMAL_SHORT_EDGE_RATIO.1)?;
-    let width = normal.mul_ratio(factor_numerator, factor_denominator)?;
-    match primitive {
-        Primitive::Circle => {
-            let radius = width.div_i128(2)?;
-            ensure_centered_extent(x, y, radius, radius, width_units, height_units, short_units)?;
-            Ok(LoweredGeometry {
-                center: Some(center),
-                radius: Some(radius.to_f64()?),
-                position: None,
-                size: None,
-            })
+    let (radius, size) = match dimensions {
+        ResolvedGeometryDimensions::Circle { radius } => (Some(radius.to_f64()?), None),
+        ResolvedGeometryDimensions::CenteredSize { width, height } => {
+            (None, Some(Point::new(width.to_f64()?, height.to_f64()?)))
         }
-        Primitive::Ellipse | Primitive::Cloudform => {
-            let height = width.mul_ratio(
-                NORMAL_ELLIPTICAL_ASPECT_RATIO.0,
-                NORMAL_ELLIPTICAL_ASPECT_RATIO.1,
-            )?;
-            ensure_centered_extent(
-                x,
-                y,
-                width.div_i128(2)?,
-                height.div_i128(2)?,
-                width_units,
-                height_units,
-                short_units,
-            )?;
-            Ok(LoweredGeometry {
-                center: Some(center),
-                radius: None,
-                position: None,
-                size: Some(Point::new(width.to_f64()?, height.to_f64()?)),
-            })
+        ResolvedGeometryDimensions::Square { side } => {
+            (None, Some(Point::new(side.to_f64()?, side.to_f64()?)))
         }
-        Primitive::Square => {
-            let half = width.div_i128(2)?;
-            let extent_x = half.mul_ratio(i128::from(short_units), i128::from(width_units))?;
-            let extent_y = half.mul_ratio(i128::from(short_units), i128::from(height_units))?;
-            let top_left_x = x.sub(extent_x)?;
-            let top_left_y = y.sub(extent_y)?;
-            if !top_left_x.in_unit_interval()
-                || !top_left_y.in_unit_interval()
-                || !top_left_x.add(extent_x.mul_i128(2)?)?.in_unit_interval()
-                || !top_left_y.add(extent_y.mul_i128(2)?)?.in_unit_interval()
-            {
-                return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
-            }
-            Ok(LoweredGeometry {
-                center: None,
-                radius: None,
-                position: Some(Point::new(top_left_x.to_f64()?, top_left_y.to_f64()?)),
-                size: Some(Point::new(width.to_f64()?, width.to_f64()?)),
-            })
-        }
-        _ => Err(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive }),
-    }
+    };
+    Ok(LoweredGeometry {
+        center: None,
+        radius,
+        position: None,
+        size,
+        at: Some(AtRegion {
+            region: focus_region_bounds(focus),
+        }),
+    })
 }
 
 fn positive(value: ExactDecimal) -> Result<Rational, ScoreFieldGap> {

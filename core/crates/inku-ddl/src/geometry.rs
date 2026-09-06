@@ -1,25 +1,33 @@
 //! Structured explicit geometry meaning and the shared resolution policy.
 
 use std::collections::BTreeSet;
+use std::fmt::Write;
+use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
 
 use crate::{
     ClauseAtom, ClauseSegment, ExactDecimal, NormalizedDdlDocument, SourceOccurrence, SourceSpan,
+    stage15_transform::FocusRegion,
 };
 
 pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy.v1";
 
-const GEOMETRY_RESOLUTION_POLICY_CANONICAL_JSON: &str = concat!(
+const GEOMETRY_RESOLUTION_POLICY_PREFIX: &str = concat!(
     "{\"anchor\":{\"closed_primitive\":\"center\",\"square_score\":\"top_left_from_center\"},",
     "\"author_resolved_omission\":{\"color\":{\"choice\":\"max_oklch_lightness_distance\",",
     "\"tie\":\"black\"},\"continuity\":\"solid\",\"count\":1,",
     "\"surface\":\"filled\",\"touch\":\"pen\"},",
-    "\"bounds\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"},",
+    "\"bounds\":{\"named\":{\"anchor\":\"performance_seed_in_region\",",
+    "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
+    "\"numeric\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"axis_position\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
-    "\"score_conversion\":\"single_final_f64_boundary\"},",
+    "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
+);
+const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
+    "},",
     "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
     "\"basis\":\"canvas_short_edge\",\"count\":1,\"width_or_diameter\":\"6/25\"},",
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
@@ -29,8 +37,25 @@ const GEOMETRY_RESOLUTION_POLICY_CANONICAL_JSON: &str = concat!(
     "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
 );
 
+const FOCUS_REGION_BOUNDS_HUNDREDTHS: [(FocusRegion, [u8; 4]); 6] = [
+    (FocusRegion::UpperRight, [60, 18, 82, 40]),
+    (FocusRegion::UpperLeft, [18, 18, 40, 40]),
+    (FocusRegion::LowerRight, [60, 60, 82, 82]),
+    (FocusRegion::LowerLeft, [18, 60, 40, 82]),
+    (FocusRegion::UpperEdge, [39, 7, 61, 29]),
+    (FocusRegion::RightHalf, [61, 39, 83, 61]),
+];
+
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
 pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
+
+pub(crate) fn focus_region_bounds(focus: FocusRegion) -> [f64; 4] {
+    let bounds = FOCUS_REGION_BOUNDS_HUNDREDTHS
+        .iter()
+        .find_map(|(candidate, bounds)| (*candidate == focus).then_some(*bounds))
+        .expect("the closed focus vocabulary has one geometry-policy region");
+    bounds.map(|coordinate| f64::from(coordinate) / 100.0)
+}
 
 pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Option<(i128, i128)> {
     match value {
@@ -46,7 +71,33 @@ pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Op
 }
 
 pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
-    GEOMETRY_RESOLUTION_POLICY_CANONICAL_JSON.as_bytes()
+    static CANONICAL_JSON: OnceLock<String> = OnceLock::new();
+    CANONICAL_JSON
+        .get_or_init(|| {
+            let mut canonical = String::from(GEOMETRY_RESOLUTION_POLICY_PREFIX);
+            for (index, (focus, bounds)) in FOCUS_REGION_BOUNDS_HUNDREDTHS.iter().enumerate() {
+                if index > 0 {
+                    canonical.push(',');
+                }
+                write!(
+                    canonical,
+                    "\"{}\":[{}.{:02},{}.{:02},{}.{:02},{}.{:02}]",
+                    focus.as_str(),
+                    bounds[0] / 100,
+                    bounds[0] % 100,
+                    bounds[1] / 100,
+                    bounds[1] % 100,
+                    bounds[2] / 100,
+                    bounds[2] % 100,
+                    bounds[3] / 100,
+                    bounds[3] % 100,
+                )
+                .expect("writing canonical geometry policy to a String cannot fail");
+            }
+            canonical.push_str(GEOMETRY_RESOLUTION_POLICY_SUFFIX);
+            canonical
+        })
+        .as_bytes()
 }
 
 pub fn geometry_resolution_policy_digest() -> String {
@@ -436,13 +487,28 @@ mod tests {
         assert_eq!(payload["numeric_basis"]["size"], "canvas_short_edge");
         assert_eq!(payload["numeric_basis"]["position"], "canvas_axes");
         assert_eq!(payload["anchor"]["square_score"], "top_left_from_center");
-        assert_eq!(
-            payload["unimplemented"],
-            serde_json::json!(["normal_geometry", "qualitative_factors"])
-        );
+        assert_eq!(payload["bounds"]["numeric"]["extent"], "must_fit");
+        assert_eq!(payload["bounds"]["named"]["extent"], "not_must_fit");
+        assert_eq!(payload["unimplemented"], serde_json::json!([]));
+        for (focus, expected) in [
+            (FocusRegion::UpperRight, [0.60, 0.18, 0.82, 0.40]),
+            (FocusRegion::UpperLeft, [0.18, 0.18, 0.40, 0.40]),
+            (FocusRegion::LowerRight, [0.60, 0.60, 0.82, 0.82]),
+            (FocusRegion::LowerLeft, [0.18, 0.60, 0.40, 0.82]),
+            (FocusRegion::UpperEdge, [0.39, 0.07, 0.61, 0.29]),
+            (FocusRegion::RightHalf, [0.61, 0.39, 0.83, 0.61]),
+        ] {
+            let actual = focus_region_bounds(focus);
+            assert_eq!(actual, expected);
+            assert!(actual.into_iter().all(f64::is_finite));
+            assert_eq!(
+                payload["focus_regions"][focus.as_str()],
+                serde_json::json!(expected)
+            );
+        }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "53f34ed5674f60f1d39c1e8cd31d32426be58c4b9c8e6eb06303b5b4b8612117"
+            "2485cacd3df46a645b5ad01d9966768ebb5e9ff897e0b1232377c17d0de4164d"
         );
     }
 }

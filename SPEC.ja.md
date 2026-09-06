@@ -100,7 +100,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる |
 
-ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決するStep10Eの現行subsetだけは、数値位置とplace actionが明示されたcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決をsource meaningへ書き戻さない。この規則は Renderer 内部の物理 fallback や既存作品の read compatibility を遡及変更しない。
+ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決するStep10Gの現行subsetだけは、数値位置、またはverified Stage 1.5でdirect `Instruction { instruction_index }`へ解決済みの元`place:center`と、place actionを持つcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決やeffective focusをsource meaningへ書き戻さない。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
 図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
 
@@ -838,7 +838,7 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 - 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり等の省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
 - 図形の大小は普通 / 小さい / 大きいと弱・標準・強を組み合わせた有限7classの局所modifierとして記し、明示normalと省略を区別する。数値geometryとqualitative sizeの併記、unknown degree、曖昧なownerはtyped conflict / issueにする
 - ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
-- Step10Eのactual Score lowererは、数値位置とplace actionが解決済みのcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。対象外の意味や必要なpalette contextの欠落はtyped gapにし、partial Scoreを成功扱いしない。このRust経路は製品runtimeにはまだ接続しない
+- Step10Gのactual Score lowererは、数値位置、またはverified Stage 1.5のdirect instruction ownerへ解決済みの元`place:center`と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったままeffective focusを`at.region`へ置き、対象外の意味や必要なpalette contextの欠落はtyped gapにしてpartial Scoreを成功扱いしない。このRust経路は製品runtimeにはまだ接続しない
 
 ### 12.5 モデル分割
 
@@ -878,12 +878,13 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 原文、正規化 DDL、元の typed meaning、effective meaning、source / generated provenance を別々に保ち、元の意味や明示属性を上書きしない
 - 新しい sentence、entity、relation、technique、color、touch、primitive、content を発明しない
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
+- verified viewをactual Scoreへ下ろすときは、元のtyped instructionと同じindexを持つdirect `Instruction { instruction_index }` targetだけがそのinstructionを所有する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
 - baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
 - Stage 1.5の入力を切り離す前に、実際のvisible DDLのUTF-8 bytes、semantic source occurrenceに残る言語証跡、未使用分を含む全macro sidecarの三項、実行macroのresolved / binding / semantic head identityをcompiler lockと照合する。SourceOccurrenceがない入力へ新しい言語条件を課さず、未使用sidecarにresolutionや実行を要求しない。Sourceとprovenanceは入場時のintegrity証拠であり、meaningやfocusの材料ではない
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v4 の typed foundation とR1 / R2 / D1は実装済みだが runtime には未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。このコード到達を独立review前のStep 9 COMPLETEとはしない。現行 Python 経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。受け入れ済み primitive と runtime 接続済み機能を混同しない。
+sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、およびdirect instructionのeffective focusをactual Scoreへ運ぶStep10G subsetは実装済みだがruntimeには未接続である。D1はinline / continuationのcanonical meaning、意味解決後のmacro実行ordinal、expanded / effective identityを同期し、source / generated provenanceを別に保持する。Source-only field candidateがfocus overlayを観測できることと、effective Scoreの成功は別である。現行Python経路はcutoverまでの互換実装であり、同じ無発明・焦点限定契約に従う。Macro Emit結合、parity、plugin-specific deliveryのretire、残るposition / primitive / surface / ground等を完了済みとしない。
 
 ### 12.12 添景と互換記録
 
@@ -1590,13 +1591,17 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行Step10E subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行Step10G subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
 Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、そのidentity / digestは`inku.geometry-resolution-policy.v1`である。Compiler lockはこのidentity / digestを参照・attestし、`ddl_engine_version`はactivation metadataに限定する。`size_rule_version`や二重ownerを作らない。
 
-現行Step10E subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先し、未対応意味が一つでも残る文書はactual Scoreを返さない。Lowering resultは使ったcanvas / background / resolved palette contextとpolicy digestを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultを挿入しない。
+同じpolicyがeffective focusを`at.region`へ写す六値も所有する: `upper_right=[0.60,0.18,0.82,0.40]`、`upper_left=[0.18,0.18,0.40,0.40]`、`lower_right=[0.60,0.60,0.82,0.82]`、`lower_left=[0.18,0.60,0.40,0.82]`、`upper_edge=[0.39,0.07,0.61,0.29]`、`right_half=[0.61,0.39,0.83,0.61]`である。Named Score instructionは`center` / `position`を持たず、解決済みの`radius` / `size`と`at.region`を持つ。数値positionだけはanchorのunit intervalとshape extentのmust-fitを検査する。Named経路はregionをshape-safe範囲と交差させず、寸法の縮小、fit目的の再配置・再抽選、空intersection停止を行わない。
+
+作者A裁定では見切れを許す。既存Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。同じScore / optionsに対するRenderer semanticsは変えない。
+
+現行Step10G subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先し、未対応意味が一つでも残る文書はactual Scoreを返さない。Lowering resultは使ったcanvas / background / resolved palette contextとpolicy digestを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
 
@@ -1646,7 +1651,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置とplace actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたはStep10Eのnormal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、symbolic candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたはStep10Gのnormal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、symbolic candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 
@@ -1672,7 +1677,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v4に反映済みだがruntimeには未接続である。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点だけを選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningを再現する。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v5に反映済みだがruntimeには未接続である。
 
 v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
 

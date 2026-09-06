@@ -1,29 +1,12 @@
-"""Guard the properties the published documents cannot check for themselves.
+"""Check published Markdown invariants before merging documentation changes.
 
-Nothing in this repository checks documentation. ``npm run lint:i18n`` reads the
-web display strings and never opens a markdown file; CI regenerates the frozen
-corpora and runs neither ``pytest`` nor any document check. So the three ways the
-documents actually break have all been found by hand, after the fact:
-
-* **the two language versions drift.** The rule is that ``*.ja.md`` is the
-  original and the English version follows it. When only one side is edited the
-  break is invisible until a reader compares them. A shape mismatch reports the
-  first differing heading ordinal, level, and source line on both sides.
-* **a published document links to a path that is not published.** ``docs/`` is
-  excluded by ``.gitignore`` except for the directories re-included by name, so
-  a link into ``docs/`` or ``no-git-sync/`` resolves on the author's disk and
-  404s on GitHub. ``CHANGELOG.md`` has linked to ``docs/inku-dev-conventions.md``
-  since Build 634 that way.
-* **the English drifts from the glossary.** ``web/src/lib/i18n/GLOSSARY.md`` is
-  the canonical source for every English word in the project, but the only
-  machine that reads it is ``npm run lint:i18n``, which opens ``en.ts`` and the
-  web components and no markdown file at all. Twenty-four lines across five
-  published documents still said ``artwork`` and ``palette`` on 2026-08-09,
-  while the Japanese originals were already right (ledger I-161).
-
-Run it from ``server/`` before merging a documentation change:
+Run it from ``server/``:
 
     uv run python scripts/check_docs.py
+
+The gate compares the Japanese originals with their English counterparts,
+checks that published links stay within published paths, and applies the
+English glossary. It reports source locations for actionable fixes.
 
 **Declared exceptions are the point.** Where the two versions legitimately
 differ, say so in ``PAIRS`` with a reason. An undeclared difference fails. This
@@ -576,7 +559,13 @@ def check_links(tracked: set[str]) -> list[str]:
             for target in LINK.findall(line):
                 if target.startswith(("http://", "https://", "#", "mailto:")):
                     continue
-                resolved = _normalise(base, target.split("#", 1)[0])
+                try:
+                    resolved = _normalise(base, target.split("#", 1)[0])
+                except ValueError:
+                    problems.append(
+                        f"{name}:{number}: relative link escapes the repository root: {target}"
+                    )
+                    continue
                 if not resolved:
                     continue
                 if not (REPO_ROOT / resolved).exists():
@@ -600,8 +589,9 @@ def _normalise(base: pathlib.PurePosixPath, target: str) -> str | None:
     parts: list[str] = []
     for part in joined.parts:
         if part == "..":
-            if parts:
-                parts.pop()
+            if not parts:
+                raise ValueError("relative link escapes the repository root")
+            parts.pop()
         elif part != ".":
             parts.append(part)
     return "/".join(parts) if parts else None

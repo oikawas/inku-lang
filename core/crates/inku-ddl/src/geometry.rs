@@ -12,15 +12,38 @@ pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy
 
 const GEOMETRY_RESOLUTION_POLICY_CANONICAL_JSON: &str = concat!(
     "{\"anchor\":{\"closed_primitive\":\"center\",\"square_score\":\"top_left_from_center\"},",
+    "\"author_resolved_omission\":{\"color\":{\"choice\":\"max_oklch_lightness_distance\",",
+    "\"tie\":\"black\"},\"continuity\":\"solid\",\"count\":1,",
+    "\"surface\":\"filled\",\"touch\":\"pen\"},",
     "\"bounds\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"axis_position\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},",
+    "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
+    "\"basis\":\"canvas_short_edge\",\"count\":1,\"width_or_diameter\":\"6/25\"},",
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
     "\"policy\":\"inku.geometry-resolution-policy.v1\",",
-    "\"unimplemented\":[\"normal_geometry\",\"qualitative_factors\"]}"
+    "\"relative_scale\":{\"large\":\"3/2\",\"normal\":\"1/1\",",
+    "\"slightly_large\":\"5/4\",\"slightly_small\":\"3/4\",\"small\":\"1/2\",",
+    "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
 );
+
+pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
+pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
+
+pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Option<(i128, i128)> {
+    match value {
+        crate::CoreModifierValue::SlightlySmall => Some((3, 4)),
+        crate::CoreModifierValue::Small => Some((1, 2)),
+        crate::CoreModifierValue::VerySmall => Some((3, 8)),
+        crate::CoreModifierValue::Normal => Some((1, 1)),
+        crate::CoreModifierValue::SlightlyLarge => Some((5, 4)),
+        crate::CoreModifierValue::Large => Some((3, 2)),
+        crate::CoreModifierValue::VeryLarge => Some((7, 4)),
+        crate::CoreModifierValue::Fine => None,
+    }
+}
 
 pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
     GEOMETRY_RESOLUTION_POLICY_CANONICAL_JSON.as_bytes()

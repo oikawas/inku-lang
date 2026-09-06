@@ -1,10 +1,13 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
 use inku_score::{
-    Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point, Primitive, Score,
-    Weight, lookup_canvas_format,
+    Canvas, CanvasFormat, Color, Instruction, InstructionMode, LineStyle, Point, Primitive,
+    ResolvedPaletteContext, Score, Weight, lookup_canvas_format,
 };
 
+use crate::geometry::{
+    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, relative_scale_factor,
+};
 use crate::{
     CoreModifierValue, ExactDecimal, ExactDecimalError, GEOMETRY_RESOLUTION_POLICY_ID,
     SemanticExplicitGeometry, SemanticHead, SemanticIdentity, SemanticInstruction,
@@ -12,8 +15,8 @@ use crate::{
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
-pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v1";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v1";
+pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v2";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,13 +74,6 @@ impl ExactCountFieldCandidate {
     }
 }
 
-/// The only explicit-small Score fields with authoritatively fixed values.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ExplicitSmallSizeFieldCandidate {
-    CircleRadius(f64),
-    EllipseSize(Point),
-}
-
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreFieldGap {
@@ -92,6 +88,7 @@ pub enum ScoreFieldGap {
     MissingExplicitGeometry,
     MissingNumericPosition,
     MissingColor,
+    MissingResolvedPaletteContext,
     MissingTouch,
     MissingContinuity,
     MissingEmptySurface,
@@ -114,10 +111,11 @@ pub enum ScoreFieldGap {
 }
 
 /// Explicit host-owned context. Canvas identity is resolved through the shared registry.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScoreLoweringContext {
     canvas_format: CanvasFormat,
     background: Color,
+    resolved_palette: Option<ResolvedPaletteContext>,
 }
 
 impl ScoreLoweringContext {
@@ -130,7 +128,34 @@ impl ScoreLoweringContext {
         Ok(Self {
             canvas_format: *canvas_format,
             background,
+            resolved_palette: None,
         })
+    }
+
+    pub fn resolve_with_palette(
+        canvas_format_id: &str,
+        background: Color,
+        resolved_palette: ResolvedPaletteContext,
+    ) -> Result<Self, ScoreLoweringContextError> {
+        let mut context = Self::resolve(canvas_format_id, background)?;
+        if resolved_palette.background().abstract_color() != background
+            || resolved_palette.black().abstract_color() != Color::Black
+            || resolved_palette.white().abstract_color() != Color::White
+        {
+            return Err(ScoreLoweringContextError::ResolvedPaletteRoleMismatch);
+        }
+        if [
+            resolved_palette.background().oklch_lightness(),
+            resolved_palette.black().oklch_lightness(),
+            resolved_palette.white().oklch_lightness(),
+        ]
+        .into_iter()
+        .any(|lightness| !lightness.is_finite() || !(0.0..=1.0).contains(&lightness))
+        {
+            return Err(ScoreLoweringContextError::InvalidResolvedPaletteLightness);
+        }
+        context.resolved_palette = Some(resolved_palette);
+        Ok(context)
     }
 
     pub const fn canvas_format(self) -> CanvasFormat {
@@ -140,11 +165,17 @@ impl ScoreLoweringContext {
     pub const fn background(self) -> Color {
         self.background
     }
+
+    pub const fn resolved_palette(self) -> Option<ResolvedPaletteContext> {
+        self.resolved_palette
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScoreLoweringContextError {
     UnknownCanvasFormat,
+    ResolvedPaletteRoleMismatch,
+    InvalidResolvedPaletteLightness,
 }
 
 /// Candidate evidence plus an all-or-nothing actual Score outcome.
@@ -193,7 +224,7 @@ pub struct ScoreInstructionFieldCandidate {
     source_instruction_index: usize,
     primitive: Option<Primitive>,
     exact_count: Option<ExactCountFieldCandidate>,
-    explicit_small_size: Option<ExplicitSmallSizeFieldCandidate>,
+    relative_scale: Option<CoreModifierValue>,
     gaps: Vec<ScoreFieldGap>,
 }
 
@@ -210,8 +241,8 @@ impl ScoreInstructionFieldCandidate {
         self.exact_count
     }
 
-    pub const fn explicit_small_size(&self) -> Option<ExplicitSmallSizeFieldCandidate> {
-        self.explicit_small_size
+    pub const fn relative_scale(&self) -> Option<CoreModifierValue> {
+        self.relative_scale
     }
 
     pub fn gaps(&self) -> &[ScoreFieldGap] {
@@ -342,28 +373,38 @@ fn lower_complete_instruction(
             gaps.push(ScoreFieldGap::ExactCountExceedsScoreRange { value });
             0
         }
-        None => {
-            gaps.push(ScoreFieldGap::MissingExactCount);
-            0
-        }
+        None => 1,
     };
-    debug_assert!(count <= 1, "Step 10C never materializes repeated count");
+    debug_assert!(count <= 1, "Step 10E never materializes repeated count");
 
-    let color = map_score_enum::<Color>(instruction.entity.color.as_ref(), "color", &mut gaps);
-    let weight = map_score_enum::<Weight>(instruction.entity.touch.as_ref(), "touch", &mut gaps);
-    let style = map_score_enum::<LineStyle>(
-        instruction.entity.continuity.as_ref(),
-        "continuity",
-        &mut gaps,
-    );
-    match instruction.entity.surface.quality.as_ref() {
-        Some(term) if term.identity.category == "surface" && term.identity.id == "none" => {}
-        Some(term) => gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
-            category: term.identity.category.clone(),
-            id: term.identity.id.clone(),
-        }),
-        None => gaps.push(ScoreFieldGap::MissingEmptySurface),
-    }
+    let color = match instruction.entity.color.as_ref() {
+        Some(_) => map_score_enum::<Color>(instruction.entity.color.as_ref(), "color", &mut gaps),
+        None => resolve_omitted_color(context, &mut gaps),
+    };
+    let weight = match instruction.entity.touch.as_ref() {
+        Some(_) => map_score_enum::<Weight>(instruction.entity.touch.as_ref(), "touch", &mut gaps),
+        None => Some(Weight::Pen),
+    };
+    let style = match instruction.entity.continuity.as_ref() {
+        Some(_) => map_score_enum::<LineStyle>(
+            instruction.entity.continuity.as_ref(),
+            "continuity",
+            &mut gaps,
+        ),
+        None => Some(LineStyle::Solid),
+    };
+    let filled = match instruction.entity.surface.quality.as_ref() {
+        Some(term) if term.identity.category == "surface" && term.identity.id == "none" => false,
+        Some(term) if term.identity.category == "surface" && term.identity.id == "solid" => true,
+        Some(term) => {
+            gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
+                category: term.identity.category.clone(),
+                id: term.identity.id.clone(),
+            });
+            false
+        }
+        None => true,
+    };
     match instruction.action.as_ref() {
         Some(term) if term.identity.category == "movement" && term.identity.id == "place" => {}
         Some(term) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
@@ -379,11 +420,22 @@ fn lower_complete_instruction(
     } else if instruction.entity.numeric_position.is_none() {
         gaps.push(ScoreFieldGap::MissingNumericPosition);
     }
-    if instruction.entity.explicit_geometry.is_none() {
-        gaps.push(ScoreFieldGap::MissingExplicitGeometry);
+    if instruction.entity.explicit_geometry.is_some() && instruction.entity.relative_scale.is_some()
+    {
+        gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+    } else if instruction.entity.explicit_geometry.is_none()
+        && !matches!(
+            primitive,
+            Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square
+        )
+    {
+        if instruction.entity.relative_scale.is_some() {
+            gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });
+        } else {
+            gaps.push(ScoreFieldGap::MissingExplicitGeometry);
+        }
     }
     if instruction.entity.thinness.is_some()
-        || instruction.entity.relative_scale.is_some()
         || instruction.entity.angle.is_some()
         || instruction.entity.surface.intensity.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
@@ -405,13 +457,19 @@ fn lower_complete_instruction(
         .numeric_position
         .as_ref()
         .expect("checked position");
-    let geometry = instruction
+    let relative_scale = instruction
         .entity
-        .explicit_geometry
+        .relative_scale
         .as_ref()
-        .expect("checked geometry");
-    let geometric = lower_geometry(primitive, geometry, position, context.canvas_format)
-        .map_err(|gap| vec![gap])?;
+        .map(|relative_scale| relative_scale.value);
+    let geometric = lower_geometry(
+        primitive,
+        instruction.entity.explicit_geometry.as_ref(),
+        relative_scale,
+        position,
+        context.canvas_format,
+    )
+    .map_err(|gap| vec![gap])?;
 
     Ok(Instruction {
         primitive,
@@ -426,7 +484,7 @@ fn lower_complete_instruction(
         angle_start: None,
         angle_end: None,
         rotation: None,
-        filled: false,
+        filled,
         style: style.expect("checked continuity"),
         weight: weight.expect("checked touch"),
         mode_: InstructionMode::Additive,
@@ -439,6 +497,24 @@ fn lower_complete_instruction(
         relation: None,
         thinness: None,
         surface: None,
+    })
+}
+
+fn resolve_omitted_color(
+    context: ScoreLoweringContext,
+    gaps: &mut Vec<ScoreFieldGap>,
+) -> Option<Color> {
+    let Some(resolved_palette) = context.resolved_palette else {
+        gaps.push(ScoreFieldGap::MissingResolvedPaletteContext);
+        return None;
+    };
+    let background = resolved_palette.background().oklch_lightness();
+    let black_distance = (background - resolved_palette.black().oklch_lightness()).abs();
+    let white_distance = (background - resolved_palette.white().oklch_lightness()).abs();
+    Some(if black_distance >= white_distance {
+        Color::Black
+    } else {
+        Color::White
     })
 }
 
@@ -489,7 +565,8 @@ struct LoweredGeometry {
 
 fn lower_geometry(
     primitive: Primitive,
-    geometry: &SemanticExplicitGeometry,
+    geometry: Option<&SemanticExplicitGeometry>,
+    relative_scale: Option<CoreModifierValue>,
     position: &crate::SemanticNumericPosition,
     canvas: CanvasFormat,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
@@ -501,6 +578,19 @@ fn lower_geometry(
     let center = Point::new(x.to_f64()?, y.to_f64()?);
     let (width_units, height_units) = canvas.integer_ratio();
     let short_units = width_units.min(height_units);
+
+    let Some(geometry) = geometry else {
+        return lower_normal_geometry(
+            primitive,
+            relative_scale.unwrap_or(CoreModifierValue::Normal),
+            x,
+            y,
+            center,
+            width_units,
+            height_units,
+            short_units,
+        );
+    };
 
     match (primitive, geometry) {
         (Primitive::Circle, SemanticExplicitGeometry::Radius(value))
@@ -569,6 +659,80 @@ fn lower_geometry(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn lower_normal_geometry(
+    primitive: Primitive,
+    relative_scale: CoreModifierValue,
+    x: Rational,
+    y: Rational,
+    center: Point,
+    width_units: u32,
+    height_units: u32,
+    short_units: u32,
+) -> Result<LoweredGeometry, ScoreFieldGap> {
+    let (factor_numerator, factor_denominator) = relative_scale_factor(relative_scale).ok_or(
+        ScoreFieldGap::UnsupportedRelativeScaleValue {
+            value: relative_scale,
+        },
+    )?;
+    let normal = Rational::from_ratio(NORMAL_SHORT_EDGE_RATIO.0, NORMAL_SHORT_EDGE_RATIO.1)?;
+    let width = normal.mul_ratio(factor_numerator, factor_denominator)?;
+    match primitive {
+        Primitive::Circle => {
+            let radius = width.div_i128(2)?;
+            ensure_centered_extent(x, y, radius, radius, width_units, height_units, short_units)?;
+            Ok(LoweredGeometry {
+                center: Some(center),
+                radius: Some(radius.to_f64()?),
+                position: None,
+                size: None,
+            })
+        }
+        Primitive::Ellipse | Primitive::Cloudform => {
+            let height = width.mul_ratio(
+                NORMAL_ELLIPTICAL_ASPECT_RATIO.0,
+                NORMAL_ELLIPTICAL_ASPECT_RATIO.1,
+            )?;
+            ensure_centered_extent(
+                x,
+                y,
+                width.div_i128(2)?,
+                height.div_i128(2)?,
+                width_units,
+                height_units,
+                short_units,
+            )?;
+            Ok(LoweredGeometry {
+                center: Some(center),
+                radius: None,
+                position: None,
+                size: Some(Point::new(width.to_f64()?, height.to_f64()?)),
+            })
+        }
+        Primitive::Square => {
+            let half = width.div_i128(2)?;
+            let extent_x = half.mul_ratio(i128::from(short_units), i128::from(width_units))?;
+            let extent_y = half.mul_ratio(i128::from(short_units), i128::from(height_units))?;
+            let top_left_x = x.sub(extent_x)?;
+            let top_left_y = y.sub(extent_y)?;
+            if !top_left_x.in_unit_interval()
+                || !top_left_y.in_unit_interval()
+                || !top_left_x.add(extent_x.mul_i128(2)?)?.in_unit_interval()
+                || !top_left_y.add(extent_y.mul_i128(2)?)?.in_unit_interval()
+            {
+                return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
+            }
+            Ok(LoweredGeometry {
+                center: None,
+                radius: None,
+                position: Some(Point::new(top_left_x.to_f64()?, top_left_y.to_f64()?)),
+                size: Some(Point::new(width.to_f64()?, width.to_f64()?)),
+            })
+        }
+        _ => Err(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive }),
+    }
+}
+
 fn positive(value: ExactDecimal) -> Result<Rational, ScoreFieldGap> {
     if !value.is_positive() {
         return Err(ScoreFieldGap::NonPositiveDimension);
@@ -604,6 +768,16 @@ struct Rational {
 }
 
 impl Rational {
+    fn from_ratio(numerator: i128, denominator: i128) -> Result<Self, ScoreFieldGap> {
+        if denominator <= 0 {
+            return Err(ScoreFieldGap::GeometryRepresentationLimit);
+        }
+        Ok(Self {
+            numerator,
+            denominator,
+        })
+    }
+
     fn from_decimal(value: ExactDecimal) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: value.coefficient(),
@@ -721,7 +895,7 @@ fn lower_source_instruction(
                 source_instruction_index,
                 primitive: None,
                 exact_count: None,
-                explicit_small_size: None,
+                relative_scale: None,
                 gaps,
             };
         }
@@ -747,25 +921,27 @@ fn lower_source_instruction(
                 }
             });
 
-    let explicit_small_size = instruction
+    let relative_scale = instruction
         .entity
         .relative_scale
         .as_ref()
-        .and_then(|scale| match (scale.value, primitive) {
-            (CoreModifierValue::Small, Some(Primitive::Circle)) => {
-                Some(ExplicitSmallSizeFieldCandidate::CircleRadius(0.038))
+        .and_then(|scale| {
+            if relative_scale_factor(scale.value).is_none() {
+                gaps.push(ScoreFieldGap::UnsupportedRelativeScaleValue { value: scale.value });
+                return None;
             }
-            (CoreModifierValue::Small, Some(Primitive::Ellipse)) => Some(
-                ExplicitSmallSizeFieldCandidate::EllipseSize(Point::new(0.06, 0.032)),
-            ),
-            (CoreModifierValue::Small, Some(primitive)) => {
-                gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });
-                None
-            }
-            (CoreModifierValue::Small, None) => None,
-            (value, _) => {
-                gaps.push(ScoreFieldGap::UnsupportedRelativeScaleValue { value });
-                None
+            match primitive {
+                Some(
+                    Primitive::Circle
+                    | Primitive::Ellipse
+                    | Primitive::Cloudform
+                    | Primitive::Square,
+                ) => Some(scale.value),
+                Some(primitive) => {
+                    gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });
+                    None
+                }
+                None => None,
             }
         });
 
@@ -773,7 +949,7 @@ fn lower_source_instruction(
         source_instruction_index,
         primitive,
         exact_count,
-        explicit_small_size,
+        relative_scale,
         gaps,
     }
 }

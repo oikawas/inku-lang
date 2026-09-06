@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use sha2::{Digest, Sha256};
 
-use crate::types::{Color, Seed};
+use crate::types::{Color, ResolvedPaletteColor, ResolvedPaletteContext, Seed};
 
 const ACHROMATIC_COLORS: [&str; 3] = ["black", "gray", "white"];
 const CHROMATIC_COLORS: [&str; 6] = ["red", "orange", "yellow", "green", "blue", "purple"];
@@ -283,6 +283,47 @@ pub fn work_color_assignment(
         assignment.insert(name.to_owned(), value);
     }
     assignment
+}
+
+/// A work-palette value could not be observed through the existing hex/OKLCH path.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PaletteObservationError {
+    InvalidResolvedColor { abstract_color: Color },
+}
+
+/// Observe the actual background, black, and white selected for one render request.
+///
+/// The returned DTO contains no selection policy. It only exposes the concrete
+/// RGB and the same OKLCH lightness already used by palette assignment.
+pub fn work_palette_context(
+    color_map: &BTreeMap<String, String>,
+    render_seed: Option<Seed>,
+    catalog_id: Option<&str>,
+    background: Color,
+) -> Result<ResolvedPaletteContext, PaletteObservationError> {
+    let assignment = work_color_assignment(color_map, render_seed, catalog_id);
+    Ok(ResolvedPaletteContext::new(
+        observe_resolved_color(background, color_map, &assignment)?,
+        observe_resolved_color(Color::Black, color_map, &assignment)?,
+        observe_resolved_color(Color::White, color_map, &assignment)?,
+    ))
+}
+
+fn observe_resolved_color(
+    abstract_color: Color,
+    color_map: &BTreeMap<String, String>,
+    assignment: &BTreeMap<String, String>,
+) -> Result<ResolvedPaletteColor, PaletteObservationError> {
+    let concrete = resolve_color(abstract_color, None, color_map, assignment);
+    let (red, green, blue) = hex_to_rgb(&concrete)
+        .ok_or(PaletteObservationError::InvalidResolvedColor { abstract_color })?;
+    let (lightness, _, _) = oklch_from_hex(&concrete)
+        .ok_or(PaletteObservationError::InvalidResolvedColor { abstract_color })?;
+    Ok(ResolvedPaletteColor::new(
+        abstract_color,
+        [red, green, blue],
+        lightness,
+    ))
 }
 
 fn normalized_label(value: &str) -> String {

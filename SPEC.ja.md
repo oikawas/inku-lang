@@ -100,7 +100,9 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる |
 
-ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed DDL compiler が採用する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` であり、parser / semantic association はこの4値を自動挿入しない。具体的な default、type applicability、typed-hole blocking、Score lowering は PLAN の Step 10 candidate / visual author gate まで未決定である。この規則は Renderer 内部の物理 fallback や既存作品の read compatibility を遡及変更しない。
+ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決するStep10Eの現行subsetだけは、数値位置とplace actionが明示されたcount1のcircle / square / ellipse / cloudformについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決をsource meaningへ書き戻さない。この規則は Renderer 内部の物理 fallback や既存作品の read compatibility を遡及変更しない。
+
+図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
 
 キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、visible DDL やmacro定義へ書かない（§19）。
 
@@ -833,9 +835,10 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 - 日本語版と英語版でフォーマットの構造を共通化
 - **記述者の目に触れる前提で設計する**（解釈フィードバックUIで表示される）
 - Stage 1が記述から素材を解釈した場合は、その選択をvisible normalized DDLへ明記する。入力が明示した素材は保持する
-- 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
+- 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり等の省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
+- 図形の大小は普通 / 小さい / 大きいと弱・標準・強を組み合わせた有限7classの局所modifierとして記し、明示normalと省略を区別する。数値geometryとqualitative sizeの併記、unknown degree、曖昧なownerはtyped conflict / issueにする
 - ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
-- `unspecified`を最終描画でdefault、typed hole、blocking diagnosticのどれへlowerするかはStep 10 gateで裁定する。本節の補正だけで作品生成を止めたり、Renderer fallbackを変えたりしない
+- Step10Eのactual Score lowererは、数値位置とplace actionが解決済みのcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。対象外の意味や必要なpalette contextの欠落はtyped gapにし、partial Scoreを成功扱いしない。このRust経路は製品runtimeにはまだ接続しない
 
 ### 12.5 モデル分割
 
@@ -1587,11 +1590,13 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。Unspecifiedのnormalはcanvas、count、placement、typed role、attested composition seedからcompositionが決める。Explicit qualitativeはnormalに対してsmall / large共通のversioned relative factorを適用し、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Description pathのStage 1 LLMは「かなり」「とても」「すごく」「めちゃくちゃ」「めっちゃ」「すげー」等の表層を有限でlanguage-independentなintensity classへ正規化し、deterministic compilerが寸法を決める。Direct DDLのunknown / ambiguous degreeはhidden LLMで補わず、明示errorにする。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行Step10E subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
 
-Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去の固定寸法 calibration は現行の universal normal や最終 size rule ではなく、値と経緯は CHANGELOG に置く。
+Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
 Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、そのidentity / digestは`inku.geometry-resolution-policy.v1`である。Compiler lockはこのidentity / digestを参照・attestし、`ddl_engine_version`はactivation metadataに限定する。`size_rule_version`や二重ownerを作らない。
+
+現行Step10E subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先し、未対応意味が一つでも残る文書はactual Scoreを返さない。Lowering resultは使ったcanvas / background / resolved palette contextとpolicy digestを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultを挿入しない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
 
@@ -1641,7 +1646,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、および対応するENの有限構造を受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewと、hostが明示したcanvas / backgroundが揃うときだけ、count=1でcolor / touch / continuity / empty surface / numeric geometry / numeric positionを明示したcircle、ellipse、cloudform、squareの独立instruction群をactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、既存candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置とplace actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたはStep10Eのnormal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。文書内に未対応意味が一つでもあればpartial `Score`を成功扱いせず、symbolic candidate evidenceとtyped gapを返す。このRust経路はruntimeにはまだ接続しない。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 

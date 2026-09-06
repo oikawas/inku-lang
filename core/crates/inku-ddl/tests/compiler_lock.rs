@@ -30,7 +30,7 @@ const V15_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V15_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "20dabf80fa0a7e3a326fddd9e94f19bc95a01c74eb3f7c3329dc18804e479ab3";
 const V15_FULL_LOCK_KNOWN_ANSWER: &str =
-    "2cd1fc0b2ff5fc931cfc01f7ecae1c2faeea1bb5f647455e124b1546a9bb2f9b";
+    "00734c3ce42df4ea721c149abf96cf9104eb1056789fb5d4c46ad6e8c7c75947";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -806,25 +806,76 @@ fn pre_head_modifier_ownership_reaches_compiler_for_primitive_and_macro_heads() 
             .map(|span| &thin_primitive.document.source()[span.start_byte..span.end_byte]),
         Some("thin")
     );
-    let small_primitive = compile(
-        "small circle",
-        ResolvedInstructionLanguage::En,
-        &[],
-        None,
-        LIMITS,
-    );
-    let small_delivery = small_primitive
-        .deliveries
-        .iter()
-        .find(|delivery| delivery.identity.owner == SemanticDeliveryOwner::RelativeScale)
-        .expect("explicit relative-scale delivery");
-    assert_eq!(small_delivery.identity.canonical_key, "small");
-    assert_eq!(
-        small_delivery
-            .span
-            .map(|span| &small_primitive.document.source()[span.start_byte..span.end_byte]),
-        Some("small")
-    );
+    for (source, language, expected_surface, expected_key) in [
+        (
+            "slightly small circle",
+            ResolvedInstructionLanguage::En,
+            "slightly small",
+            "slightly_small",
+        ),
+        (
+            "small circle",
+            ResolvedInstructionLanguage::En,
+            "small",
+            "small",
+        ),
+        (
+            "very small circle",
+            ResolvedInstructionLanguage::En,
+            "very small",
+            "very_small",
+        ),
+        (
+            "normal-sized circle",
+            ResolvedInstructionLanguage::En,
+            "normal-sized",
+            "normal",
+        ),
+        (
+            "slightly large circle",
+            ResolvedInstructionLanguage::En,
+            "slightly large",
+            "slightly_large",
+        ),
+        (
+            "large circle",
+            ResolvedInstructionLanguage::En,
+            "large",
+            "large",
+        ),
+        (
+            "very large circle",
+            ResolvedInstructionLanguage::En,
+            "very large",
+            "very_large",
+        ),
+        (
+            "とても大きな円",
+            ResolvedInstructionLanguage::Ja,
+            "とても大きな",
+            "very_large",
+        ),
+    ] {
+        let sized = compile(source, language, &[], None, LIMITS);
+        assert_eq!(
+            sized.compiler_lock.as_ref().map(|lock| lock.state),
+            Some(CompilerLockState::CanonicalReady),
+            "{source}"
+        );
+        let delivery = sized
+            .deliveries
+            .iter()
+            .find(|delivery| delivery.identity.owner == SemanticDeliveryOwner::RelativeScale)
+            .expect("explicit relative-scale delivery");
+        assert_eq!(delivery.identity.canonical_key, expected_key, "{source}");
+        assert_eq!(
+            delivery
+                .span
+                .map(|span| &sized.document.source()[span.start_byte..span.end_byte]),
+            Some(expected_surface),
+            "{source}"
+        );
+    }
     assert_eq!(
         primitive
             .deliveries

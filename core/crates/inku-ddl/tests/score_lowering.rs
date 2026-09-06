@@ -1,5 +1,5 @@
 use inku_ddl::{
-    EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitSmallSizeFieldCandidate,
+    CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate,
     GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
     ScoreFieldGap, ScoreLoweringCandidate, ScoreLoweringContext, SemanticHead, SemanticIdentity,
@@ -7,7 +7,10 @@ use inku_ddl::{
     geometry_resolution_policy_digest, lower_verified_stage15_score, lower_verified_stage15_view,
     score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
-use inku_score::{Color, LineStyle, Point, Primitive, Weight};
+use inku_render::palette::{default_color_map, work_palette_context};
+use inku_score::{
+    Color, LineStyle, Point, Primitive, ResolvedPaletteColor, ResolvedPaletteContext, Weight,
+};
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
@@ -36,6 +39,47 @@ fn lowering_context_requires_an_explicit_registry_canvas_and_background() {
     let context = ScoreLoweringContext::resolve("wide", Color::Blue).unwrap();
     assert_eq!(context.canvas_format().id, "wide");
     assert_eq!(context.background(), Color::Blue);
+    assert_eq!(context.resolved_palette(), None);
+
+    let mismatched = resolved_palette(Color::White, 0.9, 0.1, 1.0);
+    assert_eq!(
+        ScoreLoweringContext::resolve_with_palette("wide", Color::Blue, mismatched),
+        Err(inku_ddl::ScoreLoweringContextError::ResolvedPaletteRoleMismatch)
+    );
+    let invalid = resolved_palette(Color::Blue, f64::NAN, 0.1, 1.0);
+    assert_eq!(
+        ScoreLoweringContext::resolve_with_palette("wide", Color::Blue, invalid),
+        Err(inku_ddl::ScoreLoweringContextError::InvalidResolvedPaletteLightness)
+    );
+}
+
+#[test]
+fn omitted_count_size_and_drawing_attributes_resolve_to_an_actual_score() {
+    let result = stage15(
+        "place circle at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let semantic = &result.original_semantic_document().instructions[0].entity;
+    assert!(semantic.quantity.is_none());
+    assert!(semantic.explicit_geometry.is_none());
+    assert!(semantic.color.is_none());
+    assert!(semantic.touch.is_none());
+    assert!(semantic.continuity.is_none());
+    assert!(semantic.surface.quality.is_none());
+    let color_map = default_color_map();
+    let palette = work_palette_context(&color_map, None, None, Color::White).unwrap();
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve_with_palette("wide", Color::White, palette).unwrap(),
+    );
+
+    assert!(lowered.gaps().is_empty(), "{:?}", lowered.gaps());
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(instruction.radius, Some(0.12));
+    assert_eq!(instruction.color, Color::Black);
+    assert_eq!(instruction.weight, Weight::Pen);
+    assert_eq!(instruction.style, LineStyle::Solid);
+    assert!(instruction.filled);
 }
 
 #[test]
@@ -240,6 +284,226 @@ fn inline_and_continuation_explicit_geometry_share_one_score_meaning() {
 }
 
 #[test]
+fn normal_geometry_uses_short_edge_aspect_and_center_for_the_closed_subset() {
+    for (source, primitive, radius, size) in [
+        (
+            "place one red pen solid empty circle at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
+            Some(0.12),
+            None,
+        ),
+        (
+            "place one red pen solid empty ellipse at horizontal 0.5, vertical 0.5.",
+            Primitive::Ellipse,
+            None,
+            Some(Point::new(0.24, 0.144)),
+        ),
+        (
+            "place one red pen solid empty cloudform at horizontal 0.5, vertical 0.5.",
+            Primitive::Cloudform,
+            None,
+            Some(Point::new(0.24, 0.144)),
+        ),
+        (
+            "place one red pen solid empty square at horizontal 0.5, vertical 0.5.",
+            Primitive::Square,
+            None,
+            Some(Point::new(0.24, 0.24)),
+        ),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+        assert!(lowered.gaps().is_empty(), "{source}: {:?}", lowered.gaps());
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.primitive, primitive, "{source}");
+        assert_eq!(instruction.radius, radius, "{source}");
+        assert_eq!(instruction.size, size, "{source}");
+        if primitive == Primitive::Square {
+            let position = instruction.position.unwrap();
+            assert!((position.x - (0.5 - 2.4 / 47.0)).abs() < 1.0e-15);
+            assert!((position.y - 0.38).abs() < 1.0e-15);
+        } else {
+            assert_eq!(instruction.center, Some(Point::new(0.5, 0.5)));
+        }
+    }
+}
+
+#[test]
+fn seven_size_classes_apply_table_b_once_and_explicit_normal_remains_source_fact() {
+    for (surface, value, factor) in [
+        ("slightly small", CoreModifierValue::SlightlySmall, 0.75),
+        ("small", CoreModifierValue::Small, 0.50),
+        ("very small", CoreModifierValue::VerySmall, 0.375),
+        ("normal-sized", CoreModifierValue::Normal, 1.0),
+        ("slightly large", CoreModifierValue::SlightlyLarge, 1.25),
+        ("large", CoreModifierValue::Large, 1.50),
+        ("very large", CoreModifierValue::VeryLarge, 1.75),
+    ] {
+        let source = format!(
+            "place one red pen solid empty {surface} circle at horizontal 0.5, vertical 0.5."
+        );
+        let result = stage15(&source, ResolvedInstructionLanguage::En);
+        assert_eq!(
+            result.original_semantic_document().instructions[0]
+                .entity
+                .relative_scale
+                .as_ref()
+                .map(|scale| scale.value),
+            Some(value),
+            "{source}"
+        );
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        assert_eq!(
+            lowered.score().unwrap().instructions[0].radius,
+            Some(0.12 * factor),
+            "{source}"
+        );
+    }
+
+    let omitted = stage15(
+        "place one red pen solid empty circle at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let explicit = stage15(
+        "place one red pen solid empty normal-sized circle at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    assert!(
+        omitted.original_semantic_document().instructions[0]
+            .entity
+            .relative_scale
+            .is_none()
+    );
+    assert_eq!(
+        explicit.original_semantic_document().instructions[0]
+            .entity
+            .relative_scale
+            .as_ref()
+            .map(|scale| scale.value),
+        Some(CoreModifierValue::Normal)
+    );
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    assert_eq!(
+        lower_verified_stage15_score(omitted.verified_effective_view(), context).score(),
+        lower_verified_stage15_score(explicit.verified_effective_view(), context).score()
+    );
+}
+
+#[test]
+fn japanese_size_with_intervening_drawing_modifiers_reaches_the_same_score() {
+    let ja = stage15(
+        "画面の横0.5、縦0.5の位置に、とても小さな赤いペンの実線の空の円をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    let en = stage15(
+        "place one very small red pen solid empty circle at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    assert_eq!(
+        lower_verified_stage15_score(ja.verified_effective_view(), context).score(),
+        lower_verified_stage15_score(en.verified_effective_view(), context).score()
+    );
+    assert_eq!(
+        lower_verified_stage15_score(en.verified_effective_view(), context)
+            .score()
+            .unwrap()
+            .instructions[0]
+            .radius,
+        Some(0.045)
+    );
+}
+
+#[test]
+fn omission_color_uses_actual_palette_contrast_with_black_tie_and_explicit_values_win() {
+    for (background, expected) in [(Color::White, Color::Black), (Color::Black, Color::White)] {
+        let color_map = default_color_map();
+        let palette = work_palette_context(&color_map, None, None, background).unwrap();
+        let result = stage15(
+            "place one pen solid flat circle at horizontal 0.5, vertical 0.5.",
+            ResolvedInstructionLanguage::En,
+        );
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve_with_palette("square", background, palette).unwrap(),
+        );
+        assert_eq!(lowered.score().unwrap().instructions[0].color, expected);
+    }
+
+    let mut tie_map = default_color_map();
+    tie_map.insert("black".to_owned(), "#777777".to_owned());
+    tie_map.insert("white".to_owned(), "#777777".to_owned());
+    let tie_palette = work_palette_context(&tie_map, None, None, Color::Gray).unwrap();
+    let omitted = stage15(
+        "place circle at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let tie = lower_verified_stage15_score(
+        omitted.verified_effective_view(),
+        ScoreLoweringContext::resolve_with_palette("square", Color::Gray, tie_palette).unwrap(),
+    );
+    assert_eq!(tie.score().unwrap().instructions[0].color, Color::Black);
+
+    for (surface, filled) in [("empty", false), ("flat", true), ("", true)] {
+        let source = format!("place one red {surface} circle at horizontal 0.5, vertical 0.5.");
+        let explicit = stage15(&source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            explicit.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.color, Color::Red, "{source}");
+        assert_eq!(instruction.weight, Weight::Pen, "{source}");
+        assert_eq!(instruction.style, LineStyle::Solid, "{source}");
+        assert_eq!(instruction.filled, filled, "{source}");
+    }
+}
+
+#[test]
+fn unsupported_instruction_among_independent_instructions_never_yields_partial_score() {
+    let result = stage15(
+        concat!(
+            "place red circle at horizontal 0.3, vertical 0.5. ",
+            "place two blue square at horizontal 0.7, vertical 0.5."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert!(lowered.score().is_none());
+    assert!(
+        lowered
+            .gaps()
+            .contains(&ScoreFieldGap::RepeatedCountUnsupported { value: 2 })
+    );
+}
+
+#[test]
+fn qualitative_count_remains_a_typed_hole_instead_of_becoming_one() {
+    let compilation = compile_typed_ddl(
+        NormalizedDdlDocument::new(
+            "place many red circle at horizontal 0.5, vertical 0.5.",
+            ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap(),
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(!compilation.holes.is_empty());
+    assert!(stage15_transformation_input(&compilation).is_err());
+}
+
+#[test]
 fn incomplete_conflicting_and_relative_numeric_geometry_fail_as_typed_compiler_issues() {
     for (source, expected_kind) in [
         (
@@ -293,53 +557,55 @@ fn incomplete_conflicting_and_relative_numeric_geometry_fail_as_typed_compiler_i
 
 #[test]
 fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_score() {
-    for (source, expected_gap) in [
+    for (source, expected_primitive, expected_gap) in [
         (
-            "place one red pen solid empty circle at horizontal 0.5, vertical 0.5.",
+            "place one red pen solid empty triangle at horizontal 0.5, vertical 0.5.",
+            Primitive::Triangle,
             ScoreFieldGap::MissingExplicitGeometry,
         ),
         (
             "place one pen solid empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
-            ScoreFieldGap::MissingColor,
+            Primitive::Circle,
+            ScoreFieldGap::MissingResolvedPaletteContext,
         ),
         (
-            "place one red solid empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
-            ScoreFieldGap::MissingTouch,
-        ),
-        (
-            "place one red pen empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
-            ScoreFieldGap::MissingContinuity,
-        ),
-        (
-            "place one red pen solid circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
-            ScoreFieldGap::MissingEmptySurface,
+            "place zero red pen solid empty circle at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
+            ScoreFieldGap::ExactCountZero { value: 0 },
         ),
         (
             "place 4294967295 red pen solid empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::RepeatedCountUnsupported { value: u32::MAX },
         ),
         (
             "place one red pen solid empty circle with radius 0.1 at horizontal 1.1, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::PositionOutOfRange,
         ),
         (
             "place one red pen solid empty circle with radius 0.0 at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::NonPositiveDimension,
         ),
         (
             "place one red pen solid empty circle with radius -1 at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::NonPositiveDimension,
         ),
         (
             "place one red pen solid empty circle with radius 0.2 at horizontal 0.1, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::GeometryExtentOutOfBounds,
         ),
         (
             "place one red pen solid empty circle radius 0.1 at the center.",
+            Primitive::Circle,
             ScoreFieldGap::UnsupportedNamedPosition,
         ),
         (
             "place one red pen solid empty circle with radius 0.0000000000000000000000000000000000000001 at horizontal 0.5, vertical 0.5.",
+            Primitive::Circle,
             ScoreFieldGap::GeometryRepresentationLimit,
         ),
     ] {
@@ -351,15 +617,32 @@ fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_sco
         assert!(lowered.score().is_none(), "{source}");
         assert_eq!(
             lowered.candidate().instructions()[0].primitive(),
-            Some(Primitive::Circle),
+            Some(expected_primitive),
             "{source}"
         );
-        assert!(
-            lowered.candidate().instructions()[0]
-                .exact_count()
-                .is_some(),
-            "{source}: existing count evidence must survive failed actual lowering"
-        );
+        if matches!(&expected_gap, ScoreFieldGap::ExactCountZero { .. }) {
+            assert_eq!(
+                result.original_semantic_document().instructions[0]
+                    .entity
+                    .quantity
+                    .as_ref()
+                    .map(|quantity| quantity.value),
+                Some(0),
+                "{source}: explicit zero must remain semantic evidence"
+            );
+            assert_eq!(
+                lowered.candidate().instructions()[0].exact_count(),
+                None,
+                "{source}: zero must remain a typed candidate gap"
+            );
+        } else {
+            assert!(
+                lowered.candidate().instructions()[0]
+                    .exact_count()
+                    .is_some(),
+                "{source}: existing count evidence must survive failed actual lowering"
+            );
+        }
         assert!(
             lowered.gaps().contains(&expected_gap),
             "{source}: {:?}",
@@ -388,7 +671,7 @@ fn canonical_eight_primitives_map_one_to_one_and_unknown_identity_fails_closed()
         assert_eq!(instruction.source_instruction_index(), 0, "{id}");
         assert_eq!(instruction.primitive(), Some(expected), "{id}");
         assert_eq!(instruction.exact_count(), None, "{id}");
-        assert_eq!(instruction.explicit_small_size(), None, "{id}");
+        assert_eq!(instruction.relative_scale(), None, "{id}");
         assert!(instruction.gaps().is_empty(), "{id}");
     }
 
@@ -409,8 +692,8 @@ fn canonical_eight_primitives_map_one_to_one_and_unknown_identity_fails_closed()
 }
 
 #[test]
-fn ja_and_en_meaning_have_identical_primitive_count_and_explicit_small_candidates() {
-    for ((ja, en), expected_primitive, expected_count, expected_size) in [
+fn ja_and_en_meaning_have_identical_primitive_count_and_symbolic_size_candidates() {
+    for ((ja, en), expected_primitive, expected_count, expected_scale) in [
         (("円", "circle"), Primitive::Circle, None, None),
         (
             ("八つ 円", "eight circle"),
@@ -422,7 +705,7 @@ fn ja_and_en_meaning_have_identical_primitive_count_and_explicit_small_candidate
             ("小さな円", "small circle"),
             Primitive::Circle,
             None,
-            Some(ExplicitSmallSizeFieldCandidate::CircleRadius(0.038)),
+            Some(CoreModifierValue::Small),
         ),
     ] {
         let ja_result = stage15(ja, ResolvedInstructionLanguage::Ja);
@@ -434,7 +717,7 @@ fn ja_and_en_meaning_have_identical_primitive_count_and_explicit_small_candidate
         let instruction = &ja_candidate.instructions()[0];
         assert_eq!(instruction.primitive(), Some(expected_primitive));
         assert_eq!(instruction.exact_count(), expected_count);
-        assert_eq!(instruction.explicit_small_size(), expected_size);
+        assert_eq!(instruction.relative_scale(), expected_scale);
         assert!(instruction.gaps().is_empty());
     }
 }
@@ -478,23 +761,19 @@ fn exact_count_boundaries_are_lossless_and_never_clamped() {
 }
 
 #[test]
-fn explicit_small_maps_only_circle_and_ellipse_exact_score_fields() {
-    for (source, expected) in [
-        (
-            "small circle",
-            ExplicitSmallSizeFieldCandidate::CircleRadius(0.038),
-        ),
-        (
-            "small ellipse",
-            ExplicitSmallSizeFieldCandidate::EllipseSize(Point::new(0.06, 0.032)),
-        ),
+fn finite_relative_size_intent_is_symbolic_for_the_supported_closed_primitives() {
+    for source in [
+        "small circle",
+        "small ellipse",
+        "small square",
+        "small cloudform",
     ] {
         let result = stage15(source, ResolvedInstructionLanguage::En);
         let candidate = lower_verified_stage15_view(result.verified_effective_view());
         let instruction = &candidate.instructions()[0];
         assert_eq!(
-            instruction.explicit_small_size(),
-            Some(expected),
+            instruction.relative_scale(),
+            Some(CoreModifierValue::Small),
             "{source}"
         );
         assert!(instruction.gaps().is_empty(), "{source}");
@@ -502,17 +781,15 @@ fn explicit_small_maps_only_circle_and_ellipse_exact_score_fields() {
 
     for (id, primitive) in [
         ("line", Primitive::Line),
-        ("square", Primitive::Square),
         ("triangle", Primitive::Triangle),
         ("polygon", Primitive::Polygon),
         ("arc", Primitive::Arc),
-        ("cloudform", Primitive::Cloudform),
     ] {
         let result = stage15(&format!("small {id}"), ResolvedInstructionLanguage::En);
         let candidate = lower_verified_stage15_view(result.verified_effective_view());
         let instruction = &candidate.instructions()[0];
         assert_eq!(instruction.primitive(), Some(primitive), "{id}");
-        assert_eq!(instruction.explicit_small_size(), None, "{id}");
+        assert_eq!(instruction.relative_scale(), None, "{id}");
         assert_eq!(
             instruction.gaps(),
             [ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive }],
@@ -528,7 +805,7 @@ fn absent_count_and_size_remain_unspecified() {
     let instruction = &candidate.instructions()[0];
 
     assert_eq!(instruction.exact_count(), None);
-    assert_eq!(instruction.explicit_small_size(), None);
+    assert_eq!(instruction.relative_scale(), None);
     assert!(instruction.gaps().is_empty());
 }
 
@@ -577,6 +854,19 @@ fn mixed_owner_view_keeps_expansion_and_focus_overlay_pending_with_exact_identit
             .head,
         SemanticHead::MacroInvocation(_)
     ));
+}
+
+fn resolved_palette(
+    background: Color,
+    background_lightness: f64,
+    black_lightness: f64,
+    white_lightness: f64,
+) -> ResolvedPaletteContext {
+    ResolvedPaletteContext::new(
+        ResolvedPaletteColor::new(background, [128, 128, 128], background_lightness),
+        ResolvedPaletteColor::new(Color::Black, [17, 17, 17], black_lightness),
+        ResolvedPaletteColor::new(Color::White, [255, 255, 255], white_lightness),
+    )
 }
 
 fn stage15(source: &str, language: ResolvedInstructionLanguage) -> Stage15TransformationResult {

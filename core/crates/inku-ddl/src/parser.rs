@@ -47,14 +47,26 @@ impl CoreModifierDimension {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierValue {
     Fine,
+    SlightlySmall,
     Small,
+    VerySmall,
+    Normal,
+    SlightlyLarge,
+    Large,
+    VeryLarge,
 }
 
 impl CoreModifierValue {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Fine => "fine",
+            Self::SlightlySmall => "slightly_small",
             Self::Small => "small",
+            Self::VerySmall => "very_small",
+            Self::Normal => "normal",
+            Self::SlightlyLarge => "slightly_large",
+            Self::Large => "large",
+            Self::VeryLarge => "very_large",
         }
     }
 }
@@ -141,14 +153,37 @@ const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
 const QUALITATIVE_QUANTITIES_JA: &[&str] =
     &["少し", "数個", "いくつか", "たくさん", "多数", "無数"];
 const QUALITATIVE_QUANTITIES_EN: &[&str] = &["a few", "several", "many", "numerous", "countless"];
+const RELATIVE_SCALE_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
+    ("とても小さな", CoreModifierValue::VerySmall),
+    ("とても小さい", CoreModifierValue::VerySmall),
+    ("普通の大きさ", CoreModifierValue::Normal),
+    ("とても大きな", CoreModifierValue::VeryLarge),
+    ("とても大きい", CoreModifierValue::VeryLarge),
+    ("小さめ", CoreModifierValue::SlightlySmall),
+    ("小さな", CoreModifierValue::Small),
+    ("小さい", CoreModifierValue::Small),
+    ("大きめ", CoreModifierValue::SlightlyLarge),
+    ("大きな", CoreModifierValue::Large),
+    ("大きい", CoreModifierValue::Large),
+];
+const RELATIVE_SCALE_SURFACES_EN: &[(&str, CoreModifierValue)] = &[
+    ("slightly small", CoreModifierValue::SlightlySmall),
+    ("very small", CoreModifierValue::VerySmall),
+    ("normal-sized", CoreModifierValue::Normal),
+    ("slightly large", CoreModifierValue::SlightlyLarge),
+    ("very large", CoreModifierValue::VeryLarge),
+    ("small", CoreModifierValue::Small),
+    ("large", CoreModifierValue::Large),
+];
 
 const PRIORITY_FUNCTION: u8 = 1;
 const PRIORITY_NUMBER: u8 = 2;
 const PRIORITY_ASSET: u8 = 3;
 const PRIORITY_CORE_MODIFIER: u8 = 3;
+const PRIORITY_RELATIVE_SCALE: u8 = 4;
 
 pub(crate) fn is_reserved_english_non_asset_surface(surface: &str) -> bool {
-    ["thin", "small"]
+    ["thin", "slightly", "very", "normal-sized", "small"]
         .iter()
         .chain(FUNCTION_WORDS_EN)
         .chain(QUALITATIVE_QUANTITIES_EN)
@@ -415,16 +450,28 @@ fn candidates_at(
         );
     }
 
-    let relative_scale_surface = match language {
-        ResolvedInstructionLanguage::Ja => "小さな",
-        ResolvedInstructionLanguage::En => "small",
+    let relative_scale_surfaces = match language {
+        ResolvedInstructionLanguage::Ja => RELATIVE_SCALE_SURFACES_JA,
+        ResolvedInstructionLanguage::En => RELATIVE_SCALE_SURFACES_EN,
     };
-    let relative_scale_end = start_byte + relative_scale_surface.len();
-    if language != ResolvedInstructionLanguage::Ja
-        || (source.get(start_byte..relative_scale_end) == Some(relative_scale_surface)
-            && (!require_boundary || has_japanese_typed_left_boundary(source, start_byte))
-            && has_japanese_primitive_candidate_at(source, relative_scale_end))
-    {
+    for (relative_scale_surface, value) in relative_scale_surfaces {
+        let relative_scale_end = start_byte + relative_scale_surface.len();
+        let surface_matches = source
+            .get(start_byte..relative_scale_end)
+            .is_some_and(|actual| match language {
+                ResolvedInstructionLanguage::Ja => actual == *relative_scale_surface,
+                ResolvedInstructionLanguage::En => {
+                    actual.eq_ignore_ascii_case(relative_scale_surface)
+                }
+            });
+        if !surface_matches
+            || (language == ResolvedInstructionLanguage::Ja
+                && require_boundary
+                && !has_japanese_typed_left_boundary(source, start_byte))
+            || !has_relative_scale_head_context(source, relative_scale_end, language)
+        {
+            continue;
+        }
         push_surface_candidate(
             &mut candidates,
             source,
@@ -432,11 +479,11 @@ fn candidates_at(
             language,
             require_boundary,
             relative_scale_surface,
-            PRIORITY_CORE_MODIFIER,
-            "core_modifier:relative_scale:small".to_owned(),
+            PRIORITY_RELATIVE_SCALE,
+            format!("core_modifier:relative_scale:{}", value.as_str()),
             CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
                 dimension: CoreModifierDimension::RelativeScale,
-                value: CoreModifierValue::Small,
+                value: *value,
             })),
         );
     }
@@ -844,9 +891,13 @@ fn has_japanese_typed_left_boundary(source: &str, start_byte: usize) -> bool {
         || has_japanese_recognized_left_candidate_across_separators(source, start_byte)
 }
 
-fn has_japanese_primitive_candidate_at(source: &str, start_byte: usize) -> bool {
+fn has_primitive_candidate_at(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
     start_byte < source.len()
-        && candidates_at(source, start_byte, ResolvedInstructionLanguage::Ja, false)
+        && candidates_at(source, start_byte, language, false)
             .iter()
             .any(|candidate| {
                 matches!(
@@ -857,6 +908,45 @@ fn has_japanese_primitive_candidate_at(source: &str, start_byte: usize) -> bool 
                     }) if category_key == "katachi"
                 )
             })
+}
+
+fn has_relative_scale_head_context(
+    source: &str,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+) -> bool {
+    let mut cursor = start_byte;
+    loop {
+        while let Some(character) = source[cursor..].chars().next() {
+            if !character.is_whitespace() {
+                break;
+            }
+            cursor += character.len_utf8();
+        }
+        if has_primitive_candidate_at(source, cursor, language) {
+            return true;
+        }
+        if cursor >= source.len() {
+            return false;
+        }
+        let next = candidates_at(source, cursor, language, false)
+            .into_iter()
+            .filter(|candidate| match &candidate.delivery {
+                CandidateDelivery::Token(NeutralTokenKind::FunctionWord) => true,
+                CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                    category_key, ..
+                }) => category_key != "katachi",
+                _ => false,
+            })
+            .max_by_key(|candidate| candidate.end_byte);
+        let Some(next) = next else {
+            return false;
+        };
+        if next.end_byte <= cursor {
+            return false;
+        }
+        cursor = next.end_byte;
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

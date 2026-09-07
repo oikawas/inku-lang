@@ -495,6 +495,7 @@ def test_rust_saijiki_asset_matches_python_authority() -> None:
                 "surface_en": relation.surface_en,
                 "literals_ja": list(relation.literals_ja),
                 "literals_en": list(relation.literals_en),
+                **({"literal_targets": dict(relation.literal_targets)} if relation.literal_targets else {}),
             }
             for relation in saijiki.RELATIONS
         ],

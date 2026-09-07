@@ -37,13 +37,13 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         request = json.loads(request_json)
         calls.append(request)
         return "<svg/>", json.dumps(
-            {"render_engine_id": "default", "render_engine_version": "44"}
+            {"render_engine_id": "default", "render_engine_version": "45"}
         )
 
     native = SimpleNamespace(
         default_color_map_json=lambda: json.dumps({"black": "#111111"}),
         render_engine_id=lambda: "default",
-        render_engine_version=lambda: "44",
+        render_engine_version=lambda: "45",
         render=render,
     )
     monkeypatch.setattr(adapter, "_native_binding", lambda: native)
@@ -63,9 +63,9 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         composition_seed=-7,
     )
     assert engine.id == "default"
-    assert engine.version == "44"
+    assert engine.version == "45"
     assert result.svg == "<svg/>"
-    assert result.metadata["render_engine_version"] == "44"
+    assert result.metadata["render_engine_version"] == "45"
     assert len(calls) == 1
     request = calls[0]
     assert request["score"]["instructions"][0]["from"] == [0.1, 0.2]
@@ -80,7 +80,7 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
 def test_current_engine_is_the_default_rust_adapter():
     assert current_render_engine() is adapter.DEFAULT_RENDER_ENGINE
     assert current_render_engine().id == "default"
-    assert current_render_engine().version == "44"
+    assert current_render_engine().version == "45"
 
 
 def test_default_package_exports_the_thin_adapter_contract():
@@ -253,7 +253,7 @@ def test_step10q_endpoint_family_native():
     )
 
     assert result.metadata["render_engine_id"] == "default"
-    assert result.metadata["render_engine_version"] == "44"
+    assert result.metadata["render_engine_version"] == "45"
     assert 'id="instruction_000_line_red"' in result.svg
     assert 'id="instruction_001_arc_blue"' in result.svg
     assert 'id="instruction_002_point_black"' in result.svg
@@ -266,6 +266,54 @@ def test_step10q_endpoint_family_native():
     assert 'transform="rotate(30 1175 500)"' in result.svg
     assert 'cx="1880" cy="600" r="6"' in result.svg
     assert 'transform="rotate(15 470 750)"' in result.svg
+
+
+def test_step10r_touching_native():
+    from inku_analysis.rasterizer import svg_to_png
+
+    score = Score.model_validate({
+        "canvas": {"aspect": "wide"},
+        "instructions": [
+            {"primitive": "line", "from": [0.2, 0.4], "to": [0.6, 0.4],
+             "color": "red", "weight": "computer", "rotation": 20},
+            {"primitive": "arc", "center": [0.5, 0.6], "position": [0.5, 0.5],
+             "radius": 0.2, "angle_start": 150, "angle_end": 30, "color": "blue",
+             "weight": "computer", "relation": {"type": "touching",
+                 "target_instruction_index": 0, "position_authority": "named_movable",
+                 "touching_constraints": {"dimensions_fixed": False, "direction_fixed": False}}},
+            {"primitive": "line", "from": [0.2, 0.6], "to": [0.4, 0.6],
+             "color": "green", "weight": "computer", "relation": {"type": "touching",
+                 "target_instruction_index": 1, "position_authority": "named_movable",
+                 "touching_constraints": {"dimensions_fixed": False, "direction_fixed": False}}},
+            {"primitive": "circle", "center": [0.8, 0.7], "radius": 0.05, "color": "yellow"},
+        ],
+    })
+    success = current_render_engine().render(score, svg_profile="editable", render_seed=23)
+    assert success.metadata["render_engine_version"] == "45"
+    assert "execution" not in success.metadata
+    assert "instruction_001_arc_blue" in success.svg
+    assert "instruction_002_line_green" in success.svg
+    assert svg_to_png(success.svg, width=320).startswith(b"\x89PNG\r\n\x1a\n")
+
+    payload = score.model_dump(mode="json")
+    payload["instructions"][1]["relation"]["touching_constraints"]["dimensions_fixed"] = True
+    conflict = Score.model_validate(payload)
+    with pytest.raises(ValueError, match="TouchingGeometryConflict"):
+        current_render_engine().render(conflict, render_seed=23)
+    continued = current_render_engine().render(
+        conflict, svg_profile="editable", render_seed=23, error_policy="omit_and_continue"
+    )
+    assert "instruction_000_line_red" in continued.svg
+    assert "instruction_001_arc_blue" not in continued.svg
+    assert "instruction_002_line_green" not in continued.svg
+    assert "instruction_003_circle_yellow" in continued.svg
+    summary = continued.metadata["execution"]
+    assert summary["rendered_instruction_indices"] == [0, 3]
+    assert [item["reason"] for item in summary["diagnostics"]] == [
+        "touching_geometry_conflict", "touching_reference_omitted"
+    ]
+    assert summary["diagnostics"][1]["dependency_instruction_index"] == 1
+    assert svg_to_png(continued.svg, width=320).startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_step10q_connected_native():
@@ -307,7 +355,7 @@ def test_step10q_connected_native():
         render_seed=0,
         composition_seed=0,
     )
-    assert success.metadata["render_engine_version"] == "44"
+    assert success.metadata["render_engine_version"] == "45"
     assert "execution" not in success.metadata
     assert 'id="instruction_000_line_red"' in success.svg
     assert 'id="instruction_001_arc_blue"' in success.svg

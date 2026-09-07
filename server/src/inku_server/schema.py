@@ -294,6 +294,13 @@ class AtRegion(BaseModel):
         )
 
 
+class TouchingConstraints(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dimensions_fixed: bool
+    direction_fixed: bool
+
+
 class Relation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -310,12 +317,17 @@ class Relation(BaseModel):
         default=None,
         ge=0,
         exclude_if=lambda value: value is None,
-        description="connected が参照する元 Score instruction index。ほかの relation では省略",
+        description="checked connected / touching が参照する元 Score instruction index。旧 relation では省略",
     )
     position_authority: Optional[ConnectedPositionAuthority] = Field(
         default=None,
         exclude_if=lambda value: value is None,
-        description="connected current の位置出自。named_movable または numeric_fixed",
+        description="checked connected / touching current の位置出自。named_movable または numeric_fixed",
+    )
+    touching_constraints: Optional[TouchingConstraints] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="typed touching の明示寸法・向きの固定条件。省略normalとは区別する",
     )
 
     @model_validator(mode="before")

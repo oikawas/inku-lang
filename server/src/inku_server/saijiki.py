@@ -109,6 +109,7 @@ class RelationWord:
     surface_en: str
     literals_ja: tuple[str, ...]  # 正規化DDLの固定 previous-object 句
     literals_en: tuple[str, ...]
+    literal_targets: tuple[tuple[str, str], ...] = ()
 
     def surface(self, lang: str) -> str:
         return self.surface_ja if lang == "ja" else self.surface_en
@@ -374,6 +375,8 @@ RELATIONS: tuple[RelationWord, ...] = (
         "touching",
         ("前の線に触れる", "前の弧に両端で触れる"),
         ("touching the previous line", "touching the previous arc at both ends"),
+        (("前の線に触れる", "line"), ("前の弧に両端で触れる", "arc"),
+         ("touching the previous line", "line"), ("touching the previous arc at both ends", "arc")),
     ),
     RelationWord("cutting", "切る", "cutting", ("前の線を切る",), ("cutting the previous line",)),
     RelationWord("between", "間に", "between", ("前の二つの間に",), ("between the previous two",)),

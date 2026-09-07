@@ -630,7 +630,8 @@ fn candidates_at(
                 .map(|literal| (literal.as_str(), CanonicalRelationForm::FullLiteral)),
         ) {
             let delivery = canonical_relation_identity(&relation.relation_type, form)
-                .map(|canonical_identity| {
+                .map(|mut canonical_identity| {
+                    canonical_identity.target = relation.literal_targets.get(surface).copied();
                     CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
                         asset_id: SAIJIKI_ASSET_ID.to_owned(),
                         relation_type: relation.relation_type.clone(),

@@ -17,6 +17,57 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn actual_compiler_touching_reaches_render_and_stop_continue() {
+    for (current, conflict) in [("line", false), ("vertical line", true)] {
+        let source = format!(
+            "place one red horizontal line at center. place one blue {current} at center touching the previous line. place one green circle at center."
+        );
+        let execution = compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .unwrap(),
+            &[],
+            Some(23),
+            LIMITS,
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::Stop,
+        );
+        assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);
+        let score = execution.score().unwrap();
+        let request = |policy| RenderRequest {
+            score: score.clone(),
+            options: RenderOptions {
+                resolved_color_map: BTreeMap::new(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1200.0, 700.0),
+                canvas_aspect_id: "wide".to_owned(),
+                svg_profile: SvgProfile::Editable,
+                render_seed: Some(23),
+                composition_seed: Some(23),
+                wild: false,
+                error_policy: policy,
+            },
+        };
+        if conflict {
+            let stopped = render(request(ScoreErrorPolicy::Stop)).unwrap_err();
+            assert!(format!("{stopped:?}").contains("TouchingDirectionConflict"));
+        } else {
+            let output = render(request(ScoreErrorPolicy::Stop)).unwrap();
+            assert!(output.svg.contains("instruction_001_line_blue"));
+            assert!(output.metadata.execution.is_none());
+        }
+        let output = render(request(ScoreErrorPolicy::OmitAndContinue)).unwrap();
+        assert!(output.svg.contains("instruction_000_line_red"));
+        assert!(output.svg.contains("instruction_002_circle_green"));
+        assert_eq!(output.svg.contains("instruction_001_line_blue"), !conflict);
+        let joined =
+            map_compiler_render_execution(&execution, score, output.metadata.execution.as_ref())
+                .unwrap();
+        assert_eq!(joined.rendered_origins.len(), if conflict { 2 } else { 3 });
+    }
+}
+
+#[test]
 fn actual_compiler_score_reaches_checked_connected_render_and_exact_owner_join() {
     let source = concat!(
         "place one red line at center. ",

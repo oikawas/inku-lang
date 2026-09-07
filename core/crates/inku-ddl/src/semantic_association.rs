@@ -130,6 +130,7 @@ impl SemanticPreviousReference {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExplicitPreviousReferenceOccurrence {
     pub kind: SemanticRelationKind,
+    pub target: Option<crate::saijiki::TouchingLiteralTarget>,
     pub reference: SemanticPreviousReference,
     pub provenance: SourceOccurrence,
     pub asset_id: String,
@@ -1574,7 +1575,11 @@ fn explicit_previous_reference_occurrence(
     atom_index: usize,
 ) -> Result<Option<ExplicitPreviousReferenceOccurrence>, ()> {
     if asset_id != SAIJIKI_ASSET_ID
-        || !canonical_relation_identity_is_valid(relation_type, canonical_identity)
+        || !canonical_relation_identity_is_valid(
+            relation_type,
+            canonical_identity,
+            &document.source()[span.start_byte..span.end_byte],
+        )
     {
         return Err(());
     }
@@ -1595,6 +1600,7 @@ fn explicit_previous_reference_occurrence(
     };
     Ok(Some(ExplicitPreviousReferenceOccurrence {
         kind,
+        target: canonical_identity.target,
         reference,
         provenance: source_occurrence(document, span, region_index, clause_index, atom_index),
         asset_id: asset_id.to_owned(),

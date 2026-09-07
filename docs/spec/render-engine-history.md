@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **45** | Step 10R Touching checked delivery | — | 2026-09-07 | — | — | — |
 | **44** | Step 10Q-2 Connected checked execution | — | 2026-09-07 | — | — | — |
 | **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
 | **42** | Step 10O square physical coordinates | — | 2026-09-07 | 610 | **0** | **610** |
@@ -425,6 +426,14 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 45 — shared checked performance for both-endpoint Touching
+
+Ordinary bilingual full literals and adjacent bound flat Macro Emits reach Line / Arc endpoint matching and existing Arc reconstruction.
+Declared prior types and explicit dimension, direction, and numeric-position authority survive lowering; incompatibility stops or omits the entire current.
+Original Score identity, dependencies, owners, drawing ordinals, and seeds survive. Legacy Touching without metadata and Connected remain compatible.
+Score schema name 0.1.0, DDL language 5, and legacy DDL engine 21 stay unchanged. Typed production / UI / persistence cutover and whole Step 10 remain incomplete.
+See [SPEC §14.4](../../SPEC.md#144-sequential-resolution-and-performance-macro-variation).
 
 ## engine 44 — checked one-endpoint Connected performance
 

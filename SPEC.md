@@ -2254,8 +2254,9 @@ An optional `relation` field is added to an instruction.
 |---|---|---|
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | the kind of relation |
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
-| `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for `connected`; omitted for older relations |
-| `position_authority` | `named_movable` / `numeric_fixed` | whether `connected` may translate the current instruction |
+| `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for checked `connected` / `touching`; omitted for older relations |
+| `position_authority` | `named_movable` / `numeric_fixed` | position authority of the checked current instruction |
+| `touching_constraints` | boolean `dimensions_fixed` / `direction_fixed` pair | explicit dimension and direction constraints for typed `touching`, distinct from omitted normal; absent in older Scores |
 
 **The referent is always the immediately preceding instruction — an implicit
 prev reference.**  Only `between` refers to the preceding two elements.
@@ -2346,6 +2347,10 @@ relation and leaves ordinary placement. Warning-class failures, such as a grid
 layout consuming a relation, record a structured warning. Canonically silent
 fallbacks, including missing prior bounds and designated degenerate geometry,
 drop the relation without a warning.
+
+Engine 45 also carries typed `touching` from ordinary direct instructions and adjacent bound Emits in the same flat Macro into the shared checked performer. The four bilingual full literals carry their declared Line / Arc target to the original PreviousOne; a mismatched primitive cannot reach canonical success. Macros check the actual typed Emits without inventing a source noun condition. Only Line / Arc succeed. The prior stays unchanged, both endpoints coincide, and Arc uses the same minor-arc reconstruction described above. Explicit numeric geometry or relative scale (including normal at factor 1) fixes dimensions; an explicit angle fixes the performed chord direction in canonical endpoint order. Omitted normal may adjust to Touching. Numeric positions retain their anchor and the final geometry's existing must-fit requirement; named focus remains movable with clipping. Incompatibility is a typed conflict.
+
+Typed Touching follows the same Stop / OmitAndContinue and original dependency, owner, and drawing-ordinal rules. A failed current is never drawn after merely dropping its relation; independent survivors retain their original indices and seeds. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged. This does not complete the typed production pipeline, UI, saved settings, or whole Step 10.
 
 ### 14.5 The Owner of Relations
 

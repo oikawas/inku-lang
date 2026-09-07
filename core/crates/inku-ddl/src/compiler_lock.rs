@@ -1148,7 +1148,8 @@ fn project_deliveries(
                     );
                 }
             }
-            SemanticRelationIssueKind::ConflictingRelations => add_conflict(
+            SemanticRelationIssueKind::ConflictingRelations
+            | SemanticRelationIssueKind::TargetPrimitiveMismatch => add_conflict(
                 &mut projection,
                 issue.kind.as_str(),
                 span,

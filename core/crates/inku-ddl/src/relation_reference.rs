@@ -222,7 +222,11 @@ fn build_envelope(
         canonical_identity,
         ..
     } = &pending.occurrence.kind
-        && !canonical_relation_identity_is_valid(relation_type, *canonical_identity)
+        && !canonical_relation_identity_is_valid(
+            relation_type,
+            *canonical_identity,
+            &source[span.start_byte..span.end_byte],
+        )
     {
         return Err(diagnostic(
             pending,

@@ -802,11 +802,59 @@ fn spec_core_thinness_is_recognized_without_swallowing_the_genitive_marker() {
 }
 
 #[test]
+fn core_thinness_has_two_closed_bilingual_source_preserving_identities() {
+    for (source, language, expected_surface, expected_value) in [
+        ("細い線", ResolvedInstructionLanguage::Ja, "細い", "fine"),
+        (
+            "ごく細い線",
+            ResolvedInstructionLanguage::Ja,
+            "ごく細い",
+            "extra_fine",
+        ),
+        ("thin line", ResolvedInstructionLanguage::En, "thin", "fine"),
+        (
+            "EXTRA-FINE line",
+            ResolvedInstructionLanguage::En,
+            "EXTRA-FINE",
+            "extra_fine",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source.to_owned(), language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+        let modifiers = result
+            .tokens
+            .iter()
+            .filter_map(|token| match token.kind {
+                NeutralTokenKind::CoreModifier(identity) => Some((token, identity)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "{source}: {:?}",
+            result.diagnostics
+        );
+        assert_eq!(modifiers.len(), 1, "{source}");
+        assert_eq!(modifiers[0].0.surface, expected_surface, "{source}");
+        assert_eq!(modifiers[0].1.dimension.as_str(), "thinness", "{source}");
+        assert_eq!(modifiers[0].1.value.as_str(), expected_value, "{source}");
+        assert_eq!(
+            &document.source()[modifiers[0].0.span.start_byte..modifiers[0].0.span.end_byte],
+            expected_surface,
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn core_thinness_respects_ja_and_en_word_boundaries() {
     for (source, language) in [
         ("極細い", ResolvedInstructionLanguage::Ja),
         ("xthiny", ResolvedInstructionLanguage::En),
         ("thinner", ResolvedInstructionLanguage::En),
+        ("xextra-finey", ResolvedInstructionLanguage::En),
+        ("extra-finer", ResolvedInstructionLanguage::En),
     ] {
         let document = NormalizedDdlDocument::new(source.to_owned(), language, Vec::new())
             .expect("negative boundary source forms a document");

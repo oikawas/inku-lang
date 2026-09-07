@@ -133,6 +133,12 @@ Flat Emit `angle: semantic_ref` uses the same resolver. A caller angle does not 
 override Emits; the selection key uses the Macro semantic ordinal and existing expansion path /
 generated ordinal.
 
+Visible DDL `細い` / `thin` and `ごく細い` / `extra-fine` share the same Fine / ExtraFine identities
+and reach the existing `Instruction.thinness` from ordinary instructions and flat Macro Emits through
+one lowerer. Macro definitions accept only the Saijiki-independent closed core refs
+`thinness:fine` / `thinness:extra_fine`. This does not extend outer Macro-parameter binding from
+visible source; existing unbound caller-thinness diagnostics and mode-specific handling remain.
+
 The runtime-disconnected `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
 lock, and issues, in the result. Default Stop returns no Score for an upstream hole or conflict.
@@ -146,10 +152,10 @@ Global budgets and source, lock, owner, definition, or provenance integrity fail
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
 compatibility paths, not the canonical semantic specification. Unspecified and non-center named
-placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
+placement, source caller core-parameter binding, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
 delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
 public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
-compilation. Reaching Step10N does not complete Step10 as a whole. Product UI, API, and persistence
+compilation. Reaching Step10P does not complete Step10 as a whole. Product UI, API, and persistence
 do not yet select this mode, and legacy coerce / LLM fallback
 has not been replaced by it.
 

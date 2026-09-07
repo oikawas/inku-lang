@@ -69,7 +69,7 @@ pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Op
         crate::CoreModifierValue::SlightlyLarge => Some((5, 4)),
         crate::CoreModifierValue::Large => Some((3, 2)),
         crate::CoreModifierValue::VeryLarge => Some((7, 4)),
-        crate::CoreModifierValue::Fine => None,
+        crate::CoreModifierValue::Fine | crate::CoreModifierValue::ExtraFine => None,
     }
 }
 

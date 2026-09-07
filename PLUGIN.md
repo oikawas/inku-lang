@@ -64,7 +64,10 @@ complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
 (`circle`, `ellipse`, `cloudform`, or `square`), explicit
 `movement:place`, exact `place:center`, and optional same-category `color`,
-`touch`, `continuity`, `surface`, and `angle`. Angle uses the same seeded resolver
+`touch`, `continuity`, `surface`, `angle`, and `thinness`. Thinness is a closed
+core category outside Saijiki: only `thinness:fine` and
+`thinness:extra_fine` are accepted, and both use the same lowerer as ordinary DDL.
+Angle uses the same seeded resolver
 as ordinary DDL and reaches `Score.rotation` for circle, ellipse, and cloudform;
 an angled square is an invalid Emit because of the known Renderer unit seam.
 Existing fill behavior for omitted, `none`,
@@ -98,6 +101,11 @@ and receives normal count-one.
 
 An angle written on the Macro caller is unbound caller meaning. It does not fan
 out to or override angles authored by individual Emits.
+
+Thinness written on the Macro caller is also unbound caller meaning. It does not
+bind an outer Macro parameter, fan out to child Emits, or override thinness authored
+inside the definition. Definitions may pass the two closed refs through declared
+definition-local component parameters.
 
 ## Resolution, Expansion, and LLM Boundary
 

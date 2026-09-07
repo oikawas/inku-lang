@@ -18,7 +18,7 @@ use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
 use inku_score::{
     Canvas, Color, GroundMaterial, LineStyle, Point, Primitive, RelationGap, RelationType,
-    ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture, Weight,
+    ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture, Thinness, Weight,
 };
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -89,6 +89,55 @@ fn omitted_count_size_and_drawing_attributes_resolve_to_an_actual_score() {
     assert_eq!(instruction.weight, Weight::Pen);
     assert_eq!(instruction.style, LineStyle::Solid);
     assert!(instruction.filled);
+    assert_eq!(instruction.thinness, None);
+}
+
+#[test]
+fn direct_fine_reaches_actual_score_thinness() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (source, language, expected) in [
+        (
+            "place one thin red circle at center.",
+            ResolvedInstructionLanguage::En,
+            Thinness::Fine,
+        ),
+        (
+            "中心に細い赤い円をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+            Thinness::Fine,
+        ),
+        (
+            "place one extra-fine red circle at center.",
+            ResolvedInstructionLanguage::En,
+            Thinness::ExtraFine,
+        ),
+        (
+            "中心にごく細い赤い円をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+            Thinness::ExtraFine,
+        ),
+    ] {
+        let result = stage15(source, language);
+        let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+        let continued = lower_verified_stage15_score_with_policy(
+            result.verified_effective_view(),
+            context,
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+
+        assert_eq!(stop.outcome(), ScoreLoweringOutcome::Complete, "{source}");
+        assert!(
+            stop.diagnostics().is_empty(),
+            "{source}: {:?}",
+            stop.diagnostics()
+        );
+        assert_eq!(stop.score(), continued.score(), "{source}");
+        assert_eq!(
+            stop.score().unwrap().instructions[0].thinness,
+            Some(expected),
+            "{source}"
+        );
+    }
 }
 
 #[test]
@@ -1414,6 +1463,61 @@ fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
 }
 
 #[test]
+fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_lowerer() {
+    let definition = thinness_pair_definition();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let paired = stage15_locked(
+        "place one thin red circle at center. Draw.ThinnessPair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let paired = lower_verified_stage15_score(paired.verified_effective_view(), context);
+
+    assert_eq!(paired.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(
+        paired.diagnostics().is_empty(),
+        "{:?}",
+        paired.diagnostics()
+    );
+    let instructions = &paired.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 3);
+    assert_eq!(instructions[0], instructions[1]);
+    assert_eq!(instructions[1].thinness, Some(Thinness::Fine));
+    assert_eq!(instructions[2].thinness, Some(Thinness::ExtraFine));
+    assert!(matches!(
+        paired.instruction_origins(),
+        [
+            ScoreInstructionOrigin::SourceInstruction { .. },
+            ScoreInstructionOrigin::MacroEmit { .. },
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ]
+    ));
+
+    let caller = stage15_locked(
+        "place one green circle at center. extra-fine Draw.ThinnessPair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let stop = lower_verified_stage15_score(caller.verified_effective_view(), context);
+    let continued = lower_verified_stage15_score_with_policy(
+        caller.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(
+        stop.gaps()
+            .contains(&ScoreFieldGap::UnboundMacroCallerMeaning)
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert_eq!(continued.score().unwrap().instructions[0].thinness, None);
+    assert!(matches!(
+        continued.instruction_origins(),
+        [ScoreInstructionOrigin::SourceInstruction { .. }]
+    ));
+}
+
+#[test]
 fn delivered_ground_ids_use_shared_defaults_in_english_and_japanese() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     for (source, material) in [
@@ -2535,6 +2639,13 @@ fn center_emit_definition() -> MacroDefinition {
 fn complete_flat_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn thinness_pair_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"ThinnessPair","version":"1.0.0","parameters":{},"components":{"mark":{"parameters":{"width":{"type":"semantic_ref","category":"thinness"}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"parameter","name":"width"}}}]}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"semantic_ref","category":"thinness","id":"fine"}}},{"op":"use","component":"mark","arguments":{"width":{"expr":"semantic_ref","category":"thinness","id":"extra_fine"}}}]}"#,
     )
     .unwrap()
 }

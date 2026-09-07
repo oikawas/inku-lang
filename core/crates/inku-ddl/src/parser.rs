@@ -58,6 +58,29 @@ pub enum CoreModifierValue {
 }
 
 impl CoreModifierValue {
+    pub const fn dimension(self) -> CoreModifierDimension {
+        match self {
+            Self::Fine | Self::ExtraFine => CoreModifierDimension::Thinness,
+            _ => CoreModifierDimension::RelativeScale,
+        }
+    }
+
+    pub fn from_semantic_ref(category: &str, id: &str) -> Option<Self> {
+        let value = match id {
+            "fine" => Self::Fine,
+            "extra_fine" => Self::ExtraFine,
+            "slightly_small" => Self::SlightlySmall,
+            "small" => Self::Small,
+            "very_small" => Self::VerySmall,
+            "normal" => Self::Normal,
+            "slightly_large" => Self::SlightlyLarge,
+            "large" => Self::Large,
+            "very_large" => Self::VeryLarge,
+            _ => return None,
+        };
+        (value.dimension().as_str() == category).then_some(value)
+    }
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Fine => "fine",
@@ -997,7 +1020,9 @@ fn has_relative_scale_head_context(
             }
             cursor += character.len_utf8();
         }
-        if has_primitive_candidate_at(source, cursor, language) {
+        if has_primitive_candidate_at(source, cursor, language)
+            || qualified_macro_end(source, cursor).is_some()
+        {
             return true;
         }
         if cursor >= source.len() {

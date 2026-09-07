@@ -797,7 +797,7 @@ fn validate_body(
                     if !matches!(
                         semantic_category_authority(field),
                         Some(SemanticCategoryAuthority::Asset(_))
-                            | Some(SemanticCategoryAuthority::Thinness)
+                            | Some(SemanticCategoryAuthority::CoreModifier)
                     ) {
                         push_diagnostic(diagnostics, "unknown_semantic_field", &expression_path);
                     }
@@ -1339,15 +1339,15 @@ fn component_bound(
 enum SemanticCategoryAuthority {
     Asset(&'static str),
     Relation,
-    Thinness,
+    CoreModifier,
 }
 
 fn semantic_category_authority(category: &str) -> Option<SemanticCategoryAuthority> {
     if category == "relation" {
         return Some(SemanticCategoryAuthority::Relation);
     }
-    if category == "thinness" {
-        return Some(SemanticCategoryAuthority::Thinness);
+    if matches!(category, "thinness" | "relative_scale") {
+        return Some(SemanticCategoryAuthority::CoreModifier);
     }
     SEMANTIC_CATEGORIES.iter().find_map(|(known, asset)| {
         (*known == category).then_some(SemanticCategoryAuthority::Asset(*asset))
@@ -1368,8 +1368,9 @@ fn known_semantic_id(category: &str, id: &str) -> bool {
 pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {
     match semantic_category_authority(category)? {
         SemanticCategoryAuthority::Relation => known_relation(id).then(|| id.to_owned()),
-        SemanticCategoryAuthority::Thinness => {
-            matches!(id, "fine" | "extra_fine").then(|| id.to_owned())
+        SemanticCategoryAuthority::CoreModifier => {
+            crate::CoreModifierValue::from_semantic_ref(category, id)
+                .map(|value| value.as_str().to_owned())
         }
         SemanticCategoryAuthority::Asset(asset_key) => canonical_semantic_id(asset_key, id)
             .expect("embedded Saijiki semantic aliases must validate"),

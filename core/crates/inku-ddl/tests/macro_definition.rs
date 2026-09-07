@@ -11,6 +11,60 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
 
 #[test]
+fn all_finite_core_values_validate_only_their_own_category_and_field() {
+    use inku_ddl::CoreModifierValue::*;
+    for value in [
+        Fine,
+        ExtraFine,
+        SlightlySmall,
+        Small,
+        VerySmall,
+        Normal,
+        SlightlyLarge,
+        Large,
+        VeryLarge,
+    ] {
+        let category = value.dimension().as_str();
+        assert_eq!(
+            inku_ddl::CoreModifierValue::from_semantic_ref(category, value.as_str()),
+            Some(value)
+        );
+        let other = if category == "thinness" {
+            "relative_scale"
+        } else {
+            "thinness"
+        };
+        assert_eq!(
+            inku_ddl::CoreModifierValue::from_semantic_ref(other, value.as_str()),
+            None
+        );
+        let mut data = serde_json::json!({
+            "schema":"inku.macro-definition.v1", "namespace":"Core", "heading":"Value", "version":"1.0.0",
+            "parameters":{"value":{"type":"semantic_ref","category":category}}, "components":{},
+            "body":[{"op":"emit","binding":null,"fields":{category:{"expr":"semantic_ref","category":category,"id":value.as_str()}}},
+                    {"op":"emit","binding":null,"fields":{category:{"expr":"parameter","name":"value"}}}]
+        });
+        assert!(
+            MacroDefinition::from_json(&data.to_string())
+                .unwrap()
+                .validate()
+                .is_valid()
+        );
+        data["body"][0]["fields"][category]["id"] = serde_json::json!("unknown");
+        assert!(
+            !MacroDefinition::from_json(&data.to_string())
+                .unwrap()
+                .validate()
+                .is_valid()
+        );
+    }
+    assert_eq!(
+        inku_ddl::CoreModifierValue::from_semantic_ref("size", "normal"),
+        None
+    );
+}
+
+#[test]
 fn central_place_rows_share_one_typed_semantic_identity() {
     let central = project_macro_semantic_ref("basho", "中央").unwrap();
     let middle = project_macro_semantic_ref("basho", "中心").unwrap();
@@ -79,7 +133,11 @@ fn closed_core_thinness_refs_validate_for_literals_and_component_parameters() {
 
     for (category, id, expected_code) in [
         ("thinness", "normal", "unknown_semantic_id"),
-        ("relative_scale", "small", "unknown_semantic_category"),
+        (
+            "relative_scale",
+            "small",
+            "semantic_field_requires_matching_reference",
+        ),
     ] {
         let invalid = MacroDefinition::from_json(
             &serde_json::json!({

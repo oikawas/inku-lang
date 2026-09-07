@@ -197,9 +197,9 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
-Actual Scoreへ届く現行finite consumerは、flatな完成`emit`だけを一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`circle` / `ellipse` / `cloudform` / `square`、`movement`は明示`place`、`place`はexact generated focus targetを持つ`center`に限る。`color` / `touch` / `continuity` / `surface`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
+Actual Scoreへ届く現行finite consumerは、flatな完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`、`movement`は明示`place`、`place`はexact generated focus targetを持つ`center`に限る。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
 
-Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / `relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のflat EmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、無関係なflat siblingをsource / generated provenance順に残す。Structural subtreeから子Emitだけを抜き出さず、新しいEmit keyを足さない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
+Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じflat Macroの隣接bound Emit間だけは`connected` / `touching`を共有checked performerへ届け、元参照順とownerを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / 未対応`relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のflat EmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、無関係なflat siblingをsource / generated provenance順に残す。参照消失は元の依存先を保って対象Emitを省略し、残存Emitへ付け替えない。Structural subtreeから子Emitだけを抜き出さない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
@@ -207,9 +207,7 @@ Macroは意味解決後のinvocation順に実行する。照応だけのmention�
 
 Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite flat Emitを通常lowerer経由でactual Scoreへ届ける。ただしproduction runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
-Flat Emitの`thinness` keyはSaijikiとは別のclosed core ref `fine` / `extra_fine`だけを受け入れ、
-definition-local component parameterを通った値も通常instructionと同じlowererへ渡す。Visible sourceの
-caller thinnessは外側Macro parameterへbindせず、従来の未結合診断とStop / Continueの呼出し単位処置を保つ。
+Visible sourceの細さと大小は、同じdimensionの`SemanticRef` categoryを明示宣言したparameterへ、一意で完全なassignmentだけをbindingする。大小は既存のhead前修飾でqualified Macro headも認識する。Core由来の値はSaijiki asset metadataを持たず、元span / clause / atom / parameter / definitionへ結び、通常entity修飾として二重消費しない。Literal、外側parameter、definition-local component parameterの値はいずれも同じEmit fieldと通常lowererへ合流する。Missing / ambiguous bindingは既存上流error policy、未宣言caller factは既存lowering policyに従う。Bound parameterだけを新しいcontinuation predicateへ昇格せず、未宣言属性の自動overlay / fan-outを行わない。Source / owner integrity不良は両modeを停止する。
 
 ### 4.7 Render Engine との分離
 
@@ -910,7 +908,7 @@ sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instruction
 このruntime未接続subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / squareのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
 
 同じruntime未接続subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
-`Instruction.thinness`へ届ける。Visible sourceから外側Macro parameterをbindする範囲は拡張せず、
+`Instruction.thinness`へ届け、明示宣言した細さ・大小parameterも§4.6の経路へbindingする。
 この到達だけでwhole Step 10を完了とはしない。
 
 ### 12.12 添景と互換記録

@@ -3,10 +3,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
-    AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color, GroundMaterial,
-    Instruction, InstructionMode, LineStyle, Point, Primitive, Relation, RelationGap, RelationType,
-    ResolvedPaletteContext, Score, SurfaceSpec, SurfaceTexture, Thinness, Weight,
-    lookup_canvas_format,
+    AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
+    ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
+    Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score, SurfaceSpec,
+    SurfaceTexture, Thinness, Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -296,6 +296,70 @@ fn lower_macro_instruction(
         }
     };
 
+    let emit_nodes = expansion
+        .nodes
+        .iter()
+        .filter_map(|node| match node {
+            ExpandedMacroNode::Emit {
+                binding: Some(binding),
+                provenance,
+                ..
+            } => Some((binding, provenance)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let mut connected_by_to = BTreeMap::new();
+    let mut invalid_connected_targets = BTreeSet::new();
+    for node in &expansion.nodes {
+        let ExpandedMacroNode::Relation {
+            kind,
+            from,
+            to,
+            provenance,
+        } = node
+        else {
+            continue;
+        };
+        if kind != "connected" {
+            continue;
+        }
+        let from_position = emit_nodes.iter().position(|(binding, _)| *binding == from);
+        let to_position = emit_nodes.iter().position(|(binding, _)| *binding == to);
+        if from_position
+            .zip(to_position)
+            .is_some_and(|(from, to)| to == from + 1)
+            && connected_by_to.insert(to.clone(), from.clone()).is_none()
+        {
+            continue;
+        }
+        invalid_connected_targets.insert(to.clone());
+        let reason = ScoreFieldGap::UnsupportedMacroRelation;
+        let target_provenance = to_position.map(|position| emit_nodes[position].1);
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: generated_owner(
+                source_instruction_index,
+                target_provenance.unwrap_or(provenance),
+                None,
+            ),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                target_provenance.map_or_else(
+                    || ScoreOmissionUnit::MacroStructuralSubtree {
+                        source_instruction_index,
+                        invocation_ordinal: provenance.invocation.invocation_ordinal,
+                        expansion_path: provenance.expansion_path.clone(),
+                        generated_ordinal: provenance.generated_ordinal,
+                    },
+                    |provenance| macro_emit_unit(source_instruction_index, provenance),
+                ),
+                None,
+            ),
+            reason,
+        });
+    }
+    let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
+
     for node in &expansion.nodes {
         let ExpandedMacroNode::Emit {
             binding,
@@ -303,6 +367,9 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
+            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected") {
+                continue;
+            }
             let provenance = node.provenance();
             let reason = ScoreFieldGap::UnsupportedMacroStructure;
             diagnostics.push(ScoreLoweringDiagnostic {
@@ -322,6 +389,31 @@ fn lower_macro_instruction(
             });
             continue;
         };
+        if binding
+            .as_ref()
+            .is_some_and(|binding| invalid_connected_targets.contains(binding))
+        {
+            continue;
+        }
+        let connected_dependency = binding
+            .as_ref()
+            .and_then(|binding| connected_by_to.get(binding));
+        if let Some(dependency) = connected_dependency
+            && !successful_bindings.contains_key(dependency)
+        {
+            let reason = ScoreFieldGap::UnavailableMacroRelationReference;
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(source_instruction_index, provenance, None),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &reason,
+                    macro_emit_unit(source_instruction_index, provenance),
+                    None,
+                ),
+                reason,
+            });
+            continue;
+        }
         let mut input = match project_macro_emit(fields, &[]) {
             Ok(input) => input,
             Err(emit_gaps) => {
@@ -449,8 +541,48 @@ fn lower_macro_instruction(
                 reason,
             });
         }
-        if let Some(score_instruction) = attempt.instruction {
+        if let Some(mut score_instruction) = attempt.instruction {
+            if let Some(dependency) = connected_dependency {
+                let target_instruction_index = successful_bindings[dependency];
+                let prior_supported =
+                    instructions
+                        .get(target_instruction_index)
+                        .is_some_and(|prior| {
+                            matches!(
+                                prior.primitive,
+                                Primitive::Line | Primitive::Arc | Primitive::Point
+                            )
+                        });
+                let current_supported = matches!(
+                    score_instruction.primitive,
+                    Primitive::Line | Primitive::Arc | Primitive::Point
+                );
+                if !prior_supported || !current_supported {
+                    let reason = ScoreFieldGap::UnsupportedMacroRelation;
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: generated_owner(source_instruction_index, provenance, None),
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            &reason,
+                            macro_emit_unit(source_instruction_index, provenance),
+                            None,
+                        ),
+                        reason,
+                    });
+                    continue;
+                }
+                score_instruction.relation = Some(Relation {
+                    kind: RelationType::Connected,
+                    gap: RelationGap::Medium,
+                    target_instruction_index: Some(target_instruction_index),
+                    position_authority: Some(ConnectedPositionAuthority::NamedMovable),
+                });
+            }
+            let score_index = instructions.len();
             instructions.push(score_instruction);
+            if let Some(binding) = binding {
+                successful_bindings.insert(binding.clone(), score_index);
+            }
             instruction_origins.push(ScoreInstructionOrigin::MacroEmit {
                 source_instruction_index,
                 binding: binding.clone(),
@@ -1077,6 +1209,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                         instruction,
                         relation,
                         effective_focus,
+                        &instructions,
                         &instruction_origins,
                     );
                     match score_relation {
@@ -1238,9 +1371,10 @@ fn direct_score_relation(
     instruction: &SemanticInstruction,
     relation: &SemanticRelation,
     effective_focus: Option<FocusRegion>,
+    score_instructions: &[Instruction],
     instruction_origins: &[ScoreInstructionOrigin],
 ) -> Result<Relation, ScoreFieldGap> {
-    let supported_kind_and_reference = matches!(
+    let legacy_supported = matches!(
         (relation.kind, relation.reference),
         (
             SemanticRelationKind::NotTouching,
@@ -1250,13 +1384,30 @@ fn direct_score_relation(
             SemanticPreviousReference::PreviousTwo
         )
     );
+    let connected = matches!(
+        (relation.kind, relation.reference),
+        (
+            SemanticRelationKind::Connected,
+            SemanticPreviousReference::PreviousOne
+        )
+    );
     let has_exact_center = instruction.position.as_ref().is_some_and(|position| {
         position.identity.category == "place" && position.identity.id == "center"
     });
-    if !supported_kind_and_reference
-        || instruction.entity.numeric_position.is_some()
-        || !has_exact_center
-        || effective_focus.is_none()
+    let connected_position_supported = instruction.entity.numeric_position.is_some()
+        || (instruction.position.is_some() && effective_focus.is_some());
+    let connected_primitive_supported = matches!(
+        &instruction.entity.head,
+        SemanticHead::Primitive(term)
+            if term.identity.category == "shape"
+                && matches!(term.identity.id.as_str(), "line" | "arc" | "point")
+    );
+    if (!legacy_supported && !connected)
+        || (legacy_supported
+            && (instruction.entity.numeric_position.is_some()
+                || !has_exact_center
+                || effective_focus.is_none()))
+        || (connected && (!connected_position_supported || !connected_primitive_supported))
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
     }
@@ -1295,16 +1446,33 @@ fn direct_score_relation(
             dependency_instruction_indices,
         });
     }
+    if connected
+        && !score_instructions.last().is_some_and(|prior| {
+            matches!(
+                prior.primitive,
+                Primitive::Line | Primitive::Arc | Primitive::Point
+            )
+        })
+    {
+        return Err(unsupported_relation_reason(instruction_index, relation));
+    }
 
     Ok(Relation {
         kind: match relation.kind {
             SemanticRelationKind::NotTouching => RelationType::NotTouching,
             SemanticRelationKind::Between => RelationType::Between,
+            SemanticRelationKind::Connected => RelationType::Connected,
             SemanticRelationKind::Along
             | SemanticRelationKind::Cutting
             | SemanticRelationKind::Touching => unreachable!("supported relation checked"),
         },
         gap: RelationGap::Medium,
+        target_instruction_index: connected.then(|| score_instructions.len() - 1),
+        position_authority: connected.then_some(if instruction.entity.numeric_position.is_some() {
+            ConnectedPositionAuthority::NumericFixed
+        } else {
+            ConnectedPositionAuthority::NamedMovable
+        }),
     })
 }
 

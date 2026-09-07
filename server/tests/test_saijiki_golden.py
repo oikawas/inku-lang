@@ -408,8 +408,16 @@ def test_relation_literal_markers_match_golden() -> None:
         ),
         "cutting": ("前の線を切る", "cutting the previous line"),
         "between": ("前の二つの間に", "between the previous two"),
+        "connected": ("前の形につながる", "connected to the previous shape"),
     }
-    assert list(_RELATION_LITERAL_MARKERS) == ["along", "not_touching", "touching", "cutting", "between"]
+    assert list(_RELATION_LITERAL_MARKERS) == [
+        "along",
+        "not_touching",
+        "touching",
+        "cutting",
+        "between",
+        "connected",
+    ]
 
 
 # --- 受け入れ②: パーサ経由 (A-1) とテーブル直接参照の同値 ---

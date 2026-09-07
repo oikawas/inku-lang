@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::checked_performance::{CheckedPerformanceError, resolve_checked_performance};
 use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
@@ -10,7 +11,7 @@ use crate::layers::render_presence_layer;
 use crate::marks::{MarkContext, MarkError, render_instruction};
 use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
-use crate::performance::{PerformanceRequest, resolve_performance};
+use crate::performance::PerformanceRequest;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
@@ -34,6 +35,7 @@ fn canvas_ground(score: &Score) -> Option<CanvasGroundSpec> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RenderError {
     Mark(MarkError),
+    CheckedPerformance(CheckedPerformanceError),
     NonFiniteSvg,
 }
 
@@ -41,6 +43,13 @@ impl fmt::Display for RenderError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Mark(error) => error.fmt(formatter),
+            Self::CheckedPerformance(error) => {
+                write!(
+                    formatter,
+                    "checked performance stopped: {:?}",
+                    error.diagnostics
+                )
+            }
             Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
         }
     }
@@ -96,6 +105,7 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         texture_degraded: profile == SvgProfile::Compat && !render_surface_textures.is_empty(),
         render_canvas_ground: canvas_ground(score),
         render_surface_textures,
+        execution: None,
     }
 }
 
@@ -212,21 +222,25 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         request.options.catalog_id.as_deref(),
     );
     let background = background_color(&request, &assignment);
-    let performance = resolve_performance(PerformanceRequest {
-        score: &request.score,
-        performance_seed: request.options.render_seed,
-        composition_seed: request.options.composition_seed,
-        canvas: Some(request.options.canvas),
-    });
+    let performance = resolve_checked_performance(
+        PerformanceRequest {
+            score: &request.score,
+            performance_seed: request.options.render_seed,
+            composition_seed: request.options.composition_seed,
+            canvas: Some(request.options.canvas),
+        },
+        request.options.error_policy,
+    )
+    .map_err(RenderError::CheckedPerformance)?;
     let ground = canvas_ground(&performance.score);
     let support = ground.as_ref().map_or(DEFAULT_SUPPORT, |ground| {
         support_for_ground(ground.material)
     });
     let mut ordered = performance
-        .score
-        .instructions
+        .instruction_indices
         .iter()
-        .enumerate()
+        .copied()
+        .zip(performance.score.instructions.iter())
         .collect::<Vec<_>>();
     ordered.sort_by_key(|(_, instruction)| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
@@ -409,8 +423,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
     if svg.contains("NaN") || svg.contains("inf") || svg.contains("-inf") {
         return Err(RenderError::NonFiniteSvg);
     }
-    Ok(RenderOutput {
-        svg,
-        metadata: build_render_metadata(&source_score, profile),
-    })
+    let mut metadata = build_render_metadata(&source_score, profile);
+    metadata.execution = performance.execution;
+    Ok(RenderOutput { svg, metadata })
 }

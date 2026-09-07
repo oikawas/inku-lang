@@ -131,7 +131,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
-| relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
+| relations | あいだ | along, not touching, cutting, between, touching, connected — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
@@ -2202,7 +2202,7 @@ The distinction §13.3 draws between emotion words and motion words extends to
 relation.  Only physical, externally observable relations are allowed into the
 core.
 
-**The initial set is limited to these five words:**
+**The set is limited to these six words:**
 
 | Word (ja) | Word (en) | Meaning | `relation.type` |
 |---|---|---|---|
@@ -2211,6 +2211,7 @@ core.
 | 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
+| つながる | connected | joins the current start to the preceding element's endpoint without changing either shape | `connected` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
 intent and personification, not observable from outside.
@@ -2222,19 +2223,17 @@ Japanese, and `along the previous line` / `not touching the previous shape` /
 `cutting the previous line` / `between the previous two` in English.  `touching`
 is used only where `前の線に触れる` / `前の弧に両端で触れる` or `touching the
 previous line` / `touching the previous arc at both ends` makes the contact
-explicit; it is never granted spontaneously.  Notions that arrive from natural
+explicit; it is never granted spontaneously. `connected` is used only for
+`前の形につながる` / `connected to the previous shape`; shorter forms and
+phrases asserting an unverified previous primitive type are not aliases. Notions that arrive from natural
 language — around, on the same beat, leading or lagging, near or far — are not
 relations, and are expressed through position, path, rotation, and spacing.
 
 **Second-round candidates (judged after measurement)**: overlapping, set apart,
-same direction, opposite direction, thinner than, continuing.  They are added
+same direction, opposite direction, thinner than.  They are added
 only once measurement shows the current words to be expressively insufficient.
-`continuing` was confirmed to work mechanically in sketches but showed no
-decisive expressive value: the persuasiveness of a withered leaf turned out to be
-rate-limited by the cloudform's surface and ground expression instead.  It is to
-be retested after that expression improves, and stays a second-round candidate
-until then, following the §4.11 procedure — a final judgment reserved, with its
-accounting.
+The one-endpoint `connected` relation entered only after its independent visual
+value and finite Line / Arc / Point endpoint family were fixed.
 
 ### 14.3 The JSON Score Schema
 
@@ -2253,8 +2252,10 @@ An optional `relation` field is added to an instruction.
 
 | Field | Values | Meaning |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` | the kind of relation |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | the kind of relation |
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
+| `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for `connected`; omitted for older relations |
+| `position_authority` | `named_movable` / `numeric_fixed` | whether `connected` may translate the current instruction |
 
 **The referent is always the immediately preceding instruction — an implicit
 prev reference.**  Only `between` refers to the preceding two elements.
@@ -2286,6 +2287,9 @@ sequential resolution.
 - `touching` -> applies to line and arc only; the element's two endpoints are made
   to coincide with the two endpoints of the preceding line or arc as the
   performance realized them
+- `connected` -> applies to Line, Arc, and Point; the current canonical start
+  (Point center) is translated to the prior canonical end (Point center), while
+  the prior, dimensions, curvature, and rotation remain unchanged
 
 Under `touching`, when the element is an arc: let the settled endpoints of the
 preceding element be P1 and P2, the chord length `c=|P2-P1|`, and the signed
@@ -2314,29 +2318,26 @@ the relation afterwards (v1.94).  Under `touching` the preceding element's
 performed endpoints settle the position, so the region is treated as the starting
 point of the chain and as information.
 
-In the runtime-disconnected typed compiler consumer, `not_touching` and
-`between` on ordinary source-owned direct primitives reach an actual Score. The
-current instruction is limited to the existing lowerer's circle, ellipse,
-cloudform, or square subset, omitted or one count, explicit `place`, and a
-verified named focus derived from its original exact `place:center`. The
-compiler uses the existing Score `medium` gap and does not choose distance,
-anchor, or randomness. A relation survives only when every original source
-instruction named by typed previous-one or previous-two survives as exactly one
-direct primitive Score instruction and those source origins are the actual
-immediate predecessors in their original order. A projected index, the last
-Emit of a Macro, or the nearest surviving shape is never substituted.
+The typed compiler carries `connected` from the exact bilingual full literal on
+ordinary adjacent direct instructions, and from an explicit relation between
+adjacent bound flat Macro Emits, into the same Score consumer. It preserves the
+original Score index, dependency slot, owner, focus, and seed. Named positions
+are movable; numeric positions are fixed. After named-region resolution, the
+checked performer applies only the translation needed to join the endpoints and
+does not clamp again. A numeric position succeeds when the required delta is
+zero at the existing physical geometry precision and otherwise reports an
+explicit conflict.
 
-Stop returns no Score when the current instruction or its referents fall outside
-that subset. OmitAndContinue removes the current instruction as one
-`RelationInstruction`; it does not erase the relation and keep an independent
-shape. If downstream lowering omits a referent, dependent relations are omitted
-in source order. A numeric, unspecified, or non-center named position on the
-current instruction, the other three relations, a Macro current, and a Macro
-referent remain unsupported. An otherwise lowerable numeric position on a prior
-referent is preserved. The renderer still resolves the region first and performs
-the relation second. This delivery carries the type and original references into
-Score; it does not add a guarantee of geometric non-contact for every shape and
-seed beyond the renderer's existing clamps and degenerate-case drops.
+Stop resolves every Connected instruction before SVG construction and returns a
+typed reason with no new output on failure. OmitAndContinue omits the entire
+current instruction or Macro Emit, records its original Score index, reason, and
+disposition, and retains unrelated instructions with their original execution
+indices. A dependent Connected instruction whose referent was omitted is also
+omitted; it is never retargeted to the nearest survivor. Omitting every drawing
+unit and any source, lock, owner, or exact-Score join failure stop both modes.
+Older five relations retain their existing warning and wire behavior. This is a
+direct shared/native path; it does not claim the typed DDL production pipeline,
+UI, or saved-setting cutover is complete.
 
 A relation that cannot be resolved — the preceding element is a background fill
 with no contour, say — is dropped by the validator or by coerce, with a warning
@@ -2555,7 +2556,7 @@ Important score concepts:
 - `color_hint`: optional hint used when resolving catalog colors, and the descriptive markers the renderer reads as the character of a drawing
 - `note`: optional machine-written processing annotation. It never reaches the drawing: it is outside the performance seed allowlist, and Stage 2 is instructed never to emit it. Coerce and the API record their diagnostics here so that a diagnostic can no longer be mistaken for a color description. **It is a chronological record of processing steps, not a summary of the final Score or drawing state.** A later step may supersede an earlier diagnostic while both remain recorded, so no single `note` clause is evidence of the current color, shape, or placement. It is declared second, because an optional field's fill rate rises toward the tail of the declaration order
 - `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
-- `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; a touching relation pins both endpoints
+- `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, `touching`, or `connected`; touching pins both endpoints, while connected translates only the current start to the prior end
 
 A count the description states outright outranks any later reading of it.
 Canonical meaning keeps the value as lossless symbolic intent. The Step 11 pure
@@ -2688,7 +2689,7 @@ The scene-tone rule currently chooses from the abstract colors alone:
 Nuance that cannot be represented by the nine abstract colors (§3.1) is retained
 in `color_hint` for catalog-based rendering.
 
-Relations are sequential. `along`, `not_touching`, `cutting`, and `touching` refer to the immediately previous instruction; `between` refers to the previous two. There are no arbitrary ids, forward references, or repair governors for relations. Invalid relations are dropped by validation or coercion with a recorded warning, and the instruction is rendered normally without the relation. The coerce layer may remove invalid relations but must not add new ones. JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, `前の二つの間に` / `between the previous two`, and the explicit contact phrases `前の線に触れる` / `touching the previous line` or `前の弧に両端で触れる` / `touching the previous arc at both ends`. Touching is never added spontaneously. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
+Relations are sequential. `along`, `not_touching`, `cutting`, `touching`, and `connected` refer to the immediately previous instruction; `between` refers to the previous two. There are no arbitrary ids, forward references, or repair governors for relations. The older relations retain their validation/coercion warning behavior; Connected resolution is checked before SVG and never leaves a bare current instruction on failure. JSON Score `relation` is reserved for explicit previous-object phrases in normalized DDL: `前の線に沿って` / `along the previous line`, `前の形に触れない` / `not touching the previous shape`, `前の線を切る` / `cutting the previous line`, `前の二つの間に` / `between the previous two`, the explicit contact phrases `前の線に触れる` / `touching the previous line` or `前の弧に両端で触れる` / `touching the previous arc at both ends`, and `前の形につながる` / `connected to the previous shape`. Touching and Connected are never added spontaneously. Natural-language proximity, rhythm, ahead/behind, near, and far are represented with position, path, rotation, and spacing instead of relation.
 
 An instruction that carries both a region (`at`) and a relation (such as plugin-member double arcs) is placed by its region first and then resolved by its relation (v1.94); for touching, the previous instruction’s endpoints decide the final position, so the region acts as chain-start information. Relations discovered unresolvable only at performance are dropped. Warning-class failures, such as a grid layout consuming a relation, record a structured warning; canonically silent fallbacks, including missing prior bounds and designated degenerate geometry, drop the relation without a warning.
 

@@ -95,6 +95,8 @@ pub enum ScoreFieldGap {
         invocation_ordinal: u64,
     },
     UnsupportedMacroStructure,
+    UnsupportedMacroRelation,
+    UnavailableMacroRelationReference,
     MissingMacroEmitField {
         key: String,
     },

@@ -92,14 +92,16 @@ background-contrast color, into an actual Score. Existing fill behavior for `non
 remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
 Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
 material numeric defaults or seeds. Line owns exact length, arc owns exact chord and sagitta, and point owns exact
-radius or diameter. For ordinary source-owned direct primitives, the same existing four-shape, count-one,
-explicit-place, original exact-center named-focus subset carries NotTouching and Between into the existing Score
+radius or diameter. For ordinary source-owned direct primitives, the checked lowerer carries NotTouching and Between,
+and the Line / Arc / Point endpoint family carries Connected, into the existing Score
 relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order;
-Continue omits dependent currents as `RelationInstruction` units when a referent disappears. Surface intensity,
-numeric, non-center, or unspecified placement on the current instruction, normal geometry for remaining primitives,
-count allocation, the other three relations / group, Macro relation / structure / numeric input, whole-parity and
-retirement remain, and this path is not connected to the runtime. Effective focus maps through the single policy's
+Continue omits dependent currents as `RelationInstruction` units when a referent disappears. Connected also reaches
+adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
+checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
+the prior, dimensions, curvature, or rotation. A nonzero numeric conflict stops or omits the current according to
+policy, and omitted dependencies never retarget to a survivor. Other relations, general structures, caller binding,
+allocation, whole-parity, and runtime/UI persistence cutover remain. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
 Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final

@@ -114,3 +114,25 @@ fn point_roundtrips_while_an_old_arc_keeps_the_absent_semantic_anchor() {
     assert_eq!(reread, score);
     assert_eq!(reread.instructions[1].position, None);
 }
+
+#[test]
+fn connected_fields_roundtrip_while_legacy_relations_keep_them_absent() {
+    let source = br#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.4,0.5]},
+        {"primitive":"line","from":[0.4,0.5],"to":[0.7,0.5],
+         "relation":{"type":"connected","target_instruction_index":0,
+         "position_authority":"numeric_fixed"}},
+        {"primitive":"circle","center":[0.8,0.8],"radius":0.05,
+         "relation":{"type":"not_touching"}}
+    ]}"#;
+    let score = read_saved_score_json(source).expect("Connected Score must parse");
+    let connected = score.instructions[1].relation.as_ref().unwrap();
+    assert_eq!(connected.target_instruction_index, Some(0));
+    assert!(connected.position_authority.is_some());
+    let legacy = score.instructions[2].relation.as_ref().unwrap();
+    assert_eq!(legacy.target_instruction_index, None);
+    assert_eq!(legacy.position_authority, None);
+    let canonical = canonical_json_bytes(&score).expect("Connected Score serializes");
+    let reread = read_saved_score_json(&canonical).expect("Connected Score rereads");
+    assert_eq!(reread, score);
+}

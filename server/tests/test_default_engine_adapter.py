@@ -37,13 +37,13 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         request = json.loads(request_json)
         calls.append(request)
         return "<svg/>", json.dumps(
-            {"render_engine_id": "default", "render_engine_version": "43"}
+            {"render_engine_id": "default", "render_engine_version": "44"}
         )
 
     native = SimpleNamespace(
         default_color_map_json=lambda: json.dumps({"black": "#111111"}),
         render_engine_id=lambda: "default",
-        render_engine_version=lambda: "43",
+        render_engine_version=lambda: "44",
         render=render,
     )
     monkeypatch.setattr(adapter, "_native_binding", lambda: native)
@@ -63,9 +63,9 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         composition_seed=-7,
     )
     assert engine.id == "default"
-    assert engine.version == "43"
+    assert engine.version == "44"
     assert result.svg == "<svg/>"
-    assert result.metadata["render_engine_version"] == "43"
+    assert result.metadata["render_engine_version"] == "44"
     assert len(calls) == 1
     request = calls[0]
     assert request["score"]["instructions"][0]["from"] == [0.1, 0.2]
@@ -80,7 +80,7 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
 def test_current_engine_is_the_default_rust_adapter():
     assert current_render_engine() is adapter.DEFAULT_RENDER_ENGINE
     assert current_render_engine().id == "default"
-    assert current_render_engine().version == "43"
+    assert current_render_engine().version == "44"
 
 
 def test_default_package_exports_the_thin_adapter_contract():
@@ -100,6 +100,7 @@ def test_default_package_exports_the_thin_adapter_contract():
         "render_seed",
         "composition_seed",
         "wild",
+        "error_policy",
     ]
 
 
@@ -252,7 +253,7 @@ def test_step10q_endpoint_family_native():
     )
 
     assert result.metadata["render_engine_id"] == "default"
-    assert result.metadata["render_engine_version"] == "43"
+    assert result.metadata["render_engine_version"] == "44"
     assert 'id="instruction_000_line_red"' in result.svg
     assert 'id="instruction_001_arc_blue"' in result.svg
     assert 'id="instruction_002_point_black"' in result.svg
@@ -265,3 +266,80 @@ def test_step10q_endpoint_family_native():
     assert 'transform="rotate(30 1175 500)"' in result.svg
     assert 'cx="1880" cy="600" r="6"' in result.svg
     assert 'transform="rotate(15 470 750)"' in result.svg
+
+
+def test_step10q_connected_native():
+    from inku_analysis.rasterizer import svg_to_png
+
+    compatible = Score.model_validate(
+        {
+            "canvas": {"aspect": "wide"},
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.1, 0.3],
+                    "to": [0.4, 0.3],
+                    "color": "red",
+                    "weight": "computer",
+                },
+                {
+                    "primitive": "arc",
+                    "center": [0.6, 0.5],
+                    "position": [0.6, 0.43],
+                    "radius": 0.13,
+                    "angle_start": 150,
+                    "angle_end": 30,
+                    "rotation": 20,
+                    "color": "blue",
+                    "weight": "computer",
+                    "relation": {
+                        "type": "connected",
+                        "target_instruction_index": 0,
+                        "position_authority": "named_movable",
+                    },
+                },
+            ],
+        }
+    )
+    success = current_render_engine().render(
+        compatible,
+        svg_profile="editable",
+        render_seed=0,
+        composition_seed=0,
+    )
+    assert success.metadata["render_engine_version"] == "44"
+    assert "execution" not in success.metadata
+    assert 'id="instruction_000_line_red"' in success.svg
+    assert 'id="instruction_001_arc_blue"' in success.svg
+    png = svg_to_png(success.svg, width=320)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+
+    conflict_payload = compatible.model_dump(mode="json")
+    conflict_payload["instructions"][1] = {
+        "primitive": "line",
+        "from": [0.5, 0.3],
+        "to": [0.8, 0.3],
+        "color": "blue",
+        "weight": "computer",
+        "relation": {
+            "type": "connected",
+            "target_instruction_index": 0,
+            "position_authority": "numeric_fixed",
+        },
+    }
+    conflict = Score.model_validate(conflict_payload)
+    with pytest.raises(ValueError, match="NumericConnectedPositionConflict"):
+        current_render_engine().render(conflict, render_seed=0)
+
+    continued = current_render_engine().render(
+        conflict,
+        svg_profile="editable",
+        render_seed=0,
+        error_policy="omit_and_continue",
+    )
+    assert 'id="instruction_000_line_red"' in continued.svg
+    assert "instruction_001_line_blue" not in continued.svg
+    assert continued.metadata["execution"]["rendered_instruction_indices"] == [0]
+    assert continued.metadata["execution"]["diagnostics"][0]["reason"] == (
+        "numeric_connected_position_conflict"
+    )

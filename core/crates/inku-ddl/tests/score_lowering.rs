@@ -17,8 +17,9 @@ use inku_render::placement::region_in_short_side_units;
 use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
 use inku_score::{
-    Canvas, Color, GroundMaterial, LineStyle, Point, Primitive, RelationGap, RelationType,
-    ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture, Thinness, Weight,
+    Canvas, Color, ConnectedPositionAuthority, GroundMaterial, LineStyle, Point, Primitive,
+    RelationGap, RelationType, ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture,
+    Thinness, Weight,
 };
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -126,6 +127,38 @@ fn endpoint_family_normal_arc_and_point_reach_independent_actual_score_geometry(
     assert_eq!(point.center, Some(Point::new(0.7, 0.5)));
     assert!((point.radius.unwrap() - 0.006).abs() < 1.0e-15);
     assert!(point.filled);
+}
+
+#[test]
+fn connected_lowering_carries_named_and_numeric_position_authority_explicitly() {
+    for (source, expected) in [
+        (
+            "place one red line at center. place one blue line at center connected to the previous shape.",
+            ConnectedPositionAuthority::NamedMovable,
+        ),
+        (
+            "place one red line at horizontal 0.2, vertical 0.3. place one blue line at horizontal 0.4, vertical 0.3 connected to the previous shape.",
+            ConnectedPositionAuthority::NumericFixed,
+        ),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}"
+        );
+        let relation = lowered.score().unwrap().instructions[1]
+            .relation
+            .as_ref()
+            .expect("Connected reaches Score");
+        assert_eq!(relation.kind, RelationType::Connected);
+        assert_eq!(relation.target_instruction_index, Some(0));
+        assert_eq!(relation.position_authority, Some(expected));
+    }
 }
 
 #[test]

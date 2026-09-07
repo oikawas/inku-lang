@@ -87,6 +87,7 @@ pub enum SemanticRelationKind {
     Cutting,
     Between,
     Touching,
+    Connected,
 }
 
 impl SemanticRelationKind {
@@ -97,6 +98,7 @@ impl SemanticRelationKind {
             Self::Cutting => "cutting",
             Self::Between => "between",
             Self::Touching => "touching",
+            Self::Connected => "connected",
         }
     }
 }
@@ -1585,6 +1587,7 @@ fn explicit_previous_reference_occurrence(
         CanonicalRelationKind::Cutting => SemanticRelationKind::Cutting,
         CanonicalRelationKind::Between => SemanticRelationKind::Between,
         CanonicalRelationKind::Touching => SemanticRelationKind::Touching,
+        CanonicalRelationKind::Connected => SemanticRelationKind::Connected,
     };
     let reference = match reference {
         CanonicalPreviousReference::PreviousOne => SemanticPreviousReference::PreviousOne,

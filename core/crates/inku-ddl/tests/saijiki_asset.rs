@@ -45,7 +45,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .sum::<usize>(),
         91
     );
-    assert_eq!(asset.relations.len(), 5);
+    assert_eq!(asset.relations.len(), 6);
     assert_eq!(
         asset
             .categories
@@ -72,19 +72,40 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|relation| relation.relation_type.as_str())
             .collect::<Vec<_>>(),
-        ["along", "not_touching", "touching", "cutting", "between"]
+        [
+            "along",
+            "not_touching",
+            "touching",
+            "cutting",
+            "between",
+            "connected"
+        ]
     );
     assert_eq!(
         asset.relation_marker_order.ja,
-        ["触れる", "沿う", "切る", "触れない", "間に"]
+        ["触れる", "つながる", "沿う", "切る", "触れない", "間に"]
     );
     assert_eq!(
         asset.relation_marker_order.en,
-        ["touching", "along", "cutting", "not touching", "between"]
+        [
+            "touching",
+            "connected",
+            "along",
+            "cutting",
+            "not touching",
+            "between"
+        ]
     );
     assert_eq!(
         asset.relation_display_order,
-        ["along", "not_touching", "cutting", "between", "touching"]
+        [
+            "along",
+            "not_touching",
+            "cutting",
+            "between",
+            "touching",
+            "connected"
+        ]
     );
     assert_eq!(
         asset.marker_class_order,
@@ -102,7 +123,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
     assert_eq!(category_keys.len(), 11);
-    assert_eq!(relation_types.len(), 5);
+    assert_eq!(relation_types.len(), 6);
 
     let aliases = asset
         .categories

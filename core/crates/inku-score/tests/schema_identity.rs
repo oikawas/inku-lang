@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "5bc77d70261d4fff203a429df9d329fd699388430c4da14b5f9a935f8f6f48a3";
+    "a9bcaa94645f1e2611036064dede8e225dde13528d11ea449e7f0bd1e269cd29";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -45,6 +45,18 @@ fn canonical_score_schema_identity_is_stable() {
             .expect("position description")
             .contains("semantic anchor")
     );
+    let relation = schema["$defs"]["Relation"]["properties"]
+        .as_object()
+        .expect("Relation properties must be an object");
+    assert!(
+        relation["type"]["enum"]
+            .as_array()
+            .expect("relation enum")
+            .iter()
+            .any(|value| value == "connected")
+    );
+    assert!(relation.contains_key("target_instruction_index"));
+    assert!(relation.contains_key("position_authority"));
 
     assert_eq!(SCORE_SCHEMA_DIGEST_DOMAIN, "inku.score.schema.v1");
     let mut hasher = Sha256::new();

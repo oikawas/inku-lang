@@ -154,8 +154,11 @@ PresenceIntensity = Literal["low", "medium", "high"]
 PresenceSymmetry = Literal["none", "bilateral", "radial"]
 GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
-RelationType = Literal["along", "not_touching", "cutting", "between", "touching"]
+RelationType = Literal[
+    "along", "not_touching", "cutting", "between", "touching", "connected"
+]
 RelationGap = Literal["narrow", "medium", "wide"]
+ConnectedPositionAuthority = Literal["named_movable", "numeric_fixed"]
 InstructionMode = Literal["additive", "carve"]
 CarveDepth = Literal["light", "half", "bright"]
 SurfaceSpacingGradient = Literal["none", "coarse_to_dense", "dense_to_coarse"]
@@ -297,11 +300,22 @@ class Relation(BaseModel):
     """直前 instruction との観察可能な関係。参照先は暗黙 prev のみ。"""
 
     type: RelationType = Field(
-        description="along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に / touching=触れる",
+        description="along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に / touching=触れる / connected=つながる",
     )
     gap: RelationGap = Field(
         default="medium",
         description="関係解決時の距離目安: narrow / medium / wide。具体距離は Renderer が解決する",
+    )
+    target_instruction_index: Optional[int] = Field(
+        default=None,
+        ge=0,
+        exclude_if=lambda value: value is None,
+        description="connected が参照する元 Score instruction index。ほかの relation では省略",
+    )
+    position_authority: Optional[ConnectedPositionAuthority] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="connected current の位置出自。named_movable または numeric_fixed",
     )
 
     @model_validator(mode="before")

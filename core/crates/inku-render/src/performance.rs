@@ -21,6 +21,11 @@ pub struct PerformanceRequest<'a> {
 pub struct PerformancePlan {
     pub score: Score,
     pub warnings: Vec<PlanningWarning>,
+    /// Pre-omission expanded ordinals used by drawing IDs and seed material.
+    pub instruction_indices: Vec<usize>,
+    /// Original Score owners corresponding to each performed instruction.
+    pub original_instruction_indices: Vec<usize>,
+    pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
 fn instruction_extent(instruction: &Instruction) -> f64 {
@@ -79,24 +84,27 @@ fn composite_member_copy(
     moved
 }
 
-fn expand_composite_groups(
+pub(crate) fn expand_composite_groups_with_indices(
     score: &Score,
     placement_seed: Option<Seed>,
     performance_seed: Option<Seed>,
     canvas: Option<CanvasSize>,
-) -> Score {
+) -> (Score, Vec<usize>) {
     let mut expanded = Vec::new();
+    let mut original_instruction_indices = Vec::new();
     let mut index = 0;
     while index < score.instructions.len() {
         let head = &score.instructions[index];
         let Some(arrangement) = head.arrangement.as_ref() else {
             expanded.push(head.clone());
+            original_instruction_indices.push(index);
             index += 1;
             continue;
         };
         let group_size = arrangement.group_size as usize;
         if group_size == 1 {
             expanded.push(head.clone());
+            original_instruction_indices.push(index);
             index += 1;
             continue;
         }
@@ -121,7 +129,8 @@ fn expand_composite_groups(
             let scale = instruction_extent(&copy_head) / source_extent;
             let color = cycles_color.then_some(copy_head.color);
             expanded.push(copy_head.clone());
-            for member in &members[1..] {
+            original_instruction_indices.push(index);
+            for (member_offset, member) in members[1..].iter().enumerate() {
                 expanded.push(composite_member_copy(
                     member,
                     source_anchor,
@@ -131,20 +140,21 @@ fn expand_composite_groups(
                     color,
                     canvas,
                 ));
+                original_instruction_indices.push(index + member_offset + 1);
             }
         }
         index += group_size;
     }
     let mut result = score.clone();
     result.instructions = expanded;
-    result
+    (result, original_instruction_indices)
 }
 
 /// Resolve the complete deterministic pre-draw instruction sequence.
 #[must_use]
 pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     let placement_seed = request.composition_seed.or(request.performance_seed);
-    let expanded = expand_composite_groups(
+    let (expanded, original_instruction_indices) = expand_composite_groups_with_indices(
         request.score,
         placement_seed,
         request.performance_seed,
@@ -152,8 +162,11 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     );
     let Some(seed) = request.performance_seed else {
         return PerformancePlan {
+            instruction_indices: (0..expanded.instructions.len()).collect(),
+            original_instruction_indices,
             score: expanded,
             warnings: Vec::new(),
+            execution: None,
         };
     };
     let mut resolved = Vec::with_capacity(expanded.instructions.len());
@@ -185,5 +198,12 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     }
     let mut score = expanded;
     score.instructions = resolved;
-    PerformancePlan { score, warnings }
+    let instruction_indices = (0..score.instructions.len()).collect();
+    PerformancePlan {
+        score,
+        warnings,
+        instruction_indices,
+        original_instruction_indices,
+        execution: None,
+    }
 }

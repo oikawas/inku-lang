@@ -49,21 +49,25 @@ class DefaultRenderEngine:
         render_seed: int | None = None,
         composition_seed: int | None = None,
         wild: bool = False,
+        error_policy: str = "stop",
     ) -> RenderEngineResult:
         native = _native_binding()
         aspect, canvas = resolved_canvas(score, canvas_aspect)
+        options = {
+            "resolved_color_map": dict(color_map or _default_color_map(native)),
+            "catalog_id": catalog_id,
+            "canvas": {"width": canvas.width, "height": canvas.height},
+            "canvas_aspect_id": aspect,
+            "svg_profile": normalize_svg_profile(svg_profile),
+            "render_seed": render_seed,
+            "composition_seed": composition_seed,
+            "wild": wild,
+        }
+        if error_policy != "stop":
+            options["error_policy"] = error_policy
         request = {
             "score": canonical_score_payload(score),
-            "options": {
-                "resolved_color_map": dict(color_map or _default_color_map(native)),
-                "catalog_id": catalog_id,
-                "canvas": {"width": canvas.width, "height": canvas.height},
-                "canvas_aspect_id": aspect,
-                "svg_profile": normalize_svg_profile(svg_profile),
-                "render_seed": render_seed,
-                "composition_seed": composition_seed,
-                "wild": wild,
-            },
+            "options": options,
         }
         svg, metadata_json = native.render(
             json.dumps(request, ensure_ascii=False, separators=(",", ":"))

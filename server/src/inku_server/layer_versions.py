@@ -266,4 +266,6 @@ DDL_ENGINE_VERSION = "21"
 # 4 (2026-09-07): 点 / point joins the independent shape vocabulary. Japanese
 # 点 remains the existing stipple surface when phrase ownership attaches it to
 # another explicit shape; a standalone shape head owns the new point identity.
-DDL_VERSION = "4"
+# 5 (2026-09-07): つながる / connected joins the relation vocabulary through
+# only the fixed previous-shape phrases. Existing works retain their language version.
+DDL_VERSION = "5"

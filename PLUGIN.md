@@ -78,9 +78,16 @@ document Ground. A verified document-owned Ground reaches the same lowerer as a
 `CanvasGroundSpec` with the host-resolved aspect. Omitted drawing attributes and
 normal count-one geometry use the same defaults as ordinary DDL.
 
+An explicit `connected` relation may join only two adjacent bound flat Emits in
+the same expansion. It preserves Emit order and generated ownership and uses
+the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
+omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
+retargets to the last surviving Emit. Other relation kinds and structural
+relation placement remain unsupported by this consumer.
+
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and
-expanded `group`, `transform`, `anchor`, or `relation` nodes stop the entire
+expanded `group`, `transform`, `anchor`, or unsupported `relation` nodes stop the entire
 Score. Under explicit OmitAndContinue, a supported appearance problem omits
 only that field and uses the ordinary default; an invalid flat Emit omits that
 Emit; and an unsupported structural node omits its whole subtree without

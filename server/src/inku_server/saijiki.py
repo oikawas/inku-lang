@@ -358,8 +358,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
 )
 
 # あいだ (関係)。プロンプトの語彙ブロックには出さず、関係節 (散文) が扱う。
-# 表示順は SPEC §14.2 (沿う/触れない/切る/間に/触れる)、格納順は composer の
-# relation テーブル順 (along/not_touching/touching/cutting/between) とする。
+# 表示順は SPEC §14.2、格納順は composer の relation テーブル順とする。
 RELATIONS: tuple[RelationWord, ...] = (
     RelationWord("along", "沿う", "along", ("前の線に沿って",), ("along the previous line",)),
     RelationWord(
@@ -378,14 +377,28 @@ RELATIONS: tuple[RelationWord, ...] = (
     ),
     RelationWord("cutting", "切る", "cutting", ("前の線を切る",), ("cutting the previous line",)),
     RelationWord("between", "間に", "between", ("前の二つの間に",), ("between the previous two",)),
+    RelationWord(
+        "connected",
+        "つながる",
+        "connected",
+        ("前の形につながる",),
+        ("connected to the previous shape",),
+    ),
 )
 
 _RELATION_MARKER_ORDER = {
-    "ja": ("触れる", "沿う", "切る", "触れない", "間に"),
-    "en": ("touching", "along", "cutting", "not touching", "between"),
+    "ja": ("触れる", "つながる", "沿う", "切る", "触れない", "間に"),
+    "en": ("touching", "connected", "along", "cutting", "not touching", "between"),
 }
 
-_RELATION_DISPLAY_ORDER = ("along", "not_touching", "cutting", "between", "touching")
+_RELATION_DISPLAY_ORDER = (
+    "along",
+    "not_touching",
+    "cutting",
+    "between",
+    "touching",
+    "connected",
+)
 
 
 def _surface(word: SaijikiWord, lang: str) -> str:

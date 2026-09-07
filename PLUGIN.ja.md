@@ -75,6 +75,15 @@ pure ceilingを通過するまで、損失のないsymbolic intentとして残�
 
 ## 現在の実装状態
 
+Runtime未接続のfinite flat Emit consumerは、明示movement:placeとcircle / ellipse / cloudform /
+square / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と
+top / bottom / left_edge / right_edge / top_edge / bottom_edge / cornerを受け入れ、SPEC §18の領域を使う。
+Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"place"}` parameterは同じ経路を通る。
+隅はStage 2がattested meaning / composition seed / 元occurrenceから選び、隅内anchorはRendererが選ぶ。
+Sourceやprovenanceへ座標を挿入せず、未宣言callerの暗黙overlay、位置省略、count反復を追加しない。
+隣接bound Emitのconnected / touchingは両者がexact centerの場合に限り、noncenter relationを黙って捨てない。
+Stopは新Scoreなし、OmitAndContinueは元ownerと既存の最小省略単位を保ち、integrity不良は両mode停止とする。
+
 共有Rust compiler基盤は、MacroDefinition v1の値をparse、validate、identify、lock、bindし、
 決定的に展開できる。Production runtimeへの統合、install可能なpackage catalog、preview、
 legacy cutover、汎用user-package loaderは完了していない。したがって本ガイドは、任意のpackageを

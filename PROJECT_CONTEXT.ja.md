@@ -73,7 +73,7 @@ Stage 1.5の入場では、実際のvisible source bytes、存在する言語証
 言語証跡のない入力へ条件を足さず、未使用sidecarの解決や実行を要求しない。
 同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
 canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
-direct `Instruction { instruction_index }` ownerを持つ元`place:center`と、place actionが解決済みの
+direct `Instruction { instruction_index }` ownerを持つ元`place:center`、明示した上・下・四辺・隅と、place actionが解決済みの
 circle / ellipse / cloudform / square / line / arc / pointでは、明示numeric geometryに加え、count1のnormal geometryと
 日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
 `solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
@@ -99,6 +99,11 @@ Stopを既定、OmitAndContinueを明示選択とする。Stopは未対応意味
 Continueは元meaningを変えず、独立appearance fieldまたは成立しないtyped実行単位だけを省略する。
 結果はcomplete / omissions / stopped、元gap、実際の処置、source / generated ownerとspanを区別する。
 
+同じpolicyは明示top / bottom / 四辺 / cornerを§18のanchor領域へ解決する。四辺は狭い帯、
+上・下は各1/3、隅は各1/5の四候補であり、寸法や見切れ方針を変えない。隅はStage 2が元meaning、
+tag付きcomposition seedと元occurrenceを専用domainで選び、隅内anchorだけをRendererへ委ねる。
+Centerのexact owner / focusと未対応relation境界を保ち、未宣言caller overlayを足さない。
+
 同じpolicyのangle resolverは、lock検証済みoriginal pre / expanded meaning、tag付きoptional
 `composition_seed`、logical occurrence、angle identityをSHA-256の専用domainへframeし、作者が明示した
 かたむきをactual `Score.rotation`へ一度だけ解決する。horizontal / verticalは0 / 90、diagonalは4方向、
@@ -109,10 +114,10 @@ square / triangleのanchor、pivot、bounds、relation、composite、arrangement
 Engine 43はLineの端点中点、Arcの弦中点、Pointの中心をsemantic anchorとして使う。Typed Arcは既存optional
 `position`に弦中点を運び、field不在の旧Arcは従来どおり円中心をanchorとする。
 
-Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
+Finiteなflat Macro Emitも、exact execution ownerと、centerの場合だけexact generated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
 `use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは既存4つのclosed shapeとline / arc / point、明示`place`、
-exact `center`、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
+`center`または明示top / bottom / 四辺 / corner、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
 構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
 field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
 外側meaningはinvocation単位で省略する。無関係なflat siblingと元ordinal欠番は保持する。
@@ -139,7 +144,7 @@ drawをやり直さない。Global budgetとsource / lock / owner / definition /
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
+Unspecified placement、finite subset外のMacro delivery、action省略、repeated allocation、
 残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
 `CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Pの到達は
 Step10全体の完了を意味しない。製品UI / API / 保存経路は

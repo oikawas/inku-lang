@@ -59,6 +59,137 @@ const FOCUS_REGION_BOUNDS_HUNDREDTHS: [(FocusRegion, [u8; 4]); 6] = [
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
 pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
 
+// One exact rational table feeds both policy bytes and the final Score boundary.
+const NAMED_REGIONS: [(&str, [(u8, u8); 4]); 6] = [
+    ("top", [(0, 1), (0, 1), (1, 1), (1, 3)]),
+    ("bottom", [(0, 1), (2, 3), (1, 1), (1, 1)]),
+    ("left_edge", [(0, 1), (0, 1), (1, 10), (1, 1)]),
+    ("right_edge", [(9, 10), (0, 1), (1, 1), (1, 1)]),
+    ("top_edge", [(0, 1), (0, 1), (1, 1), (1, 10)]),
+    ("bottom_edge", [(0, 1), (9, 10), (1, 1), (1, 1)]),
+];
+const CORNER_REGIONS: [[(u8, u8); 4]; 4] = [
+    [(0, 1), (0, 1), (1, 5), (1, 5)],
+    [(4, 5), (0, 1), (1, 1), (1, 5)],
+    [(0, 1), (4, 5), (1, 5), (1, 1)],
+    [(4, 5), (4, 5), (1, 1), (1, 1)],
+];
+const PLACE_SELECTION_SCHEME: &str = "inku.score-place-selection.v1";
+
+pub(crate) fn supports_named_position(id: &str) -> bool {
+    matches!(id, "center" | "corner") || NAMED_REGIONS.iter().any(|(name, _)| *name == id)
+}
+
+pub(crate) fn named_region_bounds(
+    id: &str,
+    focus: Option<FocusRegion>,
+    context: crate::score_angle::ScoreAngleContext<'_>,
+) -> Option<[f64; 4]> {
+    if id == "center" {
+        return focus.map(focus_region_bounds);
+    }
+    let bounds = if id == "corner" {
+        CORNER_REGIONS[corner_index(context)]
+    } else {
+        NAMED_REGIONS.iter().find(|(name, _)| *name == id)?.1
+    };
+    Some(bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
+}
+
+// Reuses the already-attested occurrence value, never the angle resolver or its bytes.
+fn place_hash_input(context: crate::score_angle::ScoreAngleContext<'_>) -> Vec<u8> {
+    use crate::score_angle::ScoreAngleOccurrence;
+    fn frame(output: &mut Vec<u8>, label: &[u8], value: &[u8]) {
+        output.extend_from_slice(&(label.len() as u64).to_be_bytes());
+        output.extend_from_slice(label);
+        output.extend_from_slice(&(value.len() as u64).to_be_bytes());
+        output.extend_from_slice(value);
+    }
+    let mut input = Vec::new();
+    frame(&mut input, b"scheme", PLACE_SELECTION_SCHEME.as_bytes());
+    frame(
+        &mut input,
+        b"original_pre_expansion_digest",
+        context.original_pre_expansion_digest.as_bytes(),
+    );
+    frame(
+        &mut input,
+        b"original_expanded_meaning_digest",
+        context.original_expanded_meaning_digest.as_bytes(),
+    );
+    let mut seed = vec![u8::from(context.composition_seed.is_some())];
+    if let Some(value) = context.composition_seed {
+        seed.extend_from_slice(&value.to_be_bytes());
+    }
+    frame(&mut input, b"composition_seed", &seed);
+    match context.occurrence {
+        ScoreAngleOccurrence::Direct { logical_ordinal } => {
+            frame(&mut input, b"occurrence_kind", b"direct");
+            frame(
+                &mut input,
+                b"logical_ordinal",
+                &logical_ordinal.to_be_bytes(),
+            );
+        }
+        ScoreAngleOccurrence::MacroEmit {
+            macro_semantic_ordinal,
+            expansion_path,
+            generated_ordinal,
+        } => {
+            frame(&mut input, b"occurrence_kind", b"macro_emit");
+            frame(
+                &mut input,
+                b"macro_semantic_ordinal",
+                &macro_semantic_ordinal.to_be_bytes(),
+            );
+            frame(
+                &mut input,
+                b"expansion_path",
+                &crate::typed_expansion_path_bytes(expansion_path),
+            );
+            frame(
+                &mut input,
+                b"generated_ordinal",
+                &generated_ordinal.to_be_bytes(),
+            );
+        }
+    }
+    frame(&mut input, b"place_id", b"corner");
+    input
+}
+
+fn corner_index(context: crate::score_angle::ScoreAngleContext<'_>) -> usize {
+    // Four divides 256 exactly: the first digest byte gives an unbiased finite choice.
+    usize::from(Sha256::digest(place_hash_input(context))[0] % 4)
+}
+
+fn write_place_policy(output: &mut String) {
+    fn bounds(output: &mut String, values: [(u8, u8); 4]) {
+        output.push('[');
+        for (index, (n, d)) in values.into_iter().enumerate() {
+            if index > 0 {
+                output.push(',');
+            }
+            write!(output, "\"{n}/{d}\"").expect("policy String");
+        }
+        output.push(']');
+    }
+    output.push_str("\"named_regions\":{");
+    for (id, values) in NAMED_REGIONS {
+        write!(output, "\"{id}\":").expect("policy String");
+        bounds(output, values);
+        output.push(',');
+    }
+    output.push_str("\"corner\":[");
+    for (index, values) in CORNER_REGIONS.into_iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        bounds(output, values);
+    }
+    write!(output, "],\"selection\":{{\"scheme\":\"{PLACE_SELECTION_SCHEME}\",\"draw\":\"sha256_first_byte_modulo_four\",\"order\":[\"upper_left\",\"upper_right\",\"lower_left\",\"lower_right\"],\"fields\":[\"original_pre_expansion_digest\",\"original_expanded_meaning_digest\",\"tagged_composition_seed\",\"logical_occurrence\",\"place_id\"]}}}},").expect("policy String");
+}
+
 pub(crate) fn focus_region_bounds(focus: FocusRegion) -> [f64; 4] {
     let bounds = FOCUS_REGION_BOUNDS_HUNDREDTHS
         .iter()
@@ -86,6 +217,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
         .get_or_init(|| {
             let mut canonical = String::from(GEOMETRY_RESOLUTION_POLICY_PREFIX);
             crate::score_angle::write_angle_policy_json(&mut canonical);
+            write_place_policy(&mut canonical);
             canonical.push_str(GEOMETRY_RESOLUTION_POLICY_MIDDLE);
             for (index, (focus, bounds)) in FOCUS_REGION_BOUNDS_HUNDREDTHS.iter().enumerate() {
                 if index > 0 {
@@ -586,6 +718,71 @@ mod tests {
             "rotated_declared_rectangle"
         );
         assert_eq!(payload["unimplemented"], serde_json::json!([]));
+        assert_eq!(
+            payload["named_regions"]["top"],
+            serde_json::json!(["0/1", "0/1", "1/1", "1/3"])
+        );
+        assert_eq!(
+            payload["named_regions"]["selection"]["scheme"],
+            PLACE_SELECTION_SCHEME
+        );
+        let context = crate::score_angle::ScoreAngleContext {
+            composition_seed: None,
+            original_pre_expansion_digest: "pre",
+            original_expanded_meaning_digest: "expanded",
+            occurrence: crate::score_angle::ScoreAngleOccurrence::Direct { logical_ordinal: 7 },
+        };
+        assert_ne!(
+            place_hash_input(context),
+            place_hash_input(crate::score_angle::ScoreAngleContext {
+                composition_seed: Some(0),
+                ..context
+            })
+        );
+        assert_ne!(
+            place_hash_input(context),
+            place_hash_input(crate::score_angle::ScoreAngleContext {
+                occurrence: crate::score_angle::ScoreAngleOccurrence::Direct { logical_ordinal: 0 },
+                ..context
+            })
+        );
+        assert_ne!(
+            place_hash_input(context),
+            place_hash_input(crate::score_angle::ScoreAngleContext {
+                occurrence: crate::score_angle::ScoreAngleOccurrence::MacroEmit {
+                    macro_semantic_ordinal: 7,
+                    expansion_path: &[],
+                    generated_ordinal: 0
+                },
+                ..context
+            })
+        );
+        let mut selected = BTreeSet::new();
+        for seed in 0..64 {
+            let context = crate::score_angle::ScoreAngleContext {
+                composition_seed: Some(seed),
+                ..context
+            };
+            let index = corner_index(context);
+            selected.insert(index);
+            assert_eq!(
+                named_region_bounds("corner", None, context),
+                Some(CORNER_REGIONS[index].map(|(n, d)| f64::from(n) / f64::from(d)))
+            );
+        }
+        assert_eq!(selected, BTreeSet::from([0, 1, 2, 3]));
+        for (id, bounds) in NAMED_REGIONS {
+            assert_eq!(
+                payload["named_regions"][id],
+                serde_json::json!(bounds.map(|(n, d)| format!("{n}/{d}")))
+            );
+            assert_eq!(
+                named_region_bounds(id, None, context),
+                Some(bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
+            );
+        }
+        assert_eq!(named_region_bounds("unknown", None, context), None);
+        assert_eq!(named_region_bounds("center", None, context), None);
         for (focus, expected) in [
             (FocusRegion::UpperRight, [0.60, 0.18, 0.82, 0.40]),
             (FocusRegion::UpperLeft, [0.18, 0.18, 0.40, 0.40]),
@@ -604,7 +801,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "7b5f34a87b4c98ebd91d75075e38b9c0dffa561e8ead7bb8efc4ed7e65659c13"
+            "8430cc4ea6449368c45948443016603a767edd47e2b02520126c091474c1438c"
         );
     }
 }

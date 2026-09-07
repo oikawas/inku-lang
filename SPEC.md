@@ -355,9 +355,9 @@ At this boundary the Renderer needs to know only core meaning, while a plugin ca
 
 `inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
 
-The current finite consumer that reaches an actual Score projects each complete flat `emit` as one instruction into the same semantic input used by ordinary DDL. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`, `movement` must explicitly be `place`, and `place` must be `center` with its exact generated focus target. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
+The current finite consumer that reaches an actual Score projects each complete flat `emit` as one instruction into the same semantic input used by ordinary DDL. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts `center` with its exact generated focus target, or the explicit `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
 
-The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Each `place` uses only the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Only adjacent bound Emits in the same flat Macro may deliver `connected` / `touching` through the shared checked performer, preserving original reference order and ownership. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. Under the default Stop mode, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, repeated outer count, or expanded `group` / `transform` / `anchor` / unsupported `relation` stops the entire Score. Under explicit OmitAndContinue, an independent appearance field omits only that field, an invalid flat Emit omits that Emit, an unsupported structural node omits that subtree, and invalid outer caller meaning omits the invocation; unrelated flat siblings remain in source and generated-provenance order. A missing reference omits the target Emit with its original dependency, without retargeting to a survivor. No child Emit is extracted from a structural subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
+The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Only `place:center` uses the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Only adjacent bound Emits with exact center placement in the same flat Macro may deliver `connected` / `touching` through the shared checked performer, preserving original reference order and ownership. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. Under the default Stop mode, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, repeated outer count, or expanded `group` / `transform` / `anchor` / unsupported `relation` stops the entire Score. Under explicit OmitAndContinue, an independent appearance field omits only that field, an invalid flat Emit omits that Emit, an unsupported structural node omits that subtree, and invalid outer caller meaning omits the invocation; unrelated flat siblings remain in source and generated-provenance order. A missing reference omits the target Emit with its original dependency, without retargeting to a survivor. No child Emit is extracted from a structural subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
 Macros execute in invocation order after meaning resolution. A mention used only for anaphora does not execute twice or shift the semantic ordinal of a later macro. Source occurrence ordinal remains separately for ownership and provenance. The original sentences and rhythm, source spans, continuation edge / target, all bindings, and source / generated provenance are retained and verified. A full compiler-lock digest that includes them is an attestation of source integrity; equivalent expressions need not have the same digest. Source-record differences do not enter meaning selection, while source alteration is rejected.
 
@@ -994,7 +994,7 @@ and both change only on an explicit action.
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
 | Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
-| Composition | Another composition | Stage 1.5's focus selection and the concrete angle for an explicitly authored angle, both from the composition seed (§12.11 / §18) | one Stage 2 call (the saved normalized DDL is unchanged) |
+| Composition | Another composition | Stage 1.5's focus selection and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | one Stage 2 call (the saved normalized DDL is unchanged) |
 
 Another composition reselects among the closed six focus candidates and, when
 the description has an angle, reselects its concrete angle. The Stage 1.5
@@ -1389,6 +1389,7 @@ is the effective DDL / typed meaning consumed by Stage 2.
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
   source-integrity attestation rather than focus material
+- explicit noncenter place never enters the focus targets; Stage 2 resolves it to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
 - an explicit angle passes through as original typed meaning and does not join
   the center-only target set or variation axis. Stage 2 selects its concrete
   angle from the same verified pre- and expanded-meaning digests, tagged
@@ -1457,7 +1458,7 @@ Lock-verified pre-expansion meaning, expanded meaning, and an attested optional
 attests source integrity and does not require equivalent expressions to have
 the same lock. "Another composition" reuses saved normalized DDL and selects
 focus from the closed six candidates, and also reselects the concrete angle
-when an explicit angle identity is present. There is no current `vary_seed`
+when an explicit angle identity is present, or the corner when corner is explicit. There is no current `vary_seed`
 input.
 
 Explicit variation is the pair of amplitude (small, medium, or large) and
@@ -2542,6 +2543,32 @@ for evolution of the rendering layer.
 
 ## 18. JSON Score
 
+Explicit named positions reach the same geometry consumer from ordinary DDL and declared flat Macros.
+These `at.region` bounds describe semantic anchors on canvas axes from zero to one, not whole-shape fit areas.
+
+| Place identity | Region [x0,y0,x1,y1] |
+|---|---|
+| top | [0,0,1,1/3] |
+| bottom | [0,2/3,1,1] |
+| left_edge | [0,0,1/10,1] |
+| right_edge | [9/10,0,1,1] |
+| top_edge | [0,0,1,1/10] |
+| bottom_edge | [0,9/10,1,1] |
+| corner | One of upper-left [0,0,1/5,1/5], upper-right [4/5,0,1,1/5], lower-left [0,4/5,1/5,1], lower-right [4/5,4/5,1,1] |
+
+Center / middle retains canonical center and its six exact-owner focus regions. Edges are narrow bands, not fixed points.
+Stage 2 selects a corner in the dedicated `inku.score-place-selection.v1` domain. It frames verified original
+pre- and expanded-meaning digests, a composition seed tagged to distinguish None from Some(0), and either the
+original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.
+The first SHA-256 byte modulo four selects upper-left, upper-right, lower-left, then lower-right.
+Different composition seeds may select the same corner. Source, canonical meaning, and provenance never receive the
+selected corner; the existing Renderer render seed chooses its anchor within that region. Another performance and
+explicit variation preserve the corner. One rational policy table converts to Score f64 only at the final boundary.
+The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
+Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
+Unsupported noncenter relations remain unsupported and are never silently discarded. This delivery remains disconnected
+from runtime, UI, and persistence and does not complete whole Step10.
+
 JSON Score is the machine-readable score produced by Stage 2.  It is not the
 final work; it is the structure that the renderer performs.
 
@@ -2826,11 +2853,11 @@ The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** preserves saved normalized DDL,
 advances `composition_seed`, reselects focus from Stage 1.5's closed six
-candidates, and reselects the concrete angle in Stage 2 when an explicit angle
-is present. It changes no composition family, technique, color, touch,
+candidates, and reselects the concrete angle or corner in Stage 2 when that
+meaning is explicitly present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
-`composition_seed` reproduce the same effective meaning and angle. Another
-performance and explicit variation preserve the resolved angle. Saved Score / expanded
+`composition_seed` reproduce the same effective meaning, angle, and corner. Another
+performance and explicit variation preserve the resolved angle and corner. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
 identity never presents changed bytes as an old identity; the D1 implementation

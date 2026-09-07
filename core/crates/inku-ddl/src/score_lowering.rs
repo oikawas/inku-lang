@@ -10,7 +10,7 @@ use inku_score::{
 };
 
 use crate::geometry::{
-    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, focus_region_bounds,
+    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, named_region_bounds,
     relative_scale_factor,
 };
 use crate::score_angle::{ScoreAngleContext, ScoreAngleOccurrence, resolve_score_angle};
@@ -224,6 +224,10 @@ fn project_source_instruction<'a>(
             .map(|term| (&term.identity).into()),
         numeric_position: instruction.entity.numeric_position.as_ref(),
         has_named_position: instruction.position.is_some(),
+        named_position: instruction
+            .position
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         effective_focus,
         explicit_geometry: instruction.entity.explicit_geometry.as_ref(),
         relative_scale: instruction
@@ -236,18 +240,14 @@ fn project_source_instruction<'a>(
             .angle
             .as_ref()
             .map(|term| (&term.identity).into()),
-        angle_context: instruction
-            .entity
-            .angle
-            .as_ref()
-            .map(|_| ScoreAngleContext {
-                composition_seed: view.composition_seed(),
-                original_pre_expansion_digest: view.original_pre_expansion_digest(),
-                original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
-                occurrence: ScoreAngleOccurrence::Direct {
-                    logical_ordinal: instruction_index as u64,
-                },
-            }),
+        angle_context: Some(ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::Direct {
+                logical_ordinal: instruction_index as u64,
+            },
+        }),
         has_unsupported_meaning: instruction.entity.fluctuation.amplitude.is_some()
             || instruction.entity.fluctuation.frequency.is_some()
             || instruction.entity.fluctuation.quality.is_some()
@@ -361,6 +361,7 @@ fn lower_macro_instruction(
         });
     }
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
+    let mut center_bindings = BTreeSet::new();
 
     for node in &expansion.nodes {
         let ExpandedMacroNode::Emit {
@@ -477,27 +478,34 @@ fn lower_macro_instruction(
                 }
             }
         };
-        input.effective_focus = match exact_macro_emit_focus(view, provenance) {
-            Ok(focus) => Some(focus),
-            Err(reason) => {
-                diagnostics.push(ScoreLoweringDiagnostic {
-                    owner: generated_owner(
-                        source_instruction_index,
-                        provenance,
-                        Some("place".to_owned()),
-                    ),
-                    disposition: diagnostic_disposition(
-                        error_policy,
-                        &reason,
-                        macro_emit_unit(source_instruction_index, provenance),
-                        None,
-                    ),
-                    reason,
-                });
-                continue;
+        input.effective_focus = if input
+            .named_position
+            .is_some_and(|place| place.id == "center")
+        {
+            match exact_macro_emit_focus(view, provenance) {
+                Ok(focus) => Some(focus),
+                Err(reason) => {
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: generated_owner(
+                            source_instruction_index,
+                            provenance,
+                            Some("place".to_owned()),
+                        ),
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            &reason,
+                            macro_emit_unit(source_instruction_index, provenance),
+                            None,
+                        ),
+                        reason,
+                    });
+                    continue;
+                }
             }
+        } else {
+            None
         };
-        input.angle_context = input.angle.map(|_| ScoreAngleContext {
+        input.angle_context = Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
             original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
@@ -560,7 +568,11 @@ fn lower_macro_instruction(
                     Primitive::Line | Primitive::Arc
                 ) || (!touching
                     && score_instruction.primitive == Primitive::Point);
-                if !prior_supported || !current_supported {
+                if !prior_supported
+                    || !current_supported
+                    || input.effective_focus.is_none()
+                    || !center_bindings.contains(dependency)
+                {
                     let reason = ScoreFieldGap::UnsupportedMacroRelation;
                     diagnostics.push(ScoreLoweringDiagnostic {
                         owner: generated_owner(source_instruction_index, provenance, None),
@@ -594,6 +606,9 @@ fn lower_macro_instruction(
             instructions.push(score_instruction);
             if let Some(binding) = binding {
                 successful_bindings.insert(binding.clone(), score_index);
+                if input.effective_focus.is_some() {
+                    center_bindings.insert(binding.clone());
+                }
             }
             instruction_origins.push(ScoreInstructionOrigin::MacroEmit {
                 source_instruction_index,
@@ -864,7 +879,7 @@ fn project_macro_emit<'a>(
         });
     }
     if let Some(identity) = place
-        && identity.id != "center"
+        && !crate::geometry::supports_named_position(identity.id)
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
             key: "place".to_owned(),
@@ -910,6 +925,7 @@ fn project_macro_emit<'a>(
         action,
         numeric_position: None,
         has_named_position: place.is_some(),
+        named_position: place,
         effective_focus: None,
         explicit_geometry: None,
         relative_scale: relative_scale.and_then(|identity| {
@@ -1999,6 +2015,7 @@ struct ScoreLoweringInput<'a> {
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
     has_named_position: bool,
+    named_position: Option<SemanticInputIdentity<'a>>,
     effective_focus: Option<FocusRegion>,
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
     relative_scale: Option<CoreModifierValue>,
@@ -2145,8 +2162,18 @@ fn lower_complete_instruction(
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
     } else if input.has_named_position {
-        if let Some(focus) = input.effective_focus {
-            Some(focus)
+        if let Some(region) = input
+            .named_position
+            .filter(|place| place.category == "place")
+            .and_then(|place| {
+                named_region_bounds(
+                    place.id,
+                    input.effective_focus,
+                    input.angle_context.expect("verified occurrence"),
+                )
+            })
+        {
+            Some(region)
         } else {
             gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
             None
@@ -2343,7 +2370,7 @@ struct LoweredGeometry {
 #[derive(Clone, Copy)]
 enum ScorePlacement<'a> {
     Numeric(&'a crate::SemanticNumericPosition),
-    Named(FocusRegion),
+    Named([f64; 4]),
 }
 
 #[derive(Clone, Copy)]
@@ -2711,7 +2738,7 @@ fn ensure_rotated_centered_extent(
 
 fn lower_named_geometry(
     dimensions: ResolvedGeometryDimensions,
-    focus: FocusRegion,
+    region: [f64; 4],
     canvas: CanvasFormat,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
     let (width_units, height_units) = canvas.integer_ratio();
@@ -2725,9 +2752,7 @@ fn lower_named_geometry(
         size: None,
         angle_start: None,
         angle_end: None,
-        at: Some(AtRegion {
-            region: focus_region_bounds(focus),
-        }),
+        at: Some(AtRegion { region }),
     };
     match dimensions {
         ResolvedGeometryDimensions::Line { length } => {

@@ -197,9 +197,9 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
-Actual Scoreへ届く現行finite consumerは、flatな完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`、`movement`は明示`place`、`place`はexact generated focus targetを持つ`center`に限る。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
+Actual Scoreへ届く現行finite consumerは、flatな完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`、`movement`は明示`place`、`place`は`center`（exact generated focus target必須）または§18の明示`top` / `bottom` / 四辺 / `corner`を受け入れる。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
 
-Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、各`place`は`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じflat Macroの隣接bound Emit間だけは`connected` / `touching`を共有checked performerへ届け、元参照順とownerを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / 未対応`relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のflat EmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、無関係なflat siblingをsource / generated provenance順に残す。参照消失は元の依存先を保って対象Emitを省略し、残存Emitへ付け替えない。Structural subtreeから子Emitだけを抜き出さない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
+Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、`place:center`だけは`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じflat Macroの隣接bound Emit間で両者がexact centerのときだけ`connected` / `touching`を共有checked performerへ届け、元参照順とownerを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`group` / `transform` / `anchor` / 未対応`relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のflat EmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、無関係なflat siblingをsource / generated provenance順に残す。参照消失は元の依存先を保って対象Emitを省略し、残存Emitへ付け替えない。Structural subtreeから子Emitだけを抜き出さない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
@@ -603,7 +603,7 @@ PNG 書き出しの選択肢は、設定モーダルの書き出しタブでユ�
 | 段 | 名称 | 変わるもの | コスト |
 |---|---|---|---|
 | 演奏 | 別の演奏 | performance seed による領域・関係・配置位相の解決（§13.8 / §14.4） | LLM 呼び出しなし（再レンダリングのみ） |
-| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択と、作者が明示したかたむきの具体角度選択（§12.11 / §18） | Stage 2 の1回（保存済み正規化 DDL は不変） |
+| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択と、作者が明示したかたむきの具体角度選択・隅の四候補選択（§12.11 / §18） | Stage 2 の1回（保存済み正規化 DDL は不変） |
 
 別の構図が選び直すのは閉じた六つの焦点候補と、記述にかたむきがあるときの具体角度である。Stage 1.5 transformation自体はfocus-onlyを保ち、角度の数値化はStage 2 consumerが同じ`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏と明示変奏は確定した角度を保つ。明示変奏は、強度（小・中・大）と variation seed が揃ったときだけ焦点軸を動かし、不完全な指定は変奏なしとして扱う。記述、正規化 DDL、明示属性は変えない。
 
@@ -898,6 +898,7 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
 - verified viewをactual Scoreへ下ろすときは、元のtyped instructionと同じindexを持つdirect `Instruction { instruction_index }` targetだけがそのinstructionを所有する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
 - baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
+- 明示noncenter placeはfocus targetへ加えず、Stage 2が§18の領域へ解決する。隅の四候補選択も構図側の責務で、元meaningとattested optional seedおよび元logical occurrenceを使う。
 - 明示angleは元のtyped meaningのまま通し、center-only target集合や変奏軸へ追加しない。具体角度はStage 2が同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
 - Stage 1.5の入力を切り離す前に、実際のvisible DDLのUTF-8 bytes、semantic source occurrenceに残る言語証跡、未使用分を含む全macro sidecarの三項、実行macroのresolved / binding / semantic head identityをcompiler lockと照合する。SourceOccurrenceがない入力へ新しい言語条件を課さず、未使用sidecarにresolutionや実行を要求しない。Sourceとprovenanceは入場時のintegrity証拠であり、meaningやfocusの材料ではない
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
@@ -917,7 +918,7 @@ sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instruction
 
 ### 12.13 変奏（Stage 1.5）
 
-構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点を選び直し、明示angleがあれば同じidentity材料から具体角度も選び直す。現行入力に `vary_seed` はない。
+構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、閉じた六つの候補から焦点を選び直し、明示angleがあれば同じidentity材料から具体角度も、明示cornerがあれば専用domainで隅も選び直す。現行入力に `vary_seed` はない。
 
 明示変奏は amplitude（小・中・大）と `variation_seed` の組である。両方が揃った場合だけ焦点を動かし、同じlock検証済みmeaning、attested composition seed、amplitude、variation seedは同じeffective meaningを得る。構図族、色、タッチ、技法、relation、要素数は動かさない。
 
@@ -1616,6 +1617,29 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 
 ## 18. JSON Score
 
+明示named位置は通常DDLと宣言済みflat Macroの共通geometry consumerで次の`at.region`へ解決する。
+値はcanvas各軸0..1のsemantic anchor領域であり、図形全体を収める範囲ではない。
+
+| place identity | 領域 [x0,y0,x1,y1] |
+|---|---|
+| top | [0,0,1,1/3] |
+| bottom | [0,2/3,1,1] |
+| left_edge | [0,0,1/10,1] |
+| right_edge | [9/10,0,1,1] |
+| top_edge | [0,0,1,1/10] |
+| bottom_edge | [0,9/10,1,1] |
+| corner | 左上[0,0,1/5,1/5]、右上[4/5,0,1,1/5]、左下[0,4/5,1/5,1]、右下[4/5,4/5,1,1]の一つ |
+
+Center / middleは元のcanonical centerとexact ownerの六focusを保つ。四辺は狭い帯であり固定点ではない。
+隅はStage 2が`inku.score-place-selection.v1`専用domainで選ぶ。Verified original pre / expanded meaning
+digest、NoneとSome(0)を区別するtag付きcomposition seed、directの元logical ordinalまたはMacroのsemantic
+ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmodulo 4を左上・右上・左下・右下へ写す。
+四択なので異なる構図seedでも同じ隅になり得る。選んだ隅をsource / canonical meaning / provenanceへ書き戻さず、
+隅内のanchorは既存Rendererのrender seedが選ぶ。別の演奏・明示変奏は隅を変えない。
+Tableはpolicyの有理数定義から最後にだけScore f64へ変換する。Policy IDは同じでも内容digestは変わり、
+semantic schemaの新versionを意味しない。未指定位置は補わず、named/numeric conflict、numeric must-fitを保つ。
+Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryはruntime / UI / 保存へ未接続で、whole Step10の完了ではない。
+
 JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。
 
 楽譜の主要な概念:
@@ -1728,7 +1752,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点を選び直し、明示angleがあればStage 2で具体角度も選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度を再現する。別の演奏と明示変奏は確定角度を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v5に反映済みだがruntimeには未接続である。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点を選び直し、明示angleがあればStage 2で具体角度も、明示cornerがあれば隅も選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度・隅を再現する。別の演奏と明示変奏は確定角度と隅を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らず、D1の実装到達は§12.11のtyped v5に反映済みだがruntimeには未接続である。
 
 v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
 

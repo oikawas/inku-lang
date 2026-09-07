@@ -63,7 +63,7 @@ Each complete flat Emit becomes one ordinary Score instruction. A sequence of
 complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
 (`line`, `circle`, `ellipse`, `cloudform`, `square`, `arc`, or `point`), explicit
-`movement:place`, exact `place:center`, and optional same-category `color`,
+`movement:place`, explicit `place` (center, top, bottom, the four edges, or corner), and optional same-category `color`,
 `touch`, `continuity`, `surface`, `angle`, `thinness`, and `relative_scale`. Thinness is a closed
 core category outside Saijiki: only `thinness:fine` and
 `thinness:extra_fine` are accepted, and both use the same lowerer as ordinary DDL.
@@ -82,7 +82,7 @@ document Ground. A verified document-owned Ground reaches the same lowerer as a
 normal count-one geometry use the same defaults as ordinary DDL.
 
 An explicit `connected` or `touching` relation may join only two adjacent bound flat Emits in
-the same expansion. It preserves Emit order and generated ownership and uses
+the same expansion, with exact center placement on both Emits. It preserves Emit order and generated ownership and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
 omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
@@ -102,6 +102,12 @@ caller meaning omits the invocation. Unrelated flat siblings retain source and
 generated-provenance order. Diagnostics identify source or generated ownership,
 spans, invocation, expansion path, generated ordinal, field key, and the actual
 omission unit. If no drawing target remains, the result is stopped.
+
+Place literals and explicitly declared `{"type":"semantic_ref","category":"place"}` parameters
+use the same regions in SPEC §18. Only center requires an exact generated focus join.
+Stage 2 selects a corner from attested meaning, composition seed, and original occurrence; the Renderer
+chooses its anchor within that corner. Coordinates never enter source or provenance. Noncenter relations
+remain unsupported, and no implicit caller overlay or omitted-place default is added.
 
 Meaning bound through declared parameters is read from the expanded Emit. An
 unbound caller appearance field does not fan out or override generated values;

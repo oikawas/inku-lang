@@ -219,7 +219,7 @@ def test_step10q_endpoint_family_native():
                     "angle_start": 143.13010235415598,
                     "angle_end": 36.86989764584402,
                     "rotation": 30,
-                    "weight": "computer",
+                    "weight": "rotring",
                     "color": "blue",
                 },
                 {
@@ -227,7 +227,7 @@ def test_step10q_endpoint_family_native():
                     "center": [0.8, 0.6],
                     "radius": 0.006,
                     "filled": True,
-                    "weight": "computer",
+                    "weight": "rotring",
                     "color": "black",
                 },
                 {

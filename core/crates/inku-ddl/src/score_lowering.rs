@@ -782,7 +782,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 10] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 11] = [
     "shape",
     "movement",
     "place",
@@ -793,6 +793,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 10] = [
     "count",
     "angle",
     "thinness",
+    "relative_scale",
 ];
 
 fn project_macro_emit<'a>(
@@ -821,6 +822,8 @@ fn project_macro_emit<'a>(
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
     let thinness = macro_semantic_field(fields, "thinness", "thinness", false, &mut gaps);
+    let relative_scale =
+        macro_semantic_field(fields, "relative_scale", "relative_scale", false, &mut gaps);
     let count = match fields.get("count") {
         None => None,
         Some(ExpandedMacroValue::Integer(value)) if *value >= 0 => Some(*value as u64),
@@ -878,6 +881,15 @@ fn project_macro_emit<'a>(
             id: identity.id.to_owned(),
         });
     }
+    if let Some(identity) = relative_scale
+        && CoreModifierValue::from_semantic_ref(identity.category, identity.id).is_none()
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "relative_scale".to_owned(),
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     if !gaps.is_empty() {
         return Err(gaps);
     }
@@ -900,7 +912,9 @@ fn project_macro_emit<'a>(
         has_named_position: place.is_some(),
         effective_focus: None,
         explicit_geometry: None,
-        relative_scale: None,
+        relative_scale: relative_scale.and_then(|identity| {
+            CoreModifierValue::from_semantic_ref(identity.category, identity.id)
+        }),
         angle,
         angle_context: None,
         has_unsupported_meaning: false,

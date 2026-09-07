@@ -734,6 +734,12 @@ fn root_environment(
 
 fn bound_value(value: &BoundMacroParameterValue) -> Result<ExpandedMacroValue, EvalError> {
     match value {
+        BoundMacroParameterValue::CoreModifier { value, .. } => {
+            Ok(ExpandedMacroValue::SemanticRef {
+                category: value.dimension().as_str().to_owned(),
+                id: value.as_str().to_owned(),
+            })
+        }
         BoundMacroParameterValue::Integer { value, .. } => Ok(ExpandedMacroValue::Integer(*value)),
         BoundMacroParameterValue::Number { value, .. } if value.is_finite() => {
             Ok(ExpandedMacroValue::Number(*value))

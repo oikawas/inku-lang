@@ -350,6 +350,152 @@ fn canonical_input_preserves_the_existing_score_in_both_modes() {
 }
 
 #[test]
+fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
+    use serde_json::json;
+    for first_scale in ["normal", "very_large"] {
+        let fields = |scale| {
+            json!({
+                "shape":{"expr":"semantic_ref","category":"shape","id":"line"},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                "place":{"expr":"semantic_ref","category":"place","id":"center"},
+                "angle":{"expr":"semantic_ref","category":"angle","id":"horizontal"},
+                "color":{"expr":"semantic_ref","category":"color","id":"red"},
+                "relative_scale":scale
+            })
+        };
+        let definition = definition_from(&json!({
+            "schema":"inku.macro-definition.v1","namespace":"Touch","heading":"Scale","version":"1.0.0",
+            "parameters":{"scale":{"type":"semantic_ref","category":"relative_scale"}},"components":{},
+            "body":[
+                {"op":"emit","binding":"first","fields":fields(json!({"expr":"semantic_ref","category":"relative_scale","id":first_scale}))},
+                {"op":"emit","binding":"second","fields":fields(json!({"expr":"parameter","name":"scale"}))},
+                {"op":"relation","kind":"touching","from":"first","to":"second"}
+            ]
+        }).to_string());
+        let execution = execute_locked(
+            "normal-sized Touch.Scale",
+            &[definition],
+            LIMITS,
+            ScoreErrorPolicy::Stop,
+        );
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{:?} {:?}",
+            execution.upstream_diagnostics(),
+            execution.downstream_diagnostics()
+        );
+        let score = execution.score().unwrap();
+        assert!(
+            score.instructions[1]
+                .relation
+                .as_ref()
+                .unwrap()
+                .touching_constraints
+                .as_ref()
+                .unwrap()
+                .dimensions_fixed
+        );
+        let request = || PerformanceRequest {
+            score,
+            composition_seed: Some(23),
+            performance_seed: Some(23),
+            canvas: None,
+        };
+        if first_scale == "normal" {
+            assert!(resolve_checked_performance(request(), ScoreErrorPolicy::Stop).is_ok());
+        } else {
+            let stopped =
+                resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap_err();
+            assert_eq!(
+                stopped.diagnostics[0].reason,
+                ScoreExecutionReason::TouchingGeometryConflict
+            );
+            let continued =
+                resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
+            assert_eq!(continued.original_instruction_indices, [0]);
+            let joined =
+                map_compiler_render_execution(&execution, score, continued.execution.as_ref())
+                    .unwrap();
+            assert!(matches!(
+                joined.diagnostics[0].owner,
+                ScoreInstructionOrigin::MacroEmit { .. }
+            ));
+        }
+    }
+}
+
+#[test]
+fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
+    use serde_json::json;
+    let mut data = json!({
+        "schema":"inku.macro-definition.v1","namespace":"Core","heading":"One","version":"1.0.0",
+        "parameters":{"width":{"type":"semantic_ref","category":"thinness"}},"components":{},
+        "body":[{"op":"emit","binding":null,"fields":{
+            "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+            "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+            "place":{"expr":"semantic_ref","category":"place","id":"center"},
+            "thinness":{"expr":"parameter","name":"width"}
+        }}]
+    });
+    let definition = definition_from(&data.to_string());
+    for source in [
+        "place one red circle at center. Core.One",
+        "place one red circle at center. thin extra-fine Core.One",
+    ] {
+        let stop = execute_locked(
+            source,
+            std::slice::from_ref(&definition),
+            LIMITS,
+            ScoreErrorPolicy::Stop,
+        );
+        assert!(stop.score().is_none());
+        assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+        let continued = execute_locked(
+            source,
+            std::slice::from_ref(&definition),
+            LIMITS,
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert_eq!(
+            continued.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{:?}",
+            continued.upstream_diagnostics()
+        );
+        assert_eq!(continued.score().unwrap().instructions.len(), 1);
+        assert!(!continued.upstream_diagnostics().is_empty());
+        assert!(continued.downstream_diagnostics().is_empty());
+    }
+    data["parameters"] = json!({});
+    data["body"][0]["fields"]["thinness"] =
+        json!({"expr":"semantic_ref","category":"thinness","id":"fine"});
+    let definition = definition_from(&data.to_string());
+    let source = "place one red circle at center. normal-sized Core.One";
+    let stop = execute_locked(
+        source,
+        std::slice::from_ref(&definition),
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert!(stop.score().is_none());
+    let continued = execute_locked(
+        source,
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 1);
+    assert!(continued.upstream_diagnostics().is_empty());
+    assert!(
+        continued
+            .downstream_diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning)
+    );
+}
+
+#[test]
 fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
     for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
         let ground_only = execute("paper.", &[], LIMITS, policy);

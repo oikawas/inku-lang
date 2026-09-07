@@ -1543,6 +1543,70 @@ fn document_macro_definition(heading: &str, parameters: serde_json::Value) -> Ma
     .expect("synthetic document macro definition parses")
 }
 
+#[test]
+fn declared_core_values_keep_exact_non_asset_owner_and_ordinary_modifiers() {
+    let definition = document_macro_definition(
+        "Core",
+        serde_json::json!({
+            "width":{"type":"semantic_ref","category":"thinness"},
+            "scale":{"type":"semantic_ref","category":"relative_scale"}
+        }),
+    );
+    for source in [
+        "thin small Nature.Core! extra-fine large circle.",
+        "small Nature.Core thin. extra-fine large circle.",
+    ] {
+        let document = document_macro_document(source, std::slice::from_ref(&definition));
+        let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        assert!(
+            binding.diagnostics.is_empty(),
+            "{source}: {:?}",
+            binding.diagnostics
+        );
+        for parameter in &binding.complete[0].parameters {
+            assert!(matches!(
+                parameter.value,
+                inku_ddl::BoundMacroParameterValue::CoreModifier { .. }
+            ));
+            assert_eq!(
+                parameter.definition_identity,
+                definition.identity().unwrap()
+            );
+            assert_eq!(
+                &source[parameter.source_span.start_byte..parameter.source_span.end_byte],
+                parameter.source_surface
+            );
+        }
+        let result = associate_semantic_document_with_macro_binding(&document, binding);
+        assert!(result.ast.complete, "{source}: {:?}", result.issues);
+        assert_eq!(result.ast.instructions.len(), 2);
+        let macro_entity = &result.ast.instructions[0].entity;
+        assert!(macro_entity.thinness.is_none());
+        assert!(macro_entity.relative_scale.is_none());
+        let SemanticHead::MacroInvocation(head) = &macro_entity.head else {
+            panic!("macro owner");
+        };
+        for parameter in &head.parameters {
+            assert!(parameter.source_asset_id.is_none());
+            assert!(parameter.canonical_surface_ja.is_none());
+            let span = parameter.provenance.span;
+            assert_eq!(
+                &source[span.start_byte..span.end_byte],
+                parameter.provenance.surface
+            );
+        }
+        let ordinary = &result.ast.instructions[1].entity;
+        assert_eq!(
+            ordinary.thinness.as_ref().unwrap().value,
+            inku_ddl::CoreModifierValue::ExtraFine
+        );
+        assert_eq!(
+            ordinary.relative_scale.as_ref().unwrap().value,
+            inku_ddl::CoreModifierValue::Large
+        );
+    }
+}
+
 fn document_macro_document(source: &str, definitions: &[MacroDefinition]) -> NormalizedDdlDocument {
     let locks = definitions
         .iter()

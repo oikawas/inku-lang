@@ -2468,6 +2468,106 @@ fn parameter_bound_fields_and_an_unused_parameter_lower_once() {
 }
 
 #[test]
+fn declared_core_thinness_source_reaches_actual_score() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Core","heading":"Mark","version":"1.0.0","parameters":{"width":{"type":"semantic_ref","category":"thinness"}},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"parameter","name":"width"}}}]}"#,
+    ).unwrap();
+    let result = stage15_locked(
+        "Core.Mark thin",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        lowered.diagnostics()
+    );
+    assert_eq!(
+        lowered.score().unwrap().instructions[0].thinness,
+        Some(Thinness::Fine)
+    );
+}
+
+#[test]
+fn declared_core_fields_and_literals_share_ordinary_effective_score() {
+    let definition = MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Core", "heading":"Fields", "version":"1.0.0",
+        "parameters":{"width":{"type":"semantic_ref","category":"thinness"},"scale":{"type":"semantic_ref","category":"relative_scale"}},
+        "components":{}, "body":[{"op":"emit","binding":null,"fields":{
+            "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+            "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+            "place":{"expr":"semantic_ref","category":"place","id":"center"},
+            "color":{"expr":"semantic_ref","category":"color","id":"red"},
+            "thinness":{"expr":"parameter","name":"width"},
+            "relative_scale":{"expr":"parameter","name":"scale"}
+        }}]
+    }).to_string()).unwrap();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (language, source, ordinary, width, scale) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "thin normal-sized Core.Fields",
+            "place one thin normal-sized red circle at center.",
+            "fine",
+            "normal",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "very large Core.Fields extra-fine",
+            "place one extra-fine very large red circle at center.",
+            "extra_fine",
+            "very_large",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "細い普通の大きさCore.Fields",
+            "細い普通の大きさ赤い円を中心に置く。",
+            "fine",
+            "normal",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "ごく細いとても大きいCore.Fields",
+            "ごく細いとても大きい赤い円を中心に置く。",
+            "extra_fine",
+            "very_large",
+        ),
+    ] {
+        let generated = stage15_locked(source, language, std::slice::from_ref(&definition));
+        let direct = stage15(ordinary, language);
+        let mut literal = serde_json::to_value(&definition).unwrap();
+        literal["parameters"] = serde_json::json!({});
+        literal["body"][0]["fields"]["thinness"] =
+            serde_json::json!({"expr":"semantic_ref","category":"thinness","id":width});
+        literal["body"][0]["fields"]["relative_scale"] =
+            serde_json::json!({"expr":"semantic_ref","category":"relative_scale","id":scale});
+        let literal = MacroDefinition::from_json(&literal.to_string()).unwrap();
+        let literal = stage15_locked("Core.Fields", language, &[literal]);
+        let mut scores = Vec::new();
+        for result in [&generated, &direct, &literal] {
+            let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(
+                lowered.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{source}: {:?}",
+                lowered.diagnostics()
+            );
+            let mut score = lowered.score().unwrap().clone();
+            // Different definition/meaning identities may choose different effective focus.
+            score.instructions[0].at = None;
+            scores.push(score);
+        }
+        assert_eq!(scores[0], scores[1], "{source}");
+        assert_eq!(scores[0], scores[2], "{source}");
+    }
+}
+
+#[test]
 fn flat_use_repeat_and_vary_emits_are_consumed_without_origin_rejection() {
     let definition = flat_operator_definition();
     let result = stage15_locked(

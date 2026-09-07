@@ -742,6 +742,16 @@ fn classify_proportion_dimension(canonical_id: &str) -> Option<ProportionDimensi
     }
 }
 
+pub(crate) fn primitive_phrase_modifier_starts(
+    attachment_evidence: &AttachmentEvidenceResult,
+) -> BTreeSet<usize> {
+    collect_pre_head_phrase_ownership(attachment_evidence, None)
+        .modifier_starts_by_head
+        .into_values()
+        .flatten()
+        .collect()
+}
+
 fn collect_pre_head_phrase_ownership(
     attachment_evidence: &AttachmentEvidenceResult,
     macro_parameter_binding: Option<&MacroParameterBindingResult>,
@@ -821,6 +831,11 @@ fn collect_pre_head_phrase_ownership(
             .filter(|atom| atom.span().end_byte <= head_span.start_byte)
         {
             let span = atom.span();
+            if macro_parameter_binding
+                .is_some_and(|binding| macro_parameter_binding_owns_span(binding, span))
+            {
+                continue;
+            }
             if phrase_floor.is_some_and(|floor| span.end_byte <= floor)
                 || head_starts.contains(&span.start_byte)
             {
@@ -1514,9 +1529,9 @@ fn semantic_macro_parameter(
     );
     let value = semantic_macro_parameter_value_from_bound(&parameter.value);
     let (source_asset_id, canonical_surface_ja) = match &parameter.value {
-        BoundMacroParameterValue::Integer { .. } | BoundMacroParameterValue::Number { .. } => {
-            (None, None)
-        }
+        BoundMacroParameterValue::Integer { .. }
+        | BoundMacroParameterValue::Number { .. }
+        | BoundMacroParameterValue::CoreModifier { .. } => (None, None),
         BoundMacroParameterValue::SemanticRef {
             source_asset_id,
             canonical_surface_ja,
@@ -1546,6 +1561,12 @@ fn semantic_macro_parameter_value_from_bound(
     value: &BoundMacroParameterValue,
 ) -> SemanticMacroParameterValue {
     match value {
+        BoundMacroParameterValue::CoreModifier { value, .. } => {
+            SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
+                category: value.dimension().as_str().to_owned(),
+                id: value.as_str().to_owned(),
+            })
+        }
         BoundMacroParameterValue::Integer { value, .. } => {
             SemanticMacroParameterValue::Integer(*value)
         }

@@ -297,6 +297,57 @@ fn core_thinness_is_not_promoted_to_a_macro_semantic_fact() {
 }
 
 #[test]
+fn declared_core_binding_requires_a_unique_complete_assignment() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Core","heading":"Mark","version":"1.0.0","parameters":{"width":{"type":"semantic_ref","category":"thinness"},"scale":{"type":"semantic_ref","category":"relative_scale"}},"components":{},"body":[]}"#,
+    ).unwrap();
+    let identity = definition.identity().unwrap();
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    for (source, expected) in [
+        (
+            "Core.Mark thin",
+            MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
+        ),
+        (
+            "thin small circle Core.Mark",
+            MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
+        ),
+        (
+            "thin extra-fine small Core.Mark",
+            MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
+        ),
+        (
+            "thin small large Core.Mark",
+            MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment,
+        ),
+        (
+            "thin small Core.Mark Core.Mark",
+            MacroParameterBindingDiagnosticKind::SharedFact,
+        ),
+    ] {
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock.clone()])
+                .unwrap();
+        let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        assert!(result.complete.is_empty(), "{source}");
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.kind == expected),
+            "{source}: {:?}",
+            result.diagnostics
+        );
+        assert!(!result.diagnostics.is_empty(), "{source}");
+    }
+}
+
+#[test]
 fn lexical_place_facts_bind_as_one_canonical_value_without_losing_source() {
     let definition = MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Bind","heading":"Place","version":"1.0.0","parameters":{"where":{"type":"semantic_ref","category":"place"}},"components":{},"body":[]}"#,
@@ -433,6 +484,7 @@ fn value_kind(value: &BoundMacroParameterValue) -> String {
         BoundMacroParameterValue::Integer { .. } => "integer",
         BoundMacroParameterValue::Number { .. } => "number",
         BoundMacroParameterValue::SemanticRef { .. } => "semantic_ref",
+        BoundMacroParameterValue::CoreModifier { .. } => "semantic_ref",
     }
     .to_owned()
 }
@@ -441,6 +493,7 @@ fn value_text(value: &BoundMacroParameterValue) -> String {
     match value {
         BoundMacroParameterValue::Integer { value, .. } => value.to_string(),
         BoundMacroParameterValue::Number { value, .. } => value.to_string(),
+        BoundMacroParameterValue::CoreModifier { value, .. } => value.as_str().to_owned(),
         BoundMacroParameterValue::SemanticRef {
             category,
             canonical_id,

@@ -106,7 +106,7 @@ Along / Cutting, whole Step 10, and typed production / UI / persistence cutover 
 adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
 checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
 the prior, dimensions, curvature, or rotation. A nonzero numeric conflict stops or omits the current according to
-policy, and omitted dependencies never retarget to a survivor. Other relations, general structures, caller binding,
+policy, and omitted dependencies never retarget to a survivor. Other relations, general structures,
 allocation, whole-parity, and runtime/UI persistence cutover remain. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
@@ -149,8 +149,12 @@ generated ordinal.
 Visible DDL `細い` / `thin` and `ごく細い` / `extra-fine` share the same Fine / ExtraFine identities
 and reach the existing `Instruction.thinness` from ordinary instructions and flat Macro Emits through
 one lowerer. Macro definitions accept only the Saijiki-independent closed core refs
-`thinness:fine` / `thinness:extra_fine`. This does not extend outer Macro-parameter binding from
-visible source; existing unbound caller-thinness diagnostics and mode-specific handling remain.
+`thinness:fine` / `thinness:extra_fine` and seven-class `relative_scale`.
+Visible source binds uniquely only when a parameter explicitly declares the matching SemanticRef dimension,
+preserving its span, clause, atom, and definition without a second consumption as an ordinary entity modifier.
+Core values carry no asset metadata. Literals and parameters join ordinary geometry and factors exactly once
+through the same Emit fields; explicit normal also fixes dimensions. Missing or ambiguous binding retains
+the upstream error policy, and undeclared caller facts retain existing lowering diagnostics and mode handling.
 
 The runtime-disconnected `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
@@ -165,7 +169,7 @@ Global budgets and source, lock, owner, definition, or provenance integrity fail
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
 compatibility paths, not the canonical semantic specification. Unspecified and non-center named
-placement, source caller core-parameter binding, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
+placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
 delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
 public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
 compilation. Reaching Step10P does not complete Step10 as a whole. Product UI, API, and persistence

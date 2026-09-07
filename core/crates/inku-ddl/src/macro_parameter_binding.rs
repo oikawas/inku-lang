@@ -14,6 +14,11 @@ pub const MACRO_PARAMETER_BINDING_SCHEMA_ID: &str = "inku.macro-parameter-bindin
 /// One source-owned value accepted by the closed I-534 parameter schema.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BoundMacroParameterValue {
+    /// A finite core value with source provenance and no Saijiki asset origin.
+    CoreModifier {
+        value: crate::CoreModifierValue,
+        source_span: SourceSpan,
+    },
     Integer {
         value: i64,
         source_span: SourceSpan,
@@ -35,6 +40,7 @@ impl BoundMacroParameterValue {
     pub const fn source_span(&self) -> SourceSpan {
         match self {
             Self::Integer { source_span, .. }
+            | Self::CoreModifier { source_span, .. }
             | Self::Number { source_span, .. }
             | Self::SemanticRef { source_span, .. } => *source_span,
         }
@@ -141,6 +147,7 @@ struct Fact {
 
 #[derive(Clone)]
 enum FactKind {
+    CoreModifier(crate::CoreModifierValue),
     ExactNumber(u64),
     Semantic {
         category: String,
@@ -398,6 +405,11 @@ fn clause_facts(
         .clauses
         .get(clause_index)?;
     let mut facts = Vec::new();
+    let primitive_owned = crate::semantic_association::primitive_phrase_modifier_starts(
+        &macro_resolution
+            .relation_reference_evidence
+            .attachment_evidence,
+    );
     for (atom_index, atom) in clause.atoms.iter().enumerate() {
         let span = atom.span();
         if !(clause.span.start_byte <= span.start_byte && span.end_byte <= clause.span.end_byte) {
@@ -419,8 +431,16 @@ fn clause_facts(
                 &term.canonical_surface_ja,
             )?,
             ClauseAtom::UnattachedExactNumber(number) => FactKind::ExactNumber(number.value),
-            ClauseAtom::CoreModifier(_)
-            | ClauseAtom::FunctionWord { .. }
+            ClauseAtom::CoreModifier(modifier) => {
+                if primitive_owned.contains(&span.start_byte) {
+                    continue;
+                }
+                if modifier.identity.dimension != modifier.identity.value.dimension() {
+                    return None;
+                }
+                FactKind::CoreModifier(modifier.identity.value)
+            }
+            ClauseAtom::FunctionWord { .. }
             | ClauseAtom::SaijikiRelation { .. }
             | ClauseAtom::UnresolvedDiagnostic(_) => continue,
         };
@@ -451,6 +471,14 @@ fn semantic_fact(
 
 fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroParameterValue> {
     match (schema, &fact.kind) {
+        (ParameterSchema::SemanticRef { category }, FactKind::CoreModifier(value))
+            if category == value.dimension().as_str() =>
+        {
+            Some(BoundMacroParameterValue::CoreModifier {
+                value: *value,
+                source_span: fact.span,
+            })
+        }
         (ParameterSchema::Integer, FactKind::ExactNumber(value)) => {
             i64::try_from(*value)
                 .ok()
@@ -480,7 +508,8 @@ fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroP
             canonical_surface_ja: canonical_surface_ja.clone(),
             source_span: fact.span,
         }),
-        (ParameterSchema::Boolean | ParameterSchema::List { .. }, _)
+        (_, FactKind::CoreModifier(_))
+        | (ParameterSchema::Boolean | ParameterSchema::List { .. }, _)
         | (ParameterSchema::Integer | ParameterSchema::Number, FactKind::Semantic { .. })
         | (ParameterSchema::SemanticRef { .. }, FactKind::ExactNumber(_))
         | (ParameterSchema::SemanticRef { .. }, FactKind::Semantic { .. }) => None,

@@ -64,9 +64,12 @@ complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
 (`line`, `circle`, `ellipse`, `cloudform`, `square`, `arc`, or `point`), explicit
 `movement:place`, exact `place:center`, and optional same-category `color`,
-`touch`, `continuity`, `surface`, `angle`, and `thinness`. Thinness is a closed
+`touch`, `continuity`, `surface`, `angle`, `thinness`, and `relative_scale`. Thinness is a closed
 core category outside Saijiki: only `thinness:fine` and
 `thinness:extra_fine` are accepted, and both use the same lowerer as ordinary DDL.
+The other closed core category, `relative_scale`, accepts `slightly_small`, `small`,
+`very_small`, `normal`, `slightly_large`, `large`, and `very_large`. It uses ordinary
+normal geometry and the existing factor exactly once, keeping explicit normal distinct from omission.
 Angle uses the same seeded resolver as ordinary DDL and reaches
 `Score.rotation` for every supported shape whose orientation is visible,
 including line, arc, and square. Point rejects an explicit angle because its
@@ -83,7 +86,7 @@ the same expansion. It preserves Emit order and generated ownership and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
 omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
-and shares the ordinary Arc reconstruction. Explicit dimensions and chord direction remain
+and shares the ordinary Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain
 fixed; omitted normal may adjust. Macro relations check actual typed Emits without creating
 a literal noun condition. Other relation kinds and structural
 relation placement remain unsupported by this consumer.
@@ -113,10 +116,18 @@ and receives normal count-one.
 An angle written on the Macro caller is unbound caller meaning. It does not fan
 out to or override angles authored by individual Emits.
 
-Thinness written on the Macro caller is also unbound caller meaning. It does not
-bind an outer Macro parameter, fan out to child Emits, or override thinness authored
-inside the definition. Definitions may pass the two closed refs through declared
-definition-local component parameters.
+Thinness and size bind only parameters explicitly declared with
+`{"type":"semantic_ref","category":"thinness"}` or the `relative_scale` category.
+For example, `thin normal-sized Draw.Mark` supplies these two finite facts when
+`Draw.Mark` declares one parameter for each category. Size uses the existing
+modifier-before-head syntax. An Emit reads the named parameter through
+`{"expr":"parameter","name":"scale"}` in its `relative_scale` field.
+The assignment must be unique and complete. Each core fact retains its original
+source owner and has no Saijiki asset metadata; ordinary entity modifiers do not
+consume it again. Literal and definition-local component values use the same fields.
+Missing or ambiguous binding follows the upstream error policy; undeclared caller
+facts retain existing lowering diagnostics. There is no automatic overlay or fan-out,
+and a bound parameter alone does not become a continuation predicate.
 
 ## Resolution, Expansion, and LLM Boundary
 

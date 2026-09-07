@@ -91,7 +91,7 @@ Touchingは従来互換を維持する。Along / Cuttingとwhole Step10、typed�
 Connectedは同じflat Macro内の隣接bound Emitも受け、named-movable / numeric-fixedの位置authorityをshared
 checked performerまで運ぶ。先行のcanonical終端（Pointはcenter）へcurrent始端を平行移動で合わせ、先行、寸法、
 曲率、rotationを変えない。numericの非zero衝突はpolicyに従い停止またはcurrentを省略し、失われた参照をsurvivorへ
-付け替えない。他relation、一般構造、caller binding、allocation、whole parity、runtime/UI保存cutoverは残る。
+付け替えない。他relation、一般構造、allocation、whole parity、runtime/UI保存cutoverは残る。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは
@@ -122,8 +122,11 @@ Macroのsemantic ordinalと既存expansion path / generated ordinalを選択key�
 
 Visible DDLの`細い` / `thin`と`ごく細い` / `extra-fine`は、Fine / ExtraFineの同じ二段階identityとして
 通常instructionとflat Macro Emitの共通lowererから既存`Instruction.thinness`へ届く。Macro definitionは
-Saijiki外のclosed core ref `thinness:fine` / `thinness:extra_fine`だけを受け入れる。Visible sourceから
-外側Macro parameterをbindする範囲は拡張せず、未結合caller thinnessの従来診断とmode別処置を保つ。
+Saijiki外のclosed core ref `thinness:fine` / `thinness:extra_fine`と7classの`relative_scale`を受け入れる。
+Visible sourceは同dimensionのSemanticRef parameterを明示宣言した場合だけ一意にbindingし、
+元span / clause / atom / definitionを保持して通常entityで二重消費しない。Core由来のasset metadataはNoneである。
+Literalとparameterは同じEmit fieldから通常geometry / factorへ一度だけ合流し、明示normalも固定寸法とする。
+Missing / ambiguousは既存上流error、未宣言callerは従来lowering診断とmode別処置を保つ。
 
 Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
 そのcompilationとsource / state / lock / issuesを結果に保持する。既定のStopは上流のhole / conflictで
@@ -136,7 +139,7 @@ drawをやり直さない。Global budgetとsource / lock / owner / definition /
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Unspecified / 非center named placement、source caller core parameter binding、finite subset外のMacro delivery、action省略、repeated allocation、
+Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
 残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
 `CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Pの到達は
 Step10全体の完了を意味しない。製品UI / API / 保存経路は

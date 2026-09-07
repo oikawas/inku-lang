@@ -903,19 +903,27 @@ fn core_relative_scale_has_bilingual_provenance_and_bounded_pre_head_ownership()
     );
     assert!(multi.ast.entities[1].relative_scale.is_none());
 
-    let post_head =
-        NormalizedDdlDocument::new("circle small", ResolvedInstructionLanguage::En, Vec::new())
-            .unwrap();
+    let post_head_source = "circle small";
+    let post_head = NormalizedDdlDocument::new(
+        post_head_source,
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
     let post_head = associate_semantic_entities(&post_head).unwrap();
     assert!(post_head.ast.entities[0].relative_scale.is_none());
+    assert!(post_head.canonical_bytes.is_none());
+    assert_eq!(association_issue_kinds(&post_head), ["upstream_unknown"]);
+    assert!(post_head.issues[0].occurrences.is_empty());
+    let diagnostic = post_head.issues[0]
+        .upstream_diagnostic
+        .as_ref()
+        .expect("post-head scale remains its original upstream unknown");
+    assert_eq!(diagnostic.surface, "small");
     assert_eq!(
-        association_issue_kinds(&post_head),
-        ["ambiguous_entity_ownership"]
+        &post_head_source[diagnostic.span.start_byte..diagnostic.span.end_byte],
+        "small"
     );
-    assert!(matches!(
-        post_head.issues[0].occurrences.as_slice(),
-        [OwnedSemanticOccurrence::RelativeScale(_)]
-    ));
 
     let conflict = NormalizedDdlDocument::new(
         "small SMALL line",
@@ -930,6 +938,19 @@ fn core_relative_scale_has_bilingual_provenance_and_bounded_pre_head_ownership()
         ["conflicting_relative_scales"]
     );
     assert_eq!(conflict.issues[0].occurrences.len(), 2);
+    assert_eq!(
+        conflict.issues[0]
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.source().surface.as_str())
+            .collect::<Vec<_>>(),
+        ["small", "SMALL"]
+    );
+    assert!(conflict.canonical_bytes.is_none());
+    assert_eq!(
+        conflict.owned_occurrence_count,
+        conflict.delivered_occurrence_count
+    );
 
     let coexist = NormalizedDdlDocument::new(
         "thin small line",
@@ -950,6 +971,33 @@ fn core_relative_scale_has_bilingual_provenance_and_bounded_pre_head_ownership()
     );
     assert_eq!(
         coexist.ast.entities[0]
+            .relative_scale
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "small"
+    );
+
+    let reverse = NormalizedDdlDocument::new(
+        "small thin line",
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let reverse = associate_semantic_entities(&reverse).unwrap();
+    assert!(reverse.issues.is_empty());
+    assert_eq!(
+        reverse.ast.entities[0]
+            .thinness
+            .as_ref()
+            .unwrap()
+            .value
+            .as_str(),
+        "fine"
+    );
+    assert_eq!(
+        reverse.ast.entities[0]
             .relative_scale
             .as_ref()
             .unwrap()
@@ -1024,7 +1072,7 @@ fn conflicting_modifiers_inside_one_pre_head_phrase_use_existing_typed_conflict(
 #[test]
 fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     let document = NormalizedDdlDocument::new(
-        "red two pen dashed horizontal hatch dense fine slowly swaying tall full-width semicircle circle blue three pencil dotted vertical grain faint large quickly trembling wide half-width crescent line",
+        "red two pen dashed horizontal hatch dense fine slowly swaying tall full-width semicircle circle blue three pencil dotted vertical grain faint finely quickly trembling wide half-width crescent line",
         ResolvedInstructionLanguage::En,
         Vec::new(),
     )
@@ -1086,7 +1134,7 @@ fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     );
     assert_eq!(
         second.fluctuation.amplitude.as_ref().unwrap().identity.id,
-        "large"
+        "fine"
     );
     assert_eq!(
         second.fluctuation.frequency.as_ref().unwrap().identity.id,
@@ -1339,14 +1387,9 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
     for word in &category.words {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Fluctuation row has canonical identity");
-        let source = format!(
-            "{} circle.",
-            word.surface_en
-                .as_deref()
-                .expect("accepted Fluctuation row has English source surface")
-        );
+        let source = format!("{} 円。", word.surface_ja);
         let document =
-            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new())
                 .expect("accepted Fluctuation row forms a normalized document");
         let result = associate_semantic_entities(&document)
             .expect("accepted Fluctuation row forms a clause stream");
@@ -1377,6 +1420,49 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
                 projection.canonical_id
             ),
         }
+    }
+
+    for word in &category.words {
+        let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
+            .expect("accepted Fluctuation row has canonical identity");
+        let source = format!(
+            "{} circle.",
+            word.surface_en
+                .as_deref()
+                .expect("accepted Fluctuation row has English source surface")
+        );
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                .expect("accepted English Fluctuation row forms a normalized document");
+        let result = associate_semantic_entities(&document)
+            .expect("accepted English Fluctuation row forms a clause stream");
+        assert!(result.issues.is_empty(), "{}", projection.canonical_id);
+        let entity = result.ast.entities.first().expect("one entity");
+        if projection.canonical_id == "large" {
+            assert!(entity.fluctuation.amplitude.is_none());
+            assert_eq!(
+                entity
+                    .relative_scale
+                    .as_ref()
+                    .expect("large circle uses the higher-priority relative-scale meaning")
+                    .value
+                    .as_str(),
+                "large"
+            );
+            continue;
+        }
+        assert_eq!(
+            [
+                entity.fluctuation.amplitude.as_ref(),
+                entity.fluctuation.frequency.as_ref(),
+                entity.fluctuation.quality.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            .map(|term| term.identity.id.as_str())
+            .collect::<Vec<_>>(),
+            [projection.canonical_id.as_str()]
+        );
     }
 
     assert_eq!(

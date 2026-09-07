@@ -933,6 +933,7 @@ fn has_relative_scale_head_context(
             .into_iter()
             .filter(|candidate| match &candidate.delivery {
                 CandidateDelivery::Token(NeutralTokenKind::FunctionWord) => true,
+                CandidateDelivery::Token(NeutralTokenKind::CoreModifier(_)) => true,
                 CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
                     category_key, ..
                 }) => category_key != "katachi",

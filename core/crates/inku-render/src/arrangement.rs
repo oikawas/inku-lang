@@ -1,12 +1,12 @@
 //! Expansion and placement of canonical arrangements.
 
 use crate::determinism::instruction_seed;
-use crate::group::finish_group;
+use crate::group::finish_group_on_canvas;
 use crate::placement::{
     ClusterPlacement, clustered_position, path_position, region_in_short_side_units,
     rhythm_parameter, short_side_scales,
 };
-use crate::planning::{ensure_line_coordinates, instruction_anchor};
+use crate::planning::{ensure_line_coordinates, instruction_anchor_on_canvas};
 use crate::types::{
     ArrangementPath, CanvasSize, Density, Fade, Instruction, Layout, Point, Primitive, Seed,
 };
@@ -100,9 +100,16 @@ fn axis_scales(anchor: f64, offsets: impl Iterator<Item = f64> + Clone) -> (f64,
     (forward.max(0.0), backward.max(0.0))
 }
 
-fn fit_group_to_anchor(stated: &Instruction, expanded: Vec<Instruction>) -> Vec<Instruction> {
-    let anchor = instruction_anchor(stated);
-    let points: Vec<Point> = expanded.iter().map(instruction_anchor).collect();
+fn fit_group_to_anchor(
+    stated: &Instruction,
+    expanded: Vec<Instruction>,
+    canvas: Option<CanvasSize>,
+) -> Vec<Instruction> {
+    let anchor = instruction_anchor_on_canvas(stated, canvas);
+    let points: Vec<Point> = expanded
+        .iter()
+        .map(|instruction| instruction_anchor_on_canvas(instruction, canvas))
+        .collect();
     let center = Point::new(
         points.iter().map(|point| point.x).sum::<f64>() / points.len() as f64,
         points.iter().map(|point| point.y).sum::<f64>() / points.len() as f64,
@@ -250,7 +257,13 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
     if arrangement.count == 1 && arrangement.layout != Layout::Grid {
         let mut single = prepared;
         single.arrangement = None;
-        return finish_group(vec![single], arrangement, None, member_seed);
+        return finish_group_on_canvas(
+            vec![single],
+            arrangement,
+            None,
+            member_seed,
+            request.canvas,
+        );
     }
     let count = arrangement.count as usize;
     let margin = if arrangement.preserve_space {
@@ -258,7 +271,7 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
     } else {
         arrangement.margin
     };
-    let anchor = instruction_anchor(&prepared);
+    let anchor = instruction_anchor_on_canvas(&prepared, request.canvas);
     let seed = instruction_seed(&prepared, request.placement_seed);
 
     let (targets, layout_center) = if arrangement.layout == Layout::Grid {
@@ -376,9 +389,15 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
             item
         })
         .collect();
-    expanded = finish_group(expanded, arrangement, layout_center, member_seed);
+    expanded = finish_group_on_canvas(
+        expanded,
+        arrangement,
+        layout_center,
+        member_seed,
+        request.canvas,
+    );
     if arrangement.layout != Layout::Grid {
-        expanded = fit_group_to_anchor(&prepared, expanded);
+        expanded = fit_group_to_anchor(&prepared, expanded, request.canvas);
     }
     expanded.iter().map(quantize_instruction).collect()
 }

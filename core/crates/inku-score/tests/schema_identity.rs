@@ -35,6 +35,11 @@ fn canonical_score_schema_identity_is_stable() {
     hasher.update([0]);
     hasher.update((artifact.len() as u64).to_be_bytes());
     hasher.update(artifact);
-    assert_eq!(format!("{:x}", hasher.finalize()), EXPECTED_SCHEMA_DIGEST);
+    let digest = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    assert_eq!(digest, EXPECTED_SCHEMA_DIGEST);
     assert_eq!(score_schema_digest(), EXPECTED_SCHEMA_DIGEST);
 }

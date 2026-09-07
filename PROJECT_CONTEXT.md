@@ -113,11 +113,11 @@ digests, tagged optional `composition_seed`, logical occurrence, and angle ident
 angle-specific SHA-256 domain and resolves an explicitly authored angle exactly once into actual
 `Score.rotation`. Horizontal and vertical are 0 and 90; diagonal uses four directions; rising,
 falling, and their left-facing forms use the author-approved integer ranges; rotated uses the
-finite set more than five degrees from every 45-degree boundary. Numeric circle, ellipse, and
-cloudform placement checks the rotated declared extent in physical short-edge units, while named
-focus keeps its dimensions and `at.region`. Angled square is explicitly unsupported in both modes
-because of the known Renderer unit seam; unangled square remains supported. Renderer and Score wire
-are unchanged.
+finite set more than five degrees from every 45-degree boundary. Numeric circle, ellipse,
+cloudform, and square placement checks the rotated declared extent in physical short-edge units,
+while named focus keeps its dimensions and `at.region`. Square uses the same resolver for direct
+and flat Macro Emit input. Engine 42 resolves square and triangle anchors, pivots, bounds,
+relations, composites, and arrangements through the same physical short-edge coordinate family.
 
 Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
 ordinary DDL after an exact join to the execution owner and generated focus. One Emit is one
@@ -204,7 +204,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 41 | `core/crates/inku-render/src/lib.rs` |
+| Render Engine | 42 | `core/crates/inku-render/src/lib.rs` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 21 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
@@ -463,7 +463,7 @@ It can lag at any time, so an Android version number must not be read as the ser
 Its interface is bilingual and the language is chosen in the settings screen (default `ja`).
 A Kotlin language pack holds the wording; `server/scripts/gen_saijiki_kt.py` generates the saijiki
 vocabulary.
-Android and the server now use the same shared Rust render engine `41`; Android's DDL engine is `20`.
+Android and the server now use the same shared Rust render engine `42`; Android's DDL engine is `20`.
 The Android-specific Kotlin drawing engine and AndroidSVG display path are retired, with no runtime
 fallback. Android still owns Stage 1 / 1.5 / 2, Score coerce, Room, history, and `rh3` identity.
 
@@ -475,11 +475,11 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-41` (610 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
+`render-engine-42` (610 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
 byte-identical regeneration.
 - **Android reference material** — `android/app/src/test/resources/server_reference/` retains only
 DDL, Score, coerce, and history compatibility fixtures. The drawing oracle is the shared Rust core
-and `server/reference/render-engine-41/`; Android does not copy a versioned SVG corpus. Device
+and `server/reference/render-engine-42/`; Android does not copy a versioned SVG corpus. Device
 acceptance stages a bounded selection from the canonical manifest and compares packaged-JNI SVG
 bytes and raw pixels directly.
 - **`cli/tests`** — pytest.

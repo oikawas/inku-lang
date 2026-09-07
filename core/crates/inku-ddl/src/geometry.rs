@@ -24,7 +24,8 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
     "\"numeric\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
-    "\"cloudform_width_height\",\"square_side\",\"axis_position\"],",
+    "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
+    "\"axis_position\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
 );
@@ -505,7 +506,7 @@ mod tests {
         );
         assert_eq!(
             payload["angle"]["bounds"]["square"],
-            "unsupported_when_angle_present"
+            "rotated_declared_rectangle"
         );
         assert_eq!(payload["angle"]["bounds"]["circle"], "radius");
         assert_eq!(
@@ -535,7 +536,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "393b0f0cffc6538c3a657d598c88d80c29160be27006037f575d07bd895d1985"
+            "3ba520eb2111a46f4b83e4fed397dcf368894cac83a82fe8979533c4fe9026f7"
         );
     }
 }

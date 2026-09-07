@@ -952,15 +952,15 @@
     {
       "id": "fluctuation-amplitude-only",
       "language": "en",
-      "source": "large arc.",
+      "source": "fine arc.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"large\"},\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
       "owned_occurrence_count": 2,
       "fluctuation_amplitudes": [
-        "large"
+        "fine"
       ]
     },
     {
@@ -993,8 +993,8 @@
     },
     {
       "id": "fluctuation-amplitude-contrast",
-      "language": "en",
-      "source": "eight blue pen dashed horizontal bleeding dense large slowly blurring circle.",
+      "language": "ja",
+      "source": "八つ、青、ペン、破線、水平、にじみ、濃い、大きく、ゆっくり、滲む、円。",
       "entity_count": 1,
       "issue_kinds": [
 
@@ -1098,8 +1098,8 @@
     },
     {
       "id": "conflicting-fluctuation-amplitudes",
-      "language": "en",
-      "source": "fine large circle.",
+      "language": "ja",
+      "source": "細かく 大きく 円。",
       "entity_count": 1,
       "issue_kinds": [
         "conflicting_fluctuation_amplitudes"
@@ -1163,16 +1163,16 @@
     {
       "id": "regional-fluctuation-ownership",
       "language": "en",
-      "source": "fine slowly blurring circle. large quickly swaying line.",
+      "source": "fine slowly blurring circle. finely quickly swaying line.",
       "entity_count": 2,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"blurring\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"large\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"blurring\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
       "owned_occurrence_count": 8,
       "fluctuation_amplitudes": [
         "fine",
-        "large"
+        "fine"
       ],
       "fluctuation_frequencies": [
         "slowly",
@@ -1258,15 +1258,15 @@
     {
       "id": "unobserved-primitive-fluctuation-combination",
       "language": "en",
-      "source": "large quickly undulating square.",
+      "source": "finely quickly undulating square.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"large\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"square\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"square\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
       "owned_occurrence_count": 4,
       "fluctuation_amplitudes": [
-        "large"
+        "fine"
       ],
       "fluctuation_frequencies": [
         "quickly"

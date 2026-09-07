@@ -1,9 +1,11 @@
 //! Per-member variation and fade semantics for expanded groups.
 
 use crate::determinism::hash01;
-use crate::planning::instruction_anchor;
+use crate::planning::{instruction_anchor, scale_instruction_on_canvas};
 use crate::stroke::grammar;
-use crate::types::{Arrangement, Color, Fade, Instruction, Layout, Point, Primitive, Seed};
+use crate::types::{
+    Arrangement, CanvasSize, Color, Fade, Instruction, Layout, Point, Primitive, Seed,
+};
 
 fn scale_member(instruction: &Instruction, scale: f64) -> Instruction {
     let mut scaled = instruction.clone();
@@ -48,6 +50,7 @@ fn member_sizes(
     items: Vec<Instruction>,
     arrangement: &Arrangement,
     member_seed: Option<Seed>,
+    canvas: Option<CanvasSize>,
 ) -> Vec<Instruction> {
     let Some(seed) = member_seed else {
         return items;
@@ -64,7 +67,10 @@ fn member_sizes(
         .enumerate()
         .map(|(index, item)| {
             let scale = 1.0 + (hash01(index as i64, seed, "member-size") - 0.5) * 2.0 * hand;
-            scale_member(&item, scale)
+            canvas.map_or_else(
+                || scale_member(&item, scale),
+                |canvas| scale_instruction_on_canvas(&item, scale, Some(canvas)),
+            )
         })
         .collect()
 }
@@ -239,15 +245,26 @@ fn apply_fade_levels(
 /// Apply group color, fade, size, and rotation in their canonical order.
 #[must_use]
 pub fn finish_group(
-    mut items: Vec<Instruction>,
+    items: Vec<Instruction>,
     arrangement: &Arrangement,
     layout_center: Option<Point>,
     member_seed: Option<Seed>,
 ) -> Vec<Instruction> {
+    finish_group_on_canvas(items, arrangement, layout_center, member_seed, None)
+}
+
+#[must_use]
+pub fn finish_group_on_canvas(
+    mut items: Vec<Instruction>,
+    arrangement: &Arrangement,
+    layout_center: Option<Point>,
+    member_seed: Option<Seed>,
+    canvas: Option<CanvasSize>,
+) -> Vec<Instruction> {
     apply_color_cycle(&mut items, &arrangement.color_cycle);
     apply_fade_levels(&mut items, arrangement, layout_center);
     member_rotations(
-        member_sizes(items, arrangement, member_seed),
+        member_sizes(items, arrangement, member_seed, canvas),
         arrangement,
         member_seed,
     )

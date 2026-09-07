@@ -95,9 +95,9 @@ Continueは元meaningを変えず、独立appearance fieldまたは成立しな�
 `composition_seed`、logical occurrence、angle identityをSHA-256の専用domainへframeし、作者が明示した
 かたむきをactual `Score.rotation`へ一度だけ解決する。horizontal / verticalは0 / 90、diagonalは4方向、
 rising / fallingと左右版は裁定済み整数範囲、rotatedは45度境界から5度超の有限集合を使う。
-Circle / ellipse / cloudformの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
-従来の寸法と`at.region`を保つ。Angle付きsquareはRendererの既知unit seamのため両modeで明示未対応、
-angleなしsquareは既存どおりである。RendererとScore wireは変更しない。
+Circle / ellipse / cloudform / squareの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
+従来の寸法と`at.region`を保つ。Squareもdirectとflat Macro Emitで同じresolverを通る。Engine 42は
+square / triangleのanchor、pivot、bounds、relation、composite、arrangementを同じ物理短辺座標族で解決する。
 
 Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
@@ -175,7 +175,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 41 | `core/crates/inku-render/src/lib.rs` |
+| Render Engine | 42 | `core/crates/inku-render/src/lib.rs` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 21 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
@@ -367,7 +367,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 追随の遅れは常にありうるので、Android の版数と server の版数を同じものとして読まない。
 UI は日英で、切替は設定画面から行う（既定は `ja`）。
 画面の文言は Kotlin の言語パックが、歳時記の語彙は `server/scripts/gen_saijiki_kt.py` の生成物が持つ。
-現行AndroidとServerは同じ共有Rust render engine `41`を使い、AndroidのDDL engineは`20`である。
+現行AndroidとServerは同じ共有Rust render engine `42`を使い、AndroidのDDL engineは`20`である。
 Android固有のKotlin描画engineとAndroidSVG artwork pathはretire済みで、runtime fallbackは無い。
 Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityは引き続きAndroid hostが所有する。
 
@@ -375,9 +375,9 @@ Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityは引き続き
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-41`（610 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-42`（610 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
 - **Android の参照材料** — `android/app/src/test/resources/server_reference/` はDDL、Score、coerce、履歴互換だけを保持する。
-描画の正本は`server/reference/render-engine-41/`と共有Rust coreであり、Androidへ版別SVG corpusを複製しない。
+描画の正本は`server/reference/render-engine-42/`と共有Rust coreであり、Androidへ版別SVG corpusを複製しない。
 端末受入はcanonical manifestから選んだ少数のrequestをtest assetへ生成し、同梱JNIのSVG byteとraw pixelを直接照合する。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。

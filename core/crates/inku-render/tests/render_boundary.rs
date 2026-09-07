@@ -96,7 +96,7 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "41");
+    assert_eq!(metadata.render_engine_version, "42");
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -147,7 +147,7 @@ fn engine_renders_every_primitive_through_one_request() {
     let first = render(request.clone()).unwrap();
     let second = render(request).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.metadata.render_engine_version, "41");
+    assert_eq!(first.metadata.render_engine_version, "42");
     assert!(first.svg.starts_with("<svg"));
     assert!(first.svg.ends_with("</svg>"));
     assert!(first.svg.contains("stroke-engine-v1"));
@@ -156,6 +156,28 @@ fn engine_renders_every_primitive_through_one_request() {
     assert!(!first.svg.contains("NaN"));
     assert!(!first.svg.contains("<filter"));
     assert!(!first.svg.contains("<clipPath"));
+}
+
+#[test]
+fn wide_canvas_square_rotation_uses_the_physical_center() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[{"primitive":"square","position":[0.45,0.4],
+            "size":[0.2,0.2],"rotation":30,"weight":"rotring"}]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1_000.0, 500.0),
+            canvas_aspect_id: "wide".to_owned(),
+            svg_profile: SvgProfile::Compat,
+            render_seed: Some(431),
+            composition_seed: None,
+            wild: false,
+        },
+    };
+    let output = render(request).unwrap();
+    assert!(output.svg.contains("rotate(30 500 250)"));
 }
 
 #[test]

@@ -1804,10 +1804,6 @@ fn lower_complete_instruction(
             });
             None
         }
-        Some(_) if primitive == Primitive::Square => {
-            gaps.push(ScoreFieldGap::UnsupportedAngleForPrimitive { primitive });
-            None
-        }
         Some(identity) => match input
             .angle_context
             .and_then(|context| resolve_score_angle(identity.id, context))
@@ -2217,6 +2213,17 @@ fn lower_numeric_geometry(
             })
         }
         ResolvedGeometryDimensions::Square { side } => {
+            ensure_rotated_centered_extent(
+                Primitive::Square,
+                x,
+                y,
+                side,
+                side,
+                width_units,
+                height_units,
+                short_units,
+                rotation,
+            )?;
             let half = side.div_i128(2)?;
             let extent_x = half.mul_ratio(i128::from(short_units), i128::from(width_units))?;
             let extent_y = half.mul_ratio(i128::from(short_units), i128::from(height_units))?;
@@ -2287,11 +2294,11 @@ fn ensure_rotated_centered_extent(
             (half_width * cosine).hypot(half_height * sine),
             (half_width * sine).hypot(half_height * cosine),
         ),
-        Primitive::Cloudform => (
+        Primitive::Cloudform | Primitive::Square => (
             cosine * half_width + sine * half_height,
             sine * half_width + cosine * half_height,
         ),
-        _ => unreachable!("only centered ellipse and cloudform dimensions use rotated extents"),
+        _ => unreachable!("only ellipse, cloudform, and square dimensions use rotated extents"),
     };
     let extent_x = physical_extent_x / f64::from(width_units);
     let extent_y = physical_extent_y / f64::from(height_units);

@@ -6,7 +6,7 @@ use crate::determinism::{instruction_seed, needs_path_variation};
 use crate::geometry::{line_with_variation, point_to_pixels, size_to_pixels, stroke_sample_count};
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
 use crate::materials::with_texture_filter;
-use crate::planning::instruction_anchor;
+use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
     ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
     outline_for_centerline, synthesize_contour, synthesize_stroke,
@@ -26,7 +26,10 @@ pub(crate) fn rotate(
     else {
         return element;
     };
-    let center = point_to_pixels(instruction_anchor(instruction), canvas);
+    let center = point_to_pixels(
+        instruction_anchor_on_canvas(instruction, Some(canvas)),
+        canvas,
+    );
     element.set_attr(
         "transform",
         format!(

@@ -49,6 +49,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 
 | 版 | 製品版数 | Build | 凍結日 | ケース | 動いた | 不変 |
 |---|---|---|---|---|---|---|
+| **42** | Step 10O square物理座標補正 | — | 2026-09-07 | 610 | **0** | **610** |
 | **41** | Rust移行基準 | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
@@ -127,7 +128,7 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 
 | 名前 | 何の版か | 現在 | 上げる条件 |
 |---|---|---|---|
-| `render_engine_version` | 描画エンジン | `39` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
+| `render_engine_version` | 描画エンジン | `42` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
 | `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `20` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
@@ -332,6 +333,24 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
+
+## engine 42 — squareの物理anchorと回転中心を非正方canvasでそろえる
+
+Engine 42は、位置をcanvas各軸の比、寸法を短辺比として扱う既存Scoreの二つの単位を、
+closed shapeのanchor、移動、回転中心、実行後bounds、relation、composite、arrangementで
+同じ物理座標へ変換する。通常DDLとflat Macroのsquare角度も同じScore経路へ届き、numeric指定は
+中心回転した宣言矩形のmust-fitを検査する。
+
+`server/reference/render-engine-42/manifest.json`はsource commit
+`2ad5313223d47e327a812a5db6cbed9e71fe769c`から2026-09-07に凍結した。Engine 41と同じ
+610 caseについてnormalized digestの差は0件で、`changed_from_previous`は空である。
+changed-only保存規則により、この版のdirectoryが新規に持つ実pathはmanifest一件だけである。
+これは**既存610入力のnormalized出力が変わらなかった**ことだけを示す。すべての入力が不変、
+または全raw SVG byteが同一だったとは主張しない。
+
+既存corpusが持たない境界は直接回帰で確認した。1000×500 canvas、position `(0.45, 0.4)`、
+短辺比size `(0.2, 0.2)`、rotation 30のsquareは、左上 `(450, 200)`、一辺100、物理中心
+`(500, 250)`となり、Linux native検査でSVG transform `rotate(30 500 250)`を確認した。
 
 ## engine 41 — 描画中核をRustへ移すための移行基準
 

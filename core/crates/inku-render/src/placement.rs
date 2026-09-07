@@ -3,6 +3,7 @@
 use sha2::{Digest, Sha256};
 
 use crate::determinism::hash01;
+pub use crate::geometry::short_side_scales;
 use crate::types::{ArrangementPath, CanvasSize, Density, Point, RhythmSpacing, Seed};
 
 const PATH_WAVE_AMPLITUDE: f64 = 0.22;
@@ -11,14 +12,6 @@ const PATH_SPREAD: f64 = 0.30;
 
 fn clamp01(value: f64) -> f64 {
     value.clamp(0.0, 1.0)
-}
-
-/// Per-axis factors that express a normalized distance in short-side units.
-#[must_use]
-pub fn short_side_scales(canvas: Option<CanvasSize>) -> Point {
-    canvas.map_or(Point::new(1.0, 1.0), |canvas| {
-        Point::new(canvas.unit() / canvas.width, canvas.unit() / canvas.height)
-    })
 }
 
 #[must_use]

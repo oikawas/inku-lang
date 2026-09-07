@@ -455,8 +455,8 @@
     },
     {
       "id": "fluctuation-conflict-preserves-action-position",
-      "language": "en",
-      "source": "place fine large circle at center.",
+      "language": "ja",
+      "source": "中央に、細かく 大きく 円を置く。",
       "instruction_actions": [
         "place"
       ],

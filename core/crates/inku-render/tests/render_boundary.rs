@@ -96,7 +96,7 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "41");
+    assert_eq!(metadata.render_engine_version, "42");
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -177,11 +177,7 @@ fn wide_canvas_square_rotation_uses_the_physical_center() {
         },
     };
     let output = render(request).unwrap();
-    assert!(
-        output
-            .svg
-            .contains("rotate(30.000000 500.000000 250.000000)")
-    );
+    assert!(output.svg.contains("rotate(30 500 250)"));
 }
 
 #[test]

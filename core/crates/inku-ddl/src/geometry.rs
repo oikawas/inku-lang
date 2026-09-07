@@ -239,6 +239,15 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 .expect("writing canonical geometry policy to a String cannot fail");
             }
             canonical.push_str(GEOMETRY_RESOLUTION_POLICY_SUFFIX);
+            // Preserve the existing policy byte layout outside the added member.
+            canonical = canonical.replacen(
+                "\"author_resolved_omission\":{",
+                &format!(
+                    "\"author_resolved_omission\":{{\"fluctuation\":{},",
+                    crate::fluctuation::policy()
+                ),
+                1,
+            );
             canonical
         })
         .as_bytes()
@@ -689,6 +698,15 @@ mod tests {
         let payload: serde_json::Value =
             serde_json::from_slice(geometry_resolution_policy_canonical_bytes()).unwrap();
         assert_eq!(payload["policy"], GEOMETRY_RESOLUTION_POLICY_ID);
+        let fluctuation = &payload["author_resolved_omission"]["fluctuation"];
+        assert_eq!(fluctuation["words"].as_object().unwrap().len(), 8);
+        assert_eq!(fluctuation["words"]["large"]["value"], "broad");
+        assert_eq!(fluctuation["words"]["trembling"]["dimension"], "quality");
+        assert_eq!(fluctuation["absent"], "none");
+        assert_eq!(
+            fluctuation["partial"],
+            serde_json::json!({"amplitude":"medium","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]})
+        );
         assert_eq!(payload["numeric_basis"]["size"], "canvas_short_edge");
         assert_eq!(payload["numeric_basis"]["position"], "canvas_axes");
         assert_eq!(payload["anchor"]["square_score"], "top_left_from_center");
@@ -801,7 +819,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "8430cc4ea6449368c45948443016603a767edd47e2b02520126c091474c1438c"
+            "2c151167a5d73fbb6a3ab9ddbbdc2a853ecb2dd2e8f66dbcc86cf228e7458ea2"
         );
     }
 }

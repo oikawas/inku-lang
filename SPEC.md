@@ -353,6 +353,10 @@ At this boundary the Renderer needs to know only core meaning, while a plugin ca
 
 ### 4.6 Generic MacroDefinition v1
 
+Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, or `quality`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, and `fluctuation_quality`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same eight-word classification.
+
+Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
+
 `inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
 
 The current finite consumer that reaches an actual Score projects each complete flat `emit` as one instruction into the same semantic input used by ordinary DDL. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts `center` with its exact generated focus target, or the explicit `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
@@ -1748,6 +1752,8 @@ and noun.**
 Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
 and by `arrangement` (layout / path / jitter).
 
+In the runtime-disconnected shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` / `trembling` to Perlin; `undulating` to Wave; and `blurring` to Pink. With all three slots absent, `Instruction.variation=None`. With at least one present, only missing amplitude, frequency, and quality receive Medium, Medium, and Perlin respectively. Explicit values win and the dimensions are independent: `trembling` does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
+
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
 Qualified terms such as `Nature.wind` are conceptual examples of an
@@ -1833,7 +1839,7 @@ The JSON Score's `variation` field is structured by dimension.
 |---|---|---|
 | `amplitude` | `fine` / `medium` / `broad` | amplitude (from motion words) |
 | `frequency` | `slow` / `medium` / `high` | frequency (from motion words) |
-| `quality` | `none` / `white` / `perlin` / `pink` / `wave` | kind of noise (from weight) |
+| `quality` | `none` / `white` / `perlin` / `pink` / `wave` | noise quality resolved from explicit motion words; material performance remains independent |
 | `dimensions` | `[position_x, position_y, angle, length, rotation, radius]` | which dimensions sway. `thickness` was retired in v2.7.2 (declared but never read by the renderer) |
 
 **The writer never writes this structure directly.** Stage 2, the structuring
@@ -1857,10 +1863,11 @@ smaller than its own mark.
 - `pink`: blurring of the boundary — "blurring"
 - `white`: coarse, noise-like scatter
 
-When a short line is given sway, prefer `dimensions=["position_x","position_y"]`
-so the sway is not crushed against the line's length. For long horizontal or
-vertical lines, the base axis is `position_y` for a horizontal line and
-`position_x` for a vertical one.
+Explicit sway in the shared compiler always uses `dimensions=["position_x","position_y"]`.
+Line uses its existing perpendicular performer; Arc and circle / ellipse / square / cloudform
+use their existing inward/outward contour consumers. Short-line thresholds, noise, seeds,
+geometry, placement, angle, thinness, material, and relation endpoint contracts remain unchanged.
+Point and unsupported shapes reject explicit variation. This is separate from Stage 1.5 focus-only variation.
 
 The schema keeps `variation`, but it is invisible from the DDL text interface.
 Only those implementing plugins or materials handle these dimensions.
@@ -2040,9 +2047,9 @@ The description:
       "weight": "pencil",
       "variation": {
         "amplitude": "fine",
-        "frequency": "high",
+        "frequency": "medium",
         "quality": "perlin",
-        "dimensions": ["position_y"]
+        "dimensions": ["position_x", "position_y"]
       }
     }
   ]
@@ -2051,9 +2058,10 @@ The description:
 
 **The renderer:**
 
-It takes the JSON Score and, from the `variation` information, selects the actual
-sway function — Perlin noise, fine amplitude, high frequency, along the y axis —
-and generates the SVG. Each replay is performed with different random values.
+It takes the JSON Score and selects Perlin, Fine amplitude, Medium frequency, and the
+existing perpendicular line performance from `variation` to generate SVG. The same Score
+and render seed reproduce the same performance. This multiple-line example is conceptual;
+the shared compiler's count-one delivery does not imply implemented repetition allocation.
 
 The engine bumps that changed this performance are recorded in the [render engine
 version history](docs/spec/render-engine-history.md); the prose below states the
@@ -2543,6 +2551,8 @@ for evolution of the rendering layer.
 
 ## 18. JSON Score
 
+Explicit sway reaches the existing `Instruction.variation` through the three-dimensional resolver in §13.6. Score deserialization retains its existing Medium / Medium / None defaults, distinct from defaults resolved when source supplies at least one slot. Authors do not write internal Variation JSON directly in natural DDL.
+
 Explicit named positions reach the same geometry consumer from ordinary DDL and declared flat Macros.
 These `at.region` bounds describe semantic anchors on canvas axes from zero to one, not whole-shape fit areas.
 
@@ -2820,6 +2830,12 @@ recorded in [CHANGELOG.md](CHANGELOG.md).
 ---
 
 ## 20. Modes
+
+For invalid sway in the runtime-disconnected typed compiler, Stop returns no new Score.
+Continue omits the original instruction, malformed Emit, or undeclared caller invocation
+at its existing unit, preserving owner, reason, and actual disposition. Sway does not add
+a new field-level recovery unit. Integrity failures stop both modes. Product runtime,
+UI, and save integration remain incomplete.
 
 ### Single Drawing
 

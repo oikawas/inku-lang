@@ -601,6 +601,40 @@ fn definition_local_place_alias_materializes_only_the_canonical_value() {
 }
 
 #[test]
+fn fluctuation_use_checks_deferred_broad_values_and_preserves_semantic_identity() {
+    let definition = MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",
+        "parameters":{"token":{"type":"semantic_ref","category":"variation"}},
+        "components":{"part":{"parameters":{"q":{"type":"semantic_ref","category":"variation","dimension":"quality"}},
+            "body":[{"op":"emit","binding":null,"fields":{"fluctuation_quality":{"expr":"parameter","name":"q"}}}]}},
+        "body":[{"op":"use","component":"part","arguments":{"q":{"expr":"parameter","name":"token"}}}]
+    }).to_string()).unwrap();
+    assert!(definition.validate().is_valid());
+    for (source, succeeds) in [("Sway.Mark trembling", true), ("Sway.Mark fine", false)] {
+        let binding = binding(&definition, source, "en");
+        assert_eq!(binding.complete.len(), 1);
+        let seeds = seeds(&binding, source, 17);
+        let result = expand_macros(binding, std::slice::from_ref(&definition), &seeds, LIMITS);
+        if succeeds {
+            assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+            let ExpandedMacroNode::Emit { fields, .. } = &result.expanded[0].nodes[0] else {
+                panic!("expected flat emit");
+            };
+            assert_eq!(
+                fields.get("fluctuation_quality"),
+                Some(&ExpandedMacroValue::SemanticRef {
+                    category: "variation".to_owned(),
+                    id: "trembling".to_owned()
+                })
+            );
+        } else {
+            assert!(result.expanded.is_empty());
+            assert!(!result.diagnostics.is_empty());
+        }
+    }
+}
+
+#[test]
 fn fixture_schema_and_required_coverage_are_fixed() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.macro-expansion-v1-fixture.v1");

@@ -3157,6 +3157,267 @@ fn resolved_palette(
     )
 }
 
+#[test]
+fn explicit_fluctuation_reaches_actual_score() {
+    let result = stage15(
+        "place one red fine slowly blurring circle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        lowered.gaps()
+    );
+    let variation = lowered.score().unwrap().instructions[0]
+        .variation
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(variation).unwrap(),
+        serde_json::json!({
+            "amplitude": "fine", "frequency": "slow", "quality": "pink",
+            "dimensions": ["position_x", "position_y"]
+        })
+    );
+}
+
+fn fluctuation_definition(slots: &[(&str, &str)], declared: bool, shape: &str) -> MacroDefinition {
+    let mut data = serde_json::to_value(complete_flat_emit_definition()).unwrap();
+    data["body"].as_array_mut().unwrap().truncate(1);
+    data["body"][0]["fields"]["shape"]["id"] = serde_json::json!(shape);
+    data["body"][0]["fields"]["place"]["id"] = serde_json::json!("left_edge");
+    for (index, (dimension, id)) in slots.iter().enumerate() {
+        let name = format!("token{index}");
+        let expression = if declared {
+            data["parameters"][&name] = serde_json::json!({"type":"semantic_ref","category":"variation","dimension":dimension});
+            serde_json::json!({"expr":"parameter","name":name})
+        } else {
+            serde_json::json!({"expr":"semantic_ref","category":"variation","id":id})
+        };
+        data["body"][0]["fields"][format!("fluctuation_{dimension}")] = expression;
+    }
+    MacroDefinition::from_json(&data.to_string()).unwrap()
+}
+
+#[test]
+fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (dimension, id, amplitude, frequency, quality) in [
+        ("amplitude", "fine", "fine", "medium", "perlin"),
+        ("amplitude", "large", "broad", "medium", "perlin"),
+        ("frequency", "slowly", "medium", "slow", "perlin"),
+        ("frequency", "quickly", "medium", "high", "perlin"),
+        ("quality", "swaying", "medium", "medium", "perlin"),
+        ("quality", "trembling", "medium", "medium", "perlin"),
+        ("quality", "undulating", "medium", "medium", "wave"),
+        ("quality", "blurring", "medium", "medium", "pink"),
+    ] {
+        let definition = fluctuation_definition(&[(dimension, id)], false, "circle");
+        let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{id}: {:?}",
+            lowered.gaps()
+        );
+        assert_eq!(
+            serde_json::to_value(&lowered.score().unwrap().instructions[0].variation).unwrap(),
+            serde_json::json!({
+                "amplitude":amplitude, "frequency":frequency, "quality":quality, "dimensions":["position_x","position_y"]
+            })
+        );
+    }
+    for shape in ["line", "arc", "circle", "ellipse", "square", "cloudform"] {
+        let definition = fluctuation_definition(&[("quality", "undulating")], false, shape);
+        let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{shape}: {:?}",
+            lowered.gaps()
+        );
+        assert_eq!(lowered.score().unwrap().instructions.len(), 1);
+        assert!(lowered.score().unwrap().instructions[0].variation.is_some());
+    }
+    let absent = stage15(
+        "place one red circle at left-edge.",
+        ResolvedInstructionLanguage::En,
+    );
+    let absent = lower_verified_stage15_score(absent.verified_effective_view(), context);
+    assert!(absent.score().unwrap().instructions[0].variation.is_none());
+    let old_default: inku_score::Variation = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(old_default).unwrap(),
+        serde_json::json!({"amplitude":"medium","frequency":"medium","quality":"none","dimensions":[]})
+    );
+}
+
+#[test]
+fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_owners() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (language, ordinary, caller, slots) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "place one red fine slowly blurring circle at left-edge.",
+            "Draw.Pair fine slowly blurring",
+            vec![
+                ("amplitude", "fine"),
+                ("frequency", "slowly"),
+                ("quality", "blurring"),
+            ],
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "左端に、赤い円をひとつ置く。円は細かくゆっくり滲む。",
+            "Draw.Pair 細かくゆっくり滲む",
+            vec![
+                ("amplitude", "fine"),
+                ("frequency", "slowly"),
+                ("quality", "blurring"),
+            ],
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place one red fine circle at left-edge.",
+            "Draw.Pair fine",
+            vec![("amplitude", "fine")],
+        ),
+    ] {
+        let direct = stage15(ordinary, language);
+        let declared = stage15_locked(
+            caller,
+            language,
+            &[fluctuation_definition(&slots, true, "circle")],
+        );
+        let literal = stage15_locked(
+            "Draw.Pair",
+            language,
+            &[fluctuation_definition(&slots, false, "circle")],
+        );
+        let mut scores = Vec::new();
+        for (index, result) in [&direct, &declared, &literal].into_iter().enumerate() {
+            let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(
+                lowered.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{ordinary}: {:?}",
+                lowered.gaps()
+            );
+            assert_eq!(lowered.instruction_origins().len(), 1);
+            assert_eq!(
+                matches!(
+                    &lowered.instruction_origins()[0],
+                    ScoreInstructionOrigin::MacroEmit { .. }
+                ),
+                index != 0
+            );
+            scores.push(lowered.score().unwrap().clone());
+        }
+        assert_eq!(scores[0], scores[1], "{ordinary}");
+        assert_eq!(scores[0], scores[2], "{ordinary}");
+    }
+}
+
+#[test]
+fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let point = stage15(
+        "place one red trembling point at left-edge. place one blue circle at left-edge.",
+        ResolvedInstructionLanguage::En,
+    );
+    let point_emit = stage15_locked(
+        "place one blue circle at left-edge. Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        &[fluctuation_definition(
+            &[("quality", "trembling")],
+            false,
+            "point",
+        )],
+    );
+    let unbound = stage15_locked(
+        "place one blue circle at left-edge. trembling Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        &[fluctuation_definition(&[], false, "circle")],
+    );
+    // A broad legacy parameter has no known dimension until its caller value arrives.
+    let mut malformed = serde_json::to_value(fluctuation_definition(
+        &[("quality", "trembling")],
+        true,
+        "circle",
+    ))
+    .unwrap();
+    malformed["parameters"]["token0"]
+        .as_object_mut()
+        .unwrap()
+        .remove("dimension");
+    let malformed = MacroDefinition::from_json(&malformed.to_string()).unwrap();
+    let malformed = stage15_locked(
+        "place one blue circle at left-edge. Draw.Pair fine",
+        ResolvedInstructionLanguage::En,
+        &[malformed],
+    );
+    for (result, unit, survivors) in [
+        (&point, "instruction", 1),
+        (&point_emit, "emit", 1),
+        (&unbound, "invocation", 1),
+        (&malformed, "emit", 1),
+    ] {
+        let stopped = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
+        assert!(stopped.score().is_none());
+        let continued = lower_verified_stage15_score_with_policy(
+            result.verified_effective_view(),
+            context,
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert_eq!(
+            continued.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert_eq!(continued.score().unwrap().instructions.len(), survivors);
+        assert!(
+            continued.diagnostics().iter().any(|diagnostic| {
+                match (&diagnostic.owner, &diagnostic.disposition, unit) {
+                    (
+                        _,
+                        ScoreDiagnosticDisposition::Omitted {
+                            unit: ScoreOmissionUnit::SourceInstruction { .. },
+                            ..
+                        },
+                        "instruction",
+                    ) => true,
+                    (
+                        ScoreDiagnosticOwner::GeneratedNode { .. },
+                        ScoreDiagnosticDisposition::Omitted {
+                            unit: ScoreOmissionUnit::MacroEmit { .. },
+                            ..
+                        },
+                        "emit",
+                    ) => true,
+                    (
+                        ScoreDiagnosticOwner::MacroInvocation { .. },
+                        ScoreDiagnosticDisposition::Omitted {
+                            unit: ScoreOmissionUnit::MacroInvocation { .. },
+                            ..
+                        },
+                        "invocation",
+                    ) => true,
+                    _ => false,
+                }
+            }),
+            "{unit}: {:?}",
+            continued.diagnostics()
+        );
+    }
+}
+
 fn stage15(source: &str, language: ResolvedInstructionLanguage) -> Stage15TransformationResult {
     stage15_seeded(source, language, None)
 }

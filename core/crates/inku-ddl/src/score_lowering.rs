@@ -248,10 +248,27 @@ fn project_source_instruction<'a>(
                 logical_ordinal: instruction_index as u64,
             },
         }),
-        has_unsupported_meaning: instruction.entity.fluctuation.amplitude.is_some()
-            || instruction.entity.fluctuation.frequency.is_some()
-            || instruction.entity.fluctuation.quality.is_some()
-            || instruction.entity.proportion.aspect.is_some()
+        fluctuation: [
+            instruction
+                .entity
+                .fluctuation
+                .amplitude
+                .as_ref()
+                .map(|term| (&term.identity).into()),
+            instruction
+                .entity
+                .fluctuation
+                .frequency
+                .as_ref()
+                .map(|term| (&term.identity).into()),
+            instruction
+                .entity
+                .fluctuation
+                .quality
+                .as_ref()
+                .map(|term| (&term.identity).into()),
+        ],
+        has_unsupported_meaning: instruction.entity.proportion.aspect.is_some()
             || instruction.entity.proportion.width_extent.is_some()
             || instruction.entity.proportion.arc_form.is_some(),
     })
@@ -797,7 +814,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 11] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 14] = [
     "shape",
     "movement",
     "place",
@@ -809,6 +826,9 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 11] = [
     "angle",
     "thinness",
     "relative_scale",
+    "fluctuation_amplitude",
+    "fluctuation_frequency",
+    "fluctuation_quality",
 ];
 
 fn project_macro_emit<'a>(
@@ -836,6 +856,28 @@ fn project_macro_emit<'a>(
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
+    let fluctuation = [
+        "fluctuation_amplitude",
+        "fluctuation_frequency",
+        "fluctuation_quality",
+    ]
+    .map(|key| {
+        let value = macro_semantic_field(fields, key, "variation", false, &mut gaps);
+        if let Some(identity) = value
+            && !crate::fluctuation::matches_dimension(
+                identity.category,
+                identity.id,
+                crate::fluctuation::FluctuationDimension::from_field(key),
+            )
+        {
+            gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+                key: key.to_owned(),
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+        }
+        value
+    });
     let thinness = macro_semantic_field(fields, "thinness", "thinness", false, &mut gaps);
     let relative_scale =
         macro_semantic_field(fields, "relative_scale", "relative_scale", false, &mut gaps);
@@ -933,6 +975,7 @@ fn project_macro_emit<'a>(
         }),
         angle,
         angle_context: None,
+        fluctuation,
         has_unsupported_meaning: false,
     })
 }
@@ -2021,6 +2064,7 @@ struct ScoreLoweringInput<'a> {
     relative_scale: Option<CoreModifierValue>,
     angle: Option<SemanticInputIdentity<'a>>,
     angle_context: Option<ScoreAngleContext<'a>>,
+    fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
     has_unsupported_meaning: bool,
 }
 
@@ -2207,6 +2251,40 @@ fn lower_complete_instruction(
     if input.has_unsupported_meaning {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
+    let variation = if input
+        .fluctuation
+        .iter()
+        .flatten()
+        .any(|identity| identity.category != "variation")
+    {
+        gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+        None
+    } else {
+        match crate::fluctuation::resolve_fluctuation(
+            input.fluctuation[0].map(|identity| identity.id),
+            input.fluctuation[1].map(|identity| identity.id),
+            input.fluctuation[2].map(|identity| identity.id),
+        ) {
+            Ok(variation) => variation,
+            Err(()) => {
+                gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+                None
+            }
+        }
+    };
+    if variation.is_some()
+        && !matches!(
+            primitive,
+            Primitive::Line
+                | Primitive::Arc
+                | Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Square
+                | Primitive::Cloudform
+        )
+    {
+        gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+    }
     if !gaps.is_empty() {
         return Err(gaps);
     }
@@ -2246,7 +2324,7 @@ fn lower_complete_instruction(
         carve_depth: None,
         color: color.expect("checked color"),
         color_hint: None,
-        variation: None,
+        variation,
         arrangement: None,
         at: geometric.at,
         relation: None,

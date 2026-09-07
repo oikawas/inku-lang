@@ -11,6 +11,76 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
 
 #[test]
+fn fluctuation_dimension_preserves_legacy_identity_and_checks_known_constraints() {
+    let legacy = serde_json::json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",
+        "parameters":{"token":{"type":"semantic_ref","category":"variation"}}, "components":{},
+        "body":[{"op":"emit","binding":null,"fields":{"variation":{"expr":"parameter","name":"token"}}}]
+    });
+    let parse = |data: &Value| MacroDefinition::from_json(&data.to_string()).unwrap();
+    let original = parse(&legacy);
+    let original_bytes = original.canonical_json_bytes().unwrap();
+    assert!(
+        !std::str::from_utf8(&original_bytes)
+            .unwrap()
+            .contains("dimension")
+    );
+    let mut explicit_none = legacy.clone();
+    explicit_none["parameters"]["token"]["dimension"] = Value::Null;
+    assert_eq!(
+        parse(&explicit_none).canonical_json_bytes().unwrap(),
+        original_bytes
+    );
+    assert_eq!(
+        parse(&explicit_none).identity().unwrap(),
+        original.identity().unwrap()
+    );
+    let mut constrained = legacy.clone();
+    constrained["parameters"]["token"]["dimension"] = serde_json::json!("amplitude");
+    assert!(parse(&constrained).validate().is_valid());
+    assert_ne!(
+        parse(&constrained).identity().unwrap(),
+        original.identity().unwrap()
+    );
+    constrained["parameters"]["token"]["category"] = serde_json::json!("color");
+    assert!(!parse(&constrained).validate().is_valid());
+    constrained["parameters"]["token"]["dimension"] = serde_json::json!("unknown");
+    assert!(MacroDefinition::from_json(&constrained.to_string()).is_err());
+
+    for (dimension, valid, invalid) in [
+        ("amplitude", "large", "slowly"),
+        ("frequency", "quickly", "trembling"),
+        ("quality", "blurring", "fine"),
+    ] {
+        let field = format!("fluctuation_{dimension}");
+        let mut data = legacy.clone();
+        data["parameters"]["token"]["dimension"] = serde_json::json!(dimension);
+        data["body"][0]["fields"] = serde_json::json!({&field:{"expr":"parameter","name":"token"}});
+        assert!(parse(&data).validate().is_valid());
+        for (id, expected) in [(valid, true), (invalid, false), ("unknown", false)] {
+            data["body"][0]["fields"][&field] =
+                serde_json::json!({"expr":"semantic_ref","category":"variation","id":id});
+            assert_eq!(
+                parse(&data).validate().is_valid(),
+                expected,
+                "{dimension}: {id}"
+            );
+        }
+        data["body"][0]["fields"][&field] = serde_json::json!({"expr":"integer","value":1});
+        assert!(!parse(&data).validate().is_valid());
+        data["components"] = serde_json::json!({"part":{"parameters":{"other":{"type":"semantic_ref","category":"variation","dimension":dimension}}, "body":[]}});
+        for (id, expected) in [(valid, true), (invalid, false)] {
+            data["body"] = serde_json::json!([{"op":"use","component":"part","arguments":{"other":{"expr":"semantic_ref","category":"variation","id":id}}}]);
+            assert_eq!(
+                parse(&data).validate().is_valid(),
+                expected,
+                "use {dimension}: {id}"
+            );
+        }
+    }
+}
+
+#[test]
 fn all_finite_core_values_validate_only_their_own_category_and_field() {
     use inku_ddl::CoreModifierValue::*;
     for value in [

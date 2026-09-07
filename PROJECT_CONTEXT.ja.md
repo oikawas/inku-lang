@@ -54,6 +54,8 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 ### 受入済みのTyped DDL基盤（runtime未接続）
 
+通常DDLと宣言済みflat Macroの明示揺らぎは、三次元の共通resolverから既存Scoreへ届く。8語写像と一slot以上の不足値Medium / Medium / Perlin、全省略None、PositionX + PositionYはSPEC §13.6に従う。Line / Arc / circle / ellipse / square / cloudformが対象でPointは拒否する。Macroはvariation categoryにoptional dimension制約を持ち、三つのfluctuation Emit keysへ届ける。旧None schemaのidentityは保ち、宣言必須parameterの不足をdefaultで埋めない。Source / generated ownerと既存Stop / Continue単位を保つ。Whole Step10とruntime / UI / 保存cutoverは未完了である。
+
 `core/crates/inku-ddl` には、利用者に見える正規化DDLをsource span付きで保持し、
 日本語／英語の句・entity・修飾・数量・action・position・relation・coordination・
 continuationをtyped semantic documentへ組み立てるshared Rust compiler基盤がある。

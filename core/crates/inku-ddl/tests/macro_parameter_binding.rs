@@ -10,6 +10,77 @@ use serde_json::Value;
 
 const FIXTURE: &str = include_str!("fixtures/macro-parameter-binding-v1.json");
 
+#[test]
+fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_required() {
+    let data = serde_json::json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",
+        "parameters":{"z":{"type":"semantic_ref","category":"variation","dimension":"amplitude"},
+            "a":{"type":"semantic_ref","category":"variation","dimension":"frequency"},
+            "m":{"type":"semantic_ref","category":"variation","dimension":"quality"}}, "components":{}, "body":[]
+    });
+    let bind = |data: &Value, source: &str| {
+        let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let document =
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap();
+        bind_macro_parameters(&document, &[definition]).unwrap()
+    };
+    let result = bind(&data, "Sway.Mark fine slowly blurring");
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    assert_eq!(result.complete.len(), 1);
+    let parameters = &result.complete[0].parameters;
+    assert_eq!(parameters.len(), 3);
+    for (name, id) in [("z", "fine"), ("a", "slowly"), ("m", "blurring")] {
+        let parameter = parameters
+            .iter()
+            .find(|parameter| parameter.parameter_name == name)
+            .unwrap();
+        assert!(
+            matches!(&parameter.value, BoundMacroParameterValue::SemanticRef {category, canonical_id, ..} if category == "variation" && canonical_id == id)
+        );
+    }
+    assert_eq!(
+        parameters
+            .iter()
+            .map(|parameter| (
+                parameter.source_fact_clause_index,
+                parameter.source_fact_atom_index
+            ))
+            .collect::<HashSet<_>>()
+            .len(),
+        3
+    );
+    let missing = bind(&data, "Sway.Mark fine");
+    assert!(missing.complete.is_empty());
+    assert!(
+        missing.diagnostics.iter().any(|diagnostic| diagnostic.kind
+            == MacroParameterBindingDiagnosticKind::MissingCompatibleFact)
+    );
+    let mut broad = data.clone();
+    broad["parameters"] =
+        serde_json::json!({"token":{"type":"semantic_ref","category":"variation"}});
+    assert_eq!(bind(&broad, "Sway.Mark fine").complete.len(), 1);
+    let ambiguous = bind(&broad, "Sway.Mark fine slowly");
+    assert!(ambiguous.complete.is_empty());
+    assert!(
+        ambiguous
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind
+                == MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment)
+    );
+    broad["parameters"]["other"] =
+        serde_json::json!({"type":"semantic_ref","category":"variation"});
+    assert!(bind(&broad, "Sway.Mark fine slowly").complete.is_empty());
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Fixture {

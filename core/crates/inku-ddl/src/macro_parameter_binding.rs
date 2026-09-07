@@ -471,9 +471,13 @@ fn semantic_fact(
 
 fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroParameterValue> {
     match (schema, &fact.kind) {
-        (ParameterSchema::SemanticRef { category }, FactKind::CoreModifier(value))
-            if category == value.dimension().as_str() =>
-        {
+        (
+            ParameterSchema::SemanticRef {
+                category,
+                dimension: None,
+            },
+            FactKind::CoreModifier(value),
+        ) if category == value.dimension().as_str() => {
             Some(BoundMacroParameterValue::CoreModifier {
                 value: *value,
                 source_span: fact.span,
@@ -494,20 +498,27 @@ fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroP
             })
         }
         (
-            ParameterSchema::SemanticRef { category },
+            ParameterSchema::SemanticRef {
+                category,
+                dimension,
+            },
             FactKind::Semantic {
                 category: fact_category,
                 canonical_id,
                 source_asset_id,
                 canonical_surface_ja,
             },
-        ) if category == fact_category => Some(BoundMacroParameterValue::SemanticRef {
-            category: fact_category.clone(),
-            canonical_id: canonical_id.clone(),
-            source_asset_id: source_asset_id.clone(),
-            canonical_surface_ja: canonical_surface_ja.clone(),
-            source_span: fact.span,
-        }),
+        ) if category == fact_category
+            && crate::fluctuation::matches_dimension(category, canonical_id, *dimension) =>
+        {
+            Some(BoundMacroParameterValue::SemanticRef {
+                category: fact_category.clone(),
+                canonical_id: canonical_id.clone(),
+                source_asset_id: source_asset_id.clone(),
+                canonical_surface_ja: canonical_surface_ja.clone(),
+                source_span: fact.span,
+            })
+        }
         (_, FactKind::CoreModifier(_))
         | (ParameterSchema::Boolean | ParameterSchema::List { .. }, _)
         | (ParameterSchema::Integer | ParameterSchema::Number, FactKind::Semantic { .. })

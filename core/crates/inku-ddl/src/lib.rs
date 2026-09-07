@@ -12,6 +12,7 @@ pub mod error_policy;
 pub mod exact_decimal;
 pub mod execution_diagnostics;
 mod execution_projection;
+pub mod fluctuation;
 pub mod geometry;
 pub mod language;
 pub mod macro_definition;

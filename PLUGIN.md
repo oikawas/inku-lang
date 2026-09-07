@@ -27,6 +27,23 @@ Parameter schemas are closed to `number`, `integer`, `boolean`, fixed-length
 boolean, list, parameter, local, and semantic-reference forms. Unknown fields,
 types, expressions, operators, and semantic references are rejected.
 
+Declare sway with, for example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`.
+The optional `dimension` is closed to `amplitude`, `frequency`, or `quality`, and is allowed only
+for category variation. Omitted / None preserves legacy category-only matching and canonical
+bytes / digest; a specified constraint participates in the digest. Parameter names do not imply dimensions.
+
+Flat Emit keys are `fluctuation_amplitude`, `fluctuation_frequency`, and `fluctuation_quality`;
+their expression category stays `variation`. The respective IDs are `fine` / `large`,
+`slowly` / `quickly`, and `swaying` / `trembling` / `undulating` / `blurring`.
+Definition-local `use` shares the classification, and deferred actual values are checked at
+execution boundaries. Mapping, missing-slot defaults, and supported shapes follow ordinary DDL in SPEC §13.6.
+
+Three declared parameters require three caller values; supplying only one is a binding error.
+Declaring only an amplitude parameter and delivering its Emit field yields Medium frequency
+and Perlin quality. All three slots absent means no variation. Invalid values do not become None:
+undeclared callers keep invocation diagnostics and malformed Emits keep Emit diagnostics and omission units.
+This remains disconnected from runtime / UI / saves and does not ask authors to write internal Variation JSON.
+
 The body may use `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`,
 typed `transform`, and deterministic bounded `vary`; `components` are local to
 the same definition. A definition cannot contain arbitrary code, I/O,

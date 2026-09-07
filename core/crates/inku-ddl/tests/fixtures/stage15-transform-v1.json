@@ -3,7 +3,7 @@
   "version": 1,
   "transformation_schema": "inku.typed-stage15-transformation.v5",
   "geometry_policy_id": "inku.geometry-resolution-policy.v1",
-  "geometry_policy_digest": "8430cc4ea6449368c45948443016603a767edd47e2b02520126c091474c1438c",
+  "geometry_policy_digest": "2c151167a5d73fbb6a3ab9ddbbdc2a853ecb2dd2e8f66dbcc86cf228e7458ea2",
   "focus_order": [
     "upper_right",
     "upper_left",
@@ -21,7 +21,7 @@
       "variation": null,
       "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "1ae88827d891e3c5b301e181f6778c657a65023ed5ea189de693fa623447c174"
+      "expected_effective_sha256": "4acd68abb794a9878d67287a89da196977a7fe7ea6b0ad803e795b69c35b6c25"
     },
     {
       "id": "en-center-baseline",
@@ -31,7 +31,7 @@
       "variation": null,
       "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "1ae88827d891e3c5b301e181f6778c657a65023ed5ea189de693fa623447c174"
+      "expected_effective_sha256": "4acd68abb794a9878d67287a89da196977a7fe7ea6b0ad803e795b69c35b6c25"
     },
     {
       "id": "en-center-small-variation",
@@ -41,7 +41,7 @@
       "variation": {"amplitude": "small", "seed": 7},
       "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "lower_left",
-      "expected_effective_sha256": "8f56ec3f2bc95f8d820a09df9c93bb238bc53a3932dd4b349c45b3f51fd922ec"
+      "expected_effective_sha256": "ea9c9b1d5364f959565514c73e0094952b019ad7b11a97f3ec39f61ee3d0cef9"
     },
     {
       "id": "en-center-medium-variation",
@@ -51,7 +51,7 @@
       "variation": {"amplitude": "medium", "seed": 7},
       "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "upper_right",
-      "expected_effective_sha256": "28ed27a0b3f3ab2f1ad9e844ce08078fddcc8537724ca6ba82ce397512ae3fbb"
+      "expected_effective_sha256": "265f8f7c52a2b4b9b5cb70721d5e6be2122abc8ed0ca1c03ba47c813bf9e3fa0"
     },
     {
       "id": "en-center-large-variation",
@@ -61,7 +61,7 @@
       "variation": {"amplitude": "large", "seed": 7},
       "expected_baseline_focus": "upper_edge",
       "expected_effective_focus": "lower_right",
-      "expected_effective_sha256": "dd48c5e26ce401ad3c9a9e6621313a73122e7488cb100bfa2d299d8d97f7d05b"
+      "expected_effective_sha256": "73a1dc3937d93e7f535c08d2d6ab7683dd63c8eab1b63449203811470be31988"
     }
   ]
 }

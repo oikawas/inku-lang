@@ -66,10 +66,16 @@ fn shift_instruction(instruction: &Instruction, delta: Point) -> Instruction {
         Primitive::Circle
         | Primitive::Ellipse
         | Primitive::Arc
+        | Primitive::Point
         | Primitive::Polygon
         | Primitive::Cloudform => {
             if let Some(center) = instruction.center {
                 shifted.center = Some(Point::new(center.x + delta.x, center.y + delta.y));
+            }
+            if instruction.primitive == Primitive::Arc
+                && let Some(position) = instruction.position
+            {
+                shifted.position = Some(Point::new(position.x + delta.x, position.y + delta.y));
             }
         }
         Primitive::Square | Primitive::Triangle => {

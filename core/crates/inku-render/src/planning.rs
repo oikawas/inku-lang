@@ -89,9 +89,13 @@ pub fn instruction_anchor_on_canvas(
             .map_or(Point::new(0.5, 0.5), |(start, end)| {
                 Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0)
             }),
+        Primitive::Arc if instruction.position.is_some() => {
+            instruction.position.unwrap_or(Point::new(0.5, 0.5))
+        }
         Primitive::Circle
         | Primitive::Ellipse
         | Primitive::Arc
+        | Primitive::Point
         | Primitive::Polygon
         | Primitive::Cloudform => instruction.center.unwrap_or(Point::new(0.5, 0.5)),
         Primitive::Square | Primitive::Triangle => instruction
@@ -137,9 +141,20 @@ pub fn move_anchor_to_on_canvas(
                 moved.to = Some(clamp_point(Point::new(end.x + delta.x, end.y + delta.y)));
             }
         }
+        Primitive::Arc => {
+            moved.center = Some(clamp_point(instruction.center.map_or(target, |center| {
+                Point::new(center.x + delta.x, center.y + delta.y)
+            })));
+            if let Some(position) = instruction.position {
+                moved.position = Some(clamp_point(Point::new(
+                    position.x + delta.x,
+                    position.y + delta.y,
+                )));
+            }
+        }
         Primitive::Circle
         | Primitive::Ellipse
-        | Primitive::Arc
+        | Primitive::Point
         | Primitive::Polygon
         | Primitive::Cloudform => {
             moved.center = Some(clamp_point(instruction.center.map_or(target, |center| {
@@ -248,7 +263,38 @@ pub fn performed_instruction_bounds_on_canvas(
             );
             bounds_for_points(&points.map(|point| rotate_point(point, anchor, rotation)))
         }
-        Primitive::Circle | Primitive::Arc | Primitive::Polygon => {
+        Primitive::Circle | Primitive::Point | Primitive::Polygon => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let radius = instruction.radius?;
+            Some(Bounds {
+                min: Point::new(center.x - radius, center.y - radius),
+                max: Point::new(center.x + radius, center.y + radius),
+            })
+        }
+        Primitive::Arc if instruction.position.is_some() => {
+            let (start, end, _, _) = endpoint_geometry(instruction, canvas)?;
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let radius = instruction.radius?;
+            let start_angle = instruction.angle_start?;
+            let end_angle = instruction.angle_end?;
+            let anchor = point_to_short_side_units(
+                instruction_anchor_on_canvas(instruction, canvas),
+                canvas,
+            );
+            let rotation = instruction.rotation.unwrap_or(0.0);
+            let mut points = vec![start, end];
+            for step in 1..64 {
+                let t = f64::from(step) / 64.0;
+                let angle = start_angle + (end_angle - start_angle) * t;
+                points.push(rotate_point(
+                    arc_point(center, radius, angle),
+                    anchor,
+                    rotation,
+                ));
+            }
+            bounds_for_points(&points)
+        }
+        Primitive::Arc => {
             let center = point_to_short_side_units(instruction.center?, canvas);
             let radius = instruction.radius?;
             Some(Bounds {
@@ -343,6 +389,10 @@ fn endpoint_geometry(
         }
         Primitive::Arc => {
             let center = point_to_short_side_units(instruction.center?, canvas);
+            let anchor = point_to_short_side_units(
+                instruction_anchor_on_canvas(instruction, canvas),
+                canvas,
+            );
             let radius = instruction.radius?;
             let start_angle = instruction.angle_start?;
             let end_angle = instruction.angle_end?;
@@ -350,8 +400,8 @@ fn endpoint_geometry(
             let end_radians = end_angle.to_radians();
             let direction = if end_angle > start_angle { 1.0 } else { -1.0 };
             Some((
-                rotate_point(arc_point(center, radius, start_angle), center, rotation),
-                rotate_point(arc_point(center, radius, end_angle), center, rotation),
+                rotate_point(arc_point(center, radius, start_angle), anchor, rotation),
+                rotate_point(arc_point(center, radius, end_angle), anchor, rotation),
                 rotate_vector(
                     Point::new(
                         -start_radians.sin() * direction,
@@ -384,7 +434,7 @@ fn performed_arc_sagitta(instruction: &Instruction, canvas: Option<CanvasSize>) 
     let delta = minor_arc_delta(start_angle, end_angle);
     let apex = rotate_point(
         arc_point(center, radius, start_angle + delta / 2.0),
-        center,
+        point_to_short_side_units(instruction_anchor_on_canvas(instruction, canvas), canvas),
         instruction.rotation.unwrap_or(0.0),
     );
     let chord = Point::new(end.x - start.x, end.y - start.y);
@@ -485,6 +535,12 @@ fn touching_relation(
     resolved.radius = Some(arc.radius);
     resolved.angle_start = Some(arc.angle_start);
     resolved.angle_end = Some(arc.angle_end);
+    if instruction.position.is_some() {
+        resolved.position = Some(point_from_short_side_units(
+            Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0),
+            canvas,
+        ));
+    }
     RelationResolution {
         instruction: resolved,
         warning: None,
@@ -708,6 +764,14 @@ pub fn scale_instruction(instruction: &Instruction, scale: f64) -> Instruction {
         ));
     }
     scaled.radius = instruction.radius.map(|radius| radius * scale);
+    if instruction.primitive == Primitive::Arc
+        && let (Some(center), Some(anchor)) = (instruction.center, instruction.position)
+    {
+        scaled.center = Some(Point::new(
+            anchor.x + (center.x - anchor.x) * scale,
+            anchor.y + (center.y - anchor.y) * scale,
+        ));
+    }
     scaled.size = instruction
         .size
         .map(|size| Point::new(size.x * scale, size.y * scale));
@@ -750,6 +814,19 @@ pub fn scale_instruction_on_canvas(
         ));
     }
     scaled.radius = instruction.radius.map(|radius| radius * scale);
+    if instruction.primitive == Primitive::Arc
+        && let (Some(center), Some(anchor_point)) = (instruction.center, instruction.position)
+    {
+        let center = point_to_short_side_units(center, Some(canvas));
+        let anchor_point = point_to_short_side_units(anchor_point, Some(canvas));
+        scaled.center = Some(point_from_short_side_units(
+            Point::new(
+                anchor_point.x + (center.x - anchor_point.x) * scale,
+                anchor_point.y + (center.y - anchor_point.y) * scale,
+            ),
+            Some(canvas),
+        ));
+    }
     scaled.size = instruction
         .size
         .map(|size| Point::new(size.x * scale, size.y * scale));

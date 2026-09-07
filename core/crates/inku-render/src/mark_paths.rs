@@ -159,7 +159,7 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let widths = amplitude_width(variation.amplitude);
     let representative =
         match instruction.primitive {
-            Primitive::Circle | Primitive::Polygon | Primitive::Arc => {
+            Primitive::Circle | Primitive::Polygon | Primitive::Arc | Primitive::Point => {
                 instruction.radius.unwrap_or(0.02) * canvas.unit()
             }
             Primitive::Ellipse => instruction.size.map_or(canvas.unit() * 0.02, |size| {

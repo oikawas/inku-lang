@@ -153,6 +153,42 @@ fn touching_line_reuses_the_rotated_prior_endpoints() {
 }
 
 #[test]
+fn endpoint_family_anchor_adapter_preserves_old_arc_and_independent_point_semantics() {
+    let typed_arc = instruction(
+        r#"{"primitive":"arc","center":[0.5,0.59],"position":[0.5,0.5],
+        "radius":0.15,"angle_start":143.13010235415598,
+        "angle_end":36.86989764584402,"rotation":30}"#,
+    );
+    assert_eq!(instruction_anchor(&typed_arc), Point::new(0.5, 0.5));
+    let moved = move_anchor_to(&typed_arc, Point::new(0.7, 0.6), false);
+    assert_eq!(moved.position, Some(Point::new(0.7, 0.6)));
+    assert_eq!(moved.center, Some(Point::new(0.7, 0.69)));
+
+    let legacy_arc = instruction(
+        r#"{"primitive":"arc","center":[0.5,0.59],"radius":0.15,
+        "angle_start":143.13010235415598,"angle_end":36.86989764584402,
+        "rotation":30}"#,
+    );
+    assert_eq!(instruction_anchor(&legacy_arc), Point::new(0.5, 0.59));
+    let legacy_moved = move_anchor_to(&legacy_arc, Point::new(0.7, 0.6), false);
+    assert_eq!(legacy_moved.center, Some(Point::new(0.7, 0.6)));
+    assert_eq!(legacy_moved.position, None);
+
+    let point =
+        instruction(r#"{"primitive":"point","center":[0.3,0.4],"radius":0.006,"filled":true}"#);
+    assert_eq!(instruction_anchor(&point), Point::new(0.3, 0.4));
+    let bounds = performed_instruction_bounds_on_canvas(
+        &point,
+        None,
+        0,
+        Some(CanvasSize::new(1_000.0, 500.0)),
+    )
+    .unwrap();
+    assert_eq!(bounds.min, Point::new(0.594, 0.394));
+    assert_eq!(bounds.max, Point::new(0.606, 0.406));
+}
+
+#[test]
 fn unresolved_relation_is_dropped_with_structured_warning() {
     let current = instruction(
         r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.1,

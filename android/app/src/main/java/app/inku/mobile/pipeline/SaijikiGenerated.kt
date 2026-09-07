@@ -23,8 +23,8 @@ object SaijikiGenerated {
             key = "katachi",
             nameJa = "かたち",
             nameEn = "forms",
-            wordsJa = listOf("円", "楕円", "三角", "四角", "線", "弧", "雲形"),
-            wordsEn = listOf("circle", "ellipse", "triangle", "square", "line", "arc", "cloudform"),
+            wordsJa = listOf("円", "楕円", "三角", "四角", "線", "弧", "点", "雲形"),
+            wordsEn = listOf("circle", "ellipse", "triangle", "square", "line", "arc", "point", "cloudform"),
         ),
         Category(
             key = "katamuki",

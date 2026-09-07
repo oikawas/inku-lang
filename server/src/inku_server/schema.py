@@ -33,7 +33,15 @@ Coord = tuple[float, float]
 ScoreVersion = Literal["0.1.0"]
 
 Primitive = Literal[
-    "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"
+    "line",
+    "circle",
+    "ellipse",
+    "triangle",
+    "square",
+    "polygon",
+    "arc",
+    "point",
+    "cloudform",
 ]
 # The primitives that enclose an interior, and so the only ones a `surface` is
 # drawn on. It lives here because two layers decide by it and they must not
@@ -500,7 +508,7 @@ class Instruction(BaseModel):
     primitive: Primitive = Field(
         description=(
             "line=線 / circle=円 / ellipse=楕円 / triangle=三角 / square=四角"
-            " / polygon=多角形 / arc=弧 / cloudform=雲形"
+            " / polygon=多角形 / arc=弧 / point=点 / cloudform=雲形"
         ),
     )
     note: Optional[str] = Field(
@@ -519,11 +527,11 @@ class Instruction(BaseModel):
     )
     center: Optional[Coord] = Field(
         default=None,
-        description="circle/ellipse/arc/polygon/cloudform の中心 [x,y]。square/triangle には使わない (→position)",
+        description="circle/ellipse/arc/point/polygon/cloudform の中心 [x,y]。square/triangle には使わない (→position)",
     )
     radius: Optional[float] = Field(
         default=None,
-        description="circle/arc/polygon の半径 (省略=0.1)",
+        description="circle/arc/point/polygon の半径 (省略=0.1)",
     )
     sides: Optional[int] = Field(
         default=None,
@@ -533,7 +541,10 @@ class Instruction(BaseModel):
     )
     position: Optional[Coord] = Field(
         default=None,
-        description="square/triangle の bbox 左上 [x,y]。中央配置: [0.5-w/2, 0.5-h/2]",
+        description=(
+            "square/triangle の bbox 左上 [x,y]。中央配置: [0.5-w/2, 0.5-h/2]。"
+            "arc では typed DDL が指定した弦中点 semantic anchor。省略時は既存の円中心 anchor"
+        ),
     )
     size: Optional[tuple[float, float]] = Field(
         default=None,

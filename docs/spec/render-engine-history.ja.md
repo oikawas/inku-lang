@@ -49,6 +49,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 
 | 版 | 製品版数 | Build | 凍結日 | ケース | 動いた | 不変 |
 |---|---|---|---|---|---|---|
+| **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
 | **42** | Step 10O square物理座標補正 | — | 2026-09-07 | 610 | **0** | **610** |
 | **41** | Rust移行基準 | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
@@ -333,6 +334,17 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
+
+## engine 43 — Line・Arc・Pointをfinite endpoint familyとして演奏する
+
+Engine 43は独立した`point` primitiveを丸いfilled markとして描き、Lineの端点中点、Arcの弦中点、
+Pointの中心をsemantic anchorとして共有する。Typed DDL由来のArcは既存optional `position`へ弦中点を
+運ぶため、非正方canvasで移動・回転しても作者の位置がずれない。`position`を持たない旧Score Arcは
+従来の円中心anchorと回転を保つ。
+
+Line / Arc / Pointの一組と、47:20 canvasで回転するArcの弦中点・端点、旧Arc field不在互換を
+generic clean-commit native testboxで直接検査する。本版のためにEngine 42専用corpusや旧referenceは
+書き換えないため、上の表に凍結case数やmoved数を推測して記録しない。
 
 ## engine 42 — squareの物理anchorと回転中心を非正方canvasでそろえる
 

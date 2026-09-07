@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     CanonicalPreviousReference, CanonicalRelationForm, NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-    NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
+    NeutralDiagnosticKind, NeutralToken, NeutralTokenKind, NormalizedDdlDocument,
+    ResolvedInstructionLanguage, parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
@@ -438,7 +438,59 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
         }
     }
 
-    assert_eq!((active, marker_only, disabled), (89, 3, 1));
+    assert_eq!((active, marker_only, disabled), (90, 3, 1));
+}
+
+#[test]
+fn japanese_point_homograph_uses_typed_phrase_ownership() {
+    let parse = |source: &str| {
+        let document = NormalizedDdlDocument::new(
+            source.to_owned(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        parse_neutral_lexemes(&document)
+    };
+    let standalone = parse("点");
+    assert!(matches!(
+        standalone.tokens.as_slice(),
+        [NeutralToken {
+            kind: NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. },
+            ..
+        }] if category_key == "katachi" && canonical_surface_ja == "点"
+    ));
+
+    let modified = parse("点の円");
+    assert!(matches!(
+        &modified.tokens[0].kind,
+        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+            if category_key == "omote" && canonical_surface_ja == "点"
+    ));
+    assert!(matches!(
+        &modified.tokens[2].kind,
+        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+            if category_key == "katachi" && canonical_surface_ja == "円"
+    ));
+
+    let point_modified = parse("点の点");
+    assert!(matches!(
+        &point_modified.tokens[0].kind,
+        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+            if category_key == "omote" && canonical_surface_ja == "点"
+    ));
+    assert!(matches!(
+        &point_modified.tokens[2].kind,
+        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+            if category_key == "katachi" && canonical_surface_ja == "点"
+    ));
+
+    let surface_clause = parse("面: 点");
+    assert!(surface_clause.tokens.iter().any(|token| matches!(
+        &token.kind,
+        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+            if category_key == "omote" && canonical_surface_ja == "点"
+    )));
 }
 
 #[test]

@@ -47,7 +47,7 @@ impl ScorePrimitiveMappingError {
     }
 }
 
-/// Map only the closed canonical eight-shape identity into the shared Score type.
+/// Map only the closed canonical nine-shape identity into the shared Score type.
 pub fn score_primitive_from_semantic_identity(
     identity: &SemanticIdentity,
 ) -> Result<Primitive, ScorePrimitiveMappingError> {
@@ -65,6 +65,7 @@ fn score_primitive_from_identity(
         ("shape", "square") => Primitive::Square,
         ("shape", "polygon") => Primitive::Polygon,
         ("shape", "arc") => Primitive::Arc,
+        ("shape", "point") => Primitive::Point,
         ("shape", "cloudform") => Primitive::Cloudform,
         _ => {
             return Err(ScorePrimitiveMappingError {
@@ -695,7 +696,10 @@ fn project_macro_emit<'a>(
     };
 
     if let Some(identity) = primitive
-        && !matches!(identity.id, "circle" | "ellipse" | "cloudform" | "square")
+        && !matches!(
+            identity.id,
+            "line" | "circle" | "ellipse" | "cloudform" | "square" | "arc" | "point"
+        )
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
             key: "shape".to_owned(),
@@ -1817,28 +1821,33 @@ fn lower_complete_instruction(
             return Err(gaps);
         }
     };
-    let rotation = match input.angle {
-        None => None,
-        Some(identity) if identity.category != "angle" => {
-            gaps.push(ScoreFieldGap::UnsupportedAngleIdentity {
-                category: identity.category.to_owned(),
-                id: identity.id.to_owned(),
-            });
-            None
-        }
-        Some(identity) => match input
-            .angle_context
-            .and_then(|context| resolve_score_angle(identity.id, context))
-        {
-            Some(rotation) => Some(rotation),
-            None => {
+    let rotation = if primitive == Primitive::Point && input.angle.is_some() {
+        gaps.push(ScoreFieldGap::UnsupportedAngleForPrimitive { primitive });
+        None
+    } else {
+        match input.angle {
+            None => None,
+            Some(identity) if identity.category != "angle" => {
                 gaps.push(ScoreFieldGap::UnsupportedAngleIdentity {
                     category: identity.category.to_owned(),
                     id: identity.id.to_owned(),
                 });
                 None
             }
-        },
+            Some(identity) => match input
+                .angle_context
+                .and_then(|context| resolve_score_angle(identity.id, context))
+            {
+                Some(rotation) => Some(rotation),
+                None => {
+                    gaps.push(ScoreFieldGap::UnsupportedAngleIdentity {
+                        category: identity.category.to_owned(),
+                        id: identity.id.to_owned(),
+                    });
+                    None
+                }
+            },
+        }
     };
     let count = match input.count {
         Some(0) => {
@@ -1875,17 +1884,38 @@ fn lower_complete_instruction(
         Some(_) => map_score_enum::<LineStyle>(input.continuity, "continuity", &mut gaps),
         None => Some(LineStyle::Solid),
     };
-    let (filled, surface) = match input.surface {
-        Some(identity) if identity.category == "surface" && identity.id == "none" => (false, None),
-        Some(identity) if identity.category == "surface" && identity.id == "solid" => (true, None),
-        Some(identity) => match surface_spec_from_identity(identity) {
-            Ok(spec) => (true, Some(spec)),
-            Err(gap) => {
-                gaps.push(gap);
+    let (filled, surface) = if primitive == Primitive::Point && input.surface.is_some() {
+        let identity = input.surface.expect("checked present Point surface");
+        gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+        (true, None)
+    } else {
+        let closes_area = matches!(
+            primitive,
+            Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Square
+                | Primitive::Point
+                | Primitive::Cloudform
+        );
+        match input.surface {
+            Some(identity) if identity.category == "surface" && identity.id == "none" => {
                 (false, None)
             }
-        },
-        None => (true, None),
+            Some(identity) if identity.category == "surface" && identity.id == "solid" => {
+                (closes_area, None)
+            }
+            Some(identity) => match surface_spec_from_identity(identity) {
+                Ok(spec) => (closes_area, Some(spec)),
+                Err(gap) => {
+                    gaps.push(gap);
+                    (false, None)
+                }
+            },
+            None => (closes_area, None),
+        }
     };
     if let Some(identity) = input.surface_intensity {
         gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensity {
@@ -1931,7 +1961,13 @@ fn lower_complete_instruction(
     } else if input.explicit_geometry.is_none()
         && !matches!(
             primitive,
-            Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square
+            Primitive::Line
+                | Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Cloudform
+                | Primitive::Square
+                | Primitive::Arc
+                | Primitive::Point
         )
     {
         if input.relative_scale.is_some() {
@@ -1965,15 +2001,15 @@ fn lower_complete_instruction(
     Ok(Instruction {
         primitive,
         note: None,
-        from_: None,
-        to: None,
+        from_: geometric.from,
+        to: geometric.to,
         center: geometric.center,
         radius: geometric.radius,
         sides: None,
         position: geometric.position,
         size: geometric.size,
-        angle_start: None,
-        angle_end: None,
+        angle_start: geometric.angle_start,
+        angle_end: geometric.angle_end,
         rotation,
         filled,
         style: style.expect("checked continuity"),
@@ -2092,10 +2128,14 @@ fn map_score_enum<T: serde::de::DeserializeOwned>(
 
 #[derive(Clone)]
 struct LoweredGeometry {
+    from: Option<Point>,
+    to: Option<Point>,
     center: Option<Point>,
     radius: Option<f64>,
     position: Option<Point>,
     size: Option<Point>,
+    angle_start: Option<f64>,
+    angle_end: Option<f64>,
     at: Option<AtRegion>,
 }
 
@@ -2107,7 +2147,10 @@ enum ScorePlacement<'a> {
 
 #[derive(Clone, Copy)]
 enum ResolvedGeometryDimensions {
+    Line { length: Rational },
     Circle { radius: Rational },
+    Arc { chord: Rational, sagitta: Rational },
+    Point { radius: Rational },
     CenteredSize { width: Rational, height: Rational },
     Square { side: Rational },
 }
@@ -2125,7 +2168,7 @@ fn lower_geometry(
         ScorePlacement::Numeric(position) => {
             lower_numeric_geometry(primitive, dimensions, position, canvas, rotation)
         }
-        ScorePlacement::Named(focus) => lower_named_geometry(dimensions, focus),
+        ScorePlacement::Named(focus) => lower_named_geometry(dimensions, focus, canvas),
     }
 }
 
@@ -2142,13 +2185,32 @@ fn resolve_geometry_dimensions(
     };
 
     match (primitive, geometry) {
+        (Primitive::Line, SemanticExplicitGeometry::Length(value)) => {
+            Ok(ResolvedGeometryDimensions::Line {
+                length: positive(value.decimal.value)?,
+            })
+        }
         (Primitive::Circle, SemanticExplicitGeometry::Radius(value))
-        | (Primitive::Circle, SemanticExplicitGeometry::Diameter(value)) => {
+        | (Primitive::Circle, SemanticExplicitGeometry::Diameter(value))
+        | (Primitive::Point, SemanticExplicitGeometry::Radius(value))
+        | (Primitive::Point, SemanticExplicitGeometry::Diameter(value)) => {
             let mut radius = positive(value.decimal.value)?;
             if matches!(geometry, SemanticExplicitGeometry::Diameter(_)) {
                 radius = radius.div_i128(2)?;
             }
-            Ok(ResolvedGeometryDimensions::Circle { radius })
+            Ok(if primitive == Primitive::Point {
+                ResolvedGeometryDimensions::Point { radius }
+            } else {
+                ResolvedGeometryDimensions::Circle { radius }
+            })
+        }
+        (Primitive::Arc, SemanticExplicitGeometry::ChordSagitta { chord, sagitta }) => {
+            let chord = positive(chord.decimal.value)?;
+            let sagitta = positive(sagitta.decimal.value)?;
+            if !sagitta.le(chord.div_i128(2)?)? {
+                return Err(ScoreFieldGap::GeometryDimensionMismatch { primitive });
+            }
+            Ok(ResolvedGeometryDimensions::Arc { chord, sagitta })
         }
         (
             Primitive::Ellipse | Primitive::Cloudform,
@@ -2162,9 +2224,16 @@ fn resolve_geometry_dimensions(
                 side: positive(value.decimal.value)?,
             })
         }
-        (Primitive::Circle | Primitive::Ellipse | Primitive::Cloudform | Primitive::Square, _) => {
-            Err(ScoreFieldGap::GeometryDimensionMismatch { primitive })
-        }
+        (
+            Primitive::Line
+            | Primitive::Circle
+            | Primitive::Ellipse
+            | Primitive::Cloudform
+            | Primitive::Square
+            | Primitive::Arc
+            | Primitive::Point,
+            _,
+        ) => Err(ScoreFieldGap::GeometryDimensionMismatch { primitive }),
         _ => Err(ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { primitive }),
     }
 }
@@ -2181,8 +2250,17 @@ fn resolve_normal_dimensions(
     let normal = Rational::from_ratio(NORMAL_SHORT_EDGE_RATIO.0, NORMAL_SHORT_EDGE_RATIO.1)?;
     let width = normal.mul_ratio(factor_numerator, factor_denominator)?;
     match primitive {
+        Primitive::Line => Ok(ResolvedGeometryDimensions::Line { length: width }),
         Primitive::Circle => Ok(ResolvedGeometryDimensions::Circle {
             radius: width.div_i128(2)?,
+        }),
+        Primitive::Arc => Ok(ResolvedGeometryDimensions::Arc {
+            chord: width,
+            sagitta: width.div_i128(4)?,
+        }),
+        Primitive::Point => Ok(ResolvedGeometryDimensions::Point {
+            radius: Rational::from_ratio(3, 500)?
+                .mul_ratio(factor_numerator, factor_denominator)?,
         }),
         Primitive::Ellipse | Primitive::Cloudform => Ok(ResolvedGeometryDimensions::CenteredSize {
             width,
@@ -2213,13 +2291,86 @@ fn lower_numeric_geometry(
     let short_units = width_units.min(height_units);
 
     match dimensions {
+        ResolvedGeometryDimensions::Line { length } => {
+            ensure_rotated_centered_extent(
+                Primitive::Line,
+                x,
+                y,
+                length,
+                Rational::from_ratio(0, 1)?,
+                width_units,
+                height_units,
+                short_units,
+                rotation,
+            )?;
+            let half_x = length
+                .div_i128(2)?
+                .mul_ratio(i128::from(short_units), i128::from(width_units))?;
+            Ok(LoweredGeometry {
+                from: Some(Point::new(x.sub(half_x)?.to_f64()?, y.to_f64()?)),
+                to: Some(Point::new(x.add(half_x)?.to_f64()?, y.to_f64()?)),
+                center: None,
+                radius: None,
+                position: None,
+                size: None,
+                angle_start: None,
+                angle_end: None,
+                at: None,
+            })
+        }
         ResolvedGeometryDimensions::Circle { radius } => {
             ensure_centered_extent(x, y, radius, radius, width_units, height_units, short_units)?;
             Ok(LoweredGeometry {
+                from: None,
+                to: None,
                 center: Some(center),
                 radius: Some(radius.to_f64()?),
                 position: None,
                 size: None,
+                angle_start: None,
+                angle_end: None,
+                at: None,
+            })
+        }
+        ResolvedGeometryDimensions::Arc { chord, sagitta } => {
+            let (radius, start, end) = arc_parameters(chord, sagitta)?;
+            ensure_arc_extent(
+                x,
+                y,
+                radius,
+                start,
+                end,
+                rotation,
+                width_units,
+                height_units,
+                short_units,
+            )?;
+            let offset_y = radius
+                .sub(sagitta)?
+                .mul_ratio(i128::from(short_units), i128::from(height_units))?;
+            Ok(LoweredGeometry {
+                from: None,
+                to: None,
+                center: Some(Point::new(x.to_f64()?, y.add(offset_y)?.to_f64()?)),
+                radius: Some(radius.to_f64()?),
+                position: Some(center),
+                size: None,
+                angle_start: Some(start),
+                angle_end: Some(end),
+                at: None,
+            })
+        }
+        ResolvedGeometryDimensions::Point { radius } => {
+            ensure_centered_extent(x, y, radius, radius, width_units, height_units, short_units)?;
+            Ok(LoweredGeometry {
+                from: None,
+                to: None,
+                center: Some(center),
+                radius: Some(radius.to_f64()?),
+                position: None,
+                size: None,
+                angle_start: None,
+                angle_end: None,
                 at: None,
             })
         }
@@ -2236,10 +2387,14 @@ fn lower_numeric_geometry(
                 rotation,
             )?;
             Ok(LoweredGeometry {
+                from: None,
+                to: None,
                 center: Some(center),
                 radius: None,
                 position: None,
                 size: Some(Point::new(width.to_f64()?, height.to_f64()?)),
+                angle_start: None,
+                angle_end: None,
                 at: None,
             })
         }
@@ -2270,10 +2425,14 @@ fn lower_numeric_geometry(
                 return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
             }
             Ok(LoweredGeometry {
+                from: None,
+                to: None,
                 center: None,
                 radius: None,
                 position: Some(Point::new(top_left_x.to_f64()?, top_left_y.to_f64()?)),
                 size: Some(Point::new(side.to_f64()?, side.to_f64()?)),
+                angle_start: None,
+                angle_end: None,
                 at: None,
             })
         }
@@ -2325,11 +2484,13 @@ fn ensure_rotated_centered_extent(
             (half_width * cosine).hypot(half_height * sine),
             (half_width * sine).hypot(half_height * cosine),
         ),
-        Primitive::Cloudform | Primitive::Square => (
+        Primitive::Line | Primitive::Cloudform | Primitive::Square => (
             cosine * half_width + sine * half_height,
             sine * half_width + cosine * half_height,
         ),
-        _ => unreachable!("only ellipse, cloudform, and square dimensions use rotated extents"),
+        _ => {
+            unreachable!("only line, ellipse, cloudform, and square dimensions use rotated extents")
+        }
     };
     let extent_x = physical_extent_x / f64::from(width_units);
     let extent_y = physical_extent_y / f64::from(height_units);
@@ -2350,25 +2511,104 @@ fn ensure_rotated_centered_extent(
 fn lower_named_geometry(
     dimensions: ResolvedGeometryDimensions,
     focus: FocusRegion,
+    canvas: CanvasFormat,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
-    let (radius, size) = match dimensions {
-        ResolvedGeometryDimensions::Circle { radius } => (Some(radius.to_f64()?), None),
-        ResolvedGeometryDimensions::CenteredSize { width, height } => {
-            (None, Some(Point::new(width.to_f64()?, height.to_f64()?)))
-        }
-        ResolvedGeometryDimensions::Square { side } => {
-            (None, Some(Point::new(side.to_f64()?, side.to_f64()?)))
-        }
-    };
-    Ok(LoweredGeometry {
+    let (width_units, height_units) = canvas.integer_ratio();
+    let short_units = width_units.min(height_units);
+    let mut lowered = LoweredGeometry {
+        from: None,
+        to: None,
         center: None,
-        radius,
+        radius: None,
         position: None,
-        size,
+        size: None,
+        angle_start: None,
+        angle_end: None,
         at: Some(AtRegion {
             region: focus_region_bounds(focus),
         }),
-    })
+    };
+    match dimensions {
+        ResolvedGeometryDimensions::Line { length } => {
+            let half_x = length.to_f64()? * f64::from(short_units) / (2.0 * f64::from(width_units));
+            lowered.from = Some(Point::new(0.5 - half_x, 0.5));
+            lowered.to = Some(Point::new(0.5 + half_x, 0.5));
+        }
+        ResolvedGeometryDimensions::Circle { radius }
+        | ResolvedGeometryDimensions::Point { radius } => {
+            lowered.radius = Some(radius.to_f64()?);
+        }
+        ResolvedGeometryDimensions::Arc { chord, sagitta } => {
+            let (radius, start, end) = arc_parameters(chord, sagitta)?;
+            let offset_y =
+                radius.sub(sagitta)?.to_f64()? * f64::from(short_units) / f64::from(height_units);
+            lowered.center = Some(Point::new(0.5, 0.5 + offset_y));
+            lowered.position = Some(Point::new(0.5, 0.5));
+            lowered.radius = Some(radius.to_f64()?);
+            lowered.angle_start = Some(start);
+            lowered.angle_end = Some(end);
+        }
+        ResolvedGeometryDimensions::CenteredSize { width, height } => {
+            lowered.size = Some(Point::new(width.to_f64()?, height.to_f64()?));
+        }
+        ResolvedGeometryDimensions::Square { side } => {
+            lowered.size = Some(Point::new(side.to_f64()?, side.to_f64()?));
+        }
+    }
+    Ok(lowered)
+}
+
+fn arc_parameters(
+    chord: Rational,
+    sagitta: Rational,
+) -> Result<(Rational, f64, f64), ScoreFieldGap> {
+    let radius = chord
+        .mul(chord)?
+        .div(sagitta.mul_i128(8)?)?
+        .add(sagitta.div_i128(2)?)?;
+    let ratio = chord.div(radius.mul_i128(2)?)?.to_f64()?;
+    if !ratio.is_finite() || !(0.0..=1.0).contains(&ratio) {
+        return Err(ScoreFieldGap::GeometryRepresentationLimit);
+    }
+    let half_angle = ratio.asin().to_degrees();
+    Ok((radius, 90.0 + half_angle, 90.0 - half_angle))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_arc_extent(
+    x: Rational,
+    y: Rational,
+    radius: Rational,
+    start: f64,
+    end: f64,
+    rotation: Option<f64>,
+    width_units: u32,
+    height_units: u32,
+    short_units: u32,
+) -> Result<(), ScoreFieldGap> {
+    let anchor_x = x.to_f64()? * f64::from(width_units);
+    let anchor_y = y.to_f64()? * f64::from(height_units);
+    let radius = radius.to_f64()? * f64::from(short_units);
+    let center_y = anchor_y + radius * start.to_radians().sin();
+    let rotation = rotation.unwrap_or(0.0).to_radians();
+    for step in 0..=64 {
+        let t = f64::from(step) / 64.0;
+        let angle = (start + (end - start) * t).to_radians();
+        let point_x = anchor_x + radius * angle.cos();
+        let point_y = center_y - radius * angle.sin();
+        let delta_x = point_x - anchor_x;
+        let delta_y = point_y - anchor_y;
+        let rotated_x = anchor_x + delta_x * rotation.cos() - delta_y * rotation.sin();
+        let rotated_y = anchor_y + delta_x * rotation.sin() + delta_y * rotation.cos();
+        if !rotated_x.is_finite()
+            || !rotated_y.is_finite()
+            || !(0.0..=f64::from(width_units)).contains(&rotated_x)
+            || !(0.0..=f64::from(height_units)).contains(&rotated_y)
+        {
+            return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
+        }
+    }
+    Ok(())
 }
 
 fn positive(value: ExactDecimal) -> Result<Rational, ScoreFieldGap> {
@@ -2442,6 +2682,38 @@ impl Rational {
 
     fn mul_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
         self.mul_ratio(value, 1)
+    }
+
+    fn mul(self, other: Self) -> Result<Self, ScoreFieldGap> {
+        Ok(Self {
+            numerator: self
+                .numerator
+                .checked_mul(other.numerator)
+                .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+            denominator: self
+                .denominator
+                .checked_mul(other.denominator)
+                .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+        })
+    }
+
+    fn div(self, other: Self) -> Result<Self, ScoreFieldGap> {
+        if other.numerator <= 0 {
+            return Err(ScoreFieldGap::GeometryRepresentationLimit);
+        }
+        self.mul_ratio(other.denominator, other.numerator)
+    }
+
+    fn le(self, other: Self) -> Result<bool, ScoreFieldGap> {
+        let left = self
+            .numerator
+            .checked_mul(other.denominator)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?;
+        let right = other
+            .numerator
+            .checked_mul(self.denominator)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?;
+        Ok(left <= right)
     }
 
     fn div_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
@@ -2570,10 +2842,13 @@ fn lower_source_instruction(
             }
             match primitive {
                 Some(
-                    Primitive::Circle
+                    Primitive::Line
+                    | Primitive::Circle
                     | Primitive::Ellipse
                     | Primitive::Cloudform
-                    | Primitive::Square,
+                    | Primitive::Square
+                    | Primitive::Arc
+                    | Primitive::Point,
                 ) => Some(scale.value),
                 Some(primitive) => {
                     gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });

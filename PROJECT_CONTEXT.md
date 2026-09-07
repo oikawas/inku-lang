@@ -84,19 +84,20 @@ detaching source-independent input. It adds no condition when language evidence 
 not require an unused sidecar to resolve or execute.
 The same lock attests `inku.geometry-resolution-policy.v1`. From the verified view, the lowerer
 takes host-supplied canvas and background plus actual color-catalog observations when color is omitted.
-For circle, ellipse, cloudform, and square instructions with a resolved numeric position or an
+For circle, ellipse, cloudform, square, line, arc, and point instructions with a resolved numeric position or an
 original `place:center` owned by a verified direct `Instruction { instruction_index }` target, plus
 a place action, it lowers explicit numeric geometry or count-one normal geometry and the finite
 bilingual seven-class size scale, together with omitted count-one, pen, solid, fill, and
 background-contrast color, into an actual Score. Existing fill behavior for `none`, `solid`, and omitted surface
 remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
 Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
-material numeric defaults or seeds. For ordinary source-owned direct primitives, the same four-shape, count-one,
+material numeric defaults or seeds. Line owns exact length, arc owns exact chord and sagitta, and point owns exact
+radius or diameter. For ordinary source-owned direct primitives, the same existing four-shape, count-one,
 explicit-place, original exact-center named-focus subset carries NotTouching and Between into the existing Score
 relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order;
 Continue omits dependent currents as `RelationInstruction` units when a referent disappears. Surface intensity,
-numeric, non-center, or unspecified placement on the current instruction, normal geometry for other primitives,
+numeric, non-center, or unspecified placement on the current instruction, normal geometry for remaining primitives,
 count allocation, the other three relations / group, Macro relation / structure / numeric input, whole-parity and
 retirement remain, and this path is not connected to the runtime. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
@@ -114,15 +115,19 @@ angle-specific SHA-256 domain and resolves an explicitly authored angle exactly 
 `Score.rotation`. Horizontal and vertical are 0 and 90; diagonal uses four directions; rising,
 falling, and their left-facing forms use the author-approved integer ranges; rotated uses the
 finite set more than five degrees from every 45-degree boundary. Numeric circle, ellipse,
-cloudform, and square placement checks the rotated declared extent in physical short-edge units,
+cloudform, square, line, arc, and point placement checks the rotated declared extent in physical short-edge units,
 while named focus keeps its dimensions and `at.region`. Square uses the same resolver for direct
 and flat Macro Emit input. Engine 42 resolves square and triangle anchors, pivots, bounds,
 relations, composites, and arrangements through the same physical short-edge coordinate family.
+Engine 43 uses the endpoint midpoint for line, the chord midpoint for arc, and the center for point as
+semantic anchors. A typed arc carries its chord midpoint in the existing optional `position`; an old
+arc with that field absent keeps the circle-center anchor.
 
 Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
 ordinary DDL after an exact join to the execution owner and generated focus. One Emit is one
 instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
-their order. The current subset covers the four closed shapes, explicit `place`, exact `center`,
+their order. The current subset covers the existing four closed shapes plus line, arc, and point,
+explicit `place`, exact `center`,
 optional attributes from their same-named categories, and omitted count or Integer one. Under Stop,
 an unbound caller fact, structural node, incomplete or unknown Emit, or type mismatch stops the
 entire Score. Under Continue, an unbound caller appearance field is omitted while definition values
@@ -220,7 +225,7 @@ To learn why something took its current shape, search the changelog by term, ver
 The Literals in `server/src/inku_server/schema.py` are canonical; the saijiki table (`saijiki.py`)
 holds the mapping to Japanese terms.
 
-- 8 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `cloudform`
+- 9 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
 - 4 line styles — `solid` / `dashed` / `dotted` / `dash_dot`
 - 11 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 2 thinness values — `fine` / `extra_fine` (an axis independent of the tool)

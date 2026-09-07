@@ -2701,6 +2701,27 @@ pub(crate) fn semantic_explicit_geometry_value(geometry: &SemanticExplicitGeomet
                 semantic_decimal_value(value.decimal.value),
             );
         }
+        SemanticExplicitGeometry::Length(value) => {
+            record.insert("dimension".to_owned(), Value::String("length".to_owned()));
+            record.insert(
+                "value".to_owned(),
+                semantic_decimal_value(value.decimal.value),
+            );
+        }
+        SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => {
+            record.insert(
+                "dimension".to_owned(),
+                Value::String("chord_sagitta".to_owned()),
+            );
+            record.insert(
+                "chord".to_owned(),
+                semantic_decimal_value(chord.decimal.value),
+            );
+            record.insert(
+                "sagitta".to_owned(),
+                semantic_decimal_value(sagitta.decimal.value),
+            );
+        }
         SemanticExplicitGeometry::WidthHeight { width, height } => {
             record.insert(
                 "dimension".to_owned(),

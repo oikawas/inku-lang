@@ -54,6 +54,7 @@ fn primitive_name(primitive: crate::types::Primitive) -> &'static str {
         crate::types::Primitive::Square => "square",
         crate::types::Primitive::Polygon => "polygon",
         crate::types::Primitive::Arc => "arc",
+        crate::types::Primitive::Point => "point",
         crate::types::Primitive::Cloudform => "cloudform",
     }
 }

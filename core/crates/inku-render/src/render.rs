@@ -143,6 +143,7 @@ fn primitive_name(primitive: Primitive) -> &'static str {
         Primitive::Square => "square",
         Primitive::Polygon => "polygon",
         Primitive::Arc => "arc",
+        Primitive::Point => "point",
         Primitive::Cloudform => "cloudform",
     }
 }

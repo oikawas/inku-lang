@@ -15,11 +15,12 @@
         {"surface_ja": "四角", "surface_en": "square", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "線", "surface_en": "line", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "弧", "surface_en": "arc", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "点", "surface_en": "point", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "雲形", "surface_en": "cloudform", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "多角形", "surface_en": "polygon", "default": false, "prompt": false, "display": false, "marker": true, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
-      "marker_order_ja": ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"],
-      "marker_order_en": ["line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"]
+      "marker_order_ja": ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "点", "雲形"],
+      "marker_order_en": ["line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "point", "cloudform"]
     },
     {
       "key": "katamuki",

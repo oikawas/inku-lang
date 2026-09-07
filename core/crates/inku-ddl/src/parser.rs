@@ -322,9 +322,61 @@ fn selection_at(
             }
         });
     }
-    select_candidate(candidates_at_with_locked_macro_boundary(
-        document, start_byte, language,
+    let candidates = candidates_at_with_locked_macro_boundary(document, start_byte, language);
+    select_candidate(resolve_declared_point_homograph(
+        document, start_byte, language, candidates,
     ))
+}
+
+fn resolve_declared_point_homograph(
+    document: &NormalizedDdlDocument,
+    start_byte: usize,
+    language: ResolvedInstructionLanguage,
+    candidates: Vec<Candidate>,
+) -> Vec<Candidate> {
+    if language != ResolvedInstructionLanguage::Ja {
+        return candidates;
+    }
+    let has_point_head = candidates
+        .iter()
+        .any(|candidate| candidate.identity == "word:katachi:点");
+    let has_stipple = candidates
+        .iter()
+        .any(|candidate| candidate.identity == "word:omote:点");
+    if !has_point_head || !has_stipple {
+        return candidates;
+    }
+
+    let source = document.source();
+    let end_byte = start_byte + '点'.len_utf8();
+    let prefix = source[..start_byte].trim_end();
+    let explicit_surface_predicate = prefix.ends_with("面:") || prefix.ends_with("面：");
+    let suffix = source[end_byte..].trim_start();
+    let modifier_of_other_shape = suffix.strip_prefix('の').is_some_and(|after_particle| {
+        let after_particle = after_particle.trim_start();
+        saijiki_asset()
+            .categories
+            .iter()
+            .find(|category| category.key == "katachi")
+            .is_some_and(|category| {
+                category
+                    .words
+                    .iter()
+                    .any(|word| after_particle.starts_with(&word.surface_ja))
+            })
+    });
+    let selected = if explicit_surface_predicate || modifier_of_other_shape {
+        "word:omote:点"
+    } else {
+        "word:katachi:点"
+    };
+    candidates
+        .into_iter()
+        .filter(|candidate| {
+            candidate.identity != "word:katachi:点" && candidate.identity != "word:omote:点"
+                || candidate.identity == selected
+        })
+        .collect()
 }
 
 fn candidates_at_with_locked_macro_boundary(
@@ -717,8 +769,11 @@ fn geometry_keyword_at(
             ("位置に", GeometryKeyword::Position),
             ("半径", GeometryKeyword::Radius),
             ("直径", GeometryKeyword::Diameter),
+            ("弦長", GeometryKeyword::Chord),
+            ("矢高", GeometryKeyword::Sagitta),
             ("高さ", GeometryKeyword::Height),
             ("一辺", GeometryKeyword::Side),
+            ("長さ", GeometryKeyword::Length),
             ("画面", GeometryKeyword::Canvas),
             ("位置", GeometryKeyword::Position),
             ("幅", GeometryKeyword::Width),
@@ -730,9 +785,12 @@ fn geometry_keyword_at(
             ("horizontal", GeometryKeyword::AxisX),
             ("vertical", GeometryKeyword::AxisY),
             ("diameter", GeometryKeyword::Diameter),
+            ("sagitta", GeometryKeyword::Sagitta),
             ("position", GeometryKeyword::Position),
             ("radius", GeometryKeyword::Radius),
+            ("length", GeometryKeyword::Length),
             ("height", GeometryKeyword::Height),
+            ("chord", GeometryKeyword::Chord),
             ("canvas", GeometryKeyword::Canvas),
             ("width", GeometryKeyword::Width),
         ],

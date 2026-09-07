@@ -74,15 +74,16 @@ Stage 1.5の入場では、実際のvisible source bytes、存在する言語証
 同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
 canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
 direct `Instruction { instruction_index }` ownerを持つ元`place:center`と、place actionが解決済みの
-circle / ellipse / cloudform / squareでは、明示numeric geometryに加え、count1のnormal geometryと
+circle / ellipse / cloudform / square / line / arc / pointでは、明示numeric geometryに加え、count1のnormal geometryと
 日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
 `solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
 7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
-数値defaultやseedを作らない。通常sourceのdirect primitiveでは、同じ4shape / count1 / 明示place / 元のexact
+数値defaultやseedを作らない。Lineは長さ、Arcは弦長と矢高、Pointは半径または直径をexact decimalとして所有する。
+通常sourceのdirect primitiveでは、既存4shape / count1 / 明示place / 元のexact
 center由来named focusの範囲で、NotTouchingとBetweenを既存Medium gapのScore relationへ届ける。typedな
 previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
 一致する場合だけ参照を保つ。Continueは参照消失時にcurrentをRelationInstruction単位で連鎖省略する。
-Surface intensity、currentの数値・noncenter・未指定配置、他primitiveのnormal、count allocation、残る3 relation /
+Surface intensity、currentの数値・noncenter・未指定配置、残るprimitiveのnormal、count allocation、残る3 relation /
 group、Macro relation / 構造 / numeric、全体parity / retireは残り、runtime未接続である。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
@@ -95,13 +96,15 @@ Continueは元meaningを変えず、独立appearance fieldまたは成立しな�
 `composition_seed`、logical occurrence、angle identityをSHA-256の専用domainへframeし、作者が明示した
 かたむきをactual `Score.rotation`へ一度だけ解決する。horizontal / verticalは0 / 90、diagonalは4方向、
 rising / fallingと左右版は裁定済み整数範囲、rotatedは45度境界から5度超の有限集合を使う。
-Circle / ellipse / cloudform / squareの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
+Circle / ellipse / cloudform / square / line / arc / pointの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
 従来の寸法と`at.region`を保つ。Squareもdirectとflat Macro Emitで同じresolverを通る。Engine 42は
 square / triangleのanchor、pivot、bounds、relation、composite、arrangementを同じ物理短辺座標族で解決する。
+Engine 43はLineの端点中点、Arcの弦中点、Pointの中心をsemantic anchorとして使う。Typed Arcは既存optional
+`position`に弦中点を運び、field不在の旧Arcは従来どおり円中心をanchorとする。
 
 Finiteなflat Macro Emitも、exact execution ownerとgenerated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
-`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは4つのclosed shape、明示`place`、
+`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは既存4つのclosed shapeとline / arc / point、明示`place`、
 exact `center`、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
 構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
 field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
@@ -189,7 +192,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 
 正本は `server/src/inku_server/schema.py` の Literal で、日本語の語との対応は saijiki テーブル（`saijiki.py`）が持つ。
 
-- 図形 8 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `cloudform`
+- 図形 9 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
 - 道具 11 — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 細さ 2 — `fine` / `extra_fine`（道具から独立した太さの軸）

@@ -778,15 +778,22 @@ fn coerce_to_schema(
             Ok(ExpandedMacroValue::Boolean(value))
         }
         (
-            ParameterSchema::SemanticRef { category },
+            ParameterSchema::SemanticRef {
+                category,
+                dimension,
+            },
             ExpandedMacroValue::SemanticRef {
                 category: actual,
                 id,
             },
-        ) if category == &actual => Ok(ExpandedMacroValue::SemanticRef {
-            category: actual,
-            id,
-        }),
+        ) if category == &actual
+            && crate::fluctuation::matches_dimension(category, &id, *dimension) =>
+        {
+            Ok(ExpandedMacroValue::SemanticRef {
+                category: actual,
+                id,
+            })
+        }
         (ParameterSchema::List { length, items }, ExpandedMacroValue::List(values))
             if u64::try_from(values.len()) == Ok(*length) =>
         {

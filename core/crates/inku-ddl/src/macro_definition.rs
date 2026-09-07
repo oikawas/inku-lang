@@ -167,6 +167,8 @@ pub enum ParameterSchema {
     },
     SemanticRef {
         category: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dimension: Option<crate::fluctuation::FluctuationDimension>,
     },
 }
 
@@ -683,7 +685,7 @@ enum ValueKind {
     Integer,
     Boolean,
     List,
-    SemanticRef(String),
+    SemanticRef(String, Option<crate::fluctuation::FluctuationDimension>),
     Unknown,
 }
 
@@ -727,7 +729,13 @@ fn validate_parameter_schema(
         ParameterSchema::List { items, .. } => {
             validate_parameter_schema(items, &format!("{path}.items"), diagnostics);
         }
-        ParameterSchema::SemanticRef { category } => {
+        ParameterSchema::SemanticRef {
+            category,
+            dimension,
+        } => {
+            if dimension.is_some() && category != "variation" {
+                push_diagnostic(diagnostics, "invalid_semantic_dimension", path);
+            }
             if semantic_category_authority(category).is_none() {
                 push_diagnostic(diagnostics, "unknown_semantic_category", path);
             }
@@ -749,7 +757,10 @@ fn parameter_kind(schema: &ParameterSchema) -> ValueKind {
         ParameterSchema::Integer => ValueKind::Integer,
         ParameterSchema::Boolean => ValueKind::Boolean,
         ParameterSchema::List { .. } => ValueKind::List,
-        ParameterSchema::SemanticRef { category } => ValueKind::SemanticRef(category.clone()),
+        ParameterSchema::SemanticRef {
+            category,
+            dimension,
+        } => ValueKind::SemanticRef(category.clone(), *dimension),
     }
 }
 
@@ -794,8 +805,14 @@ fn validate_body(
             Statement::Emit { fields, .. } => {
                 for (field, expression) in fields.iter() {
                     let expression_path = format!("{statement_path}.fields.{field}");
+                    let dimension = crate::fluctuation::FluctuationDimension::from_field(field);
+                    let expected_category = if dimension.is_some() {
+                        "variation"
+                    } else {
+                        field.as_str()
+                    };
                     if !matches!(
-                        semantic_category_authority(field),
+                        semantic_category_authority(expected_category),
                         Some(SemanticCategoryAuthority::Asset(_))
                             | Some(SemanticCategoryAuthority::CoreModifier)
                     ) {
@@ -809,7 +826,11 @@ fn validate_body(
                         diagnostics,
                     );
                     match kind {
-                        Some(ValueKind::SemanticRef(category)) if category == *field => {}
+                        Some(ValueKind::SemanticRef(category, actual_dimension))
+                            if category == expected_category
+                                && (dimension.is_none()
+                                    || actual_dimension.is_none()
+                                    || dimension == actual_dimension) => {}
                         Some(ValueKind::Unknown) | None => {}
                         _ => push_diagnostic(
                             diagnostics,
@@ -1178,13 +1199,21 @@ fn validate_expression(
             } else if !known_semantic_id(category, id) {
                 push_diagnostic(diagnostics, "unknown_semantic_id", path);
             }
-            Some(ValueKind::SemanticRef(category.clone()))
+            Some(ValueKind::SemanticRef(
+                category.clone(),
+                if category == "variation" {
+                    crate::fluctuation::classify_fluctuation_dimension(id)
+                } else {
+                    None
+                },
+            ))
         }
     }
 }
 
 fn kinds_compatible(expected: &ValueKind, actual: &ValueKind) -> bool {
     expected == actual
+        || matches!((expected, actual), (ValueKind::SemanticRef(expected_category, expected_dimension), ValueKind::SemanticRef(actual_category, actual_dimension)) if expected_category == actual_category && (expected_dimension.is_none() || actual_dimension.is_none() || expected_dimension == actual_dimension))
         || matches!((expected, actual), (ValueKind::Number, ValueKind::Integer))
         || matches!(actual, ValueKind::Unknown)
 }

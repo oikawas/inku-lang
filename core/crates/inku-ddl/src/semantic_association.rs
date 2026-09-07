@@ -710,21 +710,7 @@ fn classify_surface_dimension(canonical_id: &str) -> Option<SurfaceDimension> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FluctuationDimension {
-    Amplitude,
-    Frequency,
-    Quality,
-}
-
-fn classify_fluctuation_dimension(canonical_id: &str) -> Option<FluctuationDimension> {
-    match canonical_id {
-        "fine" | "large" => Some(FluctuationDimension::Amplitude),
-        "quickly" | "slowly" => Some(FluctuationDimension::Frequency),
-        "swaying" | "undulating" | "trembling" | "blurring" => Some(FluctuationDimension::Quality),
-        _ => None,
-    }
-}
+use crate::fluctuation::{FluctuationDimension, classify_fluctuation_dimension};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProportionDimension {
@@ -3004,6 +2990,7 @@ mod tests {
                 "tone",
                 ParameterSchema::SemanticRef {
                     category: "color".to_owned(),
+                    dimension: None,
                 },
                 SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
                     category: "color".to_owned(),
@@ -3045,6 +3032,7 @@ mod tests {
         let mut schema_difference = original.clone();
         schema_difference[2].schema = ParameterSchema::SemanticRef {
             category: "shape".to_owned(),
+            dimension: None,
         };
         let mut duplicate_name = original.clone();
         duplicate_name[1].name = "count".to_owned();

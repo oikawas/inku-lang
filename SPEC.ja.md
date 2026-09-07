@@ -195,6 +195,10 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 ### 4.6 Generic MacroDefinition v1
 
+揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ8語分類を検査する。
+
+宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
+
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 
 Actual Scoreへ届く現行finite consumerは、flatな完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `arc` / `point`、`movement`は明示`place`、`place`は`center`（exact generated focus target必須）または§18の明示`top` / `bottom` / 四辺 / `corner`を受け入れる。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
@@ -1178,6 +1182,8 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 
 配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
+Runtime未接続のshared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying` / `trembling`はPerlin、`undulating`はWave、`blurring`はPinkへ写す。三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足する振幅／周波数／質だけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`trembling`からFineやHighを推測しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
+
 ### 13.7 Nature plugin による現象の揺らぎ
 
 `Nature.風` などの名前空間付き語は、`inku.macro-definition.v1` の閉じた typed parameter、bounded repeat、typed transform、deterministic bounded vary から core meaning を emit する概念例である。definition は raw Score field、renderer 命令、noise algorithm を直接書かず、source / generated provenance と compiler lock に従う。
@@ -1237,7 +1243,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 |---|---|---|
 | `amplitude` | `fine` / `medium` / `broad` | 振幅（運動語彙由来） |
 | `frequency` | `slow` / `medium` / `high` | 周波数（運動語彙由来） |
-| `quality` | `none` / `white` / `perlin` / `pink` / `wave` | ノイズ種別（weight由来） |
+| `quality` | `none` / `white` / `perlin` / `pink` / `wave` | 明示運動語彙から解決するノイズ種別。素材固有の演奏は独立 |
 | `dimensions` | `[position_x, position_y, angle, length, rotation, radius]` | どの次元を揺らすか。`thickness` は v2.7.2 で退役した（宣言だけで Renderer が読まなかった） |
 
 **記述者はこの構造を直接書かない**。運動語彙・weight・プラグインの組み合わせから、第二段階の構造化層が生成する。
@@ -1251,7 +1257,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 - `pink`: 「滲む」などの境界のぼかし
 - `white`: 粗いノイズ的なばらつき
 
-短い line に揺らぎを付ける場合は、`dimensions=["position_x","position_y"]` を優先し、線の長さに対して揺れが潰れないようにする。長い横線・縦線では、横線なら `position_y`、縦線なら `position_x` を基本軸とする。
+Shared compilerの明示揺らぎは常に`dimensions=["position_x","position_y"]`を使う。Lineは既存の直交方向、Arcとcircle / ellipse / square / cloudformは既存の内外方向のconsumerで演奏する。短線threshold、noise、seed、geometry、位置、angle、thinness、material、関係端点の契約を変更しない。Pointと未対応shapeへの明示variationは拒否する。Stage 1.5のfocus-only変奏とは別である。
 
 スキーマレベルでは variation は保持するが、DDLテキスト層のインターフェースからは見えない。プラグインや素材を実装する人だけがこの次元を扱う。
 
@@ -1374,9 +1380,9 @@ Canonical meaningでは、記述に明示された個数をlosslessなsymbolic i
       "weight": "pencil",
       "variation": {
         "amplitude": "fine",
-        "frequency": "high",
+        "frequency": "medium",
         "quality": "perlin",
-        "dimensions": ["position_y"]
+        "dimensions": ["position_x", "position_y"]
       }
     }
   ]
@@ -1385,7 +1391,7 @@ Canonical meaningでは、記述に明示された個数をlosslessなsymbolic i
 
 **Renderer:**
 
-JSON Score を受け取り、`variation` 情報から実際の揺らぎ関数（パーリンノイズ、細かい振幅、高い周波数、y軸方向）を選んで SVG を生成する。Replay のたびに異なる乱数値で演奏される。
+JSON Scoreを受け取り、`variation`情報から実際の揺らぎ関数（Perlin、Fine振幅、Medium周波数、既存の線に直交する演奏）を選んでSVGを生成する。同じScoreと同じrender seedは同じ演奏になる。この複数本の記述例は概念例であり、shared compilerのcount1 deliveryが反復allocationまで実装済みという意味ではない。
 
 v1.99 で揺らぎの演奏対象を線に加えて弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した。発火条件は quality ∈ {perlin, wave, white} かつ dimensions が position_x / position_y / radius のいずれかを含む場合（line と対称、radius は図形の自然軸）。閉図形は継ぎ目が連続する周期ノイズで輪郭を演奏し、多角形系は辺ごとに演奏して角を固定、弧は両端点を完全固定して touching の接点契約を維持する。pink（滲み）と quality=none の経路は不変。この変更で同一 Score + 同一 seed の演奏結果が変わるため、render engine version を 5 へ更新した（過去作品の再演奏は見た目が変わりうるが、保存済み SVG は不変）。
 
@@ -1617,6 +1623,8 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 
 ## 18. JSON Score
 
+明示揺らぎは§13.6の三次元resolverから既存`Instruction.variation`へ届く。Scoreのdeserialize default（Medium / Medium / None）は従来どおりであり、sourceの一slot以上から解決するdefaultと区別する。作者は内部Variation JSONを自然DDLへ直接書かない。
+
 明示named位置は通常DDLと宣言済みflat Macroの共通geometry consumerで次の`at.region`へ解決する。
 値はcanvas各軸0..1のsemantic anchor領域であり、図形全体を収める範囲ではない。
 
@@ -1739,6 +1747,8 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 ---
 
 ## 20. モード
+
+Runtime未接続のtyped compilerで揺らぎが不成立なら、Stopは新Scoreを返さず、Continueは元instruction／malformed Emit／未宣言caller invocationを既存単位で省略する。元owner、理由、実処置を保ち、揺らぎを新しいfield-level回復単位へ広げない。Integrity不良は両mode停止である。製品runtime、UI、保存経路への接続は未完了である。
 
 ### 単一描画
 

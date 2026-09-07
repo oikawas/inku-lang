@@ -64,6 +64,8 @@ instruction
 
 ### Accepted typed DDL foundation (not connected to runtime)
 
+Explicit sway in ordinary DDL and declared flat Macros reaches the existing Score through one three-dimensional resolver. SPEC §13.6 defines the eight-word mapping, missing-slot Medium / Medium / Perlin defaults when any slot is present, all-absent None, and PositionX + PositionY. Supported shapes are Line / Arc / circle / ellipse / square / cloudform; Point rejects explicit sway. Macros keep category variation with an optional dimension constraint and use three fluctuation Emit keys. Legacy None schemas preserve identity, and missing required parameters remain binding errors. Source / generated owners and existing Stop / Continue units remain intact. Whole Step 10 and runtime / UI / save cutover remain incomplete.
+
 `core/crates/inku-ddl` contains the accepted shared-Rust compiler foundation. It preserves the
 visible normalized DDL with source spans and composes Japanese and English phrases, entities,
 modifiers, quantities, actions, positions, relations, coordination, and continuation into a

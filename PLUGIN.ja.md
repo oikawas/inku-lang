@@ -25,6 +25,12 @@ Parameter schemaは`number`、`integer`、`boolean`、固定長`list`、`semanti
 semantic-reference形式に閉じている。未知のfield、type、expression、operator、
 semantic referenceは拒否される。
 
+揺らぎは`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`のように宣言できる。Optionalな`dimension`は`amplitude` / `frequency` / `quality`だけで、category=variationだけに許す。省略／Noneは旧category-only matchingとcanonical bytes / digestを保ち、指定した制約はdigestに含む。Parameter名からdimensionを推測しない。
+
+Flat Emitのkeysは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality`で、expressionのcategoryは常に`variation`である。対応IDは順に`fine` / `large`、`slowly` / `quickly`、`swaying` / `trembling` / `undulating` / `blurring`。Definition-local `use`も同じ分類を検査し、遅れて決まる実値は実行境界で検査する。通常DDLと同じ写像／不足slotのdefault／対応shapeはSPEC §13.6に従う。
+
+三parameterを宣言したら三値が必須であり、一値だけを渡す呼出しはbinding errorである。一振幅parameterだけを宣言して対応Emit fieldへ届ければ、周波数と質はMedium / Perlinになる。三slot全省略はvariationなし。誤値をNoneへ変えず、未宣言callerはinvocation、malformed EmitはEmit単位の既存診断・省略を保つ。この機能はruntime / UI / 保存へ未接続で、内部Variation JSONを書く方式ではない。
+
 Bodyでは`emit`、`use`、`group`、`anchor`、`relation`、上限付き`repeat`、
 型付き`transform`、決定的で上限付きの`vary`を使える。`components`は同じ定義内だけに
 属する。定義には、任意code、I/O、filesystem、network、clock、environmentへのaccess、

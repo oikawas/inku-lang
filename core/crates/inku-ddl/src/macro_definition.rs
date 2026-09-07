@@ -728,7 +728,7 @@ fn validate_parameter_schema(
             validate_parameter_schema(items, &format!("{path}.items"), diagnostics);
         }
         ParameterSchema::SemanticRef { category } => {
-            if semantic_asset_key(category).is_none() && category != "relation" {
+            if semantic_category_authority(category).is_none() {
                 push_diagnostic(diagnostics, "unknown_semantic_category", path);
             }
         }
@@ -794,7 +794,11 @@ fn validate_body(
             Statement::Emit { fields, .. } => {
                 for (field, expression) in fields.iter() {
                     let expression_path = format!("{statement_path}.fields.{field}");
-                    if semantic_asset_key(field).is_none() {
+                    if !matches!(
+                        semantic_category_authority(field),
+                        Some(SemanticCategoryAuthority::Asset(_))
+                            | Some(SemanticCategoryAuthority::Thinness)
+                    ) {
                         push_diagnostic(diagnostics, "unknown_semantic_field", &expression_path);
                     }
                     let kind = validate_expression(
@@ -1169,7 +1173,7 @@ fn validate_expression(
             }
         }
         Expression::SemanticRef { category, id } => {
-            if semantic_asset_key(category).is_none() && category != "relation" {
+            if semantic_category_authority(category).is_none() {
                 push_diagnostic(diagnostics, "unknown_semantic_category", path);
             } else if !known_semantic_id(category, id) {
                 push_diagnostic(diagnostics, "unknown_semantic_id", path);
@@ -1331,10 +1335,23 @@ fn component_bound(
     Some(value)
 }
 
-fn semantic_asset_key(category: &str) -> Option<&'static str> {
-    SEMANTIC_CATEGORIES
-        .iter()
-        .find_map(|(known, asset)| (*known == category).then_some(*asset))
+#[derive(Clone, Copy)]
+enum SemanticCategoryAuthority {
+    Asset(&'static str),
+    Relation,
+    Thinness,
+}
+
+fn semantic_category_authority(category: &str) -> Option<SemanticCategoryAuthority> {
+    if category == "relation" {
+        return Some(SemanticCategoryAuthority::Relation);
+    }
+    if category == "thinness" {
+        return Some(SemanticCategoryAuthority::Thinness);
+    }
+    SEMANTIC_CATEGORIES.iter().find_map(|(known, asset)| {
+        (*known == category).then_some(SemanticCategoryAuthority::Asset(*asset))
+    })
 }
 
 fn known_relation(value: &str) -> bool {
@@ -1349,11 +1366,14 @@ fn known_semantic_id(category: &str, id: &str) -> bool {
 }
 
 pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {
-    if category == "relation" {
-        return known_relation(id).then(|| id.to_owned());
+    match semantic_category_authority(category)? {
+        SemanticCategoryAuthority::Relation => known_relation(id).then(|| id.to_owned()),
+        SemanticCategoryAuthority::Thinness => {
+            matches!(id, "fine" | "extra_fine").then(|| id.to_owned())
+        }
+        SemanticCategoryAuthority::Asset(asset_key) => canonical_semantic_id(asset_key, id)
+            .expect("embedded Saijiki semantic aliases must validate"),
     }
-    let asset_key = semantic_asset_key(category)?;
-    canonical_semantic_id(asset_key, id).expect("embedded Saijiki semantic aliases must validate")
 }
 
 fn is_ascii_identifier(value: &str) -> bool {

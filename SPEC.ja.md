@@ -207,6 +207,10 @@ Macroは意味解決後のinvocation順に実行する。照応だけのmention�
 
 Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite flat Emitを通常lowerer経由でactual Scoreへ届ける。ただしproduction runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
+Flat Emitの`thinness` keyはSaijikiとは別のclosed core ref `fine` / `extra_fine`だけを受け入れ、
+definition-local component parameterを通った値も通常instructionと同じlowererへ渡す。Visible sourceの
+caller thinnessは外側Macro parameterへbindせず、従来の未結合診断とStop / Continueの呼出し単位処置を保つ。
+
 ### 4.7 Render Engine との分離
 
 語彙プラグインはコア語彙のマクロであり、描画コアそのものを差し替える仕組みではない。
@@ -905,6 +909,10 @@ sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instruction
 
 このruntime未接続subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / squareのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
 
+同じruntime未接続subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
+`Instruction.thinness`へ届ける。Visible sourceから外側Macro parameterをbindする範囲は拡張せず、
+この到達だけでwhole Step 10を完了とはしない。
+
 ### 12.12 添景と互換記録
 
 現行生成に添景レベルはない。Stage 1.5 と coerce は記述にない要素を足さず、明示内容を配達する限定修復だけを行う。明示angleの数値解決も新しい添景や視覚要素を足す処理ではなく、元のtyped identityを既存`rotation`へ配達する処理である。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
@@ -1091,6 +1099,11 @@ DDLの揺らぎは、この意味での揺らぎである。
 **三層（素材固有・運動語彙・Nature プラグイン）の対象外**である。細い側にのみ段階があり、
 太い側の語彙は持たない。`Instruction.thinness`（`fine` / `extra_fine`）がこれを運ぶ。
 **三層に例外を作るのではなく、太さを三層の外に置く**という整理である。
+
+Visible DDLの有限表記は、Fineが日本語`細い` / 英語`thin`、ExtraFineが日本語`ごく細い` /
+英語`extra-fine`である。Runtime未接続のshared compilerはこの二段階をsource表記から独立した
+typed identityとして保持し、対応範囲のdirect instructionとflat Macro Emitから共通lowererを通して
+既存`Instruction.thinness`へ届ける。未指定は`None`のままで、太い段階や自由なdegree同義語を補わない。
 
 なお **`thinness` は歳時記の語ではない**（2026-07-29 作者裁定）。Stage 1 は太さ語を読んで
 正規化DDL へ書くが、§3.1 の語彙表と歳時記の表示には現れない。

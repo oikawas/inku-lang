@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use inku_score::{
     AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color, GroundMaterial,
     Instruction, InstructionMode, LineStyle, Point, Primitive, Relation, RelationGap, RelationType,
-    ResolvedPaletteContext, Score, SurfaceSpec, SurfaceTexture, Weight, lookup_canvas_format,
+    ResolvedPaletteContext, Score, SurfaceSpec, SurfaceTexture, Thinness, Weight,
+    lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -211,6 +212,11 @@ fn project_source_instruction<'a>(
             .intensity
             .as_ref()
             .map(|term| (&term.identity).into()),
+        thinness: instruction
+            .entity
+            .thinness
+            .as_ref()
+            .map(|thinness| thinness.value),
         action: instruction
             .action
             .as_ref()
@@ -241,8 +247,7 @@ fn project_source_instruction<'a>(
                     logical_ordinal: instruction_index as u64,
                 },
             }),
-        has_unsupported_meaning: instruction.entity.thinness.is_some()
-            || instruction.entity.fluctuation.amplitude.is_some()
+        has_unsupported_meaning: instruction.entity.fluctuation.amplitude.is_some()
             || instruction.entity.fluctuation.frequency.is_some()
             || instruction.entity.fluctuation.quality.is_some()
             || instruction.entity.proportion.aspect.is_some()
@@ -632,7 +637,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 9] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 10] = [
     "shape",
     "movement",
     "place",
@@ -642,6 +647,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 9] = [
     "surface",
     "count",
     "angle",
+    "thinness",
 ];
 
 fn project_macro_emit<'a>(
@@ -669,6 +675,7 @@ fn project_macro_emit<'a>(
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
+    let thinness = macro_semantic_field(fields, "thinness", "thinness", false, &mut gaps);
     let count = match fields.get("count") {
         None => None,
         Some(ExpandedMacroValue::Integer(value)) if *value >= 0 => Some(*value as u64),
@@ -714,6 +721,15 @@ fn project_macro_emit<'a>(
             id: identity.id.to_owned(),
         });
     }
+    if let Some(identity) = thinness
+        && !matches!(identity.id, "fine" | "extra_fine")
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "thinness".to_owned(),
+            category: identity.category.to_owned(),
+            id: identity.id.to_owned(),
+        });
+    }
     if !gaps.is_empty() {
         return Err(gaps);
     }
@@ -726,6 +742,11 @@ fn project_macro_emit<'a>(
         continuity,
         surface,
         surface_intensity: None,
+        thinness: thinness.map(|identity| match identity.id {
+            "fine" => CoreModifierValue::Fine,
+            "extra_fine" => CoreModifierValue::ExtraFine,
+            _ => unreachable!("unsupported thinness identity checked"),
+        }),
         action,
         numeric_position: None,
         has_named_position: place.is_some(),
@@ -1769,6 +1790,7 @@ struct ScoreLoweringInput<'a> {
     continuity: Option<SemanticInputIdentity<'a>>,
     surface: Option<SemanticInputIdentity<'a>>,
     surface_intensity: Option<SemanticInputIdentity<'a>>,
+    thinness: Option<CoreModifierValue>,
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
     has_named_position: bool,
@@ -1871,6 +1893,15 @@ fn lower_complete_instruction(
             id: identity.id.to_owned(),
         });
     }
+    let thinness = match input.thinness {
+        None => None,
+        Some(CoreModifierValue::Fine) => Some(Thinness::Fine),
+        Some(CoreModifierValue::ExtraFine) => Some(Thinness::ExtraFine),
+        Some(_) => {
+            gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+            None
+        }
+    };
     match input.action {
         Some(identity) if identity.category == "movement" && identity.id == "place" => {}
         Some(identity) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
@@ -1955,7 +1986,7 @@ fn lower_complete_instruction(
         arrangement: None,
         at: geometric.at,
         relation: None,
-        thinness: None,
+        thinness,
         surface,
     })
 }

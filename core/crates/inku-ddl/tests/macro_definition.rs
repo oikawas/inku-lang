@@ -63,6 +63,50 @@ fn lexical_place_ids_remain_valid_inputs_but_share_canonical_definition_identity
     );
 }
 
+#[test]
+fn closed_core_thinness_refs_validate_for_literals_and_component_parameters() {
+    let definition = MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"ThinnessPair","version":"1.0.0","parameters":{},"components":{"mark":{"parameters":{"width":{"type":"semantic_ref","category":"thinness"}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"parameter","name":"width"}}}]}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"thinness":{"expr":"semantic_ref","category":"thinness","id":"fine"}}},{"op":"use","component":"mark","arguments":{"width":{"expr":"semantic_ref","category":"thinness","id":"extra_fine"}}}]}"#,
+    )
+    .unwrap();
+    let validation = definition.validate();
+    assert!(validation.is_valid(), "{:?}", validation.diagnostics());
+    assert_eq!(validation.symbolic_upper_bound(), Some(2));
+    let canonical_bytes = definition.canonical_json_bytes().unwrap();
+    let canonical = std::str::from_utf8(&canonical_bytes).unwrap();
+    assert!(canonical.contains(r#""category":"thinness","id":"fine""#));
+    assert!(canonical.contains(r#""category":"thinness","id":"extra_fine""#));
+
+    for (category, id, expected_code) in [
+        ("thinness", "normal", "unknown_semantic_id"),
+        ("relative_scale", "small", "unknown_semantic_category"),
+    ] {
+        let invalid = MacroDefinition::from_json(
+            &serde_json::json!({
+                "schema": "inku.macro-definition.v1",
+                "namespace": "Bad",
+                "heading": "Thinness",
+                "version": "1.0.0",
+                "parameters": {},
+                "components": {},
+                "body": [{
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                        "thinness": {"expr": "semantic_ref", "category": category, "id": id}
+                    }
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(
+            invalid.validate().has_code(expected_code),
+            "{category}:{id}"
+        );
+    }
+}
+
 #[derive(Deserialize)]
 struct Fixture {
     schema: String,

@@ -110,6 +110,11 @@ field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、
 Flat Emitの`angle: semantic_ref`も同じresolverを通る。Caller angleはEmitへfan-out / overrideせず、
 Macroのsemantic ordinalと既存expansion path / generated ordinalを選択keyにする。
 
+Visible DDLの`細い` / `thin`と`ごく細い` / `extra-fine`は、Fine / ExtraFineの同じ二段階identityとして
+通常instructionとflat Macro Emitの共通lowererから既存`Instruction.thinness`へ届く。Macro definitionは
+Saijiki外のclosed core ref `thinness:fine` / `thinness:extra_fine`だけを受け入れる。Visible sourceから
+外側Macro parameterをbindする範囲は拡張せず、未結合caller thinnessの従来診断とmode別処置を保つ。
+
 Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
 そのcompilationとsource / state / lock / issuesを結果に保持する。既定のStopは上流のhole / conflictで
 Scoreを返さない。明示したContinueだけが、同じcompilationのtyped ownershipとdependencyからsealedな
@@ -121,9 +126,9 @@ drawをやり直さない。Global budgetとsource / lock / owner / definition /
 この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
 したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
 展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Unspecified / 非center named placement、finite subset外のMacro delivery、action省略、repeated allocation、
+Unspecified / 非center named placement、source caller core parameter binding、finite subset外のMacro delivery、action省略、repeated allocation、
 残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
-`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Nの到達は
+`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Pの到達は
 Step10全体の完了を意味しない。製品UI / API / 保存経路は
 まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
 

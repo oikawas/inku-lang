@@ -365,6 +365,12 @@ The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old St
 
 The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite flat Emit subset above through the ordinary lowerer to an actual Score. Production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader remain incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
+Flat Emit `thinness` accepts only the Saijiki-independent closed core refs `fine` /
+`extra_fine`; a value passed through a definition-local component parameter rejoins the
+same lowerer as an ordinary instruction. Caller thinness from visible source does not bind
+an outer Macro parameter and retains the existing unbound diagnostic and invocation-level
+Stop / Continue handling.
+
 ### 4.7 Separation From the Render Engine
 
 A vocabulary plugin is a macro over core vocabulary; it is not a way to replace
@@ -1432,6 +1438,10 @@ circle, ellipse, cloudform, and square through the shared lowerer to actual
 Emit input. Only numeric placement must fit the rotated declared rectangle;
 named focus adds no must-fit check. This does not complete Step 10 as a whole.
 
+The same runtime-disconnected subset delivers finite two-step thinness from direct and flat
+Macro Emit input to actual `Instruction.thinness`. It does not extend outer Macro-parameter
+binding from visible source, and this delivery does not complete Step 10 as a whole.
+
 ### 12.12 Staffage and Compatibility Records
 
 Current generation has no staffage level. Stage 1.5 and coerce do not add
@@ -1662,6 +1672,12 @@ The three layers match the way bonsai is thought about:
 - **the environment** (wind, season) is laid over it (plugins)
 
 **Thinness is a dimension, not a sway** (engine 16, v2.9.3). It does not belong to the layer where `weight` carries the sway inherent to a material. A tool has a thinness as its default, but thinness itself is a dimension the writer states independently, and it falls **outside the three layers** (material, motion word, Nature plugin). It has steps on the thin side only; there is no vocabulary for the thick side. `Instruction.thinness` (`fine` / `extra_fine`) carries it. **The principle gains no exception; thinness is placed outside the three layers instead.**
+
+The finite visible DDL forms are Japanese `細い` / English `thin` for Fine and
+Japanese `ごく細い` / English `extra-fine` for ExtraFine. The runtime-disconnected shared compiler
+keeps both as typed identities independent of source spelling and carries them from supported direct
+instructions and flat Macro Emits through the common lowerer into the existing
+`Instruction.thinness`. Omission remains `None`; no thick step or open-ended degree synonym is inferred.
 
 Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). Stage 1 reads thinness words and writes them into the normalized DDL, but they appear neither in the §3.1 vocabulary table nor in the Saijiki display.
 

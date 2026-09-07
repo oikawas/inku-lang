@@ -765,16 +765,30 @@ fn pre_head_colors_are_owned_by_each_multi_head_in_source_order() {
 #[test]
 fn spec_core_thinness_has_language_independent_entity_meaning_and_source_provenance() {
     let mut canonical = Vec::new();
-    for (source, language, expected_surface) in [
+    for (source, language, expected_surface, expected_value) in [
         (
             "中心に鉛筆の細い線をひとつ置く。",
             ResolvedInstructionLanguage::Ja,
             "細い",
+            "fine",
         ),
         (
             "Place one thin pencil line at the center.",
             ResolvedInstructionLanguage::En,
             "thin",
+            "fine",
+        ),
+        (
+            "中心に鉛筆のごく細い線をひとつ置く。",
+            ResolvedInstructionLanguage::Ja,
+            "ごく細い",
+            "extra_fine",
+        ),
+        (
+            "Place one extra-fine pencil line at the center.",
+            ResolvedInstructionLanguage::En,
+            "extra-fine",
+            "extra_fine",
         ),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
@@ -795,7 +809,7 @@ fn spec_core_thinness_has_language_independent_entity_meaning_and_source_provena
         assert_eq!(entity.touch.as_ref().unwrap().identity.id, "pencil");
         assert_eq!(entity.quantity.as_ref().unwrap().value, 1);
         let thinness = entity.thinness.as_ref().expect("explicit core thinness");
-        assert_eq!(thinness.value.as_str(), "fine");
+        assert_eq!(thinness.value.as_str(), expected_value);
         assert_eq!(thinness.provenance.surface, expected_surface);
         assert_eq!(
             &document.source()
@@ -808,6 +822,8 @@ fn spec_core_thinness_has_language_independent_entity_meaning_and_source_provena
     }
 
     assert_eq!(canonical[0], canonical[1]);
+    assert_eq!(canonical[2], canonical[3]);
+    assert_ne!(canonical[0], canonical[2]);
 }
 
 #[test]
@@ -847,7 +863,7 @@ fn core_thinness_uses_pre_head_ownership_without_default_or_nearest_fallback() {
     ));
 
     let conflict = NormalizedDdlDocument::new(
-        "thin THIN line",
+        "thin extra-fine line",
         ResolvedInstructionLanguage::En,
         Vec::new(),
     )

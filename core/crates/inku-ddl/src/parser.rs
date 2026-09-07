@@ -47,6 +47,7 @@ impl CoreModifierDimension {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierValue {
     Fine,
+    ExtraFine,
     SlightlySmall,
     Small,
     VerySmall,
@@ -60,6 +61,7 @@ impl CoreModifierValue {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Fine => "fine",
+            Self::ExtraFine => "extra_fine",
             Self::SlightlySmall => "slightly_small",
             Self::Small => "small",
             Self::VerySmall => "very_small",
@@ -153,6 +155,14 @@ const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
 const QUALITATIVE_QUANTITIES_JA: &[&str] =
     &["少し", "数個", "いくつか", "たくさん", "多数", "無数"];
 const QUALITATIVE_QUANTITIES_EN: &[&str] = &["a few", "several", "many", "numerous", "countless"];
+const THINNESS_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
+    ("ごく細い", CoreModifierValue::ExtraFine),
+    ("細い", CoreModifierValue::Fine),
+];
+const THINNESS_SURFACES_EN: &[(&str, CoreModifierValue)] = &[
+    ("extra-fine", CoreModifierValue::ExtraFine),
+    ("thin", CoreModifierValue::Fine),
+];
 const RELATIVE_SCALE_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
     ("とても小さな", CoreModifierValue::VerySmall),
     ("とても小さい", CoreModifierValue::VerySmall),
@@ -183,10 +193,12 @@ const PRIORITY_CORE_MODIFIER: u8 = 3;
 const PRIORITY_RELATIVE_SCALE: u8 = 4;
 
 pub(crate) fn is_reserved_english_non_asset_surface(surface: &str) -> bool {
-    ["thin", "slightly", "very", "normal-sized", "small"]
+    THINNESS_SURFACES_EN
         .iter()
-        .chain(FUNCTION_WORDS_EN)
-        .chain(QUALITATIVE_QUANTITIES_EN)
+        .map(|(surface, _)| *surface)
+        .chain(["slightly", "very", "normal-sized", "small"])
+        .chain(FUNCTION_WORDS_EN.iter().copied())
+        .chain(QUALITATIVE_QUANTITIES_EN.iter().copied())
         .any(|reserved| reserved.eq_ignore_ascii_case(surface))
         || (!surface.is_empty() && surface.bytes().all(|byte| byte.is_ascii_digit()))
         || english_cardinal_at(surface, 0).is_some_and(|(end_byte, _)| end_byte == surface.len())
@@ -426,26 +438,29 @@ fn candidates_at(
     let mut candidates = Vec::new();
     let asset = saijiki_asset();
 
-    let core_modifier_surface = match language {
-        ResolvedInstructionLanguage::Ja => "細い",
-        ResolvedInstructionLanguage::En => "thin",
+    let thinness_surfaces = match language {
+        ResolvedInstructionLanguage::Ja => THINNESS_SURFACES_JA,
+        ResolvedInstructionLanguage::En => THINNESS_SURFACES_EN,
     };
-    if language != ResolvedInstructionLanguage::Ja
-        || !require_boundary
-        || has_japanese_recognized_left_boundary(source, start_byte)
-    {
+    for (surface, value) in thinness_surfaces {
+        if language == ResolvedInstructionLanguage::Ja
+            && require_boundary
+            && !has_japanese_recognized_left_boundary(source, start_byte)
+        {
+            continue;
+        }
         push_surface_candidate(
             &mut candidates,
             source,
             start_byte,
             language,
             require_boundary,
-            core_modifier_surface,
+            surface,
             PRIORITY_CORE_MODIFIER,
-            "core_modifier:thinness:fine".to_owned(),
+            format!("core_modifier:thinness:{}", value.as_str()),
             CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
                 dimension: CoreModifierDimension::Thinness,
-                value: CoreModifierValue::Fine,
+                value: *value,
             })),
         );
     }

@@ -257,10 +257,11 @@ def test_step10q_endpoint_family_native():
     assert 'id="instruction_001_arc_blue"' in result.svg
     assert 'id="instruction_002_point_black"' in result.svg
     assert 'id="instruction_003_arc_green"' in result.svg
-    arc_group = result.svg[result.svg.index('id="instruction_001_arc_blue"') :]
-    arc_path = re.search(r'<path d="([^"]+)"', arc_group)
-    assert arc_path is not None
-    assert arc_path.group(1) == "M 1055 500 A 150 150 0 0 1 1295 500"
+    arc_paths = re.findall(
+        r'<g id="instruction_001_arc_blue".*?<path d="([^"]+)"', result.svg
+    )
+    arc_path = next((path for path in arc_paths if " A " in path), None)
+    assert arc_path == "M 1055 500 A 150 150 0 0 1 1295 500"
     assert 'transform="rotate(30 1175 500)"' in result.svg
     assert 'cx="1880" cy="600" r="6"' in result.svg
     assert 'transform="rotate(15 470 750)"' in result.svg

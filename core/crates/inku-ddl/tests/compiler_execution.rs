@@ -4,9 +4,12 @@ use inku_ddl::{
     ResolvedInstructionLanguage, ScoreDiagnosticDisposition, ScoreErrorPolicy, ScoreFieldGap,
     ScoreInstructionOrigin, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
     SemanticPreviousReference, SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl,
-    saijiki_asset, stage15_transformation_input,
+    map_compiler_render_execution, saijiki_asset, stage15_transformation_input,
 };
-use inku_score::{Canvas, Color, GroundMaterial, Primitive, RelationType};
+use inku_score::{
+    Canvas, Color, GroundMaterial, Primitive, RelationType, ScoreExecutionDiagnostic,
+    ScoreExecutionDisposition, ScoreExecutionReason, ScoreExecutionSummary,
+};
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 8,
@@ -455,6 +458,190 @@ fn global_macro_budget_stops_both_modes() {
 }
 
 #[test]
+fn connected_full_literal_reaches_the_actual_score() {
+    let result = execute(
+        concat!(
+            "place one red line at center. ",
+            "place one blue line at center connected to the previous shape."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{result:?}"
+    );
+    let score = serde_json::to_value(result.score().expect("connected score"))
+        .expect("Score remains serializable");
+    assert_eq!(score["instructions"].as_array().unwrap().len(), 2);
+    assert_eq!(score["instructions"][1]["relation"]["type"], "connected");
+}
+
+#[test]
+fn connected_full_literals_are_bilingual_and_macro_uses_the_same_score_consumer() {
+    let english = execute_language(
+        concat!(
+            "place one red line at center. ",
+            "place one blue line at center connected to the previous shape."
+        ),
+        ResolvedInstructionLanguage::En,
+        &[],
+        ScoreErrorPolicy::Stop,
+    );
+    let japanese = execute_language(
+        "赤い線を中心に置く。\n前の形につながる\n青い線を中心に置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(english.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(japanese.outcome(), ScoreLoweringOutcome::Complete);
+    for result in [&english, &japanese] {
+        let score = result.score().unwrap();
+        assert_eq!(score.instructions.len(), 2);
+        assert_eq!(score.instructions[0].primitive, Primitive::Line);
+        assert_eq!(score.instructions[1].primitive, Primitive::Line);
+        assert_eq!(
+            score.instructions[1].relation.as_ref().unwrap().kind,
+            RelationType::Connected
+        );
+    }
+
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"connected","from":"first","to":"second"}]}"#,
+    );
+    let macro_result = execute_locked(
+        "Path.Pair",
+        std::slice::from_ref(&definition),
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(macro_result.outcome(), ScoreLoweringOutcome::Complete);
+    let mut ordinary_effective = english.score().unwrap().clone();
+    let mut macro_effective = macro_result.score().unwrap().clone();
+    assert!(
+        ordinary_effective
+            .instructions
+            .iter()
+            .chain(&macro_effective.instructions)
+            .all(|instruction| instruction.at.is_some())
+    );
+    for instruction in ordinary_effective
+        .instructions
+        .iter_mut()
+        .chain(&mut macro_effective.instructions)
+    {
+        instruction.at = None;
+    }
+    assert_eq!(macro_effective, ordinary_effective);
+    assert!(matches!(
+        macro_result.instruction_origins(),
+        [
+            ScoreInstructionOrigin::MacroEmit { .. },
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ]
+    ));
+}
+
+#[test]
+fn nonadjacent_macro_connected_omits_the_target_emit_with_its_original_owner() {
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"NonAdjacent","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"middle","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"point"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"emit","binding":"last","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"arc"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"relation","kind":"connected","from":"first","to":"last"}]}"#,
+    );
+    let result = execute_locked(
+        "Path.NonAdjacent",
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{result:?}"
+    );
+    assert_eq!(result.score().unwrap().instructions.len(), 2);
+    assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
+        matches!(
+            (&diagnostic.reason, &diagnostic.disposition),
+            (
+                ScoreFieldGap::UnsupportedMacroRelation,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::MacroEmit {
+                        generated_ordinal: 2,
+                        ..
+                    },
+                    ..
+                }
+            )
+        )
+    }));
+}
+
+#[test]
+fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
+    let result = execute(
+        concat!(
+            "place one red line at center. ",
+            "place one blue line at center connected to the previous shape."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let score = result.score().unwrap();
+    let summary = ScoreExecutionSummary {
+        diagnostics: vec![ScoreExecutionDiagnostic {
+            instruction_index: 1,
+            dependency_instruction_index: Some(0),
+            reason: ScoreExecutionReason::NumericConnectedPositionConflict,
+            disposition: ScoreExecutionDisposition::Omitted,
+        }],
+        rendered_instruction_indices: vec![0],
+    };
+    let joined = map_compiler_render_execution(&result, score, Some(&summary)).unwrap();
+    assert_eq!(
+        joined.rendered_origins,
+        [ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 0
+        }]
+    );
+    assert_eq!(
+        joined.diagnostics[0].owner,
+        ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 1
+        }
+    );
+
+    let mut different = score.clone();
+    different.background = Color::Black;
+    assert!(map_compiler_render_execution(&result, &different, Some(&summary)).is_err());
+
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"OwnerPair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"connected","from":"first","to":"second"}]}"#,
+    );
+    let macro_result = execute_locked(
+        "Path.OwnerPair",
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let macro_score = macro_result.score().unwrap();
+    let macro_joined =
+        map_compiler_render_execution(&macro_result, macro_score, Some(&summary)).unwrap();
+    assert!(matches!(
+        &macro_joined.diagnostics[0].owner,
+        ScoreInstructionOrigin::MacroEmit {
+            binding: Some(binding),
+            ..
+        } if binding.local_name == "second"
+    ));
+}
+
+#[test]
 fn strict_stage15_api_still_rejects_a_noncanonical_compilation() {
     let document = document("mystery. place one red square at center.", &[]);
     let compilation = compile_typed_ddl(document, &[], Some(23), LIMITS);
@@ -472,6 +659,23 @@ fn execute(
         definitions,
         Some(23),
         limits,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        policy,
+    )
+}
+
+fn execute_language(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+    policy: ScoreErrorPolicy,
+) -> inku_ddl::CompilerExecutionResult {
+    compile_ddl_to_score(
+        NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+        definitions,
+        Some(23),
+        LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
         None,
         policy,

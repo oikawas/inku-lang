@@ -51,6 +51,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "tile",
             "fill",
             "touching",
+            "connected",
             "along",
             "cutting",
             "not touching",
@@ -98,7 +99,14 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             .iter()
             .map(|row| row.relation_type.as_str())
             .collect::<Vec<_>>(),
-        ["along", "not_touching", "touching", "cutting", "between"]
+        [
+            "along",
+            "not_touching",
+            "touching",
+            "cutting",
+            "between",
+            "connected"
+        ]
     );
     assert_eq!(relations[2].literals[0], "前の線に触れる");
     assert_eq!(relations[2].literals[2], "touching the previous line");
@@ -136,7 +144,14 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
     assert_eq!(aida.name_en, "relations");
     assert_eq!(
         aida.words,
-        ["along", "not touching", "cutting", "between", "touching"]
+        [
+            "along",
+            "not touching",
+            "cutting",
+            "between",
+            "touching",
+            "connected"
+        ]
     );
 }
 

@@ -26,6 +26,7 @@ pub mod phrase;
 pub mod phrase_topology;
 pub mod prompt;
 pub mod relation_reference;
+pub mod render_execution;
 pub mod saijiki;
 mod score_angle;
 pub mod score_diagnostics;
@@ -158,6 +159,10 @@ pub use relation_reference::{
     RelationReferenceEvidenceDiagnosticKind, RelationReferenceEvidenceResult,
     RelationReferenceOccurrence, RelationReferenceOccurrenceKind,
     collect_relation_reference_evidence,
+};
+pub use render_execution::{
+    CompilerRenderDiagnostic, CompilerRenderExecution, CompilerRenderExecutionError,
+    map_compiler_render_execution,
 };
 pub use saijiki::{
     CanonicalPreviousReference, CanonicalRelationForm, CanonicalRelationIdentity,

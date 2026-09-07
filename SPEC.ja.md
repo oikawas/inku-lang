@@ -98,7 +98,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 | **ばしょ** | 上、下、中央、左端、右端、上端、下端、中心、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
-| **あいだ** | 沿う、触れない、切る、間に、触れる |
+| **あいだ** | 沿う、触れない、切る、間に、触れる、つながる |
 
 `左上がり` / `left-rising` と `左下がり` / `left-falling` は、typed direct DDLとMacro参照で左右の意味を保つhidden markerである。現時点ではStage 1 promptと歳時記表示へ公開せず、既存の六つの表示語を変えない。
 
@@ -1428,7 +1428,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 
 §13.3 の感情語彙/運動語彙の区別を、関係に延長する。物理的・外部観察可能な関係のみをコアに許す。
 
-**初期セットは次の5語に限定する:**
+**関係語彙は次の6語に限定する:**
 
 | 語彙（日） | 語彙（英） | 意味 | relation.type |
 |---|---|---|---|
@@ -1437,12 +1437,13 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
+| つながる | connected | current始端を直前要素の終端へ合わせ、両方の形を変えずに接続する | `connected` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
-v1.52 クローズ時点では、JSON Score の `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。日本語では `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`、英語では `along the previous line` / `not touching the previous shape` / `cutting the previous line` / `between the previous two` を固定句とする。`touching` は日本語の `前の線に触れる` / `前の弧に両端で触れる`、英語の `touching the previous line` / `touching the previous arc at both ends` が接触を明示する場合に限り使い、自発付与しない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacing で表す。
+v1.52 クローズ時点では、JSON Score の `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。日本語では `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`、英語では `along the previous line` / `not touching the previous shape` / `cutting the previous line` / `between the previous two` を固定句とする。`touching` は日本語の `前の線に触れる` / `前の弧に両端で触れる`、英語の `touching the previous line` / `touching the previous arc at both ends` が接触を明示する場合に限り使い、自発付与しない。`connected` は `前の形につながる` / `connected to the previous shape` だけを固定句とし、短表記や未検証のprior primitive typeを断定する別句をaliasにしない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacing で表す。
 
-**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く、続きから。現行語で表現の不足が実測で示されてから追加する。`続きから (continuing)` は素描で機構動作を確認したが決定的な表現価値を示さず、枯葉の説得力は雲形の surface / ground 表現に律速されていた。雲形の面表現を改善した後に再試験し、それまでは第二段候補に留める。§4.11 の手続き（会計を伴う最終判断の留保）に従う。
+**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
 
 ### 14.3 JSON Score スキーマ
 
@@ -1461,8 +1462,10 @@ instruction に任意フィールド `relation` を追加する。
 
 | フィールド | 値 | 説明 |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` | 関係の種類 |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
+| `target_instruction_index` | 0以上のScore index | `connected`が参照する正確な先行Score instruction。旧relationでは省略 |
+| `position_authority` | `named_movable` / `numeric_fixed` | `connected` currentを平行移動してよいかを示す位置authority |
 
 **参照先は常に「直前の instruction」とする（暗黙 prev 参照）。** `between` のみ直前の2要素を参照する。id による任意参照は導入しない。理由:
 
@@ -1481,6 +1484,7 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
+- `connected` → Line / Arc / Pointに適用し、currentのcanonical始端（Pointはcenter）をpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
 
 `touching` で当該要素が弧なら、直前要素の確定端点を P1, P2、弦長を `c=|P2-P1|`、当該弧の演奏後の符号付き矢高を `b` とし、`r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は弦の中点から膨らみと反対側へ `r-|b|` だけ置き、掃引角は必ず180°未満とする。直前要素が弧なら膨らみ側はその反対側を既定とする。劣弧の符号・掃引規約はRendererのSVG弧描画と一つの実装を共有する。variationと筆致は端点を固定し、中間区間だけへ作用する。閉形、端点のない直前要素、退化した弦・矢高ではrelationをdropし、座標推定による修復やgovernorは行わない。
 
@@ -1490,9 +1494,9 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 
 region（`at`）と relation を両方持つ instruction（プラグイン member 由来の双弧など）は、region 配置を先に適用した後で relation を解決する（v1.94）。touching では直前要素の演奏後端点が位置を確定するため、region は連鎖の起点・情報として扱われる。
 
-runtime未接続のtyped compiler consumerでは、通常sourceのdirect primitiveについて、`not_touching`と`between`をactual Scoreへ届ける。currentは既存lowererが扱うcircle / ellipse / cloudform / square、count省略または1、明示`place`、元のexact `place:center`から得たverified named focusに限る。`gap`は既存Scoreの`medium`を用い、compilerは距離・anchor・乱数を決めない。typed previous-one / previous-twoが指す元source instructionがそれぞれdirect primitiveとして一つのScore instructionに生存し、current直前のactual source originと元順序のまま一致するときだけrelationを残す。projection後のindex、Macroの最後のEmit、最寄りの生存図形へ参照を読み替えない。
+typed compilerは、通常direct隣接instructionの正確な日英full literalと、同じflat Macro expansion内の隣接bound Emit間に明示されたrelationから、`connected`を同じScore consumerへ運ぶ。元Score index、dependency slot、owner、focus、seedを保つ。named位置はmovable、numeric位置はfixedであり、named region解決後に接続に必要な平行移動だけを適用して再clampしない。numericは既存physical geometry精度で必要deltaがzeroなら成功し、非zeroなら明示conflictにする。
 
-Stopではcurrentまたは参照がこのsubsetを満たさなければScoreを返さない。OmitAndContinueではcurrentを`RelationInstruction`単位で省略し、relationだけを消した独立図形へ変えない。参照先が下流で省略されれば後続relationもsource順に省略する。currentの数値位置、位置省略、noncenter named position、残る3 relation、Macro current / Macro referentは未対応である。参照prior自身の既存lowerableな数値位置は保持してよい。Rendererは従来どおりregionを先に解決し、その後relationを演奏する。このdeliveryは型と参照をScoreへ運ぶ契約であり、既存clampや退化時dropを越えて全形状・全seedの幾何的非接触を保証するものではない。
+StopはSVG構築前に全Connectedを解決し、失敗位置とtyped reasonを返して新出力を返さない。OmitAndContinueはcurrent instructionまたはMacro Emit全体を省略し、元Score index、reason、dispositionを記録し、無関係なinstructionの元execution indexを保つ。参照先を失った後続Connectedも省略し、nearest survivorへ付け替えない。全描画単位の省略とsource / lock / owner / exact Score joinのintegrity失敗は両mode停止する。旧5 relationのwarning / wire挙動は維持する。これはdirect shared/native経路であり、typed DDL本番pipeline、UI、設定保存cutoverの完了を主張しない。
 
 解決不能な関係（例: 直前要素が背景塗りで輪郭を持たない）は、validator / coerce が relation を drop し、警告記録を残す。演奏時にのみ判明する解決不能はrelationをdropし、instructionはrelationなしの通常配置で描画される。grid layoutがrelationを消費する場合などwarning-classの失敗はstructured warningを記録する。一方、prior boundsの不足やcanonical-silentな退化幾何のfallbackは警告なしでrelationをdropする。
 
@@ -1509,7 +1513,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 
 ### 14.7 歳時記への表示
 
-歳時記に「あいだ」カテゴリを追加する。間（ま）の概念と重ね、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」。
+歳時記の「あいだ」カテゴリは、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」「つながる」。
 
 ---
 

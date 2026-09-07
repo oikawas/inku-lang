@@ -5,6 +5,8 @@
 pub mod canonical;
 pub mod canvas_format;
 pub mod compatibility;
+pub mod error_policy;
+pub mod execution_diagnostics;
 pub mod schema;
 pub mod types;
 
@@ -17,5 +19,10 @@ pub use canvas_format::{
     lookup_canvas_format, validate_canvas_format_id, validate_canvas_format_registry,
 };
 pub use compatibility::read_saved_score_json;
+pub use error_policy::{ScoreErrorPolicy, is_stop};
+pub use execution_diagnostics::{
+    ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason,
+    ScoreExecutionSummary,
+};
 pub use schema::{SCORE_SCHEMA_DIGEST_DOMAIN, score_schema_bytes, score_schema_digest};
 pub use types::*;

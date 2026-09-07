@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **44** | Step 10Q-2 Connected checked execution | — | 2026-09-07 | — | — | — |
 | **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
 | **42** | Step 10O square physical coordinates | — | 2026-09-07 | 610 | **0** | **610** |
 | **41** | Rust migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
@@ -424,6 +425,21 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 44 — checked one-endpoint Connected performance
+
+Engine 44 adds `connected` across the finite Line / Arc / Point endpoint family.
+It leaves the prior instruction unchanged and translates only the current
+instruction so its canonical start meets the prior canonical end. Dimensions,
+arc curvature, point diameter, and rotation remain unchanged. Named positions
+are movable; an incompatible numeric position is a checked conflict.
+
+Stop returns a typed error before SVG construction. OmitAndContinue removes the
+whole current instruction, records its original Score index and disposition,
+and never retargets a dependent connection to a survivor. Existing Scores that
+do not use Connected keep their serialized fields and legacy relation behavior.
+Engine 42's corpus and older references are not rewritten, so no frozen-case or
+moved counts are invented for this version.
 
 ## engine 43 — perform Line, Arc, and Point as one finite endpoint family
 

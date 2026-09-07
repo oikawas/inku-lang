@@ -79,6 +79,7 @@ fn render_boundary_is_one_owned_request_and_output_shape() {
             render_seed: None,
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     assert_eq!(request.options.render_seed, None);
@@ -96,7 +97,7 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "43");
+    assert_eq!(metadata.render_engine_version, "44");
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -142,12 +143,13 @@ fn engine_renders_every_primitive_through_one_request() {
             render_seed: Some(431),
             composition_seed: Some(17),
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let first = render(request.clone()).unwrap();
     let second = render(request).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.metadata.render_engine_version, "43");
+    assert_eq!(first.metadata.render_engine_version, "44");
     assert!(first.svg.starts_with("<svg"));
     assert!(first.svg.ends_with("</svg>"));
     assert!(first.svg.contains("stroke-engine-v1"));
@@ -174,6 +176,7 @@ fn wide_canvas_square_rotation_uses_the_physical_center() {
             render_seed: Some(431),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -193,6 +196,7 @@ fn render_request_has_a_stable_json_wire_shape() {
             render_seed: None,
             composition_seed: Some(-7),
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let wire = serde_json::to_string(&request).unwrap();
@@ -201,6 +205,55 @@ fn render_request_has_a_stable_json_wire_shape() {
     let output = render(decoded).unwrap();
     assert!(output.svg.contains("id=\"inku_artboard\""));
     assert!(output.svg.contains("id=\"inku_metadata\""));
+}
+
+#[test]
+fn connected_stop_returns_no_output_and_continue_reports_original_indices() {
+    let connected_score = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.2],"to":[0.4,0.2],"color":"red"},
+        {"primitive":"line","from":[0.5,0.2],"to":[0.8,0.2],"color":"blue",
+         "relation":{"type":"connected","target_instruction_index":0,"position_authority":"numeric_fixed"}},
+        {"primitive":"point","center":[0.7,0.5],"radius":0.006,"color":"green",
+         "relation":{"type":"connected","target_instruction_index":1,"position_authority":"named_movable"}},
+        {"primitive":"point","center":[0.8,0.8],"radius":0.006,"color":"black"}
+        ]}"#,
+    );
+    let options = RenderOptions {
+        resolved_color_map: BTreeMap::new(),
+        catalog_id: None,
+        canvas: CanvasSize::new(1000.0, 1000.0),
+        canvas_aspect_id: "square".to_owned(),
+        svg_profile: SvgProfile::Editable,
+        render_seed: Some(31),
+        composition_seed: None,
+        wild: false,
+        error_policy: Default::default(),
+    };
+
+    let stopped = render(RenderRequest {
+        score: connected_score.clone(),
+        options: options.clone(),
+    });
+    assert!(matches!(
+        stopped,
+        Err(inku_render::render::RenderError::CheckedPerformance(_))
+    ));
+
+    let mut continued_options = options;
+    continued_options.error_policy = inku_render::types::ScoreErrorPolicy::OmitAndContinue;
+    let continued = render(RenderRequest {
+        score: connected_score,
+        options: continued_options,
+    })
+    .expect("independent instructions render with omission metadata");
+    assert!(continued.svg.contains("instruction_000_line_red"));
+    assert!(continued.svg.contains("instruction_003_point_black"));
+    assert!(!continued.svg.contains("instruction_001_line_blue"));
+    assert!(!continued.svg.contains("instruction_002_point_green"));
+    let execution = continued.metadata.execution.expect("typed omissions");
+    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
+    assert_eq!(execution.diagnostics.len(), 2);
 }
 
 #[test]
@@ -220,6 +273,7 @@ fn abstract_presence_is_emitted_in_its_owned_layer() {
             render_seed: Some(431),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -254,6 +308,7 @@ fn engine_renders_every_surface_without_profile_only_geometry() {
             render_seed: Some(431),
             composition_seed: Some(17),
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let first = render(request.clone()).unwrap();
@@ -312,6 +367,7 @@ fn engine_preserves_every_ground_between_background_and_content() {
                     render_seed: Some(431),
                     composition_seed: None,
                     wild: false,
+                    error_policy: Default::default(),
                 },
             };
             let output = render(request).unwrap();
@@ -364,6 +420,7 @@ fn print_tools_add_plate_tone_after_marks_only_with_a_render_seed() {
             render_seed,
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let seeded = render(make_request(Some(431))).unwrap();
@@ -398,6 +455,7 @@ fn hand_fills_are_tool_fields_while_machine_fills_remain_regions() {
             render_seed: Some(431),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -424,6 +482,7 @@ fn display_owns_material_filters_but_compat_remains_filter_free() {
             render_seed: Some(431),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let display = render(make_request(SvgProfile::Display)).unwrap();
@@ -450,6 +509,7 @@ fn display_grain_tile_is_reusable_and_not_filtered_per_dab() {
             render_seed: Some(431),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -474,6 +534,7 @@ fn solid_fill_profile_boundary_keeps_base_and_scopes_mottle() {
             render_seed: Some(2718),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     for profile in [SvgProfile::Display, SvgProfile::Editable] {
@@ -504,6 +565,7 @@ fn computer_solid_remains_a_periodic_fill_field() {
             render_seed: Some(2718),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -526,6 +588,7 @@ fn tiny_hand_fill_is_one_dab_instead_of_scanlines() {
             render_seed: Some(12345),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();
@@ -548,6 +611,7 @@ fn compat_grain_omits_the_nonportable_pattern_class() {
             render_seed: Some(73),
             composition_seed: None,
             wild: false,
+            error_policy: Default::default(),
         },
     };
     let output = render(request).unwrap();

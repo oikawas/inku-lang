@@ -8,6 +8,10 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 pub use inku_score::types::*;
+pub use inku_score::{
+    ScoreErrorPolicy, ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason,
+    ScoreExecutionSummary,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CanvasSize {
@@ -50,6 +54,8 @@ pub struct RenderOptions {
     pub render_seed: Option<Seed>,
     pub composition_seed: Option<Seed>,
     pub wild: bool,
+    #[serde(default, skip_serializing_if = "inku_score::is_stop")]
+    pub error_policy: ScoreErrorPolicy,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -77,6 +83,8 @@ pub struct RenderMetadata {
     pub render_canvas_ground: Option<CanvasGroundSpec>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub render_surface_textures: Vec<SurfaceTextureMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution: Option<ScoreExecutionSummary>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

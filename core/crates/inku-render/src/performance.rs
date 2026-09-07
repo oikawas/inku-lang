@@ -21,6 +21,8 @@ pub struct PerformanceRequest<'a> {
 pub struct PerformancePlan {
     pub score: Score,
     pub warnings: Vec<PlanningWarning>,
+    pub instruction_indices: Vec<usize>,
+    pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
 fn instruction_extent(instruction: &Instruction) -> f64 {
@@ -152,8 +154,10 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     );
     let Some(seed) = request.performance_seed else {
         return PerformancePlan {
+            instruction_indices: (0..expanded.instructions.len()).collect(),
             score: expanded,
             warnings: Vec::new(),
+            execution: None,
         };
     };
     let mut resolved = Vec::with_capacity(expanded.instructions.len());
@@ -185,5 +189,11 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     }
     let mut score = expanded;
     score.instructions = resolved;
-    PerformancePlan { score, warnings }
+    let instruction_indices = (0..score.instructions.len()).collect();
+    PerformancePlan {
+        score,
+        warnings,
+        instruction_indices,
+        execution: None,
+    }
 }

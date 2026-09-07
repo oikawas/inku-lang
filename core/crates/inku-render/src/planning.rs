@@ -363,7 +363,7 @@ pub fn performed_instruction_bounds_on_canvas(
     }
 }
 
-fn endpoint_geometry(
+pub fn endpoint_geometry(
     instruction: &Instruction,
     canvas: Option<CanvasSize>,
 ) -> Option<(Point, Point, Point, Point)> {
@@ -418,8 +418,60 @@ fn endpoint_geometry(
                 ),
             ))
         }
+        Primitive::Point => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            Some((center, center, Point::new(0.0, 0.0), Point::new(0.0, 0.0)))
+        }
         _ => None,
     }
+}
+
+/// Translate one endpoint-family instruction by an exact physical short-side delta.
+/// Connected placement deliberately does not clamp after translation.
+#[must_use]
+pub(crate) fn translate_endpoint_instruction_on_canvas(
+    instruction: &Instruction,
+    delta: Point,
+    canvas: Option<CanvasSize>,
+) -> Option<Instruction> {
+    let mut moved = stripped(instruction);
+    match instruction.primitive {
+        Primitive::Line => {
+            let start = point_to_short_side_units(instruction.from_?, canvas);
+            let end = point_to_short_side_units(instruction.to?, canvas);
+            moved.from_ = Some(point_from_short_side_units(
+                Point::new(start.x + delta.x, start.y + delta.y),
+                canvas,
+            ));
+            moved.to = Some(point_from_short_side_units(
+                Point::new(end.x + delta.x, end.y + delta.y),
+                canvas,
+            ));
+        }
+        Primitive::Arc => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            moved.center = Some(point_from_short_side_units(
+                Point::new(center.x + delta.x, center.y + delta.y),
+                canvas,
+            ));
+            if let Some(position) = instruction.position {
+                let position = point_to_short_side_units(position, canvas);
+                moved.position = Some(point_from_short_side_units(
+                    Point::new(position.x + delta.x, position.y + delta.y),
+                    canvas,
+                ));
+            }
+        }
+        Primitive::Point => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            moved.center = Some(point_from_short_side_units(
+                Point::new(center.x + delta.x, center.y + delta.y),
+                canvas,
+            ));
+        }
+        _ => return None,
+    }
+    Some(moved)
 }
 
 fn performed_arc_sagitta(instruction: &Instruction, canvas: Option<CanvasSize>) -> Option<f64> {
@@ -727,6 +779,7 @@ pub fn resolve_relation_on_canvas(
             )
         }
         RelationType::Touching => unreachable!("touching handled above"),
+        RelationType::Connected => unreachable!("connected handled by checked performance"),
     };
     RelationResolution {
         instruction: move_anchor_to_on_canvas(

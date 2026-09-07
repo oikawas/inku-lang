@@ -278,11 +278,16 @@ string_enum!(RelationType {
     Cutting,
     Between,
     Touching,
+    Connected,
 });
 string_enum!(RelationGap {
     Narrow,
     Medium,
     Wide,
+});
+string_enum!(ConnectedPositionAuthority {
+    NamedMovable,
+    NumericFixed,
 });
 string_enum!(InstructionMode { Additive, Carve });
 string_enum!(CarveDepth {
@@ -568,6 +573,10 @@ pub struct Relation {
     pub kind: RelationType,
     #[serde(default = "default_relation_gap")]
     pub gap: RelationGap,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_instruction_index: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position_authority: Option<ConnectedPositionAuthority>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

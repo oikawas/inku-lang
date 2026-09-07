@@ -72,7 +72,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
-		words: ['沿う', '触れない', '切る', '間に', '触れる']
+		words: ['沿う', '触れない', '切る', '間に', '触れる', 'つながる']
 	},
 ];
 
@@ -147,6 +147,6 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
-		words: ['along', 'not touching', 'cutting', 'between', 'touching']
+		words: ['along', 'not touching', 'cutting', 'between', 'touching', 'connected']
 	},
 ];

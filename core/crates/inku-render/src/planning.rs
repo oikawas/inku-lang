@@ -474,7 +474,10 @@ pub(crate) fn translate_endpoint_instruction_on_canvas(
     Some(moved)
 }
 
-fn performed_arc_sagitta(instruction: &Instruction, canvas: Option<CanvasSize>) -> Option<f64> {
+pub(crate) fn performed_arc_sagitta(
+    instruction: &Instruction,
+    canvas: Option<CanvasSize>,
+) -> Option<f64> {
     if instruction.primitive != Primitive::Arc {
         return None;
     }
@@ -545,43 +548,54 @@ fn touching_relation(
     index: usize,
     canvas: Option<CanvasSize>,
 ) -> RelationResolution {
-    if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc) || previous.is_empty() {
-        return dropped(
+    let candidate = previous
+        .last()
+        .ok_or("touching requires a line or arc with a prior")
+        .and_then(|prior| touching_candidate(instruction, prior, canvas));
+    match candidate {
+        Ok(instruction) => RelationResolution {
             instruction,
-            index,
-            "touching requires a line or arc with a prior",
-        );
+            warning: None,
+        },
+        Err(reason) => dropped(instruction, index, reason),
     }
-    let prior = &previous[previous.len() - 1];
+}
+
+/// The existing reconstruction shared by legacy and checked execution.
+pub(crate) fn touching_candidate(
+    instruction: &Instruction,
+    prior: &Instruction,
+    canvas: Option<CanvasSize>,
+) -> Result<Instruction, &'static str> {
+    if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc) {
+        return Err("touching requires a line or arc with a prior");
+    }
     if !matches!(prior.primitive, Primitive::Line | Primitive::Arc) {
-        return dropped(instruction, index, "prior is not a line or arc");
+        return Err("prior is not a line or arc");
     }
     let Some((start, end, _, _)) = endpoint_geometry(prior, canvas) else {
-        return dropped(instruction, index, "prior has no endpoint geometry");
+        return Err("prior has no endpoint geometry");
     };
     let mut resolved = stripped(instruction);
     resolved.rotation = None;
     if instruction.primitive == Primitive::Line {
         resolved.from_ = Some(point_from_short_side_units(start, canvas));
         resolved.to = Some(point_from_short_side_units(end, canvas));
-        return RelationResolution {
-            instruction: resolved,
-            warning: None,
-        };
+        return Ok(resolved);
     }
     let Some(own_sagitta) = performed_arc_sagitta(instruction, canvas) else {
-        return dropped(instruction, index, "degenerate own sagitta");
+        return Err("degenerate own sagitta");
     };
     let sagitta = if prior.primitive == Primitive::Arc {
         let Some(prior_sagitta) = performed_arc_sagitta(prior, canvas) else {
-            return dropped(instruction, index, "degenerate prior sagitta");
+            return Err("degenerate prior sagitta");
         };
         -own_sagitta.abs().copysign(prior_sagitta)
     } else {
         own_sagitta
     };
     let Ok(arc) = arc_from_endpoints_and_sagitta(start, end, sagitta) else {
-        return dropped(instruction, index, "minor arc reconstruction failed");
+        return Err("minor arc reconstruction failed");
     };
     resolved.center = Some(point_from_short_side_units(arc.center, canvas));
     resolved.radius = Some(arc.radius);
@@ -593,10 +607,7 @@ fn touching_relation(
             canvas,
         ));
     }
-    RelationResolution {
-        instruction: resolved,
-        warning: None,
-    }
+    Ok(resolved)
 }
 
 #[must_use]

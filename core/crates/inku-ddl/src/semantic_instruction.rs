@@ -168,6 +168,7 @@ pub struct SemanticInstructionIssue {
 /// Stable relation-association issue classes without fallback target selection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticRelationIssueKind {
+    TargetPrimitiveMismatch,
     AmbiguousCurrentInstructionOwnership,
     ConflictingRelations,
     MissingCurrentInstruction,
@@ -178,6 +179,7 @@ pub enum SemanticRelationIssueKind {
 impl SemanticRelationIssueKind {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::TargetPrimitiveMismatch => "relation_target_primitive_mismatch",
             Self::AmbiguousCurrentInstructionOwnership => "ambiguous_current_relation_ownership",
             Self::ConflictingRelations => "conflicting_relations",
             Self::MissingCurrentInstruction => "missing_current_instruction",
@@ -402,7 +404,7 @@ fn build_semantic_instructions(
                 relations_by_region
                     .remove(&region_index)
                     .unwrap_or_default(),
-                instructions.len(),
+                &instructions,
                 region_index,
                 &mut relation_issues,
             )
@@ -1923,7 +1925,7 @@ fn attachment_marker_at(
 
 fn select_relation(
     mut occurrences: Vec<ExplicitPreviousReferenceOccurrence>,
-    previous_instruction_count: usize,
+    previous_instructions: &[SemanticInstruction],
     region_index: usize,
     issues: &mut Vec<SemanticRelationIssue>,
 ) -> Option<SemanticRelation> {
@@ -1940,13 +1942,30 @@ fn select_relation(
     }
 
     let occurrence = occurrences.pop().expect("one relation occurrence");
-    if previous_instruction_count < occurrence.reference.required_previous_count() {
+    if previous_instructions.len() < occurrence.reference.required_previous_count() {
         let kind = match occurrence.reference {
             SemanticPreviousReference::PreviousOne => SemanticRelationIssueKind::MissingPreviousOne,
             SemanticPreviousReference::PreviousTwo => SemanticRelationIssueKind::MissingPreviousTwo,
         };
         issues.push(SemanticRelationIssue {
             kind,
+            region_index,
+            occurrences: vec![occurrence],
+        });
+        return None;
+    }
+
+    if let Some(target) = occurrence.target
+        && !previous_instructions.last().is_some_and(|prior| {
+            matches!(
+                &prior.entity.head,
+                crate::SemanticHead::Primitive(term)
+                    if term.identity.category == "shape" && term.identity.id == target.as_str()
+            )
+        })
+    {
+        issues.push(SemanticRelationIssue {
+            kind: SemanticRelationIssueKind::TargetPrimitiveMismatch,
             region_index,
             occurrences: vec![occurrence],
         });

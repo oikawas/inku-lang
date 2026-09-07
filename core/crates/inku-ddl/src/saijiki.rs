@@ -120,6 +120,25 @@ pub struct RelationAsset {
     pub surface_en: String,
     pub literals_ja: Vec<String>,
     pub literals_en: Vec<String>,
+    #[serde(default)]
+    pub literal_targets: HashMap<String, TouchingLiteralTarget>,
+}
+
+/// The primitive explicitly named by an existing full Touching literal.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TouchingLiteralTarget {
+    Line,
+    Arc,
+}
+
+impl TouchingLiteralTarget {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::Arc => "arc",
+        }
+    }
 }
 
 /// Closed, language-independent identity of an accepted Saijiki relation row.
@@ -184,6 +203,7 @@ pub struct CanonicalRelationIdentity {
     pub kind: CanonicalRelationKind,
     pub form: CanonicalRelationForm,
     pub previous_reference: Option<CanonicalPreviousReference>,
+    pub target: Option<TouchingLiteralTarget>,
 }
 
 pub(crate) fn canonical_relation_identity(
@@ -214,14 +234,30 @@ pub(crate) fn canonical_relation_identity(
         kind,
         form,
         previous_reference,
+        target: None,
     })
 }
 
 pub(crate) fn canonical_relation_identity_is_valid(
     relation_type: &str,
     identity: CanonicalRelationIdentity,
+    surface: &str,
 ) -> bool {
-    canonical_relation_identity(relation_type, identity.form) == Some(identity)
+    let Some(mut expected) = canonical_relation_identity(relation_type, identity.form) else {
+        return false;
+    };
+    expected.target = saijiki_asset()
+        .relations
+        .iter()
+        .find(|row| row.relation_type == relation_type)
+        .and_then(|row| {
+            row.literal_targets
+                .iter()
+                .find(|(literal, _)| literal.eq_ignore_ascii_case(surface))
+                .map(|(_, target)| target)
+        })
+        .copied();
+    expected == identity
 }
 
 static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();

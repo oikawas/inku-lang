@@ -10,6 +10,57 @@ fn score(json: &str) -> Score {
 }
 
 #[test]
+fn checked_touching_preserves_numeric_final_bounds_and_never_drops_partial_metadata() {
+    let input = score(
+        r#"{"instructions":[
+        {"primitive":"arc","center":[0.5,-0.07],"position":[0.5,0.03],"radius":0.2,"angle_start":210,"angle_end":330},
+        {"primitive":"arc","center":[0.5,-0.07],"position":[0.5,0.03],"radius":0.2,"angle_start":210,"angle_end":330,
+         "relation":{"type":"touching","target_instruction_index":0,"position_authority":"numeric_fixed","touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
+    ]}"#,
+    );
+    let request = |score| PerformanceRequest {
+        score,
+        composition_seed: Some(23),
+        performance_seed: Some(23),
+        canvas: None,
+    };
+    let own_bounds = inku_render::planning::instruction_bounds(&input.instructions[1]).unwrap();
+    assert!(own_bounds.min.y >= 0.0);
+    let stopped = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap_err();
+    assert_eq!(
+        stopped.diagnostics[0].reason,
+        ScoreExecutionReason::NumericTouchingBoundsConflict
+    );
+    let continued =
+        resolve_checked_performance(request(&input), ScoreErrorPolicy::OmitAndContinue).unwrap();
+    assert_eq!(continued.original_instruction_indices, [0]);
+    let mut partial = input.clone();
+    partial.instructions[1]
+        .relation
+        .as_mut()
+        .unwrap()
+        .touching_constraints = None;
+    assert_eq!(
+        resolve_checked_performance(request(&partial), ScoreErrorPolicy::Stop)
+            .unwrap_err()
+            .diagnostics[0]
+            .reason,
+        ScoreExecutionReason::MissingTouchingConstraints
+    );
+    let mut legacy = input.clone();
+    let relation = legacy.instructions[1].relation.as_mut().unwrap();
+    relation.target_instruction_index = None;
+    relation.position_authority = None;
+    relation.touching_constraints = None;
+    assert_eq!(
+        resolve_checked_performance(request(&legacy), ScoreErrorPolicy::Stop)
+            .unwrap()
+            .score,
+        resolve_performance(request(&legacy)).score
+    );
+}
+
+#[test]
 fn absent_performance_seed_preserves_unresolved_fields() {
     let input = score(
         r#"{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,

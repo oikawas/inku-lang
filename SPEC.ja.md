@@ -1464,8 +1464,9 @@ instruction に任意フィールド `relation` を追加する。
 |---|---|---|
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
-| `target_instruction_index` | 0以上のScore index | `connected`が参照する正確な先行Score instruction。旧relationでは省略 |
-| `position_authority` | `named_movable` / `numeric_fixed` | `connected` currentを平行移動してよいかを示す位置authority |
+| `target_instruction_index` | 0以上のScore index | checked `connected` / `touching`が参照する正確な先行Score instruction。旧relationでは省略 |
+| `position_authority` | `named_movable` / `numeric_fixed` | checked currentの位置authority |
+| `touching_constraints` | `dimensions_fixed` / `direction_fixed`のboolean組 | typed `touching`の明示寸法・向きの固定条件。省略normalとは区別し、旧Scoreでは省略 |
 
 **参照先は常に「直前の instruction」とする（暗黙 prev 参照）。** `between` のみ直前の2要素を参照する。id による任意参照は導入しない。理由:
 
@@ -1499,6 +1500,10 @@ typed compilerは、通常direct隣接instructionの正確な日英full literal�
 StopはSVG構築前に全Connectedを解決し、失敗位置とtyped reasonを返して新出力を返さない。OmitAndContinueはcurrent instructionまたはMacro Emit全体を省略し、元Score index、reason、dispositionを記録し、無関係なinstructionの元execution indexを保つ。参照先を失った後続Connectedも省略し、nearest survivorへ付け替えない。全描画単位の省略とsource / lock / owner / exact Score joinのintegrity失敗は両mode停止する。旧5 relationのwarning / wire挙動は維持する。これはdirect shared/native経路であり、typed DDL本番pipeline、UI、設定保存cutoverの完了を主張しない。
 
 解決不能な関係（例: 直前要素が背景塗りで輪郭を持たない）は、validator / coerce が relation を drop し、警告記録を残す。演奏時にのみ判明する解決不能はrelationをdropし、instructionはrelationなしの通常配置で描画される。grid layoutがrelationを消費する場合などwarning-classの失敗はstructured warningを記録する。一方、prior boundsの不足やcanonical-silentな退化幾何のfallbackは警告なしでrelationをdropする。
+
+Engine 45のtyped `touching`も通常directと同flat Macroの隣接bound Emitから同じchecked performerへ届く。日英の四full literalは、有限宣言に書かれたLine / Arc対象を元のPreviousOneと照合し、型が違えばcanonical成功へ進まない。Macroは実際のtyped Emitを確認し、literalのnoun条件を作らない。Line / Arcだけが成功対象で、先行を変えずに両端を一致させ、Arcは上記と同じ劣弧再構成を使う。明示numeric geometryまたはrelative scale（normalのfactor 1も含む）は寸法を固定し、明示angleはcanonical両端順による弦方向を固定する。省略normalはTouchingに合わせて変わりうる。Numeric位置はanchor固定かつ最終geometryの既存must-fitを保ち、named focusはmovable/clippingのままとする。不一致はtyped conflictとなる。
+
+このtyped Touchingには上のStop / OmitAndContinueと元dependency / owner / drawing ordinal規則を適用する。失敗したcurrentをrelationなしで描くことはなく、独立survivorだけを元index / seedで描く。新metadataのない旧Touchingには上記legacyの再構成・warning・dropを保ち、Connectedも変えない。typed本番pipeline / UI / 保存設定cutoverとwhole Step10の完了は含まない。
 
 ### 14.5 relation の owner
 

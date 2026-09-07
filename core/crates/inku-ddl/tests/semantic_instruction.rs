@@ -1127,6 +1127,12 @@ fn accepted_full_literals_form_closed_previous_edges_and_canonical_identity() {
             ),
         ] {
             for literal in literals {
+                let target = relation.literal_targets.get(literal);
+                let prior_shape = target.map(|target| shape(target.as_str()));
+                let prior_surface = prior_shape.map_or(line_surface, |shape| match language {
+                    ResolvedInstructionLanguage::Ja => shape.surface_ja.as_str(),
+                    ResolvedInstructionLanguage::En => shape.surface_en.as_deref().unwrap(),
+                });
                 let (source, expected_reference, expected_instruction_count) = if relation
                     .relation_type
                     == "between"
@@ -1140,7 +1146,7 @@ fn accepted_full_literals_form_closed_previous_edges_and_canonical_identity() {
                     )
                 } else {
                     (
-                        format!("{line_surface}{ending} {circle_surface} {literal}{ending}"),
+                        format!("{prior_surface}{ending} {circle_surface} {literal}{ending}"),
                         "previous_one",
                         2,
                     )
@@ -1170,10 +1176,14 @@ fn accepted_full_literals_form_closed_previous_edges_and_canonical_identity() {
                 assert_eq!(result.delivered_relation_occurrence_count, 1, "{literal}");
 
                 let canonical = result.canonical_bytes.expect("issue-free canonical bytes");
-                if let Some(expected) = canonical_by_relation.get(&relation.relation_type) {
+                let canonical_key = target.map_or_else(
+                    || relation.relation_type.clone(),
+                    |target| format!("{}:{}", relation.relation_type, target.as_str()),
+                );
+                if let Some(expected) = canonical_by_relation.get(&canonical_key) {
                     assert_eq!(&canonical, expected, "{literal}: bilingual canonical");
                 } else {
-                    canonical_by_relation.insert(relation.relation_type.clone(), canonical.clone());
+                    canonical_by_relation.insert(canonical_key, canonical.clone());
                 }
                 let canonical_json: serde_json::Value =
                     serde_json::from_slice(&canonical).expect("canonical JSON");

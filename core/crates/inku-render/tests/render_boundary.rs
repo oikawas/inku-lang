@@ -97,7 +97,7 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "44");
+    assert_eq!(metadata.render_engine_version, "45");
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -149,7 +149,7 @@ fn engine_renders_every_primitive_through_one_request() {
     let first = render(request.clone()).unwrap();
     let second = render(request).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.metadata.render_engine_version, "44");
+    assert_eq!(first.metadata.render_engine_version, "45");
     assert!(first.svg.starts_with("<svg"));
     assert!(first.svg.ends_with("</svg>"));
     assert!(first.svg.contains("stroke-engine-v1"));

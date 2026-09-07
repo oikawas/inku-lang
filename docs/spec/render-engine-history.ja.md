@@ -49,6 +49,7 @@ CI が落ちる。一致しないときは描画が変わったということ�
 
 | 版 | 製品版数 | Build | 凍結日 | ケース | 動いた | 不変 |
 |---|---|---|---|---|---|---|
+| **45** | Step 10R Touching checked delivery | — | 2026-09-07 | — | — | — |
 | **44** | Step 10Q-2 Connected checked execution | — | 2026-09-07 | — | — | — |
 | **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
 | **42** | Step 10O square物理座標補正 | — | 2026-09-07 | 610 | **0** | **610** |
@@ -335,6 +336,14 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
+
+## engine 45 — 両端Touchingをshared checked performanceへ届ける
+
+通常DDLの日英full literalとflat Macroの隣接bound Emitから、Line / Arcの両端一致と既存Arc再構成へ届く。
+明記された先行型と、明示寸法・向き・numeric位置のauthorityを失わず、不一致はStopまたはcurrent全体の省略にする。
+元Score identity、dependency、owner、drawing ordinal、seedを保ち、旧metadataなしのTouchingとConnectedは互換を維持する。
+Score schema名0.1.0、DDL言語5、legacy DDL engine21は変えない。typed本番 / UI / 保存cutover、whole Step10は未完了である。
+仕様は[SPEC §14.4](../../SPEC.ja.md#144-逐次解決と演奏マクロ揺らぎ)を参照。
 
 ## engine 44 — 片端Connectedをchecked performanceで演奏する
 

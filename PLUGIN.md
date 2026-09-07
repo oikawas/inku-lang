@@ -78,11 +78,14 @@ document Ground. A verified document-owned Ground reaches the same lowerer as a
 `CanvasGroundSpec` with the host-resolved aspect. Omitted drawing attributes and
 normal count-one geometry use the same defaults as ordinary DDL.
 
-An explicit `connected` relation may join only two adjacent bound flat Emits in
+An explicit `connected` or `touching` relation may join only two adjacent bound flat Emits in
 the same expansion. It preserves Emit order and generated ownership and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
 omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
-retargets to the last surviving Emit. Other relation kinds and structural
+retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
+and shares the ordinary Arc reconstruction. Explicit dimensions and chord direction remain
+fixed; omitted normal may adjust. Macro relations check actual typed Emits without creating
+a literal noun condition. Other relation kinds and structural
 relation placement remain unsupported by this consumer.
 
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched

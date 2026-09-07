@@ -96,7 +96,13 @@ radius or diameter. For ordinary source-owned direct primitives, the checked low
 and the Line / Arc / Point endpoint family carries Connected, into the existing Score
 relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order;
-Continue omits dependent currents as `RelationInstruction` units when a referent disappears. Connected also reaches
+Continue omits dependent currents as `RelationInstruction` units when a referent disappears.
+Touching also reaches the shared checked performer from direct Line / Arc instructions and adjacent bound flat Macro Emits.
+The four bilingual full literals verify their named prior Line / Arc type in original source order. Both-endpoint matching
+shares existing Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain fixed;
+omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure stops or omits the current / Emit while
+preserving original dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
+Along / Cutting, whole Step 10, and typed production / UI / persistence cutover remain incomplete. Connected also reaches
 adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
 checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
 the prior, dimensions, curvature, or rotation. A nonzero numeric conflict stops or omits the current according to

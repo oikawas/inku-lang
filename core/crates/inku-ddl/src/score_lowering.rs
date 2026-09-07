@@ -6,7 +6,7 @@ use inku_score::{
     AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
     Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score, SurfaceSpec,
-    SurfaceTexture, Thinness, Weight, lookup_canvas_format,
+    SurfaceTexture, Thinness, TouchingConstraints, Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -320,7 +320,7 @@ fn lower_macro_instruction(
         else {
             continue;
         };
-        if kind != "connected" {
+        if kind != "connected" && kind != "touching" {
             continue;
         }
         let from_position = emit_nodes.iter().position(|(binding, _)| *binding == from);
@@ -328,7 +328,9 @@ fn lower_macro_instruction(
         if from_position
             .zip(to_position)
             .is_some_and(|(from, to)| to == from + 1)
-            && connected_by_to.insert(to.clone(), from.clone()).is_none()
+            && connected_by_to
+                .insert(to.clone(), (from.clone(), kind.as_str()))
+                .is_none()
         {
             continue;
         }
@@ -367,7 +369,8 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
-            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected") {
+            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected" || kind == "touching")
+            {
                 continue;
             }
             let provenance = node.provenance();
@@ -398,7 +401,7 @@ fn lower_macro_instruction(
         let connected_dependency = binding
             .as_ref()
             .and_then(|binding| connected_by_to.get(binding));
-        if let Some(dependency) = connected_dependency
+        if let Some((dependency, _)) = connected_dependency
             && !successful_bindings.contains_key(dependency)
         {
             let reason = ScoreFieldGap::UnavailableMacroRelationReference;
@@ -542,21 +545,21 @@ fn lower_macro_instruction(
             });
         }
         if let Some(mut score_instruction) = attempt.instruction {
-            if let Some(dependency) = connected_dependency {
+            if let Some((dependency, kind)) = connected_dependency {
+                let touching = *kind == "touching";
                 let target_instruction_index = successful_bindings[dependency];
                 let prior_supported =
                     instructions
                         .get(target_instruction_index)
                         .is_some_and(|prior| {
-                            matches!(
-                                prior.primitive,
-                                Primitive::Line | Primitive::Arc | Primitive::Point
-                            )
+                            matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+                                || (!touching && prior.primitive == Primitive::Point)
                         });
                 let current_supported = matches!(
                     score_instruction.primitive,
-                    Primitive::Line | Primitive::Arc | Primitive::Point
-                );
+                    Primitive::Line | Primitive::Arc
+                ) || (!touching
+                    && score_instruction.primitive == Primitive::Point);
                 if !prior_supported || !current_supported {
                     let reason = ScoreFieldGap::UnsupportedMacroRelation;
                     diagnostics.push(ScoreLoweringDiagnostic {
@@ -572,10 +575,19 @@ fn lower_macro_instruction(
                     continue;
                 }
                 score_instruction.relation = Some(Relation {
-                    kind: RelationType::Connected,
+                    kind: if touching {
+                        RelationType::Touching
+                    } else {
+                        RelationType::Connected
+                    },
                     gap: RelationGap::Medium,
                     target_instruction_index: Some(target_instruction_index),
                     position_authority: Some(ConnectedPositionAuthority::NamedMovable),
+                    touching_constraints: touching.then_some(TouchingConstraints {
+                        dimensions_fixed: input.explicit_geometry.is_some()
+                            || input.relative_scale.is_some(),
+                        direction_fixed: input.angle.is_some(),
+                    }),
                 });
             }
             let score_index = instructions.len();
@@ -1391,6 +1403,9 @@ fn direct_score_relation(
             SemanticPreviousReference::PreviousOne
         )
     );
+    let touching = relation.kind == SemanticRelationKind::Touching
+        && relation.reference == SemanticPreviousReference::PreviousOne;
+    let checked = connected || touching;
     let has_exact_center = instruction.position.as_ref().is_some_and(|position| {
         position.identity.category == "place" && position.identity.id == "center"
     });
@@ -1400,14 +1415,14 @@ fn direct_score_relation(
         &instruction.entity.head,
         SemanticHead::Primitive(term)
             if term.identity.category == "shape"
-                && matches!(term.identity.id.as_str(), "line" | "arc" | "point")
+                && (matches!(term.identity.id.as_str(), "line" | "arc") || (!touching && term.identity.id == "point"))
     );
-    if (!legacy_supported && !connected)
+    if (!legacy_supported && !checked)
         || (legacy_supported
             && (instruction.entity.numeric_position.is_some()
                 || !has_exact_center
                 || effective_focus.is_none()))
-        || (connected && (!connected_position_supported || !connected_primitive_supported))
+        || (checked && (!connected_position_supported || !connected_primitive_supported))
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
     }
@@ -1446,12 +1461,10 @@ fn direct_score_relation(
             dependency_instruction_indices,
         });
     }
-    if connected
+    if checked
         && !score_instructions.last().is_some_and(|prior| {
-            matches!(
-                prior.primitive,
-                Primitive::Line | Primitive::Arc | Primitive::Point
-            )
+            matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+                || (!touching && prior.primitive == Primitive::Point)
         })
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
@@ -1462,16 +1475,22 @@ fn direct_score_relation(
             SemanticRelationKind::NotTouching => RelationType::NotTouching,
             SemanticRelationKind::Between => RelationType::Between,
             SemanticRelationKind::Connected => RelationType::Connected,
-            SemanticRelationKind::Along
-            | SemanticRelationKind::Cutting
-            | SemanticRelationKind::Touching => unreachable!("supported relation checked"),
+            SemanticRelationKind::Touching => RelationType::Touching,
+            SemanticRelationKind::Along | SemanticRelationKind::Cutting => {
+                unreachable!("supported relation checked")
+            }
         },
         gap: RelationGap::Medium,
-        target_instruction_index: connected.then(|| score_instructions.len() - 1),
-        position_authority: connected.then_some(if instruction.entity.numeric_position.is_some() {
+        target_instruction_index: checked.then(|| score_instructions.len() - 1),
+        position_authority: checked.then_some(if instruction.entity.numeric_position.is_some() {
             ConnectedPositionAuthority::NumericFixed
         } else {
             ConnectedPositionAuthority::NamedMovable
+        }),
+        touching_constraints: touching.then_some(TouchingConstraints {
+            dimensions_fixed: instruction.entity.explicit_geometry.is_some()
+                || instruction.entity.relative_scale.is_some(),
+            direction_fixed: instruction.entity.angle.is_some(),
         }),
     })
 }

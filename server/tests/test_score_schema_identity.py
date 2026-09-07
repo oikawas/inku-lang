@@ -40,3 +40,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert "connected" in relation["type"]["enum"]
     assert "target_instruction_index" in relation
     assert "position_authority" in relation
+    assert "touching_constraints" in relation
+    assert set(schema["$defs"]["TouchingConstraints"]["required"]) == {
+        "dimensions_fixed", "direction_fixed"
+    }

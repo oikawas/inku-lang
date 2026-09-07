@@ -577,6 +577,15 @@ pub struct Relation {
     pub target_instruction_index: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position_authority: Option<ConnectedPositionAuthority>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub touching_constraints: Option<TouchingConstraints>,
+}
+
+/// Authoritative explicit facts; omitted normal geometry remains adjustable.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TouchingConstraints {
+    pub dimensions_fixed: bool,
+    pub direction_fixed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

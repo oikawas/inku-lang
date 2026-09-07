@@ -23,6 +23,316 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn touching_full_literal_reaches_actual_score() {
+    let result = execute(
+        "place one red line at center. place one blue arc at center touching the previous line.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        result.downstream_diagnostics()
+    );
+    let score = result
+        .score()
+        .expect("Touching must reach the actual Score");
+    assert_eq!(
+        score.instructions[1].relation.as_ref().unwrap().kind,
+        RelationType::Touching
+    );
+}
+
+#[test]
+fn touching_bilingual_targets_reach_performed_both_ends_and_reject_wrong_nouns() {
+    use inku_render::planning::endpoint_geometry;
+    use inku_render::types::CanvasSize;
+    let sources = [
+        (
+            "place one red line at center. place one blue arc at center touching the previous line. place one green arc at center touching the previous arc at both ends. place one yellow line at center touching the previous arc at both ends.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "赤い線を中心に置く。\n前の線に触れる\n青い弧を中心に置く。\n前の弧に両端で触れる\n緑の弧を中心に置く。\n前の弧に両端で触れる\n黄の線を中心に置く。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+    ];
+    for (source, language) in sources {
+        let result = execute_language(source, language, &[], ScoreErrorPolicy::Stop);
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{language:?}: {:?} {:?}",
+            result.upstream_diagnostics(),
+            result.downstream_diagnostics()
+        );
+        let score = result.score().unwrap();
+        let canvas = Some(CanvasSize::new(1200.0, 700.0));
+        let request = PerformanceRequest {
+            score,
+            composition_seed: Some(23),
+            performance_seed: Some(23),
+            canvas,
+        };
+        let plan = resolve_checked_performance(request, ScoreErrorPolicy::Stop).unwrap();
+        assert_eq!(plan.original_instruction_indices, [0, 1, 2, 3]);
+        let endpoints = endpoint_geometry(&plan.score.instructions[0], canvas).unwrap();
+        for instruction in &plan.score.instructions[1..] {
+            let actual = endpoint_geometry(instruction, canvas).unwrap();
+            assert!((actual.0.x - endpoints.0.x).hypot(actual.0.y - endpoints.0.y) < 1e-9);
+            assert!((actual.1.x - endpoints.1.x).hypot(actual.1.y - endpoints.1.y) < 1e-9);
+        }
+        let independent = inku_render::performance::resolve_performance(PerformanceRequest {
+            score,
+            composition_seed: Some(23),
+            performance_seed: Some(23),
+            canvas,
+        });
+        assert_eq!(
+            plan.score.instructions[0],
+            independent.score.instructions[0]
+        );
+        let first_center = plan.score.instructions[1].center.unwrap();
+        let second_center = plan.score.instructions[2].center.unwrap();
+        assert!((first_center.y - endpoints.0.y) * (second_center.y - endpoints.0.y) < 0.0);
+    }
+    for source in [
+        "place one red arc at center. place one blue line at center touching the previous line.",
+        "place one red line at center. place one blue arc at center touching the previous arc at both ends.",
+    ] {
+        let stopped = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
+        assert_eq!(
+            stopped.compilation().compiler_lock.as_ref().unwrap().state,
+            CompilerLockState::BlockedConflict
+        );
+        assert!(stopped.score().is_none());
+        assert!(
+            stopped
+                .compilation()
+                .semantic_document
+                .as_ref()
+                .unwrap()
+                .instruction_association
+                .relation_issues
+                .iter()
+                .any(|issue| issue.kind.as_str() == "relation_target_primitive_mismatch")
+        );
+        let continued = execute(source, &[], LIMITS, ScoreErrorPolicy::OmitAndContinue);
+        assert_eq!(
+            continued.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert_eq!(continued.score().unwrap().instructions.len(), 1);
+        assert_eq!(
+            continued.instruction_origins(),
+            [ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            }]
+        );
+    }
+}
+
+#[test]
+fn touching_explicit_facts_and_omission_chain_keep_original_dependencies() {
+    let source = concat!(
+        "place one red horizontal line with length 0.4 at horizontal 0.5, vertical 0.5. ",
+        "place one blue horizontal arc with chord 0.4, sagitta 0.05 at horizontal 0.5, vertical 0.5 touching the previous line."
+    );
+    let compatible = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
+    assert_eq!(
+        compatible.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?} {:?}",
+        compatible.upstream_diagnostics(),
+        compatible.downstream_diagnostics()
+    );
+    let perform = |score: &inku_score::Score, policy| {
+        resolve_checked_performance(
+            PerformanceRequest {
+                score,
+                composition_seed: Some(23),
+                performance_seed: Some(23),
+                canvas: None,
+            },
+            policy,
+        )
+    };
+    assert!(perform(compatible.score().unwrap(), ScoreErrorPolicy::Stop).is_ok());
+    for (replacement, reason) in [
+        (
+            "place one blue line with length 0.2 at horizontal 0.5, vertical 0.5 touching the previous line.",
+            ScoreExecutionReason::TouchingGeometryConflict,
+        ),
+        (
+            "place one blue vertical line at center touching the previous line.",
+            ScoreExecutionReason::TouchingDirectionConflict,
+        ),
+        (
+            "place one blue line at horizontal 0.7, vertical 0.5 touching the previous line.",
+            ScoreExecutionReason::NumericTouchingPositionConflict,
+        ),
+        (
+            "place one blue normal-sized line at center touching the previous line.",
+            ScoreExecutionReason::TouchingGeometryConflict,
+        ),
+    ] {
+        let chain = format!(
+            "place one red horizontal line with length 0.4 at horizontal 0.5, vertical 0.5. {replacement} place one green arc at center touching the previous line. place one yellow circle at center."
+        );
+        let execution = execute(&chain, &[], LIMITS, ScoreErrorPolicy::Stop);
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{replacement}: {:?} {:?}",
+            execution.upstream_diagnostics(),
+            execution.downstream_diagnostics()
+        );
+        let score = execution.score().unwrap();
+        let error = perform(score, ScoreErrorPolicy::Stop).unwrap_err();
+        assert_eq!(error.diagnostics[0].reason, reason);
+        let plan = perform(score, ScoreErrorPolicy::OmitAndContinue).unwrap();
+        assert_eq!(plan.original_instruction_indices, [0, 3]);
+        assert_eq!(plan.instruction_indices, [0, 3]);
+        let summary = plan.execution.as_ref().unwrap();
+        assert_eq!(
+            summary.diagnostics[1].reason,
+            ScoreExecutionReason::TouchingReferenceOmitted
+        );
+        assert_eq!(summary.diagnostics[1].dependency_instruction_index, Some(1));
+        let joined = map_compiler_render_execution(&execution, score, Some(summary)).unwrap();
+        assert_eq!(
+            joined.rendered_origins[1],
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 3
+            }
+        );
+    }
+}
+
+#[test]
+fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() {
+    use serde_json::json;
+    let mut body = Vec::new();
+    for (index, (shape, color)) in [
+        ("line", "red"),
+        ("arc", "blue"),
+        ("arc", "green"),
+        ("line", "yellow"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let mut fields = json!({
+            "shape": {"expr":"semantic_ref", "category":"shape", "id":shape},
+            "movement": {"expr":"semantic_ref", "category":"movement", "id":"place"},
+            "place": {"expr":"semantic_ref", "category":"place", "id":"center"},
+            "color": {"expr":"semantic_ref", "category":"color", "id":color}
+        });
+        if index == 0 {
+            fields["angle"] = json!({"expr":"semantic_ref", "category":"angle", "id":"vertical"});
+        }
+        if index == 1 {
+            fields["color"] = json!({"expr":"parameter", "name":"tone"});
+        }
+        body.push(json!({"op":"emit", "binding":format!("mark{index}"), "fields":fields}));
+        if index > 0 {
+            body.push(json!({"op":"relation", "kind":"touching", "from":format!("mark{}", index - 1), "to":format!("mark{index}")}));
+        }
+    }
+    let mut definition_value = json!({"schema":"inku.macro-definition.v1", "namespace":"Touch", "heading":"Chain", "version":"1.0.0", "parameters":{"tone":{"type":"semantic_ref","category":"color"}}, "components":{}, "body":body});
+    let definition = definition_from(&definition_value.to_string());
+    let generated = execute_locked(
+        "blue Touch.Chain",
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let direct = execute(
+        "place one red vertical line at center. place one blue arc at center touching the previous line. place one green arc at center touching the previous arc at both ends. place one yellow line at center touching the previous arc at both ends.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    for execution in [&direct, &generated] {
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{:?} {:?}",
+            execution.upstream_diagnostics(),
+            execution.downstream_diagnostics()
+        );
+        assert_eq!(
+            execution.score().unwrap().instructions[1].color,
+            Color::Blue
+        );
+    }
+    let mut ordinary = direct.score().unwrap().clone();
+    let mut expanded = generated.score().unwrap().clone();
+    // The two canonical meanings select their own focus; compare at the same effective focus.
+    for instruction in ordinary
+        .instructions
+        .iter_mut()
+        .chain(&mut expanded.instructions)
+    {
+        assert!(instruction.at.is_some());
+        instruction.at = None;
+    }
+    assert_eq!(ordinary, expanded);
+    let perform = |score: &inku_score::Score| {
+        resolve_checked_performance(
+            PerformanceRequest {
+                score,
+                composition_seed: Some(23),
+                performance_seed: Some(23),
+                canvas: Some(inku_render::types::CanvasSize::new(1200.0, 700.0)),
+            },
+            ScoreErrorPolicy::Stop,
+        )
+        .unwrap()
+    };
+    assert_eq!(perform(&ordinary).score, perform(&expanded).score);
+    assert!(
+        generated
+            .instruction_origins()
+            .iter()
+            .all(|owner| matches!(owner, ScoreInstructionOrigin::MacroEmit { .. }))
+    );
+    definition_value["body"][1]["fields"]["angle"] =
+        json!({"expr":"semantic_ref", "category":"angle", "id":"horizontal"});
+    let conflict = execute_locked(
+        "blue Touch.Chain",
+        &[definition_from(&definition_value.to_string())],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let score = conflict.score().unwrap();
+    let request = || PerformanceRequest {
+        score,
+        composition_seed: Some(23),
+        performance_seed: Some(23),
+        canvas: None,
+    };
+    assert_eq!(
+        resolve_checked_performance(request(), ScoreErrorPolicy::Stop)
+            .unwrap_err()
+            .diagnostics[0]
+            .reason,
+        ScoreExecutionReason::TouchingDirectionConflict
+    );
+    let omitted =
+        resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
+    assert_eq!(omitted.original_instruction_indices, [0]);
+    let joined =
+        map_compiler_render_execution(&conflict, score, omitted.execution.as_ref()).unwrap();
+    assert!(matches!(
+        joined.diagnostics[0].owner,
+        ScoreInstructionOrigin::MacroEmit { .. }
+    ));
+}
+
+#[test]
 fn canonical_input_preserves_the_existing_score_in_both_modes() {
     let source = "place one red circle at center.";
     let stop = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);

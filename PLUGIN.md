@@ -62,14 +62,15 @@ This small definition reaches the current runtime-disconnected Score lowerer:
 Each complete flat Emit becomes one ordinary Score instruction. A sequence of
 complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
-(`circle`, `ellipse`, `cloudform`, or `square`), explicit
+(`line`, `circle`, `ellipse`, `cloudform`, `square`, `arc`, or `point`), explicit
 `movement:place`, exact `place:center`, and optional same-category `color`,
 `touch`, `continuity`, `surface`, `angle`, and `thinness`. Thinness is a closed
 core category outside Saijiki: only `thinness:fine` and
 `thinness:extra_fine` are accepted, and both use the same lowerer as ordinary DDL.
-Angle uses the same seeded resolver
-as ordinary DDL and reaches `Score.rotation` for circle, ellipse, and cloudform;
-an angled square is an invalid Emit because of the known Renderer unit seam.
+Angle uses the same seeded resolver as ordinary DDL and reaches
+`Score.rotation` for every supported shape whose orientation is visible,
+including line, arc, and square. Point rejects an explicit angle because its
+round mark has no authored orientation.
 Existing fill behavior for omitted, `none`,
 and `solid` surface remains; the seven positive surface qualities use the same
 existing `SurfaceSpec` defaults as ordinary DDL. A Macro does not author a
@@ -133,9 +134,11 @@ is preserved. `(0.0,0.0)` is top-left, `(1.0,1.0)` is bottom-right, and
 `(0.5,0.5)` is exact center.
 
 The exact canonical primitive set is `line`, `circle`, `ellipse`, `triangle`,
-`square`, `polygon`, `arc`, and `cloudform`. Geometry is resolved only by the
+`square`, `polygon`, `arc`, `point`, and `cloudform`. Line accepts exact
+`length`, arc accepts exact `chord` plus `sagitta`, and point reuses exact
+`radius` or `diameter`. Geometry is resolved only by the
 single `inku-ddl` owner identified as `inku.geometry-resolution-policy.v1`;
-plugins cannot add another owner or a ninth primitive. Exact counts remain
+plugins cannot add another owner or a tenth primitive. Exact counts remain
 lossless symbolic intent until the Step 11 pure ceiling passes before any
 O(count) allocation or materialization.
 

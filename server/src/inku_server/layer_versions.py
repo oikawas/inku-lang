@@ -263,4 +263,7 @@ DDL_ENGINE_VERSION = "21"
 # them and Stage 1 offers them. This follows the same rule version 2 followed for the
 # thinness word: the language version rises when its vocabulary grows, not when its
 # grammar changes. Works saved earlier keep the version they were written under.
-DDL_VERSION = "3"
+# 4 (2026-09-07): 点 / point joins the independent shape vocabulary. Japanese
+# 点 remains the existing stipple surface when phrase ownership attaches it to
+# another explicit shape; a standalone shape head owns the new point identity.
+DDL_VERSION = "4"

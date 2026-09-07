@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "15d467bdc3adf1523040e827c3721cbdb47e785af12aed55d8000dbfe3436ad8";
+    "5bc77d70261d4fff203a429df9d329fd699388430c4da14b5f9a935f8f6f48a3";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -28,6 +28,23 @@ fn canonical_score_schema_identity_is_stable() {
             "missing {required} property"
         );
     }
+
+    let instruction = schema["$defs"]["Instruction"]["properties"]
+        .as_object()
+        .expect("Instruction properties must be an object");
+    assert!(
+        instruction["primitive"]["enum"]
+            .as_array()
+            .expect("primitive enum")
+            .iter()
+            .any(|value| value == "point")
+    );
+    assert!(
+        instruction["position"]["description"]
+            .as_str()
+            .expect("position description")
+            .contains("semantic anchor")
+    );
 
     assert_eq!(SCORE_SCHEMA_DIGEST_DOMAIN, "inku.score.schema.v1");
     let mut hasher = Sha256::new();

@@ -62,6 +62,7 @@ string_enum!(Primitive {
     Square,
     Polygon,
     Arc,
+    Point,
     Cloudform,
 });
 string_enum!(LineStyle {

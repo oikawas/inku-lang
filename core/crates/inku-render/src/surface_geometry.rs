@@ -15,7 +15,7 @@ pub(crate) fn shape_bbox(
 ) -> Option<(f64, f64, f64, f64)> {
     let canvas = context.canvas;
     match instruction.primitive {
-        Primitive::Circle => {
+        Primitive::Circle | Primitive::Point => {
             let center = point_to_pixels(instruction.center?, canvas);
             let radius = instruction.radius? * canvas.unit();
             Some((
@@ -70,7 +70,7 @@ pub(crate) fn surface_contour(
 ) -> Option<Vec<Point>> {
     let canvas = context.canvas;
     match instruction.primitive {
-        Primitive::Circle => {
+        Primitive::Circle | Primitive::Point => {
             let center = point_to_pixels(instruction.center?, canvas);
             let radius = instruction.radius? * canvas.unit();
             Some(circle_points(

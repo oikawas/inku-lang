@@ -14,25 +14,32 @@ use crate::{
 pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy.v1";
 
 const GEOMETRY_RESOLUTION_POLICY_PREFIX: &str = concat!(
-    "{\"anchor\":{\"closed_primitive\":\"center\",\"square_score\":\"top_left_from_center\"},"
+    "{\"anchor\":{\"arc_legacy\":\"circle_center\",\"arc_typed\":\"chord_midpoint\",",
+    "\"closed_primitive\":\"center\",\"line\":\"endpoint_midpoint\",\"point\":\"center\",",
+    "\"square_score\":\"top_left_from_center\"},"
 );
 const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"author_resolved_omission\":{\"color\":{\"choice\":\"max_oklch_lightness_distance\",",
     "\"tie\":\"black\"},\"continuity\":\"solid\",\"count\":1,",
-    "\"surface\":\"filled\",\"touch\":\"pen\"},",
+    "\"surface\":{\"closed_and_point\":\"filled\",\"line_and_arc\":\"unfilled\"},",
+    "\"touch\":\"pen\"},",
     "\"bounds\":{\"named\":{\"anchor\":\"performance_seed_in_region\",",
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
-    "\"numeric\":{\"anchor\":\"closed_unit_interval\",\"extent\":\"must_fit\"}},",
+    "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
-    "\"axis_position\"],",
+    "\"line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
+    "\"endpoint_rotated_finite_extent\",\"axis_position\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
 );
 const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "},",
     "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
-    "\"basis\":\"canvas_short_edge\",\"count\":1,\"width_or_diameter\":\"6/25\"},",
+    "\"basis\":\"canvas_short_edge\",\"count\":1,",
+    "\"endpoint_family\":{\"arc\":{\"chord\":\"6/25\",\"sagitta\":\"3/50\"},",
+    "\"line\":{\"length\":\"6/25\"},\"point\":{\"diameter\":\"3/250\"}},",
+    "\"width_or_diameter\":\"6/25\"},",
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
     "\"policy\":\"inku.geometry-resolution-policy.v1\",",
     "\"relative_scale\":{\"large\":\"3/2\",\"normal\":\"1/1\",",
@@ -123,6 +130,9 @@ fn hex_lower(bytes: &[u8]) -> String {
 pub enum GeometryKeyword {
     Radius,
     Diameter,
+    Length,
+    Chord,
+    Sagitta,
     Width,
     Height,
     Side,
@@ -137,6 +147,9 @@ impl GeometryKeyword {
         match self {
             Self::Radius => "radius",
             Self::Diameter => "diameter",
+            Self::Length => "length",
+            Self::Chord => "chord",
+            Self::Sagitta => "sagitta",
             Self::Width => "width",
             Self::Height => "height",
             Self::Side => "side",
@@ -165,6 +178,11 @@ pub struct SemanticGeometryValue {
 pub enum SemanticExplicitGeometry {
     Radius(SemanticGeometryValue),
     Diameter(SemanticGeometryValue),
+    Length(SemanticGeometryValue),
+    ChordSagitta {
+        chord: SemanticGeometryValue,
+        sagitta: SemanticGeometryValue,
+    },
     WidthHeight {
         width: SemanticGeometryValue,
         height: SemanticGeometryValue,
@@ -175,9 +193,11 @@ pub enum SemanticExplicitGeometry {
 impl SemanticExplicitGeometry {
     pub const fn source(&self) -> &SourceOccurrence {
         match self {
-            Self::Radius(value) | Self::Diameter(value) | Self::Side(value) => {
-                &value.keyword_provenance
-            }
+            Self::Radius(value)
+            | Self::Diameter(value)
+            | Self::Length(value)
+            | Self::Side(value) => &value.keyword_provenance,
+            Self::ChordSagitta { chord, .. } => &chord.keyword_provenance,
             Self::WidthHeight { width, .. } => &width.keyword_provenance,
         }
     }
@@ -233,7 +253,10 @@ pub(crate) fn analyze_clause_geometry(
             continue;
         }
         match keyword {
-            GeometryKeyword::Radius | GeometryKeyword::Diameter | GeometryKeyword::Side => {
+            GeometryKeyword::Radius
+            | GeometryKeyword::Diameter
+            | GeometryKeyword::Length
+            | GeometryKeyword::Side => {
                 if let Some(value) =
                     geometry_value(document, atoms, clause_index, region_index, index, keyword)
                 {
@@ -243,6 +266,7 @@ pub(crate) fn analyze_clause_geometry(
                     result.geometries.push(match keyword {
                         GeometryKeyword::Radius => SemanticExplicitGeometry::Radius(value),
                         GeometryKeyword::Diameter => SemanticExplicitGeometry::Diameter(value),
+                        GeometryKeyword::Length => SemanticExplicitGeometry::Length(value),
                         GeometryKeyword::Side => SemanticExplicitGeometry::Side(value),
                         _ => unreachable!(),
                     });
@@ -293,6 +317,50 @@ pub(crate) fn analyze_clause_geometry(
                     ));
                 }
             }
+            GeometryKeyword::Chord => {
+                let pair =
+                    geometry_value(document, atoms, clause_index, region_index, index, keyword)
+                        .zip(
+                            keyword_at(atoms, index + 2, GeometryKeyword::Sagitta)
+                                .then(|| index + 2),
+                        )
+                        .and_then(|(chord, sagitta_index)| {
+                            geometry_value(
+                                document,
+                                atoms,
+                                clause_index,
+                                region_index,
+                                sagitta_index,
+                                GeometryKeyword::Sagitta,
+                            )
+                            .map(|sagitta| (chord, sagitta_index, sagitta))
+                        });
+                if let Some((chord, sagitta_index, sagitta)) = pair {
+                    consumed_keywords.insert(sagitta_index);
+                    result
+                        .consumed_numeric_spans
+                        .insert(span_key(chord.decimal.provenance.span));
+                    result
+                        .consumed_numeric_spans
+                        .insert(span_key(sagitta.decimal.provenance.span));
+                    result
+                        .geometries
+                        .push(SemanticExplicitGeometry::ChordSagitta { chord, sagitta });
+                } else {
+                    result.issues.push(issue(
+                        GeometrySyntaxIssueKind::IncompleteGeometry,
+                        atoms,
+                        index,
+                        index + 3,
+                    ));
+                }
+            }
+            GeometryKeyword::Sagitta => result.issues.push(issue(
+                GeometrySyntaxIssueKind::IncompleteGeometry,
+                atoms,
+                index,
+                index + 1,
+            )),
             GeometryKeyword::Height => result.issues.push(issue(
                 GeometrySyntaxIssueKind::IncompleteGeometry,
                 atoms,
@@ -536,7 +604,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "3ba520eb2111a46f4b83e4fed397dcf368894cac83a82fe8979533c4fe9026f7"
+            "7b5f34a87b4c98ebd91d75075e38b9c0dffa561e8ead7bb8efc4ed7e65659c13"
         );
     }
 }

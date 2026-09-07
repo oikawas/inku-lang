@@ -336,6 +336,37 @@ fn explicit_geometry_and_numeric_position_language_evidence_is_checked() {
         stage15_transformation_input(&position_mismatch),
         Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
     );
+
+    let mut arc_mismatch = compile(
+        "place one red pen solid arc with chord 0.4, sagitta 0.1 at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(stage15_transformation_input(&arc_mismatch).is_ok());
+    let geometry = arc_mismatch
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .entity
+        .explicit_geometry
+        .as_mut()
+        .unwrap();
+    let inku_ddl::SemanticExplicitGeometry::ChordSagitta { chord, sagitta } = geometry else {
+        panic!("control has chord and sagitta geometry");
+    };
+    assert_eq!(chord.decimal.provenance.surface, "0.4");
+    assert_eq!(sagitta.decimal.provenance.surface, "0.1");
+    sagitta.keyword_provenance.language = ResolvedInstructionLanguage::Ja;
+    sagitta.decimal.provenance.language = ResolvedInstructionLanguage::Ja;
+    refresh_semantic_source_provenance_and_full_lock(&mut arc_mismatch);
+    assert_eq!(
+        stage15_transformation_input(&arc_mismatch),
+        Err(Stage15TransformError::SemanticSourceProvenanceDigestMismatch)
+    );
 }
 
 #[test]

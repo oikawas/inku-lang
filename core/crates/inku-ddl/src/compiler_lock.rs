@@ -2418,12 +2418,17 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             match geometry {
                 crate::SemanticExplicitGeometry::Radius(value)
                 | crate::SemanticExplicitGeometry::Diameter(value)
+                | crate::SemanticExplicitGeometry::Length(value)
                 | crate::SemanticExplicitGeometry::Side(value) => {
                     push_geometry_value(occurrences, value);
                 }
                 crate::SemanticExplicitGeometry::WidthHeight { width, height } => {
                     push_geometry_value(occurrences, width);
                     push_geometry_value(occurrences, height);
+                }
+                crate::SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => {
+                    push_geometry_value(occurrences, chord);
+                    push_geometry_value(occurrences, sagitta);
                 }
             }
         }
@@ -2697,10 +2702,15 @@ fn explicit_geometry_provenance_value(geometry: &crate::SemanticExplicitGeometry
     let values = match geometry {
         crate::SemanticExplicitGeometry::Radius(value)
         | crate::SemanticExplicitGeometry::Diameter(value)
+        | crate::SemanticExplicitGeometry::Length(value)
         | crate::SemanticExplicitGeometry::Side(value) => vec![geometry_value_provenance(value)],
         crate::SemanticExplicitGeometry::WidthHeight { width, height } => vec![
             geometry_value_provenance(width),
             geometry_value_provenance(height),
+        ],
+        crate::SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => vec![
+            geometry_value_provenance(chord),
+            geometry_value_provenance(sagitta),
         ],
     };
     Value::Array(values)

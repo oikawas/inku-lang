@@ -6,7 +6,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'katachi',
 		label: 'かたち',
 		en: 'forms',
-		words: ['円', '楕円', '三角', '四角', '線', '弧', '雲形']
+		words: ['円', '楕円', '三角', '四角', '線', '弧', '点', '雲形']
 	},
 	{
 		key: 'katamuki',
@@ -81,7 +81,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'katachi',
 		label: 'かたち',
 		en: 'forms',
-		words: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'cloudform']
+		words: ['circle', 'ellipse', 'triangle', 'square', 'line', 'arc', 'point', 'cloudform']
 	},
 	{
 		key: 'katamuki',

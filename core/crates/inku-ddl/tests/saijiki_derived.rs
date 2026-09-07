@@ -20,7 +20,17 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
     assert!(en.texture_material_enumeration.ends_with(", or computer"));
     assert_eq!(
         ja.shape_markers,
-        ["線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形"]
+        [
+            "線",
+            "円",
+            "楕円",
+            "三角",
+            "四角",
+            "多角形",
+            "弧",
+            "点",
+            "雲形"
+        ]
     );
     assert_eq!(
         en.core_grammar_markers,
@@ -32,6 +42,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "square",
             "polygon",
             "arc",
+            "point",
             "cloudform",
             "place",
             "draw",

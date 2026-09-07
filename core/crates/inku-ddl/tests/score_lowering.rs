@@ -63,6 +63,155 @@ fn lowering_context_requires_an_explicit_registry_canvas_and_background() {
 }
 
 #[test]
+fn endpoint_family_normal_line_reaches_actual_score() {
+    let result = stage15(
+        "place one red pen solid line at horizontal 0.5, vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+    );
+    let compilation = result.original_semantic_document();
+    assert_eq!(compilation.instructions.len(), 1);
+    assert!(matches!(
+        compilation.instructions[0].entity.head,
+        SemanticHead::Primitive(_)
+    ));
+
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    let score = lowered
+        .score()
+        .expect("a valid normal Line must reach an actual Score");
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Line);
+    let line = &score.instructions[0];
+    let from = line.from_.unwrap();
+    let to = line.to.unwrap();
+    assert!((from.x - (0.5 - 0.12 * 20.0 / 47.0)).abs() < 1.0e-15);
+    assert!((to.x - (0.5 + 0.12 * 20.0 / 47.0)).abs() < 1.0e-15);
+    assert_eq!(from.y, 0.5);
+    assert_eq!(to.y, 0.5);
+    assert!(!line.filled);
+}
+
+#[test]
+fn endpoint_family_normal_arc_and_point_reach_independent_actual_score_geometry() {
+    let result = stage15(
+        concat!(
+            "place one blue pen solid arc at horizontal 0.5, vertical 0.5. ",
+            "place one black pen solid point at horizontal 0.7, vertical 0.5."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    let instructions = &lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 2);
+
+    let arc = &instructions[0];
+    assert_eq!(arc.primitive, Primitive::Arc);
+    assert_eq!(arc.position, Some(Point::new(0.5, 0.5)));
+    assert!((arc.center.unwrap().y - 0.59).abs() < 1.0e-15);
+    assert!((arc.radius.unwrap() - 0.15).abs() < 1.0e-15);
+    assert!((arc.angle_start.unwrap() - 143.13010235415598).abs() < 1.0e-12);
+    assert!((arc.angle_end.unwrap() - 36.86989764584402).abs() < 1.0e-12);
+    assert!(!arc.filled);
+
+    let point = &instructions[1];
+    assert_eq!(point.primitive, Primitive::Point);
+    assert_eq!(point.center, Some(Point::new(0.7, 0.5)));
+    assert!((point.radius.unwrap() - 0.006).abs() < 1.0e-15);
+    assert!(point.filled);
+}
+
+#[test]
+fn endpoint_family_explicit_geometry_and_japanese_point_reach_the_same_typed_lowerer() {
+    let en = stage15(
+        concat!(
+            "place one red line with length 0.4 at horizontal 0.5, vertical 0.3. ",
+            "place one blue arc with chord 0.4, sagitta 0.1 at horizontal 0.5, vertical 0.5. ",
+            "place one black point with diameter 0.02 at horizontal 0.7, vertical 0.7."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let ja = stage15(
+        concat!(
+            "画面の横0.5、縦0.3の位置に、長さ0.4の赤い線をひとつ置く。",
+            "画面の横0.5、縦0.5の位置に、弦長0.4、矢高0.1の青い弧をひとつ置く。",
+            "画面の横0.7、縦0.7の位置に、直径0.02の黒い点をひとつ置く。"
+        ),
+        ResolvedInstructionLanguage::Ja,
+    );
+    assert_eq!(
+        en.original_pre_expansion_digest(),
+        ja.original_pre_expansion_digest()
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let en = lower_verified_stage15_score(en.verified_effective_view(), context);
+    let ja = lower_verified_stage15_score(ja.verified_effective_view(), context);
+    assert_eq!(en.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(en.score(), ja.score());
+    let score = en.score().unwrap();
+    assert_eq!(score.instructions[0].primitive, Primitive::Line);
+    assert_eq!(score.instructions[1].primitive, Primitive::Arc);
+    assert_eq!(score.instructions[2].primitive, Primitive::Point);
+    assert!((score.instructions[2].radius.unwrap() - 0.01).abs() < 1.0e-15);
+}
+
+#[test]
+fn endpoint_family_normal_flat_macro_emit_uses_the_same_effective_defaults() {
+    let definition = endpoint_family_emit_definition();
+    let macro_result = stage15_locked(
+        "Endpoint.Normal!",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let direct_result = stage15(
+        concat!(
+            "place one red line at center. ",
+            "place one blue arc at center. ",
+            "place one black point at center."
+        ),
+        ResolvedInstructionLanguage::En,
+    );
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let macro_score = lower_verified_stage15_score(macro_result.verified_effective_view(), context);
+    let direct_score =
+        lower_verified_stage15_score(direct_result.verified_effective_view(), context);
+    assert_eq!(
+        macro_score.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "gaps={:?}; diagnostics={:?}",
+        macro_score.gaps(),
+        macro_score.diagnostics()
+    );
+    assert_eq!(direct_score.outcome(), ScoreLoweringOutcome::Complete);
+    let macro_instructions = &macro_score.score().unwrap().instructions;
+    let direct_instructions = &direct_score.score().unwrap().instructions;
+    assert_eq!(macro_instructions.len(), 3);
+    for (macro_instruction, direct_instruction) in
+        macro_instructions.iter().zip(direct_instructions)
+    {
+        assert_eq!(macro_instruction.primitive, direct_instruction.primitive);
+        assert_eq!(macro_instruction.radius, direct_instruction.radius);
+        assert_eq!(macro_instruction.size, direct_instruction.size);
+        assert_eq!(
+            macro_instruction.angle_start,
+            direct_instruction.angle_start
+        );
+        assert_eq!(macro_instruction.angle_end, direct_instruction.angle_end);
+        assert_eq!(macro_instruction.filled, direct_instruction.filled);
+        assert_eq!(macro_instruction.style, direct_instruction.style);
+        assert_eq!(macro_instruction.weight, direct_instruction.weight);
+        assert_eq!(macro_instruction.color, direct_instruction.color);
+    }
+}
+
+#[test]
 fn omitted_count_size_and_drawing_attributes_resolve_to_an_actual_score() {
     let result = stage15(
         "place circle at horizontal 0.5, vertical 0.5.",
@@ -1719,7 +1868,7 @@ fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_sco
 }
 
 #[test]
-fn canonical_eight_primitives_map_one_to_one_and_unknown_identity_fails_closed() {
+fn canonical_nine_primitives_map_one_to_one_and_unknown_identity_fails_closed() {
     for (id, expected) in [
         ("line", Primitive::Line),
         ("circle", Primitive::Circle),
@@ -1728,6 +1877,7 @@ fn canonical_eight_primitives_map_one_to_one_and_unknown_identity_fails_closed()
         ("square", Primitive::Square),
         ("polygon", Primitive::Polygon),
         ("arc", Primitive::Arc),
+        ("point", Primitive::Point),
         ("cloudform", Primitive::Cloudform),
     ] {
         let result = stage15(id, ResolvedInstructionLanguage::En);
@@ -1834,6 +1984,9 @@ fn finite_relative_size_intent_is_symbolic_for_the_supported_closed_primitives()
         "small ellipse",
         "small square",
         "small cloudform",
+        "small line",
+        "small arc",
+        "small point",
     ] {
         let result = stage15(source, ResolvedInstructionLanguage::En);
         let candidate = lower_verified_stage15_view(result.verified_effective_view());
@@ -1847,10 +2000,8 @@ fn finite_relative_size_intent_is_symbolic_for_the_supported_closed_primitives()
     }
 
     for (id, primitive) in [
-        ("line", Primitive::Line),
         ("triangle", Primitive::Triangle),
         ("polygon", Primitive::Polygon),
-        ("arc", Primitive::Arc),
     ] {
         let result = stage15(&format!("small {id}"), ResolvedInstructionLanguage::En);
         let candidate = lower_verified_stage15_view(result.verified_effective_view());
@@ -2639,6 +2790,13 @@ fn center_emit_definition() -> MacroDefinition {
 fn complete_flat_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Draw","heading":"Pair","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+    )
+    .unwrap()
+}
+
+fn endpoint_family_emit_definition() -> MacroDefinition {
+    MacroDefinition::from_json(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Endpoint","heading":"Normal","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"arc"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"point"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"black"}}}]}"#,
     )
     .unwrap()
 }

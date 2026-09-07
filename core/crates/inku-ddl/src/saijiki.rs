@@ -515,6 +515,19 @@ fn register_parser_surface(
 
     let key = surface.to_ascii_lowercase();
     if let Some((first_category_key, first_surface_ja)) = owners.get(&key) {
+        if surface == "点"
+            && first_surface_ja == "点"
+            && surface_ja == "点"
+            && matches!(
+                (first_category_key.as_str(), category_key),
+                ("omote", "katachi") | ("katachi", "omote")
+            )
+        {
+            // This one declared Japanese homograph is resolved from phrase
+            // ownership in the parser: a noun head is the Point shape, while
+            // a modifier owned by another explicit shape remains stipple.
+            return Ok(());
+        }
         return Err(SaijikiProjectionError::ParserSurfaceCollision {
             surface: surface.to_owned(),
             first_category_key: first_category_key.clone(),

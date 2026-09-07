@@ -93,6 +93,7 @@ pub(crate) fn is_closed(primitive: Primitive) -> bool {
     matches!(
         primitive,
         Primitive::Circle
+            | Primitive::Point
             | Primitive::Ellipse
             | Primitive::Square
             | Primitive::Triangle
@@ -353,14 +354,15 @@ pub fn render_instruction(
                 ))
             }
         }
-        Primitive::Circle | Primitive::Ellipse => {
+        Primitive::Circle | Primitive::Point | Primitive::Ellipse => {
             let center = point_to_pixels(
                 instruction
                     .center
                     .ok_or_else(|| missing(instruction, "center"))?,
                 context.canvas,
             );
-            let (rx, ry) = if instruction.primitive == Primitive::Circle {
+            let (rx, ry) = if matches!(instruction.primitive, Primitive::Circle | Primitive::Point)
+            {
                 let radius = instruction
                     .radius
                     .ok_or_else(|| missing(instruction, "radius"))?
@@ -375,7 +377,7 @@ pub fn render_instruction(
                 );
                 (size.x / 2.0, size.y / 2.0)
             };
-            let length = if instruction.primitive == Primitive::Circle {
+            let length = if matches!(instruction.primitive, Primitive::Circle | Primitive::Point) {
                 std::f64::consts::TAU * rx
             } else {
                 ellipse_perimeter(rx, ry)
@@ -395,7 +397,8 @@ pub fn render_instruction(
                     amplitude(instruction, context.canvas),
                 );
             }
-            let geometry = if instruction.primitive == Primitive::Circle {
+            let geometry = if matches!(instruction.primitive, Primitive::Circle | Primitive::Point)
+            {
                 Element::new("circle")
                     .attr("cx", format_number(center.x))
                     .attr("cy", format_number(center.y))

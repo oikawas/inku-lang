@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
 | **42** | Step 10O square physical coordinates | — | 2026-09-07 | 610 | **0** | **610** |
 | **41** | Rust migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
@@ -423,6 +424,21 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 43 — perform Line, Arc, and Point as one finite endpoint family
+
+Engine 43 renders an independent `point` primitive as a round filled mark and
+shares semantic anchors across the family: the endpoint midpoint for line, the
+chord midpoint for arc, and the center for point. A typed-DDL arc carries its
+chord midpoint in the existing optional `position`, so movement and rotation on
+a non-square canvas retain the authored position. An old Score arc without
+`position` keeps its previous circle-center anchor and rotation behavior.
+
+The generic clean-commit native testbox directly covers one line/arc/point set,
+the chord midpoint and endpoints of a rotated arc on a 47:20 canvas, and the old
+absent-field Arc behavior. Engine 42's dedicated corpus and old references are
+not rewritten for this version, so the table does not invent frozen-case or
+moved counts.
 
 ## engine 42 — align square physical anchors and rotation centres on non-square canvases
 

@@ -1480,7 +1480,7 @@ generation. The history of reducing seven variation axes to one lives in
 The Renderer performs a validated JSON Score into SVG. It realizes coordinates,
 materials, sway, primitives, texture, and canvas ratio without inventing visual
 content absent from Score. The current authority is the platform-independent
-Rust `inku-render` core (Render Engine 42); Python and Android are hosts that
+Rust `inku-render` core (Render Engine 43); Python and Android are hosts that
 pass resolved options into the same core. Native rasterization belongs to the
 separate `inku-svg-raster` boundary.
 
@@ -2547,7 +2547,7 @@ Important score concepts:
 
 - `canvas`: selected canvas aspect identifier, such as `square` or `golden`
 - `instructions`: ordered drawing instructions
-- primitive fields: the canonical exact eight, line, circle, ellipse, triangle, square, polygon, arc, and cloudform, plus related process data. `rectangle` is not a ninth primitive and requires a separate author ruling and schema / version before it can be added
+- primitive fields: the canonical exact nine, line, circle, ellipse, triangle, square, polygon, arc, point, and cloudform, plus related process data. Point is a round filled mark with an identity distinct from Circle. `rectangle` is not a tenth primitive and requires a separate author ruling and schema / version before it can be added
 - `weight`: material / tool quality
 - `variation`: visible wobble, blur, tremble, or motion behavior
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
@@ -2570,10 +2570,13 @@ canonical count into another value.
 numeric geometry remain distinct. In the current subset, an unallocated
 count-one circle, square, ellipse, or cloudform uses `6/25` (0.24) of the canvas
 short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
-of width. Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
+of width. Normal line length and normal arc chord are also `6/25`; arc sagitta
+is one quarter of its chord, and normal point diameter is `3/250` (0.012).
+Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
 standard, and strong small; `5/4`, `3/2`, and `7/4` for the corresponding large
 classes; and `1` for normal. One exact rational factor is applied once to the
-normal geometry. Existing `small` means standard-small, while an explicit
+normal geometry: length for line, similar chord and sagitta for arc, and diameter
+for point. Existing `small` means standard-small, while an explicit
 "normal size" remains distinct from unspecified. Explicit numeric geometry is
 unchanged by qualitative size, and stating both is a conflict. Unspecified
 normal outside this subset remains undecided and is not completed through
@@ -2603,15 +2606,16 @@ selects the same angle; distinct true occurrences have distinct keys.
 Effective focus, variation seed, render seed, raw source bytes, and the full
 lock digest are excluded.
 
-A circle keeps the same radial extent under rotation. An ellipse uses its ideal
-rotated ellipse extent, and cloudform and square use the rotated rectangular envelope of
-its declared width and height. Numeric placement rotates short-edge units in
+A circle or point keeps the same radial extent under rotation. An ellipse uses its ideal
+rotated ellipse extent, cloudform and square use the rotated rectangular envelope of
+their declared width and height, and line and arc use their final finite geometry. Numeric placement rotates short-edge units in
 physical space, converts the result back to each canvas axis, and applies
 must-fit only to the rotated extent; it does not reject the unrotated box first,
 relocate, shrink, reduce count, or retry another angle. Named focus keeps the
-existing size and `at.region` without a must-fit check. Square angles use the
+existing size and `at.region` without a must-fit check. Line, arc, and square angles use the
 same resolver for direct instructions and flat Macro Emits and reach
-`Score.rotation`. The shape of the Renderer and Score wire is unchanged.
+`Score.rotation`. An explicit angle on round point is unsupported and is not
+reinterpreted as another rotated shape.
 
 The same policy owns the six mappings from effective focus to `at.region`:
 `upper_right=[0.60,0.18,0.82,0.40]`,
@@ -2621,6 +2625,8 @@ The same policy owns the six mappings from effective focus to `at.region`:
 `upper_edge=[0.39,0.07,0.61,0.29]`, and
 `right_half=[0.61,0.39,0.83,0.61]`. A named Score instruction has no `center`
 or `position`; it carries its resolved `radius` or `size` and `at.region`.
+Line, arc, and point carry finite baseline geometry and a semantic anchor plus
+`at.region`, which the Renderer moves by that anchor.
 Only numeric position applies the unit-interval anchor and shape-extent must-fit
 checks. The named path does not intersect the region with shape-safe bounds,
 shrink dimensions, relocate or resample to fit, or stop on an empty intersection.
@@ -2629,13 +2635,17 @@ The author's A ruling allows clipping. The Renderer retains its existing
 short-edge conversion of region extents, performance-seed anchor selection, and
 unit-interval base-point clamp, including a square's top-left point. This is not
 a promise that no coordinate adjustment occurs or that the whole shape always
-stays on the paper. Engine 42 preserves the existing wire in which points use
+stays on the paper. Engine 42 preserves the existing wire in which coordinates use
 normalized canvas axes while size, radius, and gap use the canvas short edge.
 It computes square and triangle semantic centers, movement, rotation pivots,
 performed bounds, relations, composite offsets, and arrangement fitting in one
 physical short-edge coordinate family before converting back to each axis.
 Public helpers called without a canvas keep their prior normalized-coordinate
 compatibility.
+Engine 43 uses the endpoint midpoint for line, the chord midpoint for arc, and
+the center for point as semantic anchors. A typed arc carries its chord midpoint
+in the existing optional `position`; an old Score arc with that field absent
+keeps its circle-center anchor and rotation behavior.
 
 Within the current subset, only an omitted count resolves to one; zero,
 repeated, and qualitative counts are not materialized. Omitted touch resolves to
@@ -2665,6 +2675,9 @@ reading of the scene, and a stated number is not a reading. When the literal
 groups together exceed `max_expanded_primitives` (400 by default), the largest is
 represented first and the budget is rechecked before the next one gives way, so
 the small groups a reader could have counted stay literal.
+
+Line and arc remain unfilled, while point is a round filled mark. An explicit
+surface or variation on point remains typed unsupported.
 
 The scene-tone rule currently chooses from the abstract colors alone:
 
@@ -2727,7 +2740,7 @@ spelling and source span as provenance while its meaning is normalized to a
 signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage
 1.5 v5 view and explicit host canvas and background, requiring the corresponding
 resolved color-catalog context only when color is omitted. Independent circle,
-ellipse, cloudform, and square instructions with resolved numeric position or an
+ellipse, cloudform, square, line, arc, and point instructions with resolved numeric position or an
 original `place:center` owned by a verified direct instruction target, plus a
 place action, can lower explicit numeric geometry or the current normal / qualitative
 geometry, together with omitted count-one, pen, solid, fill, and contrast color, into an
@@ -2752,6 +2765,13 @@ aspect. Placement, region centers, and cluster centers scale with width and
 height; path travel (`margin` / `span`) and `arrangement.margin` remain fractions
 of their axes. This decision follows the single
 `inku.geometry-resolution-policy.v1` owner in §18.
+
+Finite direct geometry also includes Japanese `長さN` / `弦長N、矢高N` and
+the corresponding English `length N` / `chord N, sagitta N`. Line, arc, and
+point enter the same actual Score lowerer as the existing four closed shapes;
+point reuses `radius` or `diameter`. Japanese `点` is Point as an independent
+noun head and remains the existing stipple surface when the same phrase owns it
+as a modifier of another explicit shape head.
 
 ### The Resolution of a Number (the Master Grid)
 

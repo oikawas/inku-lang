@@ -1615,7 +1615,7 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 - `canvas`: 選ばれたキャンバス比の識別子（`square`・`golden` など）
 - `instructions`: 順序を持つ描画命令
-- primitive のフィールド: canonical exact 8であるline・circle・ellipse・triangle・square・polygon・arc・cloudformと関連する処理データ。`rectangle`は9番目のprimitiveではなく、別の作者裁定とschema / versionなしに追加しない
+- primitive のフィールド: canonical exact 9であるline・circle・ellipse・triangle・square・polygon・arc・point・cloudformと関連する処理データ。PointはCircleとは別のidentityを持つ丸いfilled markである。`rectangle`は10番目のprimitiveではなく、別の作者裁定とschema / versionなしに追加しない
 - `weight`: 素材／道具の質
 - `variation`: 目に見える揺れ・にじみ・震え・運動の挙動
 - `arrangement`: 個数・分布・経路・グループ化・密度・減衰・色循環
@@ -1627,7 +1627,7 @@ JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へのsilent rewriteをせず、拒否時のallocation / materializationは0である。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudformについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`、normalが`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
@@ -1635,15 +1635,17 @@ Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、�
 
 同じpolicyは明示angleも所有する。`horizontal=0`、`vertical=90`、`diagonal`は`45 / 135 / 225 / 315`、`rising` / `falling`はそれぞれ整数度`[-37,-23]` / `[23,37]`、`left_rising` / `left_falling`は`[203,217]` / `[143,157]`、`rotated`は各45度境界から5度を超えて離れた整数度を有限一様に選ぶ。SHA-256のangle専用domainへ、lock検証済みoriginal pre / expanded meaning digest、tag付きoptional `composition_seed`、logical occurrence、angle identityをframeして選ぶ。同じmeaningのinline / continuationは同じ選択になり、真の別occurrenceは別keyを持つ。effective focus、variation seed、render seed、raw source bytes、full-lock digestは材料にしない。
 
-Circleの回転extentは同じ半径、ellipseは理想楕円、cloudformとsquareは宣言width / heightの矩形envelopeを使う。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named focusは従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Squareのangleはdirectとflat Macro Emitの両方で同じresolverを通って`Score.rotation`へ届く。RendererとScore wireの形は変更しない。
+CircleとPointの回転extentは同じ半径、ellipseは理想楕円、cloudformとsquareは宣言width / heightの矩形envelope、LineとArcは最終的な有限端点・弧を使う。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named focusは従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Line / Arc / Squareのangleはdirectとflat Macro Emitの両方で同じresolverを通って`Score.rotation`へ届く。丸いPointの明示angleはunsupportedであり、別の回転形へ読み替えない。
 
-同じpolicyがeffective focusを`at.region`へ写す六値も所有する: `upper_right=[0.60,0.18,0.82,0.40]`、`upper_left=[0.18,0.18,0.40,0.40]`、`lower_right=[0.60,0.60,0.82,0.82]`、`lower_left=[0.18,0.60,0.40,0.82]`、`upper_edge=[0.39,0.07,0.61,0.29]`、`right_half=[0.61,0.39,0.83,0.61]`である。Named Score instructionは`center` / `position`を持たず、解決済みの`radius` / `size`と`at.region`を持つ。数値positionだけはanchorのunit intervalとshape extentのmust-fitを検査する。Named経路はregionをshape-safe範囲と交差させず、寸法の縮小、fit目的の再配置・再抽選、空intersection停止を行わない。
+同じpolicyがeffective focusを`at.region`へ写す六値も所有する: `upper_right=[0.60,0.18,0.82,0.40]`、`upper_left=[0.18,0.18,0.40,0.40]`、`lower_right=[0.60,0.60,0.82,0.82]`、`lower_left=[0.18,0.60,0.40,0.82]`、`upper_edge=[0.39,0.07,0.61,0.29]`、`right_half=[0.61,0.39,0.83,0.61]`である。既存4 closed shapeのNamed Score instructionは`center` / `position`を持たず、解決済みの`radius` / `size`と`at.region`を持つ。Line / Arc / Pointは有限な基準geometryとsemantic anchorに加えて`at.region`を持ち、Rendererがそのanchorをregionへ移す。数値positionだけはanchorのunit intervalとshape extentのmust-fitを検査する。Named経路はregionをshape-safe範囲と交差させず、寸法の縮小、fit目的の再配置・再抽選、空intersection停止を行わない。
 
-作者A裁定では見切れを許す。Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。Engine 42では、pointはcanvas各軸の正規化座標、size / radius / gapはcanvas短辺単位という既存wireを保ったまま、square / triangleのsemantic center、移動、回転pivot、performed bounds、relation、composite offset、arrangement fitを一つの物理短辺座標族で計算して各軸へ戻す。Canvasを渡さない公開helperは従来の正規化座標互換を保つ。
+作者A裁定では見切れを許す。Rendererが行うregion extentの短辺換算、performance seedによるanchor選択、基準点のunit-interval clamp（squareのtop-leftを含む）はそのままである。したがって座標補正が一切ない、またはshape全体が常に紙内に収まるという保証ではない。Engine 42では、point座標はcanvas各軸の正規化座標、size / radius / gapはcanvas短辺単位という既存wireを保ったまま、square / triangleのsemantic center、移動、回転pivot、performed bounds、relation、composite offset、arrangement fitを一つの物理短辺座標族で計算して各軸へ戻す。Engine 43ではLineの端点中点、Arcの弦中点、Pointの中心をsemantic anchorとする。Typed Arcは既存optional `position`へ弦中点を運び、field不在の旧Score Arcは円中心anchor・回転を保つ。Canvasを渡さない公開helperは従来の正規化座標互換を保つ。
 
 現行subsetでは、省略countだけを1として解決し、zero / repeated / qualitative countはmaterializeしない。Touch省略はpen、continuity省略はsolid、closed surface省略は塗りで、明示emptyは塗らず明示solidは同じ既存fill経路へ届く。色省略には、Rendererの既存`work_color_assignment` / `resolve_color`と同じ実background / black / whiteのRGB・OKLCH L観測を明示contextとして要求する。`inku-ddl`の単一policyがbackgroundとの差の大きいblack / whiteを選び、同差はblackとする。明示色はpalette contextを要求せず、その色を保つ。各instructionの明示値は独立に優先する。Stop（既定）は未対応意味が一つでもあればactual Scoreを返さない。OmitAndContinueはunsupportedなcolor / touch / continuity / surface quality / intensityを独立fieldとして省略し、実際に使ったcontrast color / pen / solid / fill、または保持した明示qualityを診断する。それ以外はsource instruction、Macro Emit / structural subtree / invocation、Ground、coordinated group、relation instructionの最小成立単位で省略する。Relationのprevious-one / twoは元source indexの意味を保持し、省略後の圧縮indexへ付け替えない。Lowering resultは使ったcanvas / background / resolved palette contextとgeometry policy digest、mode、outcome、gap、owner / span / dispositionを保持するが、元のsemantic document / canonical meaning / provenanceへdefaultやfocusを挿入しない。
 
 静けさ・膜・記憶の場面のために繰り返しを間引く**静けさの密度 governor は、個数が明示されたグループには効かない** — 静けさは場面の読み取りであり、明示された数は読み取りではないからである。文字どおりのグループが合わせて `max_expanded_primitives`（既定 400）を超えるときは、最大のものから順に代表表現へ移し、次のものが譲る前に予算を測り直す。**読み手が数えられたはずの小さなグループは文字どおりのまま残る。**
+
+Line / Arcはnormal appearanceで非fill、PointはCircleとは別identityの丸いfillになる。Pointの明示surface / variationは未裁定のためtyped unsupportedである。
 
 場面の色調の規則は、いまのところ抽象色だけから選ぶ。
 
@@ -1694,6 +1696,8 @@ Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yは
 Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、squareの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。Surface intensityは未対応のままで、Stopは止まり、Continueはintensityだけを省略してqualityを残す。Groundだけも描画内容であり、Groundを残したContinueは元の省略診断を保つ。既定のStopは文書内の未対応意味でScore全体を止める。明示OmitAndContinueはtyped診断へ元owner / spanと実際のfieldまたは実行単位の省略を残し、描画対象が残る場合だけそのScoreを成功として返す。整合性不良または全省略はstoppedである。このRust経路はruntimeにはまだ接続しない。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
+
+Direct typed DDLのfinite geometryには、JAの`長さN` / `弦長N、矢高N`と対応するEN `length N` / `chord N, sagitta N`も含む。Line / Arc / Pointは既存4 closed shapeと同じactual Score lowererへ入り、Pointは既存`半径N` / `直径N`を使う。JA `点`は独立noun headならPointであり、別の明確な形状headを修飾する同一phraseでは既存stipple surfaceのままである。
 
 ### 数値の解像度（マスターグリッド）
 

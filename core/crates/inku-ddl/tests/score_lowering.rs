@@ -31,6 +31,310 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn explicit_left_edge_reaches_actual_score() {
+    let result = stage15(
+        "place one red pen solid empty circle radius 0.1 at left-edge.",
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    let score = lowered
+        .score()
+        .expect("explicit left-edge must reach Score");
+    assert_eq!(
+        score.instructions[0].at.as_ref().unwrap().region,
+        [0.0, 0.0, 0.1, 1.0]
+    );
+}
+
+#[test]
+fn natural_japanese_named_positions_reach_actual_score() {
+    for source in ["上に、赤い円をひとつ置く。", "隅に、赤い円をひとつ置く。"]
+    {
+        let result = stage15(source, ResolvedInstructionLanguage::Ja);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}: {:?}",
+            lowered.gaps()
+        );
+    }
+}
+
+#[test]
+fn explicit_named_table_and_seven_shape_geometry_share_one_builder() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (place, expected) in [
+        ("top", [0.0, 0.0, 1.0, 1.0 / 3.0]),
+        ("bottom", [0.0, 2.0 / 3.0, 1.0, 1.0]),
+        ("left-edge", [0.0, 0.0, 0.1, 1.0]),
+        ("right-edge", [0.9, 0.0, 1.0, 1.0]),
+        ("top-edge", [0.0, 0.0, 1.0, 0.1]),
+        ("bottom-edge", [0.0, 0.9, 1.0, 1.0]),
+    ] {
+        let source = format!("place one red circle at {place}.");
+        let result = stage15(&source, ResolvedInstructionLanguage::En);
+        assert!(result.targets().is_empty());
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}: {:?}",
+            lowered.gaps()
+        );
+        assert_eq!(
+            lowered.score().unwrap().instructions[0]
+                .at
+                .as_ref()
+                .unwrap()
+                .region,
+            expected
+        );
+    }
+    for (body, place) in [
+        ("circle radius 0.8", "left-edge"),
+        ("large ellipse", "top"),
+        ("cloudform width 0.4, height 0.2", "bottom"),
+        ("vertical square", "right-edge"),
+        ("line length 0.4", "top-edge"),
+        ("arc chord 0.4, sagitta 0.1", "bottom-edge"),
+        ("point", "corner"),
+    ] {
+        let mut instructions = Vec::new();
+        for location in ["center", place] {
+            let source = format!("place one red {body} at {location}.");
+            let result = stage15(&source, ResolvedInstructionLanguage::En);
+            let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(
+                lowered.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{source}: {:?}",
+                lowered.gaps()
+            );
+            let mut instruction = lowered.score().unwrap().instructions[0].clone();
+            instruction.at = None;
+            instructions.push(instruction);
+        }
+        assert_eq!(
+            instructions[0], instructions[1],
+            "{body}: dimensions and angle remain authored"
+        );
+    }
+}
+
+#[test]
+fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (word, identity) in [
+        ("top", "top"),
+        ("left-edge", "left_edge"),
+        ("corner", "corner"),
+    ] {
+        let parameter = parameter_bound_definition();
+        let generated = stage15_locked(
+            &format!("Param.One red place {word} pencil"),
+            ResolvedInstructionLanguage::En,
+            &[parameter.clone()],
+        );
+        let mut literal = serde_json::to_value(&parameter).unwrap();
+        literal["parameters"] = serde_json::json!({});
+        let fields = &mut literal["body"][0]["fields"];
+        for (key, category, id) in [
+            ("color", "color", "red"),
+            ("movement", "movement", "place"),
+            ("place", "place", identity),
+        ] {
+            fields[key] = serde_json::json!({"expr":"semantic_ref", "category":category, "id":id});
+        }
+        let literal = MacroDefinition::from_json(&literal.to_string()).unwrap();
+        let literal = stage15_locked("Param.One", ResolvedInstructionLanguage::En, &[literal]);
+        let direct = stage15_seeded(
+            &format!("place one red circle at {word}."),
+            ResolvedInstructionLanguage::En,
+            Some(19),
+        );
+        let mut scores = Vec::new();
+        for result in [&generated, &literal, &direct] {
+            assert!(
+                result.targets().is_empty(),
+                "noncenter must never get a synthetic focus"
+            );
+            let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(
+                lowered.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{word}: {:?}",
+                lowered.gaps()
+            );
+            let again = lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(lowered.score(), again.score());
+            if !std::ptr::eq(result, &direct) {
+                assert!(matches!(
+                    &lowered.instruction_origins()[0],
+                    ScoreInstructionOrigin::MacroEmit { .. }
+                ));
+            }
+            let mut instruction = lowered.score().unwrap().instructions[0].clone();
+            if identity == "corner" {
+                assert_corner_region(instruction.at.as_ref().unwrap().region);
+                instruction.at = None; // Different logical occurrence kinds need not select the same corner.
+            }
+            scores.push(instruction);
+        }
+        assert_eq!(scores[0], scores[1]);
+        assert_eq!(scores[1], scores[2]);
+    }
+}
+
+fn assert_corner_region(region: [f64; 4]) {
+    assert!(
+        [
+            [0.0, 0.0, 0.2, 0.2],
+            [0.8, 0.0, 1.0, 0.2],
+            [0.0, 0.8, 0.2, 1.0],
+            [0.8, 0.8, 1.0, 1.0],
+        ]
+        .contains(&region)
+    );
+}
+
+#[test]
+fn noncenter_macro_relation_stays_unsupported_in_both_modes() {
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    for kind in ["connected", "touching"] {
+        for noncenter_index in [0, 1] {
+            let mut definition = serde_json::to_value(complete_flat_emit_definition()).unwrap();
+            for (index, binding) in ["first", "second"].into_iter().enumerate() {
+                definition["body"][index]["binding"] = serde_json::json!(binding);
+                definition["body"][index]["fields"]["shape"]["id"] = serde_json::json!("line");
+            }
+            definition["body"][noncenter_index]["fields"]["place"]["id"] = serde_json::json!("top");
+            definition["body"].as_array_mut().unwrap().push(
+                serde_json::json!({"op":"relation", "kind":kind, "from":"first", "to":"second"}),
+            );
+            let definition = MacroDefinition::from_json(&definition.to_string()).unwrap();
+            let result =
+                stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+            for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+                let lowered = lower_verified_stage15_score_with_policy(
+                    result.verified_effective_view(),
+                    context,
+                    policy,
+                );
+                assert!(
+                    lowered
+                        .gaps()
+                        .contains(&ScoreFieldGap::UnsupportedMacroRelation)
+                );
+                if policy == ScoreErrorPolicy::Stop {
+                    assert!(lowered.score().is_none());
+                } else {
+                    assert_eq!(lowered.score().unwrap().instructions.len(), 1);
+                    assert!(
+                        matches!(&lowered.instruction_origins()[0], ScoreInstructionOrigin::MacroEmit { provenance, .. } if provenance.generated_ordinal == 0)
+                    );
+                    assert!(lowered.diagnostics().iter().any(|d| matches!(
+                        &d.disposition,
+                        ScoreDiagnosticDisposition::Omitted {
+                            unit: ScoreOmissionUnit::MacroEmit {
+                                generated_ordinal: 1,
+                                ..
+                            },
+                            ..
+                        }
+                    )));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn corner_uses_original_meaning_and_occurrence_not_source_or_variation() {
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    let compilation = compile_typed_ddl(
+        NormalizedDdlDocument::new(
+            "place one red circle at center. place one blue circle at corner.",
+            ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap(),
+        &[],
+        Some(41),
+        LIMITS,
+    );
+    let baseline =
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let varied = transform_stage15(
+        stage15_transformation_input(&compilation).unwrap(),
+        Some(Stage15Variation {
+            amplitude: Stage15VariationAmplitude::Large,
+            seed: 99,
+        }),
+    )
+    .unwrap();
+    let a = lower_verified_stage15_score(baseline.verified_effective_view(), context);
+    let b = lower_verified_stage15_score(varied.verified_effective_view(), context);
+    assert_eq!(
+        a.score().unwrap().instructions[1],
+        b.score().unwrap().instructions[1]
+    );
+    for seed in [None, Some(0), Some(1), Some(19)] {
+        let inline = stage15_seeded("赤い円を隅に置く。", ResolvedInstructionLanguage::Ja, seed);
+        let continued = stage15_seeded(
+            "円を隅に置く。円は赤い。",
+            ResolvedInstructionLanguage::Ja,
+            seed,
+        );
+        assert_eq!(
+            inline.original_pre_expansion_digest(),
+            continued.original_pre_expansion_digest()
+        );
+        let a = lower_verified_stage15_score(inline.verified_effective_view(), context);
+        let b = lower_verified_stage15_score(continued.verified_effective_view(), context);
+        assert_eq!(a.outcome(), ScoreLoweringOutcome::Complete);
+        assert_eq!(a.score(), b.score());
+        assert_corner_region(
+            a.score().unwrap().instructions[0]
+                .at
+                .as_ref()
+                .unwrap()
+                .region,
+        );
+    }
+    let result = stage15(
+        "place two red circle at top. place one red circle at corner.",
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(lowered.score().unwrap().instructions.len(), 1);
+    assert!(matches!(
+        &lowered.instruction_origins()[0],
+        ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 1
+        }
+    ));
+    assert_corner_region(
+        lowered.score().unwrap().instructions[0]
+            .at
+            .as_ref()
+            .unwrap()
+            .region,
+    );
+}
+
+#[test]
 fn lowering_entry_requires_a_verified_stage15_effective_view() {
     fn accepts_entry_signature(
         _: for<'a> fn(VerifiedStage15EffectiveView<'a>) -> ScoreLoweringCandidate<'a>,
@@ -1846,11 +2150,6 @@ fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_sco
             "place one red pen solid empty circle with radius 0.2 at horizontal 0.1, vertical 0.5.",
             Primitive::Circle,
             ScoreFieldGap::GeometryExtentOutOfBounds,
-        ),
-        (
-            "place one red pen solid empty circle radius 0.1 at left-edge.",
-            Primitive::Circle,
-            ScoreFieldGap::UnsupportedNamedPosition,
         ),
         (
             "place one red pen solid empty circle with radius 0.0000000000000000000000000000000000000001 at horizontal 0.5, vertical 0.5.",

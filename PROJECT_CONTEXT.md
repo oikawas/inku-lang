@@ -85,7 +85,7 @@ not require an unused sidecar to resolve or execute.
 The same lock attests `inku.geometry-resolution-policy.v1`. From the verified view, the lowerer
 takes host-supplied canvas and background plus actual color-catalog observations when color is omitted.
 For circle, ellipse, cloudform, square, line, arc, and point instructions with a resolved numeric position or an
-original `place:center` owned by a verified direct `Instruction { instruction_index }` target, plus
+original `place:center` owned by a verified direct `Instruction { instruction_index }` target, or an explicit top / bottom / edge / corner, plus
 a place action, it lowers explicit numeric geometry or count-one normal geometry and the finite
 bilingual seven-class size scale, together with omitted count-one, pen, solid, fill, and
 background-contrast color, into an actual Score. Existing fill behavior for `none`, `solid`, and omitted surface
@@ -131,11 +131,17 @@ Engine 43 uses the endpoint midpoint for line, the chord midpoint for arc, and t
 semantic anchors. A typed arc carries its chord midpoint in the existing optional `position`; an old
 arc with that field absent keeps the circle-center anchor.
 
+The same policy resolves explicit top / bottom / four edges / corner to the anchor regions in SPEC §18.
+Top and bottom use thirds, edges narrow tenths, and each corner extends one fifth along each axis without changing dimensions
+or the clipping policy. Stage 2 selects a corner using original meaning, tagged composition seed, and original
+occurrence in a dedicated domain; the Renderer chooses only its anchor within the selected region.
+Exact center owners and focus joins, unsupported relation boundaries, and declared-only caller binding remain.
+
 Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
-ordinary DDL after an exact join to the execution owner and generated focus. One Emit is one
+ordinary DDL after an exact join to the execution owner and, for center only, generated focus. One Emit is one
 instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
 their order. The current subset covers the existing four closed shapes plus line, arc, and point,
-explicit `place`, exact `center`,
+explicit `place`, `center` or explicit top / bottom / four edges / corner,
 optional attributes from their same-named categories, and omitted count or Integer one. Under Stop,
 an unbound caller fact, structural node, incomplete or unknown Emit, or type mismatch stops the
 entire Score. Under Continue, an unbound caller appearance field is omitted while definition values
@@ -168,8 +174,7 @@ Global budgets and source, lock, owner, definition, or provenance integrity fail
 
 No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
 above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
-compatibility paths, not the canonical semantic specification. Unspecified and non-center named
-placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
+compatibility paths, not the canonical semantic specification. Unspecified placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
 delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
 public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
 compilation. Reaching Step10P does not complete Step10 as a whole. Product UI, API, and persistence

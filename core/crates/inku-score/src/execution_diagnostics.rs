@@ -32,6 +32,7 @@ pub struct ScoreExecutionDiagnostic {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ScoreExecutionSummary {
+    pub input_score_digest: String,
     pub diagnostics: Vec<ScoreExecutionDiagnostic>,
     pub rendered_instruction_indices: Vec<usize>,
 }

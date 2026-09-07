@@ -106,6 +106,52 @@ fn composite_square_members_keep_their_physical_offset_on_a_wide_canvas() {
 }
 
 #[test]
+fn connected_elsewhere_preserves_legacy_composite_member_expansion_and_owner_indices() {
+    let canvas = CanvasSize::new(1_000.0, 500.0);
+    let composite = score(
+        r#"{"instructions":[
+        {"primitive":"square","position":[0.35,0.4],"size":[0.2,0.2],"weight":"pencil",
+         "arrangement":{"count":2,"group_size":2,"layout":"radial","center":[0.5,0.5],
+                        "radius":0.25,"color_cycle":["blue","red"]}},
+        {"primitive":"circle","center":[0.45,0.5],"radius":0.03,"weight":"pencil"}
+        ]}"#,
+    );
+    let legacy = resolve_performance(PerformanceRequest {
+        score: &composite,
+        performance_seed: Some(41),
+        composition_seed: Some(17),
+        canvas: Some(canvas),
+    });
+    assert_eq!(legacy.score.instructions.len(), 4);
+
+    let mut connected_input = composite;
+    connected_input.instructions.extend(
+        score(
+            r#"{"instructions":[
+            {"primitive":"line","from":[0.1,0.8],"to":[0.3,0.8]},
+            {"primitive":"line","from":[0.6,0.8],"to":[0.8,0.8],
+             "relation":{"type":"connected","target_instruction_index":2,
+                         "position_authority":"named_movable"}}
+            ]}"#,
+        )
+        .instructions,
+    );
+    let checked = resolve_checked_performance(
+        PerformanceRequest {
+            score: &connected_input,
+            performance_seed: Some(41),
+            composition_seed: Some(17),
+            canvas: Some(canvas),
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("Connected outside the composite remains performable");
+
+    assert_eq!(&checked.score.instructions[..4], &legacy.score.instructions);
+    assert_eq!(checked.instruction_indices, [0, 1, 0, 1, 2, 3]);
+}
+
+#[test]
 fn grid_relation_is_dropped_with_structured_warning() {
     let input = score(
         r#"{"instructions":[{"primitive":"square","position":[0.4,0.4],"size":[0.1,0.1],

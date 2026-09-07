@@ -1,14 +1,17 @@
 use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
-    MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, ScoreDiagnosticDisposition, ScoreErrorPolicy, ScoreFieldGap,
-    ScoreInstructionOrigin, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
-    SemanticPreviousReference, SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl,
-    map_compiler_render_execution, saijiki_asset, stage15_transformation_input,
+    CompilerRenderExecutionError, MacroDefinition, MacroExpansionLimits, MacroLock,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticDisposition,
+    ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin, ScoreLoweringContext,
+    ScoreLoweringOutcome, ScoreOmissionUnit, SemanticPreviousReference, SemanticRelationKind,
+    compile_ddl_to_score, compile_typed_ddl, map_compiler_render_execution, saijiki_asset,
+    stage15_transformation_input,
 };
+use inku_render::checked_performance::resolve_checked_performance;
+use inku_render::performance::PerformanceRequest;
 use inku_score::{
     Canvas, Color, GroundMaterial, Primitive, RelationType, ScoreExecutionDiagnostic,
-    ScoreExecutionDisposition, ScoreExecutionReason, ScoreExecutionSummary,
+    ScoreExecutionDisposition, ScoreExecutionReason, ScoreExecutionSummary, canonical_score_digest,
 };
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -594,6 +597,7 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
     );
     let score = result.score().unwrap();
     let summary = ScoreExecutionSummary {
+        input_score_digest: canonical_score_digest(score).unwrap(),
         diagnostics: vec![ScoreExecutionDiagnostic {
             instruction_index: 1,
             dependency_instruction_index: Some(0),
@@ -630,8 +634,12 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
         ScoreErrorPolicy::Stop,
     );
     let macro_score = macro_result.score().unwrap();
+    let macro_summary = ScoreExecutionSummary {
+        input_score_digest: canonical_score_digest(macro_score).unwrap(),
+        ..summary
+    };
     let macro_joined =
-        map_compiler_render_execution(&macro_result, macro_score, Some(&summary)).unwrap();
+        map_compiler_render_execution(&macro_result, macro_score, Some(&macro_summary)).unwrap();
     assert!(matches!(
         &macro_joined.diagnostics[0].owner,
         ScoreInstructionOrigin::MacroEmit {
@@ -639,6 +647,57 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
             ..
         } if binding.local_name == "second"
     ));
+}
+
+#[test]
+fn checked_render_owner_join_rejects_a_summary_produced_from_another_score() {
+    let compilation_a = execute(
+        concat!(
+            "place one red line at center. ",
+            "place one blue line at center connected to the previous shape."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let compilation_b = execute(
+        concat!(
+            "place one green line at center. ",
+            "place one yellow line at center connected to the previous shape."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let mut score_b = compilation_b.score().unwrap().clone();
+    score_b.instructions[1]
+        .relation
+        .as_mut()
+        .unwrap()
+        .position_authority = None;
+    let rendered_b = resolve_checked_performance(
+        PerformanceRequest {
+            score: &score_b,
+            performance_seed: None,
+            composition_seed: None,
+            canvas: None,
+        },
+        ScoreErrorPolicy::OmitAndContinue,
+    )
+    .expect("B retains its independent first instruction");
+    let summary_b = rendered_b
+        .execution
+        .as_ref()
+        .expect("B records its omission");
+
+    assert_eq!(
+        map_compiler_render_execution(
+            &compilation_a,
+            compilation_a.score().unwrap(),
+            Some(summary_b),
+        ),
+        Err(CompilerRenderExecutionError::ScoreIdentityMismatch)
+    );
 }
 
 #[test]

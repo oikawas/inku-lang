@@ -42,6 +42,9 @@ pub fn map_compiler_render_execution(
     if compiled_digest != rendered_digest {
         return Err(CompilerRenderExecutionError::ScoreIdentityMismatch);
     }
+    if summary.is_some_and(|summary| summary.input_score_digest != compiled_digest) {
+        return Err(CompilerRenderExecutionError::ScoreIdentityMismatch);
+    }
     if execution.instruction_origins().len() != rendered_score.instructions.len() {
         return Err(CompilerRenderExecutionError::InstructionOriginCountMismatch);
     }

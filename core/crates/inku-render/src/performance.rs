@@ -21,7 +21,10 @@ pub struct PerformanceRequest<'a> {
 pub struct PerformancePlan {
     pub score: Score,
     pub warnings: Vec<PlanningWarning>,
+    /// Pre-omission expanded ordinals used by drawing IDs and seed material.
     pub instruction_indices: Vec<usize>,
+    /// Original Score owners corresponding to each performed instruction.
+    pub original_instruction_indices: Vec<usize>,
     pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
@@ -151,7 +154,7 @@ pub(crate) fn expand_composite_groups_with_indices(
 #[must_use]
 pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     let placement_seed = request.composition_seed.or(request.performance_seed);
-    let (expanded, _) = expand_composite_groups_with_indices(
+    let (expanded, original_instruction_indices) = expand_composite_groups_with_indices(
         request.score,
         placement_seed,
         request.performance_seed,
@@ -160,6 +163,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     let Some(seed) = request.performance_seed else {
         return PerformancePlan {
             instruction_indices: (0..expanded.instructions.len()).collect(),
+            original_instruction_indices,
             score: expanded,
             warnings: Vec::new(),
             execution: None,
@@ -199,6 +203,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
         score,
         warnings,
         instruction_indices,
+        original_instruction_indices,
         execution: None,
     }
 }

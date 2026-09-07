@@ -148,7 +148,38 @@ fn connected_elsewhere_preserves_legacy_composite_member_expansion_and_owner_ind
     .expect("Connected outside the composite remains performable");
 
     assert_eq!(&checked.score.instructions[..4], &legacy.score.instructions);
-    assert_eq!(checked.instruction_indices, [0, 1, 0, 1, 2, 3]);
+    assert_eq!(checked.instruction_indices, [0, 1, 2, 3, 4, 5]);
+    assert_eq!(checked.original_instruction_indices, [0, 1, 0, 1, 2, 3]);
+
+    let mut continued_input = connected_input;
+    continued_input.instructions[3]
+        .relation
+        .as_mut()
+        .unwrap()
+        .position_authority = Some(inku_render::types::ConnectedPositionAuthority::NumericFixed);
+    continued_input.instructions.extend(
+        score(r#"{"instructions":[{"primitive":"point","center":[0.8,0.2],"radius":0.006}]}"#)
+            .instructions,
+    );
+    let continued = resolve_checked_performance(
+        PerformanceRequest {
+            score: &continued_input,
+            performance_seed: Some(41),
+            composition_seed: Some(17),
+            canvas: Some(canvas),
+        },
+        ScoreErrorPolicy::OmitAndContinue,
+    )
+    .expect("independent instruction remains after the failed Connected current");
+    assert_eq!(continued.instruction_indices, [0, 1, 2, 3, 4, 6]);
+    assert_eq!(continued.original_instruction_indices, [0, 1, 0, 1, 2, 4]);
+    assert_eq!(
+        continued
+            .execution
+            .expect("omission summary")
+            .rendered_instruction_indices,
+        [0, 1, 0, 1, 2, 4]
+    );
 }
 
 #[test]

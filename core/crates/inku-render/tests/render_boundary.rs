@@ -257,6 +257,62 @@ fn connected_stop_returns_no_output_and_continue_reports_original_indices() {
 }
 
 #[test]
+fn connected_elsewhere_keeps_composite_svg_ids_on_expanded_drawing_ordinals() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"instructions":[
+            {"primitive":"square","position":[0.35,0.4],"size":[0.2,0.2],"weight":"pencil",
+             "arrangement":{"count":2,"group_size":2,"layout":"radial","center":[0.5,0.5],
+                            "radius":0.25,"color_cycle":["blue","red"]}},
+            {"primitive":"circle","center":[0.45,0.5],"radius":0.03,"weight":"pencil"},
+            {"primitive":"line","from":[0.1,0.8],"to":[0.3,0.8]},
+            {"primitive":"line","from":[0.6,0.8],"to":[0.8,0.8],
+             "relation":{"type":"connected","target_instruction_index":2,
+                         "position_authority":"numeric_fixed"}},
+            {"primitive":"point","center":[0.8,0.2],"radius":0.006}
+            ]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1_000.0, 500.0),
+            canvas_aspect_id: "wide".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(41),
+            composition_seed: Some(17),
+            wild: false,
+            error_policy: inku_render::types::ScoreErrorPolicy::OmitAndContinue,
+        },
+    };
+
+    let output = render(request).expect("composite and independent Connected pair render");
+    for id in [
+        "instruction_000_square_blue",
+        "instruction_001_circle_blue",
+        "instruction_002_square_red",
+        "instruction_003_circle_red",
+        "instruction_004_line_black",
+        "instruction_006_point_black",
+        "mark_000_000_square",
+        "mark_001_000_circle",
+        "mark_002_000_square",
+        "mark_003_000_circle",
+        "mark_004_000_line",
+        "mark_006_000_point",
+    ] {
+        assert_eq!(
+            output.svg.matches(&format!("id=\"{id}\"")).count(),
+            1,
+            "missing or duplicate SVG id {id}"
+        );
+    }
+    assert!(!output.svg.contains("instruction_005_line_black"));
+    assert!(!output.svg.contains("mark_005_000_line"));
+    let execution = output.metadata.execution.expect("typed Connected omission");
+    assert_eq!(execution.rendered_instruction_indices, [0, 1, 0, 1, 2, 4]);
+}
+
+#[test]
 fn abstract_presence_is_emitted_in_its_owned_layer() {
     let request = RenderRequest {
         score: score(

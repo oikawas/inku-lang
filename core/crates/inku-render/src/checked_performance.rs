@@ -86,7 +86,7 @@ pub fn resolve_checked_performance(
     let seed = request.performance_seed;
     let relation_seed = seed.unwrap_or_default();
     let placement_seed = request.composition_seed.or(request.performance_seed);
-    let (expanded, original_instruction_indices) = expand_composite_groups_with_indices(
+    let (expanded, expanded_original_instruction_indices) = expand_composite_groups_with_indices(
         request.score,
         placement_seed,
         request.performance_seed,
@@ -99,10 +99,11 @@ pub fn resolve_checked_performance(
         vec![None; request.score.instructions.len()];
     let mut resolved = Vec::with_capacity(expanded.instructions.len());
     let mut instruction_indices = Vec::with_capacity(expanded.instructions.len());
+    let mut original_instruction_indices = Vec::with_capacity(expanded.instructions.len());
     let mut warnings = Vec::new();
     let mut diagnostics = Vec::new();
 
-    for (performance_index, (original_index, original)) in original_instruction_indices
+    for (performance_index, (original_index, original)) in expanded_original_instruction_indices
         .iter()
         .copied()
         .zip(&expanded.instructions)
@@ -255,7 +256,8 @@ pub fn resolve_checked_performance(
             }
         }
         by_original_index[original_index] = Some(instruction.clone());
-        instruction_indices.push(original_index);
+        instruction_indices.push(performance_index);
+        original_instruction_indices.push(original_index);
         resolved.push(instruction);
     }
 
@@ -277,12 +279,13 @@ pub fn resolve_checked_performance(
         input_score_digest: canonical_score_digest(request.score)
             .expect("typed Score canonicalization is infallible"),
         diagnostics,
-        rendered_instruction_indices: instruction_indices.clone(),
+        rendered_instruction_indices: original_instruction_indices.clone(),
     });
     Ok(PerformancePlan {
         score,
         warnings,
         instruction_indices,
+        original_instruction_indices,
         execution,
     })
 }

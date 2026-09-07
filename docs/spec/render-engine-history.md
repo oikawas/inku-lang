@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **42** | Step 10O square physical coordinates | — | 2026-09-07 | 610 | **0** | **610** |
 | **41** | Rust migration baseline | — | 2026-08-24 | 610 | **610** | **0** |
 | **40** | v2.13.46 | 935 | 2026-08-21 | 610 | **4** | **606** |
 | **39** | v2.13.45 | 934 | 2026-08-21 | 606 | **5** | **601** |
@@ -139,7 +140,7 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `39` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `42` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `20` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
@@ -422,6 +423,26 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 42 — align square physical anchors and rotation centres on non-square canvases
+
+Engine 42 converts the two units already present in a Score—positions as fractions of each canvas
+axis and sizes as fractions of the short side—into one physical coordinate system for closed-shape
+anchors, moves, rotation centres, performed bounds, relations, composites, and arrangements. Square
+angles from ordinary DDL and flat macros now reach the same Score path, and a numeric position checks
+that the declared rectangle still fits after rotating about its centre.
+
+`server/reference/render-engine-42/manifest.json` was frozen on 2026-09-07 from source commit
+`2ad5313223d47e327a812a5db6cbed9e71fe769c`. Across the same 610 cases as Engine 41, zero normalized
+digests differ and `changed_from_previous` is empty. Under the changed-only storage rule, the only new
+physical path in this version's directory is the manifest. This proves only that the normalized
+outputs of those 610 existing inputs did not change. It does not claim that every possible input is
+unchanged or that every raw SVG byte is identical.
+
+A direct regression covers the boundary absent from the existing corpus. On a 1000×500 canvas, a
+square at position `(0.45, 0.4)`, short-side size `(0.2, 0.2)`, and rotation 30 has top-left
+`(450, 200)`, side length 100, and physical centre `(500, 250)`. The Linux native check confirmed the
+exact SVG transform `rotate(30 500 250)`.
 
 ## engine 41 — migration baseline for moving the render core to Rust
 

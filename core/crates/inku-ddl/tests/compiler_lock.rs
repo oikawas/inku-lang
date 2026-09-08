@@ -74,7 +74,7 @@ const V15_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V15_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "20dabf80fa0a7e3a326fddd9e94f19bc95a01c74eb3f7c3329dc18804e479ab3";
 const V15_FULL_LOCK_KNOWN_ANSWER: &str =
-    "9bdbce636e4421a1f38e5dc7bc4c5dc7b81d915bac12160a9232819ee013a5fc";
+    "34e68a3f715f4988d4194eda908d26822967ebe0c52eab3b5f88afad05b33043";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,

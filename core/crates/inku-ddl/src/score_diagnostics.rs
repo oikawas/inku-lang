@@ -40,6 +40,9 @@ pub enum ScoreFieldGap {
     GeometryDimensionMismatch {
         primitive: inku_score::Primitive,
     },
+    ShapeConstraintMismatch {
+        primitive: inku_score::Primitive,
+    },
     UnsupportedColorIdentity {
         category: String,
         id: String,

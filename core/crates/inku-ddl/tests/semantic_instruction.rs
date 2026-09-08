@@ -12,6 +12,28 @@ use inku_ddl::{
 use serde::Deserialize;
 
 #[test]
+fn constrained_shape_and_quantity_have_separate_exact_owners() {
+    let result = associate_semantic_instructions(
+        &NormalizedDdlDocument::new(
+            "place three red hexagon at center.",
+            ResolvedInstructionLanguage::En,
+            vec![],
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(result.ast.complete);
+    let entity = &result.ast.instructions[0].entity;
+    let constraint = entity.shape_constraint.as_ref().unwrap();
+    assert_eq!(constraint.value.sides, Some(6));
+    assert_eq!(entity.quantity.as_ref().unwrap().value, 3);
+    assert_ne!(
+        constraint.provenance.span,
+        entity.quantity.as_ref().unwrap().provenance.span
+    );
+}
+
+#[test]
 fn shape_angle_and_action_direction_have_distinct_exact_owners() {
     for (language, source) in [
         (

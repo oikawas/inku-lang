@@ -10,6 +10,40 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_total_nodes: 500,
 };
 
+#[test]
+fn repeated_shape_constraints_keep_exact_dimensions_without_materialization() {
+    for source in [
+        "scatter 4294967295 red equilateral triangle at center.",
+        "line-up 4294967295 red wide rectangle at center.",
+        "tile 4294967295 red hexagon at center.",
+    ] {
+        let transformed = stage(source, ResolvedInstructionLanguage::En, &[]);
+        let plan = plan_verified_stage15(transformed.verified_effective_view(), context("wide"));
+        let objects = plan
+            .objects()
+            .unwrap_or_else(|| panic!("{source}: {:?}", plan.diagnostics()));
+        assert_eq!(objects.len(), 1);
+        assert_eq!(objects[0].count(), u32::MAX);
+        match objects[0].dimensions() {
+            ResolvedGeometryDimensions::RegularTriangle { side } => ratio(side, 6, 25),
+            ResolvedGeometryDimensions::Bbox { width, height } => {
+                ratio(width, 6, 25);
+                ratio(height, 3, 25);
+            }
+            ResolvedGeometryDimensions::Polygon { radius, sides } => {
+                ratio(radius, 3, 25);
+                assert_eq!(sides, 6);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        assert!(
+            lower_verified_stage15_score(transformed.verified_effective_view(), context("wide"))
+                .score()
+                .is_none()
+        );
+    }
+}
+
 fn compile(
     source: &str,
     language: ResolvedInstructionLanguage,
@@ -423,6 +457,8 @@ fn seven_shapes_retain_normal_aspect_and_thinness_is_separate() {
         ("circle", Primitive::Circle),
         ("ellipse", Primitive::Ellipse),
         ("square", Primitive::Square),
+        ("triangle", Primitive::Triangle),
+        ("polygon", Primitive::Polygon),
         ("arc", Primitive::Arc),
         ("cloudform", Primitive::Cloudform),
         ("point", Primitive::Point),
@@ -435,6 +471,15 @@ fn seven_shapes_retain_normal_aspect_and_thinness_is_separate() {
             .unwrap_or_else(|| panic!("{word}: {:?}", result.diagnostics()))[0];
         assert_eq!(object.primitive(), primitive);
         match object.dimensions() {
+            ResolvedGeometryDimensions::Bbox { width, height } => {
+                ratio(width, 6, 25);
+                ratio(height, 6, 25);
+            }
+            ResolvedGeometryDimensions::RegularTriangle { side } => ratio(side, 6, 25),
+            ResolvedGeometryDimensions::Polygon { radius, sides } => {
+                ratio(radius, 3, 25);
+                assert_eq!(sides, 5);
+            }
             ResolvedGeometryDimensions::Line { length } => ratio(length, 6, 25),
             ResolvedGeometryDimensions::Circle { radius } => ratio(radius, 3, 25),
             ResolvedGeometryDimensions::Point { radius } => ratio(radius, 3, 500),
@@ -697,7 +742,7 @@ fn integer_parameter_and_local_counts_keep_existing_type_and_binding_checks() {
 #[test]
 fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
     let transformed = stage(
-        "scatter four red triangle at center. scatter eight red circle at center. scatter four red polygon at center.",
+        "scatter four red wide equilateral triangle at center. scatter eight red circle at center. scatter four red sides 9 polygon at center.",
         ResolvedInstructionLanguage::En,
         &[],
     );
@@ -723,7 +768,7 @@ fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
     );
     assert_eq!(continued.diagnostics().len(), 2);
     let all_gap = stage(
-        "scatter four red triangle at center.",
+        "scatter four red wide equilateral triangle at center.",
         ResolvedInstructionLanguage::En,
         &[],
     );

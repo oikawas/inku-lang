@@ -24,6 +24,7 @@ pub enum CoreRoleKind {
 /// One typed Saijiki row at its exact source location.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoreRoleTerm {
+    pub shape_constraint: Option<crate::ShapeConstraint>,
     pub role: CoreRoleKind,
     pub asset_id: String,
     pub category_key: String,
@@ -100,6 +101,21 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
     let mut deferred_tokens = Vec::new();
 
     for token in tokens {
+        if let NeutralTokenKind::ConstrainedShape {
+            canonical_surface_ja,
+            constraint,
+        } = &token.kind
+        {
+            typed_roles.push(CoreRoleTerm {
+                role: CoreRoleKind::Primitive,
+                asset_id: format!("word:katachi:{canonical_surface_ja}"),
+                category_key: "katachi".to_owned(),
+                canonical_surface_ja: canonical_surface_ja.clone(),
+                shape_constraint: Some(*constraint),
+                span: token.span,
+            });
+            continue;
+        }
         if let NeutralTokenKind::CoreModifier(identity) = &token.kind {
             core_modifiers.push(CoreModifierTerm {
                 identity: *identity,
@@ -109,7 +125,8 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
         }
         let role = match &token.kind {
             NeutralTokenKind::SaijikiWord { category_key, .. } => role_for_category(category_key),
-            NeutralTokenKind::CoreModifier(_)
+            NeutralTokenKind::ConstrainedShape { .. }
+            | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord
@@ -130,6 +147,7 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
             unreachable!("only Saijiki words map to core roles");
         };
         typed_roles.push(CoreRoleTerm {
+            shape_constraint: None,
             role,
             asset_id,
             category_key,
@@ -173,7 +191,8 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
             NeutralTokenKind::SaijikiWord { category_key, .. } => {
                 remaining_role_for_category(category_key)
             }
-            NeutralTokenKind::CoreModifier(_)
+            NeutralTokenKind::ConstrainedShape { .. }
+            | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
             | NeutralTokenKind::FunctionWord

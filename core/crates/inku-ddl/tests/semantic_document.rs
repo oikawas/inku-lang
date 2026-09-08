@@ -15,6 +15,58 @@ use serde::Deserialize;
 const FIXTURE: &str = include_str!("fixtures/semantic-document-v14.json");
 
 #[test]
+fn shape_constraints_keep_base_head_continuation_and_canonical_meaning() {
+    for (inline, continuation, primitive, sides) in [
+        (
+            "赤い正三角形を中央に置く。",
+            "正三角形を中央に置く。三角は赤い。",
+            "triangle",
+            None,
+        ),
+        (
+            "赤い六角形を中央に置く。",
+            "六角形を中央に置く。多角形は赤い。",
+            "polygon",
+            Some(6),
+        ),
+    ] {
+        let build = |source| {
+            associate_semantic_document(
+                &NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, vec![])
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+        let inline = build(inline);
+        let continuation = build(continuation);
+        assert!(inline.ast.complete && continuation.ast.complete);
+        assert_eq!(inline.canonical_bytes, continuation.canonical_bytes);
+        let entity = &continuation.ast.instructions[0].entity;
+        let SemanticHead::Primitive(head) = &entity.head else {
+            panic!("primitive")
+        };
+        assert_eq!(head.identity.id, primitive);
+        assert_eq!(entity.shape_constraint.as_ref().unwrap().value.sides, sides);
+    }
+}
+
+#[test]
+fn explicit_polygon_sides_and_named_polygon_share_regular_meaning() {
+    let build = |source| {
+        associate_semantic_document(
+            &NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![]).unwrap(),
+        )
+        .unwrap()
+    };
+    let named = build("place one red hexagon at center.");
+    let counted = build("place one red sides 6 polygon at center.");
+    assert!(named.ast.complete && counted.ast.complete);
+    assert_eq!(named.canonical_bytes, counted.canonical_bytes);
+    let conflict = build("place one red hexagon at center. the polygon sides 7.");
+    assert!(!conflict.ast.complete);
+}
+
+#[test]
 fn layout_direction_continuation_has_same_meaning_and_distinct_source() {
     for (language, inline, continuation) in [
         (

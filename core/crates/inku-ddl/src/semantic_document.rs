@@ -748,6 +748,27 @@ fn apply_continuation_occurrence(
     occurrence: &OwnedSemanticOccurrence,
 ) -> bool {
     match occurrence {
+        OwnedSemanticOccurrence::ShapeConstraint(value) => {
+            if let Some(existing) = &mut instruction.entity.shape_constraint {
+                if existing.value.sides.is_some()
+                    && value.value.sides.is_some()
+                    && existing.value.sides != value.value.sides
+                {
+                    return false;
+                }
+                existing.value.regular |= value.value.regular;
+                existing.value.sides = existing.value.sides.or(value.value.sides);
+                existing
+                    .additional_provenance
+                    .push(value.provenance.clone());
+                existing
+                    .additional_provenance
+                    .extend(value.additional_provenance.clone());
+                true
+            } else {
+                set_if_empty(&mut instruction.entity.shape_constraint, value)
+            }
+        }
         OwnedSemanticOccurrence::Color(term) => set_if_empty(&mut instruction.entity.color, term),
         OwnedSemanticOccurrence::Thinness(value) => {
             set_if_empty(&mut instruction.entity.thinness, value)
@@ -909,6 +930,7 @@ fn continuation_marker(
 fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
     let entity = &instruction.entity;
     entity.color.is_some()
+        || entity.shape_constraint.is_some()
         || entity.thinness.is_some()
         || entity.relative_scale.is_some()
         || entity.touch.is_some()
@@ -964,6 +986,10 @@ fn predicate_is_compatible(
     let left = &target.entity;
     let right = &continuation.entity;
     option_is_mergeable(&left.color, &right.color)
+        && match (&left.shape_constraint, &right.shape_constraint) {
+            (Some(left), Some(right)) => left.compatible(right),
+            _ => true,
+        }
         && option_is_mergeable(&left.thinness, &right.thinness)
         && option_is_mergeable(&left.relative_scale, &right.relative_scale)
         && option_is_mergeable(&left.explicit_geometry, &right.explicit_geometry)
@@ -991,6 +1017,13 @@ fn option_is_mergeable<T>(left: &Option<T>, right: &Option<T>) -> bool {
 }
 
 fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInstruction) {
+    if let Some(right) = &continuation.entity.shape_constraint {
+        if let Some(left) = &mut target.entity.shape_constraint {
+            left.merge(right);
+        } else {
+            target.entity.shape_constraint = Some(right.clone());
+        }
+    }
     merge_option(&mut target.entity.color, &continuation.entity.color);
     merge_option(&mut target.entity.thinness, &continuation.entity.thinness);
     merge_option(

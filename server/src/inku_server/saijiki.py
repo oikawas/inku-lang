@@ -136,8 +136,8 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         words=(
             _w("円", "circle"),
             _w("楕円", "ellipse"),
-            _w("三角", "triangle"),
-            _w("四角", "square"),
+            _w("三角", "triangle", parser_surfaces_ja=("三角形",)),
+            _w("四角", "square", parser_surfaces_ja=("四角形", "長方形"), parser_surfaces_en=("rectangle",)),
             _w("線", "line", parser_surfaces_en=("lines",)),
             _w("弧", "arc"),
             _w("点", "point"),
@@ -349,8 +349,8 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_en="proportions",
         marker_class="ratio",
         words=(
-            _w("縦長", "tall"),
-            _w("横長", "wide"),
+            _w("縦長", "tall", parser_surfaces_ja=("縦に長い", "細長い")),
+            _w("横長", "wide", parser_surfaces_ja=("横に長い",)),
             _w("全幅", "full-width"),
             _w("半幅", "half-width"),
             _w("半円", "semicircle"),

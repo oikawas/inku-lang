@@ -54,7 +54,7 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 ### 受入済みのTyped DDL基盤（runtime未接続）
 
-Verified Stage 1.5からの共有object placement plan APIは、通常DDLと宣言済みflat Macroのline-up / scatter / tileを、一instruction / 一Emitにつき一件の解決済みplanへ届ける。数量省略は8（placeは1）、sizeはcount非依存のcanvas短辺基準で既存normal / 大小倍率を共有する。Line-upはshape angleと独立したaction-side layout_directionから横 / 縦 / 物理45度の列を解決し、省略は従来の横一列とする。方向のidentityとexact軸を保ち、bare diagonalだけが元meaning・attestされたoptional composition seed・元occurrenceの専用roleで二軸から選ぶ。日英source、single-head continuation、宣言済みMacro Emitへ接続し、未対応action / group方向や未宣言caller方向を黙って捨てない。物理aspectに沿うtile行列、performance seedを後続へ要求するscatter重心移動recipeも持ち、個体配列・乱数・Score化は実行しない。全shape共通原則のうちline / circle / ellipse / square / arc / cloudform / pointの7shapeを実deliveryし、Triangle / Polygonはownerを保つ明示geometry gapである。元のexact geometry・外観・angle・位置・originとStop / Continueを保ち、Ready planと既存Score成功を区別する。残geometry、whole Step10、Step11の個体materializationとruntime / UI / 保存cutoverは未完了である。詳細はSPEC §12末尾。
+Verified Stage 1.5からの共有object placement plan APIは、通常DDLと宣言済みflat Macroのline-up / scatter / tileを、一instruction / 一Emitにつき一件の解決済みplanへ届ける。数量省略は8（placeは1）、sizeはcount非依存のcanvas短辺基準で既存normal / 大小倍率を共有する。Line-upはshape angleと独立したaction-side layout_directionから横 / 縦 / 物理45度の列を解決し、省略は従来の横一列とする。方向のidentityとexact軸を保ち、bare diagonalだけが元meaning・attestされたoptional composition seed・元occurrenceの専用roleで二軸から選ぶ。日英source、single-head continuation、宣言済みMacro Emitへ接続し、未対応action / group方向や未宣言caller方向を黙って捨てない。物理aspectに沿うtile行列、performance seedを後続へ要求するscatter重心移動recipeも持ち、個体配列・乱数・Score化は実行しない。9primitiveは同じresolverへ届き、triangle / squareの縦長・横長、正三角 / 正方形、五〜八角形の制約もbase headと別に保持する。通常三角はnormal幅=高さ6/25、aspectは長辺6/25×size係数と短辺半分、正三角はexact sideと高さs√3/2の固定規則、polygonは外接円半径と省略5辺を使う。元のexact geometry・外観・angle・位置・originとStop / Continueを保ち、place / count1のactual Scoreと反復のReady planを区別する。Whole Step10、Step11の個体materializationとruntime / UI / 保存cutoverは未完了である。詳細はSPEC §12末尾。
 
 通常DDLと宣言済みflat Macroの明示揺らぎは、三次元の共通resolverから既存Scoreへ届く。8語写像と一slot以上の不足値Medium / Medium / Perlin、全省略None、PositionX + PositionYはSPEC §13.6に従う。Line / Arc / circle / ellipse / square / cloudformが対象でPointは拒否する。Macroはvariation categoryにoptional dimension制約を持ち、三つのfluctuation Emit keysへ届ける。旧None schemaのidentityは保ち、宣言必須parameterの不足をdefaultで埋めない。Source / generated ownerと既存Stop / Continue単位を保つ。Whole Step10とruntime / UI / 保存cutoverは未完了である。
 
@@ -78,7 +78,7 @@ Stage 1.5の入場では、実際のvisible source bytes、存在する言語証
 同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
 canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
 direct `Instruction { instruction_index }` ownerを持つ元`place:center`、明示した上・下・四辺・隅と、place actionが解決済みの
-circle / ellipse / cloudform / square / line / arc / pointでは、明示numeric geometryに加え、count1のnormal geometryと
+circle / ellipse / cloudform / square / triangle / polygon / line / arc / pointでは、明示numeric geometryに加え、count1のnormal geometryと
 日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
 `solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
 7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
@@ -120,7 +120,7 @@ Engine 43はLineの端点中点、Arcの弦中点、Pointの中心をsemantic an
 
 Finiteなflat Macro Emitも、exact execution ownerと、centerの場合だけexact generated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
-`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは既存4つのclosed shapeとline / arc / point、明示`place`、
+`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは6つのclosed shapeとline / arc / point、明示`place`、
 `center`または明示top / bottom / 四辺 / corner、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
 構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
 field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない

@@ -114,6 +114,7 @@ pub enum SemanticDeliveryOwner {
     FluctuationFrequency,
     FluctuationQuality,
     ProportionAspect,
+    ShapeConstraint,
     ProportionWidthExtent,
     ProportionArcForm,
     Action,
@@ -146,6 +147,7 @@ impl SemanticDeliveryOwner {
             Self::FluctuationFrequency => "fluctuation_frequency",
             Self::FluctuationQuality => "fluctuation_quality",
             Self::ProportionAspect => "proportion_aspect",
+            Self::ShapeConstraint => "shape_constraint",
             Self::ProportionWidthExtent => "proportion_width_extent",
             Self::ProportionArcForm => "proportion_arc_form",
             Self::Action => "action",
@@ -962,6 +964,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::ConflictingFluctuationAmplitudes
             | SemanticAssociationIssueKind::ConflictingFluctuationFrequencies
             | SemanticAssociationIssueKind::ConflictingFluctuationQualities
+            | SemanticAssociationIssueKind::ConflictingShapeConstraints
             | SemanticAssociationIssueKind::ConflictingProportionAspects
             | SemanticAssociationIssueKind::ConflictingProportionWidthExtents
             | SemanticAssociationIssueKind::ConflictingProportionArcForms
@@ -1501,6 +1504,21 @@ fn project_instruction_excluding_claims(
 }
 
 fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mut Projection) {
+    if let Some(constraint) = &instruction.entity.shape_constraint {
+        for source in
+            std::iter::once(&constraint.provenance).chain(&constraint.additional_provenance)
+        {
+            add_explicit(
+                projection,
+                source.span,
+                SemanticDeliveryOwner::ShapeConstraint,
+                format!(
+                    "regular:{};sides:{:?}",
+                    constraint.value.regular, constraint.value.sides
+                ),
+            );
+        }
+    }
     match &instruction.entity.head {
         SemanticHead::Primitive(term) => {
             add_term_explicit(projection, SemanticDeliveryOwner::EntityHead, term)
@@ -1673,6 +1691,9 @@ fn semantic_macro_parameter_value_key(value: &SemanticMacroParameterValue) -> St
 
 fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
     match occurrence {
+        OwnedSemanticOccurrence::ShapeConstraint(value) => {
+            format!("shape_constraint:{:?}", value.value)
+        }
         OwnedSemanticOccurrence::Head(SemanticHead::Primitive(term)) => {
             format!("head:{}", term_key(term))
         }
@@ -2396,6 +2417,10 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         entity: &'a crate::SemanticEntity,
     ) {
         push_head(occurrences, &entity.head);
+        if let Some(constraint) = &entity.shape_constraint {
+            occurrences.push(&constraint.provenance);
+            occurrences.extend(&constraint.additional_provenance);
+        }
         for term in [
             entity.color.as_ref(),
             entity.touch.as_ref(),
@@ -2648,6 +2673,17 @@ fn instruction_provenance_value(instruction: &SemanticInstruction) -> Value {
 
 fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(constraint) = &entity.shape_constraint {
+        record.insert(
+            "shape_constraint".to_owned(),
+            Value::Array(
+                std::iter::once(&constraint.provenance)
+                    .chain(&constraint.additional_provenance)
+                    .map(source_occurrence_value)
+                    .collect(),
+            ),
+        );
+    }
     record.insert("head".to_owned(), head_provenance_value(&entity.head));
     for (field, term) in [
         ("color", entity.color.as_ref()),

@@ -51,6 +51,22 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
 
     assert_eq!(asset.languages, ["ja", "en"]);
     assert_eq!(asset.categories.len(), 11);
+    let shape = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katachi")
+        .unwrap();
+    assert_eq!(shape.words.len(), 9);
+    assert_eq!(
+        shape
+            .words
+            .iter()
+            .find(|word| word.surface_en.as_deref() == Some("square"))
+            .unwrap()
+            .parser_surfaces_en
+            .as_deref(),
+        Some(["rectangle".to_owned()].as_slice())
+    );
     assert_eq!(
         asset
             .categories

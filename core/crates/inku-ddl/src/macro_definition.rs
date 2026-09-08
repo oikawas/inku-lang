@@ -805,7 +805,7 @@ fn validate_body(
             Statement::Emit { fields, .. } => {
                 for (field, expression) in fields.iter() {
                     let expression_path = format!("{statement_path}.fields.{field}");
-                    if field == "count" {
+                    if field == "count" || field == "sides" {
                         let kind = validate_expression(
                             expression,
                             &expression_path,
@@ -829,6 +829,8 @@ fn validate_body(
                         "variation"
                     } else if field == "layout_direction" {
                         "angle"
+                    } else if field == "proportion_aspect" {
+                        "ratio"
                     } else {
                         field.as_str()
                     };
@@ -1396,7 +1398,7 @@ fn semantic_category_authority(category: &str) -> Option<SemanticCategoryAuthori
     if category == "relation" {
         return Some(SemanticCategoryAuthority::Relation);
     }
-    if matches!(category, "thinness" | "relative_scale") {
+    if matches!(category, "thinness" | "relative_scale" | "shape_form") {
         return Some(SemanticCategoryAuthority::CoreModifier);
     }
     SEMANTIC_CATEGORIES.iter().find_map(|(known, asset)| {

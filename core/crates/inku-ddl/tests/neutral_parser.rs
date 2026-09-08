@@ -1311,6 +1311,14 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
         decimal_scale: None,
     };
     match &token.kind {
+        NeutralTokenKind::ConstrainedShape {
+            canonical_surface_ja,
+            constraint,
+        } => {
+            projected.kind = "constrained_shape".to_owned();
+            projected.canonical_surface_ja = Some(canonical_surface_ja.clone());
+            projected.modifier_value = Some(format!("{constraint:?}"));
+        }
         NeutralTokenKind::CoreModifier(identity) => {
             projected.kind = "core_modifier".to_owned();
             projected.modifier_dimension = Some(identity.dimension.as_str().to_owned());

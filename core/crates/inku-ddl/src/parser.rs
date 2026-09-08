@@ -30,6 +30,8 @@ pub struct NeutralToken {
 /// Closed core modifier dimension independent of the Saijiki asset.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierDimension {
+    ShapeForm,
+    ShapeSides,
     Thinness,
     RelativeScale,
 }
@@ -37,6 +39,8 @@ pub enum CoreModifierDimension {
 impl CoreModifierDimension {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::ShapeForm => "shape_form",
+            Self::ShapeSides => "shape_sides",
             Self::Thinness => "thinness",
             Self::RelativeScale => "relative_scale",
         }
@@ -46,6 +50,8 @@ impl CoreModifierDimension {
 /// Closed core modifier value independent of localized source spelling.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreModifierValue {
+    Regular,
+    Sides(u64),
     Fine,
     ExtraFine,
     SlightlySmall,
@@ -60,6 +66,8 @@ pub enum CoreModifierValue {
 impl CoreModifierValue {
     pub const fn dimension(self) -> CoreModifierDimension {
         match self {
+            Self::Regular => CoreModifierDimension::ShapeForm,
+            Self::Sides(_) => CoreModifierDimension::ShapeSides,
             Self::Fine | Self::ExtraFine => CoreModifierDimension::Thinness,
             _ => CoreModifierDimension::RelativeScale,
         }
@@ -67,6 +75,7 @@ impl CoreModifierValue {
 
     pub fn from_semantic_ref(category: &str, id: &str) -> Option<Self> {
         let value = match id {
+            "regular" => Self::Regular,
             "fine" => Self::Fine,
             "extra_fine" => Self::ExtraFine,
             "slightly_small" => Self::SlightlySmall,
@@ -83,6 +92,8 @@ impl CoreModifierValue {
 
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Regular => "regular",
+            Self::Sides(_) => "sides",
             Self::Fine => "fine",
             Self::ExtraFine => "extra_fine",
             Self::SlightlySmall => "slightly_small",
@@ -106,6 +117,10 @@ pub struct CoreModifierIdentity {
 /// The lexical identity of a recognized item, before typed composition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NeutralTokenKind {
+    ConstrainedShape {
+        canonical_surface_ja: String,
+        constraint: crate::ShapeConstraint,
+    },
     CoreModifier(CoreModifierIdentity),
     SaijikiWord {
         asset_id: String,
@@ -516,6 +531,74 @@ fn candidates_at(
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
     let asset = saijiki_asset();
+
+    let shape_heads = match language {
+        ResolvedInstructionLanguage::Ja => crate::shape_constraint::SHAPE_HEADS_JA,
+        ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
+    };
+    for surface in match language {
+        ResolvedInstructionLanguage::Ja => &["正形"][..],
+        ResolvedInstructionLanguage::En => &["regular"][..],
+    } {
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            surface,
+            PRIORITY_CORE_MODIFIER,
+            "shape_form:regular".to_owned(),
+            CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
+                dimension: CoreModifierDimension::ShapeForm,
+                value: CoreModifierValue::Regular,
+            })),
+        );
+    }
+    let sides_prefix = match language {
+        ResolvedInstructionLanguage::Ja => "辺数",
+        ResolvedInstructionLanguage::En => "sides ",
+    };
+    if let Some(rest) = source[start_byte..].strip_prefix(sides_prefix) {
+        let number = rest.trim_start();
+        let digits = number.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0
+            && let Ok(value) = number[..digits].parse::<u64>()
+        {
+            let surface = &source
+                [start_byte..start_byte + sides_prefix.len() + rest.len() - number.len() + digits];
+            push_surface_candidate(
+                &mut candidates,
+                source,
+                start_byte,
+                language,
+                require_boundary,
+                surface,
+                PRIORITY_CORE_MODIFIER,
+                format!("shape_sides:{value}"),
+                CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
+                    dimension: CoreModifierDimension::ShapeSides,
+                    value: CoreModifierValue::Sides(value),
+                })),
+            );
+        }
+    }
+    for (surface, base, constraint) in shape_heads {
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            surface,
+            PRIORITY_CORE_MODIFIER,
+            format!("shape_constraint:{surface}"),
+            CandidateDelivery::Token(NeutralTokenKind::ConstrainedShape {
+                canonical_surface_ja: (*base).to_owned(),
+                constraint: *constraint,
+            }),
+        );
+    }
 
     let thinness_surfaces = match language {
         ResolvedInstructionLanguage::Ja => THINNESS_SURFACES_JA,
@@ -1002,6 +1085,9 @@ fn has_primitive_candidate_at(
             .iter()
             .any(|candidate| {
                 matches!(
+                    &candidate.delivery,
+                    CandidateDelivery::Token(NeutralTokenKind::ConstrainedShape { .. })
+                ) || matches!(
                     &candidate.delivery,
                     CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
                         category_key,

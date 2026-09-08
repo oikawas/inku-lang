@@ -51,6 +51,54 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn shared_shape_constraints_reach_actual_score() {
+    for (source, language) in [
+        (
+            "place one red triangle at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "横長の赤い四角を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "place one red polygon at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "place one red equilateral triangle at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "赤い正三角形を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "place one red hexagon at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        ("赤い六角形を中央に置く。", ResolvedInstructionLanguage::Ja),
+        (
+            "place one red sides 6 polygon at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+    ] {
+        let transformed = stage15(source, language);
+        let lowered = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}: {:?}",
+            lowered.gaps()
+        );
+        assert_eq!(lowered.score().unwrap().instructions.len(), 1);
+    }
+}
+
+#[test]
 fn repeated_placement_policy_keeps_object_size_and_defaults_eight() {
     let policy: serde_json::Value =
         serde_json::from_slice(inku_ddl::geometry_resolution_policy_canonical_bytes()).unwrap();
@@ -59,6 +107,270 @@ fn repeated_placement_policy_keeps_object_size_and_defaults_eight() {
         policy["object_placement"]["size_basis"],
         "canvas_short_edge_independent_of_count"
     );
+}
+
+#[test]
+fn shared_shape_geometry_preserves_physical_extents_and_exact_rules() {
+    for (source, language, primitive, width, height) in [
+        (
+            "place one red wide rectangle at center.",
+            ResolvedInstructionLanguage::En,
+            Primitive::Square,
+            0.24,
+            0.12,
+        ),
+        (
+            "横に長い赤い四角形を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+            Primitive::Square,
+            0.24,
+            0.12,
+        ),
+        (
+            "細長い赤い三角形を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+            Primitive::Triangle,
+            0.12,
+            0.24,
+        ),
+        (
+            "place one red equilateral triangle side length 0.24 at center.",
+            ResolvedInstructionLanguage::En,
+            Primitive::Triangle,
+            0.24,
+            0.24 * 3.0_f64.sqrt() / 2.0,
+        ),
+        (
+            "一辺0.24の赤い正三角形を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+            Primitive::Triangle,
+            0.24,
+            0.24 * 3.0_f64.sqrt() / 2.0,
+        ),
+        (
+            "place one large red equilateral triangle at center.",
+            ResolvedInstructionLanguage::En,
+            Primitive::Triangle,
+            0.36,
+            0.36 * 3.0_f64.sqrt() / 2.0,
+        ),
+        (
+            "赤い正方形を中央に置く。",
+            ResolvedInstructionLanguage::Ja,
+            Primitive::Square,
+            0.24,
+            0.24,
+        ),
+        (
+            "place one red tall ellipse at center.",
+            ResolvedInstructionLanguage::En,
+            Primitive::Ellipse,
+            0.12,
+            0.24,
+        ),
+    ] {
+        let transformed = stage15(source, language);
+        for canvas in ["square", "wide", "oban"] {
+            let lowered = lower_verified_stage15_score(
+                transformed.verified_effective_view(),
+                ScoreLoweringContext::resolve(canvas, Color::White).unwrap(),
+            );
+            let instruction = &lowered
+                .score()
+                .unwrap_or_else(|| panic!("{source}: {:?}", lowered.gaps()))
+                .instructions[0];
+            assert_eq!(instruction.primitive, primitive);
+            let size = instruction.size.unwrap();
+            assert!(
+                (size.x - width).abs() < 1e-12 && (size.y - height).abs() < 1e-12,
+                "{source}: {size:?}"
+            );
+            assert!(instruction.filled);
+        }
+    }
+    for (word, sides) in [
+        ("polygon", 5),
+        ("pentagon", 5),
+        ("hexagon", 6),
+        ("heptagon", 7),
+        ("octagon", 8),
+    ] {
+        let transformed = stage15(
+            &format!("place one red {word} radius 0.1 at center."),
+            ResolvedInstructionLanguage::En,
+        );
+        let lowered = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.primitive, Primitive::Polygon);
+        assert_eq!(instruction.sides, Some(sides));
+        assert_eq!(instruction.radius, Some(0.1));
+    }
+}
+
+#[test]
+fn shared_shape_macro_parameters_and_locals_use_the_same_consumer() {
+    use serde_json::json;
+    for (shape, field, schema, value, caller, ordinary) in [
+        (
+            "triangle",
+            "shape_form",
+            json!({"type":"semantic_ref","category":"shape_form"}),
+            json!({"expr":"semantic_ref","category":"shape_form","id":"regular"}),
+            "regular",
+            "equilateral triangle",
+        ),
+        (
+            "square",
+            "proportion_aspect",
+            json!({"type":"semantic_ref","category":"ratio"}),
+            json!({"expr":"semantic_ref","category":"ratio","id":"wide"}),
+            "wide",
+            "wide rectangle",
+        ),
+        (
+            "polygon",
+            "sides",
+            json!({"type":"integer"}),
+            json!({"expr":"integer","value":6}),
+            "sides 6",
+            "hexagon",
+        ),
+    ] {
+        for route in ["literal", "parameter", "local"] {
+            let mut fields = json!({
+                "shape":{"expr":"semantic_ref","category":"shape","id":shape},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                "place":{"expr":"semantic_ref","category":"place","id":"center"},
+                "color":{"expr":"semantic_ref","category":"color","id":"red"}
+            });
+            fields[field] = match route {
+                "parameter" => json!({"expr":"parameter","name":"input"}),
+                "local" => json!({"expr":"local","name":"input"}),
+                _ => value.clone(),
+            };
+            let emit = json!({"op":"emit","binding":null,"fields":fields});
+            let body = if route == "local" {
+                json!([{"op":"vary","binding":"input","domain":"constraint","choices":[value],"range":null,"body":[emit]}])
+            } else {
+                json!([emit])
+            };
+            let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters": if route == "parameter" { json!({"input":schema}) } else {json!({})},"components":{},"body":body}).to_string()).unwrap();
+            let source = if route == "parameter" {
+                format!("Shape.Mark {caller}")
+            } else {
+                "Shape.Mark".to_owned()
+            };
+            for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+                let invalid_source = if route == "parameter" {
+                    "Shape.Mark".to_owned()
+                } else {
+                    format!("Shape.Mark {caller}")
+                };
+                let execution = inku_ddl::compile_ddl_to_score(
+                    NormalizedDdlDocument::new(
+                        &invalid_source,
+                        ResolvedInstructionLanguage::En,
+                        vec![lock_for(&definition)],
+                    )
+                    .unwrap(),
+                    &[definition.clone()],
+                    Some(19),
+                    LIMITS,
+                    ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+                    None,
+                    policy,
+                );
+                assert!(
+                    execution.score().is_none(),
+                    "missing/undeclared {field}/{route}: {invalid_source}"
+                );
+            }
+            let generated = stage15_locked(&source, ResolvedInstructionLanguage::En, &[definition]);
+            let ordinary = stage15(
+                &format!("place one red {ordinary} at center."),
+                ResolvedInstructionLanguage::En,
+            );
+            let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+            let generated =
+                lower_verified_stage15_score(generated.verified_effective_view(), context);
+            let ordinary =
+                lower_verified_stage15_score(ordinary.verified_effective_view(), context);
+            let mut left = generated
+                .score()
+                .unwrap_or_else(|| panic!("{field}/{route}: {:?}", generated.gaps()))
+                .instructions[0]
+                .clone();
+            let mut right = ordinary.score().unwrap().instructions[0].clone();
+            left.at = None;
+            right.at = None;
+            assert_eq!(left, right, "{field}/{route}");
+        }
+    }
+}
+
+#[test]
+fn shared_shape_numeric_anchors_and_conflicts_are_never_repaired() {
+    let source = "place one red triangle width 0.4 height 0.2 at horizontal 0.5 vertical 0.5.";
+    let transformed = stage15(source, ResolvedInstructionLanguage::En);
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(instruction.size, Some(Point::new(0.4, 0.2)));
+    let (w, h) = context.canvas_format().integer_ratio();
+    let short = f64::from(w.min(h));
+    let position = instruction.position.unwrap();
+    assert!((position.x + 0.2 * short / f64::from(w) - 0.5).abs() < 1e-12);
+    assert!((position.y + 0.1 * short / f64::from(h) - 0.5).abs() < 1e-12);
+    for body in ["triangle width 0.4 height 0.2", "hexagon radius 0.1"] {
+        let source = format!("place one red vertical {body} at horizontal 0.5 vertical 0.5.");
+        let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+        assert_eq!(
+            lowered.score().unwrap().instructions[0].rotation,
+            Some(90.0)
+        );
+    }
+    for body in [
+        "wide equilateral triangle",
+        "regular square width 0.4 height 0.2",
+        "tall rectangle width 0.4 height 0.2",
+        "sides 9 polygon",
+        "equilateral triangle width 0.24 height 0.2078460969",
+        "large triangle width 0.4 height 0.2",
+        "triangle width 0.4 height 0.2 at horizontal 0.01 vertical 0.01",
+        "vertical triangle width 0.4 height 0.2 at horizontal 0.01 vertical 0.01",
+        "hexagon radius 0.4 at horizontal 0.01 vertical 0.01",
+        "vertical hexagon radius 0.4 at horizontal 0.01 vertical 0.01",
+    ] {
+        let source = format!(
+            "place one red {body}{}.",
+            if body.contains(" at ") {
+                ""
+            } else {
+                " at center"
+            }
+        );
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let result = inku_ddl::compile_ddl_to_score(
+                NormalizedDdlDocument::new(&source, ResolvedInstructionLanguage::En, vec![])
+                    .unwrap(),
+                &[],
+                None,
+                LIMITS,
+                context,
+                None,
+                policy,
+            );
+            assert!(result.score().is_none(), "{source}: {policy:?}");
+            assert!(
+                !result.upstream_diagnostics().is_empty()
+                    || !result.downstream_diagnostics().is_empty()
+            );
+        }
+    }
 }
 
 #[test]
@@ -2143,9 +2455,11 @@ fn incomplete_conflicting_and_relative_numeric_geometry_fail_as_typed_compiler_i
 fn eligibility_rejects_partial_repeated_and_invalid_geometry_without_partial_score() {
     for (source, expected_primitive, expected_gap) in [
         (
-            "place one red pen solid empty triangle at horizontal 0.5, vertical 0.5.",
+            "place one red pen solid empty triangle radius 0.1 at horizontal 0.5, vertical 0.5.",
             Primitive::Triangle,
-            ScoreFieldGap::MissingExplicitGeometry,
+            ScoreFieldGap::ShapeConstraintMismatch {
+                primitive: Primitive::Triangle,
+            },
         ),
         (
             "place one pen solid empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",

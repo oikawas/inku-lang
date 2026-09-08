@@ -322,6 +322,7 @@ pub struct SemanticProportion {
 /// One independently owned head entity. A field is absent unless it has one explicit owner.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticEntity {
+    pub shape_constraint: Option<crate::SemanticShapeConstraint>,
     pub head: SemanticHead,
     pub color: Option<SemanticTerm>,
     pub quantity: Option<SemanticQuantity>,
@@ -347,6 +348,7 @@ pub struct SemanticEntityAssociationAst {
 /// An association-owned occurrence delivered to a typed issue rather than an AST field.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OwnedSemanticOccurrence {
+    ShapeConstraint(crate::SemanticShapeConstraint),
     Head(SemanticHead),
     MacroDiagnostic(SemanticMacroInvocationProvenance),
     Color(SemanticTerm),
@@ -367,6 +369,7 @@ impl OwnedSemanticOccurrence {
     /// Return the byte-exact source occurrence delivered by this issue.
     pub const fn source(&self) -> &SourceOccurrence {
         match self {
+            Self::ShapeConstraint(value) => &value.provenance,
             Self::Head(head) => head.source(),
             Self::MacroDiagnostic(provenance) => &provenance.source,
             Self::Color(term)
@@ -386,6 +389,7 @@ impl OwnedSemanticOccurrence {
 
     const fn occurrence_count(&self) -> usize {
         match self {
+            Self::ShapeConstraint(value) => 1 + value.additional_provenance.len(),
             Self::Head(head) => head.occurrence_count(),
             Self::MacroDiagnostic(_)
             | Self::Color(_)
@@ -407,6 +411,7 @@ impl OwnedSemanticOccurrence {
 /// Stable, expected association issue classes for this single-head slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticAssociationIssueKind {
+    ConflictingShapeConstraints,
     AmbiguousEntityOwnership,
     MissingEntityHead,
     ConflictingColors,
@@ -467,6 +472,7 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingFluctuationFrequencies => "conflicting_fluctuation_frequencies",
             Self::ConflictingFluctuationQualities => "conflicting_fluctuation_qualities",
             Self::UnknownFluctuationDimension => "unknown_fluctuation_dimension",
+            Self::ConflictingShapeConstraints => "conflicting_shape_constraints",
             Self::ConflictingProportionAspects => "conflicting_proportion_aspects",
             Self::ConflictingProportionWidthExtents => "conflicting_proportion_width_extents",
             Self::ConflictingProportionArcForms => "conflicting_proportion_arc_forms",
@@ -651,6 +657,7 @@ impl ClauseTopologyEvidence {
 
 #[derive(Default)]
 struct AssociationRegion {
+    shape_constraints: Vec<crate::SemanticShapeConstraint>,
     heads: Vec<SemanticHead>,
     colors: Vec<SemanticTerm>,
     quantities: Vec<SemanticQuantity>,
@@ -986,6 +993,8 @@ fn is_pre_head_modifier_atom(atom: &ClauseAtom) -> bool {
                 term.identity.dimension,
                 crate::CoreModifierDimension::Thinness
                     | crate::CoreModifierDimension::RelativeScale
+                    | crate::CoreModifierDimension::ShapeForm
+                    | crate::CoreModifierDimension::ShapeSides
             )
     ) || matches!(atom, ClauseAtom::UnattachedExactNumber(_))
 }
@@ -1275,6 +1284,25 @@ fn build_semantic_entities(
                         atom_index,
                     );
                     match modifier.identity.dimension {
+                        crate::CoreModifierDimension::ShapeForm
+                        | crate::CoreModifierDimension::ShapeSides => {
+                            region
+                                .shape_constraints
+                                .push(crate::SemanticShapeConstraint {
+                                    value: crate::ShapeConstraint {
+                                        regular: true,
+                                        sides: if let CoreModifierValue::Sides(sides) =
+                                            modifier.identity.value
+                                        {
+                                            Some(sides)
+                                        } else {
+                                            None
+                                        },
+                                    },
+                                    provenance,
+                                    additional_provenance: Vec::new(),
+                                });
+                        }
                         crate::CoreModifierDimension::Thinness => {
                             region.thinnesses.push(SemanticThinness {
                                 value: modifier.identity.value,
@@ -1358,6 +1386,48 @@ fn build_semantic_entities(
             &mut entities,
             &mut issues,
         );
+    }
+    for entity in &mut entities {
+        let source = entity.head.source();
+        if let Some(ClauseAtom::CoreRole(term)) = clause_stream
+            .clauses
+            .get(source.clause_index)
+            .and_then(|clause| clause.atoms.get(source.atom_index))
+        {
+            if term.span == source.span {
+                if let Some(value) = term.shape_constraint {
+                    let head_constraint = crate::SemanticShapeConstraint {
+                        value,
+                        provenance: source.clone(),
+                        additional_provenance: Vec::new(),
+                    };
+                    if let Some(existing) = &mut entity.shape_constraint {
+                        if existing.value.sides.is_some()
+                            && value.sides.is_some()
+                            && existing.value.sides != value.sides
+                        {
+                            issues.push(SemanticAssociationIssue {
+                                kind: SemanticAssociationIssueKind::ConflictingShapeConstraints,
+                                region_index: source.region_index,
+                                occurrences: Vec::new(),
+                                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                                upstream_diagnostic: Some(NeutralDiagnostic {
+                                    span: source.span,
+                                    surface: source.surface.clone(),
+                                    kind: NeutralDiagnosticKind::Conflict,
+                                    recognized: true,
+                                }),
+                            });
+                        }
+                        existing.value.regular |= value.regular;
+                        existing.value.sides = existing.value.sides.or(value.sides);
+                        existing.additional_provenance.push(source.clone());
+                    } else {
+                        entity.shape_constraint = Some(head_constraint);
+                    }
+                }
+            }
+        }
     }
     attach_association_causal_provenance(&clause_stream, &entities, &mut issues);
 
@@ -1774,6 +1844,12 @@ fn associate_region(
             .map(OwnedSemanticOccurrence::Color)
             .chain(
                 region
+                    .shape_constraints
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::ShapeConstraint),
+            )
+            .chain(
+                region
                     .quantities
                     .drain(..)
                     .map(OwnedSemanticOccurrence::Quantity),
@@ -1836,6 +1912,12 @@ fn associate_region(
             .colors
             .drain(..)
             .map(OwnedSemanticOccurrence::Color)
+            .chain(
+                region
+                    .shape_constraints
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::ShapeConstraint),
+            )
             .chain(
                 region
                     .quantities
@@ -1915,6 +1997,29 @@ fn associate_region(
         .heads
         .pop()
         .expect("bounded phrase retains its head");
+    let mut shape_constraint: Option<crate::SemanticShapeConstraint> = None;
+    for constraint in owned_region.shape_constraints {
+        if let Some(existing) = &mut shape_constraint {
+            if existing.value.sides.is_some()
+                && constraint.value.sides.is_some()
+                && existing.value.sides != constraint.value.sides
+            {
+                issues.push(SemanticAssociationIssue {
+                    kind: SemanticAssociationIssueKind::ConflictingShapeConstraints,
+                    region_index,
+                    occurrences: vec![OwnedSemanticOccurrence::ShapeConstraint(constraint)],
+                    causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                    upstream_diagnostic: None,
+                });
+            } else {
+                existing.value.regular |= constraint.value.regular;
+                existing.value.sides = existing.value.sides.or(constraint.value.sides);
+                existing.additional_provenance.push(constraint.provenance);
+            }
+        } else {
+            shape_constraint = Some(constraint);
+        }
+    }
     let color = select_term(
         owned_region.colors,
         OwnedSemanticOccurrence::Color,
@@ -2148,6 +2253,7 @@ fn associate_region(
         });
     }
     entities.push(SemanticEntity {
+        shape_constraint,
         head,
         color,
         quantity,
@@ -2181,6 +2287,12 @@ fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSem
         .colors
         .drain(..)
         .map(OwnedSemanticOccurrence::Color)
+        .chain(
+            region
+                .shape_constraints
+                .drain(..)
+                .map(OwnedSemanticOccurrence::ShapeConstraint),
+        )
         .chain(
             region
                 .quantities
@@ -2233,6 +2345,13 @@ fn take_pre_head_region(
     ownership: &PreHeadPhraseOwnership,
 ) -> AssociationRegion {
     AssociationRegion {
+        shape_constraints: {
+            let (owned, remaining) = std::mem::take(&mut region.shape_constraints)
+                .into_iter()
+                .partition(|constraint| ownership.owns(&head, constraint.provenance.span));
+            region.shape_constraints = remaining;
+            owned
+        },
         colors: take_owned_terms(&mut region.colors, &head, ownership),
         quantities: take_owned_quantities(&mut region.quantities, &head, ownership),
         thinnesses: take_owned_thinnesses(&mut region.thinnesses, &head, ownership),
@@ -2613,6 +2732,12 @@ pub(crate) fn causal_provenance(
 
 fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
     entity.head.occurrence_count()
+        + entity.shape_constraint.as_ref().map_or(0, |constraint| {
+            std::iter::once(&constraint.provenance)
+                .chain(&constraint.additional_provenance)
+                .filter(|source| source.span != entity.head.source().span)
+                .count()
+        })
         + usize::from(entity.color.is_some())
         + usize::from(entity.quantity.is_some())
         + usize::from(entity.thinness.is_some())
@@ -2649,6 +2774,14 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
 
 pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(constraint) = &entity.shape_constraint {
+        record.insert(
+            "shape_constraint".to_owned(),
+            serde_json::json!({
+                "regular": constraint.value.regular, "sides": constraint.value.sides,
+            }),
+        );
+    }
     record.insert(
         "angle".to_owned(),
         entity

@@ -424,6 +424,9 @@ fn clause_facts(
             .get(span.start_byte..span.end_byte)?
             .to_owned();
         let kind = match atom {
+            // One constrained head cannot be consumed as an unconstrained shape ref.
+            // Callers bind the independently declared form/sides facts explicitly.
+            ClauseAtom::CoreRole(term) if term.shape_constraint.is_some() => continue,
             ClauseAtom::CoreRole(term) => semantic_fact(
                 &term.asset_id,
                 &term.category_key,
@@ -485,6 +488,15 @@ fn semantic_fact(
 
 fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroParameterValue> {
     match (schema, &fact.kind) {
+        (
+            ParameterSchema::Integer,
+            FactKind::CoreModifier(crate::CoreModifierValue::Sides(value)),
+        ) => i64::try_from(*value)
+            .ok()
+            .map(|value| BoundMacroParameterValue::Integer {
+                value,
+                source_span: fact.span,
+            }),
         (
             ParameterSchema::SemanticRef {
                 category,

@@ -54,6 +54,8 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 ### 受入済みのTyped DDL基盤（runtime未接続）
 
+Verified Stage 1.5からの共有object placement plan APIは、通常DDLと宣言済みflat Macroのline-up / scatter / tileを、一instruction / 一Emitにつき一件の解決済みplanへ届ける。数量省略は8（placeは1）、sizeはcount非依存のcanvas短辺基準で既存normal / 大小倍率を共有する。横一列、物理aspectに沿うtile行列、performance seedを後続へ要求するscatter重心移動recipeを持ち、個体配列・乱数・Score化は実行しない。全shape共通原則のうちline / circle / ellipse / square / arc / cloudform / pointの7shapeを実deliveryし、Triangle / Polygonはownerを保つ明示geometry gapである。元のexact geometry・外観・angle・位置・originとStop / Continueを保ち、Ready planと既存Score成功を区別する。明示配置方向のStep10X、残geometry、whole Step10とruntime / UI / 保存cutoverは未完了である。詳細はSPEC §12末尾。
+
 通常DDLと宣言済みflat Macroの明示揺らぎは、三次元の共通resolverから既存Scoreへ届く。8語写像と一slot以上の不足値Medium / Medium / Perlin、全省略None、PositionX + PositionYはSPEC §13.6に従う。Line / Arc / circle / ellipse / square / cloudformが対象でPointは拒否する。Macroはvariation categoryにoptional dimension制約を持ち、三つのfluctuation Emit keysへ届ける。旧None schemaのidentityは保ち、宣言必須parameterの不足をdefaultで埋めない。Source / generated ownerと既存Stop / Continue単位を保つ。Whole Step10とruntime / UI / 保存cutoverは未完了である。
 
 `core/crates/inku-ddl` には、利用者に見える正規化DDLをsource span付きで保持し、

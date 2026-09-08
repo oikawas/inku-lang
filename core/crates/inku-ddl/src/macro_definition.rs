@@ -805,6 +805,25 @@ fn validate_body(
             Statement::Emit { fields, .. } => {
                 for (field, expression) in fields.iter() {
                     let expression_path = format!("{statement_path}.fields.{field}");
+                    if field == "count" {
+                        let kind = validate_expression(
+                            expression,
+                            &expression_path,
+                            parameters,
+                            locals,
+                            diagnostics,
+                        );
+                        if !matches!(kind, Some(ValueKind::Integer) | Some(ValueKind::Unknown)) {
+                            push_diagnostic(
+                                diagnostics,
+                                "invalid_emit_count_type",
+                                &expression_path,
+                            );
+                        }
+                        // Exact values, including parameter/local values, are checked
+                        // by the shared consumer. Only omission receives a default.
+                        continue;
+                    }
                     let dimension = crate::fluctuation::FluctuationDimension::from_field(field);
                     let expected_category = if dimension.is_some() {
                         "variation"

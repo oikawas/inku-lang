@@ -31,6 +31,17 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn repeated_placement_policy_keeps_object_size_and_defaults_eight() {
+    let policy: serde_json::Value =
+        serde_json::from_slice(inku_ddl::geometry_resolution_policy_canonical_bytes()).unwrap();
+    assert_eq!(policy["object_placement"]["repeated_default_count"], 8);
+    assert_eq!(
+        policy["object_placement"]["size_basis"],
+        "canvas_short_edge_independent_of_count"
+    );
+}
+
+#[test]
 fn explicit_left_edge_reaches_actual_score() {
     let result = stage15(
         "place one red pen solid empty circle radius 0.1 at left-edge.",

@@ -36,7 +36,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
 const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "},",
     "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
-    "\"basis\":\"canvas_short_edge\",\"count\":1,",
+    "\"basis\":\"canvas_short_edge\",\"count_dependency\":\"none\",",
     "\"endpoint_family\":{\"arc\":{\"chord\":\"6/25\",\"sagitta\":\"3/50\"},",
     "\"line\":{\"length\":\"6/25\"},\"point\":{\"diameter\":\"3/250\"}},",
     "\"width_or_diameter\":\"6/25\"},",
@@ -88,12 +88,28 @@ pub(crate) fn named_region_bounds(
     if id == "center" {
         return focus.map(focus_region_bounds);
     }
+    named_region_rational_bounds(id, focus, context)
+        .map(|bounds| bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
+}
+
+pub(crate) fn named_region_rational_bounds(
+    id: &str,
+    focus: Option<FocusRegion>,
+    context: crate::score_angle::ScoreAngleContext<'_>,
+) -> Option<[(u8, u8); 4]> {
+    if id == "center" {
+        let focus = focus?;
+        return FOCUS_REGION_BOUNDS_HUNDREDTHS
+            .iter()
+            .find(|(candidate, _)| *candidate == focus)
+            .map(|(_, bounds)| bounds.map(|value| (value, 100)));
+    }
     let bounds = if id == "corner" {
         CORNER_REGIONS[corner_index(context)]
     } else {
         NAMED_REGIONS.iter().find(|(name, _)| *name == id)?.1
     };
-    Some(bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
+    Some(bounds)
 }
 
 // Reuses the already-attested occurrence value, never the angle resolver or its bytes.
@@ -245,6 +261,26 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 &format!(
                     "\"author_resolved_omission\":{{\"fluctuation\":{},",
                     crate::fluctuation::policy()
+                ),
+                1,
+            );
+            canonical = canonical.replacen(
+                "\"numeric_basis\":",
+                concat!(
+                    "\"object_placement\":{\"repeated_default_count\":8,",
+                    "\"size_basis\":\"canvas_short_edge_independent_of_count\",",
+                    "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
+                    "\"geometry_gap\":[\"triangle\",\"polygon\"],",
+                    "\"line_up\":\"horizontal_domain_width_equal_cell_centers\",",
+                    "\"tile\":\"long_axis_min_n_ceil_sqrt_n_aspect_short_axis_ceil_n_long_axis_row_major\",",
+                    "\"tile_numeric_anchor\":\"translate_exact_filled_prefix_centroid\",",
+                    "\"tile_named_anchor\":\"stay_in_named_domain_no_centroid_translation\",",
+                    "\"scatter\":\"uniform_xy_then_translate_sample_centroid_at_materialization\",",
+                    "\"scatter_seed\":\"existing_performance_seed_owner_instance_ordinal\",",
+                    "\"non_grid_domain\":\"canvas_axes_group_centroid_at_semantic_anchor\",",
+                    "\"overlap\":\"allowed_no_resize_no_fit_no_count_change\",",
+                    "\"materialization\":\"deferred\",\"score_success\":false},",
+                    "\"numeric_basis\":"
                 ),
                 1,
             );
@@ -819,7 +855,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "2c151167a5d73fbb6a3ab9ddbbdc2a853ecb2dd2e8f66dbcc86cf228e7458ea2"
+            "d9ae29eb0a80e96afc614bbfb3c55d77646468467ac00026090d89ddaa9497fe"
         );
     }
 }

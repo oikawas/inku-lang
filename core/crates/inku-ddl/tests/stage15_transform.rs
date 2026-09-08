@@ -247,12 +247,20 @@ fn step9i_input_boundary_rejects_visible_source_replacement() {
 #[test]
 fn verified_stage15_input_rejects_a_self_consistent_foreign_geometry_policy() {
     let mut compilation = compile(
-        "place one thin pencil line at the center",
+        "scatter eight red circle at center.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
         LIMITS,
     );
+    let transformed =
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let plan = inku_ddl::plan_verified_stage15(
+        transformed.verified_effective_view(),
+        inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
+    );
+    assert_eq!(plan.outcome(), inku_ddl::CompositionPlanOutcome::Ready);
+    assert_eq!(plan.objects().unwrap()[0].count(), 8);
     let lock = compilation.compiler_lock.as_mut().unwrap();
     lock.geometry_policy_digest = "foreign-policy-digest".to_owned();
     lock.full_digest = sha256(&compiler_lock_hash_input(lock));

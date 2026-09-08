@@ -31,14 +31,15 @@ pub struct SemanticRelation {
     pub provenance: SourceOccurrence,
 }
 
-/// One single-head entity and its independently optional explicit Action and Position.
+/// One single-head entity and its independently optional action-side predicates.
 ///
-/// A missing field is unspecified; neither field receives a default.
+/// Missing fields are unspecified and receive no semantic default.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticInstruction {
     pub entity: SemanticEntity,
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
+    pub layout_direction: Option<SemanticTerm>,
     pub relation: Option<SemanticRelation>,
 }
 
@@ -109,11 +110,12 @@ pub struct SemanticInstructionAssociationAst {
     pub complete: bool,
 }
 
-/// The two roles owned by this instruction slice.
+/// Roles owned by the instruction independently from entity modifiers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticInstructionOccurrenceRole {
     Action,
     Position,
+    LayoutDirection,
 }
 
 impl SemanticInstructionOccurrenceRole {
@@ -121,6 +123,7 @@ impl SemanticInstructionOccurrenceRole {
         match self {
             Self::Action => "action",
             Self::Position => "position",
+            Self::LayoutDirection => "layout_direction",
         }
     }
 }
@@ -141,6 +144,9 @@ pub enum SemanticInstructionIssueKind {
     MissingActionEntity,
     ConflictingPositions,
     MissingPositionEntity,
+    AmbiguousLayoutDirectionOwnership,
+    ConflictingLayoutDirections,
+    MissingLayoutDirectionEntity,
 }
 
 impl SemanticInstructionIssueKind {
@@ -152,6 +158,9 @@ impl SemanticInstructionIssueKind {
             Self::MissingActionEntity => "missing_action_entity",
             Self::ConflictingPositions => "conflicting_positions",
             Self::MissingPositionEntity => "missing_position_entity",
+            Self::AmbiguousLayoutDirectionOwnership => "ambiguous_layout_direction_ownership",
+            Self::ConflictingLayoutDirections => "conflicting_layout_directions",
+            Self::MissingLayoutDirectionEntity => "missing_layout_direction_entity",
         }
     }
 }
@@ -283,6 +292,7 @@ fn build_semantic_instructions(
 ) -> SemanticInstructionAssociationResult {
     let mut actions = Vec::new();
     let mut positions = Vec::new();
+    let mut directions = Vec::new();
     let mut owned_instruction_occurrence_count = 0;
 
     for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
@@ -297,6 +307,16 @@ fn build_semantic_instructions(
                 RemainingRoleKind::Motion => SemanticInstructionOccurrenceRole::Action,
                 RemainingRoleKind::Place => SemanticInstructionOccurrenceRole::Position,
                 RemainingRoleKind::Angle
+                    if crate::semantic_association::is_layout_direction(
+                        document,
+                        &association.clause_stream,
+                        &association.clause_topology,
+                        term,
+                    ) =>
+                {
+                    SemanticInstructionOccurrenceRole::LayoutDirection
+                }
+                RemainingRoleKind::Angle
                 | RemainingRoleKind::Continuity
                 | RemainingRoleKind::Fluctuation
                 | RemainingRoleKind::Proportion => continue,
@@ -307,6 +327,7 @@ fn build_semantic_instructions(
             match role {
                 SemanticInstructionOccurrenceRole::Action => actions.push(projected),
                 SemanticInstructionOccurrenceRole::Position => positions.push(projected),
+                SemanticInstructionOccurrenceRole::LayoutDirection => directions.push(projected),
             }
             owned_instruction_occurrence_count += 1;
         }
@@ -415,8 +436,91 @@ fn build_semantic_instructions(
             entity: entity.clone(),
             action,
             position,
+            layout_direction: None,
             relation,
         });
+    }
+    for direction in directions {
+        let source = &direction.provenance.source;
+        let candidates = instructions
+            .iter()
+            .enumerate()
+            .filter(|(_, instruction)| {
+                let head = instruction.entity.head.source();
+                if head.region_index != source.region_index {
+                    return false;
+                }
+                if let Some(action) = &instruction.action {
+                    let action = &action.provenance.source;
+                    if action.clause_index != source.clause_index {
+                        return false;
+                    }
+                    match source.language {
+                        crate::ResolvedInstructionLanguage::Ja => {
+                            head.span.end_byte <= source.span.start_byte
+                                && source.span.end_byte <= action.span.start_byte
+                        }
+                        crate::ResolvedInstructionLanguage::En => {
+                            action.span.end_byte <= head.span.start_byte
+                                && head.span.end_byte <= source.span.start_byte
+                                && instructions
+                                    .iter()
+                                    .filter_map(|candidate| candidate.action.as_ref())
+                                    .filter(|candidate| {
+                                        candidate.provenance.source.clause_index
+                                            == source.clause_index
+                                            && action.span.end_byte
+                                                <= candidate.provenance.source.span.start_byte
+                                    })
+                                    .all(|candidate| {
+                                        source.span.end_byte
+                                            <= candidate.provenance.source.span.start_byte
+                                    })
+                        }
+                    }
+                } else {
+                    entity_counts_by_region[&source.region_index] == 1
+                }
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let group_owned = coordinated_head_groups.iter().any(|group| {
+            group
+                .member_instruction_indices
+                .iter()
+                .any(|index| candidates.contains(index))
+        });
+        if candidates.len() == 1 && !group_owned {
+            let instruction = &mut instructions[candidates[0]];
+            if let Some(previous) = instruction.layout_direction.take() {
+                issues.push(SemanticInstructionIssue {
+                    kind: SemanticInstructionIssueKind::ConflictingLayoutDirections,
+                    region_index: source.region_index,
+                    occurrences: vec![previous, direction]
+                        .into_iter()
+                        .map(|term| SemanticInstructionOccurrence {
+                            role: SemanticInstructionOccurrenceRole::LayoutDirection,
+                            term,
+                        })
+                        .collect(),
+                    causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                });
+            } else {
+                instruction.layout_direction = Some(direction);
+            }
+        } else {
+            append_orphan_issue(
+                vec![direction.clone()],
+                SemanticInstructionOccurrenceRole::LayoutDirection,
+                if entity_counts_by_region.contains_key(&source.region_index) {
+                    SemanticInstructionIssueKind::AmbiguousLayoutDirectionOwnership
+                } else {
+                    SemanticInstructionIssueKind::MissingLayoutDirectionEntity
+                },
+                source.region_index,
+                &mut issues,
+            );
+        }
     }
     let mut remaining_by_region = BTreeMap::<usize, (Vec<SemanticTerm>, Vec<SemanticTerm>)>::new();
     for action in actions {
@@ -481,7 +585,9 @@ fn build_semantic_instructions(
     let delivered_instruction_occurrence_count = instructions
         .iter()
         .map(|instruction| {
-            usize::from(instruction.action.is_some()) + usize::from(instruction.position.is_some())
+            usize::from(instruction.action.is_some())
+                + usize::from(instruction.position.is_some())
+                + usize::from(instruction.layout_direction.is_some())
         })
         .sum::<usize>()
         + group_predicates
@@ -1778,6 +1884,10 @@ fn japanese_predicate_segment_is_clear(
         .iter()
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
         .all(|atom| match atom {
+            ClauseAtom::FunctionWord { surface, span, .. }
+                if crate::parser::is_japanese_counter_surface(surface)
+                    && association.clause_stream.clauses[clause_index].atoms.iter().any(|candidate|
+                        matches!(candidate, ClauseAtom::UnattachedExactNumber(number) if number.span.end_byte == span.start_byte)) => true,
             ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
             ClauseAtom::FunctionWord {
                 geometry_keyword: Some(_),
@@ -1790,7 +1900,7 @@ fn japanese_predicate_segment_is_clear(
             ClauseAtom::RemainingRole(term) => {
                 matches!(
                     term.role,
-                    RemainingRoleKind::Motion | RemainingRoleKind::Place
+                    RemainingRoleKind::Motion | RemainingRoleKind::Place | RemainingRoleKind::Angle
                 )
             }
             ClauseAtom::FunctionWord { span, .. } => matches!(
@@ -1863,7 +1973,10 @@ fn english_entity_to_marker_gap_is_clear(
         .iter()
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
         .all(|atom| match atom {
-            ClauseAtom::RemainingRole(term) => term.role == RemainingRoleKind::Place,
+            ClauseAtom::RemainingRole(term) => matches!(
+                term.role,
+                RemainingRoleKind::Place | RemainingRoleKind::Angle
+            ),
             ClauseAtom::FunctionWord {
                 geometry_keyword: Some(_),
                 ..
@@ -2148,6 +2261,12 @@ pub(crate) fn semantic_group_predicate_value(edge: &SemanticGroupPredicateEdge) 
 
 pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(direction) = &instruction.layout_direction {
+        record.insert(
+            "layout_direction".to_owned(),
+            semantic_identity_value(&direction.identity),
+        );
+    }
     record.insert(
         "action".to_owned(),
         instruction

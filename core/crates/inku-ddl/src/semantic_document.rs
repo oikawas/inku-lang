@@ -925,6 +925,7 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.proportion.width_extent.is_some()
         || entity.proportion.arc_form.is_some()
         || instruction.action.is_some()
+        || instruction.layout_direction.is_some()
         || instruction.position.is_some()
         || instruction.relation.is_some()
 }
@@ -982,6 +983,7 @@ fn predicate_is_compatible(
         )
         && option_is_mergeable(&left.proportion.arc_form, &right.proportion.arc_form)
         && option_is_mergeable(&target.action, &continuation.action)
+        && option_is_mergeable(&target.layout_direction, &continuation.layout_direction)
 }
 
 fn option_is_mergeable<T>(left: &Option<T>, right: &Option<T>) -> bool {
@@ -1042,6 +1044,7 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
         &continuation.entity.proportion.arc_form,
     );
     merge_option(&mut target.action, &continuation.action);
+    merge_option(&mut target.layout_direction, &continuation.layout_direction);
 }
 
 fn merge_option<T: Clone>(target: &mut Option<T>, continuation: &Option<T>) {

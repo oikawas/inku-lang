@@ -252,6 +252,10 @@ fn project_source_instruction<'a>(
                 logical_ordinal: instruction_index as u64,
             },
         }),
+        layout_direction: instruction
+            .layout_direction
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         fluctuation: [
             instruction
                 .entity
@@ -805,6 +809,7 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.proportion.width_extent.is_some()
         || instruction.entity.proportion.arc_form.is_some()
         || instruction.action.is_some()
+        || instruction.layout_direction.is_some()
         || instruction.position.is_some()
     {
         invalid = true;
@@ -859,7 +864,8 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 14] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 15] = [
+    "layout_direction",
     "shape",
     "movement",
     "place",
@@ -902,6 +908,8 @@ fn project_macro_emit<'a>(
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
+    let layout_direction =
+        macro_semantic_field(fields, "layout_direction", "angle", false, &mut gaps);
     let fluctuation = [
         "fluctuation_amplitude",
         "fluctuation_frequency",
@@ -1022,6 +1030,7 @@ fn project_macro_emit<'a>(
         }),
         angle,
         angle_context: None,
+        layout_direction,
         fluctuation,
         has_unsupported_meaning: false,
     })
@@ -2000,6 +2009,10 @@ fn source_span_for_gap(
             .angle
             .as_ref()
             .map(|angle| angle.provenance.source.span),
+        ScoreFieldGap::UnsupportedLayoutDirection { .. } => instruction
+            .layout_direction
+            .as_ref()
+            .map(|term| term.provenance.source.span),
         _ => None,
     }
     .unwrap_or(instruction.entity.head.source().span)
@@ -2141,6 +2154,7 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         }
         ScoreFieldGap::UnsupportedAngleIdentity { .. }
         | ScoreFieldGap::UnsupportedAngleForPrimitive { .. } => Some("angle".to_owned()),
+        ScoreFieldGap::UnsupportedLayoutDirection { .. } => Some("layout_direction".to_owned()),
         ScoreFieldGap::MissingMacroEmitFocusTarget { .. }
         | ScoreFieldGap::DuplicateMacroEmitFocusTarget { .. }
         | ScoreFieldGap::MissingNumericPosition
@@ -2203,6 +2217,7 @@ struct ScoreLoweringInput<'a> {
     relative_scale: Option<CoreModifierValue>,
     angle: Option<SemanticInputIdentity<'a>>,
     angle_context: Option<ScoreAngleContext<'a>>,
+    layout_direction: Option<SemanticInputIdentity<'a>>,
     fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
     has_unsupported_meaning: bool,
 }
@@ -2262,6 +2277,7 @@ struct ResolvedObject<'a> {
     dimensions: ResolvedGeometryDimensions,
     appearance: ResolvedObjectAppearance,
     rotation: Option<f64>,
+    layout_direction: Option<crate::composition_plan::ResolvedLayoutDirection>,
     placement: ScorePlacement<'a>,
 }
 
@@ -2300,10 +2316,32 @@ fn resolve_object_plan(
             }
         };
         let n = resolved.count;
+        let layout_direction = resolved.layout_direction;
         let recipe = match resolved.action {
             PlacementAction::Place => PlacementRecipe::Place,
-            PlacementAction::LineUp => PlacementRecipe::HorizontalLine {
-                cell_width: domain[0].div_i128(n.into())?,
+            PlacementAction::LineUp => match layout_direction
+                .as_ref()
+                .map(|direction| direction.axis)
+                .unwrap_or([1, 0])
+            {
+                [1, 0] => PlacementRecipe::HorizontalLine {
+                    cell_width: domain[0].div_i128(n.into())?,
+                },
+                [0, 1] => PlacementRecipe::VerticalLine {
+                    cell_height: domain[1].div_i128(n.into())?,
+                },
+                [1, y] => {
+                    let short = if domain[0].le(domain[1])? {
+                        domain[0]
+                    } else {
+                        domain[1]
+                    };
+                    let step = short.div_i128(n.into())?;
+                    PlacementRecipe::DiagonalLine {
+                        step: [step, step.mul_i128(y.into())?],
+                    }
+                }
+                _ => unreachable!("closed layout axes"),
             },
             PlacementAction::Scatter => PlacementRecipe::ScatterUniformWithCentroidTranslation,
             PlacementAction::Tile => {
@@ -2367,6 +2405,7 @@ fn resolve_object_plan(
             relative_scale: input.relative_scale,
             appearance: resolved.appearance,
             angle: resolved.rotation,
+            layout_direction,
             anchor,
             domain,
             recipe,
@@ -2415,6 +2454,34 @@ fn resolve_complete_object<'a>(
     planning: bool,
 ) -> Result<ResolvedObject<'a>, Vec<ScoreFieldGap>> {
     let mut gaps = Vec::new();
+    let layout_direction = input.layout_direction.and_then(|direction| {
+        let axis = (planning
+            && input
+                .action
+                .is_some_and(|action| action.category == "movement" && action.id == "line_up")
+            && direction.category == "angle")
+            .then(|| {
+                input.angle_context.and_then(|context| {
+                    crate::score_angle::resolve_layout_direction(direction.id, context)
+                })
+            })
+            .flatten();
+        if let Some(axis) = axis {
+            Some(crate::composition_plan::ResolvedLayoutDirection {
+                identity: crate::SemanticIdentity {
+                    category: direction.category.to_owned(),
+                    id: direction.id.to_owned(),
+                },
+                axis,
+            })
+        } else {
+            gaps.push(ScoreFieldGap::UnsupportedLayoutDirection {
+                category: direction.category.to_owned(),
+                id: direction.id.to_owned(),
+            });
+            None
+        }
+    });
     let primitive = match score_primitive_from_identity(input.primitive) {
         Ok(primitive) => primitive,
         Err(error) => {
@@ -2682,6 +2749,7 @@ fn resolve_complete_object<'a>(
         dimensions,
         placement,
         rotation,
+        layout_direction,
         appearance: ResolvedObjectAppearance {
             filled,
             continuity: style.expect("checked continuity"),
@@ -3538,7 +3606,7 @@ mod tests {
         };
         let mut compilation = crate::compile_typed_ddl(
             crate::NormalizedDdlDocument::new(
-                "place many red circle at center. scatter eight red square at left-edge.",
+                "place many red circle at center. arrange eight red square vertically at left-edge.",
                 crate::ResolvedInstructionLanguage::En,
                 vec![],
             )
@@ -3580,6 +3648,10 @@ mod tests {
             }
         );
         assert_eq!(plan.objects().unwrap()[0].count(), 8);
+        assert_eq!(
+            plan.objects().unwrap()[0].layout_direction().unwrap().axis,
+            [0, 1]
+        );
         compilation.compiler_lock.as_mut().unwrap().full_digest = "tampered".to_owned();
         assert!(matches!(
             crate::execution_projection::project_compilation_for_execution(
@@ -3689,6 +3761,102 @@ mod tests {
                         i128::from(spacing) * cell_width.denominator
                     ),
                     _ => panic!(),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn layout_direction_physical_rectangles_and_original_seed_identity() {
+        let limits = crate::MacroExpansionLimits {
+            max_invocations: 16,
+            max_depth: 16,
+            max_evaluation_steps: 1000,
+            max_nodes_per_invocation: 100,
+            max_total_nodes: 500,
+        };
+        for (width, height) in [(1200, 800), (800, 1200)] {
+            let context = ScoreLoweringContext {
+                canvas_format: CanvasFormat {
+                    id: "physical-test",
+                    width_units: width,
+                    height_units: height,
+                },
+                background: Color::White,
+                resolved_palette: None,
+            };
+            for (word, y) in [("縦", 0), ("右上がり", -1), ("右下がり", 1), ("斜め", 2)]
+            {
+                for seed in [None, Some(0), Some(19)] {
+                    let compilation = crate::compile_typed_ddl(
+                        crate::NormalizedDdlDocument::new(
+                            format!("中央に、黒い横線を{word}に4294967295本並べる。"),
+                            crate::ResolvedInstructionLanguage::Ja,
+                            vec![],
+                        )
+                        .unwrap(),
+                        &[],
+                        seed,
+                        limits,
+                    );
+                    let transformed = crate::transform_stage15(
+                        crate::stage15_transformation_input(&compilation).unwrap(),
+                        None,
+                    )
+                    .unwrap();
+                    let view = transformed.verified_effective_view();
+                    let result = resolve_composition_plan(view, context, ScoreErrorPolicy::Stop);
+                    let objects = result
+                        .objects()
+                        .unwrap_or_else(|| panic!("{:?}", result.diagnostics()));
+                    assert_eq!(objects.len(), 1);
+                    let object = &objects[0];
+                    assert_eq!(object.count(), u32::MAX);
+                    assert_eq!(object.angle(), Some(0.0));
+                    let ResolvedGeometryDimensions::Line { length } = object.dimensions() else {
+                        panic!()
+                    };
+                    assert_eq!(length.numerator * 800 * 25, 4800 * length.denominator);
+                    match object.recipe() {
+                        PlacementRecipe::VerticalLine { cell_height } => assert_eq!(
+                            cell_height.numerator * i128::from(u32::MAX) * 800,
+                            i128::from(height) * cell_height.denominator
+                        ),
+                        PlacementRecipe::DiagonalLine { step } => {
+                            assert_eq!(
+                                step[0].numerator * i128::from(u32::MAX),
+                                step[0].denominator
+                            );
+                            if y != 2 {
+                                assert_eq!(
+                                    step[1].numerator * i128::from(u32::MAX),
+                                    i128::from(y) * step[1].denominator
+                                );
+                            }
+                            assert_eq!(
+                                step[1].numerator.abs() * step[0].denominator,
+                                step[0].numerator * step[1].denominator
+                            );
+                        }
+                        other => panic!("{other:?}"),
+                    }
+                    let variation = crate::transform_stage15(
+                        crate::stage15_transformation_input(&compilation).unwrap(),
+                        Some(crate::Stage15Variation {
+                            amplitude: crate::Stage15VariationAmplitude::Large,
+                            seed: 234,
+                        }),
+                    )
+                    .unwrap();
+                    let varied = resolve_composition_plan(
+                        variation.verified_effective_view(),
+                        context,
+                        ScoreErrorPolicy::Stop,
+                    );
+                    assert_eq!(
+                        object.layout_direction(),
+                        varied.objects().unwrap()[0].layout_direction()
+                    );
                 }
             }
         }

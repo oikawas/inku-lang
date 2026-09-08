@@ -9,6 +9,29 @@ use serde::Deserialize;
 
 const FIXTURE: &str = include_str!("fixtures/neutral-parser-v5.json");
 
+#[test]
+fn direction_surfaces_are_recognized_without_rewriting_source() {
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中央に、横線を縦に三本並べる。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange three horizontal lines vertically at center.",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, vec![]).unwrap();
+        let parsed = parse_neutral_lexemes(&document);
+        assert!(
+            parsed.diagnostics.is_empty(),
+            "{source}: {:?}",
+            parsed.diagnostics
+        );
+        assert_eq!(document.source(), source);
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Fixture {

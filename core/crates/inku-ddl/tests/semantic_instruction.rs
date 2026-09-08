@@ -11,6 +11,33 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
+#[test]
+fn shape_angle_and_action_direction_have_distinct_exact_owners() {
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中央に、横線を縦に三本並べる。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange three horizontal lines vertically at center.",
+        ),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, vec![]).unwrap();
+        let result = inku_ddl::associate_semantic_instructions(&document).unwrap();
+        assert!(result.ast.complete, "{source}: {:?}", result.issues);
+        let instruction = &result.ast.instructions[0];
+        let angle = instruction.entity.angle.as_ref().unwrap();
+        let direction = instruction.layout_direction.as_ref().unwrap();
+        assert_eq!(angle.identity.id, "horizontal");
+        assert_eq!(direction.identity.id, "vertical");
+        assert_ne!(
+            angle.provenance.source.span,
+            direction.provenance.source.span
+        );
+    }
+}
+
 const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v16.json");
 
 #[test]
@@ -1519,6 +1546,7 @@ fn assert_source_provenance(case: &Case, result: &SemanticInstructionAssociation
             let expected_category = match occurrence.role {
                 SemanticInstructionOccurrenceRole::Action => "movement",
                 SemanticInstructionOccurrenceRole::Position => "place",
+                SemanticInstructionOccurrenceRole::LayoutDirection => "angle",
             };
             assert_eq!(
                 occurrence.term.identity.category, expected_category,

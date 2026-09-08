@@ -47,6 +47,8 @@ _ALLOWED_EN: tuple[tuple[str, int], ...] = ()
 
 # (置換対象, 置換後, 期待出現回数)。削剪では表せない許可差分 (語順修正)。
 _REORDERED_JA = (
+    # Point is already public vocabulary; retain the historical prompt file.
+    ("かたち: 円、楕円、三角、四角、線、弧、雲形\n", "かたち: 円、楕円、三角、四角、線、弧、点、雲形\n", 1),
     ("髪、", "銀筆、", 1),
     ("髪・", "銀筆・", 1),
     ("ビュラン・ドライポイントのいずれか", "ビュラン・ドライポイント・コンピュータのいずれか", 1),
@@ -174,6 +176,8 @@ _REORDERED_JA = (
     ),
 )
 _REORDERED_EN = (
+    # Keep the same current-vocabulary correction as Japanese.
+    ("forms: circle, ellipse, triangle, square, line, arc, cloudform\n", "forms: circle, ellipse, triangle, square, line, arc, point, cloudform\n", 1),
     ("hair, ", "silverpoint, ", 2),
     ("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),
     ("burin, or drypoint.", "burin, drypoint, or computer.", 1),
@@ -352,25 +356,25 @@ def test_stage1_prompt_en_matches_golden_with_pruning() -> None:
 _EXPECTED_CORE_MARKERS = {
     "ja": (
         "anchor", "{領域:", "領域",
-        "線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形",
+        "線", "円", "楕円", "三角", "四角", "多角形", "弧", "点", "雲形",
         "置く", "引く", "並べる", "散らす", "敷き詰める", "埋める",  # 描く 削剪
-        "触れる", "沿う", "切る", "触れない", "間に",
+        "触れる", "つながる", "沿う", "切る", "触れない", "間に",
         "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",
         "白", "黒", "青", "赤", "緑", "灰", "黄", "橙", "紫",
         "細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む",
-        "水平", "垂直", "斜め", "右上がり", "右下がり", "回転",
+        "水平", "垂直", "斜め", "右上がり", "右下がり", "左上がり", "左下がり", "回転",
         "縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月",
         "上", "下", "中央", "左端", "右端", "上端", "下端", "中心", "隅",
     ),
     "en": (
         "anchor", "{region:", "region",
-        "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform",
+        "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "point", "cloudform",
         "place", "draw", "arrange", "scatter", "tile", "fill",
-        "touching", "along", "cutting", "not touching", "between",
+        "touching", "connected", "along", "cutting", "not touching", "between",
         "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",
         "white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple",
         "fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring",
-        "horizontal", "vertical", "diagonal", "rising", "falling", "rotated",
+        "horizontal", "vertical", "diagonal", "rising", "falling", "left-rising", "left-falling", "rotated",
         "tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent",
         "top", "bottom", "center", "left-edge", "right-edge", "top-edge", "bottom-edge", "middle", "corner",
     ),
@@ -442,7 +446,7 @@ def test_display_categories_exclude_pruned_and_hidden_words() -> None:
         assert not (hidden & words)
     aida = saijiki.display_categories("ja")[-1]
     assert aida["key"] == "aida"
-    assert aida["words"] == ("沿う", "触れない", "切る", "間に", "触れる")
+    assert aida["words"] == ("沿う", "触れない", "切る", "間に", "触れる", "つながる")
 
 
 def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
@@ -459,6 +463,9 @@ def _saijiki_word_asset_object(word: saijiki.SaijikiWord) -> dict[str, object]:
     }
     if word.semantic_alias is not None:
         result["semantic_alias"] = word.semantic_alias
+    for field in ("parser_surfaces_ja", "parser_surfaces_en"):
+        if (aliases := getattr(word, field)) is not None:
+            result[field] = list(aliases)
     if word.english_grammar is not None:
         result["english_grammar"] = {
             "lemma": word.english_grammar.lemma,

@@ -13,6 +13,49 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/stage15-transform-v1.json");
+
+#[test]
+fn direction_language_and_owner_tampering_cannot_enter_sealed_stage15() {
+    let mut compilation = compile(
+        "arrange three horizontal lines vertically at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    assert!(stage15_transformation_input(&compilation).is_ok());
+    compilation
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0]
+        .layout_direction
+        .as_mut()
+        .unwrap()
+        .provenance
+        .source
+        .language = ResolvedInstructionLanguage::Ja;
+    assert!(stage15_transformation_input(&compilation).is_err());
+    let mut compilation = compile(
+        "arrange three horizontal lines vertically at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    let instruction = &mut compilation
+        .semantic_document
+        .as_mut()
+        .unwrap()
+        .ast
+        .instructions[0];
+    std::mem::swap(
+        &mut instruction.entity.angle,
+        &mut instruction.layout_direction,
+    );
+    assert!(stage15_transformation_input(&compilation).is_err());
+}
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,

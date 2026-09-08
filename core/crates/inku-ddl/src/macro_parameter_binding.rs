@@ -397,6 +397,10 @@ fn clause_facts(
     macro_resolution: &MacroInvocationLockResolutionResult,
     clause_index: usize,
 ) -> Option<Vec<Fact>> {
+    let attachment = &macro_resolution
+        .relation_reference_evidence
+        .attachment_evidence;
+    let topology = crate::semantic_association::ClauseTopologyEvidence::from_attachment(attachment);
     let clause = macro_resolution
         .relation_reference_evidence
         .attachment_evidence
@@ -425,6 +429,16 @@ fn clause_facts(
                 &term.category_key,
                 &term.canonical_surface_ja,
             )?,
+            ClauseAtom::RemainingRole(term)
+                if crate::semantic_association::is_layout_direction(
+                    document,
+                    &attachment.noun_phrase.clause_stream,
+                    &topology,
+                    term,
+                ) =>
+            {
+                continue;
+            }
             ClauseAtom::RemainingRole(term) => semantic_fact(
                 &term.asset_id,
                 &term.category_key,

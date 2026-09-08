@@ -16,6 +16,26 @@ use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
 use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
+
+#[test]
+fn actual_score_never_drops_layout_direction_on_place() {
+    let transformed = stage15(
+        "place one red point vertically at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let result = lower_verified_stage15_score_with_policy(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            policy,
+        );
+        assert!(result.score().is_none());
+        assert!(result.diagnostics().iter().any(|diagnostic| matches!(
+            diagnostic.reason,
+            ScoreFieldGap::UnsupportedLayoutDirection { .. }
+        )));
+    }
+}
 use inku_score::{
     Canvas, Color, ConnectedPositionAuthority, GroundMaterial, LineStyle, Point, Primitive,
     RelationGap, RelationType, ResolvedPaletteColor, ResolvedPaletteContext, SurfaceTexture,

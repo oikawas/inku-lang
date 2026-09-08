@@ -50,6 +50,8 @@ pub struct SaijikiWordAsset {
     pub surface_en: Option<String>,
     #[serde(default)]
     english_grammar: Option<EnglishGrammarAsset>,
+    pub parser_surfaces_ja: Option<Vec<String>>,
+    pub parser_surfaces_en: Option<Vec<String>>,
     pub default: bool,
     pub prompt: bool,
     pub display: bool,
@@ -299,7 +301,14 @@ pub(crate) fn parser_candidate_surfaces(
         return Vec::new();
     }
     match language {
-        ResolvedInstructionLanguage::Ja => vec![Cow::Borrowed(word.surface_ja.as_str())],
+        ResolvedInstructionLanguage::Ja => std::iter::once(Cow::Borrowed(word.surface_ja.as_str()))
+            .chain(
+                word.parser_surfaces_ja
+                    .iter()
+                    .flatten()
+                    .map(|surface| Cow::Borrowed(surface.as_str())),
+            )
+            .collect(),
         ResolvedInstructionLanguage::En => {
             let mut surfaces = word
                 .surface_en
@@ -312,9 +321,33 @@ pub(crate) fn parser_candidate_surfaces(
                     project_english_grammatical_form(grammar, *form).map(Cow::Owned)
                 }));
             }
+            surfaces.extend(
+                word.parser_surfaces_en
+                    .iter()
+                    .flatten()
+                    .map(|surface| Cow::Borrowed(surface.as_str())),
+            );
             surfaces
         }
     }
+}
+
+/// Classify an attested English row form without inferring a role from a suffix.
+pub(crate) fn is_angle_adverb(surface: &str, canonical_surface_ja: &str) -> bool {
+    saijiki_asset()
+        .categories
+        .iter()
+        .filter(|category| category.key == "katamuki")
+        .flat_map(|category| &category.words)
+        .filter(|word| word.surface_ja == canonical_surface_ja)
+        .filter_map(|word| word.english_grammar.as_ref())
+        .any(|grammar| {
+            grammar
+                .permitted_forms
+                .contains(&EnglishGrammaticalForm::Adverb)
+                && project_english_grammatical_form(grammar, EnglishGrammaticalForm::Adverb)
+                    .is_some_and(|adverb| adverb.eq_ignore_ascii_case(surface))
+        })
 }
 
 fn english_form_is_compatible(
@@ -525,6 +558,15 @@ fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectio
                     &category.key,
                     &word.surface_ja,
                     &surface,
+                )?;
+            }
+            for surface in word.parser_surfaces_en.iter().flatten() {
+                register_parser_surface(
+                    asset,
+                    &mut owners,
+                    &category.key,
+                    &word.surface_ja,
+                    surface,
                 )?;
             }
         }

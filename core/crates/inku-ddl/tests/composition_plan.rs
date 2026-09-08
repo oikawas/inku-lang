@@ -51,13 +51,304 @@ fn stage(
 }
 
 fn context(canvas: &str) -> ScoreLoweringContext {
-    ScoreLoweringContext::resolve(canvas, Color::White).unwrap()
+    ScoreLoweringContext::resolve_with_palette(
+        canvas,
+        Color::White,
+        inku_score::ResolvedPaletteContext::new(
+            inku_score::ResolvedPaletteColor::new(Color::White, [255; 3], 1.0),
+            inku_score::ResolvedPaletteColor::new(Color::Black, [0; 3], 0.0),
+            inku_score::ResolvedPaletteColor::new(Color::White, [255; 3], 1.0),
+        ),
+    )
+    .unwrap()
 }
 
 fn ratio(value: Rational, numerator: i128, denominator: i128) {
     assert_eq!(
         value.numerator() * denominator,
         numerator * value.denominator()
+    );
+}
+
+#[test]
+fn explicit_layout_direction_natural_source_reaches_ready_plan() {
+    for (source, language) in [
+        (
+            "中央に、横線を縦に三本並べる。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "arrange three horizontal lines vertically at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "中央に、斜めの線を横に三本並べる。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "line up three diagonal lines horizontally at center.",
+            ResolvedInstructionLanguage::En,
+        ),
+        (
+            "中央に、横線を三本並べる。線は縦に。",
+            ResolvedInstructionLanguage::Ja,
+        ),
+        (
+            "arrange three horizontal lines at center. the line vertically.",
+            ResolvedInstructionLanguage::En,
+        ),
+    ] {
+        let transformed = stage(source, language, &[]);
+        let result =
+            plan_verified_stage15(transformed.verified_effective_view(), context("square"));
+        assert_eq!(
+            result.outcome(),
+            CompositionPlanOutcome::Ready,
+            "{source}: {:?}",
+            result.diagnostics()
+        );
+        let object = &result.objects().unwrap()[0];
+        assert_eq!(object.count(), 3);
+        let direction = object.layout_direction().unwrap();
+        if direction.identity.id == "vertical" {
+            assert_eq!(direction.axis, [0, 1]);
+            assert_eq!(object.angle(), Some(0.0));
+            assert!(matches!(
+                object.recipe(),
+                PlacementRecipe::VerticalLine { .. }
+            ));
+        } else {
+            assert_eq!(direction.identity.id, "horizontal");
+            assert_eq!(direction.axis, [1, 0]);
+            assert!([45.0, 135.0, 225.0, 315.0].contains(&object.angle().unwrap()));
+        }
+    }
+}
+
+#[test]
+fn layout_axes_preserve_rectangular_physics_shape_size_and_large_count() {
+    for canvas in ["golden", "oban"] {
+        for (word, axis) in [("縦", [0, 1]), ("右上がり", [1, -1]), ("右下がり", [1, 1])] {
+            for n in [4, u32::MAX] {
+                let source = format!("中央に、横線を{word}に{n}本並べる。");
+                let transformed = stage(&source, ResolvedInstructionLanguage::Ja, &[]);
+                let result =
+                    plan_verified_stage15(transformed.verified_effective_view(), context(canvas));
+                let objects = result
+                    .objects()
+                    .unwrap_or_else(|| panic!("{source}: {:?}", result.diagnostics()));
+                assert_eq!(objects.len(), 1);
+                let object = &objects[0];
+                assert_eq!(object.count(), n);
+                assert_eq!(object.layout_direction().unwrap().axis, axis);
+                assert_eq!(object.angle(), Some(0.0));
+                let ResolvedGeometryDimensions::Line { length } = object.dimensions() else {
+                    panic!()
+                };
+                ratio(length, 6, 25);
+                match object.recipe() {
+                    PlacementRecipe::VerticalLine { cell_height } => ratio(
+                        *cell_height,
+                        if canvas == "golden" { 1 } else { 3 },
+                        i128::from(n) * if canvas == "golden" { 1 } else { 2 },
+                    ),
+                    PlacementRecipe::DiagonalLine { step } => {
+                        ratio(step[0], 1, n.into());
+                        ratio(step[1], axis[1].into(), n.into());
+                    }
+                    other => panic!("{other:?}"),
+                }
+            }
+        }
+    }
+}
+
+fn direction_definition(value: Value, parameters: Value) -> MacroDefinition {
+    MacroDefinition::from_json(&json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Draw", "heading":"Direction", "version":"1.0.0",
+        "parameters":parameters, "components":{}, "body":[{"op":"emit","binding":null,"fields":{
+            "shape":{"expr":"semantic_ref","category":"shape","id":"line"},
+            "movement":{"expr":"semantic_ref","category":"movement","id":"line_up"},
+            "place":{"expr":"semantic_ref","category":"place","id":"center"},
+            "angle":{"expr":"semantic_ref","category":"angle","id":"horizontal"},
+            "count":{"expr":"integer","value":3}, "layout_direction":value
+        }}]
+    }).to_string()).unwrap()
+}
+
+#[test]
+fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
+    let parameter = direction_definition(
+        json!({"expr":"parameter","name":"axis"}),
+        json!({"axis":{"type":"semantic_ref","category":"angle"}}),
+    );
+    let missing = compile(
+        "Draw.Direction",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&parameter),
+    );
+    assert!(stage15_transformation_input(&missing).is_err());
+    for (source, language) in [
+        ("vertical Draw.Direction", ResolvedInstructionLanguage::En),
+        ("垂直Draw.Direction", ResolvedInstructionLanguage::Ja),
+    ] {
+        let transformed = stage(source, language, std::slice::from_ref(&parameter));
+        let result =
+            plan_verified_stage15(transformed.verified_effective_view(), context("square"));
+        let object = &result
+            .objects()
+            .unwrap_or_else(|| panic!("{:?}", result.diagnostics()))[0];
+        assert_eq!(object.layout_direction().unwrap().axis, [0, 1]);
+        assert_eq!(object.angle(), Some(0.0));
+        assert!(matches!(
+            object.origin(),
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ));
+    }
+    for id in ["rising", "falling", "diagonal", "rotated"] {
+        let definition = direction_definition(
+            json!({"expr":"semantic_ref","category":"angle","id":id}),
+            json!({}),
+        );
+        let transformed = stage(
+            "Draw.Direction",
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        let result =
+            plan_verified_stage15(transformed.verified_effective_view(), context("square"));
+        if id == "rotated" {
+            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+        } else {
+            assert!(result.objects().unwrap()[0].layout_direction().is_some());
+        }
+        let caller = stage(
+            "Draw.Direction vertically",
+            ResolvedInstructionLanguage::En,
+            &[definition],
+        );
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let result = plan_verified_stage15_with_policy(
+                caller.verified_effective_view(),
+                context("square"),
+                policy,
+            );
+            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            assert!(result.diagnostics().iter().any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning));
+        }
+    }
+    let mut local = serde_json::to_value(direction_definition(
+        json!({"expr":"local","name":"axis"}),
+        json!({}),
+    ))
+    .unwrap();
+    let emit = local["body"][0].clone();
+    local["body"] = json!([{"op":"vary","binding":"axis","domain":"layout-axis","choices":[{"expr":"semantic_ref","category":"angle","id":"vertical"}],"range":null,"body":[emit]}]);
+    let local = MacroDefinition::from_json(&local.to_string()).unwrap();
+    let transformed = stage("Draw.Direction", ResolvedInstructionLanguage::En, &[local]);
+    let result = plan_verified_stage15(transformed.verified_effective_view(), context("square"));
+    assert_eq!(
+        result.objects().unwrap()[0]
+            .layout_direction()
+            .unwrap()
+            .axis,
+        [0, 1]
+    );
+    let ambiguous = direction_definition(
+        json!({"expr":"parameter","name":"axis"}),
+        json!({"axis":{"type":"semantic_ref","category":"angle"},"shape_angle":{"type":"semantic_ref","category":"angle"}}),
+    );
+    assert!(
+        stage15_transformation_input(&compile(
+            "horizontal vertical Draw.Direction",
+            ResolvedInstructionLanguage::En,
+            &[ambiguous]
+        ))
+        .is_err()
+    );
+}
+
+#[test]
+fn unsupported_direction_and_conflicts_preserve_execution_boundaries() {
+    for source in [
+        "place one red point vertically at center.",
+        "scatter three red lines vertically at center.",
+        "tile three red lines diagonally at center.",
+    ] {
+        let transformed = stage(source, ResolvedInstructionLanguage::En, &[]);
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let result = plan_verified_stage15_with_policy(
+                transformed.verified_effective_view(),
+                context("square"),
+                policy,
+            );
+            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            assert!(result.diagnostics().iter().any(|diagnostic| matches!(
+                diagnostic.reason,
+                ScoreFieldGap::UnsupportedLayoutDirection { .. }
+            )));
+        }
+    }
+    let mixed = stage(
+        "place one red point vertically at center. arrange three red lines horizontally at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    let continued = plan_verified_stage15_with_policy(
+        mixed.verified_effective_view(),
+        context("square"),
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        continued.outcome(),
+        CompositionPlanOutcome::ReadyWithOmissions
+    );
+    assert_eq!(
+        continued.objects().unwrap()[0].origin(),
+        &ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 1
+        }
+    );
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange three red lines horizontally vertically at center.",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange three red lines horizontally at center. the line vertically.",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange a line and a circle vertically at center.",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中央に、線と円を縦に並べる。",
+        ),
+    ] {
+        assert!(
+            stage15_transformation_input(&compile(source, language, &[])).is_err(),
+            "{source}"
+        );
+    }
+    let point = stage(
+        "arrange three red point vertically at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    assert_eq!(
+        plan_verified_stage15(point.verified_effective_view(), context("square")).outcome(),
+        CompositionPlanOutcome::Ready
+    );
+    let angled_point = stage(
+        "arrange three red horizontal point vertically at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    assert_eq!(
+        plan_verified_stage15(angled_point.verified_effective_view(), context("square")).outcome(),
+        CompositionPlanOutcome::Stopped
     );
 }
 

@@ -36,7 +36,8 @@ pub mod score_lowering;
 pub use composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
     PlacementAction, PlacementRecipe, Rational, ResolvedGeometryDimensions,
-    ResolvedObjectAppearance, plan_verified_stage15, plan_verified_stage15_with_policy,
+    ResolvedLayoutDirection, ResolvedObjectAppearance, plan_verified_stage15,
+    plan_verified_stage15_with_policy,
 };
 pub mod semantic_association;
 pub mod semantic_document;

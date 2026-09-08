@@ -15,6 +15,53 @@ use serde::Deserialize;
 const FIXTURE: &str = include_str!("fixtures/semantic-document-v14.json");
 
 #[test]
+fn layout_direction_continuation_has_same_meaning_and_distinct_source() {
+    for (language, inline, continuation) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中央に、横線を縦に三本並べる。",
+            "中央に、横線を三本並べる。線は縦に。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange three horizontal lines vertically at center.",
+            "arrange three horizontal lines at center. the line vertically.",
+        ),
+    ] {
+        let build = |source| {
+            associate_semantic_document(
+                &NormalizedDdlDocument::new(source, language, vec![]).unwrap(),
+            )
+            .unwrap()
+        };
+        let left = build(inline);
+        let right = build(continuation);
+        assert!(
+            right.ast.complete,
+            "{continuation}: {:?} {:?}",
+            right.issues, right.continuation_issues
+        );
+        assert_eq!(left.canonical_bytes, right.canonical_bytes);
+        assert_ne!(
+            left.ast.instructions[0]
+                .layout_direction
+                .as_ref()
+                .unwrap()
+                .provenance
+                .source
+                .span,
+            right.ast.instructions[0]
+                .layout_direction
+                .as_ref()
+                .unwrap()
+                .provenance
+                .source
+                .span
+        );
+    }
+}
+
+#[test]
 fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
     let mut canonical = Vec::new();
     for (language, source) in [

@@ -12,6 +12,22 @@ use inku_ddl::{
 };
 use serde::Deserialize;
 
+#[test]
+fn adverbial_angle_does_not_conflict_with_entity_angle() {
+    let document = NormalizedDdlDocument::new(
+        "arrange three horizontal lines vertically at center.",
+        ResolvedInstructionLanguage::En,
+        vec![],
+    )
+    .unwrap();
+    let result = inku_ddl::associate_semantic_entities(&document).unwrap();
+    assert!(result.ast.complete, "{:?}", result.issues);
+    assert_eq!(
+        result.ast.entities[0].angle.as_ref().unwrap().identity.id,
+        "horizontal"
+    );
+}
+
 const FIXTURE: &str = include_str!("fixtures/semantic-association-v13.json");
 
 #[test]

@@ -88,6 +88,10 @@ pub enum ScoreFieldGap {
     UnsupportedCoordinatedGroup,
     UnsupportedDocumentMeaning,
     UnboundMacroCallerMeaning,
+    UnsupportedLayoutDirection {
+        category: String,
+        id: String,
+    },
     MissingMacroExpansionOwner {
         invocation_ordinal: u64,
     },

@@ -272,6 +272,11 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
                     "\"geometry_gap\":[\"triangle\",\"polygon\"],",
                     "\"line_up\":\"horizontal_domain_width_equal_cell_centers\",",
+                    "\"layout_direction\":{\"owner\":\"instruction_or_emit\",\"default\":\"horizontal\",",
+                    "\"horizontal\":\"tW,0\",\"vertical\":\"0,tH\",\"rising\":\"ts,-ts\",\"falling\":\"ts,ts\",",
+                    "\"t\":\"(i+1/2)/n-1/2\",\"s\":\"min(W,H)\",\"diagonal\":\"seeded_rising_or_falling\",",
+                    "\"seed_role\":\"inku.layout-direction-selection.v1\",\"seed\":\"attested_optional_composition_seed_original_meaning_logical_occurrence\",",
+                    "\"shape_angle\":\"independent_unchanged\",\"supported_action\":\"line_up\"},",
                     "\"tile\":\"long_axis_min_n_ceil_sqrt_n_aspect_short_axis_ceil_n_long_axis_row_major\",",
                     "\"tile_numeric_anchor\":\"translate_exact_filled_prefix_centroid\",",
                     "\"tile_named_anchor\":\"stay_in_named_domain_no_centroid_translation\",",
@@ -855,7 +860,15 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "d9ae29eb0a80e96afc614bbfb3c55d77646468467ac00026090d89ddaa9497fe"
+            "0fde6e2082b9adcb17ca0ab5a36888cb884eb3e0225f5d35c7ccdc44bba736f0"
+        );
+        assert_eq!(
+            payload["object_placement"]["layout_direction"]["vertical"],
+            "0,tH"
+        );
+        assert_eq!(
+            payload["object_placement"]["layout_direction"]["rising"],
+            "ts,-ts"
         );
     }
 }

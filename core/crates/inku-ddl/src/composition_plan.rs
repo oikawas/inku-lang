@@ -46,6 +46,13 @@ pub enum PlacementRecipe {
     HorizontalLine {
         cell_width: Rational,
     },
+    VerticalLine {
+        cell_height: Rational,
+    },
+    /// Physical 45-degree steps; the centroid is translated to the semantic anchor.
+    DiagonalLine {
+        step: [Rational; 2],
+    },
     /// Row-major filled prefix. No instances or trailing empty cells are allocated.
     Grid {
         columns: u32,
@@ -74,9 +81,17 @@ pub struct ObjectPlacementPlan {
     pub(crate) relative_scale: Option<CoreModifierValue>,
     pub(crate) appearance: ResolvedObjectAppearance,
     pub(crate) angle: Option<f64>,
+    pub(crate) layout_direction: Option<ResolvedLayoutDirection>,
     pub(crate) anchor: ObjectAnchor,
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedLayoutDirection {
+    pub identity: crate::SemanticIdentity,
+    /// Signed physical axes. Y increases downwards; rising is [1, -1].
+    pub axis: [i8; 2],
 }
 
 impl ObjectPlacementPlan {
@@ -106,6 +121,9 @@ impl ObjectPlacementPlan {
     }
     pub fn angle(&self) -> Option<f64> {
         self.angle
+    }
+    pub fn layout_direction(&self) -> Option<&ResolvedLayoutDirection> {
+        self.layout_direction.as_ref()
     }
     pub fn anchor(&self) -> &ObjectAnchor {
         &self.anchor

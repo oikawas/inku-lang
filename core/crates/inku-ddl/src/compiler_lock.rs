@@ -107,6 +107,7 @@ pub enum SemanticDeliveryOwner {
     Touch,
     Continuity,
     Angle,
+    LayoutDirection,
     SurfaceQuality,
     SurfaceIntensity,
     FluctuationAmplitude,
@@ -138,6 +139,7 @@ impl SemanticDeliveryOwner {
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
+            Self::LayoutDirection => "layout_direction",
             Self::SurfaceQuality => "surface_quality",
             Self::SurfaceIntensity => "surface_intensity",
             Self::FluctuationAmplitude => "fluctuation_amplitude",
@@ -999,6 +1001,7 @@ fn project_deliveries(
             .map(|occurrence| occurrence.term.provenance.source.span);
         match issue.kind {
             SemanticInstructionIssueKind::AmbiguousActionOwnership
+            | SemanticInstructionIssueKind::AmbiguousLayoutDirectionOwnership
             | SemanticInstructionIssueKind::AmbiguousPositionOwnership => {
                 for occurrence in issue.occurrences.iter().filter(|occurrence| {
                     !consumed_continuation_spans.contains(&occurrence.term.provenance.source.span)
@@ -1012,6 +1015,7 @@ fn project_deliveries(
                 }
             }
             SemanticInstructionIssueKind::ConflictingActions
+            | SemanticInstructionIssueKind::ConflictingLayoutDirections
             | SemanticInstructionIssueKind::ConflictingPositions => add_conflict(
                 &mut projection,
                 issue.kind.as_str(),
@@ -1023,6 +1027,7 @@ fn project_deliveries(
                     .collect(),
             ),
             SemanticInstructionIssueKind::MissingActionEntity
+            | SemanticInstructionIssueKind::MissingLayoutDirectionEntity
             | SemanticInstructionIssueKind::MissingPositionEntity => {
                 add_blocking(&mut projection, issue.kind.as_str(), span)
             }
@@ -1097,6 +1102,9 @@ fn project_deliveries(
             let owner = match predicate.role {
                 SemanticInstructionOccurrenceRole::Action => SemanticDeliveryOwner::Action,
                 SemanticInstructionOccurrenceRole::Position => SemanticDeliveryOwner::Position,
+                SemanticInstructionOccurrenceRole::LayoutDirection => {
+                    SemanticDeliveryOwner::LayoutDirection
+                }
             };
             let mut candidates = members.clone();
             candidates.push(format!(
@@ -1571,6 +1579,10 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             instruction.entity.proportion.arc_form.as_ref(),
         ),
         (SemanticDeliveryOwner::Action, instruction.action.as_ref()),
+        (
+            SemanticDeliveryOwner::LayoutDirection,
+            instruction.layout_direction.as_ref(),
+        ),
         (
             SemanticDeliveryOwner::Position,
             instruction.position.as_ref(),
@@ -2445,6 +2457,9 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
     }
     for instruction in &ast.instructions {
         push_entity(&mut occurrences, &instruction.entity);
+        if let Some(direction) = &instruction.layout_direction {
+            push_term(&mut occurrences, direction);
+        }
         if let Some(action) = &instruction.action {
             push_term(&mut occurrences, action);
         }
@@ -2594,6 +2609,12 @@ pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> 
 
 fn instruction_provenance_value(instruction: &SemanticInstruction) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(direction) = &instruction.layout_direction {
+        record.insert(
+            "layout_direction".to_owned(),
+            term_provenance_value(direction),
+        );
+    }
     record.insert(
         "entity".to_owned(),
         entity_provenance_value(&instruction.entity),

@@ -8,6 +8,9 @@ use inku_ddl::{
 fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
     let ja = saijiki_derived_projection(ResolvedInstructionLanguage::Ja).unwrap();
     let en = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
+    assert!(!en.prompt_block.contains("vertically"));
+    assert!(!en.prompt_block.contains("horizontally"));
+    assert!(!en.prompt_block.contains("diagonally"));
 
     assert!(ja.prompt_block.starts_with("かたち: 円、楕円、三角"));
     assert!(

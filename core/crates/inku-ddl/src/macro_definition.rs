@@ -827,6 +827,8 @@ fn validate_body(
                     let dimension = crate::fluctuation::FluctuationDimension::from_field(field);
                     let expected_category = if dimension.is_some() {
                         "variation"
+                    } else if field == "layout_direction" {
+                        "angle"
                     } else {
                         field.as_str()
                     };

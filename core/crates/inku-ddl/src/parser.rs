@@ -160,6 +160,10 @@ const FUNCTION_WORDS_JA: &[&str] = &["を", "に", "で", "の", "は", "が", "
 // canonical rows, not aliases or independent semantic vocabulary.
 const JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1: &[&str] = &["白", "黒", "青", "赤"];
 const JAPANESE_COUNTERS_V1: &[&str] = &["本", "個", "枚"];
+
+pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
+    JAPANESE_COUNTERS_V1.contains(&surface)
+}
 const FUNCTION_WORDS_EN: &[&str] = &[
     "a", "an", "the", "with", "in", "at", "on", "to", "of", "and",
 ];

@@ -34,6 +34,20 @@ fn embedded_asset_has_stable_identity_and_exact_digest() {
 #[test]
 fn embedded_asset_is_complete_and_orders_are_lossless() {
     let asset = saijiki_asset();
+    let angles = asset
+        .categories
+        .iter()
+        .find(|category| category.key == "katamuki")
+        .unwrap();
+    assert_eq!(
+        angles.words[0].parser_surfaces_ja.as_deref(),
+        Some(["横".to_owned()].as_slice())
+    );
+    assert_eq!(
+        angles.words[1].parser_surfaces_ja.as_deref(),
+        Some(["縦".to_owned()].as_slice())
+    );
+    assert!(angles.words[0].marker_surfaces_ja.is_none());
 
     assert_eq!(asset.languages, ["ja", "en"]);
     assert_eq!(asset.categories.len(), 11);
@@ -244,7 +258,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
             .clone()
             .filter(|word| word.get("english_grammar").is_some())
             .count(),
-        4
+        7
     );
     assert!(
         words

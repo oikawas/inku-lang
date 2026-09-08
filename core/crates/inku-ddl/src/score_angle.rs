@@ -70,6 +70,28 @@ fn select_integer_range(input: &[u8], inclusive: (i16, i16)) -> i16 {
     inclusive.0 + uniform_index(input, width as u64) as i16
 }
 
+pub(crate) fn resolve_layout_direction(
+    id: &str,
+    context: ScoreAngleContext<'_>,
+) -> Option<[i8; 2]> {
+    Some(match id {
+        "horizontal" => [1, 0],
+        "vertical" => [0, 1],
+        "rising" => [1, -1],
+        "falling" => [1, 1],
+        "diagonal" => {
+            let mut input = angle_hash_input(id, context);
+            push_frame(
+                &mut input,
+                b"semantic_role",
+                b"inku.layout-direction-selection.v1",
+            );
+            [1, if uniform_index(&input, 2) == 0 { -1 } else { 1 }]
+        }
+        _ => return None,
+    })
+}
+
 fn uniform_index(input: &[u8], upper: u64) -> usize {
     debug_assert!(upper > 0);
     let acceptance_limit = u64::MAX - (u64::MAX % upper);

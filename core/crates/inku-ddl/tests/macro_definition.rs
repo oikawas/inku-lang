@@ -11,6 +11,25 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
 
 #[test]
+fn layout_direction_emit_maps_to_existing_angle_category_only() {
+    let mut value = serde_json::json!({"schema":"inku.macro-definition.v1", "namespace":"Axis", "heading":"Line", "version":"1.0.0", "parameters":{}, "components":{}, "body":[{"op":"emit","binding":null,"fields":{
+        "layout_direction":{"expr":"semantic_ref","category":"angle","id":"vertical"},
+        "angle":{"expr":"semantic_ref","category":"angle","id":"horizontal"},
+        "count":{"expr":"integer","value":3}
+    }}]});
+    let definition = MacroDefinition::from_json(&value.to_string()).unwrap();
+    assert!(definition.identity().is_ok());
+    value["body"][0]["fields"]["layout_direction"]["category"] = Value::String("color".to_owned());
+    value["body"][0]["fields"]["layout_direction"]["id"] = Value::String("red".to_owned());
+    assert!(
+        MacroDefinition::from_json(&value.to_string())
+            .unwrap()
+            .identity()
+            .is_err()
+    );
+}
+
+#[test]
 fn fluctuation_dimension_preserves_legacy_identity_and_checks_known_constraints() {
     let legacy = serde_json::json!({
         "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",

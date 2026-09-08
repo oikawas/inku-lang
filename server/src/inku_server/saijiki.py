@@ -64,6 +64,9 @@ class SaijikiWord:
     score_value: str | None = None  # Weight / Color / SurfaceTexture の Score enum 値
     semantic_alias: str | None = None  # localized wire IDとは別のtyped semantic identity
     english_grammar: _EnglishGrammar | None = None  # Rust assetと同期する非公開metadata
+    # Compiler-only aliases never enter prompt, display, or marker projections.
+    parser_surfaces_ja: tuple[str, ...] | None = None
+    parser_surfaces_en: tuple[str, ...] | None = None
     # マーカー表面の言語別上書き。en「line-up」は従来マーカー「arrange」を保つ。
     marker_surfaces_ja: tuple[str, ...] | None = None
     marker_surfaces_en: tuple[str, ...] | None = None
@@ -135,7 +138,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("楕円", "ellipse"),
             _w("三角", "triangle"),
             _w("四角", "square"),
-            _w("線", "line"),
+            _w("線", "line", parser_surfaces_en=("lines",)),
             _w("弧", "arc"),
             _w("点", "point"),
             _w("雲形", "cloudform"),
@@ -150,9 +153,9 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_en="angles",
         marker_class="angle",
         words=(
-            _w("水平", "horizontal"),
-            _w("垂直", "vertical"),
-            _w("斜め", "diagonal"),
+            _w("水平", "horizontal", parser_surfaces_ja=("横",), english_grammar=_EnglishGrammar("horizontal", "adjective", "base", ("adverb",))),
+            _w("垂直", "vertical", parser_surfaces_ja=("縦",), english_grammar=_EnglishGrammar("vertical", "adjective", "base", ("adverb",))),
+            _w("斜め", "diagonal", english_grammar=_EnglishGrammar("diagonal", "adjective", "base", ("adverb",))),
             _w("右上がり", "rising"),
             _w("右下がり", "falling"),
             _w("左上がり", "left-rising", **_HIDDEN_MARKER),
@@ -329,7 +332,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         words=(
             _w("置く", "place"),
             # 従来の閉包マーカー「arrange」を互換のため保持する (語彙は line-up)。
-            _w("並べる", "line-up", marker_surfaces_en=("arrange",)),
+            _w("並べる", "line-up", marker_surfaces_en=("arrange",), parser_surfaces_en=("arrange", "line up")),
             _w("引く", "draw"),
             # 日本語だけに残す削剪済みの墓標。英語の draw は「引く」の対訳。
             _w("描く", None, **_PRUNED),

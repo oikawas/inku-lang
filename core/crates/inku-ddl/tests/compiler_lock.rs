@@ -17,6 +17,50 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.json");
+
+#[test]
+fn layout_direction_is_attested_separately_and_absence_adds_no_null_key() {
+    let result = compile(
+        "arrange three horizontal lines vertically at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    assert!(stage15_transformation_input(&result).is_ok());
+    let directions = result
+        .deliveries
+        .iter()
+        .filter(|delivery| delivery.identity.owner == SemanticDeliveryOwner::LayoutDirection)
+        .collect::<Vec<_>>();
+    assert_eq!(directions.len(), 1);
+    let ast = &result.semantic_document.as_ref().unwrap().ast;
+    let direction = ast.instructions[0].layout_direction.as_ref().unwrap();
+    assert_eq!(directions[0].span, Some(direction.provenance.source.span));
+    let provenance = String::from_utf8(semantic_source_provenance_canonical_bytes(ast)).unwrap();
+    assert!(provenance.contains("\"layout_direction\""));
+    assert!(provenance.contains("vertically"));
+    let old = compile(
+        "line-up three horizontal line at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        Some(0),
+        LIMITS,
+    );
+    let old_document = old.semantic_document.as_ref().unwrap();
+    assert!(
+        !String::from_utf8(semantic_source_provenance_canonical_bytes(
+            &old_document.ast
+        ))
+        .unwrap()
+        .contains("layout_direction")
+    );
+    assert!(
+        !String::from_utf8(old_document.canonical_bytes.clone().unwrap())
+            .unwrap()
+            .contains("layout_direction")
+    );
+}
 const V12_FULL_LOCK_KNOWN_ANSWER: &str =
     "ae73dd825955efda06dd344fb464ae56c8d89ef8d38810ec99fb1ccf92cfe449";
 const V13_FULL_LOCK_KNOWN_ANSWER: &str =
@@ -30,7 +74,7 @@ const V15_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V15_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "20dabf80fa0a7e3a326fddd9e94f19bc95a01c74eb3f7c3329dc18804e479ab3";
 const V15_FULL_LOCK_KNOWN_ANSWER: &str =
-    "7cb2c032498e24a8de150c684d246c3d9e53bf854d889b1fbbd49a527d1634f1";
+    "9bdbce636e4421a1f38e5dc7bc4c5dc7b81d915bac12160a9232819ee013a5fc";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,

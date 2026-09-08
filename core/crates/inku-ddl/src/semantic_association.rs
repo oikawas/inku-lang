@@ -597,7 +597,7 @@ pub(crate) struct EnglishDeterminerPhraseEvidence {
 }
 
 impl ClauseTopologyEvidence {
-    fn from_attachment(attachment: &AttachmentEvidenceResult) -> Self {
+    pub(crate) fn from_attachment(attachment: &AttachmentEvidenceResult) -> Self {
         Self {
             attachment_markers: attachment.evidence.clone(),
             determiner_starts: attachment
@@ -1038,6 +1038,40 @@ pub fn associate_semantic_entities_with_macro_binding(
     )
 }
 
+pub(crate) fn is_layout_direction(
+    document: &NormalizedDdlDocument,
+    stream: &ClauseStream,
+    topology: &ClauseTopologyEvidence,
+    term: &crate::RemainingRoleTerm,
+) -> bool {
+    if term.role != RemainingRoleKind::Angle {
+        return false;
+    }
+    match document.language() {
+        crate::ResolvedInstructionLanguage::En => crate::saijiki::is_angle_adverb(
+            &document.source()[term.span.start_byte..term.span.end_byte],
+            &term.canonical_surface_ja,
+        ),
+        crate::ResolvedInstructionLanguage::Ja => {
+            topology.attachment_markers.iter().any(|marker| {
+                marker.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Ni)
+                    && term.span.end_byte <= marker.span.start_byte
+                    && stream.clauses[marker.clause_index]
+                        .atoms
+                        .iter()
+                        .any(|atom| atom.span() == term.span)
+                    && stream.clauses[marker.clause_index]
+                        .atoms
+                        .iter()
+                        .all(|atom| {
+                            atom.span().end_byte <= term.span.end_byte
+                                || marker.span.start_byte <= atom.span().start_byte
+                        })
+            })
+        }
+    }
+}
+
 fn build_semantic_entities(
     document: &NormalizedDdlDocument,
     clause_stream: ClauseStream,
@@ -1160,6 +1194,9 @@ fn build_semantic_entities(
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Angle => {
+                    if is_layout_direction(document, &clause_stream, &clause_topology, term) {
+                        continue;
+                    }
                     region.angles.push(project_remaining_term(
                         document,
                         term,

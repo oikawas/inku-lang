@@ -1,5 +1,9 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
+use crate::composition_plan::{
+    CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
+    PlacementAction, PlacementRecipe, ResolvedObjectAppearance,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
@@ -285,6 +289,7 @@ fn lower_macro_instruction(
     instructions: &mut Vec<Instruction>,
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+    mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
 ) {
     let caller_invalid = append_macro_caller_diagnostics(
         source_instruction_index,
@@ -419,6 +424,20 @@ fn lower_macro_instruction(
         let connected_dependency = binding
             .as_ref()
             .and_then(|binding| connected_by_to.get(binding));
+        if objects.is_some() && connected_dependency.is_some() {
+            let reason = ScoreFieldGap::UnsupportedMacroRelation;
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(source_instruction_index, provenance, None),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &reason,
+                    macro_emit_unit(source_instruction_index, provenance),
+                    None,
+                ),
+                reason,
+            });
+            continue;
+        }
         if let Some((dependency, _)) = connected_dependency
             && !successful_bindings.contains_key(dependency)
         {
@@ -435,7 +454,7 @@ fn lower_macro_instruction(
             });
             continue;
         }
-        let mut input = match project_macro_emit(fields, &[]) {
+        let mut input = match project_macro_emit(fields, &[], objects.is_some()) {
             Ok(input) => input,
             Err(emit_gaps) => {
                 let recoverable = emit_gaps
@@ -489,7 +508,7 @@ fn lower_macro_instruction(
                     .iter()
                     .map(|(_, field)| *field)
                     .collect::<Vec<_>>();
-                match project_macro_emit(fields, &omitted) {
+                match project_macro_emit(fields, &omitted, objects.is_some()) {
                     Ok(input) => input,
                     Err(_) => unreachable!("removing only optional appearance fields is complete"),
                 }
@@ -534,6 +553,32 @@ fn lower_macro_instruction(
                 generated_ordinal: provenance.generated_ordinal,
             },
         });
+        if let Some(objects) = objects.as_deref_mut() {
+            let origin = ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index,
+                binding: binding.clone(),
+                provenance: provenance.clone(),
+            };
+            let attempt =
+                resolve_projected_instruction(input, context, error_policy, |input, context| {
+                    resolve_object_plan(input, context, origin.clone())
+                });
+            append_plan_attempt(
+                attempt,
+                |reason| {
+                    generated_owner(
+                        source_instruction_index,
+                        provenance,
+                        macro_key_for_gap(reason),
+                    )
+                },
+                macro_emit_unit(source_instruction_index, provenance),
+                error_policy,
+                objects,
+                diagnostics,
+            );
+            continue;
+        }
         let attempt = lower_projected_instruction(input, context, error_policy);
         for omission in attempt.appearance_omissions {
             diagnostics.push(ScoreLoweringDiagnostic {
@@ -834,6 +879,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 14] = [
 fn project_macro_emit<'a>(
     fields: &'a BTreeMap<String, ExpandedMacroValue>,
     omitted_appearance: &[ScoreAppearanceField],
+    planning: bool,
 ) -> Result<ScoreLoweringInput<'a>, Vec<ScoreFieldGap>> {
     let mut gaps = fields
         .keys()
@@ -913,6 +959,7 @@ fn project_macro_emit<'a>(
     }
     if let Some(identity) = action
         && identity.id != "place"
+        && !(planning && matches!(identity.id, "line_up" | "scatter" | "tile"))
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
             key: "movement".to_owned(),
@@ -1025,6 +1072,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     candidate: ScoreLoweringCandidate<'a>,
     context: ScoreLoweringContext,
     policy_digest: String,
+    resolved_ground: Option<CanvasGroundSpec>,
     error_policy: ScoreErrorPolicy,
     outcome: ScoreLoweringOutcome,
     score: Option<Score>,
@@ -1181,6 +1229,43 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
 ) -> ExplicitScoreLoweringResult<'a> {
+    lower_verified_stage15_shared(view, context, error_policy, None)
+}
+
+pub(crate) fn resolve_composition_plan<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+) -> CompositionPlanResult<'a> {
+    let mut objects = Vec::new();
+    let result = lower_verified_stage15_shared(view, context, error_policy, Some(&mut objects));
+    let outcome = match result.outcome {
+        ScoreLoweringOutcome::Stopped => CompositionPlanOutcome::Stopped,
+        _ if objects.is_empty() => CompositionPlanOutcome::Stopped,
+        ScoreLoweringOutcome::Complete => CompositionPlanOutcome::Ready,
+        ScoreLoweringOutcome::CompleteWithOmissions => CompositionPlanOutcome::ReadyWithOmissions,
+    };
+    if outcome == CompositionPlanOutcome::Stopped {
+        objects.clear();
+    }
+    CompositionPlanResult {
+        view,
+        context,
+        error_policy,
+        policy_digest: result.policy_digest,
+        outcome,
+        objects,
+        ground: result.resolved_ground,
+        diagnostics: result.diagnostics,
+    }
+}
+
+fn lower_verified_stage15_shared<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
+) -> ExplicitScoreLoweringResult<'a> {
     let candidate = lower_verified_stage15_view(view);
     let document = candidate
         .verified_effective_view()
@@ -1288,6 +1373,43 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                     effective_focus,
                 )
                 .expect("source projection is called only for primitive heads");
+                if let Some(objects) = objects.as_deref_mut() {
+                    if let Some(relation) = &instruction.relation {
+                        let reason = unsupported_relation_reason(instruction_index, relation);
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: source_owner_for_gap(instruction_index, instruction, &reason),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                ScoreOmissionUnit::RelationInstruction { instruction_index },
+                                None,
+                            ),
+                            reason,
+                        });
+                    } else {
+                        let attempt = resolve_projected_instruction(
+                            input,
+                            context,
+                            error_policy,
+                            |input, context| {
+                                resolve_object_plan(
+                                    input,
+                                    context,
+                                    ScoreInstructionOrigin::SourceInstruction { instruction_index },
+                                )
+                            },
+                        );
+                        append_plan_attempt(
+                            attempt,
+                            |reason| source_owner_for_gap(instruction_index, instruction, reason),
+                            ScoreOmissionUnit::SourceInstruction { instruction_index },
+                            error_policy,
+                            objects,
+                            &mut diagnostics,
+                        );
+                    }
+                    continue;
+                }
                 if let Some(relation) = &instruction.relation {
                     let score_relation = direct_score_relation(
                         instruction_index,
@@ -1367,6 +1489,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
                     &mut instructions,
                     &mut instruction_origins,
                     &mut diagnostics,
+                    objects.as_deref_mut(),
                 );
             }
         }
@@ -1381,7 +1504,10 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
             ScoreDiagnosticDisposition::Omitted { .. }
         )
     });
-    let has_drawable_content = !instructions.is_empty() || ground.is_some();
+    let has_drawable_content = objects.as_ref().map_or_else(
+        || !instructions.is_empty() || ground.is_some(),
+        |objects| !objects.is_empty(),
+    );
     let outcome = if stopped || (omitted && !has_drawable_content) {
         ScoreLoweringOutcome::Stopped
     } else if omitted {
@@ -1389,9 +1515,9 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
     } else {
         ScoreLoweringOutcome::Complete
     };
-    let score = (outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
+    let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: score_wire_version(),
-        canvas: ground.map_or_else(
+        canvas: ground.clone().map_or_else(
             || Canvas::Id(context.canvas_format.id.to_owned()),
             |ground| {
                 Canvas::Spec(CanvasSpec {
@@ -1415,6 +1541,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
         candidate,
         context,
         policy_digest: geometry_resolution_policy_digest(),
+        resolved_ground: ground,
         error_policy,
         outcome,
         score,
@@ -1576,8 +1703,8 @@ struct AppearanceOmission {
 }
 
 #[derive(Clone, Debug)]
-struct InstructionLoweringAttempt {
-    instruction: Option<Instruction>,
+struct InstructionLoweringAttempt<T = Instruction> {
+    instruction: Option<T>,
     appearance_omissions: Vec<AppearanceOmission>,
     remaining_gaps: Vec<ScoreFieldGap>,
 }
@@ -1587,7 +1714,19 @@ fn lower_projected_instruction(
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
 ) -> InstructionLoweringAttempt {
-    let first_gaps = match lower_complete_instruction(input, context) {
+    resolve_projected_instruction(input, context, error_policy, lower_complete_instruction)
+}
+
+fn resolve_projected_instruction<'a, T>(
+    input: ScoreLoweringInput<'a>,
+    context: ScoreLoweringContext,
+    error_policy: ScoreErrorPolicy,
+    mut resolve: impl FnMut(
+        ScoreLoweringInput<'a>,
+        ScoreLoweringContext,
+    ) -> Result<T, Vec<ScoreFieldGap>>,
+) -> InstructionLoweringAttempt<T> {
+    let first_gaps = match resolve(input, context) {
         Ok(instruction) => {
             return InstructionLoweringAttempt {
                 instruction: Some(instruction),
@@ -1633,7 +1772,7 @@ fn lower_projected_instruction(
             remaining_gaps,
         };
     }
-    match lower_complete_instruction(projected, context) {
+    match resolve(projected, context) {
         Ok(instruction) => InstructionLoweringAttempt {
             instruction: Some(instruction),
             appearance_omissions,
@@ -2072,6 +2211,209 @@ fn lower_complete_instruction(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
 ) -> Result<Instruction, Vec<ScoreFieldGap>> {
+    let resolved = resolve_complete_object(input, context, false)?;
+    let geometric = match resolved.placement {
+        ScorePlacement::Numeric(position) => lower_numeric_geometry(
+            resolved.primitive,
+            resolved.dimensions,
+            position,
+            context.canvas_format,
+            resolved.rotation,
+        ),
+        ScorePlacement::Named(focus) => {
+            lower_named_geometry(resolved.dimensions, focus, context.canvas_format)
+        }
+    }
+    .map_err(|gap| vec![gap])?;
+    let appearance = resolved.appearance;
+    Ok(Instruction {
+        primitive: resolved.primitive,
+        note: None,
+        from_: geometric.from,
+        to: geometric.to,
+        center: geometric.center,
+        radius: geometric.radius,
+        sides: None,
+        position: geometric.position,
+        size: geometric.size,
+        angle_start: geometric.angle_start,
+        angle_end: geometric.angle_end,
+        rotation: resolved.rotation,
+        filled: appearance.filled,
+        style: appearance.continuity,
+        weight: appearance.touch,
+        mode_: InstructionMode::Additive,
+        carve_depth: None,
+        color: appearance.color,
+        color_hint: None,
+        variation: appearance.fluctuation,
+        arrangement: None,
+        at: geometric.at,
+        relation: None,
+        thinness: appearance.thinness,
+        surface: appearance.surface,
+    })
+}
+
+struct ResolvedObject<'a> {
+    primitive: Primitive,
+    count: u32,
+    action: PlacementAction,
+    dimensions: ResolvedGeometryDimensions,
+    appearance: ResolvedObjectAppearance,
+    rotation: Option<f64>,
+    placement: ScorePlacement<'a>,
+}
+
+fn resolve_object_plan(
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+    origin: ScoreInstructionOrigin,
+) -> Result<ObjectPlacementPlan, Vec<ScoreFieldGap>> {
+    let resolved = resolve_complete_object(input, context, true)?;
+    let build = || -> Result<ObjectPlacementPlan, ScoreFieldGap> {
+        let (width, height) = context.canvas_format.integer_ratio();
+        let short = width.min(height);
+        let mut domain = [
+            Rational::from_ratio(width.into(), short.into())?,
+            Rational::from_ratio(height.into(), short.into())?,
+        ];
+        let anchor = match resolved.placement {
+            ScorePlacement::Numeric(position) => ObjectAnchor::Numeric(position.clone()),
+            ScorePlacement::Named(region) => {
+                if resolved.action == PlacementAction::Tile {
+                    let bounds = crate::geometry::named_region_rational_bounds(
+                        input.named_position.expect("resolved named position").id,
+                        input.effective_focus,
+                        input.angle_context.expect("verified occurrence"),
+                    )
+                    .expect("the shared named region was already resolved");
+                    for axis in 0..2 {
+                        let (end_n, end_d) = bounds[axis + 2];
+                        let (start_n, start_d) = bounds[axis];
+                        let extent = Rational::from_ratio(end_n.into(), end_d.into())?
+                            .sub(Rational::from_ratio(start_n.into(), start_d.into())?)?;
+                        domain[axis] = domain[axis].mul(extent)?;
+                    }
+                }
+                ObjectAnchor::Named(region)
+            }
+        };
+        let n = resolved.count;
+        let recipe = match resolved.action {
+            PlacementAction::Place => PlacementRecipe::Place,
+            PlacementAction::LineUp => PlacementRecipe::HorizontalLine {
+                cell_width: domain[0].div_i128(n.into())?,
+            },
+            PlacementAction::Scatter => PlacementRecipe::ScatterUniformWithCentroidTranslation,
+            PlacementAction::Tile => {
+                let landscape = domain[1].le(domain[0])?;
+                let aspect = if landscape {
+                    domain[0].div(domain[1])?
+                } else {
+                    domain[1].div(domain[0])?
+                };
+                // Integer binary search of k² >= n * long/short. This is bounded
+                // by 32 iterations and has no floating ceil boundary or count loop.
+                let target = aspect.mul_i128(n.into())?;
+                let mut low = 1_u32;
+                let mut high = n;
+                while low < high {
+                    let middle = low + (high - low) / 2;
+                    if target.le(Rational::from_ratio(
+                        i128::from(middle) * i128::from(middle),
+                        1,
+                    )?)? {
+                        high = middle;
+                    } else {
+                        low = middle + 1;
+                    }
+                }
+                let long_count = low;
+                let short_count = n.div_ceil(long_count);
+                let (columns, rows) = if landscape {
+                    (long_count, short_count)
+                } else {
+                    (short_count, long_count)
+                };
+                let cell_width = domain[0].div_i128(columns.into())?;
+                let cell_height = domain[1].div_i128(rows.into())?;
+                let c = i128::from(columns);
+                let q = i128::from(n / columns);
+                let remainder = i128::from(n % columns);
+                let centroid = [
+                    cell_width.mul_ratio(q * c * c + remainder * remainder, 2 * i128::from(n))?,
+                    cell_height
+                        .mul_ratio(c * q * q + remainder * (2 * q + 1), 2 * i128::from(n))?,
+                ];
+                PlacementRecipe::Grid {
+                    columns,
+                    rows,
+                    filled_count: n,
+                    cell_width,
+                    cell_height,
+                    centroid,
+                    translate_to_numeric_anchor: matches!(anchor, ObjectAnchor::Numeric(_)),
+                }
+            }
+        };
+        Ok(ObjectPlacementPlan {
+            origin,
+            primitive: resolved.primitive,
+            count: n,
+            count_was_omitted: input.count.is_none(),
+            dimensions: resolved.dimensions,
+            explicit_geometry: input.explicit_geometry.cloned(),
+            relative_scale: input.relative_scale,
+            appearance: resolved.appearance,
+            angle: resolved.rotation,
+            anchor,
+            domain,
+            recipe,
+        })
+    };
+    build().map_err(|gap| vec![gap])
+}
+
+fn append_plan_attempt(
+    attempt: InstructionLoweringAttempt<ObjectPlacementPlan>,
+    owner: impl Fn(&ScoreFieldGap) -> ScoreDiagnosticOwner,
+    unit: ScoreOmissionUnit,
+    error_policy: ScoreErrorPolicy,
+    objects: &mut Vec<ObjectPlacementPlan>,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) {
+    for omission in attempt.appearance_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: owner(&omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::AppearanceField {
+                    field: omission.field,
+                },
+                Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for reason in attempt.remaining_gaps {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: owner(&reason),
+            disposition: diagnostic_disposition(error_policy, &reason, unit.clone(), None),
+            reason,
+        });
+    }
+    if let Some(object) = attempt.instruction {
+        objects.push(object);
+    }
+}
+
+fn resolve_complete_object<'a>(
+    input: ScoreLoweringInput<'a>,
+    context: ScoreLoweringContext,
+    planning: bool,
+) -> Result<ResolvedObject<'a>, Vec<ScoreFieldGap>> {
     let mut gaps = Vec::new();
     let primitive = match score_primitive_from_identity(input.primitive) {
         Ok(primitive) => primitive,
@@ -2117,6 +2459,7 @@ fn lower_complete_instruction(
             0
         }
         Some(1) => 1,
+        Some(value) if planning && value <= u64::from(u32::MAX) => value as u32,
         Some(value) if value <= u64::from(u32::MAX) => {
             gaps.push(ScoreFieldGap::RepeatedCountUnsupported {
                 value: value as u32,
@@ -2127,10 +2470,17 @@ fn lower_complete_instruction(
             gaps.push(ScoreFieldGap::ExactCountExceedsScoreRange { value });
             0
         }
+        None if planning
+            && input.action.is_some_and(|action| {
+                action.category == "movement" && matches!(action.id, "line_up" | "scatter" | "tile")
+            }) =>
+        {
+            8
+        }
         None => 1,
     };
     debug_assert!(
-        count <= 1,
+        planning || count <= 1,
         "finite lowering never materializes repeated count"
     );
 
@@ -2194,14 +2544,35 @@ fn lower_complete_instruction(
             None
         }
     };
-    match input.action {
-        Some(identity) if identity.category == "movement" && identity.id == "place" => {}
-        Some(identity) => gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
-            category: identity.category.to_owned(),
-            id: identity.id.to_owned(),
-        }),
-        None => gaps.push(ScoreFieldGap::MissingPlaceAction),
-    }
+    let action = match input.action {
+        Some(identity) if identity.category == "movement" && identity.id == "place" => {
+            PlacementAction::Place
+        }
+        Some(identity)
+            if planning && identity.category == "movement" && identity.id == "line_up" =>
+        {
+            PlacementAction::LineUp
+        }
+        Some(identity) if planning && identity.category == "movement" && identity.id == "tile" => {
+            PlacementAction::Tile
+        }
+        Some(identity)
+            if planning && identity.category == "movement" && identity.id == "scatter" =>
+        {
+            PlacementAction::Scatter
+        }
+        Some(identity) => {
+            gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+            PlacementAction::Place
+        }
+        None => {
+            gaps.push(ScoreFieldGap::MissingPlaceAction);
+            PlacementAction::Place
+        }
+    };
     let named_focus = if input.has_named_position && input.numeric_position.is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
@@ -2294,42 +2665,32 @@ fn lower_complete_instruction(
         (None, Some(focus)) => ScorePlacement::Named(focus),
         _ => unreachable!("checked position authority"),
     };
-    let geometric = lower_geometry(
+    let dimensions =
+        resolve_geometry_dimensions(primitive, input.explicit_geometry, input.relative_scale)
+            .map_err(|gap| vec![gap])?;
+    if let ScorePlacement::Numeric(position) = placement {
+        let x = Rational::from_decimal(position.x.decimal.value).map_err(|gap| vec![gap])?;
+        let y = Rational::from_decimal(position.y.decimal.value).map_err(|gap| vec![gap])?;
+        if !x.in_unit_interval() || !y.in_unit_interval() {
+            return Err(vec![ScoreFieldGap::PositionOutOfRange]);
+        }
+    }
+    Ok(ResolvedObject {
         primitive,
-        input.explicit_geometry,
-        input.relative_scale,
+        count,
+        action,
+        dimensions,
         placement,
-        context.canvas_format,
         rotation,
-    )
-    .map_err(|gap| vec![gap])?;
-
-    Ok(Instruction {
-        primitive,
-        note: None,
-        from_: geometric.from,
-        to: geometric.to,
-        center: geometric.center,
-        radius: geometric.radius,
-        sides: None,
-        position: geometric.position,
-        size: geometric.size,
-        angle_start: geometric.angle_start,
-        angle_end: geometric.angle_end,
-        rotation,
-        filled,
-        style: style.expect("checked continuity"),
-        weight: weight.expect("checked touch"),
-        mode_: InstructionMode::Additive,
-        carve_depth: None,
-        color: color.expect("checked color"),
-        color_hint: None,
-        variation,
-        arrangement: None,
-        at: geometric.at,
-        relation: None,
-        thinness,
-        surface,
+        appearance: ResolvedObjectAppearance {
+            filled,
+            continuity: style.expect("checked continuity"),
+            touch: weight.expect("checked touch"),
+            color: color.expect("checked color"),
+            fluctuation: variation,
+            thinness,
+            surface,
+        },
     })
 }
 
@@ -2451,31 +2812,14 @@ enum ScorePlacement<'a> {
     Named([f64; 4]),
 }
 
-#[derive(Clone, Copy)]
-enum ResolvedGeometryDimensions {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResolvedGeometryDimensions {
     Line { length: Rational },
     Circle { radius: Rational },
     Arc { chord: Rational, sagitta: Rational },
     Point { radius: Rational },
     CenteredSize { width: Rational, height: Rational },
     Square { side: Rational },
-}
-
-fn lower_geometry(
-    primitive: Primitive,
-    geometry: Option<&SemanticExplicitGeometry>,
-    relative_scale: Option<CoreModifierValue>,
-    placement: ScorePlacement<'_>,
-    canvas: CanvasFormat,
-    rotation: Option<f64>,
-) -> Result<LoweredGeometry, ScoreFieldGap> {
-    let dimensions = resolve_geometry_dimensions(primitive, geometry, relative_scale)?;
-    match placement {
-        ScorePlacement::Numeric(position) => {
-            lower_numeric_geometry(primitive, dimensions, position, canvas, rotation)
-        }
-        ScorePlacement::Named(focus) => lower_named_geometry(dimensions, focus, canvas),
-    }
 }
 
 fn resolve_geometry_dimensions(
@@ -2943,13 +3287,21 @@ fn ensure_centered_extent(
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-struct Rational {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Rational {
     numerator: i128,
     denominator: i128,
 }
 
 impl Rational {
+    pub const fn numerator(self) -> i128 {
+        self.numerator
+    }
+
+    pub const fn denominator(self) -> i128 {
+        self.denominator
+    }
+
     fn from_ratio(numerator: i128, denominator: i128) -> Result<Self, ScoreFieldGap> {
         if denominator <= 0 {
             return Err(ScoreFieldGap::GeometryRepresentationLimit);
@@ -3176,14 +3528,184 @@ mod tests {
     use super::*;
 
     #[test]
+    fn composition_plan_recovery_preserves_original_source_slot_and_integrity() {
+        let limits = crate::MacroExpansionLimits {
+            max_invocations: 16,
+            max_depth: 16,
+            max_evaluation_steps: 1000,
+            max_nodes_per_invocation: 100,
+            max_total_nodes: 500,
+        };
+        let mut compilation = crate::compile_typed_ddl(
+            crate::NormalizedDdlDocument::new(
+                "place many red circle at center. scatter eight red square at left-edge.",
+                crate::ResolvedInstructionLanguage::En,
+                vec![],
+            )
+            .unwrap(),
+            &[],
+            None,
+            limits,
+        );
+        assert!(crate::stage15_transformation_input(&compilation).is_err());
+        let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+        let crate::execution_projection::ExecutionProjectionResult::Ready(ready) =
+            crate::execution_projection::project_compilation_for_execution(
+                &compilation,
+                &[],
+                None,
+                limits,
+                context,
+                None,
+            )
+        else {
+            panic!("expected typed independent survivor")
+        };
+        assert!(!ready.diagnostics.is_empty());
+        let transformed = crate::transform_stage15(
+            crate::stage15_transform::stage15_execution_projection_input(ready.projection),
+            None,
+        )
+        .unwrap();
+        let plan = resolve_composition_plan(
+            transformed.verified_effective_view(),
+            context,
+            ScoreErrorPolicy::OmitAndContinue,
+        );
+        assert_eq!(plan.objects().unwrap().len(), 1);
+        assert_eq!(
+            plan.objects().unwrap()[0].origin(),
+            &ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 1
+            }
+        );
+        assert_eq!(plan.objects().unwrap()[0].count(), 8);
+        compilation.compiler_lock.as_mut().unwrap().full_digest = "tampered".to_owned();
+        assert!(matches!(
+            crate::execution_projection::project_compilation_for_execution(
+                &compilation,
+                &[],
+                None,
+                limits,
+                context,
+                None
+            ),
+            crate::execution_projection::ExecutionProjectionResult::Stopped(_)
+        ));
+    }
+
+    #[test]
+    fn composition_plan_physical_aspect_and_exact_ceil_boundaries() {
+        for (width, height, expected, spacing) in
+            [(1200, 800, (4, 2), 300), (800, 1200, (2, 4), 200)]
+        {
+            let context = ScoreLoweringContext {
+                canvas_format: CanvasFormat {
+                    id: "physical-test",
+                    width_units: width,
+                    height_units: height,
+                },
+                background: Color::White,
+                resolved_palette: None,
+            };
+            for (action, count) in [("tile", 8), ("line_up", 4)] {
+                let mut fields = complete_macro_fields();
+                fields.insert(
+                    "movement".to_owned(),
+                    ExpandedMacroValue::SemanticRef {
+                        category: "movement".to_owned(),
+                        id: action.to_owned(),
+                    },
+                );
+                fields.insert("count".to_owned(), ExpandedMacroValue::Integer(count));
+                let mut input = project_macro_emit(&fields, &[], true).unwrap();
+                input.color = Some(SemanticInputIdentity {
+                    category: "color",
+                    id: "red",
+                });
+                input.has_named_position = true;
+                input.named_position = Some(SemanticInputIdentity {
+                    category: "place",
+                    id: "center",
+                });
+                input.effective_focus = Some(FocusRegion::UpperRight);
+                input.angle_context = Some(ScoreAngleContext {
+                    composition_seed: None,
+                    original_pre_expansion_digest: "test",
+                    original_expanded_meaning_digest: "test",
+                    occurrence: ScoreAngleOccurrence::Direct { logical_ordinal: 0 },
+                });
+                // Numeric anchor allows the whole canvas domain and exact centroid.
+                let source = "place one red circle at horizontal 0.5, vertical 0.5.";
+                let compilation = crate::compile_typed_ddl(
+                    crate::NormalizedDdlDocument::new(
+                        source,
+                        crate::ResolvedInstructionLanguage::En,
+                        vec![],
+                    )
+                    .unwrap(),
+                    &[],
+                    None,
+                    crate::MacroExpansionLimits {
+                        max_invocations: 16,
+                        max_depth: 16,
+                        max_evaluation_steps: 1000,
+                        max_nodes_per_invocation: 100,
+                        max_total_nodes: 500,
+                    },
+                );
+                input.numeric_position = compilation
+                    .semantic_document
+                    .as_ref()
+                    .unwrap()
+                    .ast
+                    .instructions[0]
+                    .entity
+                    .numeric_position
+                    .as_ref();
+                input.has_named_position = false;
+                input.named_position = None;
+                let object = resolve_object_plan(
+                    input,
+                    context,
+                    ScoreInstructionOrigin::SourceInstruction {
+                        instruction_index: 0,
+                    },
+                )
+                .unwrap();
+                let ResolvedGeometryDimensions::Circle { radius } = object.dimensions else {
+                    panic!()
+                };
+                assert_eq!(
+                    radius.numerator * i128::from(width.min(height)) * 2,
+                    192 * radius.denominator
+                );
+                match object.recipe {
+                    PlacementRecipe::Grid { columns, rows, .. } => {
+                        assert_eq!((columns, rows), expected)
+                    }
+                    PlacementRecipe::HorizontalLine { cell_width } => assert_eq!(
+                        cell_width.numerator * i128::from(width.min(height)),
+                        i128::from(spacing) * cell_width.denominator
+                    ),
+                    _ => panic!(),
+                }
+            }
+        }
+    }
+
+    #[test]
     fn macro_count_requires_an_integer_without_reinterpreting_number() {
         let mut fields = complete_macro_fields();
         fields.insert("count".to_owned(), ExpandedMacroValue::Integer(1));
-        assert_eq!(project_macro_emit(&fields, &[]).unwrap().count, Some(1));
+        assert_eq!(
+            project_macro_emit(&fields, &[], false).unwrap().count,
+            Some(1)
+        );
 
         fields.insert("count".to_owned(), ExpandedMacroValue::Number(1.0));
         assert_eq!(
-            project_macro_emit(&fields, &[]).unwrap_err(),
+            project_macro_emit(&fields, &[], false).unwrap_err(),
             [ScoreFieldGap::MacroEmitFieldTypeMismatch {
                 key: "count".to_owned(),
             }]

@@ -1026,6 +1026,14 @@ DB が保存するのは `history.svg` の `display` SVG だけである。編�
 
 ---
 
+共通Rustの`plan_verified_stage15[_with_policy]`は、verified Stage 1.5と既存のhost canvas / palette contextから、通常instructionと宣言済みflat Macro Emitに同じobject-size / placement resolverを使う。省略をsourceへ書き戻さず、`line-up` / `scatter` / `tile`の数量省略は解決結果だけで8、`place`は従来の1とする。明示正整数1..u32::MAXを保ち、zero・範囲外・不明・競合・定性的数量や必須Macro引数の欠落を8へ変えない。
+
+Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない。全shapeに同じ原則を適用し、現在の実planはline / circle / ellipse / square / arc / cloudform / pointの7shapeへ届く。Normalは幅または直径6/25、ellipse / cloudformの高さは幅の3/5、arcの矢高3/50、pointの直径3/250。既存の全大小倍率とshape固有anchorを保ち、thinnessを外形sizeにしない。例えばlarge circleの直径9/25は4個でも8個でも同じで、重なりを許す。Numeric geometryは元のexact decimal / Rational、basis、dimension、provenanceを保持する。Triangle / Polygonはidentityとownerを持つ明示gapで、新geometryを捏造しない。
+
+非Gridのdomainはcanvasの各軸の物理長さで、群の重心をsemantic anchorへ置く。方向省略のline-upは横一列で、幅Wをn分したcellの中央、同じ縦中央に置く式を保持する。TileはW>=Hならcolumns=min(n,max(1,ceil(sqrt(n*W/H))))、rows=ceil(n/columns)、H>Wなら同じ式を長辺のrowsへ適用しcolumns=ceil(n/rows)とする。行優先でn個だけを満たし、rows / columns / cell寸法 / filled countを解決する。Numeric anchorへはfilled prefixのexact重心を平行移動し、named Gridは元region内に置いて重心補正しない。Scatterは矩形のX/Y一様samplingと群の重心をanchorへ移すrecipeだけを持ち、既存performance seedと元owner / instance ordinalを後続materializationへ要求する。Composition seedの代用、乱数実行、fit縮小、個数変更、反発や最小間隔の追加は行わない。例えば1200×800 / 800×1200のnormal circle直径は共に192、4個のline-up間隔は300 / 200、8個のtileは4列2行 / 2列4行である。
+
+Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。Stopはblockingがあればplanを返さず、Continueは既存のtyped owner / span / 理由 / 実処置を保ち、全省略をReadyにしない。未対応field・relation・coordinationを黙って捨てない。Readyは描画成功やScore成功ではなく、numeric must-fitと個体bounds検査を含むmaterializationは未実行である。既存Score wire / lowering outcome / compiler executionの成功意味とcount1 / place / relation互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。明示縦 / 横 / 斜めの配置方向を接続するStep10X、残geometry、whole Step10、runtime / UI / 保存cutoverは未完了であり、entity angleを配置方向へ流用しない。
+
 ## 13. 揺らぎの設計
 
 ### 13.1 揺らぎとランダム性の区別

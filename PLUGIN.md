@@ -12,6 +12,8 @@ separate replacement for the drawing core. The normative plugin boundary is
 
 ## Definition Format
 
+Declared flat Emits with `movement` set to `line_up`, `scatter`, or `tile` reach the same object-size / placement resolver as ordinary DDL through the verified Stage 1.5 plan API. Omitted Emit count resolves to eight; explicit positive integers through u32::MAX remain exact. Missing required parameters and invalid types never receive that default. Size uses the canvas short edge independently of count, preserving existing normal sizes, size factors, appearance, and angle for seven shapes. Plans retain a horizontal row, tile from physical aspect, or a scatter recipe requiring a later performance seed, together with generated owners, bindings, and provenance. They add no undeclared caller overlay or fan-out. Stop / Continue retain field / Emit / invocation omission units. Ready plan does not mean an instance array, Score, or drawing succeeded. The existing place / count-one Score path remains; explicit layout direction, unsupported geometry, and runtime integration remain incomplete.
+
 A definition has exactly these top-level fields:
 
 - `schema`: exactly `inku.macro-definition.v1`

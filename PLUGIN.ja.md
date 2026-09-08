@@ -11,6 +11,8 @@ Canvasの選択は`inku.canvas-format-registry.v1`が所有するhost optionで�
 
 ## 定義形式
 
+宣言済みflat Emitの`movement`が`line_up` / `scatter` / `tile`なら、verified Stage 1.5後の共有plan APIで通常DDLと同じobject-size / placement resolverへ届く。Emitのcount省略は8、明示正整数はu32::MAXまで保持し、必須parameter不足やbad型をdefaultにしない。Sizeはcanvas短辺基準でcount非依存、7shapeの既存normal / 大小倍率・外観・angleを保つ。横一列、物理aspectのtile、後続performance seedを要求するscatter recipeとgenerated owner / binding / provenanceを保持し、未宣言caller overlayやfan-outを作らない。Stop / Continueのfield / Emit / invocation省略単位を保ち、Ready planは個体配列・Score・描画成功ではない。既存place / count1のScore成功経路は変わらず、明示配置方向、未対応geometry、runtime接続を含む拡張は未完了である。
+
 定義は、次のtop-level fieldだけを正確に持つ。
 
 - `schema`: 正確に`inku.macro-definition.v1`

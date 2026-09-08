@@ -7,6 +7,7 @@ pub mod clause;
 pub mod compiler_execution;
 pub mod compiler_lock;
 pub mod composition;
+pub mod composition_plan;
 pub mod document;
 pub mod error_policy;
 pub mod exact_decimal;
@@ -32,6 +33,11 @@ pub mod saijiki;
 mod score_angle;
 pub mod score_diagnostics;
 pub mod score_lowering;
+pub use composition_plan::{
+    CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
+    PlacementAction, PlacementRecipe, Rational, ResolvedGeometryDimensions,
+    ResolvedObjectAppearance, plan_verified_stage15, plan_verified_stage15_with_policy,
+};
 pub mod semantic_association;
 pub mod semantic_document;
 pub mod semantic_instruction;

@@ -11,6 +11,14 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
     assert!(!en.prompt_block.contains("vertically"));
     assert!(!en.prompt_block.contains("horizontally"));
     assert!(!en.prompt_block.contains("diagonally"));
+    for word in ["rectangle", "equilateral triangle", "hexagon"] {
+        assert!(!en.prompt_block.contains(word));
+        assert!(!en.shape_markers.iter().any(|marker| marker == word));
+    }
+    for word in ["細長い", "縦に長い", "正三角形", "六角形"] {
+        assert!(!ja.prompt_block.contains(word));
+        assert!(!ja.shape_markers.iter().any(|marker| marker == word));
+    }
 
     assert!(ja.prompt_block.starts_with("かたち: 円、楕円、三角"));
     assert!(

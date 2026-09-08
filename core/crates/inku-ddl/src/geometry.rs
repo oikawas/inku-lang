@@ -29,7 +29,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
     "\"line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
-    "\"endpoint_rotated_finite_extent\",\"axis_position\"],",
+    "\"endpoint_rotated_finite_extent\",\"axis_position\",\"triangle_width_height\",\"regular_triangle_exact_side\",\"square_width_height\",\"polygon_circumradius_sides\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
 );
@@ -42,6 +42,7 @@ const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "\"width_or_diameter\":\"6/25\"},",
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
     "\"policy\":\"inku.geometry-resolution-policy.v1\",",
+    "\"shape_constraints\":{\"aspect\":{\"long_to_short\":\"2:1\",\"explicit_dimensions\":\"retain_and_check_order\"},\"regular_triangle\":\"height=side*sqrt(3)/2_at_final_f64_boundary\",\"polygon\":{\"default_sides\":5,\"sides\":[5,6,7,8],\"radius\":\"circumradius\"},\"triangle_anchor\":\"bbox_center\"},",
     "\"relative_scale\":{\"large\":\"3/2\",\"normal\":\"1/1\",",
     "\"slightly_large\":\"5/4\",\"slightly_small\":\"3/4\",\"small\":\"1/2\",",
     "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
@@ -223,7 +224,10 @@ pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Op
         crate::CoreModifierValue::SlightlyLarge => Some((5, 4)),
         crate::CoreModifierValue::Large => Some((3, 2)),
         crate::CoreModifierValue::VeryLarge => Some((7, 4)),
-        crate::CoreModifierValue::Fine | crate::CoreModifierValue::ExtraFine => None,
+        crate::CoreModifierValue::Fine
+        | crate::CoreModifierValue::ExtraFine
+        | crate::CoreModifierValue::Regular
+        | crate::CoreModifierValue::Sides(_) => None,
     }
 }
 

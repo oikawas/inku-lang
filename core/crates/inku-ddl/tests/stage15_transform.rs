@@ -15,6 +15,33 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/stage15-transform-v1.json");
 
 #[test]
+fn shape_constraint_source_language_and_owner_are_sealed() {
+    let original = compile(
+        "place one red equilateral triangle at center.",
+        ResolvedInstructionLanguage::En,
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(stage15_transformation_input(&original).is_ok());
+    for language in [true, false] {
+        let mut altered = original.clone();
+        let source = &mut altered.semantic_document.as_mut().unwrap().ast.instructions[0]
+            .entity
+            .shape_constraint
+            .as_mut()
+            .unwrap()
+            .provenance;
+        if language {
+            source.language = ResolvedInstructionLanguage::Ja;
+        } else {
+            source.atom_index += 1;
+        }
+        assert!(stage15_transformation_input(&altered).is_err());
+    }
+}
+
+#[test]
 fn direction_language_and_owner_tampering_cannot_enter_sealed_stage15() {
     let mut compilation = compile(
         "arrange three horizontal lines vertically at center.",

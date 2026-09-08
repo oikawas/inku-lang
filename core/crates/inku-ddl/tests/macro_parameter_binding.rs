@@ -11,6 +11,39 @@ use serde_json::Value;
 const FIXTURE: &str = include_str!("fixtures/macro-parameter-binding-v1.json");
 
 #[test]
+fn sides_integer_binding_is_owned_and_never_uses_parameter_names() {
+    let bind = |parameters: Value, source: &str| {
+        let data = serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters":parameters,"components":{},"body":[]});
+        let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        bind_macro_parameters(
+            &NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap(),
+            &[definition],
+        )
+        .unwrap()
+    };
+    let one = serde_json::json!({"n":{"type":"integer"}});
+    let result = bind(one.clone(), "Shape.Mark sides 6");
+    assert!(result.diagnostics.is_empty());
+    assert!(matches!(
+        result.complete[0].parameters[0].value,
+        BoundMacroParameterValue::Integer { value: 6, .. }
+    ));
+    assert!(bind(one, "Shape.Mark").complete.is_empty());
+    let two = serde_json::json!({"sides":{"type":"integer"},"count":{"type":"integer"}});
+    let ambiguous = bind(two, "Shape.Mark sides 6 three");
+    assert!(ambiguous.complete.is_empty());
+    assert!(!ambiguous.diagnostics.is_empty());
+}
+
+#[test]
 fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_required() {
     let data = serde_json::json!({
         "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",

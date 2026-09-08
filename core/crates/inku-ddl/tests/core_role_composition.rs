@@ -330,6 +330,13 @@ fn project_deferred(token: &inku_ddl::NeutralToken) -> ExpectedDeferred {
         value: None,
     };
     match &token.kind {
+        NeutralTokenKind::ConstrainedShape {
+            canonical_surface_ja,
+            ..
+        } => {
+            projected.kind = "constrained_shape".to_owned();
+            projected.canonical_surface_ja = Some(canonical_surface_ja.clone());
+        }
         NeutralTokenKind::CoreModifier(_) => {
             panic!("typed core modifier must not remain deferred")
         }

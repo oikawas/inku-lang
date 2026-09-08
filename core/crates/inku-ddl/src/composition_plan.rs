@@ -72,6 +72,8 @@ pub enum PlacementRecipe {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectPlacementPlan {
+    pub(crate) shape_constraint: Option<crate::ShapeConstraint>,
+    pub(crate) proportion_aspect: Option<crate::SemanticIdentity>,
     pub(crate) origin: ScoreInstructionOrigin,
     pub(crate) primitive: Primitive,
     pub(crate) count: u32,
@@ -95,6 +97,12 @@ pub struct ResolvedLayoutDirection {
 }
 
 impl ObjectPlacementPlan {
+    pub fn shape_constraint(&self) -> Option<crate::ShapeConstraint> {
+        self.shape_constraint
+    }
+    pub fn proportion_aspect(&self) -> Option<&crate::SemanticIdentity> {
+        self.proportion_aspect.as_ref()
+    }
     pub fn origin(&self) -> &ScoreInstructionOrigin {
         &self.origin
     }

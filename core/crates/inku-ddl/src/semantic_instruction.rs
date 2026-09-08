@@ -1071,6 +1071,13 @@ fn semantic_entity_owned_spans(entity: &SemanticEntity) -> BTreeSet<(usize, usiz
     {
         insert_term(term);
     }
+    if let Some(constraint) = &entity.shape_constraint {
+        for source in
+            std::iter::once(&constraint.provenance).chain(&constraint.additional_provenance)
+        {
+            spans.insert((source.span.start_byte, source.span.end_byte));
+        }
+    }
     if let Some(quantity) = &entity.quantity {
         spans.insert((
             quantity.provenance.span.start_byte,

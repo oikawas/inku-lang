@@ -11,6 +11,43 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
 
 #[test]
+fn shape_emit_fields_validate_real_categories_and_integer_type() {
+    let mut value = serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
+        "proportion_aspect":{"expr":"semantic_ref","category":"ratio","id":"wide"},
+        "shape_form":{"expr":"semantic_ref","category":"shape_form","id":"regular"},
+        "sides":{"expr":"integer","value":6}
+    }}]});
+    assert!(
+        MacroDefinition::from_json(&value.to_string())
+            .unwrap()
+            .identity()
+            .is_ok()
+    );
+    for (field, bad) in [
+        ("sides", serde_json::json!({"expr":"number","value":6.0})),
+        (
+            "shape_form",
+            serde_json::json!({"expr":"semantic_ref","category":"shape_form","id":"equilateral"}),
+        ),
+        (
+            "proportion_aspect",
+            serde_json::json!({"expr":"semantic_ref","category":"color","id":"red"}),
+        ),
+    ] {
+        let old = value["body"][0]["fields"][field].clone();
+        value["body"][0]["fields"][field] = bad;
+        assert!(
+            MacroDefinition::from_json(&value.to_string())
+                .unwrap()
+                .identity()
+                .is_err(),
+            "{field}"
+        );
+        value["body"][0]["fields"][field] = old;
+    }
+}
+
+#[test]
 fn layout_direction_emit_maps_to_existing_angle_category_only() {
     let mut value = serde_json::json!({"schema":"inku.macro-definition.v1", "namespace":"Axis", "heading":"Line", "version":"1.0.0", "parameters":{}, "components":{}, "body":[{"op":"emit","binding":null,"fields":{
         "layout_direction":{"expr":"semantic_ref","category":"angle","id":"vertical"},

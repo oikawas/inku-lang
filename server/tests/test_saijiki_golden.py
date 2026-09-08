@@ -444,6 +444,9 @@ def test_display_categories_exclude_pruned_and_hidden_words() -> None:
         words = {word for category in categories for word in category["words"]}
         assert not (pruned & words)
         assert not (hidden & words)
+        compiler_only = {"三角形", "四角形", "長方形", "縦に長い", "横に長い", "細長い", "rectangle"}
+        assert not (compiler_only & words)
+        assert all(alias not in saijiki.prompt_block(lang) for alias in compiler_only)
     aida = saijiki.display_categories("ja")[-1]
     assert aida["key"] == "aida"
     assert aida["words"] == ("沿う", "触れない", "切る", "間に", "触れる", "つながる")

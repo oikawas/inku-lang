@@ -2008,6 +2008,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
     }
     for occurrence in result.issues.iter().flat_map(|issue| &issue.occurrences) {
         output_spans.push(match occurrence {
+            OwnedSemanticOccurrence::ShapeConstraint(value) => value.provenance.span,
             OwnedSemanticOccurrence::Head(head) => head.source().span,
             OwnedSemanticOccurrence::MacroDiagnostic(provenance) => provenance.source.span,
             OwnedSemanticOccurrence::Color(term) => term.provenance.source.span,

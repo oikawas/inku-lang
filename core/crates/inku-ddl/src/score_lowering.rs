@@ -184,6 +184,17 @@ fn project_source_instruction<'a>(
         return None;
     };
     Some(ScoreLoweringInput {
+        shape_constraint: instruction
+            .entity
+            .shape_constraint
+            .as_ref()
+            .map(|value| value.value),
+        proportion_aspect: instruction
+            .entity
+            .proportion
+            .aspect
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         primitive: (&term.identity).into(),
         count: instruction
             .entity
@@ -276,8 +287,7 @@ fn project_source_instruction<'a>(
                 .as_ref()
                 .map(|term| (&term.identity).into()),
         ],
-        has_unsupported_meaning: instruction.entity.proportion.aspect.is_some()
-            || instruction.entity.proportion.width_extent.is_some()
+        has_unsupported_meaning: instruction.entity.proportion.width_extent.is_some()
             || instruction.entity.proportion.arc_form.is_some(),
     })
 }
@@ -805,6 +815,7 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
         || instruction.entity.fluctuation.quality.is_some()
+        || instruction.entity.shape_constraint.is_some()
         || instruction.entity.proportion.aspect.is_some()
         || instruction.entity.proportion.width_extent.is_some()
         || instruction.entity.proportion.arc_form.is_some()
@@ -864,7 +875,10 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 15] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 18] = [
+    "proportion_aspect",
+    "shape_form",
+    "sides",
     "layout_direction",
     "shape",
     "movement",
@@ -893,6 +907,39 @@ fn project_macro_emit<'a>(
         .map(|key| ScoreFieldGap::UnknownMacroEmitField { key: key.clone() })
         .collect::<Vec<_>>();
     let primitive = macro_semantic_field(fields, "shape", "shape", true, &mut gaps);
+    let proportion_aspect =
+        macro_semantic_field(fields, "proportion_aspect", "ratio", false, &mut gaps);
+    let form = macro_semantic_field(fields, "shape_form", "shape_form", false, &mut gaps);
+    if let Some(form) = form
+        && form.id != "regular"
+    {
+        gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
+            key: "shape_form".to_owned(),
+            category: form.category.to_owned(),
+            id: form.id.to_owned(),
+        });
+    }
+    let sides = match fields.get("sides") {
+        None => None,
+        Some(ExpandedMacroValue::Integer(value)) if (5..=8).contains(value) => Some(*value as u64),
+        Some(ExpandedMacroValue::Integer(value)) => {
+            gaps.push(ScoreFieldGap::MacroEmitIntegerOutOfRange {
+                key: "sides".to_owned(),
+                value: *value,
+            });
+            None
+        }
+        Some(_) => {
+            gaps.push(ScoreFieldGap::MacroEmitFieldTypeMismatch {
+                key: "sides".to_owned(),
+            });
+            None
+        }
+    };
+    let shape_constraint = (form.is_some() || sides.is_some()).then_some(crate::ShapeConstraint {
+        regular: form.is_some() || sides.is_some(),
+        sides,
+    });
     let action = macro_semantic_field(fields, "movement", "movement", true, &mut gaps);
     let place = macro_semantic_field(fields, "place", "place", true, &mut gaps);
     let color = (!omitted_appearance.contains(&ScoreAppearanceField::Color))
@@ -956,7 +1003,15 @@ fn project_macro_emit<'a>(
     if let Some(identity) = primitive
         && !matches!(
             identity.id,
-            "line" | "circle" | "ellipse" | "cloudform" | "square" | "arc" | "point"
+            "line"
+                | "circle"
+                | "ellipse"
+                | "cloudform"
+                | "square"
+                | "triangle"
+                | "polygon"
+                | "arc"
+                | "point"
         )
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
@@ -1007,6 +1062,8 @@ fn project_macro_emit<'a>(
     }
 
     Ok(ScoreLoweringInput {
+        shape_constraint,
+        proportion_aspect,
         primitive: primitive.expect("required macro shape field checked"),
         count,
         color,
@@ -1998,6 +2055,7 @@ fn source_span_for_gap(
         ScoreFieldGap::NonPositiveDimension
         | ScoreFieldGap::GeometryRepresentationLimit
         | ScoreFieldGap::GeometryDimensionMismatch { .. }
+        | ScoreFieldGap::ShapeConstraintMismatch { .. }
         | ScoreFieldGap::UnsupportedPrimitiveForExplicitGeometry { .. } => instruction
             .entity
             .explicit_geometry
@@ -2200,6 +2258,8 @@ impl<'a> From<&'a SemanticIdentity> for SemanticInputIdentity<'a> {
 
 #[derive(Clone, Copy, Debug)]
 struct ScoreLoweringInput<'a> {
+    shape_constraint: Option<crate::ShapeConstraint>,
+    proportion_aspect: Option<SemanticInputIdentity<'a>>,
     primitive: SemanticInputIdentity<'a>,
     count: Option<u64>,
     color: Option<SemanticInputIdentity<'a>>,
@@ -2248,7 +2308,10 @@ fn lower_complete_instruction(
         to: geometric.to,
         center: geometric.center,
         radius: geometric.radius,
-        sides: None,
+        sides: match resolved.dimensions {
+            ResolvedGeometryDimensions::Polygon { sides, .. } => Some(sides),
+            _ => None,
+        },
         position: geometric.position,
         size: geometric.size,
         angle_start: geometric.angle_start,
@@ -2396,6 +2459,13 @@ fn resolve_object_plan(
             }
         };
         Ok(ObjectPlacementPlan {
+            shape_constraint: input.shape_constraint,
+            proportion_aspect: input
+                .proportion_aspect
+                .map(|identity| crate::SemanticIdentity {
+                    category: identity.category.to_owned(),
+                    id: identity.id.to_owned(),
+                }),
             origin,
             primitive: resolved.primitive,
             count: n,
@@ -2576,6 +2646,8 @@ fn resolve_complete_object<'a>(
             Primitive::Circle
                 | Primitive::Ellipse
                 | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
                 | Primitive::Point
                 | Primitive::Cloudform
         );
@@ -2676,6 +2748,8 @@ fn resolve_complete_object<'a>(
                 | Primitive::Ellipse
                 | Primitive::Cloudform
                 | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
                 | Primitive::Arc
                 | Primitive::Point
         )
@@ -2718,6 +2792,8 @@ fn resolve_complete_object<'a>(
                 | Primitive::Circle
                 | Primitive::Ellipse
                 | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
                 | Primitive::Cloudform
         )
     {
@@ -2732,9 +2808,14 @@ fn resolve_complete_object<'a>(
         (None, Some(focus)) => ScorePlacement::Named(focus),
         _ => unreachable!("checked position authority"),
     };
-    let dimensions =
-        resolve_geometry_dimensions(primitive, input.explicit_geometry, input.relative_scale)
-            .map_err(|gap| vec![gap])?;
+    let dimensions = resolve_shape_dimensions(
+        primitive,
+        input.explicit_geometry,
+        input.relative_scale,
+        input.shape_constraint,
+        input.proportion_aspect,
+    )
+    .map_err(|gap| vec![gap])?;
     if let ScorePlacement::Numeric(position) = placement {
         let x = Rational::from_decimal(position.x.decimal.value).map_err(|gap| vec![gap])?;
         let y = Rational::from_decimal(position.y.decimal.value).map_err(|gap| vec![gap])?;
@@ -2882,12 +2963,121 @@ enum ScorePlacement<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResolvedGeometryDimensions {
+    Bbox { width: Rational, height: Rational },
+    RegularTriangle { side: Rational },
+    Polygon { radius: Rational, sides: u8 },
     Line { length: Rational },
     Circle { radius: Rational },
     Arc { chord: Rational, sagitta: Rational },
     Point { radius: Rational },
     CenteredSize { width: Rational, height: Rational },
     Square { side: Rational },
+}
+
+fn resolve_shape_dimensions(
+    primitive: Primitive,
+    geometry: Option<&SemanticExplicitGeometry>,
+    scale: Option<CoreModifierValue>,
+    constraint: Option<crate::ShapeConstraint>,
+    aspect: Option<SemanticInputIdentity<'_>>,
+) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
+    let constraint = constraint.unwrap_or_default();
+    let invalid = || ScoreFieldGap::ShapeConstraintMismatch { primitive };
+    if constraint.sides.is_some() && primitive != Primitive::Polygon
+        || constraint.regular
+            && !matches!(
+                primitive,
+                Primitive::Triangle | Primitive::Square | Primitive::Polygon
+            )
+    {
+        return Err(invalid());
+    }
+    if let Some(aspect) = aspect {
+        if aspect.category != "ratio"
+            || !matches!(aspect.id, "tall" | "wide")
+            || !matches!(
+                primitive,
+                Primitive::Triangle | Primitive::Square | Primitive::Ellipse | Primitive::Cloudform
+            )
+            || constraint.regular
+        {
+            return Err(invalid());
+        }
+    }
+    let normal = || -> Result<Rational, ScoreFieldGap> {
+        let (n, d) = relative_scale_factor(scale.unwrap_or(CoreModifierValue::Normal))
+            .ok_or_else(invalid)?;
+        Rational::from_ratio(NORMAL_SHORT_EDGE_RATIO.0, NORMAL_SHORT_EDGE_RATIO.1)?.mul_ratio(n, d)
+    };
+    if primitive == Primitive::Polygon {
+        let sides = constraint.sides.unwrap_or(5);
+        if !(5..=8).contains(&sides) {
+            return Err(invalid());
+        }
+        let radius = match geometry {
+            None => normal()?.div_i128(2)?,
+            Some(SemanticExplicitGeometry::Radius(value)) => positive(value.decimal.value)?,
+            Some(SemanticExplicitGeometry::Diameter(value)) => {
+                positive(value.decimal.value)?.div_i128(2)?
+            }
+            _ => return Err(invalid()),
+        };
+        return Ok(ResolvedGeometryDimensions::Polygon {
+            radius,
+            sides: sides as u8,
+        });
+    }
+    if primitive == Primitive::Triangle && constraint.regular {
+        let side = match geometry {
+            None => normal()?,
+            Some(SemanticExplicitGeometry::Side(value)) => positive(value.decimal.value)?,
+            _ => return Err(invalid()),
+        };
+        return Ok(ResolvedGeometryDimensions::RegularTriangle { side });
+    }
+    if matches!(primitive, Primitive::Triangle | Primitive::Square) || aspect.is_some() {
+        let (width, height) = match geometry {
+            Some(SemanticExplicitGeometry::WidthHeight { width, height }) => (
+                positive(width.decimal.value)?,
+                positive(height.decimal.value)?,
+            ),
+            Some(SemanticExplicitGeometry::Side(value)) if primitive == Primitive::Square => {
+                let side = positive(value.decimal.value)?;
+                (side, side)
+            }
+            None => {
+                let long = normal()?;
+                match aspect.map(|value| value.id) {
+                    Some("tall") => (long.div_i128(2)?, long),
+                    Some("wide") => (long, long.div_i128(2)?),
+                    _ => (long, long),
+                }
+            }
+            _ => return Err(invalid()),
+        };
+        if constraint.regular && width != height {
+            return Err(invalid());
+        }
+        if let Some(aspect) = aspect {
+            if aspect.id == "tall" && height.le(width)?
+                || aspect.id == "wide" && width.le(height)?
+            {
+                return Err(invalid());
+            }
+        }
+        return Ok(
+            if matches!(primitive, Primitive::Triangle | Primitive::Square) {
+                if primitive == Primitive::Square && width == height {
+                    ResolvedGeometryDimensions::Square { side: width }
+                } else {
+                    ResolvedGeometryDimensions::Bbox { width, height }
+                }
+            } else {
+                ResolvedGeometryDimensions::CenteredSize { width, height }
+            },
+        );
+    }
+    resolve_geometry_dimensions(primitive, geometry, scale)
 }
 
 fn resolve_geometry_dimensions(
@@ -3009,6 +3199,39 @@ fn lower_numeric_geometry(
     let short_units = width_units.min(height_units);
 
     match dimensions {
+        ResolvedGeometryDimensions::Bbox { width, height } => lower_vertex_geometry(
+            primitive,
+            x,
+            y,
+            width.to_f64()?,
+            height.to_f64()?,
+            None,
+            canvas,
+            rotation,
+        ),
+        ResolvedGeometryDimensions::RegularTriangle { side } => {
+            let side = side.to_f64()?;
+            lower_vertex_geometry(
+                primitive,
+                x,
+                y,
+                side,
+                side * 3.0_f64.sqrt() / 2.0,
+                None,
+                canvas,
+                rotation,
+            )
+        }
+        ResolvedGeometryDimensions::Polygon { radius, sides } => lower_vertex_geometry(
+            primitive,
+            x,
+            y,
+            0.0,
+            0.0,
+            Some((radius.to_f64()?, sides)),
+            canvas,
+            rotation,
+        ),
         ResolvedGeometryDimensions::Line { length } => {
             ensure_rotated_centered_extent(
                 Primitive::Line,
@@ -3226,6 +3449,80 @@ fn ensure_rotated_centered_extent(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn lower_vertex_geometry(
+    primitive: Primitive,
+    x: Rational,
+    y: Rational,
+    width: f64,
+    height: f64,
+    polygon: Option<(f64, u8)>,
+    canvas: CanvasFormat,
+    rotation: Option<f64>,
+) -> Result<LoweredGeometry, ScoreFieldGap> {
+    let (cw, ch) = canvas.integer_ratio();
+    let short = f64::from(cw.min(ch));
+    let cx = x.to_f64()? * f64::from(cw) / short;
+    let cy = y.to_f64()? * f64::from(ch) / short;
+    let radians = rotation.unwrap_or(0.0).to_radians();
+    let (sine, cosine) = radians.sin_cos();
+    let check = |dx: f64, dy: f64| -> Result<(), ScoreFieldGap> {
+        let px = (cx + dx * cosine - dy * sine) * short / f64::from(cw);
+        let py = (cy + dx * sine + dy * cosine) * short / f64::from(ch);
+        if !px.is_finite()
+            || !py.is_finite()
+            || !(0.0..=1.0).contains(&px)
+            || !(0.0..=1.0).contains(&py)
+        {
+            return Err(ScoreFieldGap::GeometryExtentOutOfBounds);
+        }
+        Ok(())
+    };
+    if let Some((radius, sides)) = polygon {
+        for vertex in 0..sides {
+            let angle = -std::f64::consts::FRAC_PI_2
+                + std::f64::consts::TAU * f64::from(vertex) / f64::from(sides);
+            check(radius * angle.cos(), radius * angle.sin())?;
+        }
+    } else if primitive == Primitive::Triangle {
+        for (dx, dy) in [
+            (0.0, -height / 2.0),
+            (-width / 2.0, height / 2.0),
+            (width / 2.0, height / 2.0),
+        ] {
+            check(dx, dy)?;
+        }
+    } else {
+        for (dx, dy) in [
+            (-width / 2.0, -height / 2.0),
+            (width / 2.0, -height / 2.0),
+            (-width / 2.0, height / 2.0),
+            (width / 2.0, height / 2.0),
+        ] {
+            check(dx, dy)?;
+        }
+    }
+    Ok(LoweredGeometry {
+        from: None,
+        to: None,
+        center: polygon.map(|_| {
+            Point::new(
+                x.to_f64().expect("checked x"),
+                y.to_f64().expect("checked y"),
+            )
+        }),
+        radius: polygon.map(|value| value.0),
+        position: polygon.is_none().then_some(Point::new(
+            (cx - width / 2.0) * short / f64::from(cw),
+            (cy - height / 2.0) * short / f64::from(ch),
+        )),
+        size: polygon.is_none().then_some(Point::new(width, height)),
+        angle_start: None,
+        angle_end: None,
+        at: None,
+    })
+}
+
 fn lower_named_geometry(
     dimensions: ResolvedGeometryDimensions,
     region: [f64; 4],
@@ -3245,6 +3542,16 @@ fn lower_named_geometry(
         at: Some(AtRegion { region }),
     };
     match dimensions {
+        ResolvedGeometryDimensions::Bbox { width, height } => {
+            lowered.size = Some(Point::new(width.to_f64()?, height.to_f64()?));
+        }
+        ResolvedGeometryDimensions::RegularTriangle { side } => {
+            let side = side.to_f64()?;
+            lowered.size = Some(Point::new(side, side * 3.0_f64.sqrt() / 2.0));
+        }
+        ResolvedGeometryDimensions::Polygon { radius, .. } => {
+            lowered.radius = Some(radius.to_f64()?);
+        }
         ResolvedGeometryDimensions::Line { length } => {
             let half_x = length.to_f64()? * f64::from(short_units) / (2.0 * f64::from(width_units));
             lowered.from = Some(Point::new(0.5 - half_x, 0.5));

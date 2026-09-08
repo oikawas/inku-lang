@@ -15,6 +15,8 @@ pub mod execution_diagnostics;
 mod execution_projection;
 pub mod fluctuation;
 pub mod geometry;
+mod shape_constraint;
+pub use shape_constraint::{SemanticShapeConstraint, ShapeConstraint};
 pub mod language;
 pub mod macro_definition;
 pub mod macro_expansion;

@@ -337,7 +337,8 @@ fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStr
             surface,
             span,
         }),
-        NeutralTokenKind::CoreModifier(_)
+        NeutralTokenKind::ConstrainedShape { .. }
+        | NeutralTokenKind::CoreModifier(_)
         | NeutralTokenKind::SaijikiWord { .. }
         | NeutralTokenKind::ExactNumber { .. } => {
             Err(ClauseStreamError::UnsupportedDeferredToken { atom_span: span })

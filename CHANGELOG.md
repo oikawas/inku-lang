@@ -17,7 +17,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-10 — current version rules move to SPEC (docs only)
 
-The current rules for performance versions, identity, reference corpora, and preservation now live in `SPEC.ja.md` / `SPEC.md`. The render-engine history retains its past rules, measurements, and engine entries as historical records. `PROJECT_CONTEXT` now changes only when architecture, an important contract, or runtime integration actually changes, rather than at every Step. Production code, runtime, schema, version, and release are unchanged.
+The current rules for performance versions, identity, reference corpora, and preservation now live in `SPEC.ja.md` / `SPEC.md`. The render-engine history retains its past rules, measurements, and engine entries as historical records; new version values, reasons, and results are recorded only in this changelog. `PROJECT_CONTEXT` now changes only when architecture, an important contract, or runtime integration actually changes, rather than at every Step. Production code, runtime, schema, version, and release are unchanged.
 
 ---
 

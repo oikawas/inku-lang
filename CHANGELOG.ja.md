@@ -17,7 +17,7 @@
 
 ### 2026-09-10 — 現行の版規則を SPEC へ整理（docs only）
 
-演奏の版、同一性、参照コーパス、保存の現行規則を `SPEC.ja.md` / `SPEC.md` にまとめ、描画engine版史には過去の条件・測定・engine記録をhistorical recordとして残した。`PROJECT_CONTEXT` は実際のarchitecture・重要契約・runtime接続の変更時だけ更新し、Stepごとの重複履歴更新を要求しない。production code、runtime、schema、version、releaseは変更していない。
+演奏の版、同一性、参照コーパス、保存の現行規則を `SPEC.ja.md` / `SPEC.md` にまとめ、描画engine版史には過去の条件・測定・engine記録をhistorical recordとして残した。新しい版の値・理由・結果は本書だけへ記録し、engine版史へ新しい節を追加しない。`PROJECT_CONTEXT` は実際のarchitecture・重要契約・runtime接続の変更時だけ更新し、Stepごとの重複履歴更新を要求しない。production code、runtime、schema、version、releaseは変更していない。
 
 ---
 

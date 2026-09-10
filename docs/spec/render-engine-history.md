@@ -1,6 +1,6 @@
 # Render engine version history
 
-**An index of the performance (drawing) versions alone, newest first, one section per version.**
+**An index of already-recorded performance (drawing) versions alone, newest first, one section per version.**
 inku draws the same JSON Score a little differently every time. **The version of *how* it draws
 is the render engine version**, counted separately from the product version (`v2.7.8` and so on).
 **This document is the way in**; the detail lives where each section points.
@@ -11,9 +11,9 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 
 ## Historical version-bump rules and examples
 
-[SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated.
+[SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated. Record a new version's values, reasons, and results only in [CHANGELOG.md](../../CHANGELOG.md); do not add a new version section here.
 
-"Versions and identity IDs" below rules it. **There are two reasons.**
+What follows explains the historical "Versions and identity IDs." **There were two reasons.**
 
 1. **The performance changed** — the same Score with the same seed now draws differently
 2. **The vocabulary that can be performed grew** — raise it even if not one byte of output moved

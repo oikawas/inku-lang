@@ -820,15 +820,38 @@ pub struct Score {
 }
 
 impl Score {
-    /// Reject descriptors introduced after the declared Score edition.
+    /// Reject descriptors introduced after the declared Score edition or with
+    /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
-        if self.version == "0.1.0"
-            && self
-                .instructions
-                .iter()
-                .any(|instruction| instruction.arc_form.is_some())
-        {
-            return Err("arc_form requires Score version 0.2.0");
+        for instruction in &self.instructions {
+            if instruction.arc_form != Some(ArcForm::Crescent) {
+                continue;
+            }
+            if self.version != "0.2.0" {
+                return Err("arc_form requires Score version 0.2.0");
+            }
+            if instruction.primitive != Primitive::Arc {
+                return Err("arc_form=crescent requires primitive=arc");
+            }
+            if !instruction.filled {
+                return Err("arc_form=crescent requires filled=true");
+            }
+            if instruction.center.is_none() && instruction.at.is_none() {
+                return Err("arc_form=crescent requires center or at");
+            }
+            if !matches!(instruction.size, Some(size) if size.x > 0.0 && size.y > 0.0) {
+                return Err("arc_form=crescent requires a positive size");
+            }
+            if instruction.radius.is_some()
+                || instruction.position.is_some()
+                || instruction.angle_start.is_some()
+                || instruction.angle_end.is_some()
+            {
+                return Err("arc_form=crescent cannot carry open-arc geometry");
+            }
+            if matches!(instruction.surface, Some(ref surface) if surface.texture != SurfaceTexture::None) {
+                return Err("arc_form=crescent uses filled instead of a surface texture");
+            }
         }
         Ok(())
     }

@@ -21,6 +21,8 @@ Added Japanese `油彩` / English `oil paint` with Score weight `oil_paint` to v
 
 DDL advances 5→6 for the vocabulary addition, DDL engine 22→23 for its deterministic Score delivery, and render engine 46→47 for the new performed material. Score stays at 0.2.0 as an extension of the existing weight enum. The pending dense/faint surface proposal is not adopted.
 
+Relevant vocabulary, Score lowering, and oil-rendering checks passed, together with Web type/build/i18n checks and focused Android recognition/preservation tests. Each reference corpus was generated once: render engine47 preserves all 612 prior cases among 614, and DDL engine23 preserves all 54 prior cases among 55. Only two oil render cases and one DDL case were added. Actual oil/thick-brush lines and filled circles were visually compared. This change includes no deployment or public release.
+
 ---
 
 ### 2026-09-11 — Exact Macro dimensions, coordinates, and NotTouching

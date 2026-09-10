@@ -15,6 +15,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-10 — Correct the waxing and waning moon previews
+
+The web saijiki previews now draw the waxing moon as a 180-degree open arc bulging to the right and the waning moon as one bulging to the left. The Japanese and English effect descriptions match those shapes. The existing thin filled crescent preview is unchanged.
+
+---
+
 ### 2026-09-10 — Consolidate current rules and change records (docs only)
 
 Consolidated current rules for performance versions, identity, reference corpora, preservation, and PNG output in `SPEC.ja.md` / `SPEC.md`. Corrected references that treated version history as current authority and removed the old Android acceptance-cycle wording. The render-engine history retains past rules, measurements, and engine records; new version values, reasons, and results belong in CHANGELOG. `PROJECT_CONTEXT` changes when architecture, important contracts, or runtime integration changes. This entry combines the session's documentation and reference corrections. Product behavior, schema, version numbers, and releases are unchanged.

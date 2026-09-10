@@ -124,11 +124,12 @@ def test_render_reference_case_counts() -> None:
     # non-computer solid and a display computer control.
     # Engine 46 adds the two direct Score 0.2 filled crescents: rotring fixes
     # the exact cubic SVG path and pen carries that contour through rotation.
-    assert len(cases) == 612
+    # Engine 47 adds one oil-paint line and one solid-fill material witness.
+    assert len(cases) == 614
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 90, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:

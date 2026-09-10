@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::determinism::{instruction_seed, needs_path_variation};
 use crate::geometry::{line_with_variation, point_to_pixels, size_to_pixels, stroke_sample_count};
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
-use crate::materials::with_texture_filter;
+use crate::materials::{oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
     ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
@@ -259,13 +259,27 @@ pub(crate) fn hand_line(
             stroke.event_count
         ),
     );
-    group.push(
-        Element::new("path")
-            .attr("d", polygon_path(&outline))
-            .attr("fill", &style.color)
-            .attr("fill-opacity", format_number(style.stroke_opacity))
-            .attr("stroke", "none"),
-    );
+    if instruction.weight == Weight::OilPaint {
+        let middle = outline.len() / 2;
+        let right = outline[middle..].iter().rev().copied().collect::<Vec<_>>();
+        group.push(oil_paint_stroke(
+            polygon_path(&outline),
+            &outline[..middle],
+            &right,
+            &style.color,
+            style.stroke_opacity,
+            seed,
+            false,
+        ));
+    } else {
+        group.push(
+            Element::new("path")
+                .attr("d", polygon_path(&outline))
+                .attr("fill", &style.color)
+                .attr("fill-opacity", format_number(style.stroke_opacity))
+                .attr("stroke", "none"),
+        );
+    }
     if instruction.style != LineStyle::Solid {
         let mut line_style = style.clone();
         line_style.width = (context.canvas.unit() / 1000.0 * 0.45).max(style.width * 0.42);
@@ -306,6 +320,17 @@ pub(crate) fn hand_contour(
         support: instruction_support(instruction, context.support),
         terminal: StrokeTerminal::Taper,
     });
+    if instruction.weight == Weight::OilPaint {
+        return oil_paint_stroke(
+            contour_stroke_path(&stroke),
+            &stroke.left,
+            &stroke.right,
+            &style.color,
+            style.stroke_opacity,
+            instruction_seed(instruction, context.render_seed),
+            closed,
+        );
+    }
     with_texture_filter(
         Element::new("g")
             .attr(

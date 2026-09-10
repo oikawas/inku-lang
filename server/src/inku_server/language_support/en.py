@@ -15,6 +15,7 @@ COERCE_MARKERS = {
         (("crayon",), "crayon"),
         (("chalk",), "chalk"),
         (("fine-brush", "fine brush"), "brush_thin"),
+        (("oil paint", "oil-paint", "oil painting"), "oil_paint"),
         (("thick-brush", "thick brush"), "brush_thick"),
         (("ink-wash", "ink wash"), "brush_thin"),
     ),

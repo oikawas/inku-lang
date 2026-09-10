@@ -89,6 +89,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "tezawari": (
         ("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
         ("チョーク", "chalk"), ("細筆", "fine-brush"), ("太筆", "thick-brush"),
+        ("油彩", "oil paint"),
         ("ビュラン", "burin"), ("ドライポイント", "drypoint"),
         ("コンピュータ", "computer"),
     ),

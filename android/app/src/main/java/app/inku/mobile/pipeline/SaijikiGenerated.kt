@@ -37,8 +37,8 @@ object SaijikiGenerated {
             key = "tezawari",
             nameJa = "てざわり",
             nameEn = "touches",
-            wordsJa = listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ"),
-            wordsEn = listOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer"),
+            wordsJa = listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ"),
+            wordsEn = listOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "oil paint", "burin", "drypoint", "computer"),
         ),
         Category(
             key = "tsuranari",

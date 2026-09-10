@@ -8,7 +8,7 @@ use crate::determinism::{hash01, instruction_seed};
 use crate::geometry::stroke_sample_count;
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle};
-use crate::materials::with_texture_filter;
+use crate::materials::{oil_paint_shade, oil_paint_stroke, with_texture_filter};
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
 use crate::types::{Instruction, Point, Seed, SurfaceTexture, SvgProfile, Weight};
@@ -106,6 +106,17 @@ fn stroke_path(
         support: context.support,
         terminal: StrokeTerminal::Loaded,
     });
+    if instruction.weight == Weight::OilPaint {
+        return oil_paint_stroke(
+            contour_stroke_path(&stroke),
+            &stroke.left,
+            &stroke.right,
+            &style.color,
+            opacity,
+            seed,
+            false,
+        );
+    }
     with_texture_filter(
         Element::new("path")
             .attr("d", contour_stroke_path(&stroke))
@@ -255,6 +266,83 @@ fn fill_dab(
     Some(group)
 }
 
+fn oil_paint_fill(
+    instruction: &Instruction,
+    contour: &[Point],
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+    opacity: f64,
+) -> Element {
+    let seed = instruction_seed(instruction, context.render_seed);
+    let angle = hash01(0, seed, "oil-fill-angle") * std::f64::consts::PI;
+    let normal = Point::new(-angle.sin(), angle.cos());
+    let (low, high) = contour
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), p| {
+            let projection = p.x * normal.x + p.y * normal.y;
+            (low.min(projection), high.max(projection))
+        });
+    // Wider loaded passes keep the work bounded even for large filled shapes.
+    let span = high - low;
+    let width = (style.width * 2.0)
+        .min(span / 3.0)
+        .max(span / 64.0)
+        .max(context.canvas.unit() * 0.0001);
+    let spacing = width * 0.82;
+    let mut group = Element::new("g")
+        .attr("class", "oil-paint-fill-v1")
+        .attr("opacity", format_number(opacity));
+    group.push(
+        Element::new("path")
+            .attr("d", polygon_path(contour))
+            .attr("class", "oil-paint-fill-body-v1")
+            .attr("fill", &style.color)
+            .attr("stroke", "none"),
+    );
+    for (order, (row, mut start, mut end)) in scanline_segments(contour, angle, spacing, seed, 0.24)
+        .into_iter()
+        .enumerate()
+    {
+        let length = (end.x - start.x).hypot(end.y - start.y);
+        if length <= width {
+            continue;
+        }
+        // Leave a small boundary margin for the deposited paint's loaded ends.
+        let inset = (width * 0.45 / length).min(0.45);
+        let delta = Point::new(end.x - start.x, end.y - start.y);
+        start = Point::new(start.x + delta.x * inset, start.y + delta.y * inset);
+        end = Point::new(end.x - delta.x * inset, end.y - delta.y * inset);
+        if row % 2 == 1 {
+            std::mem::swap(&mut start, &mut end);
+        }
+        let samples = stroke_sample_count(length, context.canvas).clamp(2, 65);
+        let centerline = (0..samples)
+            .map(|index| {
+                let t = index as f64 / (samples - 1) as f64;
+                Point::new(
+                    start.x + (end.x - start.x) * t,
+                    start.y + (end.y - start.y) * t,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut pass_style = style.clone();
+        pass_style.color = oil_paint_shade(
+            &style.color,
+            (hash01(order as i64, seed, "oil-fill-load") - 0.5) * 0.10,
+        );
+        group.push(stroke_path(
+            instruction,
+            context,
+            &centerline,
+            &pass_style,
+            1.0,
+            fill_seed(seed, order),
+            width,
+        ));
+    }
+    group
+}
+
 /// Render the interior requested by a filled closed mark.
 #[must_use]
 pub(crate) fn render_interior_fill(
@@ -267,6 +355,15 @@ pub(crate) fn render_interior_fill(
         return None;
     }
     let opacity = style.fill_opacity.unwrap_or(style.stroke_opacity);
+    if instruction.weight == Weight::OilPaint {
+        return Some(oil_paint_fill(
+            instruction,
+            contour,
+            style,
+            context,
+            opacity,
+        ));
+    }
     if is_noncomputer_solid_fill(instruction) {
         let mut group = Element::new("g").attr("class", "solid-fill-v1");
         let path = polygon_path(contour);

@@ -63,6 +63,8 @@ def test_language_support_owns_coerce_marker_sets():
     assert "patchwork" not in ja_markers["rhythm"]
     assert "暗闇" in ja_markers["explicit_surface"]
     assert "dark field" in en_markers["explicit_surface"]
+    assert (("油彩", "油絵"), "oil_paint") in ja_markers["material_weight_hints"]
+    assert (("oil paint", "oil-paint", "oil painting"), "oil_paint") in en_markers["material_weight_hints"]
 
 
 def test_auto_instruction_language_resolution_remains_stable():

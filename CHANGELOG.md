@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Add oil paint to touches
+
+Added Japanese `油彩` / English `oil paint` with Score weight `oil_paint` to vocabulary, typed DDL, current interpretation/composition prompts, Score preservation, and Web/Android selection and display. The shared renderer suggests impasto with loaded paint strokes and bristle ridges shaded from the selected color across lines, arcs, closed contours, and filled surfaces. The ridges remain geometry in every SVG profile, including Compat.
+
+DDL advances 5→6 for the vocabulary addition, DDL engine 22→23 for its deterministic Score delivery, and render engine 46→47 for the new performed material. Score stays at 0.2.0 as an extension of the existing weight enum. The pending dense/faint surface proposal is not adopted.
+
+---
+
 ### 2026-09-11 — Exact Macro dimensions, coordinates, and NotTouching
 
 MacroDefinition adds the closed `exact_decimal` type. Declared caller dimensions, definition literals, components, locals, and finite choices deliver exact values through the ordinary DDL geometry and position resolver. Legacy `Number(f64)` and existing definition bytes stay unchanged; only new decimal literals normalize equivalent spellings for canonical identity. Radius, diameter, length, side, width/height, chord/sagitta, and X/Y bind uniquely by explicit dimension, retaining source and generated ownership. Count-one Score and repetition plans share numeric range, must-fit, and diagnostic recovery to the smaller overlapping size.

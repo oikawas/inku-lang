@@ -35,11 +35,11 @@ class SaijikiIsGeneratedTest {
 
     /** T1: what the screen builds, in either language, is the server's table. */
     @Test
-    fun testScreenShowsTwelveCategoriesAndNinetyOneWordsInBothLanguages() {
+    fun testScreenShowsTwelveCategoriesAndNinetyTwoWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
             assertEquals("$lang: display categories", 12, groups.size)
-            assertEquals("$lang: display words", 91, groups.sumOf { it.words.size })
+            assertEquals("$lang: display words", 92, groups.sumOf { it.words.size })
         }
     }
 
@@ -66,7 +66,7 @@ class SaijikiIsGeneratedTest {
     }
 
     /**
-     * T3: the touch words, in the server's order, including the silverpoint.
+     * T3: the touch words, in the server's order, including the oil paint.
      *
      * This replaces `WebDdlSpecTest.testStage5dDisplayVocabulary10TermsExactOrder`,
      * which asserted the ten words of 2026-07-26 and so held the drift in place
@@ -76,12 +76,12 @@ class SaijikiIsGeneratedTest {
     fun testTouchWordsMatchTheServerOrderIncludingTheSilverpoint() {
         val touch = saijikiGroups(UiLanguage.Ja).first { it.key == "tezawari" }
         assertEquals(
-            listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ"),
+            listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ"),
             touch.words,
         )
         val touchEn = saijikiGroups(UiLanguage.En).first { it.key == "tezawari" }
         assertEquals(
-            listOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer"),
+            listOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "oil paint", "burin", "drypoint", "computer"),
             touchEn.words,
         )
     }
@@ -132,7 +132,7 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 182, words.size)
+            assertEquals("$lang: detection surfaces", 184, words.size)
         }
     }
 

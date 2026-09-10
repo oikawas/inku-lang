@@ -307,6 +307,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
             if profile != SvgProfile::Compat
                 && owns_surface(single.primitive)
                 && is_noncomputer_solid_fill(single)
+                && single.weight != crate::types::Weight::OilPaint
             {
                 let (filter_id, seed) = solid_mottle_filter_id(single, context);
                 material_definitions.push(solid_mottle_filter(&filter_id, seed));

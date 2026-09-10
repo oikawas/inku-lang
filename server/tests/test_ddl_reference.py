@@ -31,7 +31,7 @@ def _aliases(model) -> set[str]:
 
 def test_ddl_reference_versions_and_parts() -> None:
     manifest = _manifest()
-    assert DDL_VERSION == "5"
+    assert DDL_VERSION == "6"
     # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
     # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
     # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。
@@ -127,7 +127,9 @@ def test_ddl_reference_versions_and_parts() -> None:
     # the 30 carried Scores remains byte-identical.
     # Engine 22 adds a literal Score 0.2 crescent carry-through case. The typed
     # compiler rules are covered by Rust tests, outside this legacy corpus.
-    assert DDL_ENGINE_VERSION == "22"
+    # Engine 23 gives oil paint its own material key; the parent-owned reference
+    # corpus supplies the new direct material case.
+    assert DDL_ENGINE_VERSION == "23"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.2.0"
@@ -176,9 +178,9 @@ def test_ddl_reference_versions_and_parts() -> None:
     # moves and two it must leave alone -- so the part is thirty. A and C do not
     # move: the rule lives inside coerce and reads a clause the expander never
     # writes.
-    assert len(manifest["cases"]) == 54
+    assert len(manifest["cases"]) == 55
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 35
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 36
     assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
     # Three entries, and they are two different quantities: `beside-cjk` is the
     # one case whose judgement moved (one unit to twelve, because the exclusion is
@@ -335,10 +337,12 @@ def test_ddl_reference_versions_and_parts() -> None:
         )
         assert body["score"] == prior_body["score"], case_id
         assert body["branch_report"]["with_stated_surface_fidelity"] == 0, case_id
-    # The new wire extension is absent on old inputs and old output bytes.
+    # Crescent remains the prior new wire extension. Oil paint is the one new
+    # engine-23 input; every earlier corpus input stays byte-identical.
     crescent_case = "B-crescent-score-0-2-carry-through"
-    assert set(manifest["cases"]) == set(twenty_one["cases"]) | {crescent_case}
-    assert manifest["changed_from_previous"] == [crescent_case]
+    oil_paint_case = "B-oil-paint-from-ddl"
+    assert set(manifest["cases"]) == set(twenty_one["cases"]) | {crescent_case, oil_paint_case}
+    assert manifest["changed_from_previous"] == [oil_paint_case]
     for case_id, prior_case in twenty_one["cases"].items():
         case = manifest["cases"][case_id]
         assert case["input"] == prior_case["input"], case_id
@@ -349,8 +353,10 @@ def test_ddl_reference_versions_and_parts() -> None:
         for case_id, case in manifest["cases"].items()
         if "without_unrequested_color_cycle" in case.get("fired_branches", {})
     ) == [
-        "B-leaf-grain-words", "B-orange-from-ddl", "B-production-multiline", "B-purple-from-ddl",
-        "B-quiet-water", "B-trigger", "B-yellow-from-ddl", "B-yellow-from-ddl-en",
+        "B-leaf-grain-words", "B-oil-paint-from-ddl", "B-orange-from-ddl",
+        "B-production-multiline", "B-purple-from-ddl", "B-quiet-water", "B-trigger",
+        "B-yellow-from-ddl",
+        "B-yellow-from-ddl-en",
     ]
     assert not any(
         manifest["cases"][case]["part"] == "a_expand" for case in manifest["changed_from_previous"]
@@ -554,6 +560,11 @@ def test_ddl_reference_coerce_discriminators() -> None:
             "with_color_delivery_repair", "with_primary_color_delivery",
             "without_unrequested_color_cycle",
         },
+        "B-oil-paint-from-ddl": {
+            "coerce_and_repair_instruction", "with_color_delivery_repair",
+            "with_primary_color_delivery", "with_stated_count_fidelity",
+            "without_unrequested_color_cycle",
+        },
         # The pair added at ddl-engine 12, and they are asserted here rather than
         # left to the frozen bytes on purpose: a corpus is a record that gets
         # regenerated, so a case can quietly stop exercising what it was added
@@ -638,6 +649,16 @@ def test_crescent_reference_is_a_literal_score_carry_through() -> None:
     assert instruction["size"] == literal["score"]["instructions"][0]["size"]
     assert all(instruction[field] is None for field in ("radius", "position", "angle_start", "angle_end"))
 
+
+def test_oil_paint_reference_delivers_the_independent_touch() -> None:
+    case_id = "B-oil-paint-from-ddl"
+    literal = _generator().build_coerce_inputs()[case_id]
+    assert literal["ddl"] == "赤い油彩の短い線を横に七本並べる。"
+    assert literal["lang"] == "ja"
+    case = _manifest()["cases"][case_id]
+    output = json.loads((MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8"))
+    assert output["score"]["instructions"][0]["weight"] == "oil_paint"
+
 def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> None:
     """T-7 of 契約 description-propagation-cut, written as a property.
 
@@ -706,7 +727,8 @@ def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> No
     # cases that carry a DDL; 18 at ddl-engine 15, whose three surface cases each
     # carry one; 22 at ddl-engine 16, whose four size cases each carry one too;
     # and 26 at ddl-engine 21, whose four stated-surface cases all carry one.
-    assert checked == 26
+    # Engine 23 adds the one direct oil-paint material case.
+    assert checked == 27
 
 
 def test_the_corpus_holds_a_case_of_the_production_shape() -> None:

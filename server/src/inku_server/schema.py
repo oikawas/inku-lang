@@ -76,6 +76,7 @@ Weight = Literal[
     "chalk",
     "brush_thin",
     "brush_thick",
+    "oil_paint",
     "burin",
     "drypoint",
     "computer",
@@ -613,7 +614,7 @@ class Instruction(BaseModel):
         default="pen",
         description=(
             "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
-            " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆"
+            " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆 / oil_paint=油彩"
             " / burin=ビュラン / drypoint=ドライポイント"
             " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
         ),

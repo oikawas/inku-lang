@@ -357,7 +357,7 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 - **「明暗」「濃淡」→ 黒/灰/白の対比層。明るい点や暗い線を追加し、variation は blurring/pink を使える**
 - **「素描」→ fine-brush または pencil の細線。下線・補助線として count を保つ**
 - **「点描」→ 小さな square または ellipse の scatter。真円を連発せず、rotation を付けて水平/垂直対称を崩す**
-- **「油絵の厚塗り」→ weight=brush_thick の短い線。反復層として扱う**
+- **「油彩」→ weight=oil_paint。形・数・配置は入力の指定を保持する**
 - **「水彩」→ 主に ellipse に blurring を付ける。淡い重なりとして扱う**
 - **「パッチワーク」→ square の反復。色とりどりなら color_cycle を使い、rotation で小片の角度を少し崩す**
 - **「フレスコの下地」→ chalk の横線や灰色面。blurring で古い壁面として扱う**
@@ -481,8 +481,8 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 入力: 赤い回転した小さな四角を点描として画面全体に点々と三十四個散らす。
 出力: {"instructions":[{"primitive":"square","position":[0.497,0.497],"size":[0.006,0.006],"color":"red","rotation":30,"arrangement":{"count":34,"layout":"scatter"}}]}
 
-入力: 赤い太筆の短い線を油絵の厚塗りとして横に七本並べる。
-出力: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
+入力: 赤い油彩の短い線を横に七本並べる。
+出力: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"oil_paint","arrangement":{"count":7,"layout":"vertical"}}]}
 
 入力: 白い右上がりの薄い水彩の楕円を左上に三つ重ねる。境界が滲む。
 出力: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","rotation":-15,"arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
@@ -627,6 +627,7 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 | チョーク | chalk |
 | 細筆 | brush_thin |
 | 太筆 | brush_thick |
+| 油彩 | oil_paint |
 | ビュラン | burin |
 | ドライポイント | drypoint |
 | コンピュータ（格子に乗り、段に落ち、誤差なく反復する） | computer |
@@ -769,7 +770,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **"value" / "light and shade" → black/gray/white contrast layers; blurring may express soft value transitions**
 - **"drawing underlines" → fine-brush or pencil thin lines; preserve count**
 - **"pointillism" → small square or ellipse scatter; avoid repeated true circles and add rotation to break axis symmetry**
-- **"oil impasto" → short brush_thick line repetition**
+- **"oil paint" / "oil impasto" → weight=oil_paint; preserve the input's shape, count, and placement**
 - **"watercolor" → primarily ellipse with blurring, layered softly**
 - **"patchwork" → square repetition; use color_cycle for multiple colors and add slight rotation to the pieces**
 - **"fresco ground" → chalk gray horizontal lines or ground plane with blurring**
@@ -882,8 +883,8 @@ Output: {"instructions":[{"primitive":"line","from":[0.12,0.85],"to":[0.78,0.28]
 Input: Scatter thirty-four small rotated red squares dotted across the whole canvas as pointillism.
 Output: {"instructions":[{"primitive":"square","position":[0.497,0.497],"size":[0.006,0.006],"color":"red","rotation":30,"arrangement":{"count":34,"layout":"scatter"}}]}
 
-Input: Line up seven short red thick-brush lines horizontally as oil impasto.
-Output: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"brush_thick","arrangement":{"count":7,"layout":"vertical"}}]}
+Input: Line up seven short red oil paint lines horizontally as oil impasto.
+Output: {"instructions":[{"primitive":"line","from":[0.35,0.5],"to":[0.65,0.5],"color":"red","weight":"oil_paint","arrangement":{"count":7,"layout":"vertical"}}]}
 
 Input: Layer three pale watercolor ellipses rising to the right in the upper left. Edges blurring.
 Output: {"instructions":[{"primitive":"ellipse","center":[0.32,0.28],"size":[0.24,0.14],"color":"white","rotation":-15,"arrangement":{"count":3,"layout":"scatter","margin":0.18},"variation":{"amplitude":"medium","frequency":"slow","quality":"pink","dimensions":["position_x","position_y"]}}]}
@@ -1016,6 +1017,7 @@ When the normalized DDL contains a material word, always set the weight field. O
 | chalk | chalk |
 | fine-brush | brush_thin |
 | thick-brush | brush_thick |
+| oil paint | oil_paint |
 | burin | burin |
 | drypoint | drypoint |
 | computer (snaps to a grid, falls into steps, repeats without error) | computer |
@@ -1293,6 +1295,7 @@ def _enforce_cloudform_literal_delivery(score: Score, ddl: str) -> Score:
         (("鉛筆", "pencil"), "pencil"),
         (("ロットリング", "rotring"), "rotring"),
         (("細筆", "fine-brush"), "brush_thin"),
+        (("油彩", "油絵", "oil paint", "oil-paint", "oil painting"), "oil_paint"),
         (("太筆", "thick-brush"), "brush_thick"),
     ):
         if any(term in normalized or term in lower for term in marker):

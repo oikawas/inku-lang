@@ -87,6 +87,7 @@ pub fn support_with_mark_word(support: Support, texture: SurfaceTexture) -> Supp
 const fn tool_support_bias(weight: Weight) -> (f64, f64) {
     match weight {
         Weight::BrushThin | Weight::BrushThick => (1.0, 0.15),
+        Weight::OilPaint => (0.04, 0.12),
         Weight::Crayon | Weight::Pencil => (0.10, 1.0),
         Weight::Chalk => (0.10, 1.30),
         Weight::Pen => (0.15, 0.15),

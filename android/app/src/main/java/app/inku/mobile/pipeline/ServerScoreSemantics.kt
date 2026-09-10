@@ -266,7 +266,8 @@ internal object ServerScoreSemantics {
         text.contains("ペン") || text.contains("pen", ignoreCase = true) -> "pen"
         text.contains("クレヨン") || text.contains("crayon", ignoreCase = true) -> "crayon"
         text.contains("チョーク") || text.contains("chalk", ignoreCase = true) -> "chalk"
-        text.contains("太筆") || text.contains("厚塗り") || text.contains("油絵") || text.contains("thick-brush", ignoreCase = true) || text.contains("thick brush", ignoreCase = true) || text.contains("oil impasto", ignoreCase = true) -> "brush_thick"
+        text.contains("油彩") || text.contains("油絵") || text.contains("oil paint", ignoreCase = true) || text.contains("oil-paint", ignoreCase = true) || text.contains("oil impasto", ignoreCase = true) -> "oil_paint"
+        text.contains("太筆") || text.contains("厚塗り") || text.contains("thick-brush", ignoreCase = true) || text.contains("thick brush", ignoreCase = true) -> "brush_thick"
         text.contains("細筆") || text.contains("水墨") || text.contains("墨") || text.contains("fine-brush", ignoreCase = true) || text.contains("fine brush", ignoreCase = true) || text.contains("ink-wash", ignoreCase = true) || text.contains("ink wash", ignoreCase = true) -> "brush_thin"
         else -> "pen"
     }

@@ -170,6 +170,18 @@ def test_coerce_score_infers_material_and_variation_from_ddl():
     assert ins.variation.quality == "perlin"
 
 
+def test_coerce_score_keeps_oil_paint_independent_from_thick_brush():
+    def material(ddl: str) -> str:
+        score = Score.model_validate(
+            {"instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}]}
+        )
+        return coerce_score(score, ddl=ddl).instructions[0].weight
+
+    assert material("赤い油彩の横線を引く。") == "oil_paint"
+    assert material("red oil paint horizontal line") == "oil_paint"
+    assert material("赤い太筆の横線を引く。") == "brush_thick"
+
+
 def test_coerce_score_adds_ddl_coverage_when_stage2_collapses_to_one_instruction():
     score = Score.model_validate(
         {

@@ -58,15 +58,19 @@ class WebDdlSpecTest {
     @Test
     fun testStage1PromptEnumeratesEveryTouchWord() {
         val prompt = WebDdlSpec.buildStage1SystemPrompt("鉛筆で線を引く")
-        for (word in listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")) {
+        for (word in listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ")) {
             org.junit.Assert.assertTrue("Stage 1 prompt does not enumerate $word", prompt.contains(word))
         }
     }
 
     @Test
-    fun testComputerWeightDetectionHairRetentionAndRopeRemoval() {
+    fun testMaterialWeightDetectionHairRetentionAndRopeRemoval() {
         // 1. Computer weight detection
         org.junit.Assert.assertEquals("computer", ServerScoreSemantics.detectWeightKey("コンピュータの直線を引く"))
+        org.junit.Assert.assertEquals("oil_paint", ServerScoreSemantics.detectWeightKey("油彩の線を引く"))
+        org.junit.Assert.assertEquals("oil_paint", ServerScoreSemantics.detectWeightKey("oil paint line"))
+        org.junit.Assert.assertTrue(WebDdlSpec.buildStage1SystemPrompt("油彩の線").contains("油彩"))
+        org.junit.Assert.assertTrue(WebDdlSpec.stage2SystemPromptForDisplay("en").contains("oil_paint"))
 
         // 2. Hair weight retention (backward compatibility)
         val sourceJson = org.json.JSONObject("""{"primitive":"line","weight":"hair"}""")

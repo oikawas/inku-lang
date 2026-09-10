@@ -88,6 +88,9 @@ pub const fn grammar(weight: Weight) -> ToolGrammar {
         Weight::BrushThick => {
             hand_grammar!(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13, 1.00, 1.0)
         }
+        Weight::OilPaint => {
+            hand_grammar!(0.42, 0.78, 0.30, 0.18, 0.08, 0.18, 0.20, 0.035, 0.65, 1.0)
+        }
         Weight::Burin => hand_grammar!(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018, 0.10, 1.0),
         Weight::Drypoint => {
             hand_grammar!(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05, 0.45, 1.0)

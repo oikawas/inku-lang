@@ -29,17 +29,14 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.2.0"
-FROZEN_AT = "2026-09-10"
+FROZEN_AT = "2026-09-11"
 REASON = (
-    "DDL engine 22 accompanies shared typed full/half canvas-width sizing, "
-    "oriented moon forms, and conflicting-size errors recovered with the smaller "
-    "independent extent under both policies. Score schema 0.2.0 adds the filled "
-    "Saijiki crescent through optional arc_form. One literal B case verifies "
-    "that coerce preserves this center-and-size representation without adding "
-    "open-arc geometry. The existing explicit Score 0.1.0 inputs and all their "
-    "outputs remain unchanged. This legacy expander/coerce/plugin corpus does "
-    "not exercise the typed compiler; the Rust lowering, compiler, Macro, and "
-    "composition tests verify those new semantic rules independently."
+    "DDL engine 23 adds oil paint as an independent touch. One literal Japanese "
+    "B case verifies that coerce changes an existing line to weight=oil_paint "
+    "when DDL names 油彩. Thick brush remains independent, and all existing "
+    "inputs and outputs remain unchanged. This legacy expander/coerce/plugin "
+    "corpus does not exercise the typed compiler; the Rust seasonal asset, "
+    "lowering, compiler, Macro, and composition tests verify that path independently."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -231,6 +228,12 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
         "B-purple-from-ddl": _coerce_input(_score([line]), ddl="紫の菫が咲く。"),
         "B-yellow-from-ddl-en": _coerce_input(
             _score([line]), ddl="Scatter three yellow circles."
+        ),
+        # ddl-engine 23. Oil paint is its own touch, rather than an alias for
+        # thick brush. The line already exists so this records only material
+        # delivery from the explicit DDL word.
+        "B-oil-paint-from-ddl": _coerce_input(
+            _score([line]), ddl="赤い油彩の短い線を横に七本並べる。", lang="ja"
         ),
         # The shape production actually hands coerce. Before the
         # description-propagation cut every b_coerce case passed a single short

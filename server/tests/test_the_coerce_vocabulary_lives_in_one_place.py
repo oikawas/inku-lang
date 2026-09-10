@@ -333,10 +333,10 @@ def test_the_move_lost_no_word_and_invented_none() -> None:
 
 
 def test_the_word_count_is_the_sum_of_the_two_places() -> None:
-    """T-283: 574 declared + 119 moved = 693 distinct words, and not one more."""
+    """T-283: 574 declared + 124 moved = 698 distinct words, and not one more."""
     assert len(FIXTURE["declared_before"]) == 574
-    assert len(FIXTURE["moved"]) == 119
-    assert len(declared_words()) == 693
+    assert len(FIXTURE["moved"]) == 124
+    assert len(declared_words()) == 698
 
 
 @pytest.mark.skip(

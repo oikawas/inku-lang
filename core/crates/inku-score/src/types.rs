@@ -211,6 +211,7 @@ string_enum!(Weight {
     Chalk,
     BrushThin,
     BrushThick,
+    OilPaint,
     Burin,
     Drypoint,
     Computer,

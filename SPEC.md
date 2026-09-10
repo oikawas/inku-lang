@@ -139,7 +139,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
+| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
@@ -1750,6 +1750,7 @@ that quality implicitly:
 | chalk | perlin_plus_noise | Perlin plus powdery scratchiness, blur |
 | brush_thin | perlin_strong | thin brush track, secondary lines, density variation |
 | brush_thick | pressure_blur | thick pressure, rubbed secondary lines, light blur |
+| oil_paint | viscous_ridges | oil paint: loaded broad strokes, bristle ridges shaded from the selected color, and overlapping paint strokes across filled surfaces suggest impasto |
 | burin | almost_none | a hard, certain engraved line. Round ends, no texture filter |
 | drypoint | burr_noise | bleeding and scratchiness from the burr. Its own burr treatment |
 | computer | periodic_quantized | it sways, but **it repeats without error**. Integer-period sine and rounding to a lattice. The material is what sampling leaves behind (see "engine 13" in the [version history](docs/spec/render-engine-history.md)) |

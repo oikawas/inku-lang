@@ -44,6 +44,21 @@ class ServerScoreVocabularyTest {
         assertEquals(expectedEnum("color_cycle"), declaredEnum("\"color_cycle\":{"))
     }
 
+    @Test
+    fun testTheSchemaAndCoercerKeepOilPaint() {
+        assertEquals(expectedEnum("weight"), declaredEnum("\"weight\":{"))
+        val coerced = ServerScoreCoercer.coerceInstruction(
+            source = JSONObject().put("primitive", "line").put("weight", "oil_paint"),
+            ddl = "油彩の線を引く",
+            background = "white",
+            detectColorKey = { _, _ -> "black" },
+            detectWeightKey = ServerScoreSemantics::detectWeightKey,
+            visibleForeground = { _, _ -> "black" },
+        )
+        assertEquals("oil_paint", coerced.getString("weight"))
+        assertEquals("oil_paint", ServerScoreSemantics.detectWeightKey("oil paint line"))
+    }
+
     /**
      * The port's schema is smaller than the server's on purpose, so this asks
      * for a subsequence, not equality. It still pins `thinness` to the end,

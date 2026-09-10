@@ -54,6 +54,7 @@
         {"surface_ja": "チョーク", "surface_en": "chalk", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "chalk", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "細筆", "surface_en": "fine-brush", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "brush_thin", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "太筆", "surface_en": "thick-brush", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "brush_thick", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "油彩", "surface_en": "oil paint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "oil_paint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "ビュラン", "surface_en": "burin", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "burin", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "ドライポイント", "surface_en": "drypoint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "drypoint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "コンピュータ", "surface_en": "computer", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "computer", "marker_surfaces_ja": null, "marker_surfaces_en": null}

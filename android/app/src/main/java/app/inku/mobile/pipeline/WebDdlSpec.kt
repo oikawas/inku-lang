@@ -151,7 +151,7 @@ internal object WebDdlSpec {
         }
         val prefix = if (lang == "en") STAGE1_PROMPT_PREFIX_EN else STAGE1_PROMPT_PREFIX_JA
         val sectionHeader = if (lang == "en") "# Examples\n\n" else "# 変換例\n\n"
-        return (prefix + "\n\n" + sectionHeader + examples).also { prompt ->
+        return (withOilPaintVocabulary(prefix, lang) + "\n\n" + sectionHeader + examples).also { prompt ->
             synchronized(stage1PromptCache) {
                 stage1PromptCache[cacheKey] = prompt
             }
@@ -171,7 +171,7 @@ internal object WebDdlSpec {
         val examples = selected.joinToString("\n") { example ->
             "入力: ${example.input}\n出力: ${example.output}"
         }
-        return (STAGE1_PROMPT_PREFIX_JA_LITERT + "\n\n# 変換例\n" + examples).also { prompt ->
+        return (withOilPaintVocabulary(STAGE1_PROMPT_PREFIX_JA_LITERT, "ja") + "\n\n# 変換例\n" + examples).also { prompt ->
             synchronized(stage1LiteRtPromptCache) {
                 stage1LiteRtPromptCache[cacheKey] = prompt
             }
@@ -179,20 +179,24 @@ internal object WebDdlSpec {
     }
 
     fun stage1SystemPromptForDisplay(lang: String = "ja"): String {
-        return if (lang == "en") STAGE1_PROMPT_PREFIX_EN else STAGE1_PROMPT_PREFIX_JA
+        return withOilPaintVocabulary(if (lang == "en") STAGE1_PROMPT_PREFIX_EN else STAGE1_PROMPT_PREFIX_JA, lang)
     }
 
     fun stage1LiteRtVisionSystemPromptForDisplay(): String {
-        return STAGE1_PROMPT_PREFIX_JA_LITERT
+        return withOilPaintVocabulary(STAGE1_PROMPT_PREFIX_JA_LITERT, "ja")
     }
 
     fun stage2SystemPromptForDisplay(lang: String = "ja"): String {
-        return if (lang == "en") STAGE2_SYSTEM_PROMPT_EN else STAGE2_SYSTEM_PROMPT_JA
+        return withOilPaintVocabulary(if (lang == "en") STAGE2_SYSTEM_PROMPT_EN else STAGE2_SYSTEM_PROMPT_JA, lang)
     }
 
     fun stage2LiteRtSystemPromptForDisplay(): String {
-        return STAGE2_SYSTEM_PROMPT_JA_LITERT
+        return withOilPaintVocabulary(STAGE2_SYSTEM_PROMPT_JA_LITERT, "ja")
     }
+
+    private fun withOilPaintVocabulary(prompt: String, lang: String): String =
+        if (lang == "en") "$prompt\n\nOil paint is a touch word. Keep `oil paint` as `oil_paint` in Score weight."
+        else "$prompt\n\n油彩はてざわりの語です。`油彩` は Score の weight で `oil_paint` として保持する。"
 
     fun sanitizePlacementWords(ddl: String): String {
         var sanitized = ddl

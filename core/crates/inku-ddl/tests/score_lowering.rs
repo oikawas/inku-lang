@@ -1951,6 +1951,18 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
             Weight::Rotring,
             LineStyle::Solid,
         ),
+        (
+            "place one red oil paint solid empty circle with diameter 0.2 at horizontal 0.5, vertical 0.5.",
+            "square",
+            Primitive::Circle,
+            Some(Point::new(0.5, 0.5)),
+            Some(0.1),
+            None,
+            None,
+            Color::Red,
+            Weight::OilPaint,
+            LineStyle::Solid,
+        ),
     ];
     for (source, canvas, primitive, center, radius, position, size, color, weight, style) in cases {
         let result = stage15(source, ResolvedInstructionLanguage::En);

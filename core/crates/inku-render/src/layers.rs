@@ -83,6 +83,7 @@ fn weight_name(weight: crate::types::Weight) -> &'static str {
         crate::types::Weight::Chalk => "chalk",
         crate::types::Weight::BrushThin => "brush_thin",
         crate::types::Weight::BrushThick => "brush_thick",
+        crate::types::Weight::OilPaint => "oil_paint",
         crate::types::Weight::Burin => "burin",
         crate::types::Weight::Drypoint => "drypoint",
         crate::types::Weight::Computer => "computer",

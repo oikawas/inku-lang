@@ -14,7 +14,8 @@ COERCE_MARKERS = {
         (("クレヨン",), "crayon"),
         (("チョーク",), "chalk"),
         (("細筆",), "brush_thin"),
-        (("太筆", "厚塗り", "油絵"), "brush_thick"),
+        (("油彩", "油絵"), "oil_paint"),
+        (("太筆", "厚塗り"), "brush_thick"),
         (("水墨", "墨"), "brush_thin"),
     ),
     "color_markers": (

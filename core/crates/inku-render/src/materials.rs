@@ -2,7 +2,96 @@
 
 use crate::determinism::hash01;
 use crate::svg::{Element, format_number};
-use crate::types::{CanvasSize, Seed, Weight};
+use crate::types::{CanvasSize, Point, Seed, Weight};
+
+/// Preserve the selected pigment while shading the sides of a raised paint ridge.
+pub(crate) fn oil_paint_shade(color: &str, amount: f64) -> String {
+    let raw = color.strip_prefix('#').unwrap_or(color);
+    if raw.len() != 6 || !raw.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return color.to_owned();
+    }
+    let channel = |start| {
+        let value = f64::from(u8::from_str_radix(&raw[start..start + 2], 16).unwrap());
+        let shaded = if amount >= 0.0 {
+            value + (255.0 - value) * amount
+        } else {
+            value * (1.0 + amount)
+        };
+        shaded.round().clamp(0.0, 255.0) as u8
+    };
+    format!("#{:02x}{:02x}{:02x}", channel(0), channel(2), channel(4))
+}
+
+/// Bounded, filter-free bristle relief follows the performed banks in every profile.
+pub(crate) fn oil_paint_stroke(
+    path: String,
+    left: &[Point],
+    right: &[Point],
+    color: &str,
+    opacity: f64,
+    seed: Seed,
+    closed: bool,
+) -> Element {
+    let mut group = Element::new("g")
+        .attr("class", "oil-paint-stroke-v1")
+        .attr("opacity", format_number(opacity));
+    group.push(
+        Element::new("path")
+            .attr("d", path)
+            .attr("class", "oil-paint-body-v1")
+            .attr("fill", color)
+            .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
+            .attr("stroke", "none"),
+    );
+    if left.len() < 2 || left.len() != right.len() {
+        return group;
+    }
+    for ridge in 0..4 {
+        let phase = hash01(ridge, seed, "oil-ridge-phase") * std::f64::consts::TAU;
+        let width = 0.025 + hash01(ridge, seed, "oil-ridge-width") * 0.025;
+        for (offset, band_width, shade, class) in [
+            (0.0, width, -0.23, "oil-paint-ridge-shadow-v1"),
+            (width, width * 0.65, 0.20, "oil-paint-ridge-light-v1"),
+        ] {
+            let mut bank_a = Vec::with_capacity(left.len());
+            let mut bank_b = Vec::with_capacity(left.len());
+            for (index, (a, b)) in left.iter().zip(right).enumerate() {
+                let t = index as f64 / (left.len() - usize::from(!closed)) as f64;
+                let wave = (t * std::f64::consts::TAU * 2.0 + phase).sin() * 0.018;
+                let center = 0.13 + ridge as f64 * 0.21 + wave + offset;
+                let end = if closed {
+                    1.0
+                } else {
+                    (t * 12.0).min((1.0 - t) * 12.0).min(1.0)
+                };
+                let at = |fraction: f64| {
+                    Point::new(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction)
+                };
+                bank_a.push(at(center));
+                bank_b.push(at(center + band_width * end));
+            }
+            let d = if closed {
+                format!(
+                    "{} {}",
+                    crate::mark_paths::polygon_path(&bank_a),
+                    crate::mark_paths::polygon_path(&bank_b)
+                )
+            } else {
+                bank_a.extend(bank_b.into_iter().rev());
+                crate::mark_paths::polygon_path(&bank_a)
+            };
+            group.push(
+                Element::new("path")
+                    .attr("d", d)
+                    .attr("class", class)
+                    .attr("fill", oil_paint_shade(color, shade))
+                    .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
+                    .attr("stroke", "none"),
+            );
+        }
+    }
+    group
+}
 
 #[derive(Clone, Copy)]
 struct TextureSpec {

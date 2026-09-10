@@ -56,6 +56,10 @@ class UiLanguageSettingTest {
         assertFalse("ja must not show circle", "circle" in ja)
         assertTrue("en shows circle", "circle" in en)
         assertFalse("en must not show 円", "円" in en)
+        assertTrue("ja shows 油彩", "油彩" in ja)
+        assertFalse("ja must not show oil paint", "oil paint" in ja)
+        assertTrue("en shows oil paint", "oil paint" in en)
+        assertFalse("en must not show 油彩", "油彩" in en)
         assertNotEquals("the two languages show the same words", ja, en)
     }
 

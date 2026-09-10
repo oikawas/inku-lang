@@ -177,6 +177,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("チョーク", "chalk", score_value="chalk"),
             _w("細筆", "fine-brush", score_value="brush_thin"),
             _w("太筆", "thick-brush", score_value="brush_thick"),
+            _w("油彩", "oil paint", score_value="oil_paint"),
             _w("ビュラン", "burin", score_value="burin"),
             _w("ドライポイント", "drypoint", score_value="drypoint"),
             _w("コンピュータ", "computer", score_value="computer"),

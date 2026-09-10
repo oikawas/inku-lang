@@ -13,7 +13,7 @@ use crate::marks::{
 use crate::materials::texture_filter_id;
 use crate::types::{Amplitude, Frequency, LineStyle, Thinness, Weight};
 
-const WEIGHTS: [Weight; 11] = [
+const WEIGHTS: [Weight; 12] = [
     Weight::Silverpoint,
     Weight::Pencil,
     Weight::Pen,
@@ -22,6 +22,7 @@ const WEIGHTS: [Weight; 11] = [
     Weight::Chalk,
     Weight::BrushThin,
     Weight::BrushThick,
+    Weight::OilPaint,
     Weight::Burin,
     Weight::Drypoint,
     Weight::Computer,
@@ -112,7 +113,13 @@ mod tests {
         let weights = reference["weight_properties"]["weights"]
             .as_array()
             .expect("weight table");
-        assert_eq!(weights.len(), 11);
+        assert_eq!(weights.len(), 12);
+        let oil = weights
+            .iter()
+            .find(|weight| weight["weight"] == "oil_paint")
+            .unwrap();
+        assert_eq!(oil["stroke_width"], 12.0);
+        assert_eq!(oil["texture_filter"], false);
         assert_eq!(weights[0]["weight"], "silverpoint");
         assert_eq!(weights[0]["stroke_width"], 0.5);
         assert_eq!(reference["performance"]["frequency_cycles"]["high"], 14.0);

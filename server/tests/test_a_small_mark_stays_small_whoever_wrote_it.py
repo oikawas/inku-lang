@@ -220,7 +220,7 @@ def test_no_frozen_engine_below_this_one_was_rewritten() -> None:
     Baking engine 17 is exactly the moment an older directory gets rewritten by
     accident, which is what this reads for.
     """
-    assert DDL_ENGINE_VERSION == "22"
+    assert DDL_ENGINE_VERSION == "23"
 
     checked = 0
     for version in range(1, int(DDL_ENGINE_VERSION)):

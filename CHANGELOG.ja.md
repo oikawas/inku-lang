@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — てざわりに油彩を追加
+
+てざわりに「油彩」／`oil paint`（Scoreの`oil_paint`）を追加した。語彙、Typed DDL、現在の解釈・構図prompt、Scoreの読み書き、Web／Androidの選択・表示へ接続する。共有rendererは絵具の残る筆跡と選択色由来の明暗の刷毛筋を描き、線・弧・閉輪郭・塗り面で厚塗りの質感を表す。Compatを含むSVG profileで刷毛筋を形状として保持する。
+
+語彙追加でDDLを5から6へ、決定的なScore変換の語彙拡張でDDL engineを22から23へ、演奏語彙追加でrender engineを46から47へ進めた。Scoreは既存weight enumの拡張として0.2.0を維持する。おもての「濃い／薄い」の未裁定案は採用していない。
+
+---
+
 ### 2026-09-11 — Macroの正確な寸法・座標と「触れない」
 
 MacroDefinitionに閉じた `exact_decimal` 型を追加し、明示した寸法・座標のcaller parameter、定義literal、component、local、有限choicesから、通常DDLと同じgeometry / position resolverへ値を届ける。旧 `Number(f64)` と既存定義のbytesを保ち、新しい十進数の同値表記だけをcanonical identityで正規化する。半径・直径・長さ・一辺・幅高さ・弦長矢高・X/Yは、明示dimensionに一意に束縛し、原文と生成元のownerを保持する。Count1のScoreと反復planを共通化し、数値位置の範囲・must-fit、サイズ重複時の診断付き小サイズ採用も継承する。

@@ -77,7 +77,7 @@ internal object ServerScoreCoercer {
         val rawHasSize = source.has("size") && !source.isNull("size")
         val data = ServerScoreCompat.migrateInstruction(JSONObject(source.toString())).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple") } ?: "black")
-        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
+        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "oil_paint", "burin", "drypoint", "computer") } ?: "pen")
         if (data.has("thinness")) {
             val thinness = data.optString("thinness").takeIf { it in setOf("fine", "extra_fine") }
             if (thinness != null) data.put("thinness", thinness) else data.remove("thinness")
@@ -376,12 +376,13 @@ internal object ServerScoreCoercer {
     }
 
     private val materialWeightHints = listOf(
+        listOf("油彩", "油絵", "oil paint", "oil-paint", "oil impasto") to "oil_paint",
         listOf("ロットリング", "rotring") to "rotring",
         listOf("鉛筆", "pencil") to "pencil",
         listOf("クレヨン", "crayon") to "crayon",
         listOf("チョーク", "chalk") to "chalk",
         listOf("細筆", "fine-brush", "fine brush") to "brush_thin",
-        listOf("太筆", "thick-brush", "thick brush", "厚塗り", "油絵") to "brush_thick",
+        listOf("太筆", "thick-brush", "thick brush", "厚塗り") to "brush_thick",
         listOf("水墨", "墨", "ink-wash", "ink wash") to "brush_thin",
         listOf("ビュラン", "burin") to "burin",
         listOf("ドライポイント", "drypoint") to "drypoint",

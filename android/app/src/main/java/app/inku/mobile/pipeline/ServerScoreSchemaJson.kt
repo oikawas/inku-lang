@@ -16,5 +16,9 @@ internal object ServerScoreSchemaJson {
                 "},\"filled\":{\"default\":false,",
                 "},\"arc_form\":{\"anyOf\":[{\"const\":\"crescent\",\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"description\":\"arc の閉じた輪郭形式。crescent は歳時記の細い塗り月形で、center と size を実際の外接bboxとして使う\",\"title\":\"Arc Form\"},\"filled\":{\"default\":false,",
             )
+            .replace(
+                "computer=コンピュータ\",\"enum\":[\"silverpoint\",\"pencil\",\"pen\",\"rotring\",\"crayon\",\"chalk\",\"brush_thin\",\"brush_thick\",\"burin\",\"drypoint\",\"computer\"]",
+                "computer=コンピュータ / oil_paint=油彩\",\"enum\":[\"silverpoint\",\"pencil\",\"pen\",\"rotring\",\"crayon\",\"chalk\",\"brush_thin\",\"brush_thick\",\"oil_paint\",\"burin\",\"drypoint\",\"computer\"]",
+            )
     }
 }

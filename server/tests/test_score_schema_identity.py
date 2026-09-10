@@ -35,6 +35,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
 
     instruction = schema["$defs"]["Instruction"]["properties"]
     assert "point" in instruction["primitive"]["enum"]
+    assert "oil_paint" in instruction["weight"]["enum"]
     assert "semantic anchor" in instruction["position"]["description"]
     relation = schema["$defs"]["Relation"]["properties"]
     assert "connected" in relation["type"]["enum"]

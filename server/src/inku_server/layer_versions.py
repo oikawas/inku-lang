@@ -256,8 +256,9 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-# 22: shared width/moon/size recovery and the additive Score 0.2.0 arc form.
-DDL_ENGINE_VERSION = "22"
+# 23: oil paint is a separate touch. Japanese and English DDL material markers
+# lower deterministically to `weight=oil_paint`; thick brush remains independent.
+DDL_ENGINE_VERSION = "23"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -269,4 +270,5 @@ DDL_ENGINE_VERSION = "22"
 # another explicit shape; a standalone shape head owns the new point identity.
 # 5 (2026-09-07): つながる / connected joins the relation vocabulary through
 # only the fixed previous-shape phrases. Existing works retain their language version.
-DDL_VERSION = "5"
+# 6 (2026-09-11): 油彩 / oil paint joins the touch vocabulary as its own wire key.
+DDL_VERSION = "6"

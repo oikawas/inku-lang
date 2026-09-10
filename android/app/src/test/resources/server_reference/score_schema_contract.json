@@ -88,6 +88,20 @@
       "yellow",
       "orange",
       "purple"
+    ],
+    "weight": [
+      "silverpoint",
+      "pencil",
+      "pen",
+      "rotring",
+      "crayon",
+      "chalk",
+      "brush_thin",
+      "brush_thick",
+      "oil_paint",
+      "burin",
+      "drypoint",
+      "computer"
     ]
   },
   "descriptions": {

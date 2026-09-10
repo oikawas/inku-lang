@@ -30,13 +30,12 @@ REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.2.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
-FROZEN_AT = "2026-09-10"
+FROZEN_AT = "2026-09-11"
 REASON = (
-    "Engine 46 adds the author-approved filled crescent descriptor: its exact three-cubic "
-    "Saijiki contour is fitted to the stated physical center and size, then rotated with "
-    "the normal mark transform. The legacy 0.1 inputs intentionally omit arc_form and "
-    "remain their byte-fixed controls; C-crescent-rotring and C-crescent-pen-rotated "
-    "are the new 0.2 cases."
+    "Engine 47 adds oil_paint: loaded paint strokes and solid fills carry seeded "
+    "bristle ridges with pigment-derived light and shade in every SVG profile. "
+    "A-oil_paint-line and C-surface-solid-oil_paint are the two new Score 0.2 cases; "
+    "the eleven-tool matrices and all earlier literal inputs remain unchanged."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -202,6 +201,17 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     for tool in TOOLS:
         for primitive in PRIMITIVES:
             _case(cases, f"A-{tool}-{primitive}", _instruction(primitive, weight=tool))
+
+    # Engine 47 adds only the two material witnesses, not another tool matrix.
+    _case(cases, "A-oil_paint-line",
+          _instruction("line", weight="oil_paint", color="blue"),
+          score_version=SCHEMA_VERSION)
+    oil_solid = copy.deepcopy(BASE_SURFACE)
+    oil_solid["texture"] = "solid"
+    _case(cases, "C-surface-solid-oil_paint",
+          _instruction("square", weight="oil_paint", color="blue", filled=True,
+                       surface=oil_solid),
+          score_version=SCHEMA_VERSION)
 
     dimensions = {"line": ["position_x", "position_y"], "circle": ["radius"], "arc": ["radius"]}
     for quality in ("white", "perlin", "pink", "wave"):
@@ -848,10 +858,11 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # corpus could reach while all four of them were `pen`.
     # Engine 46 adds the two direct crescent cases above.  The old 0.1 inputs
     # deliberately stay in place, so their unchanged SVGs remain controls.
-    expected = {"A": 88, "B": 72, "C": 90, "D": 61, "E": 119, "F": 128,
+    # Engine 47 adds one oil-paint line to A and one solid fill to C.
+    expected = {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 612:
+    if actual != expected or len(cases) != 614:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

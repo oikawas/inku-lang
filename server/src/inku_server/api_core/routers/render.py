@@ -638,6 +638,8 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         weight = "crayon"
     elif ("チョーク" in ddl) or ("chalk" in lower):
         weight = "chalk"
+    elif ("油彩" in ddl) or ("油絵" in ddl) or ("oil paint" in lower) or ("oil-paint" in lower) or ("oil painting" in lower):
+        weight = "oil_paint"
     elif ("太筆" in ddl) or ("thick-brush" in lower) or ("thick brush" in lower) or ("厚塗り" in ddl):
         weight = "brush_thick"
     elif ("細筆" in ddl) or ("水墨" in ddl) or ("墨" in ddl) or ("fine-brush" in lower) or ("ink" in lower):

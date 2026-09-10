@@ -76,6 +76,7 @@ pub(crate) fn weight_width(weight: Weight) -> f64 {
         Weight::Crayon => 4.0,
         Weight::Chalk | Weight::BrushThin => 3.0,
         Weight::BrushThick => 8.0,
+        Weight::OilPaint => 12.0,
         Weight::Burin => 3.2,
         Weight::Drypoint => 2.6,
     }
@@ -128,6 +129,7 @@ pub(crate) fn weight_opacity(weight: Weight) -> f64 {
         Weight::Chalk => 0.70,
         Weight::BrushThin => 0.90,
         Weight::BrushThick => 0.86,
+        Weight::OilPaint => 1.0,
         Weight::Burin => 0.96,
         Weight::Drypoint => 0.92,
     }

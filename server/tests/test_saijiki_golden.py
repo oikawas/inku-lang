@@ -51,8 +51,8 @@ _REORDERED_JA = (
     ("かたち: 円、楕円、三角、四角、線、弧、雲形\n", "かたち: 円、楕円、三角、四角、線、弧、点、雲形\n", 1),
     ("髪、", "銀筆、", 1),
     ("髪・", "銀筆・", 1),
-    ("ビュラン・ドライポイントのいずれか", "ビュラン・ドライポイント・コンピュータのいずれか", 1),
-    ("ビュラン、ドライポイント\n", "ビュラン、ドライポイント、コンピュータ\n", 1),
+    ("ビュラン・ドライポイントのいずれか", "油彩・ビュラン・ドライポイント・コンピュータのいずれか", 1),
+    ("ビュラン、ドライポイント\n", "油彩、ビュラン、ドライポイント、コンピュータ\n", 1),
     # --- 2026-07-27: 内部矛盾の解消 ---
     (
         "使える動作動詞: 置く、並べる、引く、散らす、埋める\n",
@@ -180,8 +180,8 @@ _REORDERED_EN = (
     ("forms: circle, ellipse, triangle, square, line, arc, cloudform\n", "forms: circle, ellipse, triangle, square, line, arc, point, cloudform\n", 1),
     ("hair, ", "silverpoint, ", 2),
     ("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),
-    ("burin, or drypoint.", "burin, drypoint, or computer.", 1),
-    ("burin, drypoint\n", "burin, drypoint, computer\n", 1),
+    ("burin, or drypoint.", "oil paint, burin, drypoint, or computer.", 1),
+    ("burin, drypoint\n", "oil paint, burin, drypoint, computer\n", 1),
     # --- 2026-07-27: 内部矛盾の解消 ---
     (
         "Forbidden: move, spread, flow, extend, rise, fall, scatter (as motion), sink, paint\n",
@@ -359,7 +359,7 @@ _EXPECTED_CORE_MARKERS = {
         "線", "円", "楕円", "三角", "四角", "多角形", "弧", "点", "雲形",
         "置く", "引く", "並べる", "散らす", "敷き詰める", "埋める",  # 描く 削剪
         "触れる", "つながる", "沿う", "切る", "触れない", "間に",
-        "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",
+        "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ",
         "白", "黒", "青", "赤", "緑", "灰", "黄", "橙", "紫",
         "細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む",
         "水平", "垂直", "斜め", "右上がり", "右下がり", "左上がり", "左下がり", "回転",
@@ -371,7 +371,7 @@ _EXPECTED_CORE_MARKERS = {
         "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "point", "cloudform",
         "place", "draw", "arrange", "scatter", "tile", "fill",
         "touching", "connected", "along", "cutting", "not touching", "between",
-        "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",
+        "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "oil paint", "burin", "drypoint", "computer",
         "white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple",
         "fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring",
         "horizontal", "vertical", "diagonal", "rising", "falling", "left-rising", "left-falling", "rotated",

@@ -43,13 +43,6 @@ SEED = 100
 HOST = "ddl-server@example.invalid"
 REPO = "inku-lang-test"
 
-# The two lines the script reads the deployment target out of, in the shape the
-# untracked deploy script writes them.
-DEPLOY_SH = f"""#!/usr/bin/env bash
-REMOTE_HOST="${{INKU_REMOTE_HOST:-{HOST}}}"
-REMOTE_REPO="${{INKU_REMOTE_REPO:-{REPO}}}"
-"""
-
 FAKE_SSH = """#!/bin/sh
 printf '%s\\n' "$*" >> "$SSH_LOG"
 if [ -n "$SSH_FAIL" ]; then
@@ -99,6 +92,8 @@ class Tree:
             "PATH": f"{self.root.parent / 'bin'}{os.pathsep}{os.environ['PATH']}",
             "SSH_LOG": str(self.ssh_log),
             "SSH_NUMBER": str(ssh_number),
+            "INKU_REMOTE_HOST": HOST,
+            "INKU_REMOTE_REPO": REPO,
             **({"SSH_FAIL": "1"} if ssh_fail else {}),
             **(env or {}),
         })
@@ -136,12 +131,6 @@ def tree(tmp_path: pathlib.Path) -> Tree:
     # commit it and a checkout back does not delete it.
     (root / ".gitignore").write_text("no-git-sync/\n", encoding="utf-8")
     _commit(root, "seed")
-
-    # The deployment target lives in the untracked deploy script, so the scan
-    # has to find it the same way it does in the real tree.
-    deploy = root / "no-git-sync/scripts/deploy.sh"
-    deploy.parent.mkdir(parents=True, exist_ok=True)
-    deploy.write_text(DEPLOY_SH, encoding="utf-8")
 
     ssh = tmp_path / "bin/ssh"
     ssh.parent.mkdir(parents=True, exist_ok=True)
@@ -215,7 +204,7 @@ def test_the_deployment_host_moves_the_next_one(tree: Tree):
     assert _next_number(result) == SEED + 21
 
 
-def test_the_host_and_path_come_from_the_deploy_script(tree: Tree):
+def test_the_host_and_path_come_from_explicit_environment(tree: Tree):
     result = tree.run("--scan-build")
 
     assert result.returncode == 0, result.stderr
@@ -225,7 +214,7 @@ def test_the_host_and_path_come_from_the_deploy_script(tree: Tree):
     assert f"{REPO}/web/BUILD_NUMBER" in calls[0]
 
 
-def test_the_environment_overrides_the_deploy_script(tree: Tree):
+def test_the_environment_supplies_the_deploy_target(tree: Tree):
     result = tree.run("--scan-build", env={
         "INKU_REMOTE_HOST": "someone@elsewhere.invalid",
         "INKU_REMOTE_REPO": "other-repo",
@@ -239,15 +228,23 @@ def test_the_environment_overrides_the_deploy_script(tree: Tree):
     assert HOST not in calls[0]
 
 
-def test_one_environment_variable_mixes_with_the_script(tree: Tree):
-    """Each half of the target is looked up on its own, not as a pair."""
+def test_one_environment_variable_stops_the_scan(tree: Tree):
+    """A host scan cannot infer the missing private deployment input."""
+    # Tree.run supplies both values, so remove one after it builds the fixture.
+    old_run = tree.run
+    def run_without_host(*args: str, **kwargs: object) -> subprocess.CompletedProcess:
+        environment = dict(os.environ)
+        environment["PATH"] = f"{tree.root.parent / 'bin'}{os.pathsep}{os.environ['PATH']}"
+        environment["SSH_LOG"] = str(tree.ssh_log)
+        environment["SSH_NUMBER"] = str(SEED)
+        environment["INKU_REMOTE_REPO"] = "other-repo"
+        return subprocess.run([sys.executable, str(tree.root / SCRIPT), *args], cwd=tree.root,
+                              capture_output=True, text=True, env=environment)
+    tree.run = run_without_host  # type: ignore[method-assign]
     result = tree.run("--scan-build", env={"INKU_REMOTE_REPO": "other-repo"})
 
-    assert result.returncode == 0, result.stderr
-    calls = tree.ssh_calls()
-    assert len(calls) == 1, calls
-    assert HOST in calls[0]
-    assert "other-repo/web/BUILD_NUMBER" in calls[0]
+    assert result.returncode != 0
+    assert "must both be set" in result.stderr
 
 
 def test_an_unreachable_host_stops_the_scan(tree: Tree):
@@ -262,10 +259,9 @@ def test_an_unreachable_host_stops_the_scan(tree: Tree):
 
 
 def test_an_unknown_deployment_target_stops_the_scan(tree: Tree):
-    """The defaults are read from a file that may not be in this checkout."""
-    (tree.root / "no-git-sync/scripts/deploy.sh").unlink()
-
-    result = tree.run("--scan-build")
+    """A public checkout cannot infer an absent private deployment target."""
+    environment = {"INKU_REMOTE_HOST": "", "INKU_REMOTE_REPO": ""}
+    result = tree.run("--scan-build", env=environment)
 
     assert result.returncode != 0
     assert "next build number" not in result.stderr

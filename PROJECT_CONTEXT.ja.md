@@ -425,7 +425,7 @@ Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityは引き続き
 **③端末instrumentation**（canonical SVG byte / raw pixel照合は、同梱JNIを使うPixel 9受入であり、
 host CIでは代替しない）、
 **④Androidの全JVM suite**（CIは共有native境界に関係するfocused testだけを回す。全走はlocal gateである）、
-**⑤ `no-git-sync/` の運用スクリプト**（git が追跡しないので CI から見えない）。
+**⑤ internal repository の運用スクリプト**（製品 repository 外で管理し、CI の入力にしない）。
 **手元の全走とは母集団が違う。**
 
 ### 残っている課題について

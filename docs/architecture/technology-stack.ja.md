@@ -32,7 +32,7 @@
 | Markdown / Mermaid | `SPEC*`, `docs/`, manual、plugin document | 製品契約、architecture、図、宣言的plugin |
 | JSON | Score、API、trace、portable contract、fixture | host間の構造化data境界 |
 | TOML / YAML / KTS | Python/Rust/Android/CI manifest | dependency、build、workflow設定 |
-| Shell | `scripts/`, `no-git-sync/scripts/` | build、検査、配備のguard付きentry point |
+| Shell | `scripts/` | 製品の build と検査の entry point。非公開運用 entry point は internal repository にある。 |
 
 ## Frameworkと主要direct dependency
 

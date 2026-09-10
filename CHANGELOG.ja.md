@@ -490,7 +490,7 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
   **同一性 ID の材料**なので名前のまま置いた。**改名したら保存済み全作品の rh2 が動き、
   検査が実際に捕まえた**（`test_legacy_render_hash_v2_calculation_remains_available`）。
   `ddl_expander` の salt `#hensou` / `#vary` も hash の材料なので不変
-- **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録した**（作者指示）。
+- **新旧の対応は no-git-sync/opus5/name_convantion/RENAMES.md に記録した**（作者指示）。
   外部スクリプトが動かなくなったときはここを引く
 - **採番は v2.8.0 のまま**（**未公開なので畳む**。タグ最新は `v2.7.2`）。Build だけ 723 へ
 - **検証（Build 723 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、

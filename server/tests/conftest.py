@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+if env_file := os.environ.get("INKU_ENV_FILE"):
+    load_dotenv(Path(env_file).expanduser())
 
 _TEST_DB_PATH: Path | None = None
 _TEST_THUMBS_PATH: Path | None = None

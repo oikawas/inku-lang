@@ -3292,7 +3292,7 @@ queue limit, and submitted/completed/failed/timed_out/rejected counters.
 
 Operational details for the author's local server are intentionally not part of
 this public specification. They are consolidated in the untracked `AGENTS.md`
-or under `no-git-sync/`.
+or in private internal documentation outside the product repository.
 
 The application is developed on macOS. **Checks that hold the CPU -- the whole
 suite, a whole perturbation sweep, rebaking the reference corpora, rasterizing,

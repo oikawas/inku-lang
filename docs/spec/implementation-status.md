@@ -421,7 +421,7 @@ Version 1.70 implements the aesthetic-selection phase: it keeps judge metrics ou
 - The comparison area shows previous/current renders side by side, a subdued prompt diff, and an LLM Model Inspection view for two Stage 1 models. It is a viewing tool, not a judge surface, and displays no judge values.
 - Localized tooltips were added to the main action controls, including the four-candidate grid, interpretation variation, save selected, model comparison, and DDL auto-repair controls. Tooltip text follows the main UI language switch.
 - The left app rail no longer expands on mouse hover. Its width is controlled by an explicit top-left expand/collapse toggle, so the working area can remain stable while editing.
-- Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in `cli/tune_bench.md`.
+- Build 458 was verified on pentala for D-1/D-2; screenshots are stored under `no-git-sync/screen-cap/` and the local verification note is recorded in cli/tune_bench.md.
 
 ### v1.71 (2026-07-08)
 

@@ -46,14 +46,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_VERSION_FILE = ROOT / "web" / "APP_VERSION"
 BUILD_NUMBER_FILE = ROOT / "web" / "BUILD_NUMBER"
 
-# Where the deployment target is written down.  The deploy script is untracked
-# and lives in the main working tree only, so the lookup walks the worktrees
-# rather than assuming this checkout is the one that has it.
-DEPLOY_SCRIPT = Path("no-git-sync") / "scripts" / "deploy.sh"
-DEPLOY_DEFAULTS = (
-    ("INKU_REMOTE_HOST", r'^REMOTE_HOST="\$\{INKU_REMOTE_HOST:-([^}"]+)\}"'),
-    ("INKU_REMOTE_REPO", r'^REMOTE_REPO="\$\{INKU_REMOTE_REPO:-([^}"]+)\}"'),
-)
+DEPLOY_DEFAULTS = ("INKU_REMOTE_HOST", "INKU_REMOTE_REPO")
 
 # (path, pattern, replacement template).  Each pattern must match exactly once;
 # a pattern that stops matching is a failure, not something to skip silently.
@@ -150,37 +143,17 @@ def scan_worktrees(paths: list[Path]) -> dict[str, int]:
     return seen
 
 
-def deploy_target(paths: list[Path]) -> tuple[str, str]:
-    """(host, repo) for the deployment host, from the environment or deploy.sh.
+def deploy_target() -> tuple[str, str]:
+    """Return an explicitly supplied deployment target.
 
-    The defaults live in the untracked deploy script so that this file -- which
-    is public -- does not carry the deployment target.  A deploy script whose
-    shape changed fails here rather than falling back to a guess.
+    This public script never searches a private helper or a sibling repository
+    for host configuration.  The internal deployment caller supplies both
+    values when a host scan is selected.
     """
-    from_env = {name: os.environ.get(name) for name, _ in DEPLOY_DEFAULTS}
-    if all(from_env.values()):
-        return from_env["INKU_REMOTE_HOST"], from_env["INKU_REMOTE_REPO"]
-
-    for path in paths:
-        script = path / DEPLOY_SCRIPT
-        if not script.is_file():
-            continue
-        text = script.read_text(encoding="utf-8")
-        found: list[str] = []
-        for name, pattern in DEPLOY_DEFAULTS:
-            match = re.search(pattern, text, re.MULTILINE)
-            if match is None:
-                raise LookupError(
-                    f"{script}: no default for {name}; the script's shape changed, "
-                    f"so set {name} in the environment or fix scripts/bump.py"
-                )
-            found.append(os.environ.get(name) or match.group(1))
-        return found[0], found[1]
-
-    raise LookupError(
-        f"the deployment target is unknown: no worktree has {DEPLOY_SCRIPT} and "
-        f"INKU_REMOTE_HOST / INKU_REMOTE_REPO are not both set"
-    )
+    values = {name: os.environ.get(name) for name in DEPLOY_DEFAULTS}
+    if all(values.values()):
+        return values["INKU_REMOTE_HOST"], values["INKU_REMOTE_REPO"]
+    raise LookupError("INKU_REMOTE_HOST and INKU_REMOTE_REPO must both be set")
 
 
 def scan_host(host: str, repo: str) -> dict[str, int]:
@@ -220,7 +193,7 @@ def scan_build_numbers(*, local: bool) -> tuple[int, dict[str, int], list[str]]:
         scanned.append("no deployment host (--local)")
     else:
         try:
-            host, repo = deploy_target(paths)
+            host, repo = deploy_target()
             seen.update(scan_host(host, repo))
         except LookupError as exc:
             raise SystemExit(

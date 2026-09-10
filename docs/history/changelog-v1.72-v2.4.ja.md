@@ -46,7 +46,7 @@
 - composer後段へdrop-onlyのground literal gateを追加した。明示マーカーがない場合だけgroundを除去し、canvas aspectは保持する。明示マーカーがあるgroundの補完・修復・置換は行わない。drop発生はwarningログで観測できる。
 - display SVGのground質感rect自身へ0.02〜0.18のopacityを持たせ、filterのalpha tableを `0 1` に変更した。filter対応ブラウザの合成アルファを保ちながら、filter非対応PNGラスタライザでも不透明な灰色壁にならない。
 - rendererの全filter使用箇所を監査し、同じく広域図形の透過をfilterだけへ依存する箇所が他にないことを確認した。
-- Build 508。Mac・pentalaともに314 passed / 30 skipped、ruff・web check/build green。Qwen3 Next固定ベンチは面/地12件12/12（地明示6/6、自発ground 0、灰色壁なし）、JP30/EN30各30/30（自発ground 0、品質急落なし、fingerprint全pass、502/timeout/fallback 0）。詳細は `cli/tune_bench.md` の「v1.74.1: ground hotfix」に記録した。
+- Build 508。Mac・pentalaともに314 passed / 30 skipped、ruff・web check/build green。Qwen3 Next固定ベンチは面/地12件12/12（地明示6/6、自発ground 0、灰色壁なし）、JP30/EN30各30/30（自発ground 0、品質急落なし、fingerprint全pass、502/timeout/fallback 0）。詳細は cli/tune_bench.md の「v1.74.1: ground hotfix」に記録した。
 
 
 ### v1.75 — 敷き詰め（pattern field） (2026-07-13)
@@ -278,7 +278,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 ### v2.0.1 — モデルカタログ v2.1（深夜ベンチ統合、Build 612、2026-07-21）
 
 - **実測 3 回目（深夜）の統合:** NVIDIA NIM 86 モデルの深夜ベンチ（2026-07-20 23:38 〜 翌 02:54、86/86 完走、スリープ中断なし）を統合し、採点を昼・夕・深夜の 3 実行合算へ更新した（`MODEL_CONFIG_VERSION` 2.0.0 → 2.1.0、43 → 44 エントリ）。`openai/gpt-oss-20b` を新規収載、削除はゼロ。速度ラベルは 3 実行を併記する。採点基準は不変だが、推奨度 5 の「全実行で全成功」条件が実行追加で厳しくなり、昇格 4 件（`qwen/qwen3.5-397b-a17b`・`z-ai/glm-5.2` が 5 へ、`meta/llama-3.3-70b-instruct`・`poolside/laguna-xs-2.1` が 4 へ）・降格 7 件（`mistralai/mistral-nemotron` 5→4、`minimaxai/minimax-m3` 4→2 ほか）。履歴が参照するモデルの脱落はゼロ（保全チェック通過）。
-- **時間帯検証の打ち止め:** 昼・夕・深夜とも総所要は 3 時間 16〜20 分に収まり、深夜は応答中央値が下がる（62.8s → 41.9s）ものの、フォールバックが単調増加（35 → 37 → 38）して相殺した。「空いた時間帯なら短縮される」仮説の検証はこれで打ち止め。詳細は `no-git-sync/fable5/mode-api-claude/RUN-LOG.md`。
+- **時間帯検証の打ち止め:** 昼・夕・深夜とも総所要は 3 時間 16〜20 分に収まり、深夜は応答中央値が下がる（62.8s → 41.9s）ものの、フォールバックが単調増加（35 → 37 → 38）して相殺した。「空いた時間帯なら短縮される」仮説の検証はこれで打ち止め。詳細は no-git-sync/fable5/mode-api-claude/RUN-LOG.md。
 - **検証:** pytest 636 passed / 30 skipped（テスト変更はカタログ表明値の実測更新のみ）・`npm run check` 0 errors。pentala 配備済み。
 
 
@@ -286,7 +286,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 
 - **`GET /api/history/{id}/neighbors` の 500 を修正:** `list_neighbor_candidates()` だけが `history.score`（TEXT 列の JSON 文字列）を `json.loads` せず生のまま返しており、`composition_distance()` 内の `score.get(...)` が `AttributeError: 'str' object has no attribute 'get'` で毎回 500 になっていた（他の履歴取得経路は loads 済み。pentala 実測 2026-07-20 以降 79 件、score 保存済み候補が 1 件でもあれば必ず失敗するため近傍表示は事実上全滅していた）。新設の `_neighbor_score()` で loads し、壊れた JSON・NULL・非オブジェクトは `{}` にフォールバックして候補を落とさない。回帰テスト 1 件を追加（修正前に契約記載と同一の AttributeError で失敗することを確認済み。`history.score` は NOT NULL 制約のため NULL 混在は空文字列で代替検証）。
 - **履歴ロード時に変奏フィールドを復元:** `loadIterationItem()` の `result` 再構成に `variation_amplitude` / `variation_seed` の 2 行を追加した（保存側は v2.0 で結線済み。読み直すと undefined になっていた）。`focus` の復元は外部入力撤去済みのため行わない（現状維持）。復元値の消費先（変奏再実行への seed 引き継ぎ等）はスコープ外。
-- **検証:** pytest 637 passed / 30 skipped（ベースライン 636 + 新規 1）・ruff・`npm run check` 0 errors。実装レポートは `no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md`。
+- **検証:** pytest 637 passed / 30 skipped（ベースライン 636 + 新規 1）・ruff・`npm run check` 0 errors。実装レポートは no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md。
 
 
 
@@ -295,8 +295,8 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **変奏の第 5 推敲要素化（作者裁定）:** v2.0 の既知残件だった変奏セクションの配置を裁定どおり整理した。`RefineKind` に `hensou` を追加し、ラジオは 配置 / 読み取り / 色カタログ / 変奏 / 言葉でタッチ の順（作者指示で「言葉でタッチ」の上へ）。変奏選択時のみ強度（小・中・大、既定 中）をラジオ直下に段落ちで表示し、各強度に `ddl_expander.py` の段階解放に対応するツールチップを付けた。実行は既存の 1案/4案 に統合（1案 = 新規 seed 1 つ、4案 = 4 つ、採番は `POST /api/variation/seeds`）。「変奏を描く」ボタン・独立セクション・関連 i18n/CSS を撤去。統合の副産物として変奏候補でも系譜の親可視化（`ensureVisibleLineageParentId`）が走るようになった。
 - **調整ダイアログ・候補・カードメニューの逐次改良（作者の逐次指示 13 件）:** 速度目安を描画ボタン直下の単独行へ移動。候補の保存ボタンを右寄せし未保存・保存中・保存済みの 3 状態化（保存済みは押下不可）。候補グリッドをウインドウ内に収め（`max-height`、固定 aspect-ratio 廃止）、1案時は全幅 1 列。推敲要素の選択を `localStorage` で記憶（`reading` が非表示になる場合は `touch` へ退避）。未描画時も破線枠プレースホルダで候補エリアを常時表示。作品カードメニューは見出し「作品を編集する」を付けて 描画要素 → 記述 → DDL → モデル → 言語 → AI 自律推敲 の順に再編し、項目名を対象語のみに短縮・行間を詰めた。調整/モデル/言語ダイアログのタイトルを「描画要素を編集」「モデルを編集」「言語を編集」へ統一。ランダム自律推敲では方向性が読み取り世代にだけ反映される条件をヒント表示（挙動は不変）。
 - **AI 自律推敲に変奏を追加:** サーバーの `ALLOWED_KINDS` に `hensou` を追加し有効要素の上限を 4 → 5 に（サーバー変更は 2 ファイル 2 行。契約の「サーバー無変更」は作者指示で解除）。変奏世代は強度を中に固定し、seed はサーバー採番。UI は `PaintOptions` に `variationAmplitude` / `variationSeed` を追加。
-- **ボタン寸法トークンの導入（作者裁定によるルール化）:** `+page.svelte` の `:root` に `--btn-sm-font-size` / `--btn-sm-padding` / `--btn-sm-radius` を新設し、`InputPanel` の `.ghost-btn` と `LineagePanel` のボタン群を変換した（`.ghost-btn` は約 37 箇所で個別定義されており片方だけ直すとズレる状態だった）。以後、ボタン CSS に触れたコンポーネントは漸進的にトークンへ寄せる規約とし、`docs/inku-dev-conventions.md` §3-2-1 と AGENTS.md に記載。あわせて「コード変更時の pentala rsync + 再起動 + Build 採番は作者承認不要」の常時承認を規約化した（§4-5）。
-- **検証:** pytest 637 passed / 30 skipped（サーバーは 2 行変更のみ、回帰ゼロ）・ruff・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功。マージ後の主 checkout でも同値を再確認。pentala へは実装中に Build 614〜629 を逐次配備し、作者が実画面で確認済み。実装レポートは `no-git-sync/fable5/claude_code/tasks/hensou-ui-5th-refine-result.md`。
+- **ボタン寸法トークンの導入（作者裁定によるルール化）:** `+page.svelte` の `:root` に `--btn-sm-font-size` / `--btn-sm-padding` / `--btn-sm-radius` を新設し、`InputPanel` の `.ghost-btn` と `LineagePanel` のボタン群を変換した（`.ghost-btn` は約 37 箇所で個別定義されており片方だけ直すとズレる状態だった）。以後、ボタン CSS に触れたコンポーネントは漸進的にトークンへ寄せる規約とし、docs/inku-dev-conventions.md §3-2-1 と AGENTS.md に記載。あわせて「コード変更時の pentala rsync + 再起動 + Build 採番は作者承認不要」の常時承認を規約化した（§4-5）。
+- **検証:** pytest 637 passed / 30 skipped（サーバーは 2 行変更のみ、回帰ゼロ）・ruff・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功。マージ後の主 checkout でも同値を再確認。pentala へは実装中に Build 614〜629 を逐次配備し、作者が実画面で確認済み。実装レポートは no-git-sync/fable5/claude_code/tasks/hensou-ui-5th-refine-result.md。
 - **残件:** AI 自律推敲の変奏は強度中固定で UI から選べない。寸法トークンへの移行は 2 コンポーネントのみ（規約に従い漸進）。
 
 
@@ -304,7 +304,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 
 - **AI 自律推敲の変奏強度選択:** v2.0.3 で中固定だった自律推敲の変奏強度を選択可能にした。推敲要素の変奏チェックが ON のときだけ、直下に段落ちで小・中・大の 3 択を表示（既定 中、調整ダイアログの強度インラインと同型・ツールチップは既存キー再利用）。選んだ強度は実行中の全変奏世代に適用される。既定のまま実行した場合の挙動は v2.0.3 と同一。変更は `AIRefineModal.svelte` のみでサーバー無変更（強度は従来どおり `PaintOptions` 経由で世代ごとに渡る）。強度 3 択のツールチップはモーダル本文のスクロールコンテナに切られるため上向き配置とした。
 - **ボタン寸法トークン移行の完了:** `--btn-sm-*` トークンへの変換を全対象に広げた。3 プロパティ完全一致の 12 ブロック / 10 ファイル（`.ghost-btn` 9 件 + `.danger-btn`/`.confirm-btn`/`.ddl-new-btn`）は見た目不変の単純置換。部分一致で保留した 6 ブロックも作者裁定「未変更のものも全て変更して」により統一し、デモパネル・未読語パネル・プロフィール・認証パネル・履歴マネージャ系統メンバー行（9px→11px 拡大）で寸法が変わった（ロックバッジは同値で不変、ピル形状の radius のみ非トークン）。これで `.ghost-btn` 定義全 14 ファイルの移行が完了し、px 直書きの小型ボタンは解消。色・hover・disabled は全ブロックで不変。
-- **検証:** pytest 637 passed / 30 skipped（サーバー無変更の回帰確認）・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功（Mac / pentala とも）。マージ後の主 checkout でも同値を再確認。実装中に Build 631〜633 を pentala へ逐次配備し、強度 UI とトークン変換は作者が実画面で確認済み（ツールチップ見切れは Build 632 で修正）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v204-followups-result.md`。
+- **検証:** pytest 637 passed / 30 skipped（サーバー無変更の回帰確認）・`npm run check` 0 errors（既存 a11y 警告 2 件）・build 成功（Mac / pentala とも）。マージ後の主 checkout でも同値を再確認。実装中に Build 631〜633 を pentala へ逐次配備し、強度 UI とトークン変換は作者が実画面で確認済み（ツールチップ見切れは Build 632 で修正）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-v204-followups-result.md。
 - **残件:** v1.99 F-4 の作者目視確認と SPEC §17.A の未対応 dimension（作者裁定待ち）は継続。
 
 
@@ -323,7 +323,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **B 層（材質）を `canvas.unit` 相対化 + 強度再調整:** 線幅・dasharray（直書き 14 個含む）・質感 filter（`TEXTURE_FILTERS` を `TEXTURE_SPECS` + 動的 XML 生成へ置換、`baseFrequency` は unit に反比例）・材質輪郭・speck を `s = unit/1000` でスケール。speck 個数は固定 18/28/36 → 周長比例（アンカー = radius 0.2 の円、下限 10）。作者所感「材質の効果をあまり感じない」を受けた 2 巡キャリブレーションで強度段 **s1** を採用: 材質輪郭 offset（下限 `unit × 0.0035`）・輪郭 opacity（下限 0.50）・speck opacity（下限 0.40）・speck 個数ゲイン 2.6 の下限方式（弱い pencil / crayon だけが持ち上がり、既に読める brush 系は不変）。質感 filter は作者裁定（方針 3）で据え置き。材質輪郭に `class="material-outline"` を付与（主線との機械的区別、touching 検査も opacity 閾値から class 判定へ）。
 - **C 層（display filter）を `canvas.unit` 相対化:** `_performance_touch_filter` の `baseFrequency` / `scale` をスケール。書式は不変。
 - **render engine version 6 → 7:** 同一 Score + 同一 seed の演奏結果が変わるため。`unit=1000` では材質の寸法・dasharray・線幅・質感 filter・display filter がバイト一致（差分は speck 個数の周長比例化と stroke 標本数の長さ比例化のみ、個数を旧仕様に戻す実験で証明済み）。`/api/reference` の公開キーを `amplitude_ratio` / `blur_ratio` / `segment_target_ratio` 等へ改名。
-- **検証:** pytest 724 passed / 30 skipped（新規 `test_renderer_proportional.py` 31 件）・ruff。`test_renderer.py:1590` の legacy golden（weight=pen / variation なし）は不変のまま通過し線幅バイト一致の番人として機能。perlin / white の「サイズ 2 倍→振幅 2 倍」検査は seed が図形内容依存のため rel=0.25 の許容差とし、厳密比例は `_amplitude_px` 直接検査で担保。キャリブレーション成果物は `cli/out2/637-v2.1.0-proportional-calibration/`（滲み・材質比較は cairosvg が feGaussianBlur も非描画と判明したため HTML/ブラウザ比較に変更）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v21-proportional-result.md`。
+- **検証:** pytest 724 passed / 30 skipped（新規 `test_renderer_proportional.py` 31 件）・ruff。`test_renderer.py:1590` の legacy golden（weight=pen / variation なし）は不変のまま通過し線幅バイト一致の番人として機能。perlin / white の「サイズ 2 倍→振幅 2 倍」検査は seed が図形内容依存のため rel=0.25 の許容差とし、厳密比例は `_amplitude_px` 直接検査で担保。キャリブレーション成果物は `cli/out2/637-v2.1.0-proportional-calibration/`（滲み・材質比較は cairosvg が feGaussianBlur も非描画と判明したため HTML/ブラウザ比較に変更）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-v21-proportional-result.md。
 - **残件:** 質感 filter は知覚閾値以下のまま（pencil 変位 ≈ 画面 1px。本筋は PNG ラスタライザ契約側）。`PRIMITIVE_AMP_GAIN` は空辞書（line 抑制なし、実作品で要調整なら 1 行）。後続契約: 閉図形への手描きストローク適用（`opus-closed-shape-strokes.md`）・PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`）。
 
 
@@ -333,7 +333,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **閉図形（circle / ellipse / square / triangle / polygon）の描画経路:** 対象 weight は rotring を除く GRAMMARS 全種（line のゲートと同一）。本体要素は幾何のまま残し、実線では `stroke="none"` で塗りのみ担当（bbox・touching・座標系は不変）。破線・点線は線種が記述なので幾何輪郭を 0.42 倍に細めて残す。帯の中心線は**変奏を演奏した後の輪郭**（合成順序の契約 4）。材質輪郭・speck は帯と併存（契約 5）。drypoint の burr は弧抽出器の誤検出を避け `<polygon>` で出力。arc は作者裁定で対象外（touching 検査の弧抽出器が `<path d="M..A..">` / `<polyline>` しか弧と数えないため、次契約で抽出器ごと設計）。cloudform は専用輪郭生成器を持つため対象外。
 - **render engine version 7 → 8:** 同一 Score + 同一 seed の演奏結果が変わるため。line と arc の出力は v2.1 とバイト一致（`MATERIAL_NONE_SEED_DIGESTS` の `brush_thin_line` / `crayon_arc` digest 不変で固定）。
 - **`test_gate_closed_output_unchanged` の読み替え（作者承認済み）:** 旧テストの「variation なしとバイト一致」は F-4（v1.99）の封じ込め保証であって恒久契約ではなく、main 時点でも pen / rotring 以外では既に不成立だった（`_seed_for_instruction` が variation を演奏の有無に関わらず seed key に含めるため）。`test_gate_closed_geometry_unchanged` に改め、手描きストローク層を除いた「意図の幾何」の不変を検査（ゲート誤開放は本体要素が揺らぎ polygon に変わるため検出可能）。「演奏されない variation を seed に影響させない」別解は `filled` 意味論と同じ「見え方が変わる変更」の束として別途扱う候補に残す。
-- **検証:** pytest **852 passed / 30 skipped**（新規 `test_closed_shape_strokes.py` 128 件: 帯の存在・決定性・seed 追随・角固定・閉合・evenodd 構造・変奏後合成・材質併存・破線の幾何維持・rotring 不変）・ruff clean（Mac / pentala 両環境）。SVG サイズは帯 1.5〜19KB/図形、最大 29KB（drypoint 8 角形 + broad/high 変奏）。**作者目視確認 OK**（2026-07-21、pentala 実 UI）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-closed-shape-strokes-result.md`。
+- **検証:** pytest **852 passed / 30 skipped**（新規 `test_closed_shape_strokes.py` 128 件: 帯の存在・決定性・seed 追随・角固定・閉合・evenodd 構造・変奏後合成・材質併存・破線の幾何維持・rotring 不変）・ruff clean（Mac / pentala 両環境）。SVG サイズは帯 1.5〜19KB/図形、最大 29KB（drypoint 8 角形 + broad/high 変奏）。**作者目視確認 OK**（2026-07-21、pentala 実 UI）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-closed-shape-strokes-result.md。
 - **付随して判明（作者判断待ち）:** 閉図形は `filled=False` でも常に塗りつぶされる（`_stroke_attrs` の `do_fill` が閉図形を無条件 True にする死にフィールド）。「材質の効果をあまり感じない」の主因候補。参考採取 = `cli/out2/639-v2.1.0-closed-shape-strokes/unfilled-*`。あわせて「塗り = 細かいストロークで内側を埋める」案の調査・試作 3 回を記録（`synthesize_along` 流用可・clipPath 不要・間隔下限必須・1 図形 40〜63KB、engine 9 相当）。作者指示により pending 案件消化後に検討。
 
 
@@ -345,7 +345,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **バックエンドの可視化（追加実装、作者裁定）:** cairosvg への無警告フォールバックで PNG が実際の作品より綺麗に見えるリスクに対し、(a) CLI は cairosvg 時に 1 プロセス 1 回 stderr 警告、サーバーは import 時に resvg = INFO / フォールバック・不在 = WARNING（journal 到達を pentala 実機確認）、(b) PNG 生成時に `paths["png_rasterizer"]`（backend/version）を成果物・`summary.json` へ記録。server venv と cli venv は同一 SVG から byte 一致を実測（resvg-py 0.3.3）。lock 一本化（uv workspace 化）は作者裁定で別契約。
 - **editable 化（デプロイの罠の解消）:** `inku-analysis` は venv へコピーとしてインストールされており、**`shared/` を rsync + 再起動しても `uv sync` までは古いコードが動き続ける**罠があった。`[tool.uv.sources]` の `editable = true` で解消。以後 `shared/` の変更は rsync + 再起動で反映される。
 - **不変:** SVG 本文・`render_hash`（rh2）・render engine version（8）は無変更。PNG はハッシュ材料に含まれない。
-- **検証:** server **863 passed / 30 skipped**（新規 `test_rasterizer.py` 11 件: cairosvg が落とし resvg が描く両方向の主張・フォールバック・不在パス・両バックエンドの出力サイズ 4 パターン一致・`rasterizer_info`）、cli **68 passed**（新規 3 件: メタデータ記録・警告 1 回・resvg 時無警告）、ruff clean。全 stage2 fixture 15 × 全 profile 3 = 45 通りの実ラスタライズ無エラー。pentala でも 863/30（Python 3.12.13、backend=resvg）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-png-filter-rasterizer-result.md`。
+- **検証:** server **863 passed / 30 skipped**（新規 `test_rasterizer.py` 11 件: cairosvg が落とし resvg が描く両方向の主張・フォールバック・不在パス・両バックエンドの出力サイズ 4 パターン一致・`rasterizer_info`）、cli **68 passed**（新規 3 件: メタデータ記録・警告 1 回・resvg 時無警告）、ruff clean。全 stage2 fixture 15 × 全 profile 3 = 45 通りの実ラスタライズ無エラー。pentala でも 863/30（Python 3.12.13、backend=resvg）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-png-filter-rasterizer-result.md。
 - **申し送り:** 生成 PNG は旧 PNG と画素非互換（filter が描画されるため。`cli/out2/` 過去ランとの直接画素比較は不成立）。resvg は cairosvg の約 6 倍の実行時間（768px で 207ms）。cairosvg はフォールバックとして残置。pentala への CLI 同期は運用があれば別途。Android の cairosvg（停止中）は対象外。
 
 
@@ -359,7 +359,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **検証:** pytest **985 passed / 30 skipped**（新規 `test_fill_strokes.py` 122 件: 手描き weight 9 種 × 閉図形 6 種の塗り群存在・`filled=False` で不在・1 パス = 1 筆・円の半径内包・凹形 cloudform のはみ出し線幅以内（実測 0.46px）・走査角の seed 多様性・間隔ジッタ・微小図形の縮退・rotring 維持・line / arc 不発火・決定性・surface 抑制と帯化・不活性 variation のバイト一致）、cli 68 passed、ruff clean（Mac / pentala 両環境）。golden digest 更新は理由つき（`filled` 復権により塗らない図形から塗り濃度が消える等）。
 - **サイズ実測（上限なしで観測、作者裁定）:** 1 図形 11〜123KB（中央 45KB）、10 instruction の作品で 422KB。最大は塗りではなく surface crosshatch の 192KB（幾何直線 80 本 × 2 層が帯化）。上限規則は実運用の分布を見て後付け。採取物 = `cli/out2/644-v2.2.1-stroke-fill/size-observation.json`。
 - **作者所感（PNG 報告後）:**「一気に情報量とニュアンスが増えました。ブレイクスルーだと思います」。あわせて人間のエミュレーションの危険への自覚が示され、以後の筆致改修は「より人間らしく」を理由にせず**記述で書き分けられる差が増えるか**で提示する方針を恒久記録。
-- **残件:** 実 UI 目視（特に塗り間隔の粗密）・サイズ上限規則・surface 粒系 / 滲み系の筆致化。arc のストローク化は裁定済み（不可視の意図弧を残し抽出器無改変・接点端も taper のまま）で engine 10 / v2.4 として次契約へ。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v23-stroke-fill-result.md`。
+- **残件:** 実 UI 目視（特に塗り間隔の粗密）・サイズ上限規則・surface 粒系 / 滲み系の筆致化。arc のストローク化は裁定済み（不可視の意図弧を残し抽出器無改変・接点端も taper のまま）で engine 10 / v2.4 として次契約へ。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-v23-stroke-fill-result.md。
 
 
 ### v2.3.1 — 弧のストローク化（Build 647、2026-07-21）
@@ -371,7 +371,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **render engine version 9 → 10:** 同一 Score + 同一 seed の演奏結果が変わるため。arc 以外は不変（`MATERIAL_NONE_SEED_DIGESTS` の `brush_thin_line` と閉図形 3 件は無更新のまま通過、`crayon_arc` のみ理由つき再採取）。
 - **検証:** pytest **1022 passed / 30 skipped**（新規 `test_arc_strokes.py` 37 件: 手描き 9 weight の帯存在・rotring 不変・solid の意図弧不可視と抽出器規準で弧 1 個・変奏ありの polyline 化・破線可視化・drypoint burr・材質併存・決定性・seed 追随・変奏後合成）、cli 68 passed、ruff clean（Mac / pentala 両環境）。`test_touching.py` 全通過（200 seed の幾何 / replay 契約含む）。
 - **目視採取:** `cli/out2/646-v2.3.1-arc-strokes/`（SVG / PNG 8 組、resvg で材質 filter 込み: pencil の taper・brush_thick の濃淡・crayon / chalk の粒・drypoint の burr・rotring の幾何・破線・wave 変奏）。
-- **残件:** 実 UI 目視（弧の帯の筆致・両端 taper・weight 差）。葉の見え方が変わるため Stage 3 葉の再目視も候補（「双弧が円に見える」所感との対照）。サイズ上限規則は引き続き後付け（今回サイズ網羅採取は未実施）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-v24-arc-strokes-result.md`。
+- **残件:** 実 UI 目視（弧の帯の筆致・両端 taper・weight 差）。葉の見え方が変わるため Stage 3 葉の再目視も候補（「双弧が円に見える」所感との対照）。サイズ上限規則は引き続き後付け（今回サイズ網羅採取は未実施）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-v24-arc-strokes-result.md。
 
 
 ### v2.3.2 — 対話型 UI 調整（v2.3.1 機能群への追随）・描画並列度の管理者設定・用語の層別統一（Build 683、2026-07-22）
@@ -391,7 +391,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **用語の層別統一（作者教義の確定、2026-07-22）:** 「Sol LeWitt の指示書 = 正規化DDL。inku は詩歌的な入力層を一段上に足している」。UI の語彙を層別に整理（入力層 = 記述 / Description、Stage 1 の行為 = 解釈 / Interpret、その生成物 = **指示書（正規化DDL）/ Instructions**、詞書 = 記述の再掲）。i18n 13 キーを relabel し、App Info モーダルに常設の語彙対応表「用語と層」を新設。**SPEC.ja §5 を改訂**（記述と正規化DDL を別層に分離した 4 段パイプライン図、LeWitt との違いに層対応を明記、§5.3 に用語対応表を収録）、SPEC.md §2 に LeWitt 対応の一文 + 同表、README 日英「しくみ」節にも用語表を収録（UI ダイアログと同一内容を単一正本とする）。
 - **運用上の発見（Build 664）:** `web/BUILD_NUMBER` は `web/src/` の外にあり従来の rsync 範囲外 + `vite.config.ts` の起動時 `define` 注入のため、**BUILD_NUMBER の反映には明示 rsync と `inku-server.service`（Vite）再起動が必要**。以降の反映は 3 手セット（`web/src/` + `BUILD_NUMBER` 明示 + Vite 再起動）に是正。
 - **不変:** render engine version は 10 のまま。Score schema / coerce / rh2・renderer / stroke_engine は無変更（サーバー変更は並列度制御のみ）。
-- **検証:** pytest **1023 passed / 30 skipped**（新規 `test_render_concurrency_settings_are_admin_only`: 一般 PUT 403・管理者 PUT 反映・`/api/client-config` 401/未認証・範囲外 400）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。Mac / pentala 両環境。作者の実 UI 目視確認多数（対話サイクル内）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-result.md`。
+- **検証:** pytest **1023 passed / 30 skipped**（新規 `test_render_concurrency_settings_are_admin_only`: 一般 PUT 403・管理者 PUT 反映・`/api/client-config` 401/未認証・範囲外 400）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。Mac / pentala 両環境。作者の実 UI 目視確認多数（対話サイクル内）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-result.md。
 - **保留・持ち越し:** UI 調整の続き（対話型・新セッション）、マスコット 2 種の扱い、描画所要時間・並列度 4 の CPU・503 発生率の計測、バッチ実行中に履歴ストリップがページ 0 へ戻る挙動（作者指示待ち）。
 
 ### v2.4.0 — リリース配布パイプライン（GHCR コンテナイメージ・タグ駆動 Actions・利用者向け compose）（Build 684、2026-07-22）
@@ -403,7 +403,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **nature-leaves プラグインの git 管理化・同梱（作者裁定）:** pentala 正本 v0.3.0（177 行）を `server/plugins/` へ取り込み。既存の `COPY server/` で自動同梱され、空 DB の新規コンテナで `plugin install` なしに `Nature.leaves 0.3.0 enabled` を確認。`.plugin-state.json` は引き続き git 管理外（実行時状態）。
 - **bootstrap admin の空文字是正（作者裁定 C = compose 必須化 + コード側寛容化の両方）:** セルフサインアップ経路が無いため bootstrap admin（`INKU_BOOTSTRAP_ADMIN_PASSWORD`、8 文字以上）が唯一の入口だが、compose の `${VAR:-}` 補間が渡す空文字を「0 文字の不正なパスワード」と読んで新規 DB の初回起動が ValueError でクラッシュループする構造だった（既存 DB では顕在化しない = 初回リリース利用者だけが踏む）。`db.py` で空文字を「未設定」に倒し、`compose.yaml` / `deploy/compose.yaml` とも `:?` で起動前必須化。挙動テスト 2 件を追加。`manual/`（ja/en 4 文書）と `SETUP*.md` に「セルフサインアップ不在・bootstrap admin なしでは誰もログインできない・password 設定 + 再起動で復旧」の前提を追記（SPEC は §15.4 / §12.1 に本リリースで記載）。
 - **不変:** render engine version 10 のまま。Score schema / coerce / rh2・renderer・`web/src/`（UI）は無変更。開発・ベンチ環境（bare metal 8100 / bench コンテナ 8101）にも影響なし。
-- **検証:** pytest **1025 passed / 30 skipped**（+2 = 空文字挙動）、workflow / compose の YAML 静的確認、pentala 隔離プロジェクト（8102/5175・専用 volume・local tag）で実 build → `deploy/compose.yaml` そのまま起動 → health / info / login / プラグイン同梱 / 撤収まで確認。bench コンテナ・bare metal は無改変。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-release-pipeline-result.md`。
+- **検証:** pytest **1025 passed / 30 skipped**（+2 = 空文字挙動）、workflow / compose の YAML 静的確認、pentala 隔離プロジェクト（8102/5175・専用 volume・local tag）で実 build → `deploy/compose.yaml` そのまま起動 → health / info / login / プラグイン同梱 / 撤収まで確認。bench コンテナ・bare metal は無改変。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-release-pipeline-result.md。
 - **公開手順の注意（レポートより）:** イメージが GHCR へ上がるのは `v*` タグ push の瞬間だけ。`git push --tags` の巻き込み事故に注意。初回 publish 後の GHCR パッケージは private 既定のため、匿名 pull には手動で public 化が要る。タグ削除とイメージ削除は別操作。（実際の初回 publish では最初から public だった — 2026-07-22 実測）
 
 ### README 整備 — 作品ギャラリー・UI スクリーンショット・構成改訂（docs のみ・採番なし、2026-07-22）
@@ -415,7 +415,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **`.gitignore` 変更:** `docs/` 丸ごと除外では配下パスを再包含できないため `docs/*` + `!docs/assets/` へ変更（`docs/` 配下の既存ローカル文書が無視され続けることを `git check-ignore --no-index` で確認）。
 - **公開後のギャラリー差し替え（作者指摘、マージ `9f3ada1`）:** 2 点目「引き波の泡の弧」が GitHub の白背景に枠線を入れてもなお溶けて見えないため、「戦争が終わった朝…」（rh2 `B962`、silver-shoal。Build 667 / engine 10 で他 5 点と出自が揃う）へ差し替え。同一ファイルを使う 3 箇所（ヒーロー帯・ギャラリー・層解説）を追随させ、層解説は新作の実 Score で全面書き直し（記述→Score の対応例が 2 → 4 に増加）。新規 PNG は 544 色でグラデーション無しのため 256 色パレット化を実測（変化画素 0.10%・実質無損失）して適用し、表示合計を 2.8 MB（契約上限内）に維持。他画像への一律適用はしない（測定して無損失と確認できた画像に限る方針）。
 - **検証:** 相対参照 55 件すべて解決・孤児アセットなし・`alt` 全数・タグ均衡。push 後の GitHub 実表示で日英とも画像 12 点ロード成功・raw 配信は SHA-256 一致・旧アセットは 404（削除確認）。
-- **不変:** コード（`web/src/`・server）無変更、render engine version 10 のまま。`APP_VERSION` / `web/BUILD_NUMBER` / pyproject の採番なし（docs のみ）。pentala 反映なし（README はサーバー配信物でない）。マージ = `7e1469a` + 差し替え `9f3ada1`（本契約は特例として Opus がマージ・push・worktree 削除まで実施）。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-readme-visuals-result.md`。
+- **不変:** コード（`web/src/`・server）無変更、render engine version 10 のまま。`APP_VERSION` / `web/BUILD_NUMBER` / pyproject の採番なし（docs のみ）。pentala 反映なし（README はサーバー配信物でない）。マージ = `7e1469a` + 差し替え `9f3ada1`（本契約は特例として Opus がマージ・push・worktree 削除まで実施）。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-readme-visuals-result.md。
 
 ### v2.4.1 — UI 調整 2 巡目（歳時記語彙の日英対応是正・語プレビューの英語化・記述タブの文言整理）（Build 687、2026-07-22）
 
@@ -423,7 +423,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **歳時記語彙の日英対応の是正（作業中に発見したバグ 2 件、作者裁定でサーバー側も修正）:** ① てざわりは削剪済みの `髪` / `hair`（P0-3、`display=False`）が i18n に残置され、表示語と解説の突き合わせが全体で 1 ずれ（英語 UI で `pencil` にホバーすると「ペン」の解説）。② うごきは `saijiki.py` の `words_en` の並びが `words_ja` と非対応で、`引く`↔`fill`・`埋める`↔`draw` の解説が日英とも交差（`ja.ts` はさらに独自の順）。**原因はサーバー正本語彙の i18n 手書き複製**。`words_en` を ja と同順（`place, line-up, draw, scatter, fill, tile`）へ並べ替え、i18n の `saijikiWords` を廃止して表示語をハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得（`gen_saijiki_ts.py` が `GENERATED_SAIJIKI_EN` も出力、`saijikiWordsFor(key, isJapanese)` 経由）。全 10 カテゴリ 68 語の日英対応を明示テーブルと突き合わせるテストを追加（**リスト長が同じままの入れ違いは長さ検査では検出できない**ため対応関係そのものを固定）。golden は置換宣言 `_REORDERED_EN` で対応（fixture 無改変）。
 - **副作用:** 英語版 Stage 1 システムプロンプトの `motions:` 行の語順が変わる（語の集合は不変）。英語入力の解釈がモデルによって微差を生む可能性があり、ベンチでの確認は未実施。SPEC.md の語彙表 motions 行を新語順へ追随（本 docs コミット）。
 - **不変:** render engine version 10 のまま。Score schema / coerce / rh2・renderer / stroke_engine は無変更（サーバー変更は saijiki テーブル・生成スクリプト・テストのみ）。
-- **検証:** pytest **1026 passed / 30 skipped**（+1 = 日英対応固定テスト）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。`display_categories('ja'/'en')` の直接実行・`saijiki.generated.ts` のパース照合・表示 68 語全部のプレビュー解決（フォールバック落ちなし）を実装セッションで確認。Mac / pentala 両環境。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-2-result.md`。
+- **検証:** pytest **1026 passed / 30 skipped**（+1 = 日英対応固定テスト）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。`display_categories('ja'/'en')` の直接実行・`saijiki.generated.ts` のパース照合・表示 68 語全部のプレビュー解決（フォールバック落ちなし）を実装セッションで確認。Mac / pentala 両環境。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-2-result.md。
 - **保留・持ち越し:** UI 調整は対話で継続中（3 巡目へ）。マスコット 2 種、バッチ実行中の履歴ストリップ、計測 3 件（1 巡目から据え置き）。`words_ja` / `words_en` の構造的解決（`SaijikiWord` が両言語の表層を持つ形）は範囲外として据え置き — 語を追加する際はサーバーのテーブルとテストの対応表の両方を更新する。
 
 ### v2.4.2 — 歳時記語彙の日英ペアリングを構造で担保する（Build 689、2026-07-23）
@@ -434,7 +434,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **特例の保持:** 削剪済みの墓標 `描く`（`ugoki`、英語に対応語なし）は `surface_en=None` の同一語列内エントリとして保持。`並べる` / `line-up` は 1 エントリにしたうえで、英語の閉包マーカーだけ `marker_surfaces_en=("arrange",)` で従来値を維持。`髪` / `hair` は `_PRUNED` のまま `score_value="hair"` を保持する（保存済み Score の Replay 互換）。
 - **出力不変（受け入れ条件）:** `prompt_block` / `texture_material_enumeration` / `display_categories` / `saijiki_marker_table` / `core_grammar_markers` / `shape_markers` / `relation_literal_markers` / `reference_categories` / `weight_for_surface` / `color_for_surface` の日英 15 項目を変更前後で SHA-256 比較し全一致。`gen_saijiki_ts.py` の再生成結果 `web/src/lib/saijiki.generated.ts` もバイト一致（git 差分なし）。`_EXPECTED_PAIRING` の 68 ペアは**書き換えずに通過**した。Stage 1 プロンプトは日英とも 1 バイトも変わっていない。
 - **不変:** render engine version 10 のまま。Score schema / coerce / rh2・renderer / stroke_engine・語彙そのもの（増減・改称）は無変更。
-- **検証:** pytest **1028 passed / 30 skipped**（+2 = 構造テスト。旧構造では fail-first を確認済み）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）、`npm run build` exit 0。Mac / pentala 両環境。実装レポートは `no-git-sync/fable5/claude_code/tasks/opus-saijiki-word-pairing-result.md`。
+- **検証:** pytest **1028 passed / 30 skipped**（+2 = 構造テスト。旧構造では fail-first を確認済み）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）、`npm run build` exit 0。Mac / pentala 両環境。実装レポートは no-git-sync/fable5/claude_code/tasks/opus-saijiki-word-pairing-result.md。
 - **残存する位置対応:** 最終出力形式（`GET /api/saijiki` の言語別語列、`saijiki.generated.ts` の 2 配列、表示リストの位置突き合わせテスト）には位置対応が残るが、いずれも**同一の二言語語列から導出**される派生物であり、正本側に手書きの並行リストはない。
 
 ### v2.4.3 — UI 調整 3 巡目（デベロッパーモード・系譜の縦横切替・デモのタイムアウト）（Build 693、2026-07-23）
@@ -446,7 +446,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **デモのタイムアウト（Build 692、サーバー変更は作者裁定）:** デモ設定に 1〜1,440 分（最大 24 時間）のタイムアウトを追加した。画面は分、API と保存値は秒（60〜86,400、既定 3,600）。締切はデモ開始操作ごとに固定し、実行中の設定変更は効かない。**締切前に開始した 1 回分は締切を越えても記述生成と描画を完了させ**、結果を画面・統計・保存指定へ通常どおり反映してから停止する。締切後は次の生成を開始せず、描画間隔の待機中に締切へ到達した場合も同様。実行中は残り時間を `HH:MM:SS` で表示し、タイムアウト待ちのあいだは「次の描画まで」を出さない。自動停止時だけ到達メッセージを残し、手動停止では出さない。保存済み設定に `timeout_seconds` が無い既存ユーザーには既定値を補う。
 - **トークン規律:** `DemoPanel` の `.step-btn` の `font-size: 14px` を `--btn-sm-font-size` へ移行した（触れたついでの寄せ）。系譜の方向切替ボタンは既存の `--btn-sm-*` を継承し、選択状態は `--accent` + `--accent-fg` を使う。新しい寸法トークンや px 直書きのボタン指定は追加していない。文言はタイムアウト設定・残り時間・自動停止メッセージとも `ja.ts` / `en.ts` / `types.ts` の三点で日英対応。
 - **不変:** render engine version 10 のまま。Score schema / coerce / rh2・`renderer.py` / `stroke_engine.py` は無変更（サーバー変更は表示用カタログ境界とデモ設定の 2 点のみ）。版固定中の pentala ベンチ用コンテナ（8101）は再 build していない。
-- **検証:** pytest **1029 passed / 30 skipped**（+1 = 通常モードで NIM が公開カタログから外れることの固定。既存の NIM 系テスト 2 件はデベロッパーモードを明示する形へ修正）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。Mac / pentala 両環境。作者の実 UI 確認は Build 690（通常モードへ一時切替のうえ NIM と Build 番号の非表示を確認）、691（系譜の縦横表示・矢印・スクロール・再読込後の方向維持）、692（タイムアウト入力の上下限・残り時間・自動停止・再読込後の設定維持）とも完了。マージ = `e15d63f`。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-ui-adjustments-3-result.md`。
+- **検証:** pytest **1029 passed / 30 skipped**（+1 = 通常モードで NIM が公開カタログから外れることの固定。既存の NIM 系テスト 2 件はデベロッパーモードを明示する形へ修正）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（既存 a11y）。Mac / pentala 両環境。作者の実 UI 確認は Build 690（通常モードへ一時切替のうえ NIM と Build 番号の非表示を確認）、691（系譜の縦横表示・矢印・スクロール・再読込後の方向維持）、692（タイムアウト入力の上下限・残り時間・自動停止・再読込後の設定維持）とも完了。マージ = `e15d63f`。実装レポートは no-git-sync/fable5/claude_code/tasks/codex-ui-adjustments-3-result.md。
 - **同梱した docs 是正 2 件（docs 単独では版を起こさない方針により本 entry へ畳む）:**
   - **`SETUP.ja.md` / `SETUP.md`（`fe63584`）:** コンテナ経路の節を新設（GHCR pull とソースからのビルドの 2 経路。詳細は `deploy/README.md` へ送る）。あわせて 3 件を是正 — ①「配布パッケージの内容」が `compose.yaml` / `deploy/` / Dockerfile 2 種などを落としていた ②**Python 要件を 3.10 以上と書いていたが実際は 3.12 以上**（利用者が `uv sync` で実際に踏む誤り）③ PNG ラスタライズを CairoSVG のみと書いていたが実装は resvg 優先で、落ちると材質フィルタが失われる。
   - **`README.ja.md` / `README.md`（`a15f699`）:** 再生成の節を「三つの『もう一度』」から **「推敲による作品の追求」** へ全面改稿。実装は推敲 5 種（`RefineKind`）+ AI 自律推敲 2 方式で、色カタログ変更・変奏・AI 自律推敲が記載から漏れていた。
@@ -465,7 +465,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **運用ルールの置き場を三層に分けた:** 契約 = SPEC（§15.5 / §12.1 の次）、**手順 = `server/reference/README.md`（成果物の隣。再生成しようとした人が最初に開く場所）**、強制 = CI。`docs/` と `CLAUDE.md` と `AGENTS.md` は git 管理外で clone した人に見えないため、規則の正本にしない。
 - **配布物から除外:** `.gitattributes` を新設して `server/reference/ export-ignore`。`git archive HEAD` に `server/reference/` が 1 件も含まれないことを実測した。`SETUP.ja.md` → `SETUP.md` の「含まれないもの」にも 1 行足した。
 - **不変:** **描画結果は 1 バイトも変わっていない。** `render_engine_version` は 10 のまま、`renderer.py` / `stroke_engine.py` / Score schema / coerce / rh2 は無変更で、`MATERIAL_NONE_SEED_DIGESTS` の 5 件は**全件無更新で通過**した。web UI も無変更（採番のみ）。
-- **検証:** pytest **1033 passed / 30 skipped**（+4 = 件数・入力の明示性・段 D の判別・SVG と manifest の突き合わせ）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 生成器を再実行して `git status` が空（220 件バイト一致）、`git archive` の除外、CI ガードの発火と復元。新規テスト `test_render_reference_inputs_are_fully_explicit` は生成器の literal を Pydantic の実フィールド集合と突き合わせるので、**schema にフィールドが増えれば落ちる**（固定し忘れが自動で露見する）。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`。
+- **検証:** pytest **1033 passed / 30 skipped**（+4 = 件数・入力の明示性・段 D の判別・SVG と manifest の突き合わせ）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 生成器を再実行して `git status` が空（220 件バイト一致）、`git archive` の除外、CI ガードの発火と復元。新規テスト `test_render_reference_inputs_are_fully_explicit` は生成器の literal を Pydantic の実フィールド集合と突き合わせるので、**schema にフィールドが増えれば落ちる**（固定し忘れが自動で露見する）。実装レポートは no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md。
 - **残り（Phase 2〜5、未着手）:** Edition ID を rh3 へ（`render_build_number` と `vary_seed` を外す。rh2 は legacy 保持）／ ddl corpus（`a_expand` / `b_coerce`）と `ddl_engine_version` / `ddl_version` の新設／ `stage1_prompt_digest` / `stage2_prompt_digest` ／ 再描画時の版差表示。**全 Phase を通じて `render_engine_version` は 10 のまま**でなければならない。
 
 ### v2.4.5 — 作品エディションID を rh3 へ（build 番号と Score 側 seed を同一性から外す）（Build 695、2026-07-24）
@@ -479,7 +479,7 @@ web UI のみの改修。描画機構（Score・render・パイプライン）�
 - **直列化は既存のまま。** `_canonical_json`（`sort_keys` + 区切り詰め）と `_canonical_seed`（`int()` 化）を流用し、新しい正規化を作っていない。これにより文字列 `"12345"` と整数 `12345` が同じ rh3 になり、**別のインストールでも同じ値**が出る。
 - **期待値は git 管理セッションが先に実測して契約へ埋め、実装はそれに一致させた**（[[参照コーパス先出し]]の型）。基準 `rh3:1f28ff5586ca6047…` に対し、**外したフィールドで基準と同一になる 4 件**（build 変更 / `vary_seed` 変更 / 両方同時 / 文字列 seed）と、**残したフィールドで別値になる 4 件**（`render_seed` / カタログ / `render_engine_version` / 2\*\*63+1 seed）を digest で固定した。「違う値になった」では受け入れない条件にしてある。
 - **不変:** render engine version 10 のまま。renderer / stroke_engine / Score schema / coerce / DDL 解釈は無変更で、**参照コーパス `server/reference/render-engine-10/` は再生成しても差分ゼロ**。`MATERIAL_NONE_SEED_DIGESTS` 5 件も無更新で通過。web UI は採番のみ。
-- **検証:** pytest **1038 passed / 30 skipped**（+5 = 基準値・外したフィールド・残したフィールド・legacy rh2 の存続・backfill）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 契約の 12 個の digest を実装から計算し直して全件一致、SQLite の実 DB に rh2 行と NULL 行を並べて backfill を走らせ、**rh2 行が無変更・NULL 行に rh3 の基準値**が入ることを実測。実装レポートは `no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md`。
+- **検証:** pytest **1038 passed / 30 skipped**（+5 = 基準値・外したフィールド・残したフィールド・legacy rh2 の存続・backfill）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings。**git 管理セッションが独立に再現した**: 契約の 12 個の digest を実装から計算し直して全件一致、SQLite の実 DB に rh2 行と NULL 行を並べて backfill を走らせ、**rh2 行が無変更・NULL 行に rh3 の基準値**が入ることを実測。実装レポートは no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md。
 - **残り（Phase 3〜5、未着手）:** ddl corpus（`a_expand` / `b_coerce`）と `ddl_engine_version` / `ddl_version` の新設／ `stage1_prompt_digest` / `stage2_prompt_digest` ／ 再描画時の版差表示。
 
 ### v2.4.6 — 版画としてのエンジン（SPEC に思想と層マップを据える）（Build 696、2026-07-24）
@@ -650,4 +650,3 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **検証:** pytest **1063 passed / 30 skipped**（+1 = `/api/info` の版フィールド）、cli 68 passed、ruff clean、`npm run check` **0 errors / 2 warnings**（新規 `ReplayComparisonModal.svelte` を含む 217 files）、`npm run build` 成功。変更範囲は server 1 ファイル + test + web のみ。
 
 ---
-

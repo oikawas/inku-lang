@@ -254,41 +254,6 @@ FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 
-# Unpublished documents that published documents already name, frozen as they
-# stood on 2026-07-28. The CHANGELOG cites the work report behind an entry;
-# SPEC tells the author to record bench results in a local log. Nothing new may
-# join this list without a decision -- see check_prose_references.
-INTERNAL_REFERENCES = frozenset(
-    {
-        # the local operating conventions, moved out of docs/ on 2026-07-28
-        "docs/inku-dev-conventions.md",
-        # the local bench log SPEC asks the author to keep
-        "cli/tune_bench.md",
-        # work reports cited by CHANGELOG entries as provenance
-        "no-git-sync/codex-task-v1.52.md",
-        "no-git-sync/fable5/co-work/inkuenterminology.md",
-        "no-git-sync/fable5/mode-api-claude/RUN-LOG.md",
-        "no-git-sync/opus5/name_convantion/RENAMES.md",
-        "no-git-sync/fable5/claude_code/tasks/codex-reference-corpus-result.md",
-        "no-git-sync/fable5/claude_code/tasks/codex-ui-adjustments-3-result.md",
-        "no-git-sync/fable5/claude_code/tasks/en-terminology.md",
-        "no-git-sync/fable5/claude_code/tasks/hensou-ui-5th-refine-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-closed-shape-strokes-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-png-filter-rasterizer-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-readme-visuals-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-release-pipeline-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-saijiki-word-pairing-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-2-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-ui-adjustments-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-v204-followups-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-v21-proportional-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-v23-stroke-fill-result.md",
-        "no-git-sync/fable5/claude_code/tasks/opus-v24-arc-strokes-result.md",
-        "no-git-sync/fable5/claude_code/tasks/small-bugs-v202-result.md",
-    }
-)
-
-
 def _tracked() -> set[str]:
     out = subprocess.run(
         ["git", "ls-files"], cwd=REPO_ROOT, check=True, capture_output=True, text=True
@@ -503,15 +468,7 @@ def check_terminology() -> list[str]:
 
 
 def check_prose_references(tracked: set[str]) -> list[str]:
-    """Freeze the set of internal documents that published documents name.
-
-    The CHANGELOG cites the work report behind each entry, and those reports
-    live in ``no-git-sync/``. A reader on GitHub cannot open them. **The author
-    ruled on 2026-07-28 that this is fine**: the citation records that a report
-    exists, which is worth keeping even though the reader cannot follow it. So
-    the set is frozen as it stood that day (22 paths, 51 occurrences) rather
-    than cleaned up, and a new one fails. The count is printed either way, so
-    the size stays visible instead of being forgotten.
+    """Reject references from published documents to unpublished documents.
 
     Only paths that carry a directory are considered: a bare `AGENTS.md` in
     prose is a name, not a route, and the reader is not being sent anywhere.
@@ -531,13 +488,10 @@ def check_prose_references(tracked: set[str]) -> list[str]:
                 if "/" not in target or target in tracked:
                     continue
                 seen += 1
-                if target in INTERNAL_REFERENCES:
-                    continue
                 problems.append(
                     f"{name}:{number}: a published document names an unpublished "
                     f"document: {target}\n    Readers cannot open it. Either point "
-                    f"at something published, or add the path to "
-                    f"INTERNAL_REFERENCES with the reason it must stay."
+                    f"at something published, or remove the reference."
                 )
     print(f"  internal references named from published documents: {seen}")
     return problems

@@ -2060,7 +2060,7 @@ Web UI の描画タブに、展示・鑑賞向けの表示補助を追加した�
 - `/api/paint`、`/api/compose`、履歴保存、JSONタブ、保存 artifact JSON は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` を記録する
 - `history` テーブルに `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` カラムを追加する
 - `inku-cli paint` / `batch` / `demo-instruction` は旧 `--lang` ではなく `--instruction-lang auto|ja|en` と任意の `--ui-lang` を送信する
-- 既存履歴や `cli/tune_bench.md` のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
+- 既存履歴や cli/tune_bench.md のハッシュ参照を壊さないため、言語メタデータは `render_hash` の canonical payload には含めない
 - Stage 1 prompt、Stage 2 prompt、Stage 1.5 expander / filter は `InstructionLanguageSupport` として registry に登録する
 - Score coerce layer が参照する語彙・文脈 marker は `InstructionLanguageSupport.coerce_markers` として `ja` / `en` の言語別ファイルに分離する
 - Score coerce layer の補修アルゴリズム本体は JSON Score 構造に対する共通処理として維持し、言語ごとの違いは marker セット側で表現する
@@ -2094,7 +2094,7 @@ Build 436 時点で観測された出力分布の収縮（構図・密度・色�
 
 **事後選択の実体化（vary）と、補修部品の指紋化の禁止**
 
-Build 441（v1.51 実装後の初回フルベンチ + 監査後修正）の3ペルソナレビューを受けた仕様改訂。レビューの詳細は `cli/tune_bench.md`「Build 441 3ペルソナレビュー」、実装指示は `no-git-sync/codex-task-v1.52.md`。3ペルソナが共通指摘した2点——(1) coerce 補修部品（近接反応の弧 93%、固定座標の小五角形 33% 等）が「システムの指紋」として全作品に反復し連作の鑑賞を壊していること、(2) 出力の振れ幅の上限が低く、外れ値（=驚き）を事後選択で扱う設計（§8）が未実体化であること——への対処。
+Build 441（v1.51 実装後の初回フルベンチ + 監査後修正）の3ペルソナレビューを受けた仕様改訂。レビューの詳細は cli/tune_bench.md「Build 441 3ペルソナレビュー」、実装指示は no-git-sync/codex-task-v1.52.md。3ペルソナが共通指摘した2点——(1) coerce 補修部品（近接反応の弧 93%、固定座標の小五角形 33% 等）が「システムの指紋」として全作品に反復し連作の鑑賞を壊していること、(2) 出力の振れ幅の上限が低く、外れ値（=驚き）を事後選択で扱う設計（§8）が未実体化であること——への対処。
 
 - §8.4「事後選択の実体化 — 二段の再生成」を新設。再生成を「別の演奏」（performance seed、LLM 不要）と「別の構図」（Stage 1.5 選択シードの vary、Stage 2 の1回）の二段として定義
 - §10.4「補修部品の指紋化の禁止」を新設。補修部品に (1) 部品別発火率の計測と上限監視（floor は設けない）、(2) 固定座標・固定形状のハードコード禁止、(3) 発火条件の限定（主題が壊れる場合のみ）を課す
@@ -2128,7 +2128,7 @@ Build 448 では、relation を「正規化DDLに `前の線に沿って` / `前
 
 Build 448 の JP/EN 30+30 full benchmark（`cli/out/jp-en-30-equivalent-448/{jp,en}/`）は 60/60 成功した。JP #01 のみ final retry でも stage2 timeout となり fallback result を使用した（fallback 1/60）。品質平均は合算で `visual_event` 92.40、`negative_space_pressure` 95.87、`motion_energy` 97.77、`constraint_adherence` 92.00、`color_resonance` 99.27 となり、Build 441 基準の -5 以内という品質回帰ガードを満たした。修復部品は `adjacent_reaction` 14/60 (23.3%)、`angular_pulse` 0/60、`vanishing_trace` 2/60 (3.3%)、`inherited_memory_arc` 4/60 (6.7%) で、v1.52 の repair fingerprint gate を満たした。relation drop は JP 1/6 (16.7%)、EN 0/2、合算 1/8 (12.5%) で、fable5 が blocking とした 20% 目安を下回った。自然文 fable set では relation sample rate が低くなるが、これは relation を fixed previous-object phrase 専用に戻した結果であり、drop-only validator 方針と整合する。これにより v1.52 の残タスク（vary、repair fingerprint、quality guard、relation blocking）は完了として扱う。
 
-**v1.52 クローズ（2026-07-07）**: Build 448 を v1.52 の受け入れとして確定し、クローズする。判断理由は次の4点。(1) 受け入れ基準（repair fingerprint 3ゲート、品質回帰ガード、vary の後方互換・決定性・分散、relation drop blocking）を全項目満たした。(2) Build 448 の JP/EN 60枚に対する3ペルソナ再評価（`cli/tune_bench.md` 参照）で、v1.52 の起点だった Build 441 の2大課題——補修部品の指紋化と振れ幅の上限——の解消を目視確認した。定型部品の反復は消え、外れ値（驚き）が出るようになり、キュレーター視点で60枚中20〜25枚が選出可能な水準に達した。(3) relation の使用縮退（relation を持つサンプルが 30件中 21〜22 件から 2〜3 件へ減少）は、「relation は正規化DDL中の明示的な previous-object 句（前の線に沿って / 前の形に触れない / 前の線を切る / 前の二つの間に、および英語同義句）専用とし、自然文由来の近接・拍子・先行/遅れは position / path / rotation / spacing で表す」という仕様として受け入れる。これは一時的な回避ではなく §14 の関係述語の定義の確定であり、drop-only validator 方針と整合する。(4) 品質判定指標（visual_event 等の judge metric）は人間評価との乖離例（JP #23: visual_event=28 だが目視評価は最良クラス）が確認されたため、以後は受け入れゲートではなく回帰検知の参考値として扱う。品質の最終判定は §8 の設計思想どおり人間の事後選択に属する。judge metric 自体の再調整は行わない（governor 化の回避）。以後の開発の完成軸は品質ゲートの漸近改善ではなく「他人が自分の視覚的短歌を書ける状態」（1.0）に移す。作業計画は v1.6 として別途管理する。
+**v1.52 クローズ（2026-07-07）**: Build 448 を v1.52 の受け入れとして確定し、クローズする。判断理由は次の4点。(1) 受け入れ基準（repair fingerprint 3ゲート、品質回帰ガード、vary の後方互換・決定性・分散、relation drop blocking）を全項目満たした。(2) Build 448 の JP/EN 60枚に対する3ペルソナ再評価（cli/tune_bench.md 参照）で、v1.52 の起点だった Build 441 の2大課題——補修部品の指紋化と振れ幅の上限——の解消を目視確認した。定型部品の反復は消え、外れ値（驚き）が出るようになり、キュレーター視点で60枚中20〜25枚が選出可能な水準に達した。(3) relation の使用縮退（relation を持つサンプルが 30件中 21〜22 件から 2〜3 件へ減少）は、「relation は正規化DDL中の明示的な previous-object 句（前の線に沿って / 前の形に触れない / 前の線を切る / 前の二つの間に、および英語同義句）専用とし、自然文由来の近接・拍子・先行/遅れは position / path / rotation / spacing で表す」という仕様として受け入れる。これは一時的な回避ではなく §14 の関係述語の定義の確定であり、drop-only validator 方針と整合する。(4) 品質判定指標（visual_event 等の judge metric）は人間評価との乖離例（JP #23: visual_event=28 だが目視評価は最良クラス）が確認されたため、以後は受け入れゲートではなく回帰検知の参考値として扱う。品質の最終判定は §8 の設計思想どおり人間の事後選択に属する。judge metric 自体の再調整は行わない（governor 化の回避）。以後の開発の完成軸は品質ゲートの漸近改善ではなく「他人が自分の視覚的短歌を書ける状態」（1.0）に移す。作業計画は v1.6 として別途管理する。
 
 
 ### v1.60 (2026-07-07)
@@ -2157,7 +2157,7 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - LLM Model Inspection の比較先は、現在の Stage 1 provider がクラウド provider の場合、まず API key 不要のローカル provider を候補にする。これは鑑賞用比較を quota や provider 側の利用不能に過度に依存させないための実装上の選択であり、judge 値は引き続き表示しない。
 - 候補4枚、解釈も含める、選を残す、モデル比較、自動補正などの主要操作に多言語対応ツールチップを追加した。ツールチップ文言はメイン UI の言語切替に追従し、表示言語と入力言語を分ける既存方針を保つ。
 - 左アプリレールの展開はマウスオーバーではなく、左上の明示的な伸ばす/格納するトグルボタンで制御する。誤展開を避け、作業領域の幅を利用者が固定できるようにする。
-- Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを `cli/tune_bench.md` に記録した。
+- Build 458 を pentala 実機で確認し、D-1/D-2 のスクリーンショットを `no-git-sync/screen-cap/`、確認メモを cli/tune_bench.md に記録した。
 
 ### v1.71 (2026-07-08)
 
@@ -2167,5 +2167,4 @@ v1.52 Build 448 でエンジン品質ゲートをクローズしたため、完�
 - render metadata に `render_texture_version`、`render_texture_profile`、`render_canvas_ground`、`render_surface_textures`、`texture_degraded` を追加した。
 - texture seed を Score / instruction / texture kind / performance seed から導出し、固定座標の紙目や高頻度の無指定 texture 注入が Renderer の指紋にならないようにした。
 - 左アプリレール、入力・出力パネルの各ボタンやタブに多言語対応ツールチップを追加・拡大適用し、操作の明瞭化を図った。
-
 

@@ -546,7 +546,7 @@ and focused host-JVM boundary tests.
 on an accepted Pixel 9 and are not replaced by host CI;
 **(4) the full Android JVM suite** — CI runs the focused tests for the shared native boundary while
 the complete suite remains a local gate;
-**(5) the operational scripts under `no-git-sync/`**, which git does not track.
+**(5) internal operational scripts**, which are maintained outside the product repository and are not CI inputs.
 **The population is not the same as a full local run.**
 
 ### On open issues

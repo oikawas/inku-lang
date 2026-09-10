@@ -25,8 +25,8 @@ npm run lint:i18n -- --list # 許容例外として何を通したかも出す
 npm run check              # 型と鍵の欠落（LangPack）
 ```
 
-出典: `no-git-sync/fable5/co-work/inkuenterminology.md`（Fable の翻訳辞書）と
-`no-git-sync/fable5/claude_code/tasks/en-terminology.md`（2026-07-25 の作者裁定）。
+出典: no-git-sync/fable5/co-work/inkuenterminology.md（Fable の翻訳辞書）と
+no-git-sync/fable5/claude_code/tasks/en-terminology.md（2026-07-25 の作者裁定）。
 適用の記録は `en-terminology-result.md`、全 788 文字列の対応表は `en-terminology-inventory.md`。
 
 ---
@@ -151,7 +151,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 
 > **hash と同一性 ID の材料は名前ではない。凍結する。**
 > rh2 payload の鍵 `vary_seed` と `ddl_expander` の salt `#hensou` / `#vary` は動かしていない。
-> **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録がある。**
+> **新旧の対応は no-git-sync/opus5/name_convantion/RENAMES.md に記録がある。**
 
 **例外その二 — 添景（2026-07-27 作者裁定「奥書と同じ方針で」、v2.8.0 で実施）。**
 辞書は 添景 = **staffage** と定めており、**web は既にその語で表示していた**。

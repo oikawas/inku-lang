@@ -56,34 +56,15 @@ android/local.properties
 **/inku-history.json
 data/history.json
 
-# Local CLI benchmark assets and generated outputs
-cli/tune_bench.md
-# The tune bench 2 family: record, procedure, and benchmark sets. Globbed so a
-# later file in the family cannot slip into the public repo unlisted.
-cli/tune_bench2*
-cli/bench/
+# Generated outputs
 cli/out/
 cli/out2/
 server/out/
 
-# Local-only operational files
-no-git-sync/
-# docs/* rather than docs/: git cannot re-include a path under an excluded
-# directory, and docs/assets/ holds the images the READMEs publish.
-# Re-include one directory at a time. Never widen this to !docs/*.md: docs/
-# used to hold the private operating conventions, and a broad rule would
-# publish whatever a later session drops here. Private documents now live in
-# no-git-sync/docs/ (moved 2026-07-28).
-docs/*
-!docs/assets/
-!docs/spec/
-!docs/history/
-!docs/guide/
-!docs/architecture/
-!docs/i18n/
-
-#Codex
+# Local assistant instructions and settings
 AGENTS.md
+.codex/
+.claude/
 
 # plugin runtime state (enabled/disabled set, server-local)
 server/plugins/.plugin-state.json

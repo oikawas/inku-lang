@@ -36,7 +36,7 @@ canonical; versions here are an architecture snapshot.
 | Markdown / Mermaid | `SPEC*`, `docs/`, manuals, plugin documents | Product contracts, architecture, diagrams, declarative plugins |
 | JSON | Score, API, trace, portable contract, fixtures | Structured data boundary among hosts |
 | TOML / YAML / KTS | Python/Rust/Android/CI manifests | Dependencies, builds, and workflows |
-| Shell | `scripts/`, `no-git-sync/scripts/` | Guarded build, check, and deployment entry points |
+| Shell | `scripts/` | Product build and check entry points; private operational entry points live in the internal repository. |
 
 ## Frameworks and major direct dependencies
 

@@ -40,6 +40,7 @@ impl MacroExpansionLimits {
 /// A closed evaluated macro value. References to parameters and locals are impossible here.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExpandedMacroValue {
+    ExactDecimal(crate::ExactDecimal),
     Number(f64),
     Integer(i64),
     Boolean(bool),
@@ -701,7 +702,54 @@ fn root_environment(
             .get(parameter.source_fact_clause_index)
             .and_then(|clause| clause.atoms.get(parameter.source_fact_atom_index))
             .map(|atom| atom.span());
-        if source_atom_span != Some(parameter.source_span) {
+        let source_matches = match &parameter.value {
+            BoundMacroParameterValue::ExactDecimal {
+                value,
+                geometry: Some(geometry),
+                ..
+            } => {
+                let stream = &parameter_binding
+                    .macro_resolution
+                    .relation_reference_evidence
+                    .attachment_evidence
+                    .noun_phrase
+                    .clause_stream;
+                let Some(clause) = stream.clauses.get(parameter.source_fact_clause_index) else {
+                    return Err(EvalError::new(
+                        MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
+                    ));
+                };
+                let atoms = &clause.atoms;
+                let keyword_matches = matches!(atoms.get(parameter.source_fact_atom_index), Some(crate::ClauseAtom::FunctionWord { geometry_keyword: Some(keyword), span, .. })
+                    if *keyword == geometry.keyword && *span == geometry.keyword_provenance.span);
+                let decimal_matches = match parameter
+                    .source_fact_atom_index
+                    .checked_add(1)
+                    .and_then(|index| atoms.get(index))
+                {
+                    Some(crate::ClauseAtom::FunctionWord {
+                        exact_decimal: Some(decimal),
+                        span,
+                        ..
+                    }) => *decimal == *value && *span == geometry.decimal.provenance.span,
+                    Some(crate::ClauseAtom::UnattachedExactNumber(number)) => {
+                        crate::ExactDecimal::from_u64(number.value) == *value
+                            && number.span == geometry.decimal.provenance.span
+                    }
+                    _ => false,
+                };
+                keyword_matches
+                    && decimal_matches
+                    && geometry.decimal.value == *value
+                    && parameter.source_span.start_byte
+                        == geometry.keyword_provenance.span.start_byte
+                    && parameter.source_span.end_byte == geometry.decimal.provenance.span.end_byte
+                    && matches!(schema, ParameterSchema::ExactDecimal { dimension: Some(dimension) }
+                        if Some(*dimension) == crate::ExactDecimalDimension::from_keyword(geometry.keyword))
+            }
+            _ => source_atom_span == Some(parameter.source_span),
+        };
+        if !source_matches {
             return Err(EvalError::new(
                 MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
             ));
@@ -734,6 +782,9 @@ fn root_environment(
 
 fn bound_value(value: &BoundMacroParameterValue) -> Result<ExpandedMacroValue, EvalError> {
     match value {
+        BoundMacroParameterValue::ExactDecimal { value, .. } => {
+            Ok(ExpandedMacroValue::ExactDecimal(*value))
+        }
         BoundMacroParameterValue::CoreModifier { value, .. } => {
             Ok(ExpandedMacroValue::SemanticRef {
                 category: value.dimension().as_str().to_owned(),
@@ -765,6 +816,9 @@ fn coerce_to_schema(
     schema: &ParameterSchema,
 ) -> Result<ExpandedMacroValue, EvalError> {
     match (schema, value) {
+        (ParameterSchema::ExactDecimal { .. }, ExpandedMacroValue::ExactDecimal(value)) => {
+            Ok(ExpandedMacroValue::ExactDecimal(value))
+        }
         (ParameterSchema::Number, ExpandedMacroValue::Number(value)) if value.is_finite() => {
             Ok(ExpandedMacroValue::Number(value))
         }
@@ -1282,6 +1336,9 @@ impl<'a> Evaluator<'a> {
     ) -> Result<ExpandedMacroValue, EvalError> {
         self.bump_step(path)?;
         match expression {
+            Expression::ExactDecimal { value } => crate::ExactDecimal::parse(value)
+                .map(ExpandedMacroValue::ExactDecimal)
+                .map_err(|_| EvalError::new(MacroExpansionDiagnosticKind::NumericRange).at(path)),
             Expression::Number { value } if value.is_finite() => {
                 Ok(ExpandedMacroValue::Number(*value))
             }

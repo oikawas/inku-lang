@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — Macroの正確な寸法・座標と「触れない」
+
+MacroDefinitionに閉じた `exact_decimal` 型を追加し、明示した寸法・座標のcaller parameter、定義literal、component、local、有限choicesから、通常DDLと同じgeometry / position resolverへ値を届ける。旧 `Number(f64)` と既存定義のbytesを保ち、新しい十進数の同値表記だけをcanonical identityで正規化する。半径・直径・長さ・一辺・幅高さ・弦長矢高・X/Yは、明示dimensionに一意に束縛し、原文と生成元のownerを保持する。Count1のScoreと反復planを共通化し、数値位置の範囲・must-fit、サイズ重複時の診断付き小サイズ採用も継承する。
+
+隣接bound flat Emitの `not_touching` は通常DDLと同じMedium gapのScore表現へ届く。元Emit順にはunboundも含め、途中のEmitや失われた参照先を飛び越さない。Connected / Touchingも同じ隣接性判定を使う。この変更はruntime未接続のcompiler拡張であり、Renderer、Score wire、公開activation version、配備を変更しない。whole Step10とruntime / UI / save接続は未完了である。
+
+---
+
 ### 2026-09-10 — 全幅・月形・重複サイズの共通処理
 
 通常DDLと宣言済みMacroの全幅・半幅、半円・上弦・下弦・三日月を共通のScore変換へ接続した。全幅・半幅は回転前のキャンバス横幅を参照する。三日月は歳時記の三次Bezier輪郭による細い塗り面として描き、位置・回転・境界判定も同じ輪郭を使う。重複するサイズはすべて原文と来歴へ残し、エラー診断に候補寸法と採用寸法を載せ、小さい方でStop/Continueとも描画する。一般の不正入力の停止規則は保持した。

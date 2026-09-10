@@ -89,6 +89,10 @@ circle / ellipse / cloudform / square / triangle / polygon / line / arc / point�
 endpoint familyがConnectedを既存Medium gapのScore relationへ届ける。typedな
 previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
 一致する場合だけ参照を保つ。Continueは参照消失時にcurrentをRelationInstruction単位で連鎖省略する。
+Macroのexact_decimal literal / 宣言parameterは通常DDLの寸法・数値位置resolverへ合流する。
+Radius等の明示dimensionで一意にbindし、旧Number(f64)、exact値、source / generated ownerを保つ。
+NotTouchingも隣接bound flat Emitから同じScoreへ届き、unbound Emitや失った参照を飛び越さない。
+
 TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから同じchecked performerへ届く。
 日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、
 明示寸法・relative scale（normal含む）・弦方向は固定、省略normalは可変、numeric anchorと最終must-fitは固定する。

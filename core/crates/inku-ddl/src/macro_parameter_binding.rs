@@ -14,6 +14,11 @@ pub const MACRO_PARAMETER_BINDING_SCHEMA_ID: &str = "inku.macro-parameter-bindin
 /// One source-owned value accepted by the closed I-534 parameter schema.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BoundMacroParameterValue {
+    ExactDecimal {
+        value: crate::ExactDecimal,
+        geometry: Option<crate::SemanticGeometryValue>,
+        source_span: SourceSpan,
+    },
     /// A finite core value with source provenance and no Saijiki asset origin.
     CoreModifier {
         value: crate::CoreModifierValue,
@@ -39,10 +44,27 @@ pub enum BoundMacroParameterValue {
 impl BoundMacroParameterValue {
     pub const fn source_span(&self) -> SourceSpan {
         match self {
+            Self::ExactDecimal { source_span, .. } => *source_span,
             Self::Integer { source_span, .. }
             | Self::CoreModifier { source_span, .. }
             | Self::Number { source_span, .. }
             | Self::SemanticRef { source_span, .. } => *source_span,
+        }
+    }
+}
+
+impl MacroParameterBinding {
+    pub(crate) fn owns_span(&self, span: SourceSpan) -> bool {
+        if let BoundMacroParameterValue::ExactDecimal {
+            geometry: Some(value),
+            ..
+        } = &self.value
+        {
+            span == value.keyword_provenance.span
+                || span == value.decimal.provenance.span
+                || span == self.source_span
+        } else {
+            span == self.source_span
         }
     }
 }
@@ -147,6 +169,11 @@ struct Fact {
 
 #[derive(Clone)]
 enum FactKind {
+    ExactDecimal {
+        value: crate::ExactDecimal,
+        geometry: Option<crate::SemanticGeometryValue>,
+        siblings: Vec<SourceSpan>,
+    },
     CoreModifier(crate::CoreModifierValue),
     ExactNumber(u64),
     Semantic {
@@ -225,7 +252,21 @@ fn build_parameter_bindings(
             }
             continue;
         }
-        let facts = match clause_facts(document, &macro_resolution, clause_index) {
+        let exact_enabled = invocations.iter().any(|invocation| {
+            invocation
+                .definition
+                .parameters
+                .iter()
+                .any(|(_, schema)| matches!(schema, ParameterSchema::ExactDecimal { .. }))
+        });
+        // Numeric geometry has no multi-head phrase owner in the accepted grammar.
+        // A matching parameter type must not take a primitive's explicit source fact.
+        if exact_enabled && macro_resolution.relation_reference_evidence.attachment_evidence.noun_phrase.clause_stream
+            .clauses[clause_index].atoms.iter().any(|atom| matches!(atom, ClauseAtom::CoreRole(term) if term.role == crate::CoreRoleKind::Primitive)) {
+            diagnose_clause(&mut diagnostics, &invocations, MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment);
+            continue;
+        }
+        let facts = match clause_facts(document, &macro_resolution, clause_index, exact_enabled) {
             Some(facts) => facts,
             None => {
                 for invocation in invocations {
@@ -315,6 +356,27 @@ fn build_parameter_bindings(
             continue;
         }
 
+        // A compound source fact is transferred only when all of its dimensions belong
+        // to one invocation. Never split width/height or X/Y between callers.
+        let complete_compounds = matching.iter().enumerate().all(|(slot_index, fact_index)| {
+            let FactKind::ExactDecimal { siblings, .. } = &facts[*fact_index].kind else {
+                return true;
+            };
+            siblings.iter().all(|span| {
+                matching.iter().enumerate().any(|(other_slot, other_fact)| {
+                    slots[other_slot].invocation_index == slots[slot_index].invocation_index
+                        && facts[*other_fact].span == *span
+                })
+            })
+        });
+        if !complete_compounds {
+            diagnose_clause(
+                &mut diagnostics,
+                &invocations,
+                MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
+            );
+            continue;
+        }
         let mut parameters_by_invocation = BTreeMap::<usize, Vec<MacroParameterBinding>>::new();
         for (slot_index, fact_index) in matching.into_iter().enumerate() {
             let slot = &slots[slot_index];
@@ -396,6 +458,7 @@ fn clause_facts(
     document: &NormalizedDdlDocument,
     macro_resolution: &MacroInvocationLockResolutionResult,
     clause_index: usize,
+    exact_enabled: bool,
 ) -> Option<Vec<Fact>> {
     let attachment = &macro_resolution
         .relation_reference_evidence
@@ -409,6 +472,60 @@ fn clause_facts(
         .clauses
         .get(clause_index)?;
     let mut facts = Vec::new();
+    let region_index = crate::semantic_association::sentence_region_index(
+        &attachment.noun_phrase.clause_stream,
+        clause.span,
+    );
+    let geometry =
+        crate::geometry::analyze_clause_geometry(document, clause, clause_index, region_index);
+    let mut geometry_groups = geometry
+        .geometries
+        .iter()
+        .map(|value| match value {
+            crate::SemanticExplicitGeometry::Radius(value)
+            | crate::SemanticExplicitGeometry::Diameter(value)
+            | crate::SemanticExplicitGeometry::Length(value)
+            | crate::SemanticExplicitGeometry::Side(value) => vec![value],
+            crate::SemanticExplicitGeometry::WidthHeight { width, height } => vec![width, height],
+            crate::SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => {
+                vec![chord, sagitta]
+            }
+        })
+        .collect::<Vec<_>>();
+    geometry_groups.extend(
+        geometry
+            .positions
+            .iter()
+            .map(|position| vec![&position.x, &position.y]),
+    );
+    for values in geometry_groups {
+        if !exact_enabled {
+            break;
+        }
+        let siblings = values
+            .iter()
+            .map(|value| SourceSpan {
+                start_byte: value.keyword_provenance.span.start_byte,
+                end_byte: value.decimal.provenance.span.end_byte,
+            })
+            .collect::<Vec<_>>();
+        for (value, span) in values.into_iter().zip(&siblings) {
+            facts.push(Fact {
+                clause_index,
+                atom_index: value.keyword_provenance.atom_index,
+                span: *span,
+                source_surface: document
+                    .source()
+                    .get(span.start_byte..span.end_byte)?
+                    .to_owned(),
+                kind: FactKind::ExactDecimal {
+                    value: value.decimal.value,
+                    geometry: Some(value.clone()),
+                    siblings: siblings.clone(),
+                },
+            });
+        }
+    }
     let primitive_owned = crate::semantic_association::primitive_phrase_modifier_starts(
         &macro_resolution
             .relation_reference_evidence
@@ -416,6 +533,13 @@ fn clause_facts(
     );
     for (atom_index, atom) in clause.atoms.iter().enumerate() {
         let span = atom.span();
+        if exact_enabled
+            && geometry
+                .consumed_numeric_spans
+                .contains(&(span.start_byte, span.end_byte))
+        {
+            continue;
+        }
         if !(clause.span.start_byte <= span.start_byte && span.end_byte <= clause.span.end_byte) {
             return None;
         }
@@ -424,6 +548,14 @@ fn clause_facts(
             .get(span.start_byte..span.end_byte)?
             .to_owned();
         let kind = match atom {
+            ClauseAtom::FunctionWord {
+                exact_decimal: Some(value),
+                ..
+            } if exact_enabled => FactKind::ExactDecimal {
+                value: *value,
+                geometry: None,
+                siblings: Vec::new(),
+            },
             // One constrained head cannot be consumed as an unconstrained shape ref.
             // Callers bind the independently declared form/sides facts explicitly.
             ClauseAtom::CoreRole(term) if term.shape_constraint.is_some() => continue,
@@ -489,6 +621,29 @@ fn semantic_fact(
 fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroParameterValue> {
     match (schema, &fact.kind) {
         (
+            ParameterSchema::ExactDecimal { dimension },
+            FactKind::ExactDecimal {
+                value, geometry, ..
+            },
+        ) if *dimension
+            == geometry
+                .as_ref()
+                .and_then(|value| crate::ExactDecimalDimension::from_keyword(value.keyword)) =>
+        {
+            Some(BoundMacroParameterValue::ExactDecimal {
+                value: *value,
+                geometry: geometry.clone(),
+                source_span: fact.span,
+            })
+        }
+        (ParameterSchema::ExactDecimal { dimension: None }, FactKind::ExactNumber(value)) => {
+            Some(BoundMacroParameterValue::ExactDecimal {
+                value: crate::ExactDecimal::from_u64(*value),
+                geometry: None,
+                source_span: fact.span,
+            })
+        }
+        (
             ParameterSchema::Integer,
             FactKind::CoreModifier(crate::CoreModifierValue::Sides(value)),
         ) => i64::try_from(*value)
@@ -545,11 +700,7 @@ fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroP
                 source_span: fact.span,
             })
         }
-        (_, FactKind::CoreModifier(_))
-        | (ParameterSchema::Boolean | ParameterSchema::List { .. }, _)
-        | (ParameterSchema::Integer | ParameterSchema::Number, FactKind::Semantic { .. })
-        | (ParameterSchema::SemanticRef { .. }, FactKind::ExactNumber(_))
-        | (ParameterSchema::SemanticRef { .. }, FactKind::Semantic { .. }) => None,
+        _ => None,
     }
 }
 

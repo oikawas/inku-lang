@@ -14,7 +14,7 @@ separate replacement for the drawing core. The normative plugin boundary is
 
 Declared flat Emits with `movement` set to `line_up`, `scatter`, or `tile` reach the same object-size / placement resolver as ordinary DDL through the verified Stage 1.5 plan API. Omitted Emit count resolves to eight; explicit positive integers through u32::MAX remain exact. Missing required parameters and invalid types never receive that default. Size uses the canvas short edge independently of count, preserving normal sizes, size factors, appearance, and angle for all nine shapes. Optional `layout_direction` requires an existing `angle` category SemanticRef and expands literals or declared parameter / local references. It is separate from shape `angle` and delivers horizontal, vertical, or physical 45-degree rows only to line_up. Omission and explicit horizontal retain distinct identities; bare diagonal chooses two axes using original meaning, attested optional composition seed, and original occurrence under a dedicated role. Unsupported actions / identities such as rotated and undeclared caller direction stop or omit the original execution unit. Multiple parameters in the same category are not disambiguated by names. Plans also retain tile from physical aspect or a scatter recipe requiring a later performance seed, together with generated owners, bindings, and provenance. They add no undeclared caller overlay or fan-out. Stop / Continue retain field / Emit / invocation omission units. Ready plan does not mean an instance array, Score, or drawing succeeded. The existing field-absent place / count-one Score path remains; the Score entrance cannot silently discard an Emit direction. Whole Step10, Step11, and runtime integration remain incomplete.
 
-Shapes retain the existing triangle / square / polygon identities. Optional Emit field `proportion_aspect` accepts ratio category tall / wide; `shape_form` accepts the closed core shape_form category regular; `sides` accepts an Integer from five through eight. Definition literals, declared parameters, and locals share one consumer. Callers bind independent facts such as regular / 正形 and sides 6 / 辺数6 to declarations. Multiple Integer parameters are not disambiguated by name. Undeclared facts and missing required arguments cannot be discarded or defaulted. The consumer shares ordinary DDL normal geometry, regular forms, and default 2:1 aspect. Place / count one reaches actual Score; repetition retains exact constraints in a plan. Triangle and square use bounding-box centers; polygon uses its circumcircle. Incompatible regular / aspect or out-of-range sides stop or omit the original Emit. General numeric geometry Emit fields are not introduced.
+Shapes retain the existing triangle / square / polygon identities. Optional Emit field `proportion_aspect` accepts ratio category tall / wide; `shape_form` accepts the closed core shape_form category regular; `sides` accepts an Integer from five through eight. Definition literals, declared parameters, and locals share one consumer. Callers bind independent facts such as regular / 正形 and sides 6 / 辺数6 to declarations. Multiple Integer parameters are not disambiguated by name. Undeclared facts and missing required arguments cannot be discarded or defaulted. The consumer shares ordinary DDL normal geometry, regular forms, and default 2:1 aspect. Place / count one reaches actual Score; repetition retains exact constraints in a plan. Triangle and square use bounding-box centers; polygon uses its circumcircle. Incompatible regular / aspect or out-of-range sides stop or omit the original Emit. Exact numeric fields follow the shared contract below.
 
 A definition has exactly these top-level fields:
 
@@ -26,13 +26,13 @@ A definition has exactly these top-level fields:
 - `components`: definition-local reusable components
 - `body`: the bounded, data-only statement list
 
-Parameter schemas are closed to `number`, `integer`, `boolean`, fixed-length
-`list`, and `semantic_ref`. Expressions are closed to typed number, integer,
+Parameter schemas are closed to `number`, `exact_decimal`, `integer`, `boolean`, fixed-length
+`list`, and `semantic_ref`. Expressions are closed to typed number, exact decimal, integer,
 boolean, list, parameter, local, and semantic-reference forms. Unknown fields,
 types, expressions, operators, and semantic references are rejected.
 
 Declare sway with, for example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`.
-The optional `dimension` is closed to `amplitude`, `frequency`, or `quality`, and is allowed only
+The optional SemanticRef `dimension` is closed to `amplitude`, `frequency`, or `quality`, and is allowed only
 for category variation. Omitted / None preserves legacy category-only matching and canonical
 bytes / digest; a specified constraint participates in the digest. Parameter names do not imply dimensions.
 
@@ -83,8 +83,8 @@ This small definition reaches the current runtime-disconnected Score lowerer:
 Each complete flat Emit becomes one ordinary Score instruction. A sequence of
 complete Emits keeps its order, including Emits already flattened through
 `use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
-(`line`, `circle`, `ellipse`, `cloudform`, `square`, `arc`, or `point`), explicit
-`movement:place`, explicit `place` (center, top, bottom, the four edges, or corner), and optional same-category `color`,
+(`line`, `circle`, `ellipse`, `cloudform`, `square`, `triangle`, `polygon`, `arc`, or `point`), explicit
+`movement:place`, either explicit `place` (center, top, bottom, the four edges, or corner) or the exact `position_x` / `position_y` pair, and optional same-category `color`,
 `touch`, `continuity`, `surface`, `angle`, `thinness`, and `relative_scale`. Thinness is a closed
 core category outside Saijiki: only `thinness:fine` and
 `thinness:extra_fine` are accepted, and both use the same lowerer as ordinary DDL.
@@ -109,8 +109,10 @@ omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
 and shares the ordinary Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain
 fixed; omitted normal may adjust. Macro relations check actual typed Emits without creating
-a literal noun condition. Other relation kinds and structural
-relation placement remain unsupported by this consumer.
+a literal noun condition. `not_touching` also uses adjacent bound Emits and the ordinary
+Medium-gap Score representation, requiring exact center on the current Emit. Adjacency
+includes every original Emit, including unbound Emits. An omitted from never retargets to
+a survivor. Other relation kinds and structural relation placement remain unsupported.
 
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and
@@ -127,8 +129,8 @@ omission unit. If no drawing target remains, the result is stopped.
 Place literals and explicitly declared `{"type":"semantic_ref","category":"place"}` parameters
 use the same regions in SPEC §18. Only center requires an exact generated focus join.
 Stage 2 selects a corner from attested meaning, composition seed, and original occurrence; the Renderer
-chooses its anchor within that corner. Coordinates never enter source or provenance. Noncenter relations
-remain unsupported, and no implicit caller overlay or omitted-place default is added.
+chooses its anchor within that corner. Generated coordinates never masquerade as original source.
+Relation position restrictions above remain; no implicit caller overlay or omitted-place default is added.
 
 Meaning bound through declared parameters is read from the expanded Emit. An
 unbound caller appearance field does not fan out or override generated values;
@@ -169,6 +171,14 @@ For a Description request, Stage 1 may receive only a bounded signature,
 parameter schema, and short summary. It never receives the definition body or
 expanded DDL. Direct DDL with an unknown or ambiguous qualified term fails
 explicitly; it does not trigger a hidden LLM fallback.
+
+## Exact Numeric Parameters and Delivery
+
+Exact decimals use a closed typed expression such as `{"expr":"exact_decimal","value":"0.240"}` and the same ExactDecimal representation as ordinary DDL. The original definition retains its spelling; canonical identity normalizes `0.240` and `0.24` to the same value. Existing `number` / `Number(f64)` meaning and definition bytes remain unchanged, and exact values are never reconstructed from f64. Literals, declared parameters, locals, components, and finite choices preserve the exact type. This adds no general arithmetic or implicit conversion into numeric ranges or transforms.
+
+Declare a parameter with, for example, `{"type":"exact_decimal","dimension":"radius"}`. The optional dimension is closed to `radius` / `diameter` / `length` / `side` / `width` / `height` / `chord` / `sagitta` / `position_x` / `position_y`. Binding matches explicit caller dimensions and values uniquely and completely; parameter names imply no meaning. An omitted dimension matches only a standalone number without a dimension. A clause mixing an ordinary primitive with an exact-parameter Macro retains the existing unsupported numeric-ownership boundary and reports an ambiguous assignment; separate clauses are unaffected. Compound width/height, chord/sagitta, and X/Y facts transfer only when every component binds to the same invocation, retaining the original keyword and decimal provenance.
+
+Flat Emit fields with those names accept exact values. `width`+`height`, `chord`+`sagitta`, and `position_x`+`position_y` require both components; missing or mistyped values produce diagnostics. Numeric position and named `place` have separate authority and cannot silently overwrite one another. Dimensions and positions reach the ordinary DDL resolver, including diagnostic recovery to the smaller overlapping size. Definition literals belong to their generated Emit and do not receive fabricated source spans. Count-one/place reaches actual Score; repetition reaches the resolved plan and leaves instance generation to later materialization.
 
 ## Geometry and Count Boundary
 

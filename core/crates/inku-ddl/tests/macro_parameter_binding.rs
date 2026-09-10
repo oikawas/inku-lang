@@ -11,6 +11,75 @@ use serde_json::Value;
 const FIXTURE: &str = include_str!("fixtures/macro-parameter-binding-v1.json");
 
 #[test]
+fn exact_decimal_dimensions_bind_compound_source_values_atomically() {
+    let bind = |parameters: Value, source: &str| {
+        let definition = MacroDefinition::from_json(&serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0","parameters":parameters,"components":{},"body":[]}).to_string()).unwrap();
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        bind_macro_parameters(
+            &NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
+                .unwrap(),
+            &[definition],
+        )
+        .unwrap()
+    };
+    let parameters = serde_json::json!({"z":{"type":"exact_decimal","dimension":"width"},"a":{"type":"exact_decimal","dimension":"height"}});
+    let result = bind(parameters.clone(), "Exact.Mark width 0.40 height 0.2");
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let values = &result.complete[0].parameters;
+    assert_eq!(values.len(), 2);
+    assert_eq!(
+        values
+            .iter()
+            .find(|p| p.parameter_name == "z")
+            .unwrap()
+            .source_surface,
+        "width 0.40"
+    );
+    assert!(matches!(
+        &values[0].value,
+        BoundMacroParameterValue::ExactDecimal {
+            geometry: Some(_),
+            ..
+        }
+    ));
+    for source in [
+        "Exact.Mark width 0.4",
+        "Exact.Mark width 0.4 height 0.2 width 0.3 height 0.1",
+    ] {
+        assert!(bind(parameters.clone(), source).complete.is_empty());
+    }
+    let partial = serde_json::json!({"w":{"type":"exact_decimal","dimension":"width"}});
+    assert!(
+        bind(partial, "Exact.Mark width 0.4 height 0.2")
+            .complete
+            .is_empty()
+    );
+    let mixed = bind(
+        parameters,
+        "Exact.Mark and red ellipse width 0.4 height 0.2",
+    );
+    assert!(mixed.complete.is_empty());
+    assert!(
+        mixed
+            .diagnostics
+            .iter()
+            .any(|d| d.kind == MacroParameterBindingDiagnosticKind::AmbiguousCompleteAssignment)
+    );
+    let xy = serde_json::json!({"y":{"type":"exact_decimal","dimension":"position_x"},"x":{"type":"exact_decimal","dimension":"position_y"}});
+    assert!(
+        bind(xy, "Exact.Mark horizontal 0.3 vertical 0.7")
+            .diagnostics
+            .is_empty()
+    );
+}
+
+#[test]
 fn sides_integer_binding_is_owned_and_never_uses_parameter_names() {
     let bind = |parameters: Value, source: &str| {
         let data = serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters":parameters,"components":{},"body":[]});
@@ -585,6 +654,7 @@ fn parse_language(value: &str, id: &str) -> ResolvedInstructionLanguage {
 
 fn value_kind(value: &BoundMacroParameterValue) -> String {
     match value {
+        BoundMacroParameterValue::ExactDecimal { .. } => "exact_decimal",
         BoundMacroParameterValue::Integer { .. } => "integer",
         BoundMacroParameterValue::Number { .. } => "number",
         BoundMacroParameterValue::SemanticRef { .. } => "semantic_ref",
@@ -595,6 +665,7 @@ fn value_kind(value: &BoundMacroParameterValue) -> String {
 
 fn value_text(value: &BoundMacroParameterValue) -> String {
     match value {
+        BoundMacroParameterValue::ExactDecimal { value, .. } => value.canonical_spelling(),
         BoundMacroParameterValue::Integer { value, .. } => value.to_string(),
         BoundMacroParameterValue::Number { value, .. } => value.to_string(),
         BoundMacroParameterValue::CoreModifier { value, .. } => value.as_str().to_owned(),
@@ -608,6 +679,7 @@ fn value_text(value: &BoundMacroParameterValue) -> String {
 
 fn schema_kind(schema: &ParameterSchema) -> String {
     match schema {
+        ParameterSchema::ExactDecimal { .. } => "exact_decimal",
         ParameterSchema::Integer => "integer",
         ParameterSchema::Number => "number",
         ParameterSchema::SemanticRef { .. } => "semantic_ref",

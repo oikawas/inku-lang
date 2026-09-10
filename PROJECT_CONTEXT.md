@@ -103,6 +103,10 @@ and the Line / Arc / Point endpoint family carries Connected, into the existing 
 relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order;
 Continue omits dependent currents as `RelationInstruction` units when a referent disappears.
+Macro exact_decimal literals and declared parameters join the ordinary DDL dimension and numeric-position resolver.
+Explicit dimensions bind uniquely, retaining legacy Number(f64), exact values, and source / generated ownership.
+NotTouching also reaches the same Score from adjacent bound flat Emits without skipping unbound Emits or lost references.
+
 Touching also reaches the shared checked performer from direct Line / Arc instructions and adjacent bound flat Macro Emits.
 The four bilingual full literals verify their named prior Line / Arc type in original source order. Both-endpoint matching
 shares existing Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain fixed;

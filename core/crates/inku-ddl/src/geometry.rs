@@ -407,6 +407,58 @@ pub struct SemanticNumericPosition {
     pub y: SemanticGeometryValue,
 }
 
+/// Exact geometry meaning shared by source-owned and generated instructions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExactGeometry {
+    Radius(ExactDecimal),
+    Diameter(ExactDecimal),
+    Length(ExactDecimal),
+    Side(ExactDecimal),
+    WidthHeight {
+        width: ExactDecimal,
+        height: ExactDecimal,
+    },
+    ChordSagitta {
+        chord: ExactDecimal,
+        sagitta: ExactDecimal,
+    },
+}
+
+impl From<&SemanticExplicitGeometry> for ExactGeometry {
+    fn from(value: &SemanticExplicitGeometry) -> Self {
+        match value {
+            SemanticExplicitGeometry::Radius(value) => Self::Radius(value.decimal.value),
+            SemanticExplicitGeometry::Diameter(value) => Self::Diameter(value.decimal.value),
+            SemanticExplicitGeometry::Length(value) => Self::Length(value.decimal.value),
+            SemanticExplicitGeometry::Side(value) => Self::Side(value.decimal.value),
+            SemanticExplicitGeometry::WidthHeight { width, height } => Self::WidthHeight {
+                width: width.decimal.value,
+                height: height.decimal.value,
+            },
+            SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => Self::ChordSagitta {
+                chord: chord.decimal.value,
+                sagitta: sagitta.decimal.value,
+            },
+        }
+    }
+}
+
+/// Axis-normalized semantic anchor; provenance stays with the source or generated owner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExactPosition {
+    pub x: ExactDecimal,
+    pub y: ExactDecimal,
+}
+
+impl From<&SemanticNumericPosition> for ExactPosition {
+    fn from(value: &SemanticNumericPosition) -> Self {
+        Self {
+            x: value.x.decimal.value,
+            y: value.y.decimal.value,
+        }
+    }
+}
+
 impl SemanticNumericPosition {
     pub const fn source(&self) -> &SourceOccurrence {
         &self.x.keyword_provenance

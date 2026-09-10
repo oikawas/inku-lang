@@ -11,6 +11,33 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn exact_decimal_generated_repetition_plan_keeps_must_fit_anchor_and_dimensions() {
+    let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Row","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
+        "shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"movement":{"expr":"semantic_ref","category":"movement","id":"tile"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"count":{"expr":"integer","value":3},"width":{"expr":"exact_decimal","value":"0.3"},"height":{"expr":"exact_decimal","value":"0.2"},"position_x":{"expr":"exact_decimal","value":"0.4"},"position_y":{"expr":"exact_decimal","value":"0.5"}
+    }}]}).to_string()).unwrap();
+    let generated = stage("Exact.Row", ResolvedInstructionLanguage::En, &[definition]);
+    let direct = stage(
+        "tile three red ellipse width 0.3 height 0.2 at horizontal 0.4 vertical 0.5.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    let generated = plan_verified_stage15(generated.verified_effective_view(), context("wide"));
+    let direct = plan_verified_stage15(direct.verified_effective_view(), context("wide"));
+    let actual = &generated
+        .objects()
+        .unwrap_or_else(|| panic!("{:?}", generated.diagnostics()))[0];
+    let expected = &direct
+        .objects()
+        .unwrap_or_else(|| panic!("{:?}", direct.diagnostics()))[0];
+    assert_eq!(actual.count(), expected.count());
+    assert_eq!(actual.dimensions(), expected.dimensions());
+    assert_eq!(actual.recipe(), expected.recipe());
+    assert!(actual.requires_numeric_must_fit());
+    assert!(matches!(actual.anchor(), ObjectAnchor::GeneratedNumeric(_)));
+    assert_eq!(actual.generated_geometries().len(), 1);
+}
+
+#[test]
 fn repeated_shape_constraints_keep_exact_dimensions_without_materialization() {
     for source in [
         "scatter 4294967295 red equilateral triangle at center.",

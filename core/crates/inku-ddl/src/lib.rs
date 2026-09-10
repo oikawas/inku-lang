@@ -88,9 +88,9 @@ pub use execution_diagnostics::{
     CompilerExecutionOmissionUnit,
 };
 pub use geometry::{
-    GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword, SemanticExactDecimal, SemanticExplicitGeometry,
-    SemanticGeometryValue, SemanticNumericPosition, geometry_resolution_policy_canonical_bytes,
-    geometry_resolution_policy_digest,
+    ExactGeometry, ExactPosition, GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword,
+    SemanticExactDecimal, SemanticExplicitGeometry, SemanticGeometryValue, SemanticNumericPosition,
+    geometry_resolution_policy_canonical_bytes, geometry_resolution_policy_digest,
 };
 
 pub use language::{
@@ -101,9 +101,9 @@ pub use language::{
     resolve_instruction_language_for_ui,
 };
 pub use macro_definition::{
-    ComponentDefinition, Expression, LEGACY_PLUGIN_FORMAT_WARNING, LegacyImportOutcome,
-    LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
-    MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
+    ComponentDefinition, ExactDecimalDimension, Expression, LEGACY_PLUGIN_FORMAT_WARNING,
+    LegacyImportOutcome, LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID,
+    MacroDefinition, MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
     MacroDefinitionValidation, MacroSemanticRefProjection, NumericRange, ParameterSchema,
     SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
     validate_macro_definition_semantic_version,

@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Exact Macro dimensions, coordinates, and NotTouching
+
+MacroDefinition adds the closed `exact_decimal` type. Declared caller dimensions, definition literals, components, locals, and finite choices deliver exact values through the ordinary DDL geometry and position resolver. Legacy `Number(f64)` and existing definition bytes stay unchanged; only new decimal literals normalize equivalent spellings for canonical identity. Radius, diameter, length, side, width/height, chord/sagitta, and X/Y bind uniquely by explicit dimension, retaining source and generated ownership. Count-one Score and repetition plans share numeric range, must-fit, and diagnostic recovery to the smaller overlapping size.
+
+Adjacent bound flat Emits now deliver `not_touching` through the ordinary Medium-gap Score representation. Original Emit order includes unbound Emits, and lost references never retarget to survivors. Connected / Touching use the same adjacency check. This compiler extension remains disconnected from runtime and changes no Renderer, Score wire, public activation version, or deployment. Whole Step10 and runtime / UI / save integration remain incomplete.
+
+---
+
 ### 2026-09-10 — Shared width, moon forms, and size recovery
 
 Ordinary DDL and declared Macros now resolve full/half width and the four moon forms through the shared Score lowerer. Width uses the canvas width before rotation. Crescent renders the saijiki's thin filled cubic outline with shared position, rotation, and bounds. Overlapping sizes retain every original candidate and emit an error with candidate and effective extents, while both Stop and Continue draw the smaller size. Other invalid input still follows its existing failure policy.

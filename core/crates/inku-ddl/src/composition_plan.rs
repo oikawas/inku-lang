@@ -32,6 +32,8 @@ pub struct ResolvedObjectAppearance {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ObjectAnchor {
+    /// Generated exact coordinates; the enclosing plan retains the MacroEmit owner.
+    GeneratedNumeric(crate::geometry::ExactPosition),
     /// Original exact coordinates, basis and provenance, including must-fit authority.
     Numeric(SemanticNumericPosition),
     /// Existing finite named-region resolution; performance chooses the anchor.
@@ -72,6 +74,7 @@ pub enum PlacementRecipe {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectPlacementPlan {
+    pub(crate) generated_geometries: Vec<crate::geometry::ExactGeometry>,
     pub(crate) arc_form: Option<inku_score::ArcForm>,
     pub(crate) proportion_width_extent: Option<crate::SemanticIdentity>,
     pub(crate) additional_relative_scales: Vec<crate::SemanticRelativeScale>,
@@ -102,6 +105,9 @@ pub struct ResolvedLayoutDirection {
 }
 
 impl ObjectPlacementPlan {
+    pub fn generated_geometries(&self) -> &[crate::geometry::ExactGeometry] {
+        &self.generated_geometries
+    }
     pub fn arc_form(&self) -> Option<inku_score::ArcForm> {
         self.arc_form
     }
@@ -164,7 +170,10 @@ impl ObjectPlacementPlan {
         &self.recipe
     }
     pub fn requires_numeric_must_fit(&self) -> bool {
-        matches!(self.anchor, ObjectAnchor::Numeric(_))
+        matches!(
+            self.anchor,
+            ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
+        )
     }
 }
 

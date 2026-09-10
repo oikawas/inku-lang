@@ -24,12 +24,12 @@ Canvasの選択は`inku.canvas-format-registry.v1`が所有するhost optionで�
 - `components`: 定義内だけで再利用するcomponent
 - `body`: 上限を持つdata-onlyのstatement list
 
-Parameter schemaは`number`、`integer`、`boolean`、固定長`list`、`semantic_ref`に
-閉じている。式は型付きのnumber、integer、boolean、list、parameter、local、
+Parameter schemaは`number`、`exact_decimal`、`integer`、`boolean`、固定長`list`、`semantic_ref`に
+閉じている。式は型付きのnumber、exact_decimal、integer、boolean、list、parameter、local、
 semantic-reference形式に閉じている。未知のfield、type、expression、operator、
 semantic referenceは拒否される。
 
-揺らぎは`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`のように宣言できる。Optionalな`dimension`は`amplitude` / `frequency` / `quality`だけで、category=variationだけに許す。省略／Noneは旧category-only matchingとcanonical bytes / digestを保ち、指定した制約はdigestに含む。Parameter名からdimensionを推測しない。
+揺らぎは`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`のように宣言できる。SemanticRefのoptionalな`dimension`は`amplitude` / `frequency` / `quality`だけで、category=variationだけに許す。省略／Noneは旧category-only matchingとcanonical bytes / digestを保ち、指定した制約はdigestに含む。Parameter名からdimensionを推測しない。
 
 Flat Emitのkeysは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality`で、expressionのcategoryは常に`variation`である。対応IDは順に`fine` / `large`、`slowly` / `quickly`、`swaying` / `trembling` / `undulating` / `blurring`。Definition-local `use`も同じ分類を検査し、遅れて決まる実値は実行境界で検査する。通常DDLと同じ写像／不足slotのdefault／対応shapeはSPEC §13.6に従う。
 
@@ -78,20 +78,30 @@ ellipseのaspectも保たれる。`(0.0,0.0)`は左上、`(1.0,1.0)`は右下、
 `(0.5,0.5)`は正確な中央である。
 
 正確なcanonical primitive setは`line`、`circle`、`ellipse`、`triangle`、`square`、
-`polygon`、`arc`、`cloudform`である。Geometryは`inku.geometry-resolution-policy.v1`として
-識別される唯一の`inku-ddl` ownerだけが解決する。Pluginは別のownerや9番目のprimitiveを
+`polygon`、`arc`、`point`、`cloudform`である。Geometryは`inku.geometry-resolution-policy.v1`として
+識別される唯一の`inku-ddl` ownerだけが解決する。Pluginは別のownerや10番目のprimitiveを
 追加できない。正確な個数は、O(count)のallocationまたはmaterializationより前にStep 11の
 pure ceilingを通過するまで、損失のないsymbolic intentとして残る。
+
+## 正確な数値の宣言と配送
+
+正確な十進数は `{"expr":"exact_decimal","value":"0.240"}` のように記す閉じた型で、通常DDLと同じExactDecimalを使う。定義の元表記を保持し、canonical identityでは `0.240` と `0.24` を同じ値に正規化する。既存 `number` / `Number(f64)` の意味・定義bytesは変えず、f64からexact値を復元しない。Literal、宣言parameter、local、component、有限choicesはexact型を保つ。一般算術やexact値のrange / transformへの暗黙変換は追加しない。
+
+Parameterは `{"type":"exact_decimal","dimension":"radius"}` のように宣言する。Optional dimensionは `radius` / `diameter` / `length` / `side` / `width` / `height` / `chord` / `sagitta` / `position_x` / `position_y` に限る。Callerの明示dimensionと値を一意かつ完全に束縛し、parameter名から意味を推測しない。Dimension省略はdimensionを持たない単独数値にだけ一致する。 同じclauseに通常primitiveとexact parameterを持つMacroが混在する場合は、既存の数値owner未対応境界を維持し、曖昧な割当として診断する。別clauseには影響しない。幅と高さ、弦長と矢高、XとYの複合factは全成分が同一呼出しへ束縛された場合だけ移管し、元keywordとdecimalの出典を保持する。
+
+Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitta`、`position_x`+`position_y`は両方が必要で、欠落・型不一致は診断する。数値位置はnamed `place`と別authorityで、両者を黙って上書きしない。寸法・位置は通常DDLと同じresolverへ届き、サイズ重複は診断付きで小さい候補を採る。Definition literalのownerは生成元のEmitであり、架空の原文spanを作らない。Count1/placeのactual Scoreと反復planを扱い、反復個体の生成は後続materializationに残す。
 
 ## 現在の実装状態
 
 Runtime未接続のfinite flat Emit consumerは、明示movement:placeとcircle / ellipse / cloudform /
-square / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と
+square / triangle / polygon / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と
 top / bottom / left_edge / right_edge / top_edge / bottom_edge / cornerを受け入れ、SPEC §18の領域を使う。
 Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"place"}` parameterは同じ経路を通る。
 隅はStage 2がattested meaning / composition seed / 元occurrenceから選び、隅内anchorはRendererが選ぶ。
-Sourceやprovenanceへ座標を挿入せず、未宣言callerの暗黙overlay、位置省略、count反復を追加しない。
+生成した座標を原文出典として挿入せず、未宣言callerの暗黙overlayや位置省略のdefaultを追加しない。
 隣接bound Emitのconnected / touchingは両者がexact centerの場合に限り、noncenter relationを黙って捨てない。
+not_touchingはcurrentがexact centerの場合に、通常DDLと同じMedium gapのScoreへ届く。
+隣接性はunbound Emitを含む元順序で判定し、省略されたfromを他のsurvivorへ付け替えない。
 Stopは新Scoreなし、OmitAndContinueは元ownerと既存の最小省略単位を保ち、integrity不良は両mode停止とする。
 
 共有Rust compiler基盤は、MacroDefinition v1の値をparse、validate、identify、lock、bindし、

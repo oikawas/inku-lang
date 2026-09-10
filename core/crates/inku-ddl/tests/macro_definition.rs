@@ -9,6 +9,48 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
+
+#[test]
+fn exact_decimal_literals_have_normalized_identity_without_retyping_number() {
+    let make = |expression: Value| {
+        MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Exact", "heading":"Mark", "version":"1.0.0",
+        "parameters":{}, "components":{}, "body":[{"op":"emit","binding":null,"fields":{"radius":expression}}]
+    }).to_string()).unwrap()
+    };
+    let first = make(serde_json::json!({"expr":"exact_decimal","value":"0.240"}));
+    let same = make(serde_json::json!({"expr":"exact_decimal","value":"+00.24"}));
+    assert_eq!(first.identity().unwrap(), same.identity().unwrap());
+    assert!(serde_json::to_string(&first).unwrap().contains("0.240"));
+    assert_ne!(
+        first.identity().unwrap(),
+        make(serde_json::json!({"expr":"exact_decimal","value":"0.241"}))
+            .identity()
+            .unwrap()
+    );
+    for value in [
+        "1e-2",
+        "NaN",
+        "1.",
+        "999999999999999999999999999999999999999",
+    ] {
+        assert!(
+            make(serde_json::json!({"expr":"exact_decimal","value":value}))
+                .identity()
+                .is_err()
+        );
+    }
+    assert!(
+        make(serde_json::json!({"expr":"number","value":0.24}))
+            .identity()
+            .is_err()
+    );
+    assert!(
+        make(serde_json::json!({"expr":"integer","value":1}))
+            .identity()
+            .is_err()
+    );
+}
 const STEP10Z_SCORE_PARITY_FIXTURE: &str =
     include_str!("fixtures/step10z-macro-score-parity-v1.json");
 

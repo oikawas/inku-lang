@@ -12,6 +12,43 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/macro-expansion-v1.json");
+
+#[test]
+fn exact_decimal_survives_source_parameter_component_and_choices() {
+    let definition = MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0",
+        "parameters":{"r":{"type":"exact_decimal","dimension":"radius"}},
+        "components":{"mark":{"parameters":{"v":{"type":"exact_decimal"}},"body":[{"op":"emit","binding":null,"fields":{"radius":{"expr":"parameter","name":"v"}}}]}},
+        "body":[{"op":"use","component":"mark","arguments":{"v":{"expr":"parameter","name":"r"}}},
+            {"op":"vary","binding":"size","domain":"size","choices":[{"expr":"exact_decimal","value":"0.20"}],"range":null,"body":[{"op":"emit","binding":null,"fields":{"diameter":{"expr":"local","name":"size"}}}]}]
+    }).to_string()).unwrap();
+    let source = "Exact.Mark radius 0.10";
+    let binding = binding(&definition, source, "en");
+    assert!(binding.diagnostics.is_empty(), "{:?}", binding.diagnostics);
+    let seeds = seeds(&binding, source, 7);
+    let mut invalid_binding = binding.clone();
+    invalid_binding.complete[0].parameters[0].source_fact_clause_index = usize::MAX;
+    let invalid = expand_macros(invalid_binding, &[definition.clone()], &seeds, LIMITS);
+    assert!(invalid.expanded.is_empty());
+    assert!(
+        invalid
+            .diagnostics
+            .iter()
+            .any(|d| d.kind == MacroExpansionDiagnosticKind::BindingOwnershipMismatch)
+    );
+    let result = expand_macros(binding, &[definition], &seeds, LIMITS);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let nodes = &result.expanded[0].nodes;
+    for (node, field, value) in [(&nodes[0], "radius", "0.1"), (&nodes[1], "diameter", "0.2")] {
+        let ExpandedMacroNode::Emit { fields, .. } = node else {
+            panic!("expected Emit")
+        };
+        assert_eq!(
+            fields[field],
+            ExpandedMacroValue::ExactDecimal(inku_ddl::ExactDecimal::parse(value).unwrap())
+        );
+    }
+}
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -933,6 +970,7 @@ fn path_snapshot(path: &[ExpansionPathSegment]) -> String {
 
 fn value_snapshot(value: &ExpandedMacroValue) -> String {
     match value {
+        ExpandedMacroValue::ExactDecimal(value) => value.canonical_spelling(),
         ExpandedMacroValue::Number(value) => value.to_string(),
         ExpandedMacroValue::Integer(value) => value.to_string(),
         ExpandedMacroValue::Boolean(value) => value.to_string(),

@@ -253,6 +253,8 @@ fn project_source_instruction<'a>(
             .as_ref()
             .map(|term| (&term.identity).into()),
         numeric_position: instruction.entity.numeric_position.as_ref(),
+        generated_position: None,
+        generated_geometries: [None; 6],
         has_named_position: instruction.position.is_some(),
         named_position: instruction
             .position
@@ -351,15 +353,15 @@ fn lower_macro_instruction(
         .iter()
         .filter_map(|node| match node {
             ExpandedMacroNode::Emit {
-                binding: Some(binding),
+                binding,
                 provenance,
                 ..
-            } => Some((binding, provenance)),
+            } => Some((binding.as_ref(), provenance)),
             _ => None,
         })
         .collect::<Vec<_>>();
-    let mut connected_by_to = BTreeMap::new();
-    let mut invalid_connected_targets = BTreeSet::new();
+    let mut relation_by_to = BTreeMap::new();
+    let mut invalid_relation_targets = BTreeSet::new();
     for node in &expansion.nodes {
         let ExpandedMacroNode::Relation {
             kind,
@@ -370,21 +372,25 @@ fn lower_macro_instruction(
         else {
             continue;
         };
-        if kind != "connected" && kind != "touching" {
+        if kind != "connected" && kind != "touching" && kind != "not_touching" {
             continue;
         }
-        let from_position = emit_nodes.iter().position(|(binding, _)| *binding == from);
-        let to_position = emit_nodes.iter().position(|(binding, _)| *binding == to);
+        let from_position = emit_nodes
+            .iter()
+            .position(|(binding, _)| binding.is_some_and(|binding| binding == from));
+        let to_position = emit_nodes
+            .iter()
+            .position(|(binding, _)| binding.is_some_and(|binding| binding == to));
         if from_position
             .zip(to_position)
             .is_some_and(|(from, to)| to == from + 1)
-            && connected_by_to
+            && relation_by_to
                 .insert(to.clone(), (from.clone(), kind.as_str()))
                 .is_none()
         {
             continue;
         }
-        invalid_connected_targets.insert(to.clone());
+        invalid_relation_targets.insert(to.clone());
         let reason = ScoreFieldGap::UnsupportedMacroRelation;
         let target_provenance = to_position.map(|position| emit_nodes[position].1);
         diagnostics.push(ScoreLoweringDiagnostic {
@@ -420,7 +426,7 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
-            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected" || kind == "touching")
+            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected" || kind == "touching" || kind == "not_touching")
             {
                 continue;
             }
@@ -445,14 +451,14 @@ fn lower_macro_instruction(
         };
         if binding
             .as_ref()
-            .is_some_and(|binding| invalid_connected_targets.contains(binding))
+            .is_some_and(|binding| invalid_relation_targets.contains(binding))
         {
             continue;
         }
-        let connected_dependency = binding
+        let relation_dependency = binding
             .as_ref()
-            .and_then(|binding| connected_by_to.get(binding));
-        if objects.is_some() && connected_dependency.is_some() {
+            .and_then(|binding| relation_by_to.get(binding));
+        if objects.is_some() && relation_dependency.is_some() {
             let reason = ScoreFieldGap::UnsupportedMacroRelation;
             diagnostics.push(ScoreLoweringDiagnostic {
                 owner: generated_owner(source_instruction_index, provenance, None),
@@ -466,7 +472,7 @@ fn lower_macro_instruction(
             });
             continue;
         }
-        if let Some((dependency, _)) = connected_dependency
+        if let Some((dependency, _)) = relation_dependency
             && !successful_bindings.contains_key(dependency)
         {
             let reason = ScoreFieldGap::UnavailableMacroRelationReference;
@@ -643,57 +649,81 @@ fn lower_macro_instruction(
             });
         }
         if let Some(mut score_instruction) = attempt.instruction {
-            if let Some((dependency, kind)) = connected_dependency {
-                let touching = *kind == "touching";
-                let target_instruction_index = successful_bindings[dependency];
-                let prior_supported =
-                    instructions
-                        .get(target_instruction_index)
-                        .is_some_and(|prior| {
-                            (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-                                && prior.arc_form.is_none())
-                                || (!touching && prior.primitive == Primitive::Point)
+            if let Some((dependency, kind)) = relation_dependency {
+                if *kind == "not_touching" {
+                    if input.effective_focus.is_none() {
+                        let reason = ScoreFieldGap::UnsupportedMacroRelation;
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: generated_owner(source_instruction_index, provenance, None),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                macro_emit_unit(source_instruction_index, provenance),
+                                None,
+                            ),
+                            reason,
                         });
-                let current_supported = matches!(
-                    score_instruction.primitive,
-                    Primitive::Line | Primitive::Arc
-                ) && score_instruction.arc_form.is_none()
-                    || (!touching && score_instruction.primitive == Primitive::Point);
-                if !prior_supported
-                    || !current_supported
-                    || input.effective_focus.is_none()
-                    || !center_bindings.contains(dependency)
-                {
-                    let reason = ScoreFieldGap::UnsupportedMacroRelation;
-                    diagnostics.push(ScoreLoweringDiagnostic {
-                        owner: generated_owner(source_instruction_index, provenance, None),
-                        disposition: diagnostic_disposition(
-                            error_policy,
-                            &reason,
-                            macro_emit_unit(source_instruction_index, provenance),
-                            None,
-                        ),
-                        reason,
+                        continue;
+                    }
+                    score_instruction.relation = Some(Relation {
+                        kind: RelationType::NotTouching,
+                        gap: RelationGap::Medium,
+                        target_instruction_index: None,
+                        position_authority: None,
+                        touching_constraints: None,
                     });
-                    continue;
+                } else {
+                    let touching = *kind == "touching";
+                    let target_instruction_index = successful_bindings[dependency];
+                    let prior_supported =
+                        instructions
+                            .get(target_instruction_index)
+                            .is_some_and(|prior| {
+                                (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+                                    && prior.arc_form.is_none())
+                                    || (!touching && prior.primitive == Primitive::Point)
+                            });
+                    let current_supported = matches!(
+                        score_instruction.primitive,
+                        Primitive::Line | Primitive::Arc
+                    ) && score_instruction.arc_form.is_none()
+                        || (!touching && score_instruction.primitive == Primitive::Point);
+                    if !prior_supported
+                        || !current_supported
+                        || input.effective_focus.is_none()
+                        || !center_bindings.contains(dependency)
+                    {
+                        let reason = ScoreFieldGap::UnsupportedMacroRelation;
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: generated_owner(source_instruction_index, provenance, None),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                macro_emit_unit(source_instruction_index, provenance),
+                                None,
+                            ),
+                            reason,
+                        });
+                        continue;
+                    }
+                    score_instruction.relation = Some(Relation {
+                        kind: if touching {
+                            RelationType::Touching
+                        } else {
+                            RelationType::Connected
+                        },
+                        gap: RelationGap::Medium,
+                        target_instruction_index: Some(target_instruction_index),
+                        position_authority: Some(ConnectedPositionAuthority::NamedMovable),
+                        touching_constraints: touching.then_some(TouchingConstraints {
+                            dimensions_fixed: input.exact_geometry().is_some()
+                                || input.relative_scale.is_some()
+                                || input.proportion_width_extent.is_some(),
+                            direction_fixed: input.angle.is_some()
+                                || input.proportion_arc_form.is_some(),
+                        }),
+                    });
                 }
-                score_instruction.relation = Some(Relation {
-                    kind: if touching {
-                        RelationType::Touching
-                    } else {
-                        RelationType::Connected
-                    },
-                    gap: RelationGap::Medium,
-                    target_instruction_index: Some(target_instruction_index),
-                    position_authority: Some(ConnectedPositionAuthority::NamedMovable),
-                    touching_constraints: touching.then_some(TouchingConstraints {
-                        dimensions_fixed: input.explicit_geometry.is_some()
-                            || input.relative_scale.is_some()
-                            || input.proportion_width_extent.is_some(),
-                        direction_fixed: input.angle.is_some()
-                            || input.proportion_arc_form.is_some(),
-                    }),
-                });
             }
             let score_index = instructions.len();
             instructions.push(score_instruction);
@@ -892,7 +922,17 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 20] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 30] = [
+    "radius",
+    "diameter",
+    "length",
+    "side",
+    "width",
+    "height",
+    "chord",
+    "sagitta",
+    "position_x",
+    "position_y",
     "proportion_width_extent",
     "proportion_arc_form",
     "proportion_aspect",
@@ -964,7 +1004,30 @@ fn project_macro_emit<'a>(
         sides,
     });
     let action = macro_semantic_field(fields, "movement", "movement", true, &mut gaps);
-    let place = macro_semantic_field(fields, "place", "place", true, &mut gaps);
+    let place = macro_semantic_field(
+        fields,
+        "place",
+        "place",
+        !fields.contains_key("position_x") && !fields.contains_key("position_y"),
+        &mut gaps,
+    );
+    use crate::geometry::{ExactGeometry as G, ExactPosition};
+    let radius = macro_exact_field(fields, "radius", &mut gaps);
+    let diameter = macro_exact_field(fields, "diameter", &mut gaps);
+    let length = macro_exact_field(fields, "length", &mut gaps);
+    let side = macro_exact_field(fields, "side", &mut gaps);
+    let size = macro_exact_pair(fields, "width", "height", &mut gaps);
+    let arc = macro_exact_pair(fields, "chord", "sagitta", &mut gaps);
+    let generated_position = macro_exact_pair(fields, "position_x", "position_y", &mut gaps)
+        .map(|(x, y)| ExactPosition { x, y });
+    let generated_geometries = [
+        radius.map(G::Radius),
+        diameter.map(G::Diameter),
+        length.map(G::Length),
+        side.map(G::Side),
+        size.map(|(width, height)| G::WidthHeight { width, height }),
+        arc.map(|(chord, sagitta)| G::ChordSagitta { chord, sagitta }),
+    ];
     let color = (!omitted_appearance.contains(&ScoreAppearanceField::Color))
         .then(|| macro_semantic_field(fields, "color", "color", false, &mut gaps))
         .flatten();
@@ -1085,6 +1148,8 @@ fn project_macro_emit<'a>(
     }
 
     Ok(ScoreLoweringInput {
+        generated_position,
+        generated_geometries,
         proportion_width_extent,
         proportion_arc_form,
         additional_relative_scales: &[],
@@ -1119,6 +1184,44 @@ fn project_macro_emit<'a>(
         fluctuation,
         has_unsupported_meaning: false,
     })
+}
+
+fn macro_exact_field(
+    fields: &BTreeMap<String, ExpandedMacroValue>,
+    key: &str,
+    gaps: &mut Vec<ScoreFieldGap>,
+) -> Option<ExactDecimal> {
+    match fields.get(key) {
+        None => None,
+        Some(ExpandedMacroValue::ExactDecimal(value)) => Some(*value),
+        Some(_) => {
+            gaps.push(ScoreFieldGap::MacroEmitFieldTypeMismatch {
+                key: key.to_owned(),
+            });
+            None
+        }
+    }
+}
+
+fn macro_exact_pair(
+    fields: &BTreeMap<String, ExpandedMacroValue>,
+    first: &str,
+    second: &str,
+    gaps: &mut Vec<ScoreFieldGap>,
+) -> Option<(ExactDecimal, ExactDecimal)> {
+    let a = macro_exact_field(fields, first, gaps);
+    let b = macro_exact_field(fields, second, gaps);
+    if fields.contains_key(first) != fields.contains_key(second) {
+        gaps.push(ScoreFieldGap::MissingMacroEmitField {
+            key: if fields.contains_key(first) {
+                second
+            } else {
+                first
+            }
+            .to_owned(),
+        });
+    }
+    a.zip(b)
 }
 
 fn macro_semantic_field<'a>(
@@ -2325,6 +2428,8 @@ impl<'a> From<&'a SemanticIdentity> for SemanticInputIdentity<'a> {
 
 #[derive(Clone, Copy, Debug)]
 struct ScoreLoweringInput<'a> {
+    generated_position: Option<crate::geometry::ExactPosition>,
+    generated_geometries: [Option<crate::geometry::ExactGeometry>; 6],
     proportion_width_extent: Option<SemanticInputIdentity<'a>>,
     proportion_arc_form: Option<SemanticInputIdentity<'a>>,
     additional_relative_scales: &'a [crate::SemanticRelativeScale],
@@ -2352,6 +2457,19 @@ struct ScoreLoweringInput<'a> {
     layout_direction: Option<SemanticInputIdentity<'a>>,
     fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
     has_unsupported_meaning: bool,
+}
+
+impl ScoreLoweringInput<'_> {
+    fn exact_position(self) -> Option<crate::geometry::ExactPosition> {
+        self.numeric_position
+            .map(Into::into)
+            .or(self.generated_position)
+    }
+    fn exact_geometry(self) -> Option<crate::geometry::ExactGeometry> {
+        self.explicit_geometry
+            .map(Into::into)
+            .or_else(|| self.generated_geometries.into_iter().flatten().next())
+    }
 }
 
 fn lower_complete_instruction(
@@ -2406,7 +2524,7 @@ fn lower_complete_instruction(
     })
 }
 
-struct ResolvedObject<'a> {
+struct ResolvedObject {
     arc_form: Option<inku_score::ArcForm>,
     primitive: Primitive,
     count: u32,
@@ -2415,7 +2533,7 @@ struct ResolvedObject<'a> {
     appearance: ResolvedObjectAppearance,
     rotation: Option<f64>,
     layout_direction: Option<crate::composition_plan::ResolvedLayoutDirection>,
-    placement: ScorePlacement<'a>,
+    placement: ScorePlacement,
 }
 
 fn resolve_object_plan(
@@ -2432,7 +2550,10 @@ fn resolve_object_plan(
             Rational::from_ratio(height.into(), short.into())?,
         ];
         let anchor = match resolved.placement {
-            ScorePlacement::Numeric(position) => ObjectAnchor::Numeric(position.clone()),
+            ScorePlacement::Numeric(position) => input
+                .numeric_position
+                .map(|source| ObjectAnchor::Numeric(source.clone()))
+                .unwrap_or(ObjectAnchor::GeneratedNumeric(position)),
             ScorePlacement::Named(region) => {
                 if resolved.action == PlacementAction::Tile {
                     let bounds = crate::geometry::named_region_rational_bounds(
@@ -2528,7 +2649,10 @@ fn resolve_object_plan(
                     cell_width,
                     cell_height,
                     centroid,
-                    translate_to_numeric_anchor: matches!(anchor, ObjectAnchor::Numeric(_)),
+                    translate_to_numeric_anchor: matches!(
+                        anchor,
+                        ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
+                    ),
                 }
             }
         };
@@ -2556,6 +2680,7 @@ fn resolve_object_plan(
             count_was_omitted: input.count.is_none(),
             dimensions: resolved.dimensions,
             explicit_geometry: input.explicit_geometry.cloned(),
+            generated_geometries: input.generated_geometries.into_iter().flatten().collect(),
             relative_scale: input.relative_scale,
             appearance: resolved.appearance,
             angle: resolved.rotation,
@@ -2606,7 +2731,7 @@ fn resolve_complete_object<'a>(
     input: ScoreLoweringInput<'a>,
     context: ScoreLoweringContext,
     planning: bool,
-) -> Result<ResolvedObject<'a>, Vec<ScoreFieldGap>> {
+) -> Result<ResolvedObject, Vec<ScoreFieldGap>> {
     let mut gaps = Vec::new();
     let layout_direction = input.layout_direction.and_then(|direction| {
         let axis = (planning
@@ -2830,7 +2955,7 @@ fn resolve_complete_object<'a>(
             PlacementAction::Place
         }
     };
-    let named_focus = if input.has_named_position && input.numeric_position.is_some() {
+    let named_focus = if input.has_named_position && input.exact_position().is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
     } else if input.has_named_position {
@@ -2850,13 +2975,13 @@ fn resolve_complete_object<'a>(
             gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
             None
         }
-    } else if input.numeric_position.is_none() {
+    } else if input.exact_position().is_none() {
         gaps.push(ScoreFieldGap::MissingNumericPosition);
         None
     } else {
         None
     };
-    if input.explicit_geometry.is_none()
+    if input.exact_geometry().is_none()
         && !matches!(
             primitive,
             Primitive::Line
@@ -2919,7 +3044,7 @@ fn resolve_complete_object<'a>(
         return Err(gaps);
     }
 
-    let placement = match (input.numeric_position, named_focus) {
+    let placement = match (input.exact_position(), named_focus) {
         (Some(position), None) => ScorePlacement::Numeric(position),
         (None, Some(focus)) => ScorePlacement::Named(focus),
         _ => unreachable!("checked position authority"),
@@ -2927,8 +3052,8 @@ fn resolve_complete_object<'a>(
     let (dimensions, _) =
         resolve_size_candidates(input, context, primitive).map_err(|gap| vec![gap])?;
     if let ScorePlacement::Numeric(position) = placement {
-        let x = Rational::from_decimal(position.x.decimal.value).map_err(|gap| vec![gap])?;
-        let y = Rational::from_decimal(position.y.decimal.value).map_err(|gap| vec![gap])?;
+        let x = Rational::from_decimal(position.x).map_err(|gap| vec![gap])?;
+        let y = Rational::from_decimal(position.y).map_err(|gap| vec![gap])?;
         if !x.in_unit_interval() || !y.in_unit_interval() {
             return Err(vec![ScoreFieldGap::PositionOutOfRange]);
         }
@@ -3067,8 +3192,8 @@ struct LoweredGeometry {
 }
 
 #[derive(Clone, Copy)]
-enum ScorePlacement<'a> {
-    Numeric(&'a crate::SemanticNumericPosition),
+enum ScorePlacement {
+    Numeric(crate::geometry::ExactPosition),
     Named([f64; 4]),
 }
 
@@ -3185,7 +3310,7 @@ fn resolve_size_candidates(
     context: ScoreLoweringContext,
     primitive: Primitive,
 ) -> Result<(ResolvedGeometryDimensions, Vec<Rational>), ScoreFieldGap> {
-    let resolve = |geometry: Option<&SemanticExplicitGeometry>,
+    let resolve = |geometry: Option<crate::geometry::ExactGeometry>,
                    scale: Option<CoreModifierValue>|
      -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
         if let Some(form) = input.proportion_arc_form {
@@ -3209,9 +3334,9 @@ fn resolve_size_candidates(
                                 .ok_or(ScoreFieldGap::ShapeConstraintMismatch { primitive })?;
                         normal.mul_ratio(n, d)?
                     }
-                    Some(SemanticExplicitGeometry::WidthHeight { width, height }) => {
-                        let width = positive(width.decimal.value)?;
-                        let height = positive(height.decimal.value)?;
+                    Some(crate::geometry::ExactGeometry::WidthHeight { width, height }) => {
+                        let width = positive(width)?;
+                        let height = positive(height)?;
                         if (width.div(height)?.to_f64()?
                             - inku_score::crescent_reference_aspect_ratio())
                         .abs()
@@ -3261,12 +3386,14 @@ fn resolve_size_candidates(
         )
     };
     // Every size is an independent proposal. Relative size is never applied to an explicit size.
-    let base = resolve(input.explicit_geometry, None)?;
+    let base = resolve(input.exact_geometry(), None)?;
     let mut candidates = Vec::new();
     for geometry in input
         .explicit_geometry
         .into_iter()
         .chain(input.additional_explicit_geometries.iter())
+        .map(crate::geometry::ExactGeometry::from)
+        .chain(input.generated_geometries.into_iter().flatten())
     {
         candidates.push(reference_extent(resolve(Some(geometry), None)?)?);
     }
@@ -3326,7 +3453,7 @@ fn size_recovery_diagnostic(
 
 fn resolve_shape_dimensions(
     primitive: Primitive,
-    geometry: Option<&SemanticExplicitGeometry>,
+    geometry: Option<crate::geometry::ExactGeometry>,
     scale: Option<CoreModifierValue>,
     constraint: Option<crate::ShapeConstraint>,
     aspect: Option<SemanticInputIdentity<'_>>,
@@ -3366,9 +3493,9 @@ fn resolve_shape_dimensions(
         }
         let radius = match geometry {
             None => normal()?.div_i128(2)?,
-            Some(SemanticExplicitGeometry::Radius(value)) => positive(value.decimal.value)?,
-            Some(SemanticExplicitGeometry::Diameter(value)) => {
-                positive(value.decimal.value)?.div_i128(2)?
+            Some(crate::geometry::ExactGeometry::Radius(value)) => positive(value)?,
+            Some(crate::geometry::ExactGeometry::Diameter(value)) => {
+                positive(value)?.div_i128(2)?
             }
             _ => return Err(invalid()),
         };
@@ -3380,19 +3507,18 @@ fn resolve_shape_dimensions(
     if primitive == Primitive::Triangle && constraint.regular {
         let side = match geometry {
             None => normal()?,
-            Some(SemanticExplicitGeometry::Side(value)) => positive(value.decimal.value)?,
+            Some(crate::geometry::ExactGeometry::Side(value)) => positive(value)?,
             _ => return Err(invalid()),
         };
         return Ok(ResolvedGeometryDimensions::RegularTriangle { side });
     }
     if matches!(primitive, Primitive::Triangle | Primitive::Square) || aspect.is_some() {
         let (width, height) = match geometry {
-            Some(SemanticExplicitGeometry::WidthHeight { width, height }) => (
-                positive(width.decimal.value)?,
-                positive(height.decimal.value)?,
-            ),
-            Some(SemanticExplicitGeometry::Side(value)) if primitive == Primitive::Square => {
-                let side = positive(value.decimal.value)?;
+            Some(crate::geometry::ExactGeometry::WidthHeight { width, height }) => {
+                (positive(width)?, positive(height)?)
+            }
+            Some(crate::geometry::ExactGeometry::Side(value)) if primitive == Primitive::Square => {
+                let side = positive(value)?;
                 (side, side)
             }
             None => {
@@ -3432,7 +3558,7 @@ fn resolve_shape_dimensions(
 
 fn resolve_geometry_dimensions(
     primitive: Primitive,
-    geometry: Option<&SemanticExplicitGeometry>,
+    geometry: Option<crate::geometry::ExactGeometry>,
     relative_scale: Option<CoreModifierValue>,
 ) -> Result<ResolvedGeometryDimensions, ScoreFieldGap> {
     let Some(geometry) = geometry else {
@@ -3443,17 +3569,17 @@ fn resolve_geometry_dimensions(
     };
 
     match (primitive, geometry) {
-        (Primitive::Line, SemanticExplicitGeometry::Length(value)) => {
+        (Primitive::Line, crate::geometry::ExactGeometry::Length(value)) => {
             Ok(ResolvedGeometryDimensions::Line {
-                length: positive(value.decimal.value)?,
+                length: positive(value)?,
             })
         }
-        (Primitive::Circle, SemanticExplicitGeometry::Radius(value))
-        | (Primitive::Circle, SemanticExplicitGeometry::Diameter(value))
-        | (Primitive::Point, SemanticExplicitGeometry::Radius(value))
-        | (Primitive::Point, SemanticExplicitGeometry::Diameter(value)) => {
-            let mut radius = positive(value.decimal.value)?;
-            if matches!(geometry, SemanticExplicitGeometry::Diameter(_)) {
+        (Primitive::Circle, crate::geometry::ExactGeometry::Radius(value))
+        | (Primitive::Circle, crate::geometry::ExactGeometry::Diameter(value))
+        | (Primitive::Point, crate::geometry::ExactGeometry::Radius(value))
+        | (Primitive::Point, crate::geometry::ExactGeometry::Diameter(value)) => {
+            let mut radius = positive(value)?;
+            if matches!(geometry, crate::geometry::ExactGeometry::Diameter(_)) {
                 radius = radius.div_i128(2)?;
             }
             Ok(if primitive == Primitive::Point {
@@ -3462,9 +3588,9 @@ fn resolve_geometry_dimensions(
                 ResolvedGeometryDimensions::Circle { radius }
             })
         }
-        (Primitive::Arc, SemanticExplicitGeometry::ChordSagitta { chord, sagitta }) => {
-            let chord = positive(chord.decimal.value)?;
-            let sagitta = positive(sagitta.decimal.value)?;
+        (Primitive::Arc, crate::geometry::ExactGeometry::ChordSagitta { chord, sagitta }) => {
+            let chord = positive(chord)?;
+            let sagitta = positive(sagitta)?;
             if !sagitta.le(chord.div_i128(2)?)? {
                 return Err(ScoreFieldGap::GeometryDimensionMismatch { primitive });
             }
@@ -3472,14 +3598,14 @@ fn resolve_geometry_dimensions(
         }
         (
             Primitive::Ellipse | Primitive::Cloudform,
-            SemanticExplicitGeometry::WidthHeight { width, height },
+            crate::geometry::ExactGeometry::WidthHeight { width, height },
         ) => Ok(ResolvedGeometryDimensions::CenteredSize {
-            width: positive(width.decimal.value)?,
-            height: positive(height.decimal.value)?,
+            width: positive(width)?,
+            height: positive(height)?,
         }),
-        (Primitive::Square, SemanticExplicitGeometry::Side(value)) => {
+        (Primitive::Square, crate::geometry::ExactGeometry::Side(value)) => {
             Ok(ResolvedGeometryDimensions::Square {
-                side: positive(value.decimal.value)?,
+                side: positive(value)?,
             })
         }
         (
@@ -3535,12 +3661,12 @@ fn resolve_normal_dimensions(
 fn lower_numeric_geometry(
     primitive: Primitive,
     dimensions: ResolvedGeometryDimensions,
-    position: &crate::SemanticNumericPosition,
+    position: crate::geometry::ExactPosition,
     canvas: CanvasFormat,
     rotation: Option<f64>,
 ) -> Result<LoweredGeometry, ScoreFieldGap> {
-    let x = Rational::from_decimal(position.x.decimal.value)?;
-    let y = Rational::from_decimal(position.y.decimal.value)?;
+    let x = Rational::from_decimal(position.x)?;
+    let y = Rational::from_decimal(position.y)?;
     if !x.in_unit_interval() || !y.in_unit_interval() {
         return Err(ScoreFieldGap::PositionOutOfRange);
     }

@@ -85,6 +85,24 @@ impl ExactDecimal {
         self.coefficient
     }
 
+    /// The unique non-exponent spelling used by exact macro literals.
+    pub fn canonical_spelling(self) -> String {
+        let negative = self.coefficient < 0;
+        let mut digits = self.coefficient.unsigned_abs().to_string();
+        if self.scale > 0 {
+            let scale = self.scale as usize;
+            if digits.len() <= scale {
+                digits = format!("{}{}", "0".repeat(scale + 1 - digits.len()), digits);
+            }
+            digits.insert(digits.len() - scale, '.');
+        }
+        if negative {
+            format!("-{digits}")
+        } else {
+            digits
+        }
+    }
+
     pub const fn scale(self) -> u32 {
         self.scale
     }

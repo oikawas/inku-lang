@@ -177,6 +177,7 @@ pub struct SemanticRelativeScale {
 /// Canonical value of one source-owned macro parameter.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SemanticMacroParameterValue {
+    ExactDecimal(crate::ExactDecimal),
     Integer(i64),
     Number(f64),
     SemanticRef(SemanticIdentity),
@@ -584,7 +585,7 @@ impl SemanticAssociationResult {
                     .complete
                     .iter()
                     .flat_map(|complete| &complete.parameters)
-                    .any(|parameter| parameter.source_span == span)
+                    .any(|parameter| parameter.owns_span(span))
             })
     }
 }
@@ -1106,8 +1107,33 @@ fn build_semantic_entities(
                 .map(ClauseAtom::span)
                 .unwrap_or(clause.span),
         );
-        let geometry_analysis =
+        let mut geometry_analysis =
             analyze_clause_geometry(document, clause, clause_index, region_index);
+        if let Some(binding) = &macro_parameter_binding {
+            let consumed = |value: &crate::SemanticGeometryValue| {
+                macro_parameter_binding_owns_span(binding, value.decimal.provenance.span)
+            };
+            geometry_analysis
+                .geometries
+                .retain(|geometry| match geometry {
+                    SemanticExplicitGeometry::Radius(value)
+                    | SemanticExplicitGeometry::Diameter(value)
+                    | SemanticExplicitGeometry::Length(value)
+                    | SemanticExplicitGeometry::Side(value) => !consumed(value),
+                    SemanticExplicitGeometry::WidthHeight { width, height } => {
+                        !(consumed(width) && consumed(height))
+                    }
+                    SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => {
+                        !(consumed(chord) && consumed(sagitta))
+                    }
+                });
+            geometry_analysis
+                .positions
+                .retain(|position| !(consumed(&position.x) && consumed(&position.y)));
+            geometry_analysis
+                .issues
+                .retain(|issue| !macro_parameter_binding_owns_span(binding, issue.span));
+        }
         let consumed_geometry_numbers = geometry_analysis.consumed_numeric_spans.clone();
         owned_occurrence_count += geometry_analysis.geometries.len();
         owned_occurrence_count += geometry_analysis.positions.len();
@@ -1482,7 +1508,7 @@ fn macro_parameter_binding_owns_span(
         .complete
         .iter()
         .flat_map(|complete| &complete.parameters)
-        .any(|parameter| parameter.source_span == span)
+        .any(|parameter| parameter.owns_span(span))
 }
 
 fn macro_invocation_owns_span(binding: &MacroParameterBindingResult, span: SourceSpan) -> bool {
@@ -1627,6 +1653,7 @@ fn semantic_macro_parameter(
     let value = semantic_macro_parameter_value_from_bound(&parameter.value);
     let (source_asset_id, canonical_surface_ja) = match &parameter.value {
         BoundMacroParameterValue::Integer { .. }
+        | BoundMacroParameterValue::ExactDecimal { .. }
         | BoundMacroParameterValue::Number { .. }
         | BoundMacroParameterValue::CoreModifier { .. } => (None, None),
         BoundMacroParameterValue::SemanticRef {
@@ -1658,6 +1685,9 @@ fn semantic_macro_parameter_value_from_bound(
     value: &BoundMacroParameterValue,
 ) -> SemanticMacroParameterValue {
     match value {
+        BoundMacroParameterValue::ExactDecimal { value, .. } => {
+            SemanticMacroParameterValue::ExactDecimal(*value)
+        }
         BoundMacroParameterValue::CoreModifier { value, .. } => {
             SemanticMacroParameterValue::SemanticRef(SemanticIdentity {
                 category: value.dimension().as_str().to_owned(),
@@ -3006,6 +3036,7 @@ fn semantic_macro_parameter_value(parameter: &SemanticMacroParameterBinding) -> 
     record.insert(
         "value".to_owned(),
         match &parameter.value {
+            SemanticMacroParameterValue::ExactDecimal(value) => semantic_decimal_value(*value),
             SemanticMacroParameterValue::Integer(value) => Value::Number(Number::from(*value)),
             SemanticMacroParameterValue::Number(value) => Value::Number(
                 Number::from_f64(*value).expect("accepted macro Number binding is finite"),

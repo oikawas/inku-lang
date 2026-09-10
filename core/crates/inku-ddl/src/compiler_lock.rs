@@ -1697,6 +1697,9 @@ fn term_key(term: &SemanticTerm) -> String {
 
 fn semantic_macro_parameter_value_key(value: &SemanticMacroParameterValue) -> String {
     match value {
+        SemanticMacroParameterValue::ExactDecimal(value) => {
+            format!("exact_decimal:{}:{}", value.coefficient(), value.scale())
+        }
         SemanticMacroParameterValue::Integer(value) => format!("integer:{value}"),
         SemanticMacroParameterValue::Number(value) => {
             format!("number:{}", compact_json(&finite_number(*value)))
@@ -3303,6 +3306,14 @@ fn node_value(
 fn expanded_value(value: &ExpandedMacroValue) -> Value {
     let mut record = BTreeMap::new();
     match value {
+        ExpandedMacroValue::ExactDecimal(value) => {
+            record.insert("kind".to_owned(), Value::String("exact_decimal".to_owned()));
+            record.insert(
+                "coefficient".to_owned(),
+                Value::String(value.coefficient().to_string()),
+            );
+            record.insert("scale".to_owned(), Value::from(value.scale()));
+        }
         ExpandedMacroValue::Number(value) => {
             record.insert("kind".to_owned(), Value::String("number".to_owned()));
             record.insert("value".to_owned(), finite_number(*value));

@@ -23,6 +23,113 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn exact_decimal_macro_geometry_and_coordinates_share_direct_score_and_recovery() {
+    use serde_json::json;
+    for (shape, dimensions, direct) in [
+        ("circle", vec![("radius", "0.1")], "radius 0.1"),
+        ("point", vec![("diameter", "0.012")], "diameter 0.012"),
+        ("line", vec![("length", "0.2")], "length 0.2"),
+        ("square", vec![("side", "0.2")], "side length 0.2"),
+        (
+            "ellipse",
+            vec![("width", "0.3"), ("height", "0.2")],
+            "width 0.3 height 0.2",
+        ),
+        (
+            "arc",
+            vec![("chord", "0.2"), ("sagitta", "0.05")],
+            "chord 0.2 sagitta 0.05",
+        ),
+        (
+            "circle",
+            vec![("radius", "0.2"), ("diameter", "0.1")],
+            "radius 0.2 diameter 0.1",
+        ),
+    ] {
+        let mut fields = json!({"shape":{"expr":"semantic_ref","category":"shape","id":shape},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"position_x":{"expr":"exact_decimal","value":"0.5"},"position_y":{"expr":"exact_decimal","value":"0.5"}});
+        for (key, value) in dimensions {
+            fields[key] = json!({"expr":"exact_decimal","value":value});
+        }
+        let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":fields}]}).to_string()).unwrap();
+        let actual = execute_locked("Exact.Mark", &[definition], LIMITS, ScoreErrorPolicy::Stop);
+        let expected = execute(
+            &format!("place one red {shape} {direct} at horizontal 0.5 vertical 0.5."),
+            &[],
+            LIMITS,
+            ScoreErrorPolicy::Stop,
+        );
+        assert!(
+            actual.score().is_some(),
+            "{shape}: {:?} {:?}",
+            actual.upstream_diagnostics(),
+            actual.downstream_diagnostics()
+        );
+        assert!(
+            expected.score().is_some(),
+            "{shape}: {:?} {:?}",
+            expected.upstream_diagnostics(),
+            expected.downstream_diagnostics()
+        );
+        assert_eq!(actual.score(), expected.score(), "{shape}: {direct}");
+        assert_eq!(
+            actual.downstream_diagnostics().len(),
+            expected.downstream_diagnostics().len()
+        );
+        assert!(matches!(
+            actual.instruction_origins()[0],
+            ScoreInstructionOrigin::MacroEmit { .. }
+        ));
+    }
+}
+
+#[test]
+fn exact_decimal_declared_caller_geometry_is_consumed_once_and_numeric_place_conflicts() {
+    use serde_json::json;
+    let mut data = json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0",
+        "parameters":{"r":{"type":"exact_decimal","dimension":"radius"},"y":{"type":"exact_decimal","dimension":"position_x"},"x":{"type":"exact_decimal","dimension":"position_y"}},"components":{},
+        "body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"radius":{"expr":"parameter","name":"r"},"position_x":{"expr":"parameter","name":"y"},"position_y":{"expr":"parameter","name":"x"}}}]});
+    let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
+    let result = execute_locked(
+        "Exact.Mark radius 0.10 horizontal 0.3 vertical 0.7",
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert!(
+        result.score().is_some(),
+        "{:?} {:?}",
+        result.upstream_diagnostics(),
+        result.downstream_diagnostics()
+    );
+    let expected = execute(
+        "place one red circle radius 0.1 at horizontal 0.3 vertical 0.7.",
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(result.score(), expected.score());
+    data["body"][0]["fields"]["place"] =
+        json!({"expr":"semantic_ref","category":"place","id":"center"});
+    let definition = MacroDefinition::from_json(&data.to_string()).unwrap();
+    let conflict = execute_locked(
+        "Exact.Mark radius 0.1 horizontal 0.3 vertical 0.7",
+        &[definition],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    assert!(conflict.score().is_none());
+    assert!(
+        conflict
+            .downstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                diagnostic.reason,
+                ScoreFieldGap::NamedAndNumericPositionConflict
+            ))
+    );
+}
+
+#[test]
 fn touching_full_literal_reaches_actual_score() {
     let result = execute(
         "place one red line at center. place one blue arc at center touching the previous line.",
@@ -1003,6 +1110,123 @@ fn connected_full_literals_are_bilingual_and_macro_uses_the_same_score_consumer(
             ScoreInstructionOrigin::MacroEmit { .. }
         ]
     ));
+}
+
+#[test]
+fn not_touching_full_literal_and_macro_use_the_same_score_consumer() {
+    let ordinary = execute_language(
+        concat!(
+            "place one red circle at center. ",
+            "place one blue square at center not touching the previous shape."
+        ),
+        ResolvedInstructionLanguage::En,
+        &[],
+        ScoreErrorPolicy::Stop,
+    );
+    let definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"Separate","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
+    );
+    let macro_result = execute_locked(
+        "Path.Separate",
+        std::slice::from_ref(&definition),
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+
+    assert_eq!(ordinary.outcome(), ScoreLoweringOutcome::Complete);
+    assert_eq!(macro_result.outcome(), ScoreLoweringOutcome::Complete);
+    let mut ordinary_effective = ordinary.score().unwrap().clone();
+    let mut macro_effective = macro_result.score().unwrap().clone();
+    for instruction in ordinary_effective
+        .instructions
+        .iter_mut()
+        .chain(&mut macro_effective.instructions)
+    {
+        instruction.at = None;
+    }
+    assert_eq!(macro_effective, ordinary_effective);
+    assert_eq!(
+        macro_result.score().unwrap().instructions[1]
+            .relation
+            .as_ref()
+            .unwrap()
+            .kind,
+        RelationType::NotTouching
+    );
+}
+
+#[test]
+fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
+    let unbound_between = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"UnboundBetween","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
+    );
+    let continued = execute_locked(
+        "Path.UnboundBetween",
+        std::slice::from_ref(&unbound_between),
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        continued.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{continued:?}"
+    );
+    assert_eq!(continued.score().unwrap().instructions.len(), 2);
+    assert!(
+        continued
+            .score()
+            .unwrap()
+            .instructions
+            .iter()
+            .all(|instruction| instruction.relation.is_none())
+    );
+    assert!(continued.downstream_diagnostics().iter().any(|diagnostic| {
+        matches!(
+            (&diagnostic.reason, &diagnostic.disposition),
+            (
+                ScoreFieldGap::UnsupportedMacroRelation,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::MacroEmit {
+                        generated_ordinal: 2,
+                        ..
+                    },
+                    ..
+                }
+            )
+        )
+    }));
+
+    let omitted_predecessor = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"OmittedPredecessor","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"emit","binding":"first","fields":{"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"second","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"relation","kind":"not_touching","from":"first","to":"second"}]}"#,
+    );
+    let missing = execute_locked(
+        "Path.OmittedPredecessor",
+        std::slice::from_ref(&omitted_predecessor),
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        missing.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{missing:?}"
+    );
+    assert_eq!(missing.score().unwrap().instructions.len(), 1);
+    assert!(missing.score().unwrap().instructions[0].relation.is_none());
+    assert!(missing.downstream_diagnostics().iter().any(|diagnostic| {
+        matches!(
+            (&diagnostic.reason, &diagnostic.disposition),
+            (
+                ScoreFieldGap::UnavailableMacroRelationReference,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::MacroEmit {
+                        generated_ordinal: 2,
+                        ..
+                    },
+                    ..
+                }
+            )
+        )
+    }));
 }
 
 #[test]

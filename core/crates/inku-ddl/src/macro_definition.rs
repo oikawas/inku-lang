@@ -159,6 +159,10 @@ where
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ParameterSchema {
     Number,
+    ExactDecimal {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dimension: Option<ExactDecimalDimension>,
+    },
     Integer,
     Boolean,
     List {
@@ -177,12 +181,63 @@ pub enum ParameterSchema {
 #[serde(tag = "expr", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Expression {
     Number { value: f64 },
+    ExactDecimal { value: String },
     Integer { value: i64 },
     Boolean { value: bool },
     List { items: Vec<Expression> },
     Parameter { name: String },
     Local { name: String },
     SemanticRef { category: String, id: String },
+}
+
+/// Explicit source roles for exact numeric arguments; parameter names have no meaning.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExactDecimalDimension {
+    Radius,
+    Diameter,
+    Length,
+    Side,
+    Width,
+    Height,
+    Chord,
+    Sagitta,
+    PositionX,
+    PositionY,
+}
+
+impl ExactDecimalDimension {
+    pub(crate) fn from_field(field: &str) -> Option<Self> {
+        Some(match field {
+            "radius" => Self::Radius,
+            "diameter" => Self::Diameter,
+            "length" => Self::Length,
+            "side" => Self::Side,
+            "width" => Self::Width,
+            "height" => Self::Height,
+            "chord" => Self::Chord,
+            "sagitta" => Self::Sagitta,
+            "position_x" => Self::PositionX,
+            "position_y" => Self::PositionY,
+            _ => return None,
+        })
+    }
+    pub(crate) fn from_keyword(keyword: crate::GeometryKeyword) -> Option<Self> {
+        use crate::GeometryKeyword as K;
+        Some(match keyword {
+            K::Radius => Self::Radius,
+            K::Diameter => Self::Diameter,
+            K::Length => Self::Length,
+            K::Side => Self::Side,
+            K::Width => Self::Width,
+            K::Height => Self::Height,
+            K::Chord => Self::Chord,
+            K::Sagitta => Self::Sagitta,
+            K::AxisX => Self::PositionX,
+            K::AxisY => Self::PositionY,
+            _ => return None,
+        })
+    }
 }
 
 /// A finite numeric choice domain for deterministic `vary`.
@@ -662,6 +717,11 @@ fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
 
 fn normalize_expression_semantic_aliases(expression: &mut Expression) {
     match expression {
+        Expression::ExactDecimal { value } => {
+            *value = crate::ExactDecimal::parse(value)
+                .expect("validated exact decimal")
+                .canonical_spelling();
+        }
         Expression::List { items } => {
             for item in items {
                 normalize_expression_semantic_aliases(item);
@@ -682,6 +742,7 @@ fn normalize_expression_semantic_aliases(expression: &mut Expression) {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ValueKind {
     Number,
+    ExactDecimal,
     Integer,
     Boolean,
     List,
@@ -740,7 +801,10 @@ fn validate_parameter_schema(
                 push_diagnostic(diagnostics, "unknown_semantic_category", path);
             }
         }
-        ParameterSchema::Number | ParameterSchema::Integer | ParameterSchema::Boolean => {}
+        ParameterSchema::Number
+        | ParameterSchema::ExactDecimal { .. }
+        | ParameterSchema::Integer
+        | ParameterSchema::Boolean => {}
     }
 }
 
@@ -754,6 +818,7 @@ fn parameter_types(parameters: &SemanticMap<ParameterSchema>) -> BTreeMap<String
 fn parameter_kind(schema: &ParameterSchema) -> ValueKind {
     match schema {
         ParameterSchema::Number => ValueKind::Number,
+        ParameterSchema::ExactDecimal { .. } => ValueKind::ExactDecimal,
         ParameterSchema::Integer => ValueKind::Integer,
         ParameterSchema::Boolean => ValueKind::Boolean,
         ParameterSchema::List { .. } => ValueKind::List,
@@ -805,6 +870,26 @@ fn validate_body(
             Statement::Emit { fields, .. } => {
                 for (field, expression) in fields.iter() {
                     let expression_path = format!("{statement_path}.fields.{field}");
+                    if ExactDecimalDimension::from_field(field).is_some() {
+                        let kind = validate_expression(
+                            expression,
+                            &expression_path,
+                            parameters,
+                            locals,
+                            diagnostics,
+                        );
+                        if !matches!(
+                            kind,
+                            Some(ValueKind::ExactDecimal) | Some(ValueKind::Unknown)
+                        ) {
+                            push_diagnostic(
+                                diagnostics,
+                                "geometry_field_requires_exact_decimal",
+                                &expression_path,
+                            );
+                        }
+                        continue;
+                    }
                     if field == "count" || field == "sides" {
                         let kind = validate_expression(
                             expression,
@@ -1173,6 +1258,12 @@ fn validate_expression(
     diagnostics: &mut Vec<MacroDefinitionDiagnostic>,
 ) -> Option<ValueKind> {
     match expression {
+        Expression::ExactDecimal { value } => {
+            if let Err(error) = crate::ExactDecimal::parse(value) {
+                push_diagnostic(diagnostics, error.code(), path);
+            }
+            Some(ValueKind::ExactDecimal)
+        }
         Expression::Number { value } => {
             if !value.is_finite() {
                 push_diagnostic(diagnostics, "non_finite_number", path);

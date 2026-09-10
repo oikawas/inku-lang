@@ -115,6 +115,10 @@ Each version of a deterministic layer has a reference corpus made from fixed inp
 
 SVG fractional values follow the master grid defined by `MASTER_GRID_DECIMALS` and retain six fixed decimal places. The application has no mechanism to choose an old engine for replay: replay uses the latest engine, while a past edition is reproduced by returning its saved SVG. The version history retains the historical rationale and measurements.
 
+A recorded engine version is provenance, not an input to replay. The UI reports when it differs from the current version. Reinterpreting DDL also uses the latest implementation and creates a new edition. Saved SVG, Score, seed, and edition ID remain intact.
+
+PNG is derived from the canonical SVG. Reducing its size must not silently omit material or ground filters. Do not use `cairosvg`, which omits `feTurbulence`, `feDisplacementMap`, and `feGaussianBlur`; if the required rasterizer is unavailable, stop rather than fall back to a degraded PNG. Server and CLI use the resvg path in `shared/src/inku_analysis/rasterizer.py`; Android uses the shared native raster API in §12.14. This collects the PNG rule retained in the history and the current host connections without changing rendering semantics or execution paths.
+
 DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
 should express such ideas through visible choices: number, placement, material,
 line behavior, color, weight, and negative space.
@@ -509,9 +513,7 @@ declares it), **48%** at 19, **83%** at 22 and **89%** at the tail (25 distinct 
 Stage 1 output, the same Stage 2 prompt, `nvidia:google/gemma-4-31b-it`, counted over the 21 that
 completed all five groups). **The head scoring 0% rules out "sitting next to a related word is what
 hurts": the further back a field sits, the more often it is filled.** Field declaration order is
-therefore part of the specification, not a matter of readability. The rule for raising the version
-when that order changes lives under "When the version goes up" in the
-[render engine version history](docs/spec/render-engine-history.md).
+therefore part of the specification, not a matter of readability. The rule for raising the version when that order changes is in §2.1.
 
 **`thinness` moved to sit immediately before `surface` in v2.9.33, giving the tail back to `surface`.**
 
@@ -1717,7 +1719,7 @@ Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). St
 - **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
 - **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
 
-This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance. (The table of layers is in the [render engine version history](docs/spec/render-engine-history.md).)
+This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance. (Layer responsibilities are in §12, and version rules are in §2.1.)
 
 ### 13.5 Weight Decides the Quality of Sway
 
@@ -2530,8 +2532,7 @@ LiteRT-LM (Gemma 4 E2B / E4B)
 - a port that follows the server as canonical, tracking the render engine
   version by version (the current state is in `android/ANDROID_SPEC.ja.md`)
 - kept as the "it runs on a local LLM too" point of difference
-- its versioning is independent, in `android/VERSION`, with its own acceptance
-  cycle
+- the Android application version is maintained independently in `android/VERSION`
 
 ### 15.2 Where Completed Phases Live
 
@@ -2541,15 +2542,11 @@ archive](docs/history/changelog-v0.1-v1.71.md).
 
 ### 15.3 Current Development Boundary
 
-Current implementation status lives in [Implementation
-Status](docs/spec/implementation-status.md), and rendering-engine evolution in
-the version history below. This section defines no new implementation phase.
+Current implementation status lives in [Implementation Status](docs/spec/implementation-status.md). New render engine changes belong in [CHANGELOG.md](CHANGELOG.md), and existing version records remain in the history below. This section defines no new implementation phase.
 
 **The per-version engine record moved to the
 [render engine history](docs/spec/render-engine-history.md) on 2026-07-28.**
-Distribution, the deterministic layers, versions and identity IDs, the reference
-corpora, the rule that the engine does not go backward, the handling of PNG, and
-what each version changed are canonical there.
+The version history preserves past records. Current version, identity, reference-corpus, preservation, and PNG rules are in §2.1; new changes belong in [CHANGELOG.md](CHANGELOG.md).
 
 ## 16. Licensing
 
@@ -2569,8 +2566,7 @@ the reference implementation as one concrete path.
 The public specification contains neither an open-items list nor operational
 procedures. [Implementation status](docs/spec/implementation-status.md) is the
 authority for implemented scope, [CHANGELOG.md](CHANGELOG.md) for design and
-implementation history, and the [version history](docs/spec/render-engine-history.md)
-for evolution of the rendering layer.
+implementation history, and the [version history](docs/spec/render-engine-history.md) for existing render-layer version records.
 
 
 ---
@@ -3323,7 +3319,7 @@ there. Git is used for source history, not as a file exchange mechanism with the
 local server.
 
 **The record of each engine version moved to the [render engine history](docs/spec/render-engine-history.md) on 2026-07-28.**
-Release distribution, deterministic layers, versions and identity IDs, the reference corpus, the engine not going backwards, how a PNG is treated, and what each version changed are canonical there.
+The version history preserves past records. Current version, identity, reference-corpus, preservation, and PNG rules are in §2.1; new changes belong in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

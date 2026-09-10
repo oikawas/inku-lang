@@ -15,6 +15,12 @@
 
 ---
 
+### 2026-09-10 — 現行規則への参照を修正（docs only）
+
+SPECに残っていた版史を現行正本とする参照とAndroidの旧受入サイクル表記を修正した。版史に残る保存・PNGの現行規則をSPECへ明記し、過去の記録と今後のCHANGELOGを区別する。製品動作と版番号は変更していない。
+
+---
+
 ### 2026-09-10 — 現行の版規則を SPEC へ整理（docs only）
 
 演奏の版、同一性、参照コーパス、保存の現行規則を `SPEC.ja.md` / `SPEC.md` にまとめ、描画engine版史には過去の条件・測定・engine記録をhistorical recordとして残した。新しい版の値・理由・結果は本書だけへ記録し、engine版史へ新しい節を追加しない。`PROJECT_CONTEXT` は実際のarchitecture・重要契約・runtime接続の変更時だけ更新し、Stepごとの重複履歴更新を要求しない。production code、runtime、schema、version、releaseは変更していない。

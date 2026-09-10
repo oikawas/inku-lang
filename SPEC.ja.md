@@ -85,6 +85,10 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 
 SVGへ出す小数は `MASTER_GRID_DECIMALS` が定めるmaster gridに従い、固定小数6桁を保つ。過去engineを選択して再演奏する機構は持たず、再演奏は常に最新engineで行う。過去の版を再現する作品は保存済みSVGを返す。版史の経緯と測定値は同文書のhistorical recordとして保持する。
 
+記録されたengine版は来歴であり、再描画の入力にはしない。現在の版と異なる場合はUIで知らせる。DDLの再解釈も常に最新の処理を使い、新しいエディションを作る。保存済みSVG・Score・seed・エディションIDはそのまま保持する。
+
+PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・地のfilterを黙って落としてはならない。`feTurbulence` / `feDisplacementMap` / `feGaussianBlur`を省略する`cairosvg`は使わず、必要なラスタライザが無い場合は劣化したPNGへのfallbackではなく停止する。ServerとCLIは`shared/src/inku_analysis/rasterizer.py`のresvg経路、Androidは §12.14 の共有native raster APIを使う。これは旧版史に残るPNG規則と現在のhost接続をまとめたもので、描画の意味や実行経路を変更しない。
+
 ---
 
 ## 3. コアとエクステンションの分離
@@ -306,8 +310,7 @@ Water.さざ波
 （異なり入力 25 件・同じ Stage 1 出力・同じ Stage 2 プロンプト・`nvidia:google/gemma-4-31b-it`。
 全 5 群がそろった 21 件で対応をとった集計）。**先頭が 0% なので「意味の近い語の隣にあるのが悪い」のではない。
 後ろにあるほど埋まる。** ゆえに**フィールドの宣言順は読みやすさの都合ではなく仕様である**。
-順序を変えたときに版を上げる規則は
-[render engine の版史](docs/spec/render-engine-history.ja.md) の「版を上げる条件」が持つ。
+順序を変えたときに版を上げる規則は本書 §2.1 が持つ。
 
 **`thinness` は v2.9.33 で `surface` の直前へ移し、末尾は `surface` へ返した。**
 
@@ -1152,7 +1155,7 @@ typed identityとして保持し、対応範囲のdirect instructionとflat Macr
   暴れさせても動かない。**機械には暴れる余地がない**
 
 **これは変奏（Stage 1.5）とは層が違う。** 変奏は楽譜を書き換える決定的な工程で、
-暴れるは楽譜を変えずに演奏の幅を変える Renderer 層のノブである（本書と同じ呼び分け。層の表は [render engine の版史](docs/spec/render-engine-history.ja.md) にある）。
+暴れるは楽譜を変えずに演奏の幅を変える Renderer 層のノブである（層の責任は本書 §12、版の扱いは §2.1 に記す）。
 
 ### 13.5 weight による揺らぎの質
 
@@ -1617,7 +1620,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 **補完軸**: ネイティブ Android アプリ（Pixel 9 で検証）+ LiteRT-LM（Gemma 4 E2B / E4B）
 - server を正本とする後追い移植で、render engine の版を追随させる（現況は `android/ANDROID_SPEC.ja.md`）
 - 「ローカルLLMでも動く」差別化ポイントとして保持
-- 版管理は `android/VERSION` が独立に持ち、専任の受け入れサイクルで進む
+- Androidアプリの版は `android/VERSION` が独立に持つ
 
 ### 15.2 完了済み Phase の所在
 
@@ -1625,10 +1628,10 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 
 ### 15.3 現行開発の境界
 
-現在の実装状況は [実装状況](docs/spec/implementation-status.ja.md)、描画 engine の変遷は次の版史を正とする。本節は新しい実装 Phase を定義しない。
+現在の実装状況は [実装状況](docs/spec/implementation-status.ja.md) に記す。描画 engine の新しい変更は [CHANGELOG.ja.md](CHANGELOG.ja.md)、既存の版記録は次の版史に置く。本節は新しい実装 Phase を定義しない。
 
 **engine の版ごとの記録は 2026-07-28 に [render engine の版史](docs/spec/render-engine-history.ja.md) へ移した。**
-配布、決定的な層、版と同一性 ID、参照コーパス、エンジンが後戻りしないこと、PNG の扱い、そして各版が何を変えたかは、そちらが正本である。
+版史は過去の記録として保持する。現行の版・同一性・参照コーパス・保存とPNGの規則は本書 §2.1、新しい変更履歴は [CHANGELOG.ja.md](CHANGELOG.ja.md) を参照する。
 
 ## 16. ライセンス
 
@@ -1642,7 +1645,7 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 
 ## 17. 残件と検討事項
 
-公開仕様は残件一覧や運用手順を持たない。実装済み範囲は [実装状況](docs/spec/implementation-status.ja.md)、設計・実装の経緯は [CHANGELOG.ja.md](CHANGELOG.ja.md)、描画層の変遷は [版史](docs/spec/render-engine-history.ja.md) を正とする。
+公開仕様は残件一覧や運用手順を持たない。実装済み範囲は [実装状況](docs/spec/implementation-status.ja.md)、設計・実装の経緯は [CHANGELOG.ja.md](CHANGELOG.ja.md)、既存の描画層の版記録は [版史](docs/spec/render-engine-history.ja.md) に保持する。
 
 
 ---
@@ -1911,7 +1914,7 @@ DB 設定タブは現在のSQLite DBファイルサイズも示す。管理者�
 アプリケーションは macOS で開発する。**負荷が継続する試験——試験一式の全走、摂動の全走、参照コーパスの焼き直し、ラスタ化、ベンチのラン、移植の JVM 試験——は配備先ホストのテスト専用コンテナで回す**（**試験の器は用途ごとに分かれる**）（手順は `AGENTS.md`）。実装物は従来どおり rsync で同期し、systemd サービスを再起動して配備先ホストで確認する。本番の Docker Compose イメージは、通常のソース変更ごとに作り直すのではなく、リリース候補などの節目で確認する。**テスト専用コンテナとリリースのイメージは別物である** —— リリースのイメージは試験の依存を持たないので（`uv sync --frozen --no-dev`）、試験の器は同じ土台に dev 依存を足した別のイメージになる。**測定について言えるのは「リリースと同じ土台の上で測っている」までで、「リリースと同一の環境で測っている」ではない。****凍結物（参照コーパス・移植の参照 fixture）は、リリースが走るのと同じ Linux で焼く** —— macOS の libm と glibc は sin/cos/hypot で 1 ULP 食い違い、量子化の網の外に在る値はそこで割れる。**Git はソースの履歴のために使うのであって、ローカルサーバーとのファイル交換の手段としては使わない。**
 
 **engine の版ごとの記録は 2026-07-28 に [render engine の版史](docs/spec/render-engine-history.ja.md) へ移した。**
-リリース配布、決定的な層、版と同一性 ID、参照コーパス、エンジンが後戻りしないこと、PNG の扱い、そして各版が何を変えたかは、そちらが正本である。
+リリース版史は過去の記録として保持する。現行の版・同一性・参照コーパス・保存とPNGの規則は本書 §2.1、新しい変更履歴は [CHANGELOG.ja.md](CHANGELOG.ja.md) を参照する。
 
 ---
 

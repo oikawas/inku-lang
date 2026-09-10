@@ -15,6 +15,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-10 — Correct references to current rules (docs only)
+
+Corrected SPEC references that still treated the version history as current authority and removed the old Android acceptance-cycle wording. Made the current preservation and PNG rules explicit in SPEC, and distinguished existing historical records from future CHANGELOG entries. Product behavior and version numbers are unchanged.
+
+---
+
 ### 2026-09-10 — current version rules move to SPEC (docs only)
 
 The current rules for performance versions, identity, reference corpora, and preservation now live in `SPEC.ja.md` / `SPEC.md`. The render-engine history retains its past rules, measurements, and engine entries as historical records; new version values, reasons, and results are recorded only in this changelog. `PROJECT_CONTEXT` now changes only when architecture, an important contract, or runtime integration actually changes, rather than at every Step. Production code, runtime, schema, version, and release are unchanged.

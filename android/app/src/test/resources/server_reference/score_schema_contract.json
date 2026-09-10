@@ -13,6 +13,7 @@
     "angle_start",
     "angle_end",
     "rotation",
+    "arc_form",
     "filled",
     "style",
     "weight",

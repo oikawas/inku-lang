@@ -293,6 +293,18 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 ),
                 1,
             );
+            canonical = canonical.replacen(
+                "\"unimplemented\":[]",
+                concat!(
+                    "\"width_extent\":{\"basis\":\"canvas_width_before_rotation\",\"full_width\":\"1\",\"half_width\":\"1/2\",",
+                    "\"closed\":\"reference_contour_width\",\"cloudform\":\"declared_width\",\"line\":\"length\",\"open_arc\":\"chord\",\"aspect\":\"preserved\"},",
+                    "\"arc_form\":{\"semicircle\":\"upper_open_180\",\"waxing\":\"right_open_180\",\"waning\":\"left_open_180\",",
+                    "\"crescent\":\"filled_saijiki_three_cubic_contour\",\"crescent_anchor\":\"reference_bbox_center\"},",
+                    "\"size_conflict\":{\"diagnostic\":\"error\",\"recovery\":\"minimum_independent_reference_extent\",\"policies\":[\"stop\",\"continue\"],\"originals\":\"preserved\",\"scale_applications\":1},",
+                    "\"unimplemented\":[]"
+                ),
+                1,
+            );
             canonical
         })
         .as_bytes()
@@ -782,6 +794,20 @@ mod tests {
         );
         assert_eq!(payload["unimplemented"], serde_json::json!([]));
         assert_eq!(
+            payload["width_extent"]["basis"],
+            "canvas_width_before_rotation"
+        );
+        assert_eq!(payload["width_extent"]["open_arc"], "chord");
+        assert_eq!(
+            payload["arc_form"]["crescent"],
+            "filled_saijiki_three_cubic_contour"
+        );
+        assert_eq!(payload["size_conflict"]["diagnostic"], "error");
+        assert_eq!(
+            payload["size_conflict"]["policies"],
+            serde_json::json!(["stop", "continue"])
+        );
+        assert_eq!(
             payload["named_regions"]["top"],
             serde_json::json!(["0/1", "0/1", "1/1", "1/3"])
         );
@@ -864,7 +890,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "0fde6e2082b9adcb17ca0ab5a36888cb884eb3e0225f5d35c7ccdc44bba736f0"
+            "cff343a5d5ab7ec1c775d0c90bf7987a462b37896317cb3a37be86d5b534ff52"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

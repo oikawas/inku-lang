@@ -8,8 +8,8 @@ use crate::determinism::{instruction_seed, needs_contour_variation};
 use crate::fills::{is_noncomputer_solid_fill, render_interior_fill};
 use crate::geometry::{
     ArcGeometry, arc_points, arc_points_with_variation, circle_points,
-    closed_contour_with_variation, edge_contour_with_anchors, ellipse_perimeter, point_to_pixels,
-    polygon_points, size_to_pixels, stroke_sample_count,
+    closed_contour_with_variation, crescent_contour_points, edge_contour_with_anchors,
+    ellipse_perimeter, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
 };
 use crate::mark_paths::{
     amplitude, cloudform_path, hand_contour, hand_line, points_attribute, rotate, uses_hand_stroke,
@@ -18,8 +18,8 @@ use crate::palette::resolve_color;
 use crate::support::Support;
 use crate::svg::{Element, format_number};
 use crate::types::{
-    CanvasSize, CarveDepth, Instruction, LineStyle, Point, Primitive, Seed, SurfaceTexture,
-    SvgProfile, Thinness, Weight,
+    ArcForm, CRESCENT_REFERENCE_CUBICS, CanvasSize, CarveDepth, Instruction, LineStyle, Point,
+    Primitive, Seed, SurfaceTexture, SvgProfile, Thinness, Weight, crescent_transform_point,
 };
 
 pub(crate) const MIN_STROKE_WIDTH: f64 = 0.5;
@@ -320,6 +320,78 @@ fn missing(instruction: &Instruction, field: &'static str) -> MarkError {
     }
 }
 
+fn crescent_path(center: Point, size: Point) -> String {
+    let segments = CRESCENT_REFERENCE_CUBICS
+        .map(|cubic| cubic.map(|point| crescent_transform_point(point, center, size, 0.0)));
+    let first = segments[0][0];
+    let body = segments
+        .iter()
+        .map(|segment| {
+            format!(
+                "C {} {} {} {} {} {}",
+                format_number(segment[1].x),
+                format_number(segment[1].y),
+                format_number(segment[2].x),
+                format_number(segment[2].y),
+                format_number(segment[3].x),
+                format_number(segment[3].y),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "M {} {} {body} Z",
+        format_number(first.x),
+        format_number(first.y)
+    )
+}
+
+fn render_crescent(
+    instruction: &Instruction,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Result<Element, MarkError> {
+    let center = point_to_pixels(
+        instruction
+            .center
+            .ok_or_else(|| missing(instruction, "center"))?,
+        context.canvas,
+    );
+    let size = size_to_pixels(
+        instruction
+            .size
+            .ok_or_else(|| missing(instruction, "size"))?,
+        context.canvas,
+    );
+    let contour = crescent_contour_points(center, size, 25);
+    let geometry = apply_style(
+        Element::new("path").attr("d", crescent_path(center, size)),
+        style,
+        true,
+    );
+    if uses_hand_stroke(instruction.weight) {
+        let mut group = Element::new("g");
+        if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
+            group.push(fill);
+        }
+        group.push(hand_contour(
+            instruction,
+            &contour,
+            &BTreeSet::new(),
+            style,
+            context,
+            true,
+        ));
+        Ok(rotate(group, instruction, context.canvas))
+    } else {
+        Ok(rotate(
+            mechanical_closed_mark(instruction, &contour, geometry, style, context),
+            instruction,
+            context.canvas,
+        ))
+    }
+}
+
 /// Render one expanded, performed instruction into an SVG-specific element tree.
 pub fn render_instruction(
     instruction: &Instruction,
@@ -481,6 +553,9 @@ pub fn render_instruction(
             render_corner_shape(instruction, &corners, &style, context)
         }
         Primitive::Arc => {
+            if instruction.arc_form == Some(ArcForm::Crescent) {
+                return render_crescent(instruction, &style, context);
+            }
             let center = point_to_pixels(
                 instruction
                     .center

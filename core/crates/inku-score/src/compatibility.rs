@@ -25,7 +25,7 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
         None => {
             object.insert("version".to_owned(), Value::String("0.1.0".to_owned()));
         }
-        Some(Value::String(version)) if version == "0.1.0" => {}
+        Some(Value::String(version)) if version == "0.1.0" || version == "0.2.0" => {}
         _ => return Err(invalid_saved_score("unsupported saved Score version")),
     }
 
@@ -60,7 +60,11 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
         }
     }
 
-    serde_json::from_value(value)
+    let score: Score = serde_json::from_value(value)?;
+    score
+        .validate_schema_edition()
+        .map_err(invalid_saved_score)?;
+    Ok(score)
 }
 
 fn invalid_saved_score(message: &'static str) -> serde_json::Error {

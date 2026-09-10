@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -27,20 +28,18 @@ PLUGIN_DIR = REFERENCE_ROOT.parent / "plugins"
 OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
-SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-26"
+SCHEMA_VERSION = "0.2.0"
+FROZEN_AT = "2026-09-10"
 REASON = (
-    "one positive whole `面:` or `Surface:` clause reaches the one closed shape "
-    "left after structural dedupe. The repair addresses two measured Stage 2 "
-    "failures: English `Surface: flat.` left as none, and Japanese 塗り emitted "
-    "twice as fill-equivalent duplicate circles. Solid surface and filled=true "
-    "are therefore one structural spelling only when every other field agrees; "
-    "then the live saijiki mapping supplies the texture, with no guess when the "
-    "clause or closed shape is absent or plural. FOUR B CASES JOIN: the English "
-    "miss, Japanese duplicate, a two-shape ambiguity, and empty-surface no-op. "
-    "A new branch key enters all 34 B reports, so all B digests move; the 30 "
-    "carried Scores remain byte-identical. Parts A and C do not enter coerce and "
-    "remain byte-identical. Render engine remains 41; this is DDL engine 21."
+    "DDL engine 22 accompanies shared typed full/half canvas-width sizing, "
+    "oriented moon forms, and conflicting-size errors recovered with the smaller "
+    "independent extent under both policies. Score schema 0.2.0 adds the filled "
+    "Saijiki crescent through optional arc_form. One literal B case verifies "
+    "that coerce preserves this center-and-size representation without adding "
+    "open-arc geometry. The existing explicit Score 0.1.0 inputs and all their "
+    "outputs remain unchanged. This legacy expander/coerce/plugin corpus does "
+    "not exercise the typed compiler; the Rust lowering, compiler, Macro, and "
+    "composition tests verify those new semantic rules independently."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -193,6 +192,14 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
     trigger = "赤い円を三つ散らす。ゆっくり波打つ。"
     cases = {
         "B-baseline-no-ddl": _coerce_input(_score([line])),
+        # A fixed Score input, independent of the typed compiler and Part A.
+        "B-crescent-score-0-2-carry-through": _coerce_input(_score([
+            _instruction(
+                primitive="arc", arc_form="crescent", **{"from": None}, to=None,
+                center=[0.5, 0.5], size=[0.23628022621925713, 0.30392304845413264],
+                filled=True,
+            ),
+        ], version="0.2.0")),
         # Words that used to summon instructions of coerce's own -- motion,
         # a visual event, an accent for the diversity of the composition. The
         # three cases that separated the staffage levels collapsed into this one
@@ -462,6 +469,11 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
 
 def _source_commit() -> str:
+    archive_commit = os.environ.get("INKU_SOURCE_COMMIT")
+    if archive_commit is not None:
+        if len(archive_commit) != 40 or any(c not in "0123456789abcdef" for c in archive_commit):
+            raise ValueError("INKU_SOURCE_COMMIT must be a full lowercase Git commit SHA")
+        return archive_commit
     return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REFERENCE_ROOT.parent.parent,
                           check=True, capture_output=True, text=True).stdout.strip()
 

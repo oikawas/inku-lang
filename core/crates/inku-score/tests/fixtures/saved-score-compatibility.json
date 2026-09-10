@@ -2,7 +2,7 @@
   "cases": [
     {
       "id": "current-valid",
-      "input": {"instructions": [{"primitive": "line"}]},
+      "input": {"version": "0.1.0", "instructions": [{"primitive": "line"}]},
       "canonical_json": "{\"background\":\"white\",\"canvas\":\"square\",\"instructions\":[{\"angle_end\":null,\"angle_start\":null,\"arrangement\":null,\"at\":null,\"carve_depth\":null,\"center\":null,\"color\":\"black\",\"color_hint\":null,\"filled\":false,\"from\":null,\"mode\":\"additive\",\"note\":null,\"position\":null,\"primitive\":\"line\",\"radius\":null,\"relation\":null,\"rotation\":null,\"sides\":null,\"size\":null,\"style\":\"solid\",\"surface\":null,\"thinness\":null,\"to\":null,\"variation\":null,\"weight\":\"pen\"}],\"presence\":null,\"version\":\"0.1.0\"}",
       "digest": "94d2cc9a680fc4bc32615405cf4cf02d8fca5090f2ecbf431fa033f5e4b04e56"
     },
@@ -24,7 +24,7 @@
     },
     {
       "id": "unsupported-version",
-      "input": {"version": "0.2.0", "instructions": []}
+      "input": {"version": "0.3.0", "instructions": []}
     },
     {
       "id": "non-object-root",

@@ -31,7 +31,7 @@ def _aliases(model) -> set[str]:
 
 def test_ddl_reference_versions_and_parts() -> None:
     manifest = _manifest()
-    assert DDL_VERSION == "3"
+    assert DDL_VERSION == "5"
     # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
     # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
     # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。
@@ -125,10 +125,12 @@ def test_ddl_reference_versions_and_parts() -> None:
     # cases join: two measured failures and two decline/no-op controls. The new
     # branch key enters every B report, so all 34 B digests move while each of
     # the 30 carried Scores remains byte-identical.
-    assert DDL_ENGINE_VERSION == "21"
+    # Engine 22 adds a literal Score 0.2 crescent carry-through case. The typed
+    # compiler rules are covered by Rust tests, outside this legacy corpus.
+    assert DDL_ENGINE_VERSION == "22"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
-    assert manifest["schema_version"] == "0.1.0"
+    assert manifest["schema_version"] == "0.2.0"
     # Engine 7 (2026-08-05): the staffage level was folded away, so Stage 1.5
     # appends nothing of its own and coerce runs no branch that invents. The six
     # cases that existed only to separate the three levels became copies of one
@@ -174,9 +176,9 @@ def test_ddl_reference_versions_and_parts() -> None:
     # moves and two it must leave alone -- so the part is thirty. A and C do not
     # move: the rule lives inside coerce and reads a clause the expander never
     # writes.
-    assert len(manifest["cases"]) == 53
+    assert len(manifest["cases"]) == 54
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 34
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 35
     assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
     # Three entries, and they are two different quantities: `beside-cjk` is the
     # one case whose judgement moved (one unit to twelve, because the exclusion is
@@ -303,6 +305,8 @@ def test_ddl_reference_versions_and_parts() -> None:
     # Engine 21: all 34 B records move because the observable branch inventory
     # gains one key; the 30 carried Scores do not. The four new cases are the
     # only new files, while A and C remain byte-identical to engine 20.
+    twenty_one_dir = root / "ddl-engine-21"
+    twenty_one = json.loads((twenty_one_dir / "manifest.json").read_text(encoding="utf-8"))
     new_cases = {
         "B-stated-surface-english-delivery",
         "B-stated-surface-fill-equivalent-duplicate",
@@ -311,26 +315,35 @@ def test_ddl_reference_versions_and_parts() -> None:
     }
     current_b = {
         case_id
-        for case_id, case in manifest["cases"].items()
+        for case_id, case in twenty_one["cases"].items()
         if case["part"] == "b_coerce"
     }
-    assert manifest["changed_from_previous"] == sorted(current_b)
-    assert set(manifest["cases"]) == set(twenty["cases"]) | new_cases
+    assert twenty_one["changed_from_previous"] == sorted(current_b)
+    assert set(twenty_one["cases"]) == set(twenty["cases"]) | new_cases
     for case_id, prior_case in twenty["cases"].items():
-        case = manifest["cases"][case_id]
+        case = twenty_one["cases"][case_id]
         if case["part"] != "b_coerce":
             assert case["digest"] == prior_case["digest"], case_id
             assert case["bytes"] == prior_case["bytes"], case_id
             continue
         assert case["digest"] != prior_case["digest"], case_id
         body = json.loads(
-            (MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8")
+            (twenty_one_dir / case["output_path"]).read_text(encoding="utf-8")
         )
         prior_body = json.loads(
             (twenty_dir / prior_case["output_path"]).read_text(encoding="utf-8")
         )
         assert body["score"] == prior_body["score"], case_id
         assert body["branch_report"]["with_stated_surface_fidelity"] == 0, case_id
+    # The new wire extension is absent on old inputs and old output bytes.
+    crescent_case = "B-crescent-score-0-2-carry-through"
+    assert set(manifest["cases"]) == set(twenty_one["cases"]) | {crescent_case}
+    assert manifest["changed_from_previous"] == [crescent_case]
+    for case_id, prior_case in twenty_one["cases"].items():
+        case = manifest["cases"][case_id]
+        assert case["input"] == prior_case["input"], case_id
+        assert case["digest"] == prior_case["digest"], case_id
+        assert case["bytes"] == prior_case["bytes"], case_id
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -347,14 +360,19 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()
     assert set(generator.BASE_SCORE) == set(Score.model_fields)
     assert set(generator.BASE_SCORE["canvas"]) == set(CanvasSpec.model_fields)
-    assert set(generator.BASE_INSTRUCTION) == _aliases(Instruction) - {"note"}
+    assert set(generator.BASE_INSTRUCTION) == _aliases(Instruction) - {"note", "arc_form"}
     # Every field is stated except the span, which is stated only where a case
     # states one: writing `group_size: 1` into the base would move every input
     # frozen before engine 17 for a span none of them has.
     assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
         "group_size"
     }
-    assert set(generator.BASE_RELATION) == set(Relation.model_fields)
+    # Legacy literal relations predate the optional typed endpoint authority.
+    # Keep their original inputs while checking all original fields explicitly.
+    legacy_relation_extensions = {
+        "target_instruction_index", "position_authority", "touching_constraints",
+    }
+    assert set(generator.BASE_RELATION) == set(Relation.model_fields) - legacy_relation_extensions
     assert set(generator.BASE_PRESENCE) == set(Presence.model_fields)
 
     expand_fields = set(inspect.signature(expand_intermediate_ddl).parameters) - {"variation_report"}
@@ -376,13 +394,14 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
         assert set(score) == set(Score.model_fields)
         assert set(score["canvas"]) == set(CanvasSpec.model_fields)
         for instruction in score["instructions"]:
-            assert set(instruction) == _aliases(Instruction) - {"note"}
+            omitted = {"note", "arc_form"} if score["version"] == "0.1.0" else {"note"}
+            assert set(instruction) == _aliases(Instruction) - omitted
             if instruction["arrangement"] is not None:
                 assert set(instruction["arrangement"]) - {"group_size"} == set(
                     Arrangement.model_fields
                 ) - {"group_size"}
             if instruction["relation"] is not None:
-                assert set(instruction["relation"]) == set(Relation.model_fields)
+                assert set(instruction["relation"]) == set(Relation.model_fields) - legacy_relation_extensions
         if score["presence"] is not None:
             assert set(score["presence"]) == set(Presence.model_fields)
 
@@ -572,6 +591,7 @@ def test_ddl_reference_coerce_discriminators() -> None:
         },
         "B-stated-surface-two-shapes-declines": {"presence_from_ddl"},
         "B-stated-surface-empty-declines": {"presence_from_ddl"},
+        "B-crescent-score-0-2-carry-through": set(),
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id
@@ -602,6 +622,21 @@ def test_ddl_reference_output_files_match_manifest() -> None:
         data = (MANIFEST_PATH.parent / case["output_path"]).read_bytes()
         assert len(data) == case["bytes"]
         assert hashlib.sha256(data).hexdigest()[:32] == case["digest"]
+
+def test_crescent_reference_is_a_literal_score_carry_through() -> None:
+    case_id = "B-crescent-score-0-2-carry-through"
+    literal = _generator().build_coerce_inputs()[case_id]
+    assert literal["ddl"] is None
+    assert literal["score"]["version"] == "0.2.0"
+    case = _manifest()["cases"][case_id]
+    output = json.loads((MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8"))
+    instruction = output["score"]["instructions"][0]
+    assert output["score"]["version"] == "0.2.0"
+    assert instruction["arc_form"] == "crescent"
+    assert instruction["filled"] is True
+    assert instruction["center"] == literal["score"]["instructions"][0]["center"]
+    assert instruction["size"] == literal["score"]["instructions"][0]["size"]
+    assert all(instruction[field] is None for field in ("radius", "position", "angle_start", "angle_end"))
 
 def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> None:
     """T-7 of 契約 description-propagation-cut, written as a property.

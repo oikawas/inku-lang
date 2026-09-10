@@ -30,7 +30,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.1.0"]
+ScoreVersion = Literal["0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -162,6 +162,7 @@ ConnectedPositionAuthority = Literal["named_movable", "numeric_fixed"]
 InstructionMode = Literal["additive", "carve"]
 CarveDepth = Literal["light", "half", "bright"]
 SurfaceSpacingGradient = Literal["none", "coarse_to_dense", "dense_to_coarse"]
+ArcForm = Literal["crescent"]
 
 
 def _clamp_unit_value(v: object, default: float | None = None) -> object:
@@ -591,6 +592,14 @@ class Instruction(BaseModel):
             "線・楕円・四角・三角・弧を中心まわりに回転する。"
         ),
     )
+    arc_form: Optional[ArcForm] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "arc の閉じた輪郭形式。crescent は歳時記の細い塗り月形で、"
+            "center と size を実際の外接bboxとして使う"
+        ),
+    )
 
     filled: bool = Field(
         default=False,
@@ -692,6 +701,24 @@ class Instruction(BaseModel):
         except (TypeError, ValueError):
             return 5
 
+    @model_validator(mode="after")
+    def _validate_arc_form(self) -> "Instruction":
+        if self.arc_form != "crescent":
+            return self
+        if self.primitive != "arc":
+            raise ValueError("arc_form=crescent requires primitive=arc")
+        if not self.filled:
+            raise ValueError("arc_form=crescent requires filled=true")
+        if self.center is None and self.at is None:
+            raise ValueError("arc_form=crescent requires center or at")
+        if self.size is None or self.size[0] <= 0.0 or self.size[1] <= 0.0:
+            raise ValueError("arc_form=crescent requires a positive size")
+        if any(value is not None for value in (self.radius, self.position, self.angle_start, self.angle_end)):
+            raise ValueError("arc_form=crescent cannot carry open-arc geometry")
+        if self.surface is not None and self.surface.texture != "none":
+            raise ValueError("arc_form=crescent uses filled instead of a surface texture")
+        return self
+
 
 def fill_is_asked_for(ins: "Instruction") -> bool:
     """`filled=true` と `surface.texture="solid"` は同じ要求の 2 通りの言い方。
@@ -753,7 +780,7 @@ def migrate_score_payload(value: object) -> object:
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.1.0"
+    version: ScoreVersion = "0.2.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -795,6 +822,10 @@ class Score(BaseModel):
     @model_validator(mode="after")
     def _validate_composite_arrangements(self) -> "Score":
         """A composite is one contiguous, non-overlapping instruction span."""
+        if self.version == "0.1.0" and any(
+            instruction.arc_form is not None for instruction in self.instructions
+        ):
+            raise ValueError("arc_form requires Score version 0.2.0")
         covered_until = 0
         for index, instruction in enumerate(self.instructions):
             arrangement = instruction.arrangement

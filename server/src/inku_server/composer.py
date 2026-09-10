@@ -560,7 +560,7 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 - **半円** → arc、angle_start=0、angle_end=180 (上半分)
 - **上弦** → arc、angle_start=270、angle_end=90 (右側半円、D字形)
 - **下弦** → arc、angle_start=90、angle_end=270 (左側半円、C字形)
-- **三日月** → arc、angle_start=210、angle_end=330 (細い下弦弧、約120°)
+- **三日月** → arc_form="crescent"、filled=true。center と size は実際の外接bboxで、size は幅:高さが約0.777434:1。右が明るい満ちる三日月は rotation=180、左が明るい欠ける三日月は rotation=0
 - **水平** → rotation=0。線なら from=[0.0,y], to=[1.0,y] の横線
 - **垂直** → rotation=90。線なら from=[x,0.0], to=[x,1.0] の縦線
 - **斜め** → rotation=45
@@ -583,8 +583,8 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 入力: 上弦の弧を中央に置く。半径は0.15。
 出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.15,"angle_start":270,"angle_end":90}]}
 
-入力: 背景を黒で埋める。三日月の弧を右上に置く。半径は0.12。
-出力: {"background":"black","instructions":[{"primitive":"arc","center":[0.7,0.25],"radius":0.12,"angle_start":210,"angle_end":330,"color":"white"}]}
+入力: 背景を黒で埋める。右が明るい三日月を右上に置く。幅は0.12。
+出力: {"background":"black","instructions":[{"primitive":"arc","arc_form":"crescent","center":[0.7,0.25],"size":[0.12,0.1543538636],"rotation":180,"filled":true,"color":"white"}]}
 
 入力: 右上がりの横長の四角を中央に置く。
 出力: {"instructions":[{"primitive":"square","position":[0.325,0.425],"size":[0.35,0.15],"rotation":-30}]}
@@ -973,7 +973,7 @@ Output: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.4
 - **semicircle** → arc, angle_start=0, angle_end=180
 - **waxing** → arc, angle_start=270, angle_end=90
 - **waning** → arc, angle_start=90, angle_end=270
-- **crescent** → arc, angle_start=210, angle_end=330
+- **crescent** → arc_form="crescent", filled=true; center and size are the physical bbox and size width:height is about 0.777434:1. A waxing right-lit crescent uses rotation=180; a waning left-lit crescent uses rotation=0
 - **horizontal** → rotation=0. For line, use from=[0.0,y], to=[1.0,y]
 - **vertical** → rotation=90. For line, use from=[x,0.0], to=[x,1.0]
 - **diagonal** → rotation=45
@@ -1704,7 +1704,7 @@ def _record_stage2_raw(trace_sink: list[dict] | None, raw_text: str, parse_ok: b
 def _score_from_model_output(data: object) -> Score:
     """Validate a Score a model wrote, without letting one constant throw it away.
 
-    `version` is `Literal["0.1.0"]` with that same value as its default, and the
+    `version` is owned by the current Score schema edition, and the
     tool schema does not require it: the model has nothing to say through this
     field, and the one legal value is already ours. A provider whose decoder is
     constrained cannot get it wrong, but Ollama Cloud ignores structured output
@@ -1716,12 +1716,14 @@ def _score_from_model_output(data: object) -> Score:
     failed on this field and nothing else**, taking four models from "returns
     nothing usable" to a working Score once the key is dropped.
 
-    Dropped rather than rewritten: rewriting would mean deciding the model meant
-    0.1.0, and there is nothing to decide -- the field simply carries no
-    information from a model. The default then supplies it.
+    Dropped rather than rewritten: the model carries no version information.
+    Fresh composition writes the current edition, while the compatibility reader
+    alone assigns the legacy edition to a saved Score that omitted it.
     """
     if isinstance(data, dict) and "version" in data and data.get("version") != SCORE_VERSION:
         data = {key: value for key, value in data.items() if key != "version"}
+    if isinstance(data, dict):
+        data = {**data, "version": SCORE_VERSION}
     return Score.model_validate(data)
 
 

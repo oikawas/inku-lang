@@ -964,21 +964,20 @@ fn core_relative_scale_has_bilingual_provenance_and_bounded_pre_head_ownership()
     )
     .unwrap();
     let conflict = associate_semantic_entities(&conflict).unwrap();
-    assert!(conflict.ast.entities[0].relative_scale.is_none());
+    let entity = &conflict.ast.entities[0];
+    assert!(conflict.ast.complete);
+    assert!(conflict.issues.is_empty());
+    assert_eq!(entity.additional_relative_scales.len(), 1);
     assert_eq!(
-        association_issue_kinds(&conflict),
-        ["conflicting_relative_scales"]
-    );
-    assert_eq!(conflict.issues[0].occurrences.len(), 2);
-    assert_eq!(
-        conflict.issues[0]
-            .occurrences
+        entity
+            .relative_scale
             .iter()
-            .map(|occurrence| occurrence.source().surface.as_str())
+            .chain(&entity.additional_relative_scales)
+            .map(|value| value.provenance.surface.as_str())
             .collect::<Vec<_>>(),
         ["small", "SMALL"]
     );
-    assert!(conflict.canonical_bytes.is_none());
+    assert!(conflict.canonical_bytes.is_some());
     assert_eq!(
         conflict.owned_occurrence_count,
         conflict.delivered_occurrence_count
@@ -1799,7 +1798,11 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
                 case.id
             );
         }
-        if let Some(relative_scale) = &entity.relative_scale {
+        for relative_scale in entity
+            .relative_scale
+            .iter()
+            .chain(&entity.additional_relative_scales)
+        {
             assert_source_occurrence(case, &relative_scale.provenance, &result.clause_stream);
             assert_eq!(
                 entity.head.source().region_index,
@@ -1815,6 +1818,7 @@ fn assert_source_provenance(case: &Case, result: &SemanticAssociationResult) {
         ]
         .into_iter()
         .flatten()
+        .chain(&entity.additional_width_extents)
         {
             assert_source_occurrence(case, &term.provenance.source, &result.clause_stream);
             assert_eq!(
@@ -1970,7 +1974,11 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         if let Some(thinness) = &entity.thinness {
             output_spans.push(thinness.provenance.span);
         }
-        if let Some(relative_scale) = &entity.relative_scale {
+        for relative_scale in entity
+            .relative_scale
+            .iter()
+            .chain(&entity.additional_relative_scales)
+        {
             output_spans.push(relative_scale.provenance.span);
         }
         for term in [&entity.touch, &entity.continuity, &entity.angle]
@@ -1992,6 +2000,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
         ]
         .into_iter()
         .flatten()
+        .chain(&entity.additional_width_extents)
         {
             output_spans.push(term.provenance.source.span);
         }

@@ -8,7 +8,8 @@ use crate::geometry::{
 };
 use crate::placement::region_in_short_side_units;
 use crate::types::{
-    CanvasSize, Instruction, Layout, Point, Primitive, RelationGap, RelationType, Seed,
+    ArcForm, CanvasSize, Instruction, Layout, Point, Primitive, RelationGap, RelationType, Seed,
+    crescent_contour_bounds,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -270,6 +271,12 @@ pub fn performed_instruction_bounds_on_canvas(
                 min: Point::new(center.x - radius, center.y - radius),
                 max: Point::new(center.x + radius, center.y + radius),
             })
+        }
+        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let size = instruction.size?;
+            let (min, max) = crescent_contour_bounds(center, size, rotation);
+            Some(Bounds { min, max })
         }
         Primitive::Arc if instruction.position.is_some() => {
             let (start, end, _, _) = endpoint_geometry(instruction, canvas)?;

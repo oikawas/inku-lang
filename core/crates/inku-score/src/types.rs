@@ -65,6 +65,137 @@ string_enum!(Primitive {
     Point,
     Cloudform,
 });
+string_enum!(ArcForm { Crescent });
+
+/// The three cubic Bézier segments of the author-approved Saijiki crescent.
+///
+/// The values stay in the source SVG coordinate space so every host can derive
+/// the same physical contour rather than approximating a crescent from an arc.
+pub const CRESCENT_REFERENCE_CUBICS: [[Point; 4]; 3] = [
+    [
+        Point::new(106.0, 18.0),
+        Point::new(76.0, 24.0),
+        Point::new(62.0, 52.0),
+        Point::new(82.0, 74.0),
+    ],
+    [
+        Point::new(82.0, 74.0),
+        Point::new(52.0, 63.0),
+        Point::new(50.0, 27.0),
+        Point::new(82.0, 14.0),
+    ],
+    [
+        Point::new(82.0, 14.0),
+        Point::new(92.0, 12.0),
+        Point::new(100.0, 14.0),
+        Point::new(106.0, 18.0),
+    ],
+];
+
+/// Actual Bézier extrema of [`CRESCENT_REFERENCE_CUBICS`], not its control box.
+pub const CRESCENT_REFERENCE_MIN: Point = Point::new(58.743_954_756_148_575, 13.215_390_309_173_47);
+pub const CRESCENT_REFERENCE_MAX: Point = Point::new(106.0, 74.0);
+pub const CRESCENT_REFERENCE_WIDTH: f64 = CRESCENT_REFERENCE_MAX.x - CRESCENT_REFERENCE_MIN.x;
+pub const CRESCENT_REFERENCE_HEIGHT: f64 = CRESCENT_REFERENCE_MAX.y - CRESCENT_REFERENCE_MIN.y;
+pub const CRESCENT_REFERENCE_ASPECT_RATIO: f64 =
+    CRESCENT_REFERENCE_WIDTH / CRESCENT_REFERENCE_HEIGHT;
+
+/// The fixed physical width-to-height ratio of the approved crescent contour.
+#[must_use]
+pub const fn crescent_reference_aspect_ratio() -> f64 {
+    CRESCENT_REFERENCE_ASPECT_RATIO
+}
+
+/// Physical bounds of the reference crescent after fitting it into `size` about `center`.
+///
+/// `size` is the unrotated physical bounding box. The returned bounds include
+/// the exact cubic extrema after clockwise SVG-space rotation.
+#[must_use]
+pub fn crescent_contour_bounds(
+    center: Point,
+    size: Point,
+    rotation_degrees: f64,
+) -> (Point, Point) {
+    let mut min = Point::new(f64::INFINITY, f64::INFINITY);
+    let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for cubic in CRESCENT_REFERENCE_CUBICS {
+        let points =
+            cubic.map(|point| crescent_transform_point(point, center, size, rotation_degrees));
+        for t in cubic_extrema(points) {
+            let point = cubic_point(points, t);
+            min.x = min.x.min(point.x);
+            min.y = min.y.min(point.y);
+            max.x = max.x.max(point.x);
+            max.y = max.y.max(point.y);
+        }
+    }
+    (min, max)
+}
+
+/// Map a reference SVG coordinate to the centered physical crescent box.
+#[must_use]
+pub fn crescent_transform_point(
+    reference: Point,
+    center: Point,
+    size: Point,
+    rotation_degrees: f64,
+) -> Point {
+    let local = Point::new(
+        (reference.x - CRESCENT_REFERENCE_MIN.x) / CRESCENT_REFERENCE_WIDTH * size.x - size.x / 2.0,
+        (reference.y - CRESCENT_REFERENCE_MIN.y) / CRESCENT_REFERENCE_HEIGHT * size.y
+            - size.y / 2.0,
+    );
+    let angle = rotation_degrees.to_radians();
+    Point::new(
+        center.x + local.x * angle.cos() - local.y * angle.sin(),
+        center.y + local.x * angle.sin() + local.y * angle.cos(),
+    )
+}
+
+fn cubic_point(points: [Point; 4], t: f64) -> Point {
+    let inverse = 1.0 - t;
+    Point::new(
+        inverse.powi(3) * points[0].x
+            + 3.0 * inverse.powi(2) * t * points[1].x
+            + 3.0 * inverse * t.powi(2) * points[2].x
+            + t.powi(3) * points[3].x,
+        inverse.powi(3) * points[0].y
+            + 3.0 * inverse.powi(2) * t * points[1].y
+            + 3.0 * inverse * t.powi(2) * points[2].y
+            + t.powi(3) * points[3].y,
+    )
+}
+
+fn cubic_extrema(points: [Point; 4]) -> Vec<f64> {
+    let mut roots = vec![0.0, 1.0];
+    for values in [
+        [points[0].x, points[1].x, points[2].x, points[3].x],
+        [points[0].y, points[1].y, points[2].y, points[3].y],
+    ] {
+        let a = -values[0] + 3.0 * values[1] - 3.0 * values[2] + values[3];
+        let b = 2.0 * (values[0] - 2.0 * values[1] + values[2]);
+        let c = values[1] - values[0];
+        if a.abs() <= 1.0e-12 {
+            if b.abs() > 1.0e-12 {
+                let root = -c / b;
+                if (0.0..1.0).contains(&root) {
+                    roots.push(root);
+                }
+            }
+        } else {
+            let discriminant = b * b - 4.0 * a * c;
+            if discriminant >= 0.0 {
+                let root = discriminant.sqrt();
+                for value in [(-b - root) / (2.0 * a), (-b + root) / (2.0 * a)] {
+                    if (0.0..1.0).contains(&value) {
+                        roots.push(value);
+                    }
+                }
+            }
+        }
+    }
+    roots
+}
 string_enum!(LineStyle {
     Solid,
     Dashed,
@@ -376,7 +507,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.1.0".to_owned()
+    "0.2.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -613,6 +744,8 @@ pub struct Instruction {
     pub angle_end: Option<f64>,
     #[serde(default)]
     pub rotation: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arc_form: Option<ArcForm>,
     #[serde(default)]
     pub filled: bool,
     #[serde(default = "default_line_style")]
@@ -684,4 +817,19 @@ pub struct Score {
     #[serde(default)]
     pub presence: Option<Presence>,
     pub instructions: Vec<Instruction>,
+}
+
+impl Score {
+    /// Reject descriptors introduced after the declared Score edition.
+    pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
+        if self.version == "0.1.0"
+            && self
+                .instructions
+                .iter()
+                .any(|instruction| instruction.arc_form.is_some())
+        {
+            return Err("arc_form requires Score version 0.2.0");
+        }
+        Ok(())
+    }
 }

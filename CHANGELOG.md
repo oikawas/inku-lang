@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-10 — Shared width, moon forms, and size recovery
+
+Ordinary DDL and declared Macros now resolve full/half width and the four moon forms through the shared Score lowerer. Width uses the canvas width before rotation. Crescent renders the saijiki's thin filled cubic outline with shared position, rotation, and bounds. Overlapping sizes retain every original candidate and emit an error with candidate and effective extents, while both Stop and Continue draw the smaller size. Other invalid input still follows its existing failure policy.
+
+Score advances to 0.2.0 with optional `arc_form: crescent`; explicit saved 0.1.0 and canonical bytes without the extension remain readable and unchanged. Render engine advances 45→46 for the new performed shape, and DDL engine 21→22 for deterministic sizing and the Score declaration change. Current interpreter/composer crescent guidance matches the new form. The JSON `compile-score` example batches ordinary DDL/Macro compilation with diagnostics. This does not complete the typed compiler's application-runtime integration or publish a release.
+
+---
+
 ### 2026-09-10 — Correct the waxing and waning moon previews
 
 The web saijiki previews now draw the waxing moon as a 180-degree open arc bulging to the right and the waning moon as one bulging to the left. The Japanese and English effect descriptions match those shapes. The existing thin filled crescent preview is unchanged.

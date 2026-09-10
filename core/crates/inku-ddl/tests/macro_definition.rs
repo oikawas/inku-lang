@@ -9,11 +9,15 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const FIXTURE: &str = include_str!("fixtures/macro-definition-v1.json");
+const STEP10Z_SCORE_PARITY_FIXTURE: &str =
+    include_str!("fixtures/step10z-macro-score-parity-v1.json");
 
 #[test]
 fn shape_emit_fields_validate_real_categories_and_integer_type() {
     let mut value = serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "proportion_aspect":{"expr":"semantic_ref","category":"ratio","id":"wide"},
+        "proportion_width_extent":{"expr":"semantic_ref","category":"ratio","id":"full_width"},
+        "proportion_arc_form":{"expr":"semantic_ref","category":"ratio","id":"crescent"},
         "shape_form":{"expr":"semantic_ref","category":"shape_form","id":"regular"},
         "sides":{"expr":"integer","value":6}
     }}]});
@@ -33,6 +37,14 @@ fn shape_emit_fields_validate_real_categories_and_integer_type() {
             "proportion_aspect",
             serde_json::json!({"expr":"semantic_ref","category":"color","id":"red"}),
         ),
+        (
+            "proportion_width_extent",
+            serde_json::json!({"expr":"semantic_ref","category":"color","id":"red"}),
+        ),
+        (
+            "proportion_arc_form",
+            serde_json::json!({"expr":"semantic_ref","category":"color","id":"red"}),
+        ),
     ] {
         let old = value["body"][0]["fields"][field].clone();
         value["body"][0]["fields"][field] = bad;
@@ -44,6 +56,30 @@ fn shape_emit_fields_validate_real_categories_and_integer_type() {
             "{field}"
         );
         value["body"][0]["fields"][field] = old;
+    }
+}
+
+#[test]
+fn step10z_score_parity_fixture_definitions_are_valid_declared_macros() {
+    let fixture: Value = serde_json::from_str(STEP10Z_SCORE_PARITY_FIXTURE).unwrap();
+    assert_eq!(
+        fixture["schema"],
+        Value::String("inku.step10z-macro-score-parity-v1".to_owned())
+    );
+    assert_eq!(fixture["version"], Value::from(1));
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 3);
+    for case in cases {
+        assert!(case["ordinary_source"].is_string());
+        assert!(case["macro_source"].is_string());
+        let definition = MacroDefinition::from_json(&case["macro_definition"].to_string())
+            .unwrap_or_else(|error| panic!("{}: {error}", case["id"]));
+        assert!(
+            definition.identity().is_ok(),
+            "{}: {:?}",
+            case["id"],
+            definition.validate().diagnostics()
+        );
     }
 }
 

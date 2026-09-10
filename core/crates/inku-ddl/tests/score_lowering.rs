@@ -51,6 +51,301 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn width_extent_uses_canvas_horizontal_axis_before_rotation() {
+    for format in ["square", "wide", "vertical"] {
+        let context = ScoreLoweringContext::resolve(format, Color::White).unwrap();
+        let (cw, ch) = context.canvas_format().integer_ratio();
+        let canvas_width = f64::from(cw) / f64::from(cw.min(ch));
+        for (word, fraction) in [("full-width", 1.0), ("half-width", 0.5)] {
+            for angle in ["horizontal", "diagonal"] {
+                let source = format!("place one red {word} {angle} line at center.");
+                let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+                let lowered =
+                    lower_verified_stage15_score(transformed.verified_effective_view(), context);
+                let instruction = &lowered
+                    .score()
+                    .unwrap_or_else(|| panic!("{source}: {:?}", lowered.diagnostics()))
+                    .instructions[0];
+                let length =
+                    (instruction.to.unwrap().x - instruction.from_.unwrap().x) * canvas_width;
+                assert!(
+                    (length - canvas_width * fraction).abs() < 1e-10,
+                    "{format} {source}"
+                );
+                assert_eq!(
+                    instruction.rotation.unwrap_or(0.0).rem_euclid(90.0),
+                    if angle == "diagonal" { 45.0 } else { 0.0 }
+                );
+            }
+            let source = format!("place one red tall {word} ellipse at center.");
+            let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+            let lowered =
+                lower_verified_stage15_score(transformed.verified_effective_view(), context);
+            let size = lowered.score().unwrap().instructions[0].size.unwrap();
+            assert!((size.x - canvas_width * fraction).abs() < 1e-10);
+            assert!((size.y / size.x - 2.0).abs() < 1e-10);
+        }
+    }
+}
+
+#[test]
+fn width_extent_measures_each_primitive_reference_contour() {
+    for format in ["wide", "vertical"] {
+        let context = ScoreLoweringContext::resolve(format, Color::White).unwrap();
+        let (cw, ch) = context.canvas_format().integer_ratio();
+        let canvas_width = f64::from(cw) / f64::from(cw.min(ch));
+        for shape in [
+            "circle",
+            "point",
+            "ellipse",
+            "cloudform",
+            "square",
+            "triangle",
+            "pentagon",
+            "hexagon",
+            "heptagon",
+            "octagon",
+            "arc",
+            "crescent arc",
+        ] {
+            let source = format!("place one red half-width {shape} at center.");
+            let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+            let lowered =
+                lower_verified_stage15_score(transformed.verified_effective_view(), context);
+            let instruction = &lowered
+                .score()
+                .unwrap_or_else(|| panic!("{source}: {:?}", lowered.diagnostics()))
+                .instructions[0];
+            let extent = match instruction.primitive {
+                Primitive::Circle | Primitive::Point => instruction.radius.unwrap() * 2.0,
+                Primitive::Polygon => {
+                    let sides = instruction.sides.unwrap();
+                    let xs = (0..sides)
+                        .map(|i| {
+                            (-std::f64::consts::FRAC_PI_2
+                                + std::f64::consts::TAU * f64::from(i) / f64::from(sides))
+                            .cos()
+                        })
+                        .collect::<Vec<_>>();
+                    (xs.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                        - xs.iter().copied().fold(f64::INFINITY, f64::min))
+                        * instruction.radius.unwrap()
+                }
+                Primitive::Arc if instruction.arc_form.is_none() => {
+                    2.0 * instruction.radius.unwrap()
+                        * ((instruction.angle_start.unwrap() - instruction.angle_end.unwrap())
+                            / 2.0)
+                            .to_radians()
+                            .sin()
+                }
+                _ => instruction.size.unwrap().x,
+            };
+            assert!(
+                (extent - canvas_width * 0.5).abs() < 1e-10,
+                "{source} on {format}: {extent}"
+            );
+        }
+    }
+}
+
+#[test]
+fn moon_forms_preserve_semicircle_direction_and_filled_reference_crescent() {
+    for (form, rotation) in [("semicircle", 0.0), ("waxing", 90.0), ("waning", 270.0)] {
+        let source = format!("place one red half-width {form} arc at center.");
+        let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        let instruction = &lowered
+            .score()
+            .unwrap_or_else(|| panic!("{source}: {:?}", lowered.diagnostics()))
+            .instructions[0];
+        assert_eq!(instruction.radius, Some(0.25));
+        assert!(
+            (instruction.angle_start.unwrap() - instruction.angle_end.unwrap() - 180.0).abs()
+                < 1e-10
+        );
+        assert_eq!(instruction.rotation.unwrap_or(0.0), rotation);
+        assert!(!instruction.filled);
+        assert!(instruction.arc_form.is_none());
+    }
+    for source in [
+        "place one red crescent arc at center.",
+        "赤い三日月の弧を中央に置く。",
+    ] {
+        let language = if source.starts_with("place") {
+            ResolvedInstructionLanguage::En
+        } else {
+            ResolvedInstructionLanguage::Ja
+        };
+        let transformed = stage15(source, language);
+        let lowered = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        let instruction = &lowered
+            .score()
+            .unwrap_or_else(|| panic!("{source}: {:?}", lowered.diagnostics()))
+            .instructions[0];
+        assert_eq!(instruction.arc_form, Some(inku_score::ArcForm::Crescent));
+        assert!(instruction.filled);
+        assert!(
+            instruction.radius.is_none()
+                && instruction.angle_start.is_none()
+                && instruction.position.is_none()
+        );
+        let size = instruction.size.unwrap();
+        assert!((size.x / size.y - inku_score::crescent_reference_aspect_ratio()).abs() < 1e-10);
+    }
+}
+
+#[test]
+fn conflicting_sizes_report_error_and_render_minimum_under_both_policies() {
+    for (source, expected_radius, candidate_count) in [
+        ("place one small red full-width circle at center.", 0.06, 2),
+        (
+            "place one red full-width half-width circle at center.",
+            0.25,
+            2,
+        ),
+        (
+            "place one red circle with radius 0.2 diameter 0.1 at center.",
+            0.05,
+            2,
+        ),
+        (
+            "place one small red circle with radius 0.2 at center.",
+            0.06,
+            2,
+        ),
+        ("place one small large red circle at center.", 0.06, 2),
+    ] {
+        let transformed = stage15(source, ResolvedInstructionLanguage::En);
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let lowered = lower_verified_stage15_score_with_policy(
+                transformed.verified_effective_view(),
+                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+                policy,
+            );
+            let score = lowered
+                .score()
+                .unwrap_or_else(|| panic!("{source}: {:?}", lowered.diagnostics()));
+            assert!(
+                (score.instructions[0].radius.unwrap() - expected_radius).abs() < 1e-10,
+                "{source}"
+            );
+            assert_eq!(lowered.diagnostics().len(), 1, "{source}");
+            let diagnostic = &lowered.diagnostics()[0];
+            assert_eq!(
+                diagnostic.disposition,
+                ScoreDiagnosticDisposition::Recovered
+            );
+            let ScoreDiagnosticOwner::SourceInstruction { spans, .. } = &diagnostic.owner else {
+                panic!("unexpected recovery owner")
+            };
+            assert_eq!(spans.len(), candidate_count);
+            let ScoreFieldGap::ConflictingSizeSpecifications {
+                candidate_extents,
+                effective_extent,
+            } = &diagnostic.reason
+            else {
+                panic!("{:?}", diagnostic.reason)
+            };
+            assert_eq!(candidate_extents.len(), candidate_count);
+            let effective =
+                effective_extent.numerator() as f64 / effective_extent.denominator() as f64;
+            assert!((effective - expected_radius * 2.0).abs() < 1e-10);
+        }
+    }
+}
+
+#[test]
+fn recovered_composition_keeps_original_sizes_and_preserves_explicit_shape_aspect() {
+    let source = "place one red large triangle width 0.4 height 0.2 at center.";
+    let transformed = stage15(source, ResolvedInstructionLanguage::En);
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let planned = inku_ddl::plan_verified_stage15_with_policy(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            policy,
+        );
+        let object = &planned.objects().unwrap()[0];
+        assert!(object.explicit_geometry().is_some());
+        assert_eq!(object.relative_scale(), Some(CoreModifierValue::Large));
+        let inku_ddl::ResolvedGeometryDimensions::Bbox { width, height } = object.dimensions()
+        else {
+            panic!()
+        };
+        let value =
+            |number: inku_ddl::Rational| number.numerator() as f64 / number.denominator() as f64;
+        assert!((value(width) - 0.36).abs() < 1e-10);
+        assert!((value(height) - 0.18).abs() < 1e-10);
+        assert_eq!(
+            planned.diagnostics()[0].disposition,
+            ScoreDiagnosticDisposition::Recovered
+        );
+    }
+}
+
+#[test]
+fn crescent_numeric_bounds_and_non_size_errors_keep_their_authority() {
+    for (source, fits) in [
+        (
+            "place one red diagonal crescent arc at horizontal 0.5 vertical 0.5.",
+            true,
+        ),
+        (
+            "place one red diagonal crescent arc at horizontal 0.01 vertical 0.01.",
+            false,
+        ),
+    ] {
+        let transformed = stage15(source, ResolvedInstructionLanguage::En);
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let lowered = lower_verified_stage15_score_with_policy(
+                transformed.verified_effective_view(),
+                ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+                policy,
+            );
+            assert_eq!(
+                lowered.score().is_some(),
+                fits,
+                "{source}: {:?}",
+                lowered.diagnostics()
+            );
+            if fits {
+                let instruction = &lowered.score().unwrap().instructions[0];
+                assert_eq!(instruction.center, Some(Point::new(0.5, 0.5)));
+                assert!(instruction.filled && instruction.arc_form.is_some());
+            } else {
+                assert!(
+                    lowered
+                        .diagnostics()
+                        .iter()
+                        .all(|diagnostic| diagnostic.disposition
+                            != ScoreDiagnosticDisposition::Recovered)
+                );
+            }
+        }
+    }
+    for modifier in ["tall", "regular", "empty", "hatch"] {
+        let source = format!("place one red {modifier} crescent arc at center.");
+        let transformed = stage15(&source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        );
+        assert!(lowered.score().is_none(), "{source}");
+        assert!(
+            lowered
+                .diagnostics()
+                .iter()
+                .all(|diagnostic| diagnostic.disposition != ScoreDiagnosticDisposition::Recovered)
+        );
+    }
+}
+
+#[test]
 fn shared_shape_constraints_reach_actual_score() {
     for (source, language) in [
         (
@@ -339,7 +634,6 @@ fn shared_shape_numeric_anchors_and_conflicts_are_never_repaired() {
         "tall rectangle width 0.4 height 0.2",
         "sides 9 polygon",
         "equilateral triangle width 0.24 height 0.2078460969",
-        "large triangle width 0.4 height 0.2",
         "triangle width 0.4 height 0.2 at horizontal 0.01 vertical 0.01",
         "vertical triangle width 0.4 height 0.2 at horizontal 0.01 vertical 0.01",
         "hexagon radius 0.4 at horizontal 0.01 vertical 0.01",
@@ -2400,12 +2694,8 @@ fn qualitative_count_remains_a_typed_hole_instead_of_becoming_one() {
 }
 
 #[test]
-fn incomplete_conflicting_and_relative_numeric_geometry_fail_as_typed_compiler_issues() {
+fn incomplete_and_unowned_numeric_geometry_fail_as_typed_compiler_issues() {
     for (source, expected_kind) in [
-        (
-            "place one red pen solid empty circle with radius 0.1 diameter 0.2 at horizontal 0.5, vertical 0.5.",
-            "conflicting_explicit_geometries",
-        ),
         (
             "place one red pen solid empty ellipse with width 0.2 at horizontal 0.5, vertical 0.5.",
             "incomplete_numeric_geometry",
@@ -2413,10 +2703,6 @@ fn incomplete_conflicting_and_relative_numeric_geometry_fail_as_typed_compiler_i
         (
             "place one red pen solid empty circle with radius 0.1 at horizontal 0.5.",
             "incomplete_numeric_position",
-        ),
-        (
-            "place one small red pen solid empty circle with radius 0.1 at horizontal 0.5, vertical 0.5.",
-            "conflicting_relative_and_explicit_geometry",
         ),
         (
             "circle square radius 0.1 horizontal 0.5 vertical 0.5.",

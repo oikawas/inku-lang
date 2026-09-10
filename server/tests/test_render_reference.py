@@ -122,11 +122,13 @@ def test_render_reference_case_counts() -> None:
     # exclusion would be a claim with nobody to test it.
     # Engine 40 adds four profile-boundary cases: editable/display/compat
     # non-computer solid and a display computer control.
-    assert len(cases) == 610
+    # Engine 46 adds the two direct Score 0.2 filled crescents: rotring fixes
+    # the exact cubic SVG path and pen carries that contour through rotation.
+    assert len(cases) == 612
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 88, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 88, "B": 72, "C": 90, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -135,7 +137,7 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     score_fields = set(generator.BASE_SCORE)
     assert instruction_fields == {
         field.alias or name for name, field in Instruction.model_fields.items()
-    } - {"note"}
+    } - {"note", "arc_form"}
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
@@ -152,7 +154,8 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         # first scores here to hold more than one, and a member stated with
         # fewer fields than its head would be an input this corpus never froze.
         for instruction in score["instructions"]:
-            assert set(instruction) == instruction_fields
+            expected_fields = instruction_fields | ({"arc_form"} if "arc_form" in instruction else set())
+            assert set(instruction) == expected_fields
         if case_id.startswith("F-"):
             assert case["catalog_id"] is not None
             assert any(key.startswith("palette:") for key in case["color_map"])

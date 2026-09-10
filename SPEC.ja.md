@@ -921,13 +921,20 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通のStop（既定）/ OmitAndContinue error policyはactual Scoreまで実装済みだがruntimeには未接続である。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。Stopは上流hole / conflictでScoreを返さない。明示Continueだけが同じcompilationのtyped owner / dependencyに従うsealed projectionから独立命令を届け、全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenance、geometry policy digest、Score wireは変えず、現行Python経路のcoerceやLLM fallbackが置換済みとはみなさない。Runtime / UI / API / 保存接続は後続の責務である。
+sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通のStop（既定）/ OmitAndContinue error policyはactual Scoreまで実装済みだがruntimeには未接続である。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。Stopは回復規則のない上流hole / conflictでScoreを返さない。明示Continueだけが同じcompilationのtyped owner / dependencyに従うsealed projectionから独立命令を届け、全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenanceは保ち、寸法規則の追加はgeometry policy digestへ記録し、Score 0.2.0で新しい月形を表す。現行Python経路のcoerceやLLM fallbackが置換済みとはみなさない。Runtime / UI / API / 保存接続は後続の責務である。
 
 このruntime未接続subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / square / triangle / polygonのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
 
 同じruntime未接続subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
 `Instruction.thinness`へ届け、明示宣言した細さ・大小parameterも§4.6の経路へbindingする。
 この到達だけでwhole Step 10を完了とはしない。
+
+
+全幅・半幅はキャンバスの横幅の100%・50%を回転前の寸法へ適用する。線は長さ、開弧は弦の長さ、閉じた図形は基準輪郭の横幅、雲形は宣言幅を使い、元の形と縦横比を保つ。回転後の横占有幅や筆致の外縁から再計測せず、端への接触や位置移動を追加しない。通常DDLと宣言済みflat Macro Emitの`proportion_width_extent`は共通の寸法解決を通る。
+
+半円は上へ膨らむ半円の開弧、上弦は右、下弦は左へ膨らむ半円の開弧とする。三日月は歳時記の細い月形の閉じた塗り面であり、一本の開弧に置き換えない。Score 0.2.0の`primitive: arc`、`arc_form: crescent`と`center`・`size`がその輪郭を表す。月形の基準は歳時記の三本の三次Bezier曲線で、寸法は曲線の実際の境界に基づく。省略された`arc_form`は従来の開弧の意味とcanonical bytesを保ち、保存済みScore 0.1.0を読み続ける。三日月の位置・回転・境界は共通rendererへ渡す。端点を要求するconnected/touchingへ閉じた三日月を渡すと不適合を診断する。
+
+大きさの指定が重なるときは、原文の全候補を保持し、各候補を独立に物理寸法へ解決して小さい幅を採用する。明示寸法が形を指定する場合はその縦横比を一度だけ拡縮し、相対サイズを二重に掛けない。同じ大きさの重複もエラーとして示す。`ConflictingSizeSpecifications`は候補寸法と採用寸法を持ち、処置`Recovered`はStop/Continueの両方でその図形を描くことを表す。この例外は重複サイズだけであり、形の不整合、未対応属性、source/lockの整合性不良を回復可能にしない。これは共通compilerからScoreと診断までの接続であり、現行のPython生成経路やUIへの置換を意味しない。
 
 ### 12.12 添景と互換記録
 
@@ -954,7 +961,7 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 - SVG フィルターとテクスチャ効果
 - キャンバス比の扱い
 
-現行の標準実装はRender Engine 42であり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostでcoerce済みScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
+現行の標準実装は共有Rust rendererであり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostでcoerce済みScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
 
 Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroidと将来のclientへ同じcoreを渡すportability boundaryである。Android bindingはEngine 42で統合済みであり、Android固有のKotlin rendererへfallbackしない。
 

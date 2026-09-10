@@ -829,7 +829,10 @@ fn validate_body(
                         "variation"
                     } else if field == "layout_direction" {
                         "angle"
-                    } else if field == "proportion_aspect" {
+                    } else if matches!(
+                        field.as_str(),
+                        "proportion_aspect" | "proportion_width_extent" | "proportion_arc_form"
+                    ) {
                         "ratio"
                     } else {
                         field.as_str()

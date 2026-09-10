@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -27,14 +28,15 @@ from inku_server.schema import GroundMaterial, Score
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
 CORPUS_FORMAT_VERSION = "2"
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
+CRESCENT_SCHEMA_VERSION = "0.2.0"
 FROZEN_AT = "2026-08-21"
 REASON = (
-    "Non-computer solid surfaces now keep a real base fill and use a deterministic "
-    "standard SVG mottle filter in editable and display output. Compat keeps a "
-    "filter-free flat vector base fill, and computer keeps its periodic scan. Engine 40 "
-    "adds the four direct cases C-surface-solid-pen, C-display-surface-solid-pen, "
-    "C-compat-surface-solid-pen, and C-display-surface-solid-computer."
+    "Engine 46 adds the author-approved filled crescent descriptor: its exact three-cubic "
+    "Saijiki contour is fitted to the stated physical center and size, then rotated with "
+    "the normal mark transform. The legacy 0.1 inputs intentionally omit arc_form and "
+    "remain their byte-fixed controls; C-crescent-rotring and C-crescent-pen-rotated "
+    "are the new 0.2 cases."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -126,10 +128,12 @@ def _score(
     aspect: str = "square",
     ground: dict[str, Any] | None = None,
     background: str = "white",
+    version: str = BASE_SCORE["version"],
 ) -> dict[str, Any]:
     result = copy.deepcopy(BASE_SCORE)
     result["canvas"] = {"aspect": aspect, "ground": copy.deepcopy(ground)}
     result["background"] = background
+    result["version"] = version
     result["instructions"] = [copy.deepcopy(instruction)]
     return result
 
@@ -139,6 +143,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
           background: str = "white",
           render_seed: int = DEFAULT_RENDER_SEED,
           composition_seed: int | None = None,
+          score_version: str = BASE_SCORE["version"],
           color_map: dict[str, str] = DEFAULT_COLOR_MAP,
           catalog_id: str | None = None,
           svg_profile: str = SVG_PROFILE,
@@ -147,7 +152,8 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
         raise ValueError(f"duplicate case ID: {case_id}")
     cases[case_id] = {
         "score": _score(
-            instruction, aspect=aspect, ground=ground, background=background
+            instruction, aspect=aspect, ground=ground, background=background,
+            version=score_version,
         ),
         "render_seed": render_seed,
         "color_map": copy.deepcopy(color_map),
@@ -213,6 +219,33 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         for tool in ("pencil", "crayon", "brush_thick"):
             _case(cases, f"C-fill-{primitive}-{tool}",
                   _instruction(primitive, weight=tool, filled=True))
+
+    # Engine 46: ``arc_form=crescent`` is the only new descriptor.  The first
+    # case fixes the exact cubic fill on the direct SVG path; the second carries
+    # the sampled hand contour through a non-zero rotation.  Their score
+    # version is 0.2 while every earlier literal input remains an explicit 0.1
+    # control with no new optional key.
+    crescent_size = [0.20, 0.2572564393705176]
+    _case(
+        cases,
+        "C-crescent-rotring",
+        _instruction(
+            "arc", center=[0.50, 0.50], radius=None, size=crescent_size,
+            angle_start=None, angle_end=None, arc_form="crescent", filled=True,
+            weight="rotring",
+        ),
+        score_version=CRESCENT_SCHEMA_VERSION,
+    )
+    _case(
+        cases,
+        "C-crescent-pen-rotated",
+        _instruction(
+            "arc", center=[0.72, 0.34], radius=None, size=crescent_size,
+            angle_start=None, angle_end=None, arc_form="crescent", filled=True,
+            rotation=30.0, weight="pen",
+        ),
+        score_version=CRESCENT_SCHEMA_VERSION,
+    )
 
     # Engine 22 branches a fill on coverage, and the engine-21 corpus could not
     # tell that rule from a hand-written list of tool names: it carried zero
@@ -813,10 +846,12 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # the two drawing paths a line has plus an arc, and a closed control -- and
     # five that reach the texture filters, which no `display` case in the
     # corpus could reach while all four of them were `pen`.
-    expected = {"A": 88, "B": 72, "C": 88, "D": 61, "E": 119, "F": 128,
+    # Engine 46 adds the two direct crescent cases above.  The old 0.1 inputs
+    # deliberately stay in place, so their unchanged SVGs remain controls.
+    expected = {"A": 88, "B": 72, "C": 90, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 610:
+    if actual != expected or len(cases) != 612:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -859,6 +894,11 @@ def _previous_manifest(engine_version: str) -> dict[str, Any] | None:
 
 
 def _source_commit() -> str:
+    archive_commit = os.environ.get("INKU_SOURCE_COMMIT")
+    if archive_commit is not None:
+        if len(archive_commit) != 40 or any(c not in "0123456789abcdef" for c in archive_commit):
+            raise ValueError("INKU_SOURCE_COMMIT must be a full lowercase Git commit SHA")
+        return archive_commit
     return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REFERENCE_ROOT.parent.parent,
                           check=True, capture_output=True, text=True).stdout.strip()
 

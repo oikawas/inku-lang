@@ -1163,6 +1163,65 @@ fn strict_stage15_api_still_rejects_a_noncanonical_compilation() {
     assert!(stage15_transformation_input(&compilation).is_err());
 }
 
+#[test]
+fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl() {
+    let definition = MacroDefinition::from_json(
+        &serde_json::json!({
+            "schema": "inku.macro-definition.v1",
+            "namespace": "Size",
+            "heading": "RecoveredCircle",
+            "version": "1.0.0",
+            "parameters": {},
+            "components": {},
+            "body": [{
+                "op": "emit",
+                "binding": null,
+                "fields": {
+                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                    "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+                    "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+                    "relative_scale": {"expr": "semantic_ref", "category": "relative_scale", "id": "small"},
+                    "proportion_width_extent": {"expr": "semantic_ref", "category": "ratio", "id": "full_width"}
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let ordinary_source = "place one small red full-width circle at center.";
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let ordinary = execute(ordinary_source, &[], LIMITS, policy);
+        let declared = execute_locked(
+            "Size.RecoveredCircle",
+            &[definition.clone()],
+            LIMITS,
+            policy,
+        );
+        for result in [&ordinary, &declared] {
+            assert_eq!(
+                result.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{:?} {:?}",
+                result.upstream_diagnostics(),
+                result.downstream_diagnostics()
+            );
+            assert!(matches!(
+                result.downstream_diagnostics(),
+                [inku_ddl::ScoreLoweringDiagnostic {
+                    reason: ScoreFieldGap::ConflictingSizeSpecifications { .. },
+                    disposition: ScoreDiagnosticDisposition::Recovered,
+                    ..
+                }]
+            ));
+        }
+        let ordinary_radius = ordinary.score().unwrap().instructions[0].radius.unwrap();
+        let declared_radius = declared.score().unwrap().instructions[0].radius.unwrap();
+        assert!((ordinary_radius - declared_radius).abs() < 1e-12);
+        assert!((declared_radius - 0.06).abs() < 1e-12);
+    }
+}
+
 fn execute(
     source: &str,
     definitions: &[MacroDefinition],

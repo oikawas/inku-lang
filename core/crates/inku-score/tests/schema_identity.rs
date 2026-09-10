@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "b89cb89d4fc23b325f8d790a77392bcd48ba439160d60516742972d7df24c0a7";
+    "e2aea569171ec1f3aa8cf1d809b94eb37f12b8ede333ea281edc07ad1898ec7f";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -45,6 +45,8 @@ fn canonical_score_schema_identity_is_stable() {
             .expect("position description")
             .contains("semantic anchor")
     );
+    assert_eq!(instruction["arc_form"]["default"], Value::Null);
+    assert_eq!(instruction["arc_form"]["anyOf"][0]["const"], "crescent");
     let relation = schema["$defs"]["Relation"]["properties"]
         .as_object()
         .expect("Relation properties must be an object");

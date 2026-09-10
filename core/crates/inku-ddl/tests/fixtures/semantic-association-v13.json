@@ -1413,11 +1413,10 @@
       "language": "en",
       "source": "full-width half-width line.",
       "entity_count": 1,
-      "issue_kinds": [
-        "conflicting_proportion_width_extents"
-      ],
-      "canonical": null,
-      "owned_occurrence_count": 3
+      "issue_kinds": [],
+      "canonical": "{\"entities\":[{\"additional_width_extents\":[{\"category\":\"ratio\",\"id\":\"half_width\"}],\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":{\"category\":\"ratio\",\"id\":\"full_width\"}},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v14\"}",
+      "owned_occurrence_count": 3,
+      "proportion_width_extents": ["full_width"]
     },
     {
       "id": "conflicting-proportion-arc-forms",

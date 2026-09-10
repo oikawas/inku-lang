@@ -1,0 +1,93 @@
+{
+  "schema": "inku.step10z-macro-score-parity-v1",
+  "version": 1,
+  "context": {
+    "canvas_format": "square",
+    "background": "white",
+    "composition_seed": 23,
+    "error_policy": "stop"
+  },
+  "cases": [
+    {
+      "id": "full-width-line",
+      "ordinary_source": "place one red full-width horizontal line at center.",
+      "macro_source": "Step10Z.FullWidthLine",
+      "macro_definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Step10Z",
+        "heading": "FullWidthLine",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {"expr": "semantic_ref", "category": "shape", "id": "line"},
+              "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+              "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+              "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+              "angle": {"expr": "semantic_ref", "category": "angle", "id": "horizontal"},
+              "proportion_width_extent": {"expr": "semantic_ref", "category": "ratio", "id": "full_width"}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "half-width-semicircle",
+      "ordinary_source": "place one red half-width semicircle arc at center.",
+      "macro_source": "Step10Z.HalfWidthSemicircle",
+      "macro_definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Step10Z",
+        "heading": "HalfWidthSemicircle",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+              "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+              "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+              "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+              "proportion_width_extent": {"expr": "semantic_ref", "category": "ratio", "id": "half_width"},
+              "proportion_arc_form": {"expr": "semantic_ref", "category": "ratio", "id": "semicircle"}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "full-width-crescent",
+      "ordinary_source": "place one red full-width crescent arc at center.",
+      "macro_source": "Step10Z.FullWidthCrescent",
+      "macro_definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Step10Z",
+        "heading": "FullWidthCrescent",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": null,
+            "fields": {
+              "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+              "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+              "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+              "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+              "proportion_width_extent": {"expr": "semantic_ref", "category": "ratio", "id": "full_width"},
+              "proportion_arc_form": {"expr": "semantic_ref", "category": "ratio", "id": "crescent"}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

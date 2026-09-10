@@ -601,6 +601,92 @@ fn definition_local_place_alias_materializes_only_the_canonical_value() {
 }
 
 #[test]
+fn proportion_width_extent_and_arc_form_preserve_literal_parameter_and_local_values() {
+    let definition = MacroDefinition::from_json(
+        &serde_json::json!({
+            "schema": "inku.macro-definition.v1",
+            "namespace": "Proportion",
+            "heading": "Fields",
+            "version": "1.0.0",
+            "parameters": {
+                "extent": {"type": "semantic_ref", "category": "ratio"}
+            },
+            "components": {},
+            "body": [
+                {
+                    "op": "emit",
+                    "binding": null,
+                    "fields": {
+                        "proportion_width_extent": {"expr": "parameter", "name": "extent"},
+                        "proportion_arc_form": {"expr": "semantic_ref", "category": "ratio", "id": "crescent"}
+                    }
+                },
+                {
+                    "op": "vary",
+                    "binding": "arc_form",
+                    "domain": "arc_form",
+                    "choices": [{"expr": "semantic_ref", "category": "ratio", "id": "waning"}],
+                    "range": null,
+                    "body": [{
+                        "op": "emit",
+                        "binding": null,
+                        "fields": {
+                            "proportion_width_extent": {"expr": "semantic_ref", "category": "ratio", "id": "half_width"},
+                            "proportion_arc_form": {"expr": "local", "name": "arc_form"}
+                        }
+                    }]
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    assert!(definition.validate().is_valid());
+
+    let binding = binding(&definition, "Proportion.Fields full-width", "en");
+    assert_eq!(binding.complete.len(), 1, "{:?}", binding.diagnostics);
+    let seeds = seeds(&binding, "Proportion.Fields full-width", 17);
+    let result = expand_macros(binding, std::slice::from_ref(&definition), &seeds, LIMITS);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let emitted = flatten(&result.expanded[0].nodes)
+        .into_iter()
+        .filter_map(|node| match node {
+            ExpandedMacroNode::Emit { fields, .. } => Some(fields),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(emitted.len(), 2);
+    assert_eq!(
+        emitted[0].get("proportion_width_extent"),
+        Some(&ExpandedMacroValue::SemanticRef {
+            category: "ratio".to_owned(),
+            id: "full_width".to_owned(),
+        })
+    );
+    assert_eq!(
+        emitted[0].get("proportion_arc_form"),
+        Some(&ExpandedMacroValue::SemanticRef {
+            category: "ratio".to_owned(),
+            id: "crescent".to_owned(),
+        })
+    );
+    assert_eq!(
+        emitted[1].get("proportion_width_extent"),
+        Some(&ExpandedMacroValue::SemanticRef {
+            category: "ratio".to_owned(),
+            id: "half_width".to_owned(),
+        })
+    );
+    assert_eq!(
+        emitted[1].get("proportion_arc_form"),
+        Some(&ExpandedMacroValue::SemanticRef {
+            category: "ratio".to_owned(),
+            id: "waning".to_owned(),
+        })
+    );
+}
+
+#[test]
 fn fluctuation_use_checks_deferred_broad_values_and_preserves_semantic_identity() {
     let definition = MacroDefinition::from_json(&serde_json::json!({
         "schema":"inku.macro-definition.v1", "namespace":"Sway", "heading":"Mark", "version":"1.0.0",

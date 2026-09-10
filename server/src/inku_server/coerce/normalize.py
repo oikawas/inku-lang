@@ -148,6 +148,21 @@ def _fix_arc_angles(data: dict) -> None:
         data["angle_end"] = (data.get("angle_start", 0) + 270.0) % 360.0
 
 
+def _field_specs_for(ins: Instruction) -> list[FieldSpec]:
+    """Return the geometry that belongs to this declared form.
+
+    A crescent remains the canonical ``arc`` primitive, but it is a closed,
+    filled descriptor whose physical box is ``center`` plus ``size``.  Giving
+    it the legacy arc defaults would silently turn it back into an open arc.
+    """
+    if ins.primitive == "arc" and ins.arc_form == "crescent":
+        return [
+            FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
+            FieldSpec("size", [0.3, 0.3], coerce=_as_positive_size),
+        ]
+    return PRIMITIVE_SPECS.get(ins.primitive, [])
+
+
 POST_COERCE: dict[str, Callable[[dict], None]] = {
     "arc": _fix_arc_angles,
 }
@@ -170,6 +185,8 @@ VISIBLE_ON_BACKGROUND: dict[str, str] = {
 
 
 def _shape_extent(ins: Instruction) -> float:
+    if ins.primitive == "arc" and ins.arc_form == "crescent" and ins.size:
+        return max(float(ins.size[0]), float(ins.size[1]))
     if ins.primitive in ("circle", "arc", "polygon"):
         return float(ins.radius or 0.0) * 2
     if ins.size:
@@ -980,6 +997,8 @@ def ensure_renderable_score(score: Score) -> None:
 def _has_relation_contour(ins: Instruction) -> bool:
     if ins.primitive == "line":
         return ins.from_ is not None and ins.to is not None
+    if ins.primitive == "arc" and ins.arc_form == "crescent":
+        return ins.center is not None and ins.size is not None
     if ins.primitive in {"circle", "arc", "polygon"}:
         return ins.center is not None and ins.radius is not None
     if ins.primitive in {"ellipse", "cloudform"}:
@@ -1021,7 +1040,7 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
     """
     data = ins.model_dump(by_alias=True)
 
-    for spec in PRIMITIVE_SPECS.get(ins.primitive, []):
+    for spec in _field_specs_for(ins):
         val = data.get(spec.name)
 
         # (1) None → fallback を順に試みる
@@ -1042,7 +1061,7 @@ def _coerce_instruction(ins: Instruction) -> Instruction:
         data[spec.name] = val
 
     # (3) cross-field 補正
-    if post := POST_COERCE.get(ins.primitive):
+    if ins.arc_form != "crescent" and (post := POST_COERCE.get(ins.primitive)):
         post(data)
 
     return Instruction.model_validate(data)

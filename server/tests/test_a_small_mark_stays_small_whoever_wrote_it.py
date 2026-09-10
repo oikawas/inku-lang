@@ -220,7 +220,7 @@ def test_no_frozen_engine_below_this_one_was_rewritten() -> None:
     Baking engine 17 is exactly the moment an older directory gets rewritten by
     accident, which is what this reads for.
     """
-    assert DDL_ENGINE_VERSION == "21"
+    assert DDL_ENGINE_VERSION == "22"
 
     checked = 0
     for version in range(1, int(DDL_ENGINE_VERSION)):
@@ -240,4 +240,5 @@ def test_no_frozen_engine_below_this_one_was_rewritten() -> None:
     # the version that was baked is the only directory that moved. Engine 20
     # moves 19's 49 in the same way, which is what 718 says. Engine 21 moves
     # engine 20's 49 into the same immutable-history check: 767 total.
-    assert checked == 767
+    # Engine 22 also checks engine 21's 53 cases, for 820 historical outputs.
+    assert checked == 820

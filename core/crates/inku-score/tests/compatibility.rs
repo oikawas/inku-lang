@@ -97,6 +97,18 @@ fn saved_score_compatibility_rejects_invalid_artifacts() {
 }
 
 #[test]
+fn crescent_is_rejected_when_mislabeled_as_score_0_1() {
+    let source = br#"{"version":"0.1.0","instructions":[{
+        "primitive":"arc","arc_form":"crescent","center":[0.5,0.5],
+        "size":[0.2,0.2572564393705176],"filled":true
+    }]}"#;
+    assert!(read_saved_score_json(source).is_err());
+
+    let direct: Score = serde_json::from_slice(source).expect("typed Score can inspect input");
+    assert!(canonical_json_bytes(&direct).is_err());
+}
+
+#[test]
 fn point_roundtrips_while_an_old_arc_keeps_the_absent_semantic_anchor() {
     let source = br#"{"instructions":[
         {"primitive":"point","center":[0.25,0.4],"radius":0.006,"filled":true},

@@ -97,7 +97,7 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "45");
+    assert_eq!(metadata.render_engine_version, "46");
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -149,7 +149,7 @@ fn engine_renders_every_primitive_through_one_request() {
     let first = render(request.clone()).unwrap();
     let second = render(request).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.metadata.render_engine_version, "45");
+    assert_eq!(first.metadata.render_engine_version, "46");
     assert!(first.svg.starts_with("<svg"));
     assert!(first.svg.ends_with("</svg>"));
     assert!(first.svg.contains("stroke-engine-v1"));
@@ -158,6 +158,35 @@ fn engine_renders_every_primitive_through_one_request() {
     assert!(!first.svg.contains("NaN"));
     assert!(!first.svg.contains("<filter"));
     assert!(!first.svg.contains("<clipPath"));
+}
+
+#[test]
+fn filled_crescent_uses_the_saijiki_contour_and_physical_bbox() {
+    let request = RenderRequest {
+        score: score(
+            r#"{"version":"0.2.0","instructions":[{
+                "primitive":"arc","arc_form":"crescent","center":[0.5,0.5],
+                "size":[0.2,0.257256],"rotation":30,"filled":true,"weight":"rotring",
+                "color":"black"
+            }]}"#,
+        ),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(17),
+            composition_seed: None,
+            wild: false,
+            error_policy: Default::default(),
+        },
+    };
+    let output = render(request).expect("crescent must render");
+    assert!(output.svg.contains("C "));
+    assert!(output.svg.contains("rotate(30 500 500)"));
+    assert!(output.svg.contains("fill=\"#111111\""));
+    assert!(!output.svg.contains(" NaN"));
 }
 
 #[test]

@@ -1068,6 +1068,7 @@ fn semantic_entity_owned_spans(entity: &SemanticEntity) -> BTreeSet<(usize, usiz
     ]
     .into_iter()
     .flatten()
+    .chain(&entity.additional_width_extents)
     {
         insert_term(term);
     }
@@ -1090,12 +1091,25 @@ fn semantic_entity_owned_spans(entity: &SemanticEntity) -> BTreeSet<(usize, usiz
             thinness.provenance.span.end_byte,
         ));
     }
-    if let Some(relative_scale) = &entity.relative_scale {
+    for relative_scale in entity
+        .relative_scale
+        .iter()
+        .chain(&entity.additional_relative_scales)
+    {
         spans.insert((
             relative_scale.provenance.span.start_byte,
             relative_scale.provenance.span.end_byte,
         ));
     }
+    for geometry in entity
+        .explicit_geometry
+        .iter()
+        .chain(&entity.additional_explicit_geometries)
+    {
+        let span = geometry.source().span;
+        spans.insert((span.start_byte, span.end_byte));
+    }
+
     spans
 }
 
@@ -1997,6 +2011,22 @@ fn english_entity_to_marker_gap_is_clear(
                     .clause_topology
                     .determiner_starts
                     .contains(&span.start_byte)
+                    || (attachment_marker_at(association, clause_index, span.start_byte)
+                        == Some(AttachmentMarkerKind::English(
+                            EnglishAttachmentMarkerKind::With,
+                        ))
+                        && association.ast.entities.iter().any(|entity| {
+                            entity.head.source().clause_index == clause_index
+                                && entity.head.source().span.end_byte == start_byte
+                                && entity
+                                    .explicit_geometry
+                                    .iter()
+                                    .chain(&entity.additional_explicit_geometries)
+                                    .any(|geometry| {
+                                        span.end_byte <= geometry.source().span.start_byte
+                                            && geometry.source().span.end_byte <= end_byte
+                                    })
+                        }))
                     || matches!(
                         attachment_marker_at(association, clause_index, span.start_byte),
                         Some(AttachmentMarkerKind::English(

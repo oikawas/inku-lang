@@ -3,7 +3,10 @@
 use std::collections::BTreeSet;
 
 use crate::determinism::{hash_to_unit, periodic_value_noise_1d, value_noise_1d, wave_phase};
-use crate::types::{CanvasSize, Dimension, Frequency, Point, Quality, Seed, Variation};
+use crate::types::{
+    CRESCENT_REFERENCE_CUBICS, CanvasSize, Dimension, Frequency, Point, Quality, Seed, Variation,
+    crescent_transform_point,
+};
 
 pub const SEGMENT_TARGET_RATIO: f64 = 0.01;
 pub const SEGMENT_COUNT_MIN: usize = 32;
@@ -397,6 +400,34 @@ pub fn circle_points(center: Point, rx: f64, ry: f64, count: usize) -> Vec<Point
             Point::new(center.x + angle.cos() * rx, center.y + angle.sin() * ry)
         })
         .collect()
+}
+
+/// Sample the fixed Saijiki crescent after scaling it to its physical bounding box.
+#[must_use]
+pub fn crescent_contour_points(center: Point, size: Point, samples_per_cubic: usize) -> Vec<Point> {
+    let samples = samples_per_cubic.max(2);
+    let mut points = Vec::with_capacity(CRESCENT_REFERENCE_CUBICS.len() * samples);
+    for (segment_index, cubic) in CRESCENT_REFERENCE_CUBICS.iter().enumerate() {
+        for sample in 0..samples {
+            if segment_index > 0 && sample == 0 {
+                continue;
+            }
+            let t = sample as f64 / (samples - 1) as f64;
+            let inverse = 1.0 - t;
+            let reference = Point::new(
+                inverse.powi(3) * cubic[0].x
+                    + 3.0 * inverse.powi(2) * t * cubic[1].x
+                    + 3.0 * inverse * t.powi(2) * cubic[2].x
+                    + t.powi(3) * cubic[3].x,
+                inverse.powi(3) * cubic[0].y
+                    + 3.0 * inverse.powi(2) * t * cubic[1].y
+                    + 3.0 * inverse * t.powi(2) * cubic[2].y
+                    + t.powi(3) * cubic[3].y,
+            );
+            points.push(crescent_transform_point(reference, center, size, 0.0));
+        }
+    }
+    points
 }
 
 #[must_use]

@@ -72,6 +72,11 @@ pub enum PlacementRecipe {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObjectPlacementPlan {
+    pub(crate) arc_form: Option<inku_score::ArcForm>,
+    pub(crate) proportion_width_extent: Option<crate::SemanticIdentity>,
+    pub(crate) additional_relative_scales: Vec<crate::SemanticRelativeScale>,
+    pub(crate) additional_explicit_geometries: Vec<SemanticExplicitGeometry>,
+    pub(crate) additional_width_extents: Vec<crate::SemanticTerm>,
     pub(crate) shape_constraint: Option<crate::ShapeConstraint>,
     pub(crate) proportion_aspect: Option<crate::SemanticIdentity>,
     pub(crate) origin: ScoreInstructionOrigin,
@@ -97,6 +102,21 @@ pub struct ResolvedLayoutDirection {
 }
 
 impl ObjectPlacementPlan {
+    pub fn arc_form(&self) -> Option<inku_score::ArcForm> {
+        self.arc_form
+    }
+    pub fn proportion_width_extent(&self) -> Option<&crate::SemanticIdentity> {
+        self.proportion_width_extent.as_ref()
+    }
+    pub fn additional_relative_scales(&self) -> &[crate::SemanticRelativeScale] {
+        &self.additional_relative_scales
+    }
+    pub fn additional_explicit_geometries(&self) -> &[SemanticExplicitGeometry] {
+        &self.additional_explicit_geometries
+    }
+    pub fn additional_width_extents(&self) -> &[crate::SemanticTerm] {
+        &self.additional_width_extents
+    }
     pub fn shape_constraint(&self) -> Option<crate::ShapeConstraint> {
         self.shape_constraint
     }

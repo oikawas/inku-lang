@@ -300,7 +300,7 @@ _SYSTEM_PROMPT_PREFIX_TEMPLATE = ("""あなたは inku DDL の第一段階イン
 - 半円 → 弧の 180° (上半分: 右から左へ円弧)
 - 上弦 → D字形の弧 (右側半円)
 - 下弦 → C字形の弧 (左側半円)
-- 三日月 → 細い弧 約120°〜150°
+- 三日月 → 細い閉じた塗りの月形（弧として指定する）
 
 # かたむき (角度・回転)
 
@@ -688,7 +688,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["三日月", "細い月", "クレセント", "月", "弦月"],
         "input": "三日月が夜空に浮かぶ",
-        "output": "背景を黒で埋める。三日月の弧を右上に置く。半径は0.12。",
+        "output": "小さい黒い三日月の弧を中央に置く。",
     },
     # 地の質感: 「地: ...」の別文として保持する (canvas.ground 経路)
     {
@@ -965,9 +965,9 @@ EXAMPLE_POOL_EN: list[dict] = [
         "output": "Place a semicircle arc at center. Radius 0.2.",
     },
     {
-        "keywords": ["crescent", "moon", "thin arc", "sliver", "waning"],
+        "keywords": ["crescent", "moon", "thin closed moon", "sliver"],
         "input": "A crescent moon in the night sky",
-        "output": "Fill background with black. Place a crescent arc in the upper right. Radius 0.12.",
+        "output": "Place one small black crescent arc at horizontal 0.7 vertical 0.25.",
     },
     # Ground texture: keep as a separate "Ground: ..." sentence (canvas.ground route)
     {
@@ -1199,7 +1199,7 @@ Arc / Moon:
 - semicircle → 180° arc (upper half: right to left)
 - waxing → D-shape arc (right semicircle)
 - waning → C-shape arc (left semicircle)
-- crescent → thin arc ~120°–150°
+- crescent → thin closed filled moon (write it as a crescent arc)
 
 # Angles / Rotation
 

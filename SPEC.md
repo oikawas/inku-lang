@@ -1430,7 +1430,7 @@ explicit geometry, finite flat Macro Emits, and the shared default Stop / explic
 OmitAndContinue error policy are implemented through an actual Score but are not
 connected to runtime. The `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains its source, state, lock, and issues.
-Stop returns no Score for upstream holes or conflicts. Explicit Continue alone uses
+Stop returns no Score for upstream holes or conflicts without an explicit recovery rule. Explicit Continue alone uses
 the same compilation's typed owners and dependencies to build a sealed projection
 and deliver independent instructions; omitting every drawing unit is stopped.
 Canonical pre-meaning reuses the exact subset of successful macro output with its
@@ -1440,8 +1440,9 @@ omissions before one seed derivation and expansion and never retries a draw afte
 local failure. Global budgets and source, lock, owner, definition, or provenance
 integrity failures stop both modes. The public Stage 1.5 API remains
 `CanonicalReady`-only and cannot recover an arbitrary mutable compilation. D1
-meaning, seed, focus, source-ordinal gaps, generated provenance, the geometry policy
-digest, and the Score wire are unchanged. The current Python coerce and LLM fallback
+meaning, seed, focus, source-ordinal gaps, and generated provenance are preserved.
+The added sizing rules update the geometry policy digest, and Score 0.2.0 carries
+the new moon descriptor. The current Python coerce and LLM fallback
 have not been replaced by this facade; runtime / UI / API / persistence connection
 remains later work.
 
@@ -1454,6 +1455,13 @@ named focus adds no must-fit check. This does not complete Step 10 as a whole.
 The same runtime-disconnected subset delivers finite two-step thinness from direct and flat
 Macro Emit input to actual `Instruction.thinness`, and binds explicitly declared thinness and size
 parameters through §4.6. This delivery does not complete Step 10 as a whole.
+
+
+Full-width and half-width use 100% and 50% of the canvas width before rotation. Their reference dimension is line length, open-arc chord length, the base outline width of a closed shape, or declared cloudform width. Uniform scaling preserves the shape and aspect ratio. Rotation and stroke variation do not trigger another width measurement or force edge contact or repositioning. Ordinary DDL and declared flat Macro Emit `proportion_width_extent` fields use the same size resolver.
+
+Semicircle is an upward open semicircle; waxing bulges right and waning left. Crescent is the thin closed filled moon shown in the saijiki, never a single open arc. Score 0.2.0 represents it with `primitive: arc`, `arc_form: crescent`, `center`, and `size`. Its reference is the saijiki's three cubic Bezier curves, sized by their actual bounds. An absent `arc_form` retains legacy open-arc meaning and canonical bytes, and saved Score 0.1.0 remains readable. Position, rotation, and bounds use the shared renderer. Endpoint-only connected/touching relations reject the closed crescent with a diagnostic.
+
+Overlapping size specifications retain all original candidates. The resolver independently computes their physical reference dimensions and chooses the smaller extent, scaling the original shape once without multiplying relative size into explicit size a second time. Equal duplicates also produce an error. `ConflictingSizeSpecifications` records candidate and effective extents; its `Recovered` disposition draws the shape under both Stop and Continue. This exception applies only to size overlaps, not shape incompatibility, unsupported attributes, or source/lock integrity failures. This connects the shared compiler to Score and diagnostics; it does not replace the current Python generation path or connect its UI.
 
 ### 12.12 Staffage and Compatibility Records
 

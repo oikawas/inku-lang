@@ -111,7 +111,7 @@ def test_surface_is_declared_last() -> None:
     pass silently.
     """
     properties = _instruction_properties()
-    assert len(properties) == 25
+    assert len(properties) == 26
     assert list(properties)[-1] == "surface"
     assert list(Instruction.model_fields)[-1] == "surface"
 

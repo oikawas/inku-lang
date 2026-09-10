@@ -37,13 +37,13 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         request = json.loads(request_json)
         calls.append(request)
         return "<svg/>", json.dumps(
-            {"render_engine_id": "default", "render_engine_version": "45"}
+            {"render_engine_id": "default", "render_engine_version": "46"}
         )
 
     native = SimpleNamespace(
         default_color_map_json=lambda: json.dumps({"black": "#111111"}),
         render_engine_id=lambda: "default",
-        render_engine_version=lambda: "45",
+        render_engine_version=lambda: "46",
         render=render,
     )
     monkeypatch.setattr(adapter, "_native_binding", lambda: native)
@@ -63,9 +63,9 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         composition_seed=-7,
     )
     assert engine.id == "default"
-    assert engine.version == "45"
+    assert engine.version == "46"
     assert result.svg == "<svg/>"
-    assert result.metadata["render_engine_version"] == "45"
+    assert result.metadata["render_engine_version"] == "46"
     assert len(calls) == 1
     request = calls[0]
     assert request["score"]["instructions"][0]["from"] == [0.1, 0.2]
@@ -80,7 +80,7 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
 def test_current_engine_is_the_default_rust_adapter():
     assert current_render_engine() is adapter.DEFAULT_RENDER_ENGINE
     assert current_render_engine().id == "default"
-    assert current_render_engine().version == "45"
+    assert current_render_engine().version == "46"
 
 
 def test_default_package_exports_the_thin_adapter_contract():
@@ -253,7 +253,7 @@ def test_step10q_endpoint_family_native():
     )
 
     assert result.metadata["render_engine_id"] == "default"
-    assert result.metadata["render_engine_version"] == "45"
+    assert result.metadata["render_engine_version"] == "46"
     assert 'id="instruction_000_line_red"' in result.svg
     assert 'id="instruction_001_arc_blue"' in result.svg
     assert 'id="instruction_002_point_black"' in result.svg
@@ -289,7 +289,7 @@ def test_step10r_touching_native():
         ],
     })
     success = current_render_engine().render(score, svg_profile="editable", render_seed=23)
-    assert success.metadata["render_engine_version"] == "45"
+    assert success.metadata["render_engine_version"] == "46"
     assert "execution" not in success.metadata
     assert "instruction_001_arc_blue" in success.svg
     assert "instruction_002_line_green" in success.svg
@@ -355,7 +355,7 @@ def test_step10q_connected_native():
         render_seed=0,
         composition_seed=0,
     )
-    assert success.metadata["render_engine_version"] == "45"
+    assert success.metadata["render_engine_version"] == "46"
     assert "execution" not in success.metadata
     assert 'id="instruction_000_line_red"' in success.svg
     assert 'id="instruction_001_arc_blue"' in success.svg

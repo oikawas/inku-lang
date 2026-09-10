@@ -240,6 +240,7 @@ mod tests {
                     asset_id: "inku.saijiki.v1".to_owned(),
                     category_key: "katachi".to_owned(),
                     canonical_surface_ja: "円".to_owned(),
+                    shape_constraint: None,
                     span: SourceSpan {
                         start_byte: 1,
                         end_byte: 7,

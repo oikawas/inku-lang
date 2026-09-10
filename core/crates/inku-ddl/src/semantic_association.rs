@@ -329,6 +329,10 @@ pub struct SemanticEntity {
     pub thinness: Option<SemanticThinness>,
     pub relative_scale: Option<SemanticRelativeScale>,
     pub explicit_geometry: Option<SemanticExplicitGeometry>,
+    /// Additional original size candidates, resolved after canvas selection.
+    pub additional_relative_scales: Vec<SemanticRelativeScale>,
+    pub additional_explicit_geometries: Vec<SemanticExplicitGeometry>,
+    pub additional_width_extents: Vec<SemanticTerm>,
     pub numeric_position: Option<SemanticNumericPosition>,
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
@@ -2064,42 +2068,11 @@ fn associate_region(
             None
         }
     };
-    let mut relative_scale = match owned_region.relative_scales.len() {
-        0 => None,
-        1 => owned_region.relative_scales.pop(),
-        _ => {
-            issues.push(SemanticAssociationIssue {
-                kind: SemanticAssociationIssueKind::ConflictingRelativeScales,
-                region_index,
-                occurrences: owned_region
-                    .relative_scales
-                    .into_iter()
-                    .map(OwnedSemanticOccurrence::RelativeScale)
-                    .collect(),
-                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
-                upstream_diagnostic: None,
-            });
-            None
-        }
-    };
-    let mut explicit_geometry = match owned_region.explicit_geometries.len() {
-        0 => None,
-        1 => owned_region.explicit_geometries.pop(),
-        _ => {
-            issues.push(SemanticAssociationIssue {
-                kind: SemanticAssociationIssueKind::ConflictingExplicitGeometries,
-                region_index,
-                occurrences: owned_region
-                    .explicit_geometries
-                    .into_iter()
-                    .map(OwnedSemanticOccurrence::ExplicitGeometry)
-                    .collect(),
-                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
-                upstream_diagnostic: None,
-            });
-            None
-        }
-    };
+    // Preserve all size owners for diagnostic recovery after canvas selection.
+    let (relative_scale, additional_relative_scales) =
+        take_size_candidates(owned_region.relative_scales);
+    let (explicit_geometry, additional_explicit_geometries) =
+        take_size_candidates(owned_region.explicit_geometries);
     let numeric_position = match owned_region.numeric_positions.len() {
         0 => None,
         1 => owned_region.numeric_positions.pop(),
@@ -2118,24 +2091,6 @@ fn associate_region(
             None
         }
     };
-    if relative_scale.is_some() && explicit_geometry.is_some() {
-        issues.push(SemanticAssociationIssue {
-            kind: SemanticAssociationIssueKind::ConflictingRelativeAndExplicitGeometry,
-            region_index,
-            occurrences: vec![
-                OwnedSemanticOccurrence::RelativeScale(
-                    relative_scale
-                        .take()
-                        .expect("checked explicit relative scale"),
-                ),
-                OwnedSemanticOccurrence::ExplicitGeometry(
-                    explicit_geometry.take().expect("checked explicit geometry"),
-                ),
-            ],
-            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
-            upstream_diagnostic: None,
-        });
-    }
     let touch = select_term(
         owned_region.touches,
         OwnedSemanticOccurrence::Touch,
@@ -2225,13 +2180,8 @@ fn associate_region(
         region_index,
         issues,
     );
-    let width_extent = select_term(
-        owned_region.proportion_width_extents,
-        OwnedSemanticOccurrence::Proportion,
-        SemanticAssociationIssueKind::ConflictingProportionWidthExtents,
-        region_index,
-        issues,
-    );
+    let (width_extent, additional_width_extents) =
+        take_size_candidates(owned_region.proportion_width_extents);
     let arc_form = select_term(
         owned_region.proportion_arc_forms,
         OwnedSemanticOccurrence::Proportion,
@@ -2260,6 +2210,9 @@ fn associate_region(
         thinness,
         relative_scale,
         explicit_geometry,
+        additional_relative_scales,
+        additional_explicit_geometries,
+        additional_width_extents,
         numeric_position,
         touch,
         continuity,
@@ -2483,6 +2436,11 @@ fn take_proportion_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSeman
         .chain(region.unclassified_proportions.drain(..))
         .map(OwnedSemanticOccurrence::Proportion)
         .collect()
+}
+
+fn take_size_candidates<T>(values: Vec<T>) -> (Option<T>, Vec<T>) {
+    let mut values = values.into_iter();
+    (values.next(), values.collect())
 }
 
 fn select_term(
@@ -2743,6 +2701,9 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.thinness.is_some())
         + usize::from(entity.relative_scale.is_some())
         + usize::from(entity.explicit_geometry.is_some())
+        + entity.additional_relative_scales.len()
+        + entity.additional_explicit_geometries.len()
+        + entity.additional_width_extents.len()
         + usize::from(entity.numeric_position.is_some())
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
@@ -2774,6 +2735,43 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
 
 pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
     let mut record = BTreeMap::new();
+    if !entity.additional_relative_scales.is_empty() {
+        record.insert(
+            "additional_relative_scales".to_owned(),
+            Value::Array(
+                entity
+                    .additional_relative_scales
+                    .iter()
+                    .map(|value| Value::String(value.value.as_str().to_owned()))
+                    .collect(),
+            ),
+        );
+    }
+    if !entity.additional_explicit_geometries.is_empty() {
+        record.insert(
+            "additional_explicit_geometries".to_owned(),
+            Value::Array(
+                entity
+                    .additional_explicit_geometries
+                    .iter()
+                    .map(semantic_explicit_geometry_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !entity.additional_width_extents.is_empty() {
+        record.insert(
+            "additional_width_extents".to_owned(),
+            Value::Array(
+                entity
+                    .additional_width_extents
+                    .iter()
+                    .map(|value| semantic_identity_value(&value.identity))
+                    .collect(),
+            ),
+        );
+    }
+
     if let Some(constraint) = &entity.shape_constraint {
         record.insert(
             "shape_constraint".to_owned(),

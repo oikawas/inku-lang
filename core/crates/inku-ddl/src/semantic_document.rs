@@ -773,12 +773,16 @@ fn apply_continuation_occurrence(
         OwnedSemanticOccurrence::Thinness(value) => {
             set_if_empty(&mut instruction.entity.thinness, value)
         }
-        OwnedSemanticOccurrence::RelativeScale(value) => {
-            set_if_empty(&mut instruction.entity.relative_scale, value)
-        }
-        OwnedSemanticOccurrence::ExplicitGeometry(value) => {
-            set_if_empty(&mut instruction.entity.explicit_geometry, value)
-        }
+        OwnedSemanticOccurrence::RelativeScale(value) => append_size_candidate(
+            &mut instruction.entity.relative_scale,
+            &mut instruction.entity.additional_relative_scales,
+            value,
+        ),
+        OwnedSemanticOccurrence::ExplicitGeometry(value) => append_size_candidate(
+            &mut instruction.entity.explicit_geometry,
+            &mut instruction.entity.additional_explicit_geometries,
+            value,
+        ),
         OwnedSemanticOccurrence::NumericPosition(value) => {
             set_if_empty(&mut instruction.entity.numeric_position, value)
         }
@@ -805,9 +809,11 @@ fn apply_continuation_occurrence(
         },
         OwnedSemanticOccurrence::Proportion(term) => match term.identity.id.as_str() {
             "tall" | "wide" => set_if_empty(&mut instruction.entity.proportion.aspect, term),
-            "full_width" | "half_width" => {
-                set_if_empty(&mut instruction.entity.proportion.width_extent, term)
-            }
+            "full_width" | "half_width" => append_size_candidate(
+                &mut instruction.entity.proportion.width_extent,
+                &mut instruction.entity.additional_width_extents,
+                term,
+            ),
             "semicircle" | "waxing" | "waning" | "crescent" => {
                 set_if_empty(&mut instruction.entity.proportion.arc_form, term)
             }
@@ -817,6 +823,19 @@ fn apply_continuation_occurrence(
         | OwnedSemanticOccurrence::MacroDiagnostic(_)
         | OwnedSemanticOccurrence::Quantity(_) => false,
     }
+}
+
+fn append_size_candidate<T: Clone>(
+    target: &mut Option<T>,
+    additional: &mut Vec<T>,
+    value: &T,
+) -> bool {
+    if target.is_some() {
+        additional.push(value.clone());
+    } else {
+        *target = Some(value.clone());
+    }
+    true
 }
 
 fn set_if_empty<T: Clone>(target: &mut Option<T>, value: &T) -> bool {
@@ -991,8 +1010,6 @@ fn predicate_is_compatible(
             _ => true,
         }
         && option_is_mergeable(&left.thinness, &right.thinness)
-        && option_is_mergeable(&left.relative_scale, &right.relative_scale)
-        && option_is_mergeable(&left.explicit_geometry, &right.explicit_geometry)
         && option_is_mergeable(&left.numeric_position, &right.numeric_position)
         && option_is_mergeable(&left.touch, &right.touch)
         && option_is_mergeable(&left.continuity, &right.continuity)
@@ -1003,10 +1020,6 @@ fn predicate_is_compatible(
         && option_is_mergeable(&left.fluctuation.frequency, &right.fluctuation.frequency)
         && option_is_mergeable(&left.fluctuation.quality, &right.fluctuation.quality)
         && option_is_mergeable(&left.proportion.aspect, &right.proportion.aspect)
-        && option_is_mergeable(
-            &left.proportion.width_extent,
-            &right.proportion.width_extent,
-        )
         && option_is_mergeable(&left.proportion.arc_form, &right.proportion.arc_form)
         && option_is_mergeable(&target.action, &continuation.action)
         && option_is_mergeable(&target.layout_direction, &continuation.layout_direction)
@@ -1026,14 +1039,30 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     }
     merge_option(&mut target.entity.color, &continuation.entity.color);
     merge_option(&mut target.entity.thinness, &continuation.entity.thinness);
-    merge_option(
-        &mut target.entity.relative_scale,
-        &continuation.entity.relative_scale,
-    );
-    merge_option(
-        &mut target.entity.explicit_geometry,
-        &continuation.entity.explicit_geometry,
-    );
+    for value in continuation
+        .entity
+        .relative_scale
+        .iter()
+        .chain(&continuation.entity.additional_relative_scales)
+    {
+        append_size_candidate(
+            &mut target.entity.relative_scale,
+            &mut target.entity.additional_relative_scales,
+            value,
+        );
+    }
+    for value in continuation
+        .entity
+        .explicit_geometry
+        .iter()
+        .chain(&continuation.entity.additional_explicit_geometries)
+    {
+        append_size_candidate(
+            &mut target.entity.explicit_geometry,
+            &mut target.entity.additional_explicit_geometries,
+            value,
+        );
+    }
     merge_option(
         &mut target.entity.numeric_position,
         &continuation.entity.numeric_position,
@@ -1068,10 +1097,19 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
         &mut target.entity.proportion.aspect,
         &continuation.entity.proportion.aspect,
     );
-    merge_option(
-        &mut target.entity.proportion.width_extent,
-        &continuation.entity.proportion.width_extent,
-    );
+    for value in continuation
+        .entity
+        .proportion
+        .width_extent
+        .iter()
+        .chain(&continuation.entity.additional_width_extents)
+    {
+        append_size_candidate(
+            &mut target.entity.proportion.width_extent,
+            &mut target.entity.additional_width_extents,
+            value,
+        );
+    }
     merge_option(
         &mut target.entity.proportion.arc_form,
         &continuation.entity.proportion.arc_form,

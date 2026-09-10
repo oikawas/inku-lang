@@ -1,5 +1,7 @@
 //! Canonical JSON serialization and digest identity for accepted Scores.
 
+use std::io::{Error as IoError, ErrorKind};
+
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -13,6 +15,9 @@ pub const CANONICAL_SCORE_DIGEST_DOMAIN: &str = "inku.score.canonical-json.v1";
 /// Object keys are ordered recursively by Unicode scalar lexical order while
 /// array order, string escaping, and number formatting come from `serde_json`.
 pub fn canonical_json_bytes(score: &Score) -> serde_json::Result<Vec<u8>> {
+    score
+        .validate_schema_edition()
+        .map_err(|message| serde_json::Error::io(IoError::new(ErrorKind::InvalidData, message)))?;
     let mut value = serde_json::to_value(score)?;
     sort_object_keys(&mut value);
     serde_json::to_vec(&value)

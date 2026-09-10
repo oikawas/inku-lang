@@ -91,6 +91,20 @@ class ServerScoreVocabularyTest {
     }
 
     @Test
+    fun testTheSchemaOffersScore0_2AndTheCrescentDescriptor() {
+        val root = JSONObject(ServerScoreSchemaJson.parameters)
+        val properties = root.getJSONObject("properties")
+        assertEquals("0.2.0", properties.getJSONObject("version").getString("default"))
+
+        val instruction = properties
+            .getJSONObject("instructions")
+            .getJSONObject("items")
+            .getJSONObject("properties")
+        assertEquals("crescent", instruction.getJSONObject("arc_form").getJSONArray("anyOf")
+            .getJSONObject(0).getString("const"))
+    }
+
+    @Test
     fun testTheCoercerKeepsEveryAbstractColorAndDropsTheRest() {
         val kept = mutableListOf<String>()
         for (color in expectedEnum("color")) {

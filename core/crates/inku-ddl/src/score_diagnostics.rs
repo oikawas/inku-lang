@@ -5,6 +5,10 @@ use crate::{ExpansionPathSegment, SemanticPreviousReference, SemanticRelationKin
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreFieldGap {
+    ConflictingSizeSpecifications {
+        candidate_extents: Vec<crate::score_lowering::Rational>,
+        effective_extent: crate::score_lowering::Rational,
+    },
     UnsupportedPrimitiveIdentity {
         category: String,
         id: String,
@@ -246,6 +250,8 @@ pub enum ScoreOmissionUnit {
 /// Actual treatment of a diagnostic under the selected mode.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreDiagnosticDisposition {
+    /// The error is reported while the authorized smaller geometry is rendered.
+    Recovered,
     Stopped,
     Omitted {
         unit: ScoreOmissionUnit,

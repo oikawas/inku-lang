@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use inku_score::{Score, canonical_json_bytes, canonical_score_digest};
+use inku_score::{Score, canonical_json_bytes, canonical_score_digest, read_saved_score_json};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -54,7 +54,8 @@ fn canonical_score_fixtures_are_stable() {
             fixture.id
         );
 
-        let score: Score = serde_json::from_value(fixture.input).expect("fixture Score must parse");
+        let input = serde_json::to_vec(&fixture.input).expect("fixture input must serialize");
+        let score = read_saved_score_json(&input).expect("saved fixture Score must parse");
         let canonical_json = canonical_json_bytes(&score).expect("Score must serialize");
         assert_eq!(
             canonical_json,

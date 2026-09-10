@@ -711,6 +711,7 @@ mod projection_integrity_tests {
                     asset_id: "synthetic.asset".to_owned(),
                     category_key: "synthetic.category".to_owned(),
                     canonical_surface_ja: "x".to_owned(),
+                    shape_constraint: None,
                     span,
                 })],
             }],
@@ -1610,6 +1611,13 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             add_term_explicit(projection, owner, term);
         }
     }
+    for term in &instruction.entity.additional_width_extents {
+        add_term_explicit(
+            projection,
+            SemanticDeliveryOwner::ProportionWidthExtent,
+            term,
+        );
+    }
     if let Some(quantity) = &instruction.entity.quantity {
         add_explicit(
             projection,
@@ -1626,7 +1634,12 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             thinness.value.as_str().to_owned(),
         );
     }
-    if let Some(relative_scale) = &instruction.entity.relative_scale {
+    for relative_scale in instruction
+        .entity
+        .relative_scale
+        .iter()
+        .chain(&instruction.entity.additional_relative_scales)
+    {
         add_explicit(
             projection,
             relative_scale.provenance.span,
@@ -1634,7 +1647,12 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             relative_scale.value.as_str().to_owned(),
         );
     }
-    if let Some(geometry) = &instruction.entity.explicit_geometry {
+    for geometry in instruction
+        .entity
+        .explicit_geometry
+        .iter()
+        .chain(&instruction.entity.additional_explicit_geometries)
+    {
         add_explicit(
             projection,
             geometry.source().span,
@@ -2437,9 +2455,16 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         ]
         .into_iter()
         .flatten()
+        .chain(&entity.additional_width_extents)
         {
             push_term(occurrences, term);
         }
+        occurrences.extend(
+            entity
+                .additional_relative_scales
+                .iter()
+                .map(|value| &value.provenance),
+        );
         occurrences.extend(
             [
                 entity.quantity.as_ref().map(|value| &value.provenance),
@@ -2452,7 +2477,11 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             .into_iter()
             .flatten(),
         );
-        if let Some(geometry) = &entity.explicit_geometry {
+        for geometry in entity
+            .explicit_geometry
+            .iter()
+            .chain(&entity.additional_explicit_geometries)
+        {
             match geometry {
                 crate::SemanticExplicitGeometry::Radius(value)
                 | crate::SemanticExplicitGeometry::Diameter(value)
@@ -2673,6 +2702,43 @@ fn instruction_provenance_value(instruction: &SemanticInstruction) -> Value {
 
 fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
     let mut record = BTreeMap::new();
+    if !entity.additional_relative_scales.is_empty() {
+        record.insert(
+            "additional_relative_scales".to_owned(),
+            Value::Array(
+                entity
+                    .additional_relative_scales
+                    .iter()
+                    .map(|value| source_occurrence_value(&value.provenance))
+                    .collect(),
+            ),
+        );
+    }
+    if !entity.additional_explicit_geometries.is_empty() {
+        record.insert(
+            "additional_explicit_geometries".to_owned(),
+            Value::Array(
+                entity
+                    .additional_explicit_geometries
+                    .iter()
+                    .map(explicit_geometry_provenance_value)
+                    .collect(),
+            ),
+        );
+    }
+    if !entity.additional_width_extents.is_empty() {
+        record.insert(
+            "additional_width_extents".to_owned(),
+            Value::Array(
+                entity
+                    .additional_width_extents
+                    .iter()
+                    .map(term_provenance_value)
+                    .collect(),
+            ),
+        );
+    }
+
     if let Some(constraint) = &entity.shape_constraint {
         record.insert(
             "shape_constraint".to_owned(),

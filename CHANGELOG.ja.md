@@ -21,6 +21,8 @@
 
 Scoreは0.2.0へ進め、任意の`arc_form: crescent`を追加した。明示された旧Score 0.1.0と新フィールドのないcanonical bytesは保持する。演奏語彙の追加によりrender engineは45から46へ、決定的なサイズ解決とScore宣言の変更によりDDL engineは21から22へ進めた。現行の解釈・構図promptの三日月説明も新形式へ揃えた。`compile-score` exampleはJSON入力の通常DDL/MacroからScoreと診断を一括出力できる。Typed compilerのアプリruntimeへの全面接続や公開releaseはこの変更に含めない。
 
+Linuxでrender engine46の612例とDDL engine22の54例を生成した。renderの既存610例、DDLの既存53例は不変で、差分は三日月の新規2例/1例だけである。両generatorの再実行はバイト一致し、旧参照コーパスを保持した。共有compiler/Scoreとhost schemaの関連検査、AndroidのScore語彙検査、native描画境界・弧の検査、参照コーパスの検査を通した。
+
 ---
 
 ### 2026-09-10 — 歳時記サンプルの上弦・下弦を修正

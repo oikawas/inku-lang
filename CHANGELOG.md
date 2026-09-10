@@ -21,6 +21,8 @@ Ordinary DDL and declared Macros now resolve full/half width and the four moon f
 
 Score advances to 0.2.0 with optional `arc_form: crescent`; explicit saved 0.1.0 and canonical bytes without the extension remain readable and unchanged. Render engine advances 45→46 for the new performed shape, and DDL engine 21→22 for deterministic sizing and the Score declaration change. Current interpreter/composer crescent guidance matches the new form. The JSON `compile-score` example batches ordinary DDL/Macro compilation with diagnostics. This does not complete the typed compiler's application-runtime integration or publish a release.
 
+Generated render-engine 46 (612 cases) and DDL-engine 22 (54 cases) on Linux. All 610 existing render cases and 53 existing DDL cases remained unchanged; only the two new render crescents and one new DDL crescent were added. Both generators repeated byte-identically and preserved older corpora. Relevant shared compiler/Score, host schema, Android Score vocabulary, native render-boundary/arc, and corpus checks passed.
+
 ---
 
 ### 2026-09-10 — Correct the waxing and waning moon previews

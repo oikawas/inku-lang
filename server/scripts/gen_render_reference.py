@@ -30,7 +30,7 @@ REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.2.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
-FROZEN_AT = "2026-08-21"
+FROZEN_AT = "2026-09-10"
 REASON = (
     "Engine 46 adds the author-approved filled crescent descriptor: its exact three-cubic "
     "Saijiki contour is fitted to the stated physical center and size, then rotated with "

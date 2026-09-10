@@ -9,7 +9,9 @@ is the render engine version**, counted separately from the product version (`v2
 four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (engines 5 through 10), `SPEC.ja.md` §15.9–15.11 (13 through 15),
 `server/reference/README.md` (12 and 15), and the changelog entries.
 
-## When the version goes up
+## Historical version-bump rules and examples
+
+[SPEC.md §2.1](../../SPEC.md#21-performance-versions-identity-and-preservation) is the authority for current version, identity, and reference-corpus rules. The material below preserves the rules and examples as they stood at the time; it is not where current values or procedures are updated.
 
 "Versions and identity IDs" below rules it. **There are two reasons.**
 
@@ -99,9 +101,9 @@ of SVGs the directory holds.
 **What stayed still is what explains the version.** The version where everything moved (11) says,
 through its zero unchanged cases, that it changed how numbers are written and not what is drawn.
 
-## Principles that outlast a version
+## Historical principles and measurements across versions
 
-**The record of each version is in the sections below. What stands here is what holds across versions.**
+**The record of each version is in the sections below. This section preserves the principles and measurements that then held across versions; current rules are in SPEC.md §2.1.**
 Moved out of `SPEC.md` §12.1-12.9 on 2026-07-28.
 
 ### Deterministic and Non-Deterministic Layers (v2.4.6)

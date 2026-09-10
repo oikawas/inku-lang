@@ -569,10 +569,7 @@ A separate developer-facing register holds them, with state.
 ## Documentation Update Rules
 
 - Update `SPEC.ja.md` first for a specification change, then carry **the same content, section for section**, into `SPEC.md`. Neither language may hold a section the other lacks (the author's ruling of 2026-08-02; **Japanese remains canonical**). `server/scripts/check_docs.py` is the only gate on this and must be run before merging. The same gate also reads the forbidden words on the English side (a backticked identifier is not checked).
-- At the completion of each implementation Step (including when work stops there) and before moving
-to the next Step, compare both project-context files with the current implementation milestone,
-important contracts, and runtime integration state, then update both wherever they changed. Also
-update those passages when current architecture or an important contract changes within a Step.
+- Update both project-context files only when current architecture, an important contract, or runtime integration actually changes. Completing, stopping at, or moving to the next Step does not itself require an update.
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.
 - For Web behavior or UI changes, increment `web/BUILD_NUMBER`.

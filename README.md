@@ -11,7 +11,7 @@
 **Turn a sentence into a picture.**
 
 > **一文を、絵にする。**
-> `inku`（インク）は、シンプルな文章から抽象的なベクターグラフィック（SVG形式）を生み出す、アプリケーションです。中核を成すのは、 オリジナルに作成した絵画言語DDL（Drawing Description Language）。DDLは、「中央に丸を置く」「クレヨンで緑の線を100本引く」といった自然言語を受け付ける、柔軟なスクリプティング言語です。
+> `inku`（インク）は、シンプルな文章から抽象絵画のベクターグラフィック（SVG形式）を生み出す、アプリケーションです。中核を成すのは、 オリジナルの絵画言語DDL（Drawing Description Language）。DDLは、「中央に丸を置く」「クレヨンで緑の線を100本引く」といった自然言語を受け付ける、柔軟なスクリプティング言語です。
 > **日本語の全文は [日本語版 README](README.ja.md) にあります。**
 
 <table align="center">
@@ -22,13 +22,16 @@
 </tr>
 </table>
 
-`inku` is an application that turns simple writing into abstract vector graphics in SVG format. At its core is DDL (Drawing Description Language), an original language for drawing. DDL is a flexible scripting language that accepts natural-language instructions such as “Place a circle in the center” or “Draw one hundred green lines in crayon.”
+`inku` is an application that turns simple writing into abstract paintings as vector graphics in SVG format. At its core is DDL (Drawing Description Language), an original language for drawing. DDL is a flexible scripting language that accepts natural-language instructions such as “Place a circle in the center” or “Draw one hundred green lines in crayon.”
 
 ```
 A blue line slowly loosens across the night water.
 ```
 
-An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words into visual elements and converts them into normalized DDL. A Typed Compiler then converts the DDL into the JSON data underlying the vector graphic. This JSON data is a “score”: even as the application moves from one generation to another, it can continue to “perform” the work consistently as SVG. The computer generates the SVG image by having the Renderer interpret that JSON. Together, the LLM, Typed Compiler, and Renderer create a controllable environment for AI vector-graphic generation.
+An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words into visual elements and converts them into DDL, the language of drawing. A Typed Compiler then compiles the DDL into JSON data that can be rendered as SVG.
+This JSON data is a “score”: even as the application moves from one generation to another, it can continue to “perform” the work consistently as SVG. The computer generates the SVG image by having a dedicated Renderer interpret that JSON. The inku application brings this entire sequence together.
+
+Together, the LLM, Typed Compiler, and Renderer provide a “controllable environment for AI vector-graphic generation.”
 
 inku uses several processing layers because it alternates nondeterministic LLMs with deterministic programs. This accepts the variability of human expression while making creation predictable and reproducible. Works recorded in the database as JSON are managed as lineages and preserved generation by generation. From the first work, you create variations in composition, color, and handling, refine them, choose among them, and give rise to a new generation — **the back-and-forth of writing and choosing** is how creation works in inku. You may hold on to the first sentence and carry it through to a finished work, or leave its meaning behind and pursue what is visually compelling. DDL interprets only the language of drawing; words that express meaning or emotion are not implemented. What the drawing carries is for its maker to decide.
 

@@ -466,19 +466,25 @@ fn checked_macro_relation(
     current_primitive: Primitive,
     current_arc_form: Option<inku_score::ArcForm>,
 ) -> Result<Relation, ScoreFieldGap> {
-    if kind == "not_touching" {
-        return input
-            .effective_focus
-            .is_some()
-            .then_some(Relation {
-                kind: RelationType::NotTouching,
+    if matches!(kind, "not_touching" | "between") {
+        return target_instruction_index
+            .map(|target| Relation {
+                kind: if kind == "between" {
+                    RelationType::Between
+                } else {
+                    RelationType::NotTouching
+                },
                 gap: RelationGap::Medium,
-                target_instruction_index: None,
+                target_instruction_index: Some(target),
                 target_anchor_index: None,
-                position_authority: None,
+                position_authority: Some(if input.exact_position().is_some() {
+                    ConnectedPositionAuthority::NumericFixed
+                } else {
+                    ConnectedPositionAuthority::NamedMovable
+                }),
                 touching_constraints: None,
             })
-            .ok_or(ScoreFieldGap::UnsupportedMacroRelation);
+            .ok_or(ScoreFieldGap::UnavailableMacroRelationReference);
     }
     let Some(target_instruction_index) = target_instruction_index else {
         return Err(ScoreFieldGap::UnavailableMacroRelationReference);
@@ -675,9 +681,6 @@ fn lower_macro_instruction(
     let emit_nodes = delivery_nodes
         .iter()
         .enumerate()
-        .filter_map(|(index, delivery)| {
-            (!is_in_invalid_transform(delivery, &invalid_transforms)).then_some((index, delivery))
-        })
         .filter_map(|(index, delivery)| match delivery.node {
             ExpandedMacroNode::Emit {
                 binding,
@@ -769,7 +772,7 @@ fn lower_macro_instruction(
         };
         if !matches!(
             kind.as_str(),
-            "along" | "cutting" | "connected" | "touching" | "not_touching"
+            "along" | "cutting" | "connected" | "touching" | "not_touching" | "between"
         ) {
             continue;
         }
@@ -792,13 +795,26 @@ fn lower_macro_instruction(
         let to_position = emit_nodes
             .iter()
             .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+        let secondary = (kind == "between")
+            .then(|| {
+                from_position
+                    .and_then(|from| from.checked_sub(1))
+                    .map(|position| emit_nodes[position].1.generated_ordinal)
+            })
+            .flatten();
         if from_position.zip(to_position).is_some_and(|(from, to)| {
             to == from + 1
-                && delivery_nodes[emit_nodes[from].2 + 1..emit_nodes[to].2]
+                && (kind != "between" || secondary.is_some())
+                && delivery_nodes[emit_nodes[if kind == "between" {
+                    from.saturating_sub(1)
+                } else {
+                    from
+                }]
+                .2 + 1..emit_nodes[to].2]
                     .iter()
                     .all(|node| !matches!(node.node, ExpandedMacroNode::Anchor { .. }))
         }) && relation_by_to
-            .insert(to.clone(), (from.clone(), kind.as_str()))
+            .insert(to.clone(), (from.clone(), kind.as_str(), secondary))
             .is_none()
         {
             continue;
@@ -816,6 +832,7 @@ fn lower_macro_instruction(
         });
     }
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
+    let mut successful_emits = BTreeMap::new();
     let mut center_bindings = BTreeSet::new();
 
     for delivery in &delivery_nodes {
@@ -830,7 +847,7 @@ fn lower_macro_instruction(
         } = node
         else {
             if matches!(node, ExpandedMacroNode::Anchor { .. })
-                || matches!(node, ExpandedMacroNode::Relation { kind, .. } if matches!(kind.as_str(), "along" | "cutting" | "connected" | "touching" | "not_touching"))
+                || matches!(node, ExpandedMacroNode::Relation { kind, .. } if matches!(kind.as_str(), "along" | "cutting" | "connected" | "touching" | "not_touching" | "between"))
             {
                 continue;
             }
@@ -859,8 +876,9 @@ fn lower_macro_instruction(
         let anchor_relation_dependency = binding
             .as_ref()
             .and_then(|binding| anchor_relation_by_to.get(binding));
-        if let Some((dependency, _)) = relation_dependency
-            && !successful_bindings.contains_key(dependency)
+        if let Some((dependency, _, secondary)) = relation_dependency
+            && (!successful_bindings.contains_key(dependency)
+                || secondary.is_some_and(|ordinal| !successful_emits.contains_key(&ordinal)))
         {
             let reason = ScoreFieldGap::UnavailableMacroRelationReference;
             diagnostics.push(ScoreLoweringDiagnostic {
@@ -996,7 +1014,7 @@ fn lower_macro_instruction(
             let Some(object_index) = object_index else {
                 continue;
             };
-            if let Some((dependency, kind)) = relation_dependency {
+            if let Some((dependency, kind, _)) = relation_dependency {
                 let target_object_index = successful_bindings[dependency];
                 let prior = &objects[target_object_index];
                 let current = &objects[object_index];
@@ -1045,6 +1063,7 @@ fn lower_macro_instruction(
                 object_index,
                 input.exact_position().is_some(),
             );
+            successful_emits.insert(provenance.generated_ordinal, object_index);
             if let Some(binding) = binding {
                 successful_bindings.insert(binding.clone(), object_index);
                 if input.effective_focus.is_some() {
@@ -1089,7 +1108,7 @@ fn lower_macro_instruction(
             });
         }
         if let Some(mut score_instruction) = attempt.instruction {
-            if let Some((dependency, kind)) = relation_dependency {
+            if let Some((dependency, kind, _)) = relation_dependency {
                 let target_instruction_index = successful_bindings.get(dependency).copied();
                 let prior = target_instruction_index.and_then(|index| instructions.get(index));
                 match checked_macro_relation(
@@ -1137,6 +1156,7 @@ fn lower_macro_instruction(
                 score_index,
                 input.exact_position().is_some(),
             );
+            successful_emits.insert(provenance.generated_ordinal, score_index);
             if let Some(binding) = binding {
                 successful_bindings.insert(binding.clone(), score_index);
                 if input.effective_focus.is_some() {
@@ -2121,14 +2141,41 @@ fn lower_verified_stage15_shared<'a>(
                 )
                 .expect("source projection is called only for primitive heads");
                 if let Some(objects) = objects.as_deref_mut() {
-                    if let Some(relation) = &instruction.relation {
-                        let reason = unsupported_relation_reason(instruction_index, relation);
-                        diagnostics.push(ScoreLoweringDiagnostic {
-                            owner: source_owner_for_gap(instruction_index, instruction, &reason),
-                            disposition: relation_diagnostic_disposition(),
-                            reason,
-                        });
-                    }
+                    let relation = instruction.relation.as_ref().and_then(|relation| {
+                        let resolved = if matches!(
+                            relation.kind,
+                            SemanticRelationKind::NotTouching | SemanticRelationKind::Between
+                        ) {
+                            direct_score_relation(
+                                instruction_index,
+                                instruction,
+                                relation,
+                                effective_focus,
+                                objects
+                                    .last()
+                                    .map(|object| (object.primitive(), object.arc_form())),
+                                objects.iter().map(|object| &object.origin),
+                                objects.len().checked_sub(1),
+                            )
+                        } else {
+                            Err(unsupported_relation_reason(instruction_index, relation))
+                        };
+                        match resolved {
+                            Ok(relation) => Some(plan_relation(relation)),
+                            Err(reason) => {
+                                diagnostics.push(ScoreLoweringDiagnostic {
+                                    owner: source_owner_for_gap(
+                                        instruction_index,
+                                        instruction,
+                                        &reason,
+                                    ),
+                                    disposition: relation_diagnostic_disposition(),
+                                    reason,
+                                });
+                                None
+                            }
+                        }
+                    });
                     let attempt = resolve_projected_instruction(
                         input,
                         context,
@@ -2141,7 +2188,7 @@ fn lower_verified_stage15_shared<'a>(
                             )
                         },
                     );
-                    append_plan_attempt(
+                    let object_index = append_plan_attempt(
                         attempt,
                         |reason| source_owner_for_gap(instruction_index, instruction, reason),
                         ScoreOmissionUnit::SourceInstruction { instruction_index },
@@ -2149,6 +2196,9 @@ fn lower_verified_stage15_shared<'a>(
                         objects,
                         &mut diagnostics,
                     );
+                    if let Some(index) = object_index {
+                        objects[index].relation = relation;
+                    }
                     continue;
                 }
                 if let Some(relation) = &instruction.relation {
@@ -2157,8 +2207,11 @@ fn lower_verified_stage15_shared<'a>(
                         instruction,
                         relation,
                         effective_focus,
-                        &instructions,
-                        &instruction_origins,
+                        instructions
+                            .last()
+                            .map(|prior: &Instruction| (prior.primitive, prior.arc_form)),
+                        instruction_origins.iter(),
+                        instructions.len().checked_sub(1),
                     ) {
                         Ok(score_relation) => lower_source_relation_instruction_with_policy(
                             instruction_index,
@@ -2328,15 +2381,16 @@ fn unsupported_relation_reason(
     }
 }
 
-fn direct_score_relation(
+fn direct_score_relation<'a>(
     instruction_index: usize,
     instruction: &SemanticInstruction,
     relation: &SemanticRelation,
     effective_focus: Option<FocusRegion>,
-    score_instructions: &[Instruction],
-    instruction_origins: &[ScoreInstructionOrigin],
+    prior: Option<(Primitive, Option<inku_score::ArcForm>)>,
+    instruction_origins: impl DoubleEndedIterator<Item = &'a ScoreInstructionOrigin>,
+    target_instruction_index: Option<usize>,
 ) -> Result<Relation, ScoreFieldGap> {
-    let legacy_supported = matches!(
+    let bounds_relation = matches!(
         (relation.kind, relation.reference),
         (
             SemanticRelationKind::NotTouching,
@@ -2361,9 +2415,6 @@ fn direct_score_relation(
         && relation.reference == SemanticPreviousReference::PreviousOne;
     let checked = connected || touching || along || cutting;
     let line_relation = along || cutting;
-    let has_exact_center = instruction.position.as_ref().is_some_and(|position| {
-        position.identity.category == "place" && position.identity.id == "center"
-    });
     let checked_position_supported = if line_relation {
         instruction.entity.numeric_position.is_some()
             || instruction.position.is_none()
@@ -2384,11 +2435,7 @@ fn direct_score_relation(
                 })
                 && instruction.entity.proportion.arc_form.as_ref().is_none_or(|form| form.identity.id != "crescent")
     );
-    if (!legacy_supported && !checked)
-        || (legacy_supported
-            && (instruction.entity.numeric_position.is_some()
-                || !has_exact_center
-                || effective_focus.is_none()))
+    if (!bounds_relation && !checked)
         || (checked && (!checked_position_supported || !checked_primitive_supported))
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
@@ -2407,20 +2454,22 @@ fn direct_score_relation(
             dependency_instruction_indices: Vec::new(),
         });
     }
-    let actual_dependencies_match = instruction_origins
-        .get(instruction_origins.len().saturating_sub(required)..)
-        .is_some_and(|origins| {
-            origins.len() == required
-                && origins.iter().zip(&dependency_instruction_indices).all(
-                    |(origin, expected_index)| {
-                        matches!(
-                            origin,
-                            ScoreInstructionOrigin::SourceInstruction { instruction_index }
-                                if instruction_index == expected_index
-                        )
-                    },
-                )
-        });
+    let prior_origins = instruction_origins.rev().take(required).collect::<Vec<_>>();
+    let actual_dependencies_match = {
+        let origins = &prior_origins;
+        origins.len() == required
+            && origins
+                .iter()
+                .rev()
+                .zip(&dependency_instruction_indices)
+                .all(|(origin, expected_index)| {
+                    matches!(
+                        origin,
+                        ScoreInstructionOrigin::SourceInstruction { instruction_index }
+                            if instruction_index == expected_index
+                    )
+                })
+    };
     if !actual_dependencies_match {
         return Err(ScoreFieldGap::UnavailableRelationReference {
             kind: relation.kind,
@@ -2429,13 +2478,12 @@ fn direct_score_relation(
         });
     }
     if checked
-        && !score_instructions.last().is_some_and(|prior| {
+        && !prior.is_some_and(|(primitive, arc_form)| {
             if line_relation {
-                prior.primitive == Primitive::Line
+                primitive == Primitive::Line
             } else {
-                (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-                    && prior.arc_form.is_none())
-                    || (!touching && prior.primitive == Primitive::Point)
+                (matches!(primitive, Primitive::Line | Primitive::Arc) && arc_form.is_none())
+                    || (!touching && primitive == Primitive::Point)
             }
         })
     {
@@ -2452,9 +2500,9 @@ fn direct_score_relation(
             SemanticRelationKind::Cutting => RelationType::Cutting,
         },
         gap: RelationGap::Medium,
-        target_instruction_index: checked.then(|| score_instructions.len() - 1),
+        target_instruction_index,
         target_anchor_index: None,
-        position_authority: checked.then_some(if instruction.entity.numeric_position.is_some() {
+        position_authority: Some(if instruction.entity.numeric_position.is_some() {
             ConnectedPositionAuthority::NumericFixed
         } else {
             ConnectedPositionAuthority::NamedMovable

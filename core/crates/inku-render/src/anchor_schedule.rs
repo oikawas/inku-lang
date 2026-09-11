@@ -74,7 +74,13 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
         let targets = if let Some(anchor) = relation.target_anchor_index {
             vec![(None, Some(anchor))]
         } else if let Some(target) = relation.target_instruction_index {
-            vec![(Some(target), None)]
+            let mut targets = vec![(Some(target), None)];
+            if relation.kind == RelationType::Between
+                && let Some(second) = source_index.checked_sub(2)
+            {
+                targets.push((Some(second), None));
+            }
+            targets
         } else {
             let needed = if relation.kind == RelationType::Between {
                 2
@@ -102,7 +108,9 @@ pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSched
             let target_final = below_common(&target_chain, common)
                 .map(|group| count + group)
                 .or(target_instruction);
-            external_groups[source_index] = source_group;
+            // Between may see one target inside the source scope and one
+            // outside it. Its correction belongs to the outermost such scope.
+            external_groups[source_index] = external_groups[source_index].max(source_group);
             if let Some(source_group) = source_group {
                 if let Some(target_final) = target_final {
                     dependencies[count + source_group].insert(target_final);

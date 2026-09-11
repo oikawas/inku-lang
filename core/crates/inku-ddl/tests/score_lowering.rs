@@ -1557,7 +1557,7 @@ fn direct_between_relation_preserves_focus_geometry_and_origins() {
 }
 
 #[test]
-fn relation_requires_original_surviving_direct_referents_and_omits_dependents() {
+fn relation_requires_original_surviving_direct_referents_and_retains_dependents() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let definition = complete_flat_emit_definition();
 
@@ -1592,8 +1592,11 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
         std::slice::from_ref(&definition),
     );
     let stopped = lower_verified_stage15_score(macro_referent.verified_effective_view(), context);
-    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stopped.score().is_none());
+    assert_eq!(
+        stopped.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(stopped.score().unwrap().instructions.len(), 3);
     let macro_referent = lower_verified_stage15_score_with_policy(
         macro_referent.verified_effective_view(),
         context,
@@ -1603,7 +1606,7 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
         macro_referent.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
     );
-    assert_eq!(macro_referent.score().unwrap().instructions.len(), 2);
+    assert_eq!(macro_referent.score().unwrap().instructions.len(), 3);
     assert!(
         macro_referent
             .diagnostics()
@@ -1616,12 +1619,7 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
                         reference: SemanticPreviousReference::PreviousOne,
                         dependency_instruction_indices,
                     },
-                    ScoreDiagnosticDisposition::Omitted {
-                        unit: ScoreOmissionUnit::RelationInstruction {
-                            instruction_index: 1
-                        },
-                        ..
-                    }
+                    ScoreDiagnosticDisposition::RelationOmitted
                 ) if dependency_instruction_indices == &[0]
             ))
     );
@@ -1646,8 +1644,8 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
         ScoreLoweringOutcome::CompleteWithOmissions
     );
     let score = cascading.score().unwrap();
-    assert_eq!(score.instructions.len(), 1);
-    assert_eq!(score.instructions[0].primitive, Primitive::Ellipse);
+    assert_eq!(score.instructions.len(), 3);
+    assert_eq!(score.instructions[2].primitive, Primitive::Ellipse);
     assert!(matches!(
         &score.canvas,
         Canvas::Spec(spec)
@@ -1655,9 +1653,17 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
     ));
     assert_eq!(
         cascading.instruction_origins(),
-        &[ScoreInstructionOrigin::SourceInstruction {
-            instruction_index: 3
-        }]
+        &[
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 1
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 3
+            }
+        ]
     );
     let unavailable = cascading
         .diagnostics()
@@ -1670,11 +1676,11 @@ fn relation_requires_original_surviving_direct_referents_and_omits_dependents() 
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(unavailable, vec![vec![0], vec![1]]);
+    assert_eq!(unavailable, vec![vec![0]]);
 }
 
 #[test]
-fn relation_accepts_a_numeric_prior_but_rejects_numeric_or_noncenter_current_position() {
+fn bounds_relation_preserves_numeric_and_noncenter_position_authority() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let numeric_prior = stage15(
         concat!(
@@ -1701,10 +1707,6 @@ fn relation_accepts_a_numeric_prior_but_rejects_numeric_or_noncenter_current_pos
             "place one red circle at center. ",
             "place one blue square at left-edge not touching the previous shape."
         ),
-        concat!(
-            "place one red circle at center. ",
-            "blue square not touching the previous shape."
-        ),
     ] {
         let result = stage15(source, ResolvedInstructionLanguage::En);
         let lowered = lower_verified_stage15_score_with_policy(
@@ -1714,25 +1716,23 @@ fn relation_accepts_a_numeric_prior_but_rejects_numeric_or_noncenter_current_pos
         );
         assert_eq!(
             lowered.outcome(),
-            ScoreLoweringOutcome::CompleteWithOmissions
+            ScoreLoweringOutcome::Complete,
+            "{:?}",
+            lowered.diagnostics()
         );
-        assert_eq!(lowered.score().unwrap().instructions.len(), 1);
-        assert!(lowered.diagnostics().iter().any(|diagnostic| matches!(
-            (&diagnostic.reason, &diagnostic.disposition),
-            (
-                ScoreFieldGap::UnsupportedRelation {
-                    kind: SemanticRelationKind::NotTouching,
-                    reference: SemanticPreviousReference::PreviousOne,
-                    dependency_instruction_indices,
-                },
-                ScoreDiagnosticDisposition::Omitted {
-                    unit: ScoreOmissionUnit::RelationInstruction {
-                        instruction_index: 1
-                    },
-                    ..
-                }
-            ) if dependency_instruction_indices == &[0]
-        )));
+        assert_eq!(lowered.score().unwrap().instructions.len(), 2);
+        let relation = lowered.score().unwrap().instructions[1]
+            .relation
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            relation.position_authority,
+            Some(if source.contains("horizontal 0.7") {
+                inku_score::ConnectedPositionAuthority::NumericFixed
+            } else {
+                inku_score::ConnectedPositionAuthority::NamedMovable
+            })
+        );
     }
 }
 

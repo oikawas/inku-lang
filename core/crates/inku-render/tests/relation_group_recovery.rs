@@ -253,3 +253,97 @@ fn missing_references_and_cycles_keep_sources_and_downstream_targets_for_both_po
         );
     }
 }
+
+#[test]
+fn not_touching_uses_final_bounds_and_keeps_already_separated_numeric_groups() {
+    let canvas = Some(CanvasSize::new(2000.0, 1000.0));
+    let mut input = json!({"version":"0.6.0","instructions":[
+        {"primitive":"line","from":[0.4,0.45],"to":[0.5,0.45]},
+        {"primitive":"line","from":[0.42,0.5],"to":[0.52,0.5],"relation":{
+            "type":"not_touching","target_instruction_index":0,"position_authority":"named_movable","gap":"medium"}},
+        {"primitive":"line","from":[0.42,0.55],"to":[0.52,0.55]},
+        {"primitive":"point","position":[0.9,0.9]}
+    ],"transform_groups":[{"start":1,"end":3,"rotation_degrees":90,"scale_x":0.5}]});
+    let before = baseline(input.clone(), canvas);
+    let after = plan(input.clone(), canvas, ScoreErrorPolicy::Stop);
+    assert!(after.execution.is_none(), "{:?}", after.execution);
+    common_translation(&before, &after, 1..3, canvas);
+    let (a, b) = endpoints(&after, 0, canvas);
+    let (c, d) = endpoints(&after, 1, canvas);
+    let distance = ((a.x + b.x - c.x - d.x) / 2.0).hypot((a.y + b.y - c.y - d.y) / 2.0);
+    let radii = (a.x - b.x).hypot(a.y - b.y) / 2.0 + (c.x - d.x).hypot(c.y - d.y) / 2.0;
+    assert!(distance >= radii + 0.06 - 1e-9);
+
+    input["instructions"][1]["relation"]["position_authority"] = json!("numeric_fixed");
+    let failed = plan(input.clone(), canvas, ScoreErrorPolicy::Stop);
+    assert_eq!(failed.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+    assert_eq!(
+        failed.execution.unwrap().diagnostics[0].reason,
+        ScoreExecutionReason::NumericNotTouchingPositionConflict
+    );
+    input["instructions"][0]["from"] = json!([0.05, 0.1]);
+    input["instructions"][0]["to"] = json!([0.15, 0.1]);
+    let before = baseline(input.clone(), canvas);
+    let far = plan(input, canvas, ScoreErrorPolicy::Stop);
+    assert!(far.execution.is_none());
+    assert_eq!(far.instruction_transforms, before.instruction_transforms);
+
+    let standalone = json!({"version":"0.6.0","instructions":[
+        {"primitive":"circle","center":[0.2,0.2],"radius":0.03},
+        {"primitive":"circle","center":[0.8,0.8],"radius":0.03,"relation":{
+            "type":"not_touching","target_instruction_index":0,"position_authority":"numeric_fixed"}}
+    ]});
+    let resolved = plan(standalone, None, ScoreErrorPolicy::Stop);
+    assert!(resolved.execution.is_none());
+    assert!(resolved.instruction_transforms[1].is_identity());
+}
+
+#[test]
+fn between_waits_for_both_final_targets_and_moves_an_internal_target_with_its_group() {
+    let input = json!({"version":"0.6.0","instructions":[
+        {"primitive":"line","from":[0.25,0.3],"to":[0.35,0.3]},
+        {"primitive":"line","from":[0.55,0.5],"to":[0.65,0.5]},
+        {"primitive":"line","from":[0.6,0.65],"to":[0.7,0.65],"relation":{
+            "type":"between","target_instruction_index":1,"position_authority":"named_movable"}},
+        {"primitive":"line","from":[0.7,0.7],"to":[0.8,0.7]}
+    ],"transform_groups":[
+        {"start":0,"end":1,"rotation_degrees":90,"translate_x":0.1,"translate_y":0.1},
+        {"start":1,"end":4,"rotation_degrees":0}
+    ]});
+    let before = baseline(input.clone(), None);
+    let after = plan(input.clone(), None, ScoreErrorPolicy::Stop);
+    assert!(after.execution.is_none(), "{:?}", after.execution);
+    common_translation(&before, &after, 1..4, None);
+    let center = |index| {
+        let (a, b) = endpoints(&after, index, None);
+        Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0)
+    };
+    let a = center(0);
+    let b = center(1);
+    let c = center(2);
+    near(a, Point::new(0.4, 0.4));
+    let jitter_x = c.x - (a.x + b.x) / 2.0;
+    let jitter_y = c.y - (a.y + b.y) / 2.0;
+    assert!((jitter_x + jitter_y).abs() < 1e-9);
+    assert!(jitter_x.abs() <= 0.04 + 1e-9);
+    let mut fixed = input;
+    fixed["instructions"][2]["relation"]["position_authority"] = json!("numeric_fixed");
+    let failed = plan(fixed, None, ScoreErrorPolicy::Stop);
+    assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+    assert_eq!(failed.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(
+        failed.execution.unwrap().diagnostics[0].reason,
+        ScoreExecutionReason::NumericBetweenPositionConflict
+    );
+
+    let standalone = json!({"version":"0.6.0","instructions":[
+        {"primitive":"circle","center":[0.2,0.2],"radius":0.03},
+        {"primitive":"circle","center":[0.8,0.8],"radius":0.03},
+        {"primitive":"circle","center":[0.3,0.3],"radius":0.03,"relation":{
+            "type":"between","target_instruction_index":1,"position_authority":"numeric_fixed"}}
+    ]});
+    let resolved = plan(standalone, None, ScoreErrorPolicy::Stop);
+    assert!(resolved.execution.is_none());
+    assert!(resolved.instruction_transforms[2].is_identity());
+}

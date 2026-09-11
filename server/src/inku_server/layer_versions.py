@@ -264,7 +264,8 @@
 # 26: typed Macro scale/translate reach Score 0.5 and symbolic plans; material scale stays fixed.
 # 27: explicit non-drawing Anchors reach Score 0.6 and enclosing transforms.
 # 28: recoverable failures keep drawable units; invalid relations alone are omitted.
-DDL_ENGINE_VERSION = "28"
+# 29: NotTouching and Between share direct, Macro, and symbolic-plan delivery.
+DDL_ENGINE_VERSION = "29"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

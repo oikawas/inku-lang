@@ -27,6 +27,17 @@ struct Execution<'a> {
 
 enum TranslationPredicate {
     Exact(Point),
+    NotTouching {
+        center: Point,
+        target: Point,
+        minimum: f64,
+    },
+    Between {
+        center: Point,
+        first: Point,
+        second: Point,
+        moving_targets: [bool; 2],
+    },
     Along {
         center: Point,
         start: Point,
@@ -52,6 +63,35 @@ impl ExternalConstraint {
     fn accepts(&self, delta: Point) -> bool {
         let moved = |point: Point| Point::new(point.x + delta.x, point.y + delta.y);
         match self.predicate {
+            TranslationPredicate::NotTouching {
+                center,
+                target,
+                minimum,
+            } => {
+                distance(Point::new(
+                    center.x + delta.x - target.x,
+                    center.y + delta.y - target.y,
+                )) + GEOMETRY_EPSILON
+                    >= minimum
+            }
+            TranslationPredicate::Between {
+                center,
+                first,
+                second,
+                moving_targets,
+            } => between_contains(
+                moved(center),
+                if moving_targets[0] {
+                    moved(first)
+                } else {
+                    first
+                },
+                if moving_targets[1] {
+                    moved(second)
+                } else {
+                    second
+                },
+            ),
             TranslationPredicate::Exact(required) => {
                 distance(Point::new(required.x - delta.x, required.y - delta.y)) <= GEOMETRY_EPSILON
             }
@@ -73,6 +113,23 @@ impl ExternalConstraint {
 
 fn distance(point: Point) -> f64 {
     point.x.hypot(point.y)
+}
+
+/// The two-center segment with the existing diagonal jitter, independent of
+/// which point the performance seed happens to select for a movable source.
+fn between_contains(point: Point, first: Point, second: Point) -> bool {
+    let vector = Point::new(second.x - first.x, second.y - first.y);
+    let offset = Point::new(point.x - first.x, point.y - first.y);
+    let sum = vector.x + vector.y;
+    if sum.abs() <= GEOMETRY_EPSILON {
+        return (offset.x + offset.y).abs() <= GEOMETRY_EPSILON
+            && offset.x >= vector.x.min(0.0) - 0.04 - GEOMETRY_EPSILON
+            && offset.x <= vector.x.max(0.0) + 0.04 + GEOMETRY_EPSILON;
+    }
+    let factor = (offset.x + offset.y) / sum;
+    let jitter = offset.x - vector.x * factor;
+    (-GEOMETRY_EPSILON..=1.0 + GEOMETRY_EPSILON).contains(&factor)
+        && jitter.abs() <= 0.04 + GEOMETRY_EPSILON
 }
 
 fn finite_point(point: Point) -> Result<Point, ScoreExecutionReason> {
@@ -271,12 +328,40 @@ impl Execution<'_> {
             return self.prepare_connected(index, instruction);
         }
         if self.schedule.external_groups[index].is_some()
-            && (is_checked_touching(relation)
+            && (is_bounds_relation(relation)
+                || is_checked_touching(relation)
                 || is_checked_line_relation(relation, RelationType::Along)
                 || is_checked_line_relation(relation, RelationType::Cutting))
         {
             // Preserve the member geometry until the scope's own transform has
             // completed. Only a common translation can satisfy this relation.
+            return Ok(instruction);
+        }
+        if is_bounds_relation(relation)
+            && (is_checked_bounds_relation(relation)
+                || (index.saturating_sub(if relation.kind == RelationType::Between {
+                    2
+                } else {
+                    1
+                })..index)
+                    .any(|target| !self.transforms[target].is_identity()))
+        {
+            let constraint = self.bounds_constraint(index, ordinal, &instruction, None)?;
+            let zero = Point::new(0.0, 0.0);
+            let delta = if constraint.accepts(zero) {
+                zero
+            } else {
+                if relation.position_authority == Some(ConnectedPositionAuthority::NumericFixed) {
+                    return Err(constraint.numeric_reason);
+                }
+                if !constraint.accepts(constraint.preferred) {
+                    return Err(ScoreExecutionReason::ConflictingRelationConstraints);
+                }
+                constraint.preferred
+            };
+            self.transforms[index] =
+                AffineTransform::translation(delta).compose(self.transforms[index]);
+            instruction.relation = None;
             return Ok(instruction);
         }
         let target = relation.target_instruction_index;
@@ -394,6 +479,136 @@ impl Execution<'_> {
         Ok(instruction)
     }
 
+    fn bounds_constraint(
+        &self,
+        source: usize,
+        ordinal: usize,
+        instruction: &Instruction,
+        scope: Option<usize>,
+    ) -> Result<ExternalConstraint, ScoreExecutionReason> {
+        let relation = instruction.relation.as_ref().expect("bounds relation");
+        let between = relation.kind == RelationType::Between;
+        let (missing, omitted, geometry, numeric_reason) = if between {
+            (
+                ScoreExecutionReason::MissingBetweenReference,
+                ScoreExecutionReason::BetweenReferenceOmitted,
+                ScoreExecutionReason::UnsupportedBetweenGeometry,
+                ScoreExecutionReason::NumericBetweenPositionConflict,
+            )
+        } else {
+            (
+                ScoreExecutionReason::MissingNotTouchingReference,
+                ScoreExecutionReason::NotTouchingReferenceOmitted,
+                ScoreExecutionReason::UnsupportedNotTouchingGeometry,
+                ScoreExecutionReason::NumericNotTouchingPositionConflict,
+            )
+        };
+        let needed = if between { 2 } else { 1 };
+        let first_index = source.checked_sub(needed).ok_or(missing)?;
+        if relation.target_anchor_index.is_some()
+            || relation
+                .target_instruction_index
+                .is_some_and(|target| Some(target) != source.checked_sub(1))
+        {
+            return Err(missing);
+        }
+        if self.structural[source] || (first_index..source).any(|target| self.structural[target]) {
+            return Err(geometry);
+        }
+        let bounds = |value: &Instruction, index, ordinal, seed_override| {
+            crate::affine_geometry::bounds(
+                value,
+                self.request.performance_seed,
+                ordinal,
+                self.request.canvas,
+                seed_override,
+                self.transforms[index],
+            )
+            .ok_or(geometry)
+        };
+        let own = bounds(
+            instruction,
+            source,
+            ordinal,
+            self.performed[source]
+                .last()
+                .and_then(|value| value.seed_override),
+        )?;
+        let target = |index: usize| {
+            let value = self.performed[index].last().ok_or(omitted)?;
+            bounds(
+                &value.instruction,
+                index,
+                value.ordinal,
+                value.seed_override,
+            )
+        };
+        let prior = target(source - 1)?;
+        let center = own.center();
+        let seed = self.request.performance_seed.unwrap_or_default();
+        if !between {
+            let radius = own.radius() + prior.radius();
+            let gap = relation_gap_amount(relation.gap, seed, ordinal);
+            let minimum_gap = match relation.gap {
+                RelationGap::Narrow => 0.02,
+                RelationGap::Medium => 0.06,
+                RelationGap::Wide => 0.15,
+            };
+            let angle = std::f64::consts::TAU
+                * crate::determinism::hash01(ordinal as i64, seed, "not-touching-angle");
+            let target = clamp_short_side_point(
+                Point::new(
+                    prior.center().x + angle.cos() * (radius + gap),
+                    prior.center().y + angle.sin() * (radius + gap),
+                ),
+                self.request.canvas,
+            );
+            return Ok(ExternalConstraint {
+                source,
+                preferred: Point::new(target.x - center.x, target.y - center.y),
+                predicate: TranslationPredicate::NotTouching {
+                    center,
+                    target: prior.center(),
+                    minimum: radius + minimum_gap,
+                },
+                numeric_reason,
+            });
+        }
+        let other = target(source - 2)?;
+        let moving_targets = scope.map_or([false; 2], |scope| {
+            let group = &self.request.score.transform_groups[scope];
+            [source - 2, source - 1].map(|target| group.start <= target && target < group.end)
+        });
+        let jitter =
+            0.08 * (crate::determinism::hash01(ordinal as i64, seed, "between-jitter") - 0.5);
+        let target = Point::new(
+            (prior.center().x + other.center().x) / 2.0 + jitter,
+            (prior.center().y + other.center().y) / 2.0 - jitter,
+        );
+        let factor = 1.0 - moving_targets.iter().filter(|&&moving| moving).count() as f64 / 2.0;
+        if factor <= 0.0 {
+            return Err(geometry);
+        }
+        let target = clamp_short_side_point(
+            Point::new(
+                center.x + (target.x - center.x) / factor,
+                center.y + (target.y - center.y) / factor,
+            ),
+            self.request.canvas,
+        );
+        Ok(ExternalConstraint {
+            source,
+            preferred: Point::new(target.x - center.x, target.y - center.y),
+            predicate: TranslationPredicate::Between {
+                center,
+                first: other.center(),
+                second: prior.center(),
+                moving_targets,
+            },
+            numeric_reason,
+        })
+    }
+
     fn external_constraint(
         &self,
         source: usize,
@@ -402,6 +617,17 @@ impl Execution<'_> {
             .prior(source)
             .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
         let relation = instruction.relation.as_ref().expect("deferred relation");
+        if is_bounds_relation(relation) {
+            return self.bounds_constraint(
+                source,
+                self.performed[source]
+                    .last()
+                    .expect("performed member")
+                    .ordinal,
+                instruction,
+                self.schedule.external_groups[source],
+            );
+        }
         let canvas = self.request.canvas;
         let (unsupported, structure, missing, omitted, authority_missing, numeric_reason) =
             match relation.kind {

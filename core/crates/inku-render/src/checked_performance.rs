@@ -114,6 +114,20 @@ fn is_checked_touching(relation: &inku_score::Relation) -> bool {
             || relation.position_authority.is_some())
 }
 
+fn is_bounds_relation(relation: &inku_score::Relation) -> bool {
+    matches!(
+        relation.kind,
+        RelationType::NotTouching | RelationType::Between
+    )
+}
+
+fn is_checked_bounds_relation(relation: &inku_score::Relation) -> bool {
+    is_bounds_relation(relation)
+        && (relation.target_instruction_index.is_some()
+            || relation.target_anchor_index.is_some()
+            || relation.position_authority.is_some())
+}
+
 fn is_checked_line_relation(relation: &inku_score::Relation, kind: RelationType) -> bool {
     relation.kind == kind
         && (relation.target_instruction_index.is_some() || relation.position_authority.is_some())
@@ -542,6 +556,7 @@ pub fn resolve_checked_performance(
                 relation.kind == RelationType::Connected
                     || relation.target_anchor_index.is_some()
                     || is_checked_touching(relation)
+                    || is_checked_bounds_relation(relation)
                     || is_checked_line_relation(relation, RelationType::Along)
                     || is_checked_line_relation(relation, RelationType::Cutting)
             })

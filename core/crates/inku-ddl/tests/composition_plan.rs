@@ -168,6 +168,162 @@ fn context(canvas: &str) -> ScoreLoweringContext {
     .unwrap()
 }
 
+fn bounds_definition(kind: &str, place: &str, omitted: Option<usize>) -> MacroDefinition {
+    let mut body = Vec::new();
+    for (index, color) in ["red", "blue", "green"].into_iter().enumerate() {
+        let mut fields = json!({
+            "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+            "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+            "color":{"expr":"semantic_ref","category":"color","id":color},
+            "place":{"expr":"semantic_ref","category":"place","id":place}
+        });
+        if omitted == Some(index) {
+            fields.as_object_mut().unwrap().remove("shape");
+        }
+        body.push(json!({"op":"emit", "binding":if index == 0 { Value::Null } else { json!(format!("member{index}")) }, "fields":fields}));
+    }
+    body.push(json!({"op":"relation","kind":kind,"from":"member1","to":"member2"}));
+    MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Bounds","heading":"Trio","version":"1.0.0","parameters":{},"components":{},"body":body}).to_string()).unwrap()
+}
+
+#[test]
+fn bounds_relations_share_direct_macro_score_and_symbolic_plan_delivery() {
+    for (kind, phrase) in [
+        ("not_touching", "not touching the previous shape"),
+        ("between", "between the previous two"),
+    ] {
+        for place in ["center", "top"] {
+            let definition = bounds_definition(kind, place, None);
+            let generated = stage(
+                "Bounds.Trio",
+                ResolvedInstructionLanguage::En,
+                &[definition],
+            );
+            let direct = stage(
+                &format!(
+                    "place one red circle at {place}. place one blue circle at {place}. place one green circle at {place} {phrase}."
+                ),
+                ResolvedInstructionLanguage::En,
+                &[],
+            );
+            let mut relations = Vec::new();
+            for transformed in [&direct, &generated] {
+                let score = lower_verified_stage15_score(
+                    transformed.verified_effective_view(),
+                    context("wide"),
+                );
+                assert!(
+                    score.diagnostics().is_empty(),
+                    "{kind}/{place}: {:?}",
+                    score.diagnostics()
+                );
+                let relation = score.score().unwrap().instructions[2]
+                    .relation
+                    .clone()
+                    .unwrap();
+                assert_eq!(relation.target_instruction_index, Some(1));
+                let plan =
+                    plan_verified_stage15(transformed.verified_effective_view(), context("wide"));
+                assert!(plan.diagnostics().is_empty(), "{:?}", plan.diagnostics());
+                let planned = plan.objects().unwrap()[2].relation().unwrap();
+                assert_eq!(planned.kind(), relation.kind);
+                assert_eq!(planned.target_object_index(), Some(1));
+                assert_eq!(planned.position_authority(), relation.position_authority);
+                relations.push(relation);
+            }
+            assert_eq!(relations[0], relations[1]);
+        }
+    }
+}
+
+#[test]
+fn between_keeps_both_original_emit_owners_when_either_reference_is_omitted() {
+    for omitted in [0, 1] {
+        let definition = bounds_definition("between", "center", Some(omitted));
+        let transformed = stage(
+            "Bounds.Trio",
+            ResolvedInstructionLanguage::En,
+            &[definition],
+        );
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let score = lower_verified_stage15_score_with_policy(
+                transformed.verified_effective_view(),
+                context("wide"),
+                policy,
+            );
+            assert_eq!(score.score().unwrap().instructions.len(), 2);
+            assert!(
+                score
+                    .score()
+                    .unwrap()
+                    .instructions
+                    .last()
+                    .unwrap()
+                    .relation
+                    .is_none()
+            );
+            assert!(
+                score
+                    .diagnostics()
+                    .iter()
+                    .any(|diagnostic| diagnostic.reason
+                        == ScoreFieldGap::UnavailableMacroRelationReference
+                        && diagnostic.disposition == ScoreDiagnosticDisposition::RelationOmitted)
+            );
+            let plan = plan_verified_stage15_with_policy(
+                transformed.verified_effective_view(),
+                context("wide"),
+                policy,
+            );
+            assert_eq!(plan.objects().unwrap().len(), 2);
+            assert!(plan.objects().unwrap().last().unwrap().relation().is_none());
+            assert!(plan.diagnostics().iter().any(|diagnostic| diagnostic.reason
+                == ScoreFieldGap::UnavailableMacroRelationReference
+                && diagnostic.disposition == ScoreDiagnosticDisposition::RelationOmitted));
+        }
+        let first = if omitted == 0 {
+            "place one red circle."
+        } else {
+            "place one red circle at center."
+        };
+        let second = if omitted == 1 {
+            "place one blue circle."
+        } else {
+            "place one blue circle at center."
+        };
+        let direct = stage(
+            &format!("{first} {second} place one green circle at center between the previous two."),
+            ResolvedInstructionLanguage::En,
+            &[],
+        );
+        let score = lower_verified_stage15_score(direct.verified_effective_view(), context("wide"));
+        assert_eq!(
+            score.score().unwrap().instructions.len(),
+            2,
+            "{:?}",
+            score.diagnostics()
+        );
+        assert!(
+            score
+                .score()
+                .unwrap()
+                .instructions
+                .last()
+                .unwrap()
+                .relation
+                .is_none()
+        );
+        let plan = plan_verified_stage15(direct.verified_effective_view(), context("wide"));
+        assert_eq!(plan.objects().unwrap().len(), 2);
+        assert!(plan.objects().unwrap().last().unwrap().relation().is_none());
+        assert!(plan.diagnostics().iter().any(|diagnostic| matches!(
+            diagnostic.reason,
+            ScoreFieldGap::UnavailableRelationReference { .. }
+        ) && diagnostic.disposition
+            == ScoreDiagnosticDisposition::RelationOmitted));
+    }
+}
+
 fn ratio(value: Rational, numerator: i128, denominator: i128) {
     assert_eq!(
         value.numerator() * denominator,

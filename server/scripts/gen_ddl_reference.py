@@ -28,15 +28,14 @@ PLUGIN_DIR = REFERENCE_ROOT.parent / "plugins"
 OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "DDL engine 23 adds oil paint as an independent touch. One literal Japanese "
-    "B case verifies that coerce changes an existing line to weight=oil_paint "
-    "when DDL names 油彩. Thick brush remains independent, and all existing "
-    "inputs and outputs remain unchanged. This legacy expander/coerce/plugin "
-    "corpus does not exercise the typed compiler; the Rust seasonal asset, "
-    "lowering, compiler, Macro, and composition tests verify that path independently."
+    "DDL engine 24 records the Instruction declaration-order change that inserts "
+    "surface_intensity before the final surface field in Score 0.3. The existing "
+    "literal Score 0.1 and 0.2 inputs remain fixed; normal intensity is omitted "
+    "from serialized instructions. This legacy expander/coerce/plugin corpus "
+    "does not exercise or activate the typed compiler."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")

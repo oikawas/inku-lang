@@ -33,6 +33,8 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert isinstance(properties, dict)
     assert {"version", "canvas", "background", "presence", "instructions"} <= properties.keys()
 
+    assert properties["version"]["default"] == "0.3.0"
+    assert properties["version"]["enum"] == ["0.3.0", "0.2.0", "0.1.0"]
     instruction = schema["$defs"]["Instruction"]["properties"]
     assert "point" in instruction["primitive"]["enum"]
     assert "oil_paint" in instruction["weight"]["enum"]

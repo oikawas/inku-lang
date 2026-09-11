@@ -15,11 +15,19 @@
 
 ---
 
+### 2026-09-11 — Macro Group内の共通配送
+
+配置・変換を持たないMacro Groupの内側も、元の図形順と生成元・解決済み参照を保って通常DDLの共通lowererへ渡す。Count1のScoreと反復planで同じ経路を使い、入れ子にしただけで正しいEmitを未対応として落とさない。未対応transform等はsubtree単位で診断し、省略された要素を飛ばして関係をつなぎ直さない。
+
+一般のgroup配置やtransformの意味、個体materialization、typed runtime/UI/save全面接続は今回の変更に含めない。
+
+---
+
 ### 2026-09-11 — 道具別の塗りと濃淡
 
 12道具の通常・濃い・薄いを共有Rust rendererへ実装した。粉、蝋、墨、製図インク、彫線、銀筆・鉛筆の擦り跡、CRTの走査線、油彩の幅広い筆跡を、それぞれの道具に合わせた小さなpattern／mask／filterまたはpathで表す。油彩は下地と輪郭を保ち、幅と間隔を3倍にした穏やかな筋を使う。コンピュータの濃い・薄いは明度の暗・明で表す。
 
-Scoreの`surface_intensity`はnormal／dense／faintを保持し、省略時のnormalは既存wire表現を変えない。Typed DDLのsolidな閉じた塗りは通常DDLとMacroの共通lowererからこの値を届け、反復計画も個体生成なしで保持する。非solidなど未対応の意味は既存の診断へ残す。typed runtime／UI／saveの全面接続、配備・公開releaseは含まない。
+Score 0.3.0の`surface_intensity`はnormal／dense／faintを保持し、省略時のnormalは既存wire表現を変えない。Typed DDLのsolidな閉じた塗りは通常DDLとMacroの共通lowererからこの値を届け、反復計画も個体生成なしで保持する。非solidなど未対応の意味は既存の診断へ残す。保存済みScore 0.1.0／0.2.0の読み書きは元の版を保持する。同じScoreの描画が変わるためrender engineを47から48へ、Instructionのフィールド宣言変更によりDDL engineを23から24へ進める。APP_VERSION／BUILD_NUMBERは並行作業の値を保持する。typed runtime／UI／saveの全面接続、配備・公開releaseは含まない。
 
 ---
 

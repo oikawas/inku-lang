@@ -553,7 +553,7 @@ class LocalFallbackPipeline(
         }
         addVariationHint(instruction, context)
         val score = JSONObject()
-            .put("version", "0.2.0")
+            .put("version", "0.3.0")
             .put("canvas", canvasAspect)
             .put("background", background)
             // The DDL alone, on both calls. The concatenation used to reach the
@@ -624,7 +624,7 @@ class LocalFallbackPipeline(
             .let { DdlEngineRepairs.withoutUnrequestedColorCycle(it, ddl) }
             .fold(JSONArray()) { array, item -> array.put(item); array }
         val result = JSONObject()
-            .put("version", "0.2.0")
+            .put("version", score.optString("version", "0.1.0"))
             .put("canvas", canvasAspect)
             .put("background", background)
             .put("instructions", repaired)

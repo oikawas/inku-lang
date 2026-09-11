@@ -45,6 +45,24 @@ class LocalFallbackRenderSeamTest {
     }
 
     @Test
+    fun normalizationKeepsScoreEditionAndAcceptedSurfaceIntensity() {
+        val pipeline = LocalFallbackPipeline(CapturingSvgRenderer())
+        for (edition in listOf("0.1.0", "0.2.0", "0.3.0")) {
+            val source = JSONObject("""{"version":"$edition","instructions":[{"primitive":"circle","filled":true}]}""")
+            if (edition == "0.3.0") source.getJSONArray("instructions")
+                .getJSONObject(0).put("surface_intensity", "dense")
+            val normalized = pipeline.normalizeServerScoreWithLang(source, "", "square", null)
+            assertEquals(edition, normalized.getString("version"))
+            val instruction = normalized.getJSONArray("instructions").getJSONObject(0)
+            assertEquals(if (edition == "0.3.0") "dense" else "",
+                instruction.optString("surface_intensity"))
+        }
+        val versionless = JSONObject("""{"instructions":[{"primitive":"circle"}]}""")
+        assertEquals("0.1.0", pipeline.normalizeServerScoreWithLang(versionless, "", "square", null)
+            .getString("version"))
+    }
+
+    @Test
     fun canonicalSeedDoesNotNarrowUnsignedOrBigIntegerValues() {
         val pipeline = LocalFallbackPipeline(CapturingSvgRenderer())
         val unsignedMax = BigInteger("18446744073709551615")

@@ -15,11 +15,19 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Shared delivery inside Macro Groups
+
+Placement-free Macro Groups now deliver their children through the ordinary DDL lowerer, preserving original Emit order, generated ownership, and resolved references. Count-one Score delivery and symbolic repetition plans share this path. Nesting alone no longer rejects an otherwise supported Emit. Unsupported transforms and other structural subtrees retain their diagnostics and omission boundaries, without reconnecting a relation across omitted elements.
+
+General group placement, transform semantics, instance materialization, and full typed runtime/UI/save integration remain outside this change.
+
+---
+
 ### 2026-09-11 — Tool-specific fills and intensity
 
 Implemented normal, dense, and faint fills for all twelve tools in the shared Rust renderer. Compact patterns, masks, filters, or paths express powder, wax, brush ink, drafting ink, engraving, silverpoint and pencil rubbing, CRT scanlines, and broad oil-paint strokes. Oil widens both paint tracks and spacing threefold with gentle bristle contrast while retaining the base and outline. Computer density is expressed as darker or lighter brightness.
 
-Score `surface_intensity` retains normal / dense / faint; the default normal value does not change existing wire output. Solid closed fills in typed DDL use the same lowerer for direct instructions and Macro, and repeated plans retain the value without materialization. Unsupported meanings such as non-solid intensity keep their diagnostics. Full typed runtime / UI / save integration, deployment, and public release are outside this change.
+Score 0.3.0 `surface_intensity` retains normal / dense / faint; the default normal value does not change existing wire output. Solid closed fills in typed DDL use the same lowerer for direct instructions and Macro, and repeated plans retain the value without materialization. Unsupported meanings such as non-solid intensity keep their diagnostics. Saved Score 0.1.0 / 0.2.0 retain their original versions when read and written. Render engine advances 47→48 because the same Score renders differently; DDL engine advances 23→24 for the Instruction field declaration change. APP_VERSION / BUILD_NUMBER retain the values from parallel work. Full typed runtime / UI / save integration, deployment, and public release are outside this change.
 
 ---
 

@@ -30,7 +30,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -796,7 +796,7 @@ def migrate_score_payload(value: object) -> object:
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.2.0"
+    version: ScoreVersion = "0.3.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -842,6 +842,10 @@ class Score(BaseModel):
             instruction.arc_form is not None for instruction in self.instructions
         ):
             raise ValueError("arc_form requires Score version 0.2.0")
+        if self.version != "0.3.0" and any(
+            instruction.surface_intensity != "normal" for instruction in self.instructions
+        ):
+            raise ValueError("surface_intensity requires Score version 0.3.0")
         covered_until = 0
         for index, instruction in enumerate(self.instructions):
             arrangement = instruction.arrangement

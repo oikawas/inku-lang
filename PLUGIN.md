@@ -115,7 +115,12 @@ a literal noun condition. `not_touching` also uses adjacent bound Emits and the 
 Medium-gap Score representation, requiring exact center on the current Emit. Adjacency
 includes every original Emit, including unbound Emits. An omitted from never retargets to
 a survivor. Relations inside placement-free Groups use the same rules. Unsupported
-subtrees are not traversed and cannot be crossed to create adjacency. Other relation kinds remain unsupported.
+subtrees are not traversed and cannot be crossed to create adjacency. `along` / `cutting`
+also accept adjacent bound Line Emits through the shared checked performer. Along
+aligns an unspecified direction parallel to the preceding line; Cutting retains
+the resolved length. Explicit direction, dimensions, and numeric position remain
+authoritative. Unsupported pairs or incompatible constraints use Stop /
+OmitAndContinue without retargeting. Other relation kinds remain unsupported.
 
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and

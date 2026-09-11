@@ -32,11 +32,11 @@ SCHEMA_VERSION = "0.3.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "Engine 48 gives solid fills the accepted tool-specific deposition, engraving "
-    "and CRT surfaces, and widens oil-paint passes with milder interior relief. "
-    "Normal, dense and faint preserve the geometry seed; Compat keeps explicit "
-    "intensity with a filter-free approximation. Earlier literal inputs and "
-    "frozen Engine 47 artifacts remain unchanged."
+    "Engine 49 delivers typed Along and Cutting through the checked relation "
+    "performer. Along aligns an unspecified line direction with its prior line; "
+    "Cutting retains the resolved line length. Explicit directions and numeric "
+    "positions remain authoritative. Metadata-free legacy relations and frozen "
+    "Engine 48 inputs and artifacts remain unchanged."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -170,6 +170,8 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
 
 def _case_unit(cases: dict[str, dict[str, Any]], case_id: str,
                instructions: list[dict[str, Any]], *,
+               aspect: str = "square",
+               score_version: str = BASE_SCORE["version"],
                render_seed: int = DEFAULT_RENDER_SEED,
                composition_seed: int | None = None) -> None:
     """A case whose score holds more than one instruction.
@@ -181,7 +183,8 @@ def _case_unit(cases: dict[str, dict[str, Any]], case_id: str,
     if case_id in cases:
         raise ValueError(f"duplicate case ID: {case_id}")
     score = copy.deepcopy(BASE_SCORE)
-    score["canvas"] = {"aspect": "square", "ground": None}
+    score["canvas"] = {"aspect": aspect, "ground": None}
+    score["version"] = score_version
     score["background"] = "white"
     score["instructions"] = [copy.deepcopy(item) for item in instructions]
     cases[case_id] = {
@@ -846,6 +849,28 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _pair("H-pair-cycle-unit", group_size=2, count=4,
           color_cycle=["red", "blue"])
 
+    # I: checked Line relations use resolved lengths on a non-square canvas.
+    # Legacy cases keep their original literal inputs and metadata-free path.
+    for case_id, kind, prior_start, prior_end, current_start, current_end in (
+        ("I-typed-along-parallel", "along", [0.15, 0.30], [0.85, 0.50],
+         [0.35, 0.70], [0.55, 0.70]),
+        ("I-typed-cutting-keeps-length", "cutting", [0.10, 0.50], [0.90, 0.50],
+         [0.40, 0.20], [0.60, 0.20]),
+    ):
+        _case_unit(
+            cases, case_id,
+            [
+                _instruction("line", weight="rotring",
+                             **{"from": prior_start, "to": prior_end}),
+                _instruction("line", weight="rotring", rotation=None,
+                             relation={"type": kind, "gap": "medium",
+                                       "target_instruction_index": 0,
+                                       "position_authority": "named_movable"},
+                             **{"from": current_start, "to": current_end}),
+            ],
+            aspect="wide", score_version=SCHEMA_VERSION,
+        )
+
     # C gained two with `canvas` and `drawing_paper`. The count stays written
     # out by hand on purpose: the ground cases are read from the enum now, so
     # this line is what makes adding a support a deliberate re-bake instead of a
@@ -860,10 +885,11 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Engine 46 adds the two direct crescent cases above.  The old 0.1 inputs
     # deliberately stay in place, so their unchanged SVGs remain controls.
     # Engine 47 adds one oil-paint line to A and one solid fill to C.
+    # Engine 49 adds one checked Along and one checked Cutting case to I.
     expected = {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128,
-                "G": 50, "H": 4}
+                "G": 50, "H": 4, "I": 2}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 614:
+    if actual != expected or len(cases) != 616:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

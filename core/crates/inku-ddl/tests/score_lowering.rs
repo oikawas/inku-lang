@@ -1103,6 +1103,43 @@ fn connected_lowering_carries_named_and_numeric_position_authority_explicitly() 
 }
 
 #[test]
+fn typed_along_and_cutting_lowering_carry_checked_metadata_without_touching_constraints() {
+    for (source, expected_kind) in [
+        (
+            "place one red line at center. place one blue line at center along the previous line.",
+            RelationType::Along,
+        ),
+        (
+            "place one red line at center. place one blue line with length 0.2 at center cutting the previous line.",
+            RelationType::Cutting,
+        ),
+    ] {
+        let result = stage15(source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        );
+        assert_eq!(
+            lowered.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}"
+        );
+        let current = &lowered.score().unwrap().instructions[1];
+        let relation = current
+            .relation
+            .as_ref()
+            .expect("typed relation reaches Score");
+        assert_eq!(relation.kind, expected_kind);
+        assert_eq!(relation.target_instruction_index, Some(0));
+        assert_eq!(
+            relation.position_authority,
+            Some(ConnectedPositionAuthority::NamedMovable)
+        );
+        assert!(relation.touching_constraints.is_none());
+    }
+}
+
+#[test]
 fn endpoint_family_explicit_geometry_and_japanese_point_reach_the_same_typed_lowerer() {
     let en = stage15(
         concat!(
@@ -3671,6 +3708,53 @@ fn macro_group_definition(body: serde_json::Value) -> MacroDefinition {
     let mut value = serde_json::to_value(complete_flat_emit_definition()).unwrap();
     value["body"] = body;
     MacroDefinition::from_json(&value.to_string()).unwrap()
+}
+
+#[test]
+fn placement_free_nested_macro_group_delivers_typed_along_and_cutting() {
+    use serde_json::json;
+
+    let definition = macro_group_definition(json!([
+        {"op":"group","body":[
+            macro_group_emit("first", "black"),
+            {"op":"group","body":[
+                macro_group_emit("along", "red"),
+                {"op":"relation","kind":"along","from":"first","to":"along"},
+                macro_group_emit("cutting", "blue"),
+                {"op":"relation","kind":"cutting","from":"along","to":"cutting"}
+            ]}
+        ]}
+    ]));
+    let result = stage15_locked(
+        "Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+    );
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        lowered.diagnostics()
+    );
+    let instructions = &lowered.score().unwrap().instructions;
+    assert_eq!(instructions.len(), 3);
+    for (index, expected_kind) in [(1, RelationType::Along), (2, RelationType::Cutting)] {
+        let relation = instructions[index]
+            .relation
+            .as_ref()
+            .expect("nested relation reaches Score");
+        assert_eq!(relation.kind, expected_kind);
+        assert_eq!(relation.target_instruction_index, Some(index - 1));
+        assert_eq!(
+            relation.position_authority,
+            Some(ConnectedPositionAuthority::NamedMovable)
+        );
+        assert!(relation.touching_constraints.is_none());
+    }
 }
 
 #[test]

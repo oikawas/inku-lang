@@ -77,6 +77,281 @@ fn absent_performance_seed_preserves_unresolved_fields() {
 }
 
 #[test]
+fn typed_along_derives_only_an_omitted_line_direction_and_preserves_fixed_position() {
+    let input = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.15,0.3],"to":[0.85,0.5]},
+        {"primitive":"line","from":[0.35,0.7],"to":[0.55,0.7],
+         "relation":{"type":"along","target_instruction_index":0,"position_authority":"named_movable"}}
+        ]}"#,
+    );
+    let result = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(23),
+            composition_seed: Some(23),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("typed Along lines perform");
+    let prior = endpoint_geometry(&result.score.instructions[0], None).unwrap();
+    let along = endpoint_geometry(&result.score.instructions[1], None).unwrap();
+    let original_along = endpoint_geometry(&input.instructions[1], None).unwrap();
+    let prior_direction = (prior.1.x - prior.0.x, prior.1.y - prior.0.y);
+    let along_direction = (along.1.x - along.0.x, along.1.y - along.0.y);
+    assert!(
+        (prior_direction.0 * along_direction.1 - prior_direction.1 * along_direction.0).abs()
+            < 1.0e-9
+    );
+    assert!(
+        ((along.1.x - along.0.x).hypot(along.1.y - along.0.y)
+            - (original_along.1.x - original_along.0.x)
+                .hypot(original_along.1.y - original_along.0.y))
+        .abs()
+            < 1.0e-9
+    );
+
+    let fixed = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"line","from":[0.4,0.58],"to":[0.6,0.58],
+         "relation":{"type":"along","target_instruction_index":0,"position_authority":"numeric_fixed"}}
+        ]}"#,
+    );
+    let fixed = resolve_checked_performance(
+        PerformanceRequest {
+            score: &fixed,
+            performance_seed: Some(23),
+            composition_seed: Some(23),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("fixed Along within its band performs");
+    let fixed_prior = endpoint_geometry(&fixed.score.instructions[0], None).unwrap();
+    let fixed_line = endpoint_geometry(&fixed.score.instructions[1], None).unwrap();
+    let fixed_direction = (
+        fixed_line.1.x - fixed_line.0.x,
+        fixed_line.1.y - fixed_line.0.y,
+    );
+    let fixed_prior_direction = (
+        fixed_prior.1.x - fixed_prior.0.x,
+        fixed_prior.1.y - fixed_prior.0.y,
+    );
+    assert!(
+        (fixed_prior_direction.0 * fixed_direction.1 - fixed_prior_direction.1 * fixed_direction.0)
+            .abs()
+            < 1.0e-9
+    );
+    let fixed_center = (
+        (fixed_line.0.x + fixed_line.1.x) / 2.0,
+        (fixed_line.0.y + fixed_line.1.y) / 2.0,
+    );
+    assert!((fixed_center.0 - 0.5).abs() < 1.0e-9);
+    assert!((fixed_center.1 - 0.58).abs() < 1.0e-9);
+
+    let explicit = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"line","from":[0.4,0.2],"to":[0.6,0.2],"rotation":90,
+         "relation":{"type":"along","target_instruction_index":0,"position_authority":"named_movable"}}
+        ]}"#,
+    );
+    let explicit = resolve_checked_performance(
+        PerformanceRequest {
+            score: &explicit,
+            performance_seed: Some(23),
+            composition_seed: Some(23),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("explicit Along direction performs without parallelization");
+    let explicit_line = endpoint_geometry(&explicit.score.instructions[1], None).unwrap();
+    assert_eq!(explicit.score.instructions[1].rotation, Some(90.0));
+    assert!((explicit_line.1.x - explicit_line.0.x).abs() < 1.0e-9);
+
+    let edge = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.0,0.1],"to":[0.01,0.1]},
+        {"primitive":"line","from":[0.4,0.7],"to":[0.8,0.7],
+         "relation":{"type":"along","target_instruction_index":0,"position_authority":"named_movable"}}
+        ]}"#,
+    );
+    let edge_original = endpoint_geometry(&edge.instructions[1], None).unwrap();
+    let edge = resolve_checked_performance(
+        PerformanceRequest {
+            score: &edge,
+            performance_seed: Some(23),
+            composition_seed: Some(23),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("named Along keeps its line length at the edge");
+    let edge_line = endpoint_geometry(&edge.score.instructions[1], None).unwrap();
+    assert!(
+        ((edge_line.1.x - edge_line.0.x).hypot(edge_line.1.y - edge_line.0.y)
+            - (edge_original.1.x - edge_original.0.x).hypot(edge_original.1.y - edge_original.0.y))
+        .abs()
+            < 1.0e-9
+    );
+
+    let fixed_outside = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.1],"to":[0.9,0.1]},
+        {"primitive":"line","from":[0.01,0.02],"to":[0.01,0.18],
+         "relation":{"type":"along","target_instruction_index":0,"position_authority":"numeric_fixed"}}
+        ]}"#,
+    );
+    let fixed_outside = resolve_checked_performance(
+        PerformanceRequest {
+            score: &fixed_outside,
+            performance_seed: Some(23),
+            composition_seed: Some(23),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect_err("fixed Along must still fit after derived direction");
+    assert_eq!(
+        fixed_outside.diagnostics[0].reason,
+        ScoreExecutionReason::NumericAlongPositionConflict
+    );
+}
+
+#[test]
+fn typed_cutting_rejects_an_explicit_parallel_direction() {
+    let input = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"line","from":[0.4,0.2],"to":[0.6,0.2],"rotation":0,
+         "relation":{"type":"cutting","target_instruction_index":0,"position_authority":"named_movable"}},
+        {"primitive":"line","from":[0.4,0.7],"to":[0.6,0.7],
+         "relation":{"type":"along","target_instruction_index":1,"position_authority":"named_movable"}},
+        {"primitive":"point","center":[0.8,0.8],"radius":0.006}
+        ]}"#,
+    );
+    let stopped = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(29),
+            composition_seed: Some(29),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect_err("an explicit parallel Cutting direction conflicts");
+    assert_eq!(
+        stopped.diagnostics[0].reason,
+        ScoreExecutionReason::CuttingDirectionConflict
+    );
+    let fixed_collinear = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"line","from":[0.4,0.5],"to":[0.6,0.5],"rotation":0,
+         "relation":{"type":"cutting","target_instruction_index":0,"position_authority":"numeric_fixed"}}
+        ]}"#,
+    );
+    let fixed_collinear = resolve_checked_performance(
+        PerformanceRequest {
+            score: &fixed_collinear,
+            performance_seed: Some(29),
+            composition_seed: Some(29),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect_err("a fixed collinear Cutting line conflicts");
+    assert_eq!(
+        fixed_collinear.diagnostics[0].reason,
+        ScoreExecutionReason::CuttingDirectionConflict
+    );
+    let continued = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(29),
+            composition_seed: Some(29),
+            canvas: None,
+        },
+        ScoreErrorPolicy::OmitAndContinue,
+    )
+    .expect("independent instruction survives typed relation omissions");
+    assert_eq!(continued.original_instruction_indices, [0, 3]);
+    let execution = continued
+        .execution
+        .expect("typed omissions remain recorded");
+    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
+    assert_eq!(
+        execution
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.reason)
+            .collect::<Vec<_>>(),
+        [
+            ScoreExecutionReason::CuttingDirectionConflict,
+            ScoreExecutionReason::AlongReferenceOmitted,
+        ]
+    );
+}
+
+#[test]
+fn typed_cutting_keeps_line_length_while_legacy_cutting_keeps_its_raw_recipe() {
+    let input = score(
+        r#"{"instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"line","from":[0.4,0.2],"to":[0.6,0.2],
+         "relation":{"type":"cutting","target_instruction_index":0,"position_authority":"named_movable"}}
+        ]}"#,
+    );
+    let original = endpoint_geometry(&input.instructions[1], None).unwrap();
+    let original_length = (original.1.x - original.0.x).hypot(original.1.y - original.0.y);
+    let result = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(29),
+            composition_seed: Some(29),
+            canvas: None,
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("typed Cutting performs");
+    let cut = endpoint_geometry(&result.score.instructions[1], None).unwrap();
+    let cut_length = (cut.1.x - cut.0.x).hypot(cut.1.y - cut.0.y);
+    assert!((cut_length - original_length).abs() < 1.0e-9);
+    assert!(
+        (cut.0.y - 0.5) * (cut.1.y - 0.5) <= 1.0e-9,
+        "typed Cutting crosses the prior line"
+    );
+
+    let mut legacy = input.clone();
+    let relation = legacy.instructions[1].relation.as_mut().unwrap();
+    relation.target_instruction_index = None;
+    relation.position_authority = None;
+    assert_eq!(
+        resolve_checked_performance(
+            PerformanceRequest {
+                score: &legacy,
+                performance_seed: Some(29),
+                composition_seed: Some(29),
+                canvas: None,
+            },
+            ScoreErrorPolicy::Stop,
+        )
+        .expect("metadata-free Cutting remains legacy")
+        .score,
+        resolve_performance(PerformanceRequest {
+            score: &legacy,
+            performance_seed: Some(29),
+            composition_seed: Some(29),
+            canvas: None,
+        })
+        .score
+    );
+}
+
+#[test]
 fn performance_resolves_regions_then_relations_in_sequence() {
     let input = score(
         r#"{"instructions":[

@@ -223,7 +223,7 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 Actual Scoreへ届く現行finite consumerは、完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。配置や変換を持たない`group`の入れ子も元の順序で巡回し、生成元ownerとlexical scopeで解決済みの参照IDを保持する。Group自身が新しい配置・座標変換・描画命令を作ることはない。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`、`movement`は明示`place`、`place`は`center`（exact generated focus target必須）または§18の明示`top` / `bottom` / 四辺 / `corner`を受け入れる。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
 
-Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、`place:center`だけは`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じMacroの元の生成順で隣接するbound Emit間で両者がexact centerのときだけ`connected` / `touching`を共有checked performerへ届け、元参照順とownerを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。`not_touching`も同じMacroの隣接bound Emitから通常DDLと同じMedium gapのScoreへ届く。Currentはexact centerを必要とする。隣接性はunbound Emitも含む元順序で判定し、省略されたfromをsurvivorへ付け替えない。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`transform` / `anchor` / 未対応`relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のEmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、Group内も含め無関係なsiblingをsource / generated provenance順に残す。参照消失は元の依存先を保って対象Emitを省略し、残存Emitへ付け替えない。未対応structural subtreeから子Emitだけを抜き出さず、未対応subtreeを跨いで隣接関係を作らない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
+Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、`place:center`だけは`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じMacroの元の生成順で隣接するbound Emit間で両者がexact centerのときだけ`connected` / `touching`を共有checked performerへ届け、元参照順とownerを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。`not_touching`も同じMacroの隣接bound Emitから通常DDLと同じMedium gapのScoreへ届く。Currentはexact centerを必要とする。`along` / `cutting`は両者がLineの隣接bound Emitから同じchecked performerへ届き、named位置はmovable、数値位置はfixedとして§14.4の方向・寸法規則を使う。隣接性はunbound Emitも含む元順序で判定し、省略されたfromをsurvivorへ付け替えない。既定のStopでは不完全Emit、unknown key、category / type不一致、未結合caller fact、repeated outer count、展開後の`transform` / `anchor` / 未対応`relation`のいずれもScore全体を停止する。明示したOmitAndContinueでは、独立appearance fieldはそのfieldだけ、不成立のEmitはそのEmit、未対応structural nodeはそのsubtree、成立しない外側caller meaningは呼出し全体を省略し、Group内も含め無関係なsiblingをsource / generated provenance順に残す。参照消失は元の依存先を保って対象Emitを省略し、残存Emitへ付け替えない。未対応structural subtreeから子Emitだけを抜き出さず、未対応subtreeを跨いで隣接関係を作らない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
 
@@ -1534,7 +1534,7 @@ instruction に任意フィールド `relation` を追加する。
 |---|---|---|
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
-| `target_instruction_index` | 0以上のScore index | checked `connected` / `touching`が参照する正確な先行Score instruction。旧relationでは省略 |
+| `target_instruction_index` | 0以上のScore index | checked `connected` / `touching` / `along` / `cutting`が参照する正確な先行Score instruction。旧relationでは省略 |
 | `position_authority` | `named_movable` / `numeric_fixed` | checked currentの位置authority |
 | `touching_constraints` | `dimensions_fixed` / `direction_fixed`のboolean組 | typed `touching`の明示寸法・向きの固定条件。省略normalとは区別し、旧Scoreでは省略 |
 
@@ -1551,11 +1551,13 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 関係の解決は Renderer が演奏時に行う。Renderer は制約ソルバを持たない。instruction を順に処理し、直前要素の**確定した**位置・輪郭を参照して次を配置する（逐次解決）。
 
 - `not_touching, gap=narrow` → 直前要素の輪郭から一定レンジ内の距離・方位を、演奏ごとの乱数で決める
-- `along` → 直前要素の軌跡に沿う帯領域内で、位置・位相・長さを演奏ごとに決める
+- `along` → 直前要素の軌跡に沿う帯領域内で、位置・位相を演奏ごとに決める
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
 - `connected` → Line / Arc / Pointに適用し、currentのcanonical始端（Pointはcenter）をpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
+
+現行のtyped Along / Cutting配送はCount1のactual Scoreを対象とし、反復CompositionPlanのrelation配送は未対応である。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は互換用に保持し、Typed DDL本番pipeline／UI／saveの全面接続とは区別する。
 
 `touching` で当該要素が弧なら、直前要素の確定端点を P1, P2、弦長を `c=|P2-P1|`、当該弧の演奏後の符号付き矢高を `b` とし、`r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は弦の中点から膨らみと反対側へ `r-|b|` だけ置き、掃引角は必ず180°未満とする。直前要素が弧なら膨らみ側はその反対側を既定とする。劣弧の符号・掃引規約はRendererのSVG弧描画と一つの実装を共有する。variationと筆致は端点を固定し、中間区間だけへ作用する。閉形、端点のない直前要素、退化した弦・矢高ではrelationをdropし、座標推定による修復やgovernorは行わない。
 

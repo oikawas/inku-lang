@@ -114,7 +114,12 @@ The four bilingual full literals verify their named prior Line / Arc type in ori
 shares existing Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain fixed;
 omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure stops or omits the current / Emit while
 preserving original dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
-Along / Cutting, whole Step 10, and typed production / UI / persistence cutover remain incomplete. Connected also reaches
+Engine49 also delivers typed Along / Cutting between adjacent count-one Lines through the shared checked performer.
+Relation delivery in repeated plans remains unsupported.
+Along aligns only an unspecified direction; Cutting keeps the resolved length. Explicit direction, dimensions,
+and numeric position remain authoritative. Incompatible constraints or missing references stop or omit the
+current instruction / Emit, while metadata-free legacy Scores remain compatible. Whole Step 10 and typed
+production / UI / persistence cutover remain incomplete. Connected also reaches
 adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
 checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
 the prior, dimensions, curvature, or rotation. A nonzero numeric conflict stops or omits the current according to

@@ -206,15 +206,21 @@ fn touching_bilingual_targets_reach_performed_both_ends_and_reject_wrong_nouns()
         assert!((first_center.y - endpoints.0.y) * (second_center.y - endpoints.0.y) < 0.0);
     }
     for source in [
-        "place one red arc at center. place one blue line at center touching the previous line.",
-        "place one red line at center. place one blue arc at center touching the previous arc at both ends.",
+        "place one red arc at center. place one blue line at center touching the previous line. place one green square at center.",
+        "place one red line at center. place one blue arc at center touching the previous arc at both ends. place one green square at center.",
     ] {
         let stopped = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
         assert_eq!(
             stopped.compilation().compiler_lock.as_ref().unwrap().state,
             CompilerLockState::BlockedConflict
         );
-        assert!(stopped.score().is_none());
+        assert_eq!(
+            stopped.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        let stopped_score = stopped.score().unwrap();
+        assert_eq!(stopped_score.instructions.len(), 3);
+        assert!(stopped_score.instructions[1].relation.is_none());
         assert!(
             stopped
                 .compilation()
@@ -231,13 +237,78 @@ fn touching_bilingual_targets_reach_performed_both_ends_and_reject_wrong_nouns()
             continued.outcome(),
             ScoreLoweringOutcome::CompleteWithOmissions
         );
-        assert_eq!(continued.score().unwrap().instructions.len(), 1);
+        assert_eq!(continued.score(), Some(stopped_score));
+        assert_eq!(continued.score().unwrap().instructions.len(), 3);
         assert_eq!(
             continued.instruction_origins(),
-            [ScoreInstructionOrigin::SourceInstruction {
-                instruction_index: 0
-            }]
+            [
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 0
+                },
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 1
+                },
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 2
+                }
+            ]
         );
+        assert!(continued.upstream_diagnostics().iter().any(|diagnostic| {
+            matches!(
+                diagnostic.disposition,
+                CompilerExecutionDisposition::RelationOmitted {
+                    unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                        instruction_index: 1,
+                        ..
+                    }
+                }
+            )
+        }));
+    }
+}
+
+#[test]
+fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
+    let source = concat!(
+        "place one red arc at center. ",
+        "place one blue line at center touching the previous line. ",
+        "place one green square at center."
+    );
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let result = execute(source, &[], LIMITS, policy);
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{policy:?}: {result:?}"
+        );
+        let score = result.score().unwrap();
+        assert_eq!(score.instructions.len(), 3);
+        assert!(score.instructions[1].relation.is_none());
+        assert_eq!(
+            result.instruction_origins(),
+            [
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 0
+                },
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 1
+                },
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 2
+                }
+            ]
+        );
+        assert!(result.upstream_diagnostics().iter().any(|diagnostic| {
+            matches!(
+                diagnostic.disposition,
+                CompilerExecutionDisposition::RelationOmitted {
+                    unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                        instruction_index: 1,
+                        ..
+                    }
+                }
+            )
+        }));
     }
 }
 
@@ -1171,7 +1242,7 @@ fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
         ScoreLoweringOutcome::CompleteWithOmissions,
         "{continued:?}"
     );
-    assert_eq!(continued.score().unwrap().instructions.len(), 2);
+    assert_eq!(continued.score().unwrap().instructions.len(), 3);
     assert!(
         continued
             .score()
@@ -1185,13 +1256,7 @@ fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
             (&diagnostic.reason, &diagnostic.disposition),
             (
                 ScoreFieldGap::UnsupportedMacroRelation,
-                ScoreDiagnosticDisposition::Omitted {
-                    unit: ScoreOmissionUnit::MacroEmit {
-                        generated_ordinal: 2,
-                        ..
-                    },
-                    ..
-                }
+                ScoreDiagnosticDisposition::RelationOmitted
             )
         )
     }));
@@ -1210,58 +1275,57 @@ fn macro_not_touching_preserves_emit_adjacency_and_omission_dependencies() {
         ScoreLoweringOutcome::CompleteWithOmissions,
         "{missing:?}"
     );
-    assert_eq!(missing.score().unwrap().instructions.len(), 1);
+    assert_eq!(missing.score().unwrap().instructions.len(), 2);
     assert!(missing.score().unwrap().instructions[0].relation.is_none());
     assert!(missing.downstream_diagnostics().iter().any(|diagnostic| {
         matches!(
             (&diagnostic.reason, &diagnostic.disposition),
             (
                 ScoreFieldGap::UnavailableMacroRelationReference,
-                ScoreDiagnosticDisposition::Omitted {
-                    unit: ScoreOmissionUnit::MacroEmit {
-                        generated_ordinal: 2,
-                        ..
-                    },
-                    ..
-                }
+                ScoreDiagnosticDisposition::RelationOmitted
             )
         )
     }));
 }
 
 #[test]
-fn nonadjacent_macro_connected_omits_the_target_emit_with_its_original_owner() {
+fn nonadjacent_macro_connected_keeps_emits_and_reports_relation_omission_in_both_policies() {
     let definition = definition_from(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"NonAdjacent","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"middle","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"point"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"emit","binding":"last","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"arc"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"relation","kind":"connected","from":"first","to":"last"}]}"#,
     );
-    let result = execute_locked(
-        "Path.NonAdjacent",
-        &[definition],
-        LIMITS,
-        ScoreErrorPolicy::OmitAndContinue,
-    );
-
-    assert_eq!(
-        result.outcome(),
-        ScoreLoweringOutcome::CompleteWithOmissions,
-        "{result:?}"
-    );
-    assert_eq!(result.score().unwrap().instructions.len(), 2);
-    assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
-        matches!(
-            (&diagnostic.reason, &diagnostic.disposition),
-            (
-                ScoreFieldGap::UnsupportedMacroRelation,
-                ScoreDiagnosticDisposition::Omitted {
-                    unit: ScoreOmissionUnit::MacroEmit {
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let result = execute_locked("Path.NonAdjacent", &[definition.clone()], LIMITS, policy);
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{policy:?}: {result:?}"
+        );
+        let score = result.score().unwrap();
+        assert_eq!(score.instructions.len(), 3);
+        assert!(
+            score
+                .instructions
+                .iter()
+                .all(|instruction| instruction.relation.is_none())
+        );
+        assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
+            matches!(
+                (
+                    &diagnostic.owner,
+                    &diagnostic.reason,
+                    &diagnostic.disposition
+                ),
+                (
+                    inku_ddl::ScoreDiagnosticOwner::GeneratedNode {
                         generated_ordinal: 2,
                         ..
                     },
-                    ..
-                }
+                    ScoreFieldGap::UnsupportedMacroRelation,
+                    ScoreDiagnosticDisposition::RelationOmitted,
+                )
             )
-        )
-    }));
+        }));
+    }
 }
 
 #[test]

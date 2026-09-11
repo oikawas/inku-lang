@@ -54,7 +54,7 @@ pub struct RenderOptions {
     pub render_seed: Option<Seed>,
     pub composition_seed: Option<Seed>,
     pub wild: bool,
-    #[serde(default, skip_serializing_if = "inku_score::is_stop")]
+    #[serde(default)]
     pub error_policy: ScoreErrorPolicy,
 }
 

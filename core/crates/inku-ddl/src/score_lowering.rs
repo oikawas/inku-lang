@@ -588,7 +588,7 @@ fn lower_macro_instruction(
         error_policy,
         diagnostics,
     );
-    if caller_invalid && error_policy == ScoreErrorPolicy::OmitAndContinue {
+    if caller_invalid {
         return;
     }
     let expansion = match exact_macro_expansion(view, head) {
@@ -753,7 +753,6 @@ fn lower_macro_instruction(
     }
     let mut relation_by_to = BTreeMap::new();
     let mut anchor_relation_by_to = BTreeMap::new();
-    let mut invalid_relation_targets = BTreeSet::new();
     for delivery in &delivery_nodes {
         if is_in_invalid_transform(delivery, &invalid_transforms) {
             continue;
@@ -804,7 +803,6 @@ fn lower_macro_instruction(
         {
             continue;
         }
-        invalid_relation_targets.insert(to.clone());
         let reason = ScoreFieldGap::UnsupportedMacroRelation;
         let target_provenance = to_position.map(|position| emit_nodes[position].1);
         diagnostics.push(ScoreLoweringDiagnostic {
@@ -813,20 +811,7 @@ fn lower_macro_instruction(
                 target_provenance.unwrap_or(provenance),
                 None,
             ),
-            disposition: diagnostic_disposition(
-                error_policy,
-                &reason,
-                target_provenance.map_or_else(
-                    || ScoreOmissionUnit::MacroStructuralSubtree {
-                        source_instruction_index,
-                        invocation_ordinal: provenance.invocation.invocation_ordinal,
-                        expansion_path: provenance.expansion_path.clone(),
-                        generated_ordinal: provenance.generated_ordinal,
-                    },
-                    |provenance| macro_emit_unit(source_instruction_index, provenance),
-                ),
-                None,
-            ),
+            disposition: relation_diagnostic_disposition(),
             reason,
         });
     }
@@ -868,13 +853,7 @@ fn lower_macro_instruction(
             });
             continue;
         };
-        if binding
-            .as_ref()
-            .is_some_and(|binding| invalid_relation_targets.contains(binding))
-        {
-            continue;
-        }
-        let relation_dependency = binding
+        let mut relation_dependency = binding
             .as_ref()
             .and_then(|binding| relation_by_to.get(binding));
         let anchor_relation_dependency = binding
@@ -886,15 +865,10 @@ fn lower_macro_instruction(
             let reason = ScoreFieldGap::UnavailableMacroRelationReference;
             diagnostics.push(ScoreLoweringDiagnostic {
                 owner: generated_owner(source_instruction_index, provenance, None),
-                disposition: diagnostic_disposition(
-                    error_policy,
-                    &reason,
-                    macro_emit_unit(source_instruction_index, provenance),
-                    None,
-                ),
+                disposition: relation_diagnostic_disposition(),
                 reason,
             });
-            continue;
+            relation_dependency = None;
         }
         let mut input = match project_macro_emit(fields, &[], objects.is_some()) {
             Ok(input) => input,
@@ -943,7 +917,7 @@ fn lower_macro_instruction(
                         reason: reason.clone(),
                     });
                 }
-                if error_policy != ScoreErrorPolicy::OmitAndContinue || !remaining.is_empty() {
+                if !remaining.is_empty() {
                     continue;
                 }
                 let omitted = recoverable
@@ -1039,18 +1013,11 @@ fn lower_macro_instruction(
                 match relation {
                     Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
                     Err(reason) => {
-                        objects.pop();
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: generated_owner(source_instruction_index, provenance, None),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                macro_emit_unit(source_instruction_index, provenance),
-                                None,
-                            ),
+                            disposition: relation_diagnostic_disposition(),
                             reason,
                         });
-                        continue;
                     }
                 }
             } else if let Some((target_anchor_index, kind)) = anchor_relation_dependency {
@@ -1064,18 +1031,11 @@ fn lower_macro_instruction(
                 ) {
                     Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
                     Err(reason) => {
-                        objects.pop();
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: generated_owner(source_instruction_index, provenance, None),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                macro_emit_unit(source_instruction_index, provenance),
-                                None,
-                            ),
+                            disposition: relation_diagnostic_disposition(),
                             reason,
                         });
-                        continue;
                     }
                 }
             }
@@ -1146,15 +1106,9 @@ fn lower_macro_instruction(
                     Err(reason) => {
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: generated_owner(source_instruction_index, provenance, None),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                macro_emit_unit(source_instruction_index, provenance),
-                                None,
-                            ),
+                            disposition: relation_diagnostic_disposition(),
                             reason,
                         });
-                        continue;
                     }
                 }
             } else if let Some((target_anchor_index, kind)) = anchor_relation_dependency {
@@ -1169,15 +1123,9 @@ fn lower_macro_instruction(
                     Err(reason) => {
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: generated_owner(source_instruction_index, provenance, None),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                macro_emit_unit(source_instruction_index, provenance),
-                                None,
-                            ),
+                            disposition: relation_diagnostic_disposition(),
                             reason,
                         });
-                        continue;
                     }
                 }
             }
@@ -1996,15 +1944,18 @@ pub fn lower_verified_stage15_view<'a>(
     }
 }
 
-/// Lower with the historical all-or-nothing behavior.
+/// Lower with the default recoverable-error policy.
 pub fn lower_verified_stage15_score<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
 ) -> ExplicitScoreLoweringResult<'a> {
-    lower_verified_stage15_score_with_policy(view, context, ScoreErrorPolicy::Stop)
+    lower_verified_stage15_score_with_policy(view, context, ScoreErrorPolicy::default())
 }
 
 /// Lower with an explicit shared policy for ordinary instructions and macro expansions.
+///
+/// The legacy `Stop` value remains accepted, but recoverable failures retain
+/// every independently drawable unit.
 pub fn lower_verified_stage15_score_with_policy<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
@@ -2174,48 +2125,41 @@ fn lower_verified_stage15_shared<'a>(
                         let reason = unsupported_relation_reason(instruction_index, relation);
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: source_owner_for_gap(instruction_index, instruction, &reason),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                ScoreOmissionUnit::RelationInstruction { instruction_index },
-                                None,
-                            ),
+                            disposition: relation_diagnostic_disposition(),
                             reason,
                         });
-                    } else {
-                        let attempt = resolve_projected_instruction(
-                            input,
-                            context,
-                            error_policy,
-                            |input, context| {
-                                resolve_object_plan(
-                                    input,
-                                    context,
-                                    ScoreInstructionOrigin::SourceInstruction { instruction_index },
-                                )
-                            },
-                        );
-                        append_plan_attempt(
-                            attempt,
-                            |reason| source_owner_for_gap(instruction_index, instruction, reason),
-                            ScoreOmissionUnit::SourceInstruction { instruction_index },
-                            error_policy,
-                            objects,
-                            &mut diagnostics,
-                        );
                     }
+                    let attempt = resolve_projected_instruction(
+                        input,
+                        context,
+                        error_policy,
+                        |input, context| {
+                            resolve_object_plan(
+                                input,
+                                context,
+                                ScoreInstructionOrigin::SourceInstruction { instruction_index },
+                            )
+                        },
+                    );
+                    append_plan_attempt(
+                        attempt,
+                        |reason| source_owner_for_gap(instruction_index, instruction, reason),
+                        ScoreOmissionUnit::SourceInstruction { instruction_index },
+                        error_policy,
+                        objects,
+                        &mut diagnostics,
+                    );
                     continue;
                 }
                 if let Some(relation) = &instruction.relation {
-                    let score_relation = direct_score_relation(
+                    match direct_score_relation(
                         instruction_index,
                         instruction,
                         relation,
                         effective_focus,
                         &instructions,
                         &instruction_origins,
-                    );
-                    match score_relation {
+                    ) {
                         Ok(score_relation) => lower_source_relation_instruction_with_policy(
                             instruction_index,
                             instruction,
@@ -2227,20 +2171,27 @@ fn lower_verified_stage15_shared<'a>(
                             &mut instruction_origins,
                             &mut diagnostics,
                         ),
-                        Err(reason) => diagnostics.push(ScoreLoweringDiagnostic {
-                            owner: ScoreDiagnosticOwner::SourceInstruction {
+                        Err(reason) => {
+                            diagnostics.push(ScoreLoweringDiagnostic {
+                                owner: ScoreDiagnosticOwner::SourceInstruction {
+                                    instruction_index,
+                                    field: None,
+                                    spans: vec![relation.provenance.span],
+                                },
+                                disposition: relation_diagnostic_disposition(),
+                                reason,
+                            });
+                            lower_source_instruction_with_policy(
                                 instruction_index,
-                                field: None,
-                                spans: vec![relation.provenance.span],
-                            },
-                            disposition: diagnostic_disposition(
+                                instruction,
+                                input,
+                                context,
                                 error_policy,
-                                &reason,
-                                ScoreOmissionUnit::RelationInstruction { instruction_index },
-                                None,
-                            ),
-                            reason,
-                        }),
+                                &mut instructions,
+                                &mut instruction_origins,
+                                &mut diagnostics,
+                            );
+                        }
                     }
                 } else {
                     lower_source_instruction_with_policy(
@@ -2265,15 +2216,9 @@ fn lower_verified_stage15_shared<'a>(
                             field: None,
                             spans: vec![relation.provenance.span, head.provenance.source.span],
                         },
-                        disposition: diagnostic_disposition(
-                            error_policy,
-                            &reason,
-                            macro_invocation_unit(instruction_index, head),
-                            None,
-                        ),
+                        disposition: relation_diagnostic_disposition(),
                         reason,
                     });
-                    continue;
                 }
                 lower_macro_instruction(
                     candidate.verified_effective_view(),
@@ -2302,6 +2247,7 @@ fn lower_verified_stage15_shared<'a>(
         matches!(
             diagnostic.disposition,
             ScoreDiagnosticDisposition::Omitted { .. }
+                | ScoreDiagnosticDisposition::RelationOmitted
         )
     });
     let has_drawable_content = objects.as_ref().map_or_else(
@@ -2540,15 +2486,15 @@ struct InstructionLoweringAttempt<T = Instruction> {
 fn lower_projected_instruction(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
-    error_policy: ScoreErrorPolicy,
+    _error_policy: ScoreErrorPolicy,
 ) -> InstructionLoweringAttempt {
-    resolve_projected_instruction(input, context, error_policy, lower_complete_instruction)
+    resolve_projected_instruction(input, context, _error_policy, lower_complete_instruction)
 }
 
 fn resolve_projected_instruction<'a, T>(
     input: ScoreLoweringInput<'a>,
     context: ScoreLoweringContext,
-    error_policy: ScoreErrorPolicy,
+    _error_policy: ScoreErrorPolicy,
     mut resolve: impl FnMut(
         ScoreLoweringInput<'a>,
         ScoreLoweringContext,
@@ -2566,14 +2512,6 @@ fn resolve_projected_instruction<'a, T>(
         }
         Err(gaps) => gaps,
     };
-    if error_policy == ScoreErrorPolicy::Stop {
-        return InstructionLoweringAttempt {
-            instruction: None,
-            appearance_omissions: Vec::new(),
-            remaining_gaps: first_gaps,
-        };
-    }
-
     let appearance_fields = first_gaps
         .iter()
         .filter_map(appearance_field_for_gap)
@@ -2709,7 +2647,7 @@ fn lower_source_relation_instruction_with_policy(
 }
 
 fn diagnostic_disposition(
-    error_policy: ScoreErrorPolicy,
+    _error_policy: ScoreErrorPolicy,
     reason: &ScoreFieldGap,
     unit: ScoreOmissionUnit,
     appearance_resolution: Option<ScoreAppearanceResolution>,
@@ -2717,7 +2655,7 @@ fn diagnostic_disposition(
     if matches!(reason, ScoreFieldGap::ConflictingSizeSpecifications { .. }) {
         return ScoreDiagnosticDisposition::Recovered;
     }
-    if error_policy == ScoreErrorPolicy::OmitAndContinue && !reason.is_integrity_failure() {
+    if !reason.is_integrity_failure() {
         ScoreDiagnosticDisposition::Omitted {
             unit,
             appearance_resolution,
@@ -2725,6 +2663,10 @@ fn diagnostic_disposition(
     } else {
         ScoreDiagnosticDisposition::Stopped
     }
+}
+
+const fn relation_diagnostic_disposition() -> ScoreDiagnosticDisposition {
+    ScoreDiagnosticDisposition::RelationOmitted
 }
 
 fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField> {

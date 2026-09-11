@@ -344,7 +344,7 @@ pub fn plan_verified_stage15<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     context: ScoreLoweringContext,
 ) -> CompositionPlanResult<'a> {
-    plan_verified_stage15_with_policy(view, context, ScoreErrorPolicy::Stop)
+    plan_verified_stage15_with_policy(view, context, ScoreErrorPolicy::default())
 }
 
 pub fn plan_verified_stage15_with_policy<'a>(

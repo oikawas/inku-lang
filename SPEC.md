@@ -371,9 +371,9 @@ A Transform containing only Anchors uses the center of their resolved bounding b
 
 The current consumer accepts rotation plus `scale_x` / `scale_y` and `translate_x` / `translate_y`. Only finite values are accepted; negative scale reflects and zero scale degenerates. It transforms child geometry only: scale about the exact combined child bounding-box center before rotation, rotate about that same center, then translate by a normalized-canvas-axis delta. Shape geometry and spacing change while stroke width and grain pitch remain fixed. General affine transforms compose inner to outer. If placement is determined during performance, that placement resolves before the bounding box is computed. A `group` is transparent structure that carries the range, references, and ownership; it creates neither placement nor a drawing instruction.
 
-Transform reaches both count-one actual Scores and repeated symbolic plans. Score 0.5.0 `transform_groups` retains the range, rotation, scale, translation, and original instruction indices of numerically fixed members. Rotation-only Score 0.4.0 groups, saved 0.1.0 / 0.2.0 / 0.3.0 Scores, and versionless artifacts retain their existing compatibility. An empty group list stays off the wire; `surface_intensity` is valid from Score 0.3.0 onward. Repeated plans remain symbolic and do not materialize instances. External Connected is supported, while external nonConnected relations remain unsupported in the current performer. Numeric fixed members, Stop / OmitAndContinue, and owners, original indices, seeds, and lost references retain their rules. Step11 instance materialization and Step13 runtime / UI / persistence cutover remain incomplete.
+Transform reaches both count-one actual Scores and repeated symbolic plans. Score 0.5.0 `transform_groups` retains the range, rotation, scale, translation, and original instruction indices of numerically fixed members. Rotation-only Score 0.4.0 groups, saved 0.1.0 / 0.2.0 / 0.3.0 Scores, and versionless artifacts retain their existing compatibility. An empty group list stays off the wire; `surface_intensity` is valid from Score 0.3.0 onward. Repeated plans remain symbolic and do not materialize instances. External Connected and Touching / Along / Cutting attempt one whole-group translation while preserving transformed geometry, direction, and explicit values. Failure records an error, removes only the relation, and leaves the group at its original transformed placement. Numeric fixed members, legacy Stop input, and owners, original indices, seeds, and lost references retain their rules. Step11 instance materialization and Step13 runtime / UI / persistence cutover remain incomplete.
 
-An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and Stop / OmitAndContinue remain, and a missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
+An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
 
 Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, or `quality`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, and `fluctuation_quality`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same eight-word classification.
 
@@ -1160,7 +1160,7 @@ drop, an explicit failure, or a read-compatibility path; its meaning is not
 guessed and repaired. Repair is neither a quality floor nor a minimum firing
 rate and must not create a recurring stock part.
 
-The shared boundary from lock-verified Stage 1.5 to an actual Score has only the author-selected Stop and OmitAndContinue modes. Stop is the default and returns no Score when any meaning cannot be drawn. OmitAndContinue leaves original meaning intact and narrows only the execution projection, recording the actual omitted appearance field, source instruction, Macro Emit / subtree / invocation, Ground, coordinated group, or relation instruction with source or generated owner and spans. It stops when all drawing units are omitted or when owner / focus joins or host context fail integrity. Neither mode uses an LLM, guesses values, clamps them, or resolves previous-one / two relations against compressed post-omission indices.
+The shared boundary from lock-verified Stage 1.5 to an actual Score retains the author-selected Stop and OmitAndContinue inputs. A recoverable relation failure, including under legacy Stop input, never prevents the rest of the drawing: it records an error and removes only that relation, leaving its instruction or Macro Emit, group, and dependent instructions in their original transformed placement. OmitAndContinue still narrows only the execution projection for its established appearance and structural units. Both modes stop when no drawing unit remains or when owner / focus joins or host context fail integrity. Neither mode uses an LLM, guesses values, clamps them, or resolves previous-one / two relations against compressed post-omission indices.
 
 
 ---
@@ -2436,28 +2436,30 @@ does not clamp again. A numeric position succeeds when the required delta is
 zero at the existing physical geometry precision and otherwise reports an
 explicit conflict.
 
-Stop resolves every Connected instruction before SVG construction and returns a
-typed reason with no new output on failure. OmitAndContinue omits the entire
-current instruction or Macro Emit, records its original Score index, reason, and
-disposition, and retains unrelated instructions with their original execution
-indices. A dependent Connected instruction whose referent was omitted is also
-omitted; it is never retargeted to the nearest survivor. Omitting every drawing
-unit and any source, lock, owner, or exact-Score join failure stop both modes.
-Older five relations retain their existing warning and wire behavior. This is a
-direct shared/native path; it does not claim the typed DDL production pipeline,
-UI, or saved-setting cutover is complete.
+Recoverable relation failure, including under legacy Stop input, never stops SVG
+construction. It records an error and removes only the failed relation; the
+current instruction or Macro Emit, its group, and dependent instructions remain
+at their original transformed placement with their original Score indices,
+owners, and seeds. A lost referent never retargets to the nearest survivor. When
+several translations conflict, none is chosen arbitrarily: the original placement
+is retained and only relations that cannot hold there are removed. Omitting every
+drawing unit and any source, lock, owner, or exact-Score join failure stop both
+modes. Older five relations retain their existing warning and wire behavior.
+This is a direct shared/native path; it does not claim the typed DDL production
+pipeline, UI, or saved-setting cutover is complete.
 
-A relation that cannot be resolved — the preceding element is a background fill
-with no contour, say — is dropped by the validator or by coerce, with a warning
-recorded. Unresolvability that becomes apparent only at performance drops the
-relation and leaves ordinary placement. Warning-class failures, such as a grid
+An invalid relation discovered by the validator or coerce retains its existing
+warning and drop behavior; neither layer invents a relation. A recoverable
+failure discovered only by the checked performer records an error and removes
+only that relation. Its instruction, group, and dependent instructions continue
+at their original transformed placement. Warning-class failures, such as a grid
 layout consuming a relation, record a structured warning. Canonically silent
 fallbacks, including missing prior bounds and designated degenerate geometry,
 drop the relation without a warning.
 
 Engine 45 also carries typed `touching` from ordinary direct instructions and adjacent bound Emits in the same flat Macro into the shared checked performer. The four bilingual full literals carry their declared Line / Arc target to the original PreviousOne; a mismatched primitive cannot reach canonical success. Macros check the actual typed Emits without inventing a source noun condition. Only Line / Arc succeed. The prior stays unchanged, both endpoints coincide, and Arc uses the same minor-arc reconstruction described above. Explicit numeric geometry or relative scale (including normal at factor 1) fixes dimensions; an explicit angle fixes the performed chord direction in canonical endpoint order. Omitted normal may adjust to Touching. Numeric positions retain their anchor and the final geometry's existing must-fit requirement; named focus remains movable with clipping. Incompatibility is a typed conflict.
 
-Typed Touching follows the same Stop / OmitAndContinue and original dependency, owner, and drawing-ordinal rules. A failed current is never drawn after merely dropping its relation; independent survivors retain their original indices and seeds. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged. This does not complete the typed production pipeline, UI, saved settings, or whole Step 10.
+Typed Touching follows the same relation-recovery and original dependency, owner, and drawing-ordinal rules. On failure it records an error and removes only Touching, leaving the current, its group, and dependent instructions at their original transformed placement. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged. This does not complete the typed production pipeline, UI, saved settings, or whole Step 10.
 
 ### 14.5 The Owner of Relations
 

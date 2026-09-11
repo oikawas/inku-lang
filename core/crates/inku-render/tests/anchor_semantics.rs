@@ -133,7 +133,7 @@ fn local_and_nested_sibling_transforms_use_shape_or_anchor_only_pivots() {
 }
 
 #[test]
-fn numeric_conflicts_cycles_and_unsupported_anchor_relations_omit_original_dependents() {
+fn numeric_conflicts_cycles_and_unsupported_anchor_relations_keep_original_dependents() {
     let pure_anchor =
         score(r#"{"version":"0.6.0","instructions":[],"anchors":[{"position":[0.5,0.5]}]}"#);
     let stopped =
@@ -157,7 +157,7 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_omit_original_depen
     let anchor_only =
         resolve_checked_performance(request(&anchor_only), ScoreErrorPolicy::OmitAndContinue)
             .unwrap();
-    assert_eq!(anchor_only.original_instruction_indices, [0]);
+    assert_eq!(anchor_only.original_instruction_indices, [0, 1]);
     let diagnostics = &anchor_only.execution.as_ref().unwrap().diagnostics;
     assert_eq!(
         diagnostics[0].reason,
@@ -177,18 +177,18 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_omit_original_depen
     ],"anchors":[{"at":{"region":[0.2,0.2,0.2,0.2]}},{"position":[0.7,0.7]}],
     "transform_groups":[{"start":1,"end":2,"rotation_degrees":0,"anchor_indices":[1]}]}"#,
     );
-    let stopped =
-        resolve_checked_performance(request(&numeric), ScoreErrorPolicy::Stop).unwrap_err();
+    let stopped = resolve_checked_performance(request(&numeric), ScoreErrorPolicy::Stop).unwrap();
     assert_eq!(
-        stopped.diagnostics[0].reason,
+        stopped.execution.as_ref().unwrap().diagnostics[0].reason,
         ScoreExecutionReason::NumericConnectedPositionConflict
     );
     let omitted =
         resolve_checked_performance(request(&numeric), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0]);
+    assert_eq!(omitted.original_instruction_indices, [0, 1, 2]);
+    assert_eq!(stopped, omitted);
     let diagnostics = &omitted.execution.as_ref().unwrap().diagnostics;
-    assert!(diagnostics.iter().any(|value| value.instruction_index == 2
-        && value.reason == ScoreExecutionReason::ConnectedReferenceOmitted));
+    assert_eq!(diagnostics.len(), 1);
+    near(start(&omitted, 2), 0.7, 0.7);
 
     let cycle = score(
         r#"{"version":"0.6.0","instructions":[
@@ -203,25 +203,30 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_omit_original_depen
     "transform_groups":[{"start":0,"end":1,"rotation_degrees":0,"anchor_indices":[0]},
                         {"start":1,"end":2,"rotation_degrees":0,"anchor_indices":[1]}]}"#,
     );
-    let stopped = resolve_checked_performance(request(&cycle), ScoreErrorPolicy::Stop).unwrap_err();
+    let stopped = resolve_checked_performance(request(&cycle), ScoreErrorPolicy::Stop).unwrap();
     assert!(
         stopped
+            .execution
+            .as_ref()
+            .unwrap()
             .diagnostics
             .iter()
             .all(|value| value.reason == ScoreExecutionReason::CyclicConnectedDependency)
     );
     let omitted =
         resolve_checked_performance(request(&cycle), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [2]);
-    assert_eq!(omitted.instruction_indices, [2]);
+    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(omitted.instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(stopped, omitted);
+    near(start(&omitted, 3), 0.2, 0.2);
     assert!(
         omitted
             .execution
             .unwrap()
             .diagnostics
             .iter()
-            .any(|value| value.instruction_index == 3
-                && value.reason == ScoreExecutionReason::ConnectedReferenceOmitted)
+            .all(|value| value.instruction_index < 2
+                && value.reason == ScoreExecutionReason::CyclicConnectedDependency)
     );
 
     let unsupported = score(
@@ -234,7 +239,7 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_omit_original_depen
     let omitted =
         resolve_checked_performance(request(&unsupported), ScoreErrorPolicy::OmitAndContinue)
             .unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0]);
+    assert_eq!(omitted.original_instruction_indices, [0, 1]);
     assert_eq!(
         omitted.execution.unwrap().diagnostics[0].reason,
         ScoreExecutionReason::UnsupportedAnchorRelation
@@ -261,21 +266,24 @@ fn group_connections_require_one_compatible_translation() {
     near(start(&performed, 1), 0.2, 0.2);
     near(start(&performed, 2), 0.3, 0.3);
     input.anchors[1].position = Some(Point::new(0.3, 0.2));
-    let stopped = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap_err();
+    let stopped = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
     assert_eq!(
-        stopped.diagnostics[0].reason,
-        ScoreExecutionReason::ConflictingConnectedConstraints
+        stopped.execution.as_ref().unwrap().diagnostics[0].reason,
+        ScoreExecutionReason::ConflictingRelationConstraints
     );
     let omitted =
         resolve_checked_performance(request(&input), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [3]);
+    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(stopped, omitted);
+    near(start(&omitted, 0), 0.4, 0.4);
+    near(start(&omitted, 2), 0.5, 0.5);
     assert!(
         omitted
             .execution
             .unwrap()
             .diagnostics
             .iter()
-            .any(|value| value.instruction_index == 2
-                && value.reason == ScoreExecutionReason::ConnectedReferenceOmitted)
+            .all(|value| value.instruction_index < 2
+                && value.reason == ScoreExecutionReason::ConflictingRelationConstraints)
     );
 }

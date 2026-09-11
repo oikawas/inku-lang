@@ -31,6 +31,6 @@ class RenderEngine(Protocol):
         render_seed: int | None = None,
         composition_seed: int | None = None,
         wild: bool = False,
-        error_policy: str = "stop",
+        error_policy: str = "omit_and_continue",
     ) -> RenderEngineResult:
         ...

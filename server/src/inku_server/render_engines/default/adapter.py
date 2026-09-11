@@ -49,7 +49,7 @@ class DefaultRenderEngine:
         render_seed: int | None = None,
         composition_seed: int | None = None,
         wild: bool = False,
-        error_policy: str = "stop",
+        error_policy: str = "omit_and_continue",
     ) -> RenderEngineResult:
         native = _native_binding()
         aspect, canvas = resolved_canvas(score, canvas_aspect)
@@ -62,9 +62,8 @@ class DefaultRenderEngine:
             "render_seed": render_seed,
             "composition_seed": composition_seed,
             "wild": wild,
+            "error_policy": error_policy,
         }
-        if error_policy != "stop":
-            options["error_policy"] = error_policy
         request = {
             "score": canonical_score_payload(score),
             "options": options,

@@ -105,7 +105,9 @@ fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
     relation.position_authority = None;
     assert_eq!(
         resolve_checked_performance(request(&legacy), ScoreErrorPolicy::Stop)
-            .unwrap_err()
+            .unwrap()
+            .execution
+            .unwrap()
             .diagnostics[0]
             .reason,
         ScoreExecutionReason::UnsupportedTransformGroupRelation
@@ -114,8 +116,8 @@ fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
     fixed.transform_groups[0].fixed_position_indices = vec![2];
     let continued =
         resolve_checked_performance(request(&fixed), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(continued.original_instruction_indices, vec![0]);
-    assert_eq!(continued.instruction_transforms.len(), 1);
+    assert_eq!(continued.original_instruction_indices, vec![0, 1, 2, 3]);
+    assert_eq!(continued.instruction_transforms.len(), 4);
     let reasons = continued
         .execution
         .unwrap()
@@ -125,10 +127,7 @@ fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
         .collect::<Vec<_>>();
     assert_eq!(
         reasons,
-        vec![
-            ScoreExecutionReason::NumericConnectedPositionConflict,
-            ScoreExecutionReason::ConnectedReferenceOmitted
-        ]
+        vec![ScoreExecutionReason::NumericConnectedPositionConflict]
     );
 }
 
@@ -149,14 +148,17 @@ fn checked_touching_preserves_numeric_final_bounds_and_never_drops_partial_metad
     };
     let own_bounds = inku_render::planning::instruction_bounds(&input.instructions[1]).unwrap();
     assert!(own_bounds.min.y >= 0.0);
-    let stopped = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap_err();
+    let stopped = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop)
+        .unwrap()
+        .execution
+        .unwrap();
     assert_eq!(
         stopped.diagnostics[0].reason,
         ScoreExecutionReason::NumericTouchingBoundsConflict
     );
     let continued =
         resolve_checked_performance(request(&input), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(continued.original_instruction_indices, [0]);
+    assert_eq!(continued.original_instruction_indices, [0, 1]);
     let mut partial = input.clone();
     partial.instructions[1]
         .relation
@@ -165,7 +167,9 @@ fn checked_touching_preserves_numeric_final_bounds_and_never_drops_partial_metad
         .touching_constraints = None;
     assert_eq!(
         resolve_checked_performance(request(&partial), ScoreErrorPolicy::Stop)
-            .unwrap_err()
+            .unwrap()
+            .execution
+            .unwrap()
             .diagnostics[0]
             .reason,
         ScoreExecutionReason::MissingTouchingConstraints
@@ -337,7 +341,9 @@ fn typed_along_derives_only_an_omitted_line_direction_and_preserves_fixed_positi
         },
         ScoreErrorPolicy::Stop,
     )
-    .expect_err("fixed Along must still fit after derived direction");
+    .expect("relation failure preserves geometry")
+    .execution
+    .expect("relation diagnostic");
     assert_eq!(
         fixed_outside.diagnostics[0].reason,
         ScoreExecutionReason::NumericAlongPositionConflict
@@ -365,7 +371,9 @@ fn typed_cutting_rejects_an_explicit_parallel_direction() {
         },
         ScoreErrorPolicy::Stop,
     )
-    .expect_err("an explicit parallel Cutting direction conflicts");
+    .expect("relation failure preserves geometry")
+    .execution
+    .expect("relation diagnostic");
     assert_eq!(
         stopped.diagnostics[0].reason,
         ScoreExecutionReason::CuttingDirectionConflict
@@ -386,7 +394,9 @@ fn typed_cutting_rejects_an_explicit_parallel_direction() {
         },
         ScoreErrorPolicy::Stop,
     )
-    .expect_err("a fixed collinear Cutting line conflicts");
+    .expect("relation failure preserves geometry")
+    .execution
+    .expect("relation diagnostic");
     assert_eq!(
         fixed_collinear.diagnostics[0].reason,
         ScoreExecutionReason::CuttingDirectionConflict
@@ -401,21 +411,18 @@ fn typed_cutting_rejects_an_explicit_parallel_direction() {
         ScoreErrorPolicy::OmitAndContinue,
     )
     .expect("independent instruction survives typed relation omissions");
-    assert_eq!(continued.original_instruction_indices, [0, 3]);
+    assert_eq!(continued.original_instruction_indices, [0, 1, 2, 3]);
     let execution = continued
         .execution
         .expect("typed omissions remain recorded");
-    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
+    assert_eq!(execution.rendered_instruction_indices, [0, 1, 2, 3]);
     assert_eq!(
         execution
             .diagnostics
             .iter()
             .map(|diagnostic| diagnostic.reason)
             .collect::<Vec<_>>(),
-        [
-            ScoreExecutionReason::CuttingDirectionConflict,
-            ScoreExecutionReason::AlongReferenceOmitted,
-        ]
+        [ScoreExecutionReason::CuttingDirectionConflict]
     );
 }
 
@@ -620,14 +627,17 @@ fn connected_elsewhere_preserves_legacy_composite_member_expansion_and_owner_ind
         ScoreErrorPolicy::OmitAndContinue,
     )
     .expect("independent instruction remains after the failed Connected current");
-    assert_eq!(continued.instruction_indices, [0, 1, 2, 3, 4, 6]);
-    assert_eq!(continued.original_instruction_indices, [0, 1, 0, 1, 2, 4]);
+    assert_eq!(continued.instruction_indices, [0, 1, 2, 3, 4, 5, 6]);
+    assert_eq!(
+        continued.original_instruction_indices,
+        [0, 1, 0, 1, 2, 3, 4]
+    );
     assert_eq!(
         continued
             .execution
             .expect("omission summary")
             .rendered_instruction_indices,
-        [0, 1, 0, 1, 2, 4]
+        [0, 1, 0, 1, 2, 3, 4]
     );
 }
 
@@ -743,7 +753,9 @@ fn numeric_connected_position_succeeds_only_when_the_fixed_endpoint_already_matc
         },
         ScoreErrorPolicy::Stop,
     )
-    .expect_err("fixed numeric mismatch stops");
+    .expect("relation failure preserves geometry")
+    .execution
+    .expect("relation diagnostic");
     assert_eq!(
         stopped.diagnostics[0].reason,
         ScoreExecutionReason::NumericConnectedPositionConflict
@@ -751,7 +763,7 @@ fn numeric_connected_position_succeeds_only_when_the_fixed_endpoint_already_matc
 }
 
 #[test]
-fn continue_omits_the_failed_current_and_keeps_original_indices_and_dependencies() {
+fn continue_omits_the_failed_relation_and_keeps_original_indices_and_dependencies() {
     let input = score(
         r#"{"instructions":[
         {"primitive":"line","from":[0.1,0.2],"to":[0.4,0.2]},
@@ -773,23 +785,23 @@ fn continue_omits_the_failed_current_and_keeps_original_indices_and_dependencies
     )
     .expect("independent survivor remains");
 
-    assert_eq!(result.instruction_indices, [0, 3]);
-    assert_eq!(result.score.instructions.len(), 2);
+    assert_eq!(result.instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(result.score.instructions.len(), 4);
     let execution = result.execution.expect("omissions stay typed");
-    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
-    assert_eq!(execution.diagnostics.len(), 2);
+    assert_eq!(execution.rendered_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(execution.diagnostics.len(), 1);
     assert_eq!(
         execution.diagnostics[0].reason,
         ScoreExecutionReason::NumericConnectedPositionConflict
     );
     assert_eq!(
-        execution.diagnostics[1].reason,
-        ScoreExecutionReason::ConnectedReferenceOmitted
+        execution.diagnostics[0].disposition,
+        ScoreExecutionDisposition::RelationOmitted
     );
 }
 
 #[test]
-fn continue_does_not_retarget_a_legacy_relation_across_a_connected_omission() {
+fn continue_resolves_a_legacy_relation_against_the_preserved_connected_source() {
     let input = score(
         r#"{"instructions":[
         {"primitive":"line","from":[0.1,0.2],"to":[0.4,0.2]},
@@ -811,18 +823,18 @@ fn continue_does_not_retarget_a_legacy_relation_across_a_connected_omission() {
     )
     .expect("independent survivor remains");
 
-    assert_eq!(result.instruction_indices, [0, 3]);
+    assert_eq!(result.instruction_indices, [0, 1, 2, 3]);
     let execution = result.execution.expect("both omissions stay typed");
-    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
-    assert_eq!(execution.diagnostics.len(), 2);
+    assert_eq!(execution.rendered_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(execution.diagnostics.len(), 1);
     assert_eq!(
-        execution.diagnostics[1].reason,
-        ScoreExecutionReason::ConnectedReferenceOmitted
+        execution.diagnostics[0].disposition,
+        ScoreExecutionDisposition::RelationOmitted
     );
 }
 
 #[test]
-fn continue_stops_instead_of_returning_an_all_omitted_work() {
+fn a_missing_relation_keeps_the_only_drawable_instruction() {
     let input = score(
         r#"{"instructions":[
         {"primitive":"line","from":[0.1,0.2],"to":[0.4,0.2],
@@ -838,16 +850,18 @@ fn continue_stops_instead_of_returning_an_all_omitted_work() {
         },
         ScoreErrorPolicy::OmitAndContinue,
     )
-    .expect_err("an all-omitted work is never successful");
+    .expect("the only shape survives its missing relation");
 
-    assert_eq!(stopped.diagnostics.len(), 2);
+    assert_eq!(stopped.original_instruction_indices, [0]);
+    let diagnostics = stopped.execution.unwrap().diagnostics;
+    assert_eq!(diagnostics.len(), 1);
     assert_eq!(
-        stopped.diagnostics[1].reason,
-        ScoreExecutionReason::NoDrawableInstructions
+        diagnostics[0].reason,
+        ScoreExecutionReason::CyclicConnectedDependency
     );
     assert_eq!(
-        stopped.diagnostics[1].disposition,
-        ScoreExecutionDisposition::Stopped
+        diagnostics[0].disposition,
+        ScoreExecutionDisposition::RelationOmitted
     );
 }
 
@@ -877,9 +891,12 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
     .expect("nested transform groups perform");
     assert!(result.score.transform_groups.is_empty());
     assert_eq!(result.instruction_seed_overrides.len(), 7);
-    assert_eq!(result.score.instructions[4].rotation, Some(90.0));
-    assert_eq!(result.score.instructions[5].rotation, Some(121.0));
-    assert_eq!(result.score.instructions[6].rotation, Some(121.0));
+    for (index, angle) in [(4, 90.0_f64), (5, 121.0), (6, 121.0)] {
+        assert_eq!(result.score.instructions[index].rotation, None);
+        let transform = result.instruction_transforms[index];
+        assert!((transform.a - angle.to_radians().cos()).abs() < 1e-9);
+        assert!((transform.b - angle.to_radians().sin()).abs() < 1e-9);
+    }
     assert_eq!(result.instruction_indices[6], 6);
     assert_eq!(
         result.instruction_seed_overrides[6],
@@ -889,10 +906,11 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
         ))
     );
     let before_center = inku_render::types::Point::new(1400.0, 500.0);
-    let after_center = inku_render::types::Point::new(
-        result.score.instructions[6].center.unwrap().x * 2000.0,
-        result.score.instructions[6].center.unwrap().y * 1000.0,
-    );
+    let after_center = result.instruction_transforms[6].apply(Point::new(
+        result.score.instructions[6].center.unwrap().x * 2.0,
+        result.score.instructions[6].center.unwrap().y,
+    ));
+    let after_center = Point::new(after_center.x * 1000.0, after_center.y * 1000.0);
     let before_contour = generate_cloudform_contour(CloudformRequest {
         center: before_center,
         size: inku_render::types::Point::new(200.0, 120.0),
@@ -943,6 +961,9 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
     .expect("precise group geometry performs");
     let line_anchor =
         instruction_anchor_on_canvas(&precise_result.score.instructions[0], Some(precise_canvas));
+    let line_anchor = precise_result.instruction_transforms[0]
+        .apply(Point::new(line_anchor.x * 2.0, line_anchor.y));
+    let line_anchor = Point::new(line_anchor.x / 2.0, line_anchor.y);
     // The upright pentagon's lower vertices have y = cy + r * cos(36 degrees).
     // In short-side units the combined bounds are x=[0.2, 1.2], y=[0.2, bottom].
     let bottom = 0.5 + 0.1 * (1.0 + 5.0_f64.sqrt()) / 4.0;
@@ -960,6 +981,10 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
     );
     let arc = endpoint_geometry(&precise_result.score.instructions[1], Some(precise_canvas))
         .expect("group arc retains endpoint geometry");
+    let arc = (
+        precise_result.instruction_transforms[1].apply(arc.0),
+        precise_result.instruction_transforms[1].apply(arc.1),
+    );
     assert!(
         (arc.0.x - (pivot_x + pivot_y - 0.5)).abs() < 1.0e-9,
         "{arc:?}"
@@ -971,7 +996,7 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
 }
 
 #[test]
-fn external_connected_moves_its_whole_group_and_fixed_member_conflicts_omit_the_range() {
+fn external_connected_moves_its_whole_group_and_fixed_member_conflicts_preserve_the_range() {
     let input = score(
         r#"{"version":"0.4.0","instructions":[
         {"primitive":"line","from":[0.10,0.20],"to":[0.30,0.20]},
@@ -993,23 +1018,30 @@ fn external_connected_moves_its_whole_group_and_fixed_member_conflicts_omit_the_
         .expect("external Connected translates the enclosing group");
     let prior = endpoint_geometry(&moved.score.instructions[0], None).unwrap();
     let member = endpoint_geometry(&moved.score.instructions[1], None).unwrap();
+    let member = (
+        moved.instruction_transforms[1].apply(member.0),
+        moved.instruction_transforms[1].apply(member.1),
+    );
     assert!((prior.1.x - member.0.x).hypot(prior.1.y - member.0.y) < 1.0e-9);
-    assert!((moved.score.instructions[2].center.unwrap().x - 0.20).abs() < 1.0e-9);
-    assert!((moved.score.instructions[2].center.unwrap().y - 0.52).abs() < 1.0e-9);
+    let center = moved.instruction_transforms[2].apply(moved.score.instructions[2].center.unwrap());
+    assert!((center.x - 0.20).abs() < 1.0e-9);
+    assert!((center.y - 0.52).abs() < 1.0e-9);
 
     let mut fixed = input.clone();
     for group in &mut fixed.transform_groups {
         group.fixed_position_indices = vec![2];
     }
     let stopped = resolve_checked_performance(request(&fixed), ScoreErrorPolicy::Stop)
-        .expect_err("a fixed member prevents external translation");
+        .expect("relation failure preserves geometry")
+        .execution
+        .expect("relation diagnostic");
     assert_eq!(
         stopped.diagnostics[0].reason,
         ScoreExecutionReason::NumericConnectedPositionConflict
     );
     let continued = resolve_checked_performance(request(&fixed), ScoreErrorPolicy::OmitAndContinue)
         .expect("independent sibling survives group omission");
-    assert_eq!(continued.original_instruction_indices, [0, 3]);
+    assert_eq!(continued.original_instruction_indices, [0, 1, 2, 3]);
 }
 
 #[test]
@@ -1056,7 +1088,7 @@ fn transform_group_integrity_stops_both_policies_and_empty_groups_preserve_legac
         ScoreErrorPolicy::OmitAndContinue,
     )
     .expect("failed final member omits its full group while independent work remains");
-    assert_eq!(continued.original_instruction_indices, [0, 4]);
+    assert_eq!(continued.original_instruction_indices, [0, 1, 2, 3, 4]);
     let execution = continued
         .execution
         .expect("omission diagnostics remain typed");
@@ -1065,8 +1097,8 @@ fn transform_group_integrity_stops_both_policies_and_empty_groups_preserve_legac
         ScoreExecutionReason::NumericConnectedPositionConflict
     );
     assert_eq!(
-        execution.diagnostics[1].reason,
-        ScoreExecutionReason::ConnectedReferenceOmitted
+        execution.diagnostics[0].disposition,
+        ScoreExecutionDisposition::RelationOmitted
     );
     let legacy = score(
         r#"{"instructions":[{"primitive":"line","from":[0.1,0.2],"to":[0.3,0.2]}],"transform_groups":[]}"#,

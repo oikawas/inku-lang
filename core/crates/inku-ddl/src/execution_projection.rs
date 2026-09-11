@@ -72,6 +72,16 @@ pub(crate) fn project_compilation_for_execution(
     let mut omitted_clauses = BTreeSet::new();
     let mut diagnostics = Vec::new();
     for (issue_kind, issue_id, reason, span) in compiler_issues(compilation) {
+        if let Some(unit) = relation_omission_unit(semantic, span) {
+            diagnostics.push(CompilerExecutionDiagnostic {
+                issue_kind,
+                issue_id,
+                reason,
+                span,
+                disposition: CompilerExecutionDisposition::RelationOmitted { unit },
+            });
+            continue;
+        }
         let unit =
             if reason == "conflicting_grounds" {
                 CompilerExecutionOmissionUnit::GroundCandidates
@@ -360,6 +370,30 @@ pub(crate) fn project_compilation_for_execution(
     ExecutionProjectionResult::Ready(ReadyExecutionProjection {
         projection,
         diagnostics,
+    })
+}
+
+fn relation_omission_unit(
+    semantic: &crate::SemanticDocumentResult,
+    span: Option<crate::SourceSpan>,
+) -> Option<CompilerExecutionOmissionUnit> {
+    let span = span?;
+    let issue = semantic
+        .instruction_association
+        .relation_issues
+        .iter()
+        .find(|issue| {
+            issue
+                .occurrences
+                .iter()
+                .any(|occurrence| occurrence.provenance.span == span)
+        })?;
+    let instruction_index = semantic.ast.instructions.iter().position(|instruction| {
+        instruction.entity.head.source().region_index == issue.region_index
+    })?;
+    Some(CompilerExecutionOmissionUnit::RelationInstruction {
+        instruction_index,
+        dependency_instruction_indices: Vec::new(),
     })
 }
 

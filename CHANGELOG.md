@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Preserve groups and omit only unsatisfied relations
+
+External Touching, Along, and Cutting translate the whole transformed group while retaining its geometry, orientation, and explicit values. Unsatisfied relations produce errors and are omitted individually. Conflicting translations preserve the original placement and retain relations satisfied there. Shapes, groups, and subsequent drawing remain, with original targets, drawing order, and seeds. Missing references and cycles also omit relations alone.
+
+Ordinary DDL, Macros, repeated plans, and the shared renderer use the same recovery principle. Legacy stop input remains readable, but recoverable semantic errors no longer halt the whole drawing. Existing local recovery retains drawable content, while source and lock integrity failures remain rejected. Score stays at 0.6.0; render engine advances to 53 and DDL engine to 28. APP_VERSION and BUILD_NUMBER are unchanged. External NotTouching and Between, instance materialization, and full typed runtime, UI, and save integration remain unfinished.
+
+---
+
 ### 2026-09-11 — Explicit non-drawing Anchor positions and connections
 
 Macro Anchors specify named positions or numeric coordinates and reach Connected as non-drawing Score targets. Anchor center means the canvas center, without inferring placement from nearby shapes. Anchors follow enclosing Transforms. A group without drawable shapes rotates and scales about the combined Anchor bounding-box center; a group with drawable shapes retains its existing combined shape center.

@@ -147,9 +147,6 @@ fn execute_compilation(
         };
     }
 
-    if error_policy == ScoreErrorPolicy::Stop {
-        return stopped(compilation, error_policy);
-    }
     match project_compilation_for_execution(
         &compilation,
         definitions,

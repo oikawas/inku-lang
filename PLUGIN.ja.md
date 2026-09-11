@@ -93,7 +93,7 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 ## 現在の実装状態
 
-`transform`は透明な`group`のEmit連続範囲を内側から外側へ保ち、Count1ではScore 0.5.0の`transform_groups`へ、反復では個体を作らないsymbolic planへ届く。有限の`scale_x` / `scale_y`と`translate_x` / `translate_y`は、bbox中心でのscale、同中心でのrotate、normalized canvas軸のtranslateをgeneral affineとして合成する。geometryと間隔だけを変え、stroke幅とgrain pitchは保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部Connected以外のnonConnected relationは未対応であり、Step11 materializationとStep13 runtime / UI / 保存cutoverも未完了である。
+`transform`は透明な`group`のEmit連続範囲を内側から外側へ保ち、Count1ではScore 0.5.0の`transform_groups`へ、反復では個体を作らないsymbolic planへ届く。有限の`scale_x` / `scale_y`と`translate_x` / `translate_y`は、bbox中心でのscale、同中心でのrotate、normalized canvas軸のtranslateをgeneral affineとして合成する。geometryと間隔だけを変え、stroke幅とgrain pitchは保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部のTouching / Along / Cuttingは変形後の形・向き・明示指定を保ち、group全体の平行移動で成立を試みる。失敗時はrelationだけをerrorとして外し、groupは元の変形後配置で描く。Step11 materializationとStep13 runtime / UI / 保存cutoverは未完了である。
 
 AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央で、Emitのfocus依存配置を借用しない。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
 
@@ -106,7 +106,7 @@ Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"pla
 隣接bound Emitのconnected / touchingは両者がexact centerの場合に限り、noncenter relationを黙って捨てない。
 not_touchingはcurrentがexact centerの場合に、通常DDLと同じMedium gapのScoreへ届く。
 隣接性はunbound Emitを含む元順序で判定し、省略されたfromを他のsurvivorへ付け替えない。
-Stopは新Scoreなし、OmitAndContinueは元ownerと既存の最小省略単位を保ち、integrity不良は両mode停止とする。
+旧Stop入力も受けるが、recoverableなrelation失敗で新Score全体を止めない。relationだけをerrorとして外し、元ownerと変形後配置を保って描く。OmitAndContinueは既存の最小省略単位を保ち、integrity不良は両mode停止とする。
 
 共有Rust compiler基盤は、MacroDefinition v1の値をparse、validate、identify、lock、bindし、
 決定的に展開できる。Production runtimeへの統合、install可能なpackage catalog、preview、

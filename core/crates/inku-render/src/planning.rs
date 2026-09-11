@@ -593,67 +593,6 @@ pub(crate) fn translate_endpoint_instruction_on_canvas(
     Some(moved)
 }
 
-/// Translate every rendered primitive by an exact physical short-side delta.
-/// This deliberately avoids the normal placement clamp because group transforms
-/// preserve rigid geometry before fixed-position validation decides whether it fits.
-#[must_use]
-pub(crate) fn translate_instruction_on_canvas(
-    instruction: &Instruction,
-    delta: Point,
-    canvas: Option<CanvasSize>,
-) -> Option<Instruction> {
-    let move_point = |point: Point| {
-        point_from_short_side_units(
-            Point::new(
-                point_to_short_side_units(point, canvas).x + delta.x,
-                point_to_short_side_units(point, canvas).y + delta.y,
-            ),
-            canvas,
-        )
-    };
-    let mut moved = instruction.clone();
-    match instruction.primitive {
-        Primitive::Line => {
-            moved.from_ = Some(move_point(instruction.from_?));
-            moved.to = Some(move_point(instruction.to?));
-        }
-        Primitive::Arc => {
-            moved.center = Some(move_point(instruction.center?));
-            moved.position = instruction.position.map(move_point);
-        }
-        Primitive::Circle
-        | Primitive::Ellipse
-        | Primitive::Point
-        | Primitive::Polygon
-        | Primitive::Cloudform => moved.center = Some(move_point(instruction.center?)),
-        Primitive::Square | Primitive::Triangle => {
-            moved.position = Some(move_point(instruction.position?))
-        }
-    }
-    Some(moved)
-}
-
-/// Rotate a rendered primitive rigidly about a physical short-side pivot.
-/// Its local shape stays intact; only its anchor moves and its own orientation composes.
-#[must_use]
-pub(crate) fn rotate_instruction_about_on_canvas(
-    instruction: &Instruction,
-    pivot: Point,
-    degrees: f64,
-    canvas: Option<CanvasSize>,
-) -> Option<Instruction> {
-    let anchor =
-        point_to_short_side_units(instruction_anchor_on_canvas(instruction, canvas), canvas);
-    let target = rotate_point(anchor, pivot, degrees);
-    let mut rotated = translate_instruction_on_canvas(
-        instruction,
-        Point::new(target.x - anchor.x, target.y - anchor.y),
-        canvas,
-    )?;
-    rotated.rotation = Some(rotated.rotation.unwrap_or(0.0) + degrees);
-    Some(rotated)
-}
-
 pub(crate) fn performed_arc_sagitta(
     instruction: &Instruction,
     canvas: Option<CanvasSize>,

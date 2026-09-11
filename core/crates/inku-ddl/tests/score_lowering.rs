@@ -9,8 +9,8 @@ use inku_ddl::{
     Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
     VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
     lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
-    lower_verified_stage15_view, plan_verified_stage15, score_primitive_from_semantic_identity,
-    stage15_transformation_input, transform_stage15,
+    lower_verified_stage15_view, plan_verified_stage15, plan_verified_stage15_with_policy,
+    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -870,25 +870,48 @@ fn noncenter_macro_relation_stays_unsupported_in_both_modes() {
                         .gaps()
                         .contains(&ScoreFieldGap::UnsupportedMacroRelation)
                 );
-                if policy == ScoreErrorPolicy::Stop {
-                    assert!(lowered.score().is_none());
-                } else {
-                    assert_eq!(lowered.score().unwrap().instructions.len(), 1);
-                    assert!(
-                        matches!(&lowered.instruction_origins()[0], ScoreInstructionOrigin::MacroEmit { provenance, .. } if provenance.generated_ordinal == 0)
-                    );
-                    assert!(lowered.diagnostics().iter().any(|d| matches!(
-                        &d.disposition,
-                        ScoreDiagnosticDisposition::Omitted {
-                            unit: ScoreOmissionUnit::MacroEmit {
-                                generated_ordinal: 1,
-                                ..
-                            },
-                            ..
-                        }
-                    )));
-                }
+                let score = lowered.score().unwrap();
+                assert_eq!(score.instructions.len(), 2);
+                assert!(
+                    score
+                        .instructions
+                        .iter()
+                        .all(|instruction| instruction.relation.is_none())
+                );
+                assert!(lowered.diagnostics().iter().any(|diagnostic| matches!(
+                    diagnostic.disposition,
+                    ScoreDiagnosticDisposition::RelationOmitted
+                )));
+                let plan = plan_verified_stage15_with_policy(
+                    result.verified_effective_view(),
+                    context,
+                    policy,
+                );
+                assert_eq!(plan.objects().unwrap().len(), 2);
+                assert!(
+                    plan.objects()
+                        .unwrap()
+                        .iter()
+                        .all(|object| object.relation().is_none())
+                );
+                assert!(plan.diagnostics().iter().any(|diagnostic| matches!(
+                    diagnostic.disposition,
+                    ScoreDiagnosticDisposition::RelationOmitted
+                )));
             }
+            let default_score =
+                lower_verified_stage15_score(result.verified_effective_view(), context);
+            assert_eq!(
+                default_score.error_policy(),
+                ScoreErrorPolicy::OmitAndContinue
+            );
+            assert_eq!(default_score.score().unwrap().instructions.len(), 2);
+            let default_plan = plan_verified_stage15(result.verified_effective_view(), context);
+            assert_eq!(
+                default_plan.error_policy(),
+                ScoreErrorPolicy::OmitAndContinue
+            );
+            assert_eq!(default_plan.objects().unwrap().len(), 2);
         }
     }
 }
@@ -4044,15 +4067,11 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
                 &diagnostic.owner, ScoreDiagnosticOwner::GeneratedNode { expansion_path, .. }
                     if expansion_path.iter().any(|segment| matches!(segment, inku_ddl::ExpansionPathSegment::Group { .. }))
             )));
-            if policy == ScoreErrorPolicy::Stop {
-                assert!(result.score().is_none());
-                continue;
-            }
             let instructions = &result.score().unwrap().instructions;
             let expected_colors = if obstruction == "failed_source" {
-                vec![Color::Green]
+                vec![Color::Blue, Color::Green]
             } else {
-                vec![Color::Red, Color::Green]
+                vec![Color::Red, Color::Blue, Color::Green]
             };
             assert_eq!(
                 instructions
@@ -4066,6 +4085,13 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
                     .iter()
                     .all(|instruction| instruction.relation.is_none())
             );
+            assert!(result.diagnostics().iter().any(|diagnostic| {
+                diagnostic.reason == expected
+                    && matches!(
+                        diagnostic.disposition,
+                        ScoreDiagnosticDisposition::RelationOmitted
+                    )
+            }));
         }
     }
 }

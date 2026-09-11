@@ -23,6 +23,7 @@ pub enum ScoreExecutionReason {
     NumericConnectedPositionConflict,
     CyclicConnectedDependency,
     ConflictingConnectedConstraints,
+    ConflictingRelationConstraints,
     UnsupportedAnchorRelation,
     InvalidTransformGroup,
     UnsupportedTransformGroupRelation,
@@ -33,6 +34,7 @@ pub enum ScoreExecutionReason {
     UnsupportedAlongStructure,
     MissingAlongPositionAuthority,
     NumericAlongPositionConflict,
+    AlongDirectionConflict,
     MissingCuttingReference,
     CuttingReferenceOmitted,
     UnsupportedCuttingPrimitive,
@@ -48,6 +50,8 @@ pub enum ScoreExecutionReason {
 pub enum ScoreExecutionDisposition {
     Stopped,
     Omitted,
+    /// The source geometry remains rendered without the failed relation.
+    RelationOmitted,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

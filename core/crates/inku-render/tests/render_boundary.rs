@@ -237,7 +237,7 @@ fn render_request_has_a_stable_json_wire_shape() {
 }
 
 #[test]
-fn connected_stop_returns_no_output_and_continue_reports_original_indices() {
+fn connected_failures_render_sources_and_report_original_indices_for_both_policies() {
     let connected_score = score(
         r#"{"instructions":[
         {"primitive":"line","from":[0.1,0.2],"to":[0.4,0.2],"color":"red"},
@@ -260,14 +260,13 @@ fn connected_stop_returns_no_output_and_continue_reports_original_indices() {
         error_policy: Default::default(),
     };
 
+    let mut stop_options = options.clone();
+    stop_options.error_policy = inku_render::types::ScoreErrorPolicy::Stop;
     let stopped = render(RenderRequest {
         score: connected_score.clone(),
-        options: options.clone(),
-    });
-    assert!(matches!(
-        stopped,
-        Err(inku_render::render::RenderError::CheckedPerformance(_))
-    ));
+        options: stop_options,
+    })
+    .expect("legacy Stop also recovers relation failures");
 
     let mut continued_options = options;
     continued_options.error_policy = inku_render::types::ScoreErrorPolicy::OmitAndContinue;
@@ -278,11 +277,16 @@ fn connected_stop_returns_no_output_and_continue_reports_original_indices() {
     .expect("independent instructions render with omission metadata");
     assert!(continued.svg.contains("instruction_000_line_red"));
     assert!(continued.svg.contains("instruction_003_point_black"));
-    assert!(!continued.svg.contains("instruction_001_line_blue"));
-    assert!(!continued.svg.contains("instruction_002_point_green"));
+    assert!(continued.svg.contains("instruction_001_line_blue"));
+    assert!(continued.svg.contains("instruction_002_point_green"));
+    assert_eq!(stopped.svg, continued.svg);
     let execution = continued.metadata.execution.expect("typed omissions");
-    assert_eq!(execution.rendered_instruction_indices, [0, 3]);
-    assert_eq!(execution.diagnostics.len(), 2);
+    assert_eq!(execution.rendered_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(execution.diagnostics.len(), 1);
+    assert_eq!(
+        execution.diagnostics[0].disposition,
+        inku_render::types::ScoreExecutionDisposition::RelationOmitted
+    );
 }
 
 #[test]
@@ -335,10 +339,13 @@ fn connected_elsewhere_keeps_composite_svg_ids_on_expanded_drawing_ordinals() {
             "missing or duplicate SVG id {id}"
         );
     }
-    assert!(!output.svg.contains("instruction_005_line_black"));
-    assert!(!output.svg.contains("mark_005_000_line"));
+    assert!(output.svg.contains("instruction_005_line_black"));
+    assert!(output.svg.contains("mark_005_000_line"));
     let execution = output.metadata.execution.expect("typed Connected omission");
-    assert_eq!(execution.rendered_instruction_indices, [0, 1, 0, 1, 2, 4]);
+    assert_eq!(
+        execution.rendered_instruction_indices,
+        [0, 1, 0, 1, 2, 3, 4]
+    );
 }
 
 #[test]

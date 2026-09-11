@@ -12,7 +12,7 @@ pub(crate) enum ScheduleNode {
 
 pub(crate) struct AnchorSchedule {
     pub(crate) order: Vec<ScheduleNode>,
-    pub(crate) cyclic: Vec<ScheduleNode>,
+    pub(crate) cyclic_relations: Vec<usize>,
     pub(crate) external_groups: Vec<Option<usize>>,
 }
 
@@ -43,14 +43,15 @@ fn below_common(chain: &[usize], common: Option<usize>) -> Option<usize> {
 }
 
 /// An instruction sees its target after the target's inner transforms, but
-/// before any common outer transform. An external Connected correction belongs
+/// before any common outer transform. An external relation correction belongs
 /// to the outermost source group below that common scope.
-pub(crate) fn schedule(score: &Score) -> AnchorSchedule {
+pub(crate) fn schedule(score: &Score, omitted_relations: &[bool]) -> AnchorSchedule {
     let count = score.instructions.len();
     let group_count = score.transform_groups.len();
     let node_count = count + group_count;
     let mut dependencies = vec![BTreeSet::<usize>::new(); node_count];
     let mut external_groups = vec![None; count];
+    let mut relation_edges = vec![Vec::new(); count];
 
     for (group_index, group) in score.transform_groups.iter().enumerate() {
         let group_node = count + group_index;
@@ -63,6 +64,9 @@ pub(crate) fn schedule(score: &Score) -> AnchorSchedule {
     }
 
     for (source_index, instruction) in score.instructions.iter().enumerate() {
+        if omitted_relations[source_index] {
+            continue;
+        }
         let Some(relation) = &instruction.relation else {
             continue;
         };
@@ -98,22 +102,15 @@ pub(crate) fn schedule(score: &Score) -> AnchorSchedule {
             let target_final = below_common(&target_chain, common)
                 .map(|group| count + group)
                 .or(target_instruction);
-            if relation.kind == RelationType::Connected {
-                external_groups[source_index] = source_group;
-            }
-            if let Some(source_group) = source_group
-                && relation.kind == RelationType::Connected
-            {
+            external_groups[source_index] = source_group;
+            if let Some(source_group) = source_group {
                 if let Some(target_final) = target_final {
                     dependencies[count + source_group].insert(target_final);
-                }
-                // Existing instruction checks require the original target to
-                // exist; its enclosing transform is awaited by the correction.
-                if let Some(target_instruction) = target_instruction {
-                    dependencies[source_index].insert(target_instruction);
+                    relation_edges[source_index].push((count + source_group, target_final));
                 }
             } else if let Some(target_final) = target_final {
                 dependencies[source_index].insert(target_final);
+                relation_edges[source_index].push((source_index, target_final));
             }
         }
     }
@@ -171,7 +168,33 @@ pub(crate) fn schedule(score: &Score) -> AnchorSchedule {
             .filter(|node| !cyclic.contains(node))
             .map(as_node)
             .collect(),
-        cyclic: cyclic.into_iter().map(as_node).collect(),
+        cyclic_relations: relation_edges
+            .iter()
+            .enumerate()
+            .filter_map(|(source, edges)| {
+                edges
+                    .iter()
+                    .any(|&(from, to)| {
+                        if !cyclic.contains(&from) || !cyclic.contains(&to) {
+                            return false;
+                        }
+                        // Only remove relation edges inside the same cycle, not
+                        // edges between otherwise independent cyclic components.
+                        let mut pending = vec![to];
+                        let mut visited = BTreeSet::new();
+                        while let Some(node) = pending.pop() {
+                            if node == from {
+                                return true;
+                            }
+                            if visited.insert(node) {
+                                pending.extend(dependencies[node].iter().copied());
+                            }
+                        }
+                        false
+                    })
+                    .then_some(source)
+            })
+            .collect(),
         external_groups,
     }
 }

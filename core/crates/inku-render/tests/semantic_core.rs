@@ -5,7 +5,8 @@ use inku_render::determinism::{
 use inku_render::geometry::{
     arc_points, ellipse_perimeter, polygon_points, segment_count, stroke_sample_count,
 };
-use inku_render::types::{CanvasSize, Score};
+use inku_render::types::{CanvasSize, RenderOptions, Score, ScoreErrorPolicy, SvgProfile};
+use std::collections::BTreeMap;
 
 fn close(actual: f64, expected: f64) {
     assert!(
@@ -41,6 +42,43 @@ fn canonical_score_consumer_preserves_none_and_zero() {
         score.instructions[0].surface.as_ref().unwrap().seed,
         Some(-7)
     );
+}
+
+#[test]
+fn render_options_preserve_explicit_error_policy_and_default_omission() {
+    let options = |error_policy| RenderOptions {
+        resolved_color_map: BTreeMap::new(),
+        catalog_id: None,
+        canvas: CanvasSize::new(1000.0, 800.0),
+        canvas_aspect_id: "landscape".to_owned(),
+        svg_profile: SvgProfile::Editable,
+        render_seed: Some(23),
+        composition_seed: None,
+        wild: false,
+        error_policy,
+    };
+
+    for error_policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let expected = options(error_policy);
+        let serialized = serde_json::to_value(&expected).unwrap();
+        assert_eq!(
+            serde_json::from_value::<RenderOptions>(serialized).unwrap(),
+            expected
+        );
+    }
+
+    let omitted: RenderOptions = serde_json::from_value(serde_json::json!({
+        "resolved_color_map": {},
+        "catalog_id": null,
+        "canvas": {"width": 1000.0, "height": 800.0},
+        "canvas_aspect_id": "landscape",
+        "svg_profile": "editable",
+        "render_seed": 23,
+        "composition_seed": null,
+        "wild": false
+    }))
+    .unwrap();
+    assert_eq!(omitted.error_policy, ScoreErrorPolicy::OmitAndContinue);
 }
 
 #[test]

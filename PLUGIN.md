@@ -107,7 +107,7 @@ normal count-one geometry use the same defaults as ordinary DDL.
 An explicit `connected` or `touching` relation may join only two adjacent bound Emits in
 the same expansion, with exact center placement on both Emits. It preserves Emit order and generated ownership and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
-omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
+omitted `from` records an error and removes only the relation; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
 and shares the ordinary Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain
 fixed; omitted normal may adjust. Macro relations check actual typed Emits without creating
@@ -119,13 +119,15 @@ subtrees are not traversed and cannot be crossed to create adjacency. `along` / 
 also accept adjacent bound Line Emits through the shared checked performer. Along
 aligns an unspecified direction parallel to the preceding line; Cutting retains
 the resolved length. Explicit direction, dimensions, and numeric position remain
-authoritative. Unsupported pairs or incompatible constraints use Stop /
-OmitAndContinue without retargeting. Other relation kinds remain unsupported.
+authoritative. Unsupported pairs or incompatible constraints record an error and
+remove only that relation without retargeting. Other relation kinds remain unsupported.
 
-Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
+Legacy Stop input remains accepted. Incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and
-expanded `transform`, `anchor`, or unsupported `relation` nodes stop the entire
-Score. Under explicit OmitAndContinue, a supported appearance problem omits
+expanded `transform` or `anchor` nodes retain their established failure handling;
+a recoverable relation failure never stops the whole Score. It records an error,
+removes only the relation, and draws its Emit, group, and dependent Emits at
+their original transformed placement. Under explicit OmitAndContinue, a supported appearance problem omits
 only that field and uses the ordinary default; an invalid Emit omits that
 Emit; and an unsupported structural node omits its whole subtree without
 extracting child Emits. Invalid outer placement, size, count, relation, or other
@@ -210,7 +212,7 @@ O(count) allocation or materialization.
 
 ## Current Implementation Status
 
-`transform` retains the contiguous Emit range carried by transparent `group` from inner to outer. Count-one reaches Score 0.5.0 `transform_groups`; repetition reaches a symbolic plan without materializing instances. Finite `scale_x` / `scale_y` and `translate_x` / `translate_y` compose as a general affine transform: scale at the bounding-box center, rotate at that center, then translate on normalized canvas axes. They change geometry and spacing only, retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External nonConnected relations remain unsupported; Step11 materialization and Step13 runtime / UI / persistence cutover remain incomplete.
+`transform` retains the contiguous Emit range carried by transparent `group` from inner to outer. Count-one reaches Score 0.5.0 `transform_groups`; repetition reaches a symbolic plan without materializing instances. Finite `scale_x` / `scale_y` and `translate_x` / `translate_y` compose as a general affine transform: scale at the bounding-box center, rotate at that center, then translate on normalized canvas axes. They change geometry and spacing only, retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External Touching / Along / Cutting preserve transformed geometry, direction, and explicit values while attempting one whole-group translation. Failure records an error, removes only the relation, and leaves the group at its original transformed placement. Step11 materialization and Step13 runtime / UI / persistence cutover remain incomplete.
 
 Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the canvas center and does not borrow an Emit's focus-dependent placement. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
 

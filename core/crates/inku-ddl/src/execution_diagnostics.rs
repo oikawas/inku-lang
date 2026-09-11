@@ -42,7 +42,13 @@ pub enum CompilerExecutionOmissionUnit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompilerExecutionDisposition {
     Stopped,
-    Omitted { unit: CompilerExecutionOmissionUnit },
+    /// The source instruction remains after its unresolved relation is removed.
+    RelationOmitted {
+        unit: CompilerExecutionOmissionUnit,
+    },
+    Omitted {
+        unit: CompilerExecutionOmissionUnit,
+    },
 }
 
 /// Original compiler identity plus the exact execution treatment.

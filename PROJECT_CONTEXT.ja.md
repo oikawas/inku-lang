@@ -56,7 +56,7 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 全幅・半幅は通常サイズの短辺基準と異なり、キャンバス横幅の100%・50%を回転前の基準寸法へ適用する。通常DDLと宣言Macroで同じ寸法解決を使い、線長・開弧の弦長・閉形の輪郭幅を区別する。半円は上、上弦は右、下弦は左へ膨らむ開弧で、三日月は歳時記の細い塗り面としてScore 0.2.0の`arc_form: crescent`、center/sizeへ届ける。保存済みScore 0.1.0はそのまま読む。重複サイズだけは全候補と原文を保持し、`ConflictingSizeSpecifications`と採用寸法を示しながら小さい方で描く。`Recovered`はStop/Continueとも描画を続ける処置であり、他の整合性・未対応エラーの停止規則は変えない。詳細はSPEC §12.11。
 
-共有Rustは12道具の通常／濃い／薄いを道具別の塗りとして描く。`surface_intensity`はScore 0.3.0以後で通常DDLとMacroの共通lowererから届き、既存0.1.0／0.2.0／0.3.0とversionなしartifactの読み書きは保持する。Macro TransformはCount1 Score 0.5.0の`transform_groups`と反復symbolic planへ届く。有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`はbbox中心のscale、同中心のrotate、normalized canvas軸のtranslateを内側から外側へ合成し、geometryと間隔だけを変えてstroke幅とgrain pitchを保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部nonConnected relation、Step11の個体materialization、Step13のruntime / UI / 保存全面接続は未完了である。
+共有Rustは12道具の通常／濃い／薄いを道具別の塗りとして描く。`surface_intensity`はScore 0.3.0以後で通常DDLとMacroの共通lowererから届き、既存0.1.0／0.2.0／0.3.0とversionなしartifactの読み書きは保持する。Macro TransformはCount1 Score 0.5.0の`transform_groups`と反復symbolic planへ届く。有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`はbbox中心のscale、同中心のrotate、normalized canvas軸のtranslateを内側から外側へ合成し、geometryと間隔だけを変えてstroke幅とgrain pitchを保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部Touching / Along / Cuttingは変形後の形・向き・明示指定を保ち、group全体の平行移動で成立を試みる。失敗時はerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。Step11の個体materialization、Step13のruntime / UI / 保存全面接続は未完了である。
 
 AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央で、Emitのfocus依存配置を借用しない。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
 
@@ -92,7 +92,7 @@ circle / ellipse / cloudform / square / triangle / polygon / line / arc / point�
 通常sourceのdirect primitiveでは既存checked lowererがNotTouchingとBetweenを、Line / Arc / Pointの
 endpoint familyがConnectedを既存Medium gapのScore relationへ届ける。typedな
 previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
-一致する場合だけ参照を保つ。Continueは参照消失時にcurrentをRelationInstruction単位で連鎖省略する。
+一致する場合だけ参照を保つ。参照消失時はerrorを記録してdependent relationだけを外し、currentを連鎖省略も付け替えもしない。
 Macroのexact_decimal literal / 宣言parameterは通常DDLの寸法・数値位置resolverへ合流する。
 Radius等の明示dimensionで一意にbindし、旧Number(f64)、exact値、source / generated ownerを保つ。
 NotTouchingも隣接bound flat Emitから同じScoreへ届き、unbound Emitや失った参照を飛び越さない。
@@ -100,19 +100,19 @@ NotTouchingも隣接bound flat Emitから同じScoreへ届き、unbound Emitや�
 TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから同じchecked performerへ届く。
 日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、
 明示寸法・relative scale（normal含む）・弦方向は固定、省略normalは可変、numeric anchorと最終must-fitは固定する。
-失敗時はStopまたはcurrent / Emit省略となり、元dependency、owner、drawing ordinal、seedを保つ。旧metadataなしの
+失敗時はerrorを記録してrelationだけを外し、元の変形後配置、dependency、owner、drawing ordinal、seedを保つ。旧metadataなしの
 Touchingは従来互換を維持する。Engine49のtyped Along / CuttingもCount1の隣接するLine間を共通配送する。反復planは`PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`としてchecked relation intentを保持する。
 Alongは未指定方向だけを平行に揃え、Cuttingは解決済みの長さを保持する。明示方向・寸法・数値位置を保ち、
-両立しない指定や参照消失は停止またはcurrent / Emit省略となる。旧metadata-free Scoreの挙動は保持する。
+両立しない指定や参照消失はerrorを記録してrelationだけを外す。旧metadata-free Scoreの挙動は保持する。
 whole Step10とtyped本番 / UI / 保存cutoverは残る。
 Connectedは同じflat Macro内の隣接bound Emitも受け、named-movable / numeric-fixedの位置authorityをshared
 checked performerまで運ぶ。先行のcanonical終端（Pointはcenter）へcurrent始端を平行移動で合わせ、先行、寸法、
-曲率、rotationを変えない。numericの非zero衝突はpolicyに従い停止またはcurrentを省略し、失われた参照をsurvivorへ
+曲率、rotationを変えない。numericの非zero衝突はerrorを記録してrelationだけを外し、失われた参照をsurvivorへ
 付け替えない。他relation、一般構造、allocation、whole parity、runtime/UI保存cutoverは残る。
 Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
 must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
 Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは
-Stopを既定、OmitAndContinueを明示選択とする。Stopは未対応意味が一つでもあればScoreを返さず、
+旧Stop入力を受け、OmitAndContinueを明示選択とする。recoverableなrelation失敗はScoreを止めず、
 Continueは元meaningを変えず、独立appearance fieldまたは成立しないtyped実行単位だけを省略する。
 結果はcomplete / omissions / stopped、元gap、実際の処置、source / generated ownerとspanを区別する。
 

@@ -30,7 +30,8 @@ def _reference_generator():
     return module
 
 
-def test_default_adapter_uses_one_canonical_request(monkeypatch):
+@pytest.mark.parametrize("legacy_stop", [False, True])
+def test_default_adapter_uses_one_canonical_request(monkeypatch, legacy_stop):
     calls: list[dict] = []
 
     def render(request_json: str) -> tuple[str, str]:
@@ -61,6 +62,7 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
         svg_profile="compat",
         render_seed=0,
         composition_seed=-7,
+        **({"error_policy": "stop"} if legacy_stop else {}),
     )
     assert engine.id == "default"
     assert engine.version == "46"
@@ -73,6 +75,9 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch):
     assert request["options"]["svg_profile"] == "compat"
     assert request["options"]["render_seed"] == 0
     assert request["options"]["composition_seed"] == -7
+    assert request["options"]["error_policy"] == (
+        "stop" if legacy_stop else "omit_and_continue"
+    )
     assert request["options"]["canvas"]["height"] == 1000
     assert request["options"]["canvas"]["width"] < 1000
 
@@ -298,21 +303,19 @@ def test_step10r_touching_native():
     payload = score.model_dump(mode="json")
     payload["instructions"][1]["relation"]["touching_constraints"]["dimensions_fixed"] = True
     conflict = Score.model_validate(payload)
-    with pytest.raises(ValueError, match="TouchingGeometryConflict"):
-        current_render_engine().render(conflict, render_seed=23)
     continued = current_render_engine().render(
-        conflict, svg_profile="editable", render_seed=23, error_policy="omit_and_continue"
+        conflict, svg_profile="editable", render_seed=23
     )
     assert "instruction_000_line_red" in continued.svg
-    assert "instruction_001_arc_blue" not in continued.svg
-    assert "instruction_002_line_green" not in continued.svg
+    assert "instruction_001_arc_blue" in continued.svg
+    assert "instruction_002_line_green" in continued.svg
     assert "instruction_003_circle_yellow" in continued.svg
     summary = continued.metadata["execution"]
-    assert summary["rendered_instruction_indices"] == [0, 3]
+    assert summary["rendered_instruction_indices"] == [0, 1, 2, 3]
     assert [item["reason"] for item in summary["diagnostics"]] == [
-        "touching_geometry_conflict", "touching_reference_omitted"
+        "touching_geometry_conflict"
     ]
-    assert summary["diagnostics"][1]["dependency_instruction_index"] == 1
+    assert summary["diagnostics"][0]["disposition"] == "relation_omitted"
     assert svg_to_png(continued.svg, width=320).startswith(b"\x89PNG\r\n\x1a\n")
 
 
@@ -376,18 +379,18 @@ def test_step10q_connected_native():
         },
     }
     conflict = Score.model_validate(conflict_payload)
-    with pytest.raises(ValueError, match="NumericConnectedPositionConflict"):
-        current_render_engine().render(conflict, render_seed=0)
-
     continued = current_render_engine().render(
         conflict,
         svg_profile="editable",
         render_seed=0,
-        error_policy="omit_and_continue",
+        error_policy="stop",
     )
     assert 'id="instruction_000_line_red"' in continued.svg
-    assert "instruction_001_line_blue" not in continued.svg
-    assert continued.metadata["execution"]["rendered_instruction_indices"] == [0]
+    assert "instruction_001_line_blue" in continued.svg
+    assert continued.metadata["execution"]["rendered_instruction_indices"] == [0, 1]
     assert continued.metadata["execution"]["diagnostics"][0]["reason"] == (
         "numeric_connected_position_conflict"
+    )
+    assert continued.metadata["execution"]["diagnostics"][0]["disposition"] == (
+        "relation_omitted"
     )

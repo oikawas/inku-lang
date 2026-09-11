@@ -21,6 +21,54 @@ struct Execution<'a> {
     omitted_groups: Vec<bool>,
     structural: Vec<bool>,
     warnings: Vec<PlanningWarning>,
+    omitted_relations: Vec<bool>,
+    diagnostics: Vec<ScoreExecutionDiagnostic>,
+}
+
+enum TranslationPredicate {
+    Exact(Point),
+    Along {
+        center: Point,
+        start: Point,
+        end: Point,
+        gap: inku_score::RelationGap,
+    },
+    Cutting {
+        start: Point,
+        end: Point,
+        target_start: Point,
+        target_end: Point,
+    },
+}
+
+struct ExternalConstraint {
+    source: usize,
+    preferred: Point,
+    predicate: TranslationPredicate,
+    numeric_reason: ScoreExecutionReason,
+}
+
+impl ExternalConstraint {
+    fn accepts(&self, delta: Point) -> bool {
+        let moved = |point: Point| Point::new(point.x + delta.x, point.y + delta.y);
+        match self.predicate {
+            TranslationPredicate::Exact(required) => {
+                distance(Point::new(required.x - delta.x, required.y - delta.y)) <= GEOMETRY_EPSILON
+            }
+            TranslationPredicate::Along {
+                center,
+                start,
+                end,
+                gap,
+            } => along_band_contains(moved(center), start, end, gap),
+            TranslationPredicate::Cutting {
+                start,
+                end,
+                target_start,
+                target_end,
+            } => segments_properly_cross(moved(start), moved(end), target_start, target_end),
+        }
+    }
 }
 
 fn distance(point: Point) -> f64 {
@@ -76,6 +124,25 @@ fn merge_bounds(bounds: &mut Option<Bounds>, next: Bounds) {
 }
 
 impl Execution<'_> {
+    fn drop_relation(&mut self, index: usize, reason: ScoreExecutionReason) {
+        if !self.omitted_relations[index] {
+            self.diagnostics
+                .push(relation_failure(self.request.score, index, reason));
+            self.omitted_relations[index] = true;
+        }
+        for value in &mut self.performed[index] {
+            value.instruction.relation = None;
+        }
+    }
+
+    fn placed_instruction(&self, ordinal: usize, original: &Instruction) -> Instruction {
+        let mut instruction = ensure_line_coordinates(original);
+        if let Some(seed) = self.request.performance_seed {
+            instruction = resolve_at_region(&instruction, seed, ordinal, self.request.canvas);
+        }
+        instruction
+    }
+
     fn prior(&self, index: usize) -> Option<&Instruction> {
         self.performed
             .get(index)?
@@ -101,21 +168,6 @@ impl Execution<'_> {
             if child == outermost || group_contains(group, candidate) {
                 self.omitted_groups[child] = true;
             }
-        }
-    }
-
-    fn omit_instruction(&mut self, index: usize) {
-        if let Some(group) = self
-            .request
-            .score
-            .transform_groups
-            .iter()
-            .rposition(|group| group.start <= index && index < group.end)
-        {
-            self.omit_group(group);
-        } else {
-            self.omitted[index] = true;
-            self.performed[index].clear();
         }
     }
 
@@ -205,9 +257,9 @@ impl Execution<'_> {
         ordinal: usize,
         original: &Instruction,
     ) -> Result<Instruction, ScoreExecutionReason> {
-        let mut instruction = ensure_line_coordinates(original);
-        if let Some(seed) = self.request.performance_seed {
-            instruction = resolve_at_region(&instruction, seed, ordinal, self.request.canvas);
+        let mut instruction = self.placed_instruction(ordinal, original);
+        if self.omitted_relations[index] {
+            instruction.relation = None;
         }
         let Some(relation) = instruction.relation.as_ref() else {
             return Ok(instruction);
@@ -217,6 +269,15 @@ impl Execution<'_> {
         }
         if relation.kind == RelationType::Connected {
             return self.prepare_connected(index, instruction);
+        }
+        if self.schedule.external_groups[index].is_some()
+            && (is_checked_touching(relation)
+                || is_checked_line_relation(relation, RelationType::Along)
+                || is_checked_line_relation(relation, RelationType::Cutting))
+        {
+            // Preserve the member geometry until the scope's own transform has
+            // completed. Only a common translation can satisfy this relation.
+            return Ok(instruction);
         }
         let target = relation.target_instruction_index;
         let legacy_target = target.or_else(|| {
@@ -333,6 +394,252 @@ impl Execution<'_> {
         Ok(instruction)
     }
 
+    fn external_constraint(
+        &self,
+        source: usize,
+    ) -> Result<ExternalConstraint, ScoreExecutionReason> {
+        let instruction = self
+            .prior(source)
+            .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+        let relation = instruction.relation.as_ref().expect("deferred relation");
+        let canvas = self.request.canvas;
+        let (unsupported, structure, missing, omitted, authority_missing, numeric_reason) =
+            match relation.kind {
+                RelationType::Connected => (
+                    ScoreExecutionReason::UnsupportedConnectedPrimitive,
+                    ScoreExecutionReason::UnsupportedConnectedStructure,
+                    ScoreExecutionReason::MissingConnectedReference,
+                    ScoreExecutionReason::ConnectedReferenceOmitted,
+                    ScoreExecutionReason::MissingConnectedPositionAuthority,
+                    ScoreExecutionReason::NumericConnectedPositionConflict,
+                ),
+                RelationType::Touching => (
+                    ScoreExecutionReason::UnsupportedTouchingPrimitive,
+                    ScoreExecutionReason::UnsupportedTouchingStructure,
+                    ScoreExecutionReason::MissingTouchingReference,
+                    ScoreExecutionReason::TouchingReferenceOmitted,
+                    ScoreExecutionReason::MissingTouchingPositionAuthority,
+                    ScoreExecutionReason::NumericTouchingPositionConflict,
+                ),
+                RelationType::Along => (
+                    ScoreExecutionReason::UnsupportedAlongPrimitive,
+                    ScoreExecutionReason::UnsupportedAlongStructure,
+                    ScoreExecutionReason::MissingAlongReference,
+                    ScoreExecutionReason::AlongReferenceOmitted,
+                    ScoreExecutionReason::MissingAlongPositionAuthority,
+                    ScoreExecutionReason::NumericAlongPositionConflict,
+                ),
+                RelationType::Cutting => (
+                    ScoreExecutionReason::UnsupportedCuttingPrimitive,
+                    ScoreExecutionReason::UnsupportedCuttingStructure,
+                    ScoreExecutionReason::MissingCuttingReference,
+                    ScoreExecutionReason::CuttingReferenceOmitted,
+                    ScoreExecutionReason::MissingCuttingPositionAuthority,
+                    ScoreExecutionReason::NumericCuttingPositionConflict,
+                ),
+                _ => return Err(ScoreExecutionReason::UnsupportedTransformGroupRelation),
+            };
+        if self.structural[source]
+            || relation
+                .target_instruction_index
+                .is_some_and(|target| self.structural.get(target).copied().unwrap_or(false))
+        {
+            return Err(structure);
+        }
+        relation.position_authority.ok_or(authority_missing)?;
+        let (start, end, _, _) =
+            crate::affine_geometry::endpoints(instruction, canvas, self.transforms[source])
+                .ok_or(unsupported)?;
+        let exact = |target: Point| ExternalConstraint {
+            source,
+            preferred: Point::new(target.x - start.x, target.y - start.y),
+            predicate: TranslationPredicate::Exact(Point::new(
+                target.x - start.x,
+                target.y - start.y,
+            )),
+            numeric_reason,
+        };
+        if relation.kind == RelationType::Connected {
+            return Ok(exact(self.connected_target(source, relation)?));
+        }
+        let target = relation
+            .target_instruction_index
+            .filter(|&target| Some(target) == source.checked_sub(1))
+            .ok_or(missing)?;
+        let prior = self.prior(target).ok_or(omitted)?;
+        let (target_start, target_end, _, _) =
+            crate::affine_geometry::endpoints(prior, canvas, self.transforms[target])
+                .ok_or(unsupported)?;
+        let vector = Point::new(end.x - start.x, end.y - start.y);
+        let target_vector =
+            Point::new(target_end.x - target_start.x, target_end.y - target_start.y);
+        let length = distance(vector);
+        let target_length = distance(target_vector);
+        if length <= GEOMETRY_EPSILON || target_length <= GEOMETRY_EPSILON {
+            return Err(unsupported);
+        }
+        if relation.kind == RelationType::Touching {
+            relation
+                .touching_constraints
+                .ok_or(ScoreExecutionReason::MissingTouchingConstraints)?;
+            if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc)
+                || !matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+            {
+                return Err(unsupported);
+            }
+            if (length - target_length).abs() > GEOMETRY_EPSILON {
+                return Err(ScoreExecutionReason::TouchingGeometryConflict);
+            }
+            if distance(Point::new(
+                vector.x - target_vector.x,
+                vector.y - target_vector.y,
+            )) > GEOMETRY_EPSILON
+            {
+                return Err(ScoreExecutionReason::TouchingDirectionConflict);
+            }
+            return Ok(exact(target_start));
+        }
+        if instruction.primitive != Primitive::Line || prior.primitive != Primitive::Line {
+            return Err(unsupported);
+        }
+        let center = Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
+        let parallel = (vector.x * target_vector.y - vector.y * target_vector.x).abs()
+            / (length * target_length)
+            <= GEOMETRY_EPSILON;
+        let seed = self.request.performance_seed.unwrap_or_default();
+        let ordinal = self.performed[source]
+            .last()
+            .expect("performed member")
+            .ordinal;
+        if relation.kind == RelationType::Along {
+            if instruction.rotation.is_none() && !parallel {
+                return Err(ScoreExecutionReason::AlongDirectionConflict);
+            }
+            let target = typed_along_target(
+                target_start,
+                target_end,
+                relation.gap,
+                seed,
+                ordinal,
+                canvas,
+            )
+            .ok_or(unsupported)?;
+            return Ok(ExternalConstraint {
+                source,
+                preferred: Point::new(target.x - center.x, target.y - center.y),
+                predicate: TranslationPredicate::Along {
+                    center,
+                    start: target_start,
+                    end: target_end,
+                    gap: relation.gap,
+                },
+                numeric_reason,
+            });
+        }
+        if parallel {
+            return Err(ScoreExecutionReason::CuttingDirectionConflict);
+        }
+        let factor = 0.18 + 0.64 * crate::determinism::hash01(ordinal as i64, seed, "cutting-t");
+        let target = Point::new(
+            target_start.x + target_vector.x * factor,
+            target_start.y + target_vector.y * factor,
+        );
+        Ok(ExternalConstraint {
+            source,
+            preferred: Point::new(target.x - center.x, target.y - center.y),
+            predicate: TranslationPredicate::Cutting {
+                start,
+                end,
+                target_start,
+                target_end,
+            },
+            numeric_reason,
+        })
+    }
+
+    fn correct_external_relations(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
+        let group = &self.request.score.transform_groups[index];
+        let mut constraints = Vec::new();
+        for source in group.start..group.end {
+            if self.schedule.external_groups[source] != Some(index)
+                || self.omitted_relations[source]
+            {
+                continue;
+            }
+            match self.external_constraint(source) {
+                Ok(constraint) => constraints.push(constraint),
+                Err(reason) => self.drop_relation(source, reason),
+            }
+        }
+        let zero = Point::new(0.0, 0.0);
+        let fixed = !group.fixed_position_indices.is_empty()
+            || group
+                .anchor_indices
+                .iter()
+                .any(|&anchor| self.request.score.anchors[anchor].position.is_some())
+            || (group.start..group.end).any(|source| {
+                self.request.score.instructions[source]
+                    .relation
+                    .as_ref()
+                    .is_some_and(|relation| {
+                        relation.position_authority
+                            == Some(ConnectedPositionAuthority::NumericFixed)
+                    })
+            });
+        // Check semantic predicates at every proposed translation. Two Along or
+        // Cutting relations need not choose the same preferred point to coexist.
+        let correction = std::iter::once(zero)
+            .chain(
+                constraints
+                    .iter()
+                    .filter(|_| !fixed)
+                    .map(|constraint| constraint.preferred),
+            )
+            .find(|&candidate| {
+                candidate.x.is_finite()
+                    && candidate.y.is_finite()
+                    && constraints
+                        .iter()
+                        .all(|constraint| constraint.accepts(candidate))
+            });
+        let delta = correction.unwrap_or(zero);
+        if correction.is_none() {
+            for constraint in &constraints {
+                if !constraint.accepts(zero) {
+                    self.drop_relation(
+                        constraint.source,
+                        if fixed {
+                            constraint.numeric_reason
+                        } else {
+                            ScoreExecutionReason::ConflictingRelationConstraints
+                        },
+                    );
+                }
+            }
+        }
+        // No mutation precedes the common decision, so a failed relation cannot
+        // leave behind a partial translation or change any member's geometry.
+        let translation = AffineTransform::translation(delta);
+        for member in group.start..group.end {
+            let composed = translation.compose(self.transforms[member]);
+            if !composed.is_finite() {
+                return Err(ScoreExecutionReason::InvalidTransformGroup);
+            }
+            self.transforms[member] = composed;
+            if self.schedule.external_groups[member] == Some(index) {
+                for value in &mut self.performed[member] {
+                    value.instruction.relation = None;
+                }
+            }
+        }
+        for &anchor in &group.anchor_indices {
+            self.anchors[anchor] = self.anchors[anchor]
+                .map(|point| finite_point(translation.apply(point)))
+                .transpose()?;
+        }
+        Ok(())
+    }
+
     fn perform_group(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
         let group = &self.request.score.transform_groups[index];
         if (group.start..group.end)
@@ -400,69 +707,7 @@ impl Execution<'_> {
                 .map(|point| finite_point(transform.apply(point)))
                 .transpose()?;
         }
-        let mut correction: Option<Point> = None;
-        for source in group.start..group.end {
-            if self.schedule.external_groups[source] != Some(index) {
-                continue;
-            }
-            let instruction = self
-                .prior(source)
-                .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
-            let relation = instruction
-                .relation
-                .as_ref()
-                .ok_or(ScoreExecutionReason::MissingConnectedReference)?;
-            let target = self.connected_target(source, relation)?;
-            let start = crate::affine_geometry::endpoints(
-                instruction,
-                self.request.canvas,
-                self.transforms[source],
-            )
-            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?
-            .0;
-            let delta = finite_point(Point::new(target.x - start.x, target.y - start.y))?;
-            if (relation.position_authority == Some(ConnectedPositionAuthority::NumericFixed)
-                || !group.fixed_position_indices.is_empty()
-                || group
-                    .anchor_indices
-                    .iter()
-                    .any(|&anchor| self.request.score.anchors[anchor].position.is_some()))
-                && distance(delta) > GEOMETRY_EPSILON
-            {
-                return Err(ScoreExecutionReason::NumericConnectedPositionConflict);
-            }
-            if correction.is_some_and(|prior| {
-                distance(Point::new(prior.x - delta.x, prior.y - delta.y)) > GEOMETRY_EPSILON
-            }) {
-                return Err(ScoreExecutionReason::ConflictingConnectedConstraints);
-            }
-            correction.get_or_insert(delta);
-        }
-        if let Some(delta) = correction {
-            let delta = if distance(delta) <= GEOMETRY_EPSILON {
-                Point::new(0.0, 0.0)
-            } else {
-                delta
-            };
-            let translation = AffineTransform::translation(delta);
-            for member in group.start..group.end {
-                let composed = translation.compose(self.transforms[member]);
-                if !composed.is_finite() {
-                    return Err(ScoreExecutionReason::InvalidTransformGroup);
-                }
-                self.transforms[member] = composed;
-                if self.schedule.external_groups[member] == Some(index) {
-                    for value in &mut self.performed[member] {
-                        value.instruction.relation = None;
-                    }
-                }
-            }
-            for &anchor in &group.anchor_indices {
-                self.anchors[anchor] = self.anchors[anchor]
-                    .map(|point| finite_point(translation.apply(point)))
-                    .transpose()?;
-            }
-        }
+        self.correct_external_relations(index)?;
         let has_outer = self.request.score.transform_groups[index + 1..]
             .iter()
             .any(|outer| group_contains(outer, group));
@@ -504,8 +749,9 @@ impl Execution<'_> {
 
 pub(super) fn resolve(
     request: PerformanceRequest<'_>,
-    policy: ScoreErrorPolicy,
+    _policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
+    let policy = ScoreErrorPolicy::OmitAndContinue;
     if request.score.validate_transform_groups().is_err() {
         return Err(CheckedPerformanceError {
             diagnostics: vec![connected_failure(
@@ -548,9 +794,23 @@ pub(super) fn resolve(
             ))
         })
         .collect();
+    let mut omitted_relations = vec![false; request.score.instructions.len()];
+    let mut diagnostics = Vec::new();
+    let mut dependency_schedule = schedule(request.score, &omitted_relations);
+    while !dependency_schedule.cyclic_relations.is_empty() {
+        for &source in &dependency_schedule.cyclic_relations {
+            omitted_relations[source] = true;
+            diagnostics.push(relation_failure(
+                request.score,
+                source,
+                ScoreExecutionReason::CyclicConnectedDependency,
+            ));
+        }
+        dependency_schedule = schedule(request.score, &omitted_relations);
+    }
     let mut execution = Execution {
         request,
-        schedule: schedule(request.score),
+        schedule: dependency_schedule,
         performed: (0..request.score.instructions.len())
             .map(|_| Vec::new())
             .collect(),
@@ -560,63 +820,44 @@ pub(super) fn resolve(
         omitted_groups: vec![false; request.score.transform_groups.len()],
         structural: structural_instruction_indices(request.score),
         warnings: Vec::new(),
+        omitted_relations,
+        diagnostics,
     };
-    let mut diagnostics = Vec::new();
-    for node in execution.schedule.cyclic.clone() {
-        match node {
-            ScheduleNode::Instruction(index) => {
-                execution.omit_instruction(index);
-            }
-            ScheduleNode::Group(index) => {
-                execution.omit_group(index);
-            }
-        };
-        diagnostics.push(node_failure(
-            request.score,
-            node,
-            ScoreExecutionReason::CyclicConnectedDependency,
-            policy,
-        ));
-    }
-    if policy == ScoreErrorPolicy::Stop && !diagnostics.is_empty() {
-        return Err(CheckedPerformanceError { diagnostics });
-    }
     for node in execution.schedule.order.clone() {
         let failure = match node {
             ScheduleNode::Instruction(index) => {
                 if execution.omitted[index] {
                     continue;
                 }
-                let mut failure = None;
                 for &ordinal in &ordinals[index] {
-                    match execution.prepare_instruction(
+                    let instruction = match execution.prepare_instruction(
                         index,
                         ordinal,
                         &expanded.instructions[ordinal],
                     ) {
-                        Ok(instruction) => {
-                            let seed_override =
-                                in_any_transform_group(&request.score.transform_groups, index)
-                                    .then(|| {
-                                        crate::determinism::instruction_seed(
-                                            &instruction,
-                                            request.performance_seed,
-                                        )
-                                    });
-                            execution.performed[index].push(Performed {
-                                instruction,
-                                ordinal,
-                                seed_override,
-                            });
-                        }
+                        Ok(instruction) => instruction,
                         Err(reason) => {
-                            execution.omit_instruction(index);
-                            failure = Some((index, reason));
-                            break;
+                            execution.drop_relation(index, reason);
+                            let mut instruction = execution
+                                .placed_instruction(ordinal, &expanded.instructions[ordinal]);
+                            instruction.relation = None;
+                            instruction
                         }
-                    }
+                    };
+                    let seed_override =
+                        in_any_transform_group(&request.score.transform_groups, index).then(|| {
+                            crate::determinism::instruction_seed(
+                                &instruction,
+                                request.performance_seed,
+                            )
+                        });
+                    execution.performed[index].push(Performed {
+                        instruction,
+                        ordinal,
+                        seed_override,
+                    });
                 }
-                failure
+                None
             }
             ScheduleNode::Group(index) => {
                 if execution.omitted_groups[index] {
@@ -632,10 +873,9 @@ pub(super) fn resolve(
             }
         };
         if let Some((_, reason)) = failure {
-            diagnostics.push(node_failure(request.score, node, reason, policy));
-            if policy == ScoreErrorPolicy::Stop {
-                return Err(CheckedPerformanceError { diagnostics });
-            }
+            execution
+                .diagnostics
+                .push(node_failure(request.score, node, reason, policy));
         }
     }
     let mut rendered = Vec::new();
@@ -657,8 +897,10 @@ pub(super) fn resolve(
         if request.score.instructions.is_empty() && !request.score.anchors.is_empty() {
             diagnostic.anchor_index = Some(0);
         }
-        diagnostics.push(diagnostic);
-        return Err(CheckedPerformanceError { diagnostics });
+        execution.diagnostics.push(diagnostic);
+        return Err(CheckedPerformanceError {
+            diagnostics: execution.diagnostics,
+        });
     }
     let original_instruction_indices = rendered.iter().map(|(owner, _)| *owner).collect::<Vec<_>>();
     let instruction_indices = rendered.iter().map(|(_, value)| value.ordinal).collect();
@@ -676,10 +918,10 @@ pub(super) fn resolve(
         .map(|(_, value)| value.instruction)
         .collect();
     score.transform_groups.clear();
-    let summary = (!diagnostics.is_empty()).then(|| ScoreExecutionSummary {
+    let summary = (!execution.diagnostics.is_empty()).then(|| ScoreExecutionSummary {
         input_score_digest: canonical_score_digest(request.score)
             .expect("typed Score canonicalization"),
-        diagnostics,
+        diagnostics: execution.diagnostics,
         rendered_instruction_indices: original_instruction_indices.clone(),
     });
     Ok(PerformancePlan {

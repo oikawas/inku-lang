@@ -252,6 +252,8 @@ pub enum ScoreOmissionUnit {
 pub enum ScoreDiagnosticDisposition {
     /// The error is reported while the authorized smaller geometry is rendered.
     Recovered,
+    /// The source geometry remains while its unsupported relation is removed.
+    RelationOmitted,
     Stopped,
     Omitted {
         unit: ScoreOmissionUnit,

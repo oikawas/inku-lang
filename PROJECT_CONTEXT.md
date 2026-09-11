@@ -66,7 +66,7 @@ instruction
 
 Full/half width use 100%/50% of canvas width before rotation, unlike normal sizing's short-edge basis. Ordinary DDL and declared Macros share one resolver, distinguishing line length, open-arc chord, and closed-outline width. Semicircle bulges upward, waxing right, and waning left; crescent is the saijiki's thin filled shape represented by Score 0.2.0 `arc_form: crescent` with center/size. Saved 0.1.0 remains readable unchanged. Only overlapping sizes recover: all original candidates are retained, `ConflictingSizeSpecifications` reports the effective extent, and `Recovered` draws the smaller size under both Stop and Continue. Other integrity and unsupported-meaning failures keep their existing policy. See SPEC §12.11.
 
-Shared Rust renders normal, dense, and faint fills for all twelve tools. `surface_intensity` is valid from Score 0.3.0 onward and reaches one lowerer from direct DDL and Macros; saved 0.1.0 / 0.2.0 / 0.3.0 Scores and versionless artifacts retain their existing reads and writes. Macro Transform reaches count-one Score 0.5.0 `transform_groups` and repeated symbolic plans. Finite `scale_x` / `scale_y` / `translate_x` / `translate_y` compose inner to outer as scale at the bounding-box center, rotation at that center, then normalized-canvas-axis translation. They change geometry and spacing while retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External nonConnected relations, Step11 instance materialization, and Step13 runtime / UI / persistence cutover remain incomplete.
+Shared Rust renders normal, dense, and faint fills for all twelve tools. `surface_intensity` is valid from Score 0.3.0 onward and reaches one lowerer from direct DDL and Macros; saved 0.1.0 / 0.2.0 / 0.3.0 Scores and versionless artifacts retain their existing reads and writes. Macro Transform reaches count-one Score 0.5.0 `transform_groups` and repeated symbolic plans. Finite `scale_x` / `scale_y` / `translate_x` / `translate_y` compose inner to outer as scale at the bounding-box center, rotation at that center, then normalized-canvas-axis translation. They change geometry and spacing while retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External Touching / Along / Cutting preserve transformed geometry, direction, and explicit values while attempting one whole-group translation; a failure records an error, removes only the relation, and leaves the group at its original transformed placement. Step11 instance materialization and Step13 runtime / UI / persistence cutover remain incomplete.
 
 Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the canvas center and does not borrow an Emit's focus-dependent placement. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
 
@@ -106,7 +106,7 @@ radius or diameter. For ordinary source-owned direct primitives, the checked low
 and the Line / Arc / Point endpoint family carries Connected, into the existing Score
 relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order;
-Continue omits dependent currents as `RelationInstruction` units when a referent disappears.
+A missing referent records an error and removes only its dependent relation; it does not retarget or omit the dependent current.
 Macro exact_decimal literals and declared parameters join the ordinary DDL dimension and numeric-position resolver.
 Explicit dimensions bind uniquely, retaining legacy Number(f64), exact values, and source / generated ownership.
 NotTouching also reaches the same Score from adjacent bound flat Emits without skipping unbound Emits or lost references.
@@ -114,24 +114,24 @@ NotTouching also reaches the same Score from adjacent bound flat Emits without s
 Touching also reaches the shared checked performer from direct Line / Arc instructions and adjacent bound flat Macro Emits.
 The four bilingual full literals verify their named prior Line / Arc type in original source order. Both-endpoint matching
 shares existing Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain fixed;
-omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure stops or omits the current / Emit while
-preserving original dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
+omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure records an error and removes only the relation while
+preserving original transformed placement, dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
 Engine49 also delivers typed Along / Cutting between adjacent count-one Lines through the shared checked performer.
 Repeated plans retain checked relation intent as `PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`.
 Along aligns only an unspecified direction; Cutting keeps the resolved length. Explicit direction, dimensions,
-and numeric position remain authoritative. Incompatible constraints or missing references stop or omit the
-current instruction / Emit, while metadata-free legacy Scores remain compatible. Whole Step 10 and typed
+and numeric position remain authoritative. Incompatible constraints or missing references record an error and remove only the
+relation, while metadata-free legacy Scores remain compatible. Whole Step 10 and typed
 production / UI / persistence cutover remain incomplete. Connected also reaches
 adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
 checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
-the prior, dimensions, curvature, or rotation. A nonzero numeric conflict stops or omits the current according to
-policy, and omitted dependencies never retarget to a survivor. Other relations, general structures,
+the prior, dimensions, curvature, or rotation. A nonzero numeric conflict records an error and removes only the relation;
+dependencies never retarget to a survivor. Other relations, general structures,
 allocation, whole-parity, and runtime/UI persistence cutover remain. Effective focus maps through the single policy's
 six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
 while the existing Renderer selects a region anchor from the performance seed and clamps base points.
 Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final
-boundary. The shared lowerer uses Stop by default and exposes OmitAndContinue explicitly. Stop
-returns no Score when any unsupported meaning remains. Continue leaves original meaning intact
+boundary. The shared lowerer accepts legacy Stop input and exposes OmitAndContinue explicitly. Recoverable
+relation failure never prevents a Score. Continue leaves original meaning intact
 and omits only an independent appearance field or invalid typed execution unit. The result
 distinguishes complete, complete with omissions, and stopped, retaining original gaps, actual
 treatment, source or generated owners, and spans.

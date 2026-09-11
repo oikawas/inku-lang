@@ -21,6 +21,8 @@
 
 通常DDL、Macro、反復planと共通rendererの回復を揃えた。旧stop指定は入力互換として受け取るが、回復可能な意味エラーで全体を止めない。描画可能な部分を残す既存の局所回復を既定とし、sourceやlockの整合性不良は正常な入力として通さない。Score 0.6.0を維持し、描画意味の変更でrender engineを53、DDL engineを28へ進める。APP_VERSION／BUILD_NUMBERは変更しない。外部NotTouching／Between、個体materialization、typed runtime／UI／save全面接続は未完了である。
 
+共有DDL／serdeの局所6件、Pythonのnative mock2件と変更ファイルのlintが成功した。Linuxでは共通executorへの切替に必要な4 targetを一回buildし、20 selectorを各一回、network noneで実行して全て成功した。関係だけの省略、群の形・明示値、元owner／順序／seedを確認し、全件参照生成・無関係な道具や地の再評価・wheel作成は行っていない。
+
 ---
 
 ### 2026-09-11 — 描かない基準点Anchorの位置と接続

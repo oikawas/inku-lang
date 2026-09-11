@@ -219,10 +219,10 @@ Anchors are non-drawing Score 0.6.0 targets that deliver explicit named position
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
 and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including Groups and rotation-only Transforms,
 also reaches an actual Score through the same lowerer used by ordinary
-DDL, with shared Stop / OmitAndContinue outcomes and typed omission diagnostics.
+DDL, with shared local-recovery outcomes and typed omission diagnostics.
 The compile-once facade retains the original document, compiler state, lock, and
-issues. Explicit Continue can omit typed upstream holes, conflicts, and dependent
-units in a sealed execution projection while preserving independent instructions.
+issues. Both legacy mode inputs apply the same local recovery to typed upstream holes,
+conflicts, and dependent units in a sealed execution projection while preserving independent instructions.
 Canonical macro output reuses its original seed, semantic ordinal, and generated
 provenance without expansion retry. Missing or duplicate execution owners, focus
 joins, global budgets, and integrity failures stop both modes. The public Stage 1.5

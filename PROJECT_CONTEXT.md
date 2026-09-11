@@ -161,11 +161,11 @@ ordinary DDL after an exact join to the execution owner and, for center only, ge
 instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
 their order. The current subset covers six closed shapes plus line, arc, and point,
 explicit `place`, `center` or explicit top / bottom / four edges / corner,
-optional attributes from their same-named categories, and omitted count or Integer one. Under Stop,
-an unbound caller fact, structural node, incomplete or unknown Emit, or type mismatch stops the
-entire Score. Under Continue, an unbound caller appearance field is omitted while definition values
-remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted as its typed
-unit. Unrelated flat siblings and original ordinal gaps remain.
+optional attributes from their same-named categories, and omitted count or Integer one. Regardless of
+legacy Stop or Continue input, an unbound caller fact, structural node, incomplete or unknown Emit,
+or type mismatch uses shared local recovery. An unbound caller appearance field is omitted while
+definition values remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted
+as its typed unit. Unrelated flat siblings and original ordinal gaps remain.
 
 Flat Emit `angle: semantic_ref` uses the same resolver. A caller angle does not fan out to or
 override Emits; the selection key uses the Macro semantic ordinal and existing expansion path /
@@ -183,9 +183,9 @@ the upstream error policy, and undeclared caller facts retain existing lowering 
 
 The runtime-disconnected `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
-lock, and issues, in the result. Default Stop returns no Score for an upstream hole or conflict.
-Explicit Continue alone builds a sealed execution projection from the same compilation's typed
-ownership and dependencies and delivers independent instructions to an actual Score. For canonical
+lock, and issues, in the result. Legacy Stop and Continue input both build a sealed execution projection
+from the same compilation's typed ownership and dependencies. A recoverable upstream hole or conflict
+omits its established local unit and delivers independent instructions to an actual Score. For canonical
 pre-meaning it reuses the exact subset of successful macro output with the original seed, source
 ordinal, and generated provenance, without re-expansion. For a noncanonical projection it finalizes
 omissions before one seed derivation and expansion and never retries a draw after a local failure.

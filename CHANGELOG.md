@@ -21,6 +21,8 @@ External Touching, Along, and Cutting translate the whole transformed group whil
 
 Ordinary DDL, Macros, repeated plans, and the shared renderer use the same recovery principle. Legacy stop input remains readable, but recoverable semantic errors no longer halt the whole drawing. Existing local recovery retains drawable content, while source and lock integrity failures remain rejected. Score stays at 0.6.0; render engine advances to 53 and DDL engine to 28. APP_VERSION and BUILD_NUMBER are unchanged. External NotTouching and Between, instance materialization, and full typed runtime, UI, and save integration remain unfinished.
 
+Six focused shared DDL/serde cases, two Python native-mock cases, and changed-file lint passed. Linux built the four affected test targets once and ran 20 selectors once each with networking disabled; all passed. Checks cover relation-only omission, group geometry and explicit values, original owners, order, and seeds. No full reference regeneration, unrelated tool or ground evaluation, or wheel build was added.
+
 ---
 
 ### 2026-09-11 — Explicit non-drawing Anchor positions and connections

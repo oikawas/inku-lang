@@ -134,10 +134,9 @@ Engine 43はLineの端点中点、Arcの弦中点、Pointの中心をsemantic an
 Finiteなflat Macro Emitも、exact execution ownerと、centerの場合だけexact generated focusへjoinした後、通常DDLと同じ
 semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
 `use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは6つのclosed shapeとline / arc / point、明示`place`、
-`center`または明示top / bottom / 四辺 / corner、任意の同名category属性、count省略またはInteger 1である。Stopでは未結合caller fact、
-構造node、不完全・未知・型不一致のEmitがScore全体を止める。Continueでは未結合caller appearanceを
-field単位で省略してdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
-外側meaningはinvocation単位で省略する。無関係なflat siblingと元ordinal欠番は保持する。
+`center`または明示top / bottom / 四辺 / corner、任意の同名category属性、count省略またはInteger 1である。旧Stop / Continue入力にかかわらず、未結合caller fact、
+構造node、不完全・未知・型不一致のEmitは共通局所回復で扱う。未結合caller appearanceはfield単位でdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
+外側meaningはinvocation単位で診断付きに省略する。無関係なflat siblingと元ordinal欠番は保持する。
 
 Flat Emitの`angle: semantic_ref`も同じresolverを通る。Caller angleはEmitへfan-out / overrideせず、
 Macroのsemantic ordinalと既存expansion path / generated ordinalを選択keyにする。
@@ -151,9 +150,8 @@ Literalとparameterは同じEmit fieldから通常geometry / factorへ一度だ�
 Missing / ambiguousは既存上流error、未宣言callerは従来lowering診断とmode別処置を保つ。
 
 Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
-そのcompilationとsource / state / lock / issuesを結果に保持する。既定のStopは上流のhole / conflictで
-Scoreを返さない。明示したContinueだけが、同じcompilationのtyped ownershipとdependencyからsealedな
-execution projectionを作り、独立した命令をactual Scoreへ届ける。Canonicalなpre-meaningでは成功済み
+そのcompilationとsource / state / lock / issuesを結果に保持する。旧Stop / Continue入力は、ともに同じcompilationのtyped ownershipとdependencyからsealedな
+execution projectionを作る。recoverableな上流hole / conflictは確立済みの局所単位を省略し、独立した命令をactual Scoreへ届ける。Canonicalなpre-meaningでは成功済み
 macro outputと元seed / source ordinal / generated provenanceをexact subsetとして再利用し、再展開しない。
 NonCanonicalなprojectionでは省略単位を先に確定してから一度だけseed導出・展開し、local failure後に
 drawをやり直さない。Global budgetとsource / lock / owner / definition / provenance整合性不良は両modeを止める。

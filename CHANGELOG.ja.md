@@ -21,6 +21,8 @@
 
 Scoreは任意の`transform_groups`を持つ0.4.0へ進め、旧0.1.0／0.2.0／0.3.0と版省略の保存互換を保つ。共有契約、server schema、Androidの保存保持を揃えた。決定的なgroup配送と演奏の追加によりDDL engineは25、render engineは50とする。DDL語彙版6とAPP/buildは変更しない。Transformのtranslate／scaleとtyped runtime／UI／save全面接続は未完了である。
 
+共有Score／server／Androidの保存互換と不正groupの局所確認、Macro配送2件、Linuxの回転・外部接続・停止／省略3件を確認した。回転1件の五角形の期待計算を訂正した後、その1件だけ再実行し成功した。[render50参照](server/reference/render-engine-50/manifest.json)は1回生成し、旧616例の入力・出力は全て不変、回転と外部接続の2例を追加した618例となった。[DDL25参照](server/reference/ddl-engine-25/manifest.json)も1回生成し、旧55例の入力・出力は全て不変だった。旧参照を保持し、参照だけを理由に全作品PNGや成功済み試験を再実行していない。
+
 ---
 
 ### 2026-09-11 — まとまりの回転中心を確定

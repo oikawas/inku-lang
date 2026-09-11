@@ -21,6 +21,8 @@ Rotation-only Macro Transforms now reach Scores and repetition plans through the
 
 Score advances to 0.4.0 with optional `transform_groups`, preserving saved 0.1.0 / 0.2.0 / 0.3.0 and versionless compatibility. The shared contract, server schema, and Android preservation agree. DDL engine advances to 25 for deterministic group delivery and render engine to 50 for group performance. DDL vocabulary version 6 and APP/build are unchanged. Transform translate / scale and full typed runtime / UI / save integration remain incomplete.
 
+Focused shared Score, server, and Android compatibility and malformed-group checks passed, along with two Macro-delivery tests and three Linux tests for rotation, external connections, and Stop / Omit. One rotation expectation used the wrong pentagon orientation; only that test was corrected and rerun successfully. The [render50 corpus](server/reference/render-engine-50/manifest.json) was generated once: all 616 prior inputs and outputs are unchanged, with two new rotation/connection cases bringing the total to 618. The [DDL25 corpus](server/reference/ddl-engine-25/manifest.json) was also generated once; all 55 prior inputs and outputs are unchanged. Older references remain, and full-work PNGs and passing tests were not rerun solely for the reference update.
+
 ---
 
 ### 2026-09-11 — Define the pivot for a group rotation

@@ -21,6 +21,8 @@ Placement-free Macro Groups now deliver their children through the ordinary DDL 
 
 General group placement, transform semantics, instance materialization, and full typed runtime/UI/save integration remain outside this change.
 
+Five focused checks passed for nesting, reference ownership, unsupported subtrees, and omission boundaries.
+
 ---
 
 ### 2026-09-11 — Tool-specific fills and intensity
@@ -28,6 +30,8 @@ General group placement, transform semantics, instance materialization, and full
 Implemented normal, dense, and faint fills for all twelve tools in the shared Rust renderer. Compact patterns, masks, filters, or paths express powder, wax, brush ink, drafting ink, engraving, silverpoint and pencil rubbing, CRT scanlines, and broad oil-paint strokes. Oil widens both paint tracks and spacing threefold with gentle bristle contrast while retaining the base and outline. Computer density is expressed as darker or lighter brightness.
 
 Score 0.3.0 `surface_intensity` retains normal / dense / faint; the default normal value does not change existing wire output. Solid closed fills in typed DDL use the same lowerer for direct instructions and Macro, and repeated plans retain the value without materialization. Unsupported meanings such as non-solid intensity keep their diagnostics. Saved Score 0.1.0 / 0.2.0 retain their original versions when read and written. Render engine advances 47→48 because the same Score renders differently; DDL engine advances 23→24 for the Instruction field declaration change. APP_VERSION / BUILD_NUMBER retain the values from parallel work. Full typed runtime / UI / save integration, deployment, and public release are outside this change.
+
+Each reference corpus was generated once on Linux with all existing inputs preserved. [Render engine48](server/reference/render-engine-48/manifest.json) changes 53 filled cases among 614 and leaves 561 unchanged. All 55 outputs in [DDL engine24](server/reference/ddl-engine-24/manifest.json) are unchanged. Older corpora are retained; render48 stores the 53 changed SVGs, while DDL24 keeps all 55 output files under its existing format. Four Rust and two Python Score compatibility/schema checks and two focused Android checks passed. Existing focused fill checks and the visual comparison of twelve tools at three intensities (36 images) were retained.
 
 ---
 

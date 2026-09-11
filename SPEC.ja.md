@@ -81,7 +81,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 
 版と同一性 ID は別の名前空間である。作品エディション ID は `rh3` で、`score`、`render_seed`、render engine の ID / 版、`render_color_catalog_id` から決まる。`render_build_number` と Score側の `vary_seed` は同一性に含めない。保存済み `rh2` はlegacyとして保持し、再計算も `rh3` との比較もしない。
 
-決定的な層の版には固定入力から得た参照コーパスを対応させる。既存caseの再生成はバイト一致しなければならず、違えば当該層の版を上げる。凍結済み版の出力を更新せず次の版directoryを作り、case IDは追加だけを許す。層ごとのcorpusを連結せず、外部依存はgeneratorでliteralに固定する。新しい版では前版との差をmanifestで記録する。描画コーパスは動いたcaseのSVGだけを保存する。既存のDDL互換コーパスは各版に全caseのJSONを保存する形式を保持する。これは演奏の変更を確かめる規則であり、実装Stepごとの文書更新儀式ではない。
+決定的な層の版には固定入力から得た参照コーパスを対応させる。既存caseの再生成はバイト一致しなければならず、違えば当該層の版を上げる。凍結済み版の出力を更新せず次の版directoryを作り、case IDは追加だけを許す。層ごとのcorpusを連結せず、外部依存はgeneratorでliteralに固定する。新しい版では前版との差をmanifestで記録する。描画コーパスは動いたcaseのSVGだけを保存する。既存のDDL互換コーパスは各版に全caseの出力ファイル（DDLテキストまたはJSON）を保存する形式を保持する。これは演奏の変更を確かめる規則であり、実装Stepごとの文書更新儀式ではない。
 
 SVGへ出す小数は `MASTER_GRID_DECIMALS` が定めるmaster gridに従い、固定小数6桁を保つ。過去engineを選択して再演奏する機構は持たず、再演奏は常に最新engineで行う。過去の版を再現する作品は保存済みSVGを返す。版史の経緯と測定値は同文書のhistorical recordとして保持する。
 

@@ -21,6 +21,8 @@ Macro Transform accepts finite `scale_x` / `scale_y` / `translate_x` / `translat
 
 Score advances to 0.5.0, render engine to 51, and DDL engine to 26. Rotation-only Score 0.4.0 groups and existing saved compatibility remain intact. DDL vocabulary, APP_VERSION, and BUILD_NUMBER do not change. Count-one and symbolic repeated plans remain preserved; Step11 materialization, Step13 runtime integration, and external nonConnected relations remain incomplete.
 
+Shared Score, server, and Android save compatibility passed, together with two Macro-delivery checks and three Linux results for scaling, connections, and physical material dimensions. The [render51 corpus](server/reference/render-engine-51/manifest.json) retains all 618 prior inputs and outputs and adds two affine examples, for 620 cases. The [DDL26 corpus](server/reference/ddl-engine-26/manifest.json) retains all 55 prior inputs and outputs. Previously passing results were inherited; no full-work or all-tool evaluation was added.
+
 ---
 
 ### 2026-09-11 — Group rotation and external connections

@@ -21,6 +21,8 @@ Macro Transformは有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`
 
 Scoreは0.5.0、render engineは51、DDL engineは26へ進める。Score 0.4.0の回転だけのgroupと既存保存互換を保ち、DDL語彙版、APP_VERSION、BUILD_NUMBERは変更しない。Count1とsymbolic反復planを保持し、Step11 materialization、Step13 runtime接続、外部nonConnected relationは未完了である。
 
+共有Score・server・Androidの保存互換、Macro配送2件、Linuxの拡縮・接続・画材維持の3結果を確認した。[render51参照](server/reference/render-engine-51/manifest.json)は旧618例の入力・出力が不変で、非等方拡縮と入れ子の2例を追加した620例。[DDL26参照](server/reference/ddl-engine-26/manifest.json)は旧55例の入力・出力が不変。既存成功結果を継承し、全作品や全道具の再評価は追加していない。
+
 ---
 
 ### 2026-09-11 — まとまりの回転と外部接続

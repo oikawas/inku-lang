@@ -1,37 +1,17 @@
-"""Run the frozen-corpus guard the way CI runs it, before pushing.
+"""Run a full frozen-corpus update at an explicit migration checkpoint.
 
-CI (`.github/workflows/reference-corpus.yml`) is the only automated check this
-repository has, and it is the only one that regenerates the corpora on another
-machine. The unit tests cannot stand in for it: `test_render_reference.py` and
-`test_ddl_reference.py` compare frozen files with the manifest and never
-re-render or re-expand anything, so a corpus can drift while the whole suite
-stays green. That has happened three times -- the engine 10 platform drift, the
-retired `contact` key, and the silverpoint rename -- and each time the red
-arrived after the push instead of before it.
+This is not a normal pre-push or version-bump check. Use it only when an
+overall migration has reached its explicit full-update checkpoint. Ordinary
+changes select focused validation from their risk; an engine version alone does
+not require a corpus update or a current-version reference directory.
 
-**CI owns this check** (author's ruling, 2026-08-17, ledger I-258). It is not an
-acceptance criterion in any contract, no perturbation is aimed at it, and the
-session accepting a branch is not expected to run it by hand. The two other
-homes considered -- the contract template, and the generators checking
-themselves -- were declined. The consequence is stated where the ruling is:
-drift is caught after the push, by a job whose result this project does not wait
-for.
+Run from ``server/`` only with the explicit acknowledgement:
 
-Run it from ``server/`` when you want that answer before pushing rather than
-after:
-
-    uv run python scripts/check_frozen_corpora.py
-
-**The generators write before their guard fires.** If this script reports drift,
-the working tree already holds the new corpus. Decide which it is:
-
-* the change was sanctioned (a rename the author ruled on, a new engine
-  version) -> keep it, and run the generator a second time to confirm the run
-  is clean and byte-identical;
-* the change was not sanctioned -> ``git checkout -- server/reference/``.
+    uv run python scripts/check_frozen_corpora.py --full-update
 """
 from __future__ import annotations
 
+import argparse
 import pathlib
 import subprocess
 import sys
@@ -56,7 +36,16 @@ def _dirty_paths() -> list[str]:
     return [line for line in status.splitlines() if line]
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full-update",
+        action="store_true",
+        help="regenerate both corpora at an explicitly approved migration checkpoint",
+    )
+    args = parser.parse_args(argv)
+    if not args.full_update:
+        parser.error("--full-update is required; this is not a routine version-bump check")
     before = _dirty_paths()
     if before:
         print("server/reference/ is already dirty before the run; commit or restore it first:")
@@ -81,9 +70,7 @@ def main() -> int:
     if guards_fired:
         print(f"identity guard fired in: {', '.join(guards_fired)}")
     print()
-    print("if this was sanctioned, run the generator again -- the second run must be")
-    print("clean and byte-identical. if it was not, restore it:")
-    print("  git checkout -- server/reference/")
+    print("resolve the cause before repeating this explicit full update.")
     return 1
 
 

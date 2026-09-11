@@ -1,10 +1,6 @@
 name: reference-corpus
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 env:
@@ -20,7 +16,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-      - name: Regenerate current render corpus
+      - name: Regenerate render corpus at the explicit migration checkpoint
         working-directory: server
         # The Server keeps the independently deployed native wheel out of its
         # dependency graph, so this gate injects the local binding only here.
@@ -41,7 +37,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
-      - name: Regenerate current DDL corpus
+      - name: Regenerate DDL corpus at the explicit migration checkpoint
         working-directory: server
         run: uv run python scripts/gen_ddl_reference.py
       - name: Require byte-identical frozen output

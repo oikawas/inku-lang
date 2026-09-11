@@ -77,11 +77,11 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 
 ### 2.1 演奏の版・同一性・保存
 
-決定的な層だけが版を持つ。Stage 1 と Stage 2 の LLM 層は同じ入力でも揺らぐため、版ではなく実際に送信した prompt の digest を来歴として記録する。`render_engine_version` は同じ Score と seed の演奏結果が変わるとき、または演奏できる語彙が増えるときに上げる。語や道具の改名だけでは上げない。改名は凍結物をその場で再生成して整合させるが、新しい版directoryを作らない。`ddl_engine_version` は決定的変換の出力が変わるときに加え、`Instruction` のフィールド宣言順が変わるときにも上げる。宣言順を変えるときは移すfieldだけでなく席を譲るfieldも測る。`ddl_version` は文法または語彙が追加・変更・廃止されるとき、Score の `version` はschema構造が変わるときに上げる。`ddl_version` と `ddl_engine_version` は1から数える。`MODEL_CONFIG_VERSION` は計測値・推奨度・選択可否が変わるときに上げ、同じidの保存済みcatalogへ組み込みmetadataを反映する。`APP_VERSION` は `web/APP_VERSION` を唯一の正本とし、UI、`/api/info` の `version`、CLIが同じ値を読む。`server/pyproject.toml` の配布版はrelease tag時だけ更新する。`web/BUILD_NUMBER` はUI変更でも進む共有連番で、同一性には含めない。現在の値は実装と保存済み作品が正本である。新しい版の値、理由、結果は[変更履歴](CHANGELOG.ja.md)だけへ記録する。[描画エンジンの版史](docs/spec/render-engine-history.ja.md)は既存の版記録を保存するhistorical recordであり、新しい節を追加しない。
+決定的な層だけが版を持つ。Stage 1 と Stage 2 の LLM 層は同じ入力でも揺らぐため、版ではなく実際に送信した prompt の digest を来歴として記録する。`render_engine_version` は同じ Score と seed の演奏結果が変わるとき、または演奏できる語彙が増えるときに上げる。語や道具の改名だけでは上げず、参照記録の更新もそれだけでは要求しない。`ddl_engine_version` は決定的変換の出力が変わるときに加え、`Instruction` のフィールド宣言順が変わるときにも上げる。宣言順を変えるときは移すfieldだけでなく席を譲るfieldも測る。`ddl_version` は文法または語彙が追加・変更・廃止されるとき、Score の `version` はschema構造が変わるときに上げる。`ddl_version` と `ddl_engine_version` は1から数える。`MODEL_CONFIG_VERSION` は計測値・推奨度・選択可否が変わるときに上げ、同じidの保存済みcatalogへ組み込みmetadataを反映する。`APP_VERSION` は `web/APP_VERSION` を唯一の正本とし、UI、`/api/info` の `version`、CLIが同じ値を読む。`server/pyproject.toml` の配布版はrelease tag時だけ更新する。`web/BUILD_NUMBER` はUI変更でも進む共有連番で、同一性には含めない。現在の値は実装と保存済み作品が正本である。新しい版の値、理由、結果は[変更履歴](CHANGELOG.ja.md)だけへ記録する。[描画エンジンの版史](docs/spec/render-engine-history.ja.md)は既存の版記録を保存するhistorical recordであり、新しい節を追加しない。
 
 版と同一性 ID は別の名前空間である。作品エディション ID は `rh3` で、`score`、`render_seed`、render engine の ID / 版、`render_color_catalog_id` から決まる。`render_build_number` と Score側の `vary_seed` は同一性に含めない。保存済み `rh2` はlegacyとして保持し、再計算も `rh3` との比較もしない。
 
-決定的な層の版には固定入力から得た参照コーパスを対応させる。既存caseの再生成はバイト一致しなければならず、違えば当該層の版を上げる。凍結済み版の出力を更新せず次の版directoryを作り、case IDは追加だけを許す。層ごとのcorpusを連結せず、外部依存はgeneratorでliteralに固定する。新しい版では前版との差をmanifestで記録する。描画コーパスは動いたcaseのSVGだけを保存する。既存のDDL互換コーパスは各版に全caseの出力ファイル（DDLテキストまたはJSON）を保存する形式を保持する。これは演奏の変更を確かめる規則であり、実装Stepごとの文書更新儀式ではない。
+保存済みの参照コーパスは、凍結した版の比較記録として保持する。凍結済み版の出力は更新せず、既存のcase IDも保持する。全体の移行実装が完了した明示的なcheckpointでは、一度だけ全件を更新し、前版との差をmanifestに記録する。途中のengine版上げ、DDL版上げ、または改名だけでは、参照コーパスの全件更新・現行版directoryの作成・generatorや手動比較の実行を義務にしない。変更のリスクに応じて局所的な確認を選ぶ。描画の保存記録はSVG、DDLの保存記録はDDLテキストまたはJSONの形式を維持する。
 
 SVGへ出す小数は `MASTER_GRID_DECIMALS` が定めるmaster gridに従い、固定小数6桁を保つ。過去engineを選択して再演奏する機構は持たず、再演奏は常に最新engineで行う。過去の版を再現する作品は保存済みSVGを返す。版史の経緯と測定値は同文書のhistorical recordとして保持する。
 

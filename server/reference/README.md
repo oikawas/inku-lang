@@ -61,8 +61,9 @@ its observational branch report from independent literal Score inputs. A never
 feeds B; corpora for different layers must not feed one another.
 
 Directories are immutable after they are frozen. Never regenerate an old
-version to accept changed output. Create the next version directory instead.
-Case IDs are permanent: do not rename or delete them; new cases may be added.
+version to accept changed output. The explicit full-update checkpoint creates a
+new directory; an engine bump alone does not. Case IDs are permanent: do not
+rename or delete them; the checkpoint adds new cases when its record needs them.
 
 A version directory holds an SVG body only for the cases that version changed.
 Its manifest still carries the digest, byte count, tag counts, and classes of
@@ -204,12 +205,14 @@ platform; verified on macOS arm64 and Ubuntu x86_64.
 Engine 10 is kept because the 10 → 11 diff is the evidence that only the written
 digits changed and the drawing did not: across all 220 cases the count of numbers
 is identical and no number moved by more than 5e-4 (the half-step of the old
-three-decimal formatting). Do not try to verify engine 10 on Linux; only engine
-11 and later are checked by CI.
+three-decimal formatting). Do not try to verify engine 10 on Linux; engine 11
+and later use the portable numeric format.
 
-## Regenerate and compare
+## Explicit full-update checkpoint
 
-Run from `server/`:
+Do not regenerate these records as a normal version-bump or pre-push step. At an
+explicit checkpoint after an overall migration is complete, run the complete
+update from `server/`:
 
 ```sh
 UV_CACHE_DIR=/tmp/inku-uv-cache \
@@ -218,32 +221,31 @@ uv run python scripts/gen_render_reference.py
 UV_CACHE_DIR=/tmp/inku-uv-cache \
 UV_PYTHON_INSTALL_DIR=$HOME/.local/share/uv/python \
 uv run python scripts/gen_ddl_reference.py
-git diff --exit-code reference/
+git status --short reference/
 ```
 
-Each generator writes into the directory named by the layer version it reads, so
-bumping a layer version leaves the new directory untracked. CI checks the whole
-`reference/` tree, which means an unstaged new corpus fails the build until it is
-committed. That is intended: a version bump must land with its frozen output.
-
-For an unchanged layer, regeneration must be byte-identical. Each generator
-exits unsuccessfully if case output changes while its manifest identity fields
-remain unchanged.
+The manual `reference-corpus` workflow remains available for an explicitly selected
+Linux comparison. It does not save an updated snapshot and does not run for pull
+requests, pushes, or an engine-version bump.
+Saved directories are historical records: do not overwrite them. Outside an
+explicit checkpoint, select focused checks from the changed behavior and do not
+run either generator or a manual corpus comparison by default.
 
 Render inputs fix every Score field, color map, render seed, and SVG profile.
 DDL inputs likewise fix every expansion argument and every Score field. The DDL
 manifest stores the complete literal input, output path, SHA-256 digest, byte
 count, and—for coerce cases—the output instruction count and fired branches.
 
-## Bumping a layer version
+## At the checkpoint
 
-1. Change the implementation and its independent layer version together.
-2. Generate a new version directory; do not modify the old directory.
-3. Compare every digest with the previous manifest.
-4. Put only changed IDs in `changed_from_previous`; for render corpora, save SVG
-   bodies only for those changed cases.
-5. Run the generator twice; the second run must leave a clean worktree.
-6. Run the full server tests and lint checks.
+1. Change the implementation and its independent layer version as needed.
+2. Generate a new directory only for the explicit full-update checkpoint; do
+   not modify an old directory.
+3. Compare each digest with the previous manifest and record changed IDs. Render
+   records store SVG bodies only for changed cases.
+4. Inspect the generated difference and save the completed record.
+5. Run the selected checks for the migration. Repeat the full update only when a
+   failed run or an unresolved concern requires it.
 
-If output changes without a relevant manifest identity change, a dependency was
-not fixed correctly. Repair the corpus design instead of updating frozen output.
+If output changes without a relevant manifest identity change, investigate the
+dependency before accepting the new record.

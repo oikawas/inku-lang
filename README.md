@@ -275,7 +275,7 @@ inku's drawing engine has **no past versions**. (One could, of course, trace the
 
 A saved work is **a print**. The SVG itself persists, so the piece as it was can always be seen. If we interpret it through the techniques of printmaking, the engine is **the block**, and only its carved-forward state exists. Redrawing pulls a fresh print from the current engine, and that is a new edition. Both are never warehoused at once.
 
-During development, we always move forward while comparing against older engines. The block cannot be restored, but the prints can be kept. Each time a generation rises, the actual output from a fixed set of inputs is frozen so that it remains comparable (`server/reference/`, currently 610 cases). **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
+During development, we always move forward while comparing with saved reference records. The block cannot be restored, but the prints can be kept. An engine bump alone does not update the reference corpus; validation is selected from the change risk. At an explicit checkpoint after an overall migration is complete, update the full set once. **Which generation changed what is recorded in the [render engine history](docs/spec/render-engine-history.md).**
 
 ---
 

@@ -821,12 +821,31 @@ fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloud
     .expect("precise group geometry performs");
     let line_anchor =
         instruction_anchor_on_canvas(&precise_result.score.instructions[0], Some(precise_canvas));
-    assert!((line_anchor.x - 0.448_776_412_907_378).abs() < 1.0e-9);
-    assert!((line_anchor.y - 0.097_552_825_814_758).abs() < 1.0e-9);
+    // The upright pentagon's lower vertices have y = cy + r * cos(36 degrees).
+    // In short-side units the combined bounds are x=[0.2, 1.2], y=[0.2, bottom].
+    let bottom = 0.5 + 0.1 * (1.0 + 5.0_f64.sqrt()) / 4.0;
+    let pivot_x = 0.7;
+    let pivot_y = (0.2 + bottom) / 2.0;
+    let expected_line_x = (pivot_x + pivot_y - 0.2) / 2.0;
+    let expected_line_y = pivot_y + 0.4 - pivot_x;
+    assert!(
+        (line_anchor.x - expected_line_x).abs() < 1.0e-9,
+        "{line_anchor:?}"
+    );
+    assert!(
+        (line_anchor.y - expected_line_y).abs() < 1.0e-9,
+        "{line_anchor:?}"
+    );
     let arc = endpoint_geometry(&precise_result.score.instructions[1], Some(precise_canvas))
         .expect("group arc retains endpoint geometry");
-    assert!((arc.0.x - 0.597_552_825_814_758).abs() < 1.0e-9);
-    assert!((arc.0.y - 0.897_552_825_814_758).abs() < 1.0e-9);
+    assert!(
+        (arc.0.x - (pivot_x + pivot_y - 0.5)).abs() < 1.0e-9,
+        "{arc:?}"
+    );
+    assert!(
+        (arc.0.y - (pivot_y + 1.2 - pivot_x)).abs() < 1.0e-9,
+        "{arc:?}"
+    );
 }
 
 #[test]

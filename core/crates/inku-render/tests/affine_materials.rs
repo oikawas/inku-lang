@@ -57,8 +57,8 @@ fn affine_geometry_changes_all_primitives_but_keeps_material_metrics_physical() 
     for svg in [&uniform, &nonuniform] {
         assert!(!svg.contains("NaN"));
         assert!(!svg.contains("inf"));
-        assert!(svg.contains("mark_000_line_black"));
-        assert!(svg.contains("mark_009_cloudform_black"));
+        assert!(svg.contains("instruction_000_line_black"));
+        assert!(svg.contains("instruction_009_cloudform_black"));
         assert!(svg.contains("baseFrequency=\""));
         assert!(svg.contains("width=\"3\""));
         assert!(svg.contains("height=\"8\""));

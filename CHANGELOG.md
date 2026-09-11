@@ -15,6 +15,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### v2.14.2 — Animation export and headnote display (2026-09-11)
+
+Assign the application patch version to the shared history/lineage animation
+export modal and saved Japanese headnote writing-mode and position settings
+described below. Current main already includes oil paint and moon forms with
+DDL 6, DDL engine 23, render engine 47, and Score 0.2.0; this UI change preserves
+those versions. Full Typed DDL runtime integration and whole Step10 remain
+incomplete.
+
+---
+
 ### 2026-09-11 — Select vertical or horizontal Japanese headnotes
 
 Added a horizontal/vertical choice for Japanese headnotes in the normal canvas

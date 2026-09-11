@@ -28,14 +28,14 @@ from inku_server.schema import GroundMaterial, Score
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
 CORPUS_FORMAT_VERSION = "2"
-SCHEMA_VERSION = "0.4.0"
+SCHEMA_VERSION = "0.5.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "Engine 50 rotates groups around their combined bounds and connects a "
-    "member to an external line by translating the complete group. Numeric "
-    "position constraints and original dependencies remain authoritative. "
-    "Existing Engine 49 literal inputs and artifacts are retained."
+    "Engine 51 scales group geometry and spacing while keeping stroke widths "
+    "and material grain in canvas units. Nonuniform and nested affine transforms "
+    "are resolved before material generation. Existing Engine 50 literal inputs "
+    "and artifacts are retained."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -792,6 +792,33 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g("G-composition-path-wave-edge", "edge", composition_seed=G_COMPOSITION_SEED,
        layout="vertical", path="wave")
 
+    # K: geometry scales before fixed-pitch material generation.
+    _case_unit(
+        cases, "K-group-scale-materials",
+        [_instruction("circle", weight="pencil", filled=True, center=[0.22, 0.48], radius=0.09),
+         _instruction("circle", weight="pencil", filled=True, center=[0.55, 0.48], radius=0.09),
+         _instruction("line", weight="rotring",
+                      **{"from": [0.42, 0.73], "to": [0.68, 0.73]})],
+        score_version="0.5.0",
+    )
+    cases["K-group-scale-materials"]["score"]["transform_groups"] = [
+        {"start": 1, "end": 3, "rotation_degrees": 0.0,
+         "scale_x": 1.6, "scale_y": 1.4, "translate_x": 0.04, "translate_y": -0.03},
+    ]
+    _case_unit(
+        cases, "K-group-affine-nested",
+        [_instruction("square", weight="computer", filled=True,
+                      position=[0.25, 0.32], size=[0.18, 0.18]),
+         _instruction("arc", weight="rotring", center=[0.60, 0.55], radius=0.14,
+                      angle_start=20.0, angle_end=250.0)],
+        score_version="0.5.0",
+    )
+    cases["K-group-affine-nested"]["score"]["transform_groups"] = [
+        {"start": 0, "end": 1, "rotation_degrees": 32.0},
+        {"start": 0, "end": 2, "rotation_degrees": -18.0,
+         "scale_x": 1.35, "scale_y": 0.70, "translate_x": 0.04},
+    ]
+
     # C gained 6 in engine 22: a filled computer and a filled silverpoint, which
     # the corpus had never carried, the crayon / brush_thick thinness pair that
     # tells a coverage rule from a list of tool names, and the chalk pair that
@@ -877,7 +904,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                       **{"from": [0.20, 0.50], "to": [0.40, 0.50]}),
          _instruction("ellipse", weight="rotring", center=[0.65, 0.50],
                       size=[0.12, 0.20])],
-        aspect="wide", score_version=SCHEMA_VERSION,
+        aspect="wide", score_version="0.4.0",
     )
     cases["J-group-rotation-wide"]["score"]["transform_groups"] = [
         {"start": 0, "end": 2, "rotation_degrees": 90.0},
@@ -893,7 +920,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                       **{"from": [0.30, 0.50], "to": [0.40, 0.50]}),
          _instruction("line", weight="rotring",
                       **{"from": [0.60, 0.50], "to": [0.70, 0.50]})],
-        score_version=SCHEMA_VERSION,
+        score_version="0.4.0",
     )
     cases["J-group-connected-whole"]["score"]["transform_groups"] = [
         {"start": 1, "end": 3, "rotation_degrees": 90.0},
@@ -916,7 +943,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Engine 49 adds one checked Along and one checked Cutting case to I.
     # Engine 50 adds one group rotation and one external group connection to J.
     expected = {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128,
-                "G": 50, "H": 4, "I": 2, "J": 2}
+                "G": 50, "H": 4, "I": 2, "J": 2, "K": 2}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
     if actual != expected or len(cases) != 618:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")

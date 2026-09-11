@@ -747,13 +747,28 @@ pub(crate) fn touching_candidate(
     prior: &Instruction,
     canvas: Option<CanvasSize>,
 ) -> Result<Instruction, &'static str> {
+    touching_candidate_with_transform(
+        instruction,
+        prior,
+        canvas,
+        crate::affine::AffineTransform::identity(),
+    )
+}
+
+pub(crate) fn touching_candidate_with_transform(
+    instruction: &Instruction,
+    prior: &Instruction,
+    canvas: Option<CanvasSize>,
+    transform: crate::affine::AffineTransform,
+) -> Result<Instruction, &'static str> {
     if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc) {
         return Err("touching requires a line or arc with a prior");
     }
     if !matches!(prior.primitive, Primitive::Line | Primitive::Arc) {
         return Err("prior is not a line or arc");
     }
-    let Some((start, end, _, _)) = endpoint_geometry(prior, canvas) else {
+    let Some((start, end, _, _)) = crate::affine_geometry::endpoints(prior, canvas, transform)
+    else {
         return Err("prior has no endpoint geometry");
     };
     let mut resolved = stripped(instruction);
@@ -770,7 +785,9 @@ pub(crate) fn touching_candidate(
         let Some(prior_sagitta) = performed_arc_sagitta(prior, canvas) else {
             return Err("degenerate prior sagitta");
         };
-        -own_sagitta.abs().copysign(prior_sagitta)
+        -own_sagitta
+            .abs()
+            .copysign(prior_sagitta * (transform.a * transform.d - transform.b * transform.c))
     } else {
         own_sagitta
     };

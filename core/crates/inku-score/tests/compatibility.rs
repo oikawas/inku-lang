@@ -169,10 +169,18 @@ fn old_and_transform_group_scores_roundtrip_through_saved_compatibility() {
             "transform_groups":[
                 {"start":0,"end":2,"rotation_degrees":30.0,"fixed_position_indices":[1]},
                 {"start":0,"end":3,"rotation_degrees":90.0,"fixed_position_indices":[1]}
-            ]}"#.as_slice(),
+            ]}"#
+        .as_slice(),
+        br#"{"version":"0.5.0","instructions":[{"primitive":"line"},{"primitive":"line"}],
+            "transform_groups":[{"start":0,"end":2,"rotation_degrees":0.0,
+            "scale_x":-1.0,"scale_y":0.0,"translate_x":0.2,"translate_y":-0.1}]}"#
+            .as_slice(),
     ] {
         let score = read_saved_score_json(source).expect("saved Score must parse");
         let canonical = canonical_json_bytes(&score).expect("saved Score must canonicalize");
-        assert_eq!(read_saved_score_json(&canonical).expect("canonical Score must reread"), score);
+        assert_eq!(
+            read_saved_score_json(&canonical).expect("canonical Score must reread"),
+            score
+        );
     }
 }

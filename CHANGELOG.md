@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Group scale and translation
+
+Macro Transform accepts finite `scale_x` / `scale_y` / `translate_x` / `translate_y`. Negative scale reflects and zero scale degenerates. It transforms child geometry only: scale at the combined child bounding-box center before rotation, rotate at that center, then translate by a normalized-canvas-axis delta. Stroke width and grain pitch remain fixed, and nested groups compose general affine transforms inner to outer.
+
+Score advances to 0.5.0, render engine to 51, and DDL engine to 26. Rotation-only Score 0.4.0 groups and existing saved compatibility remain intact. DDL vocabulary, APP_VERSION, and BUILD_NUMBER do not change. Count-one and symbolic repeated plans remain preserved; Step11 materialization, Step13 runtime integration, and external nonConnected relations remain incomplete.
+
+---
+
 ### 2026-09-11 — Group rotation and external connections
 
 Rotation-only Macro Transforms now reach Scores and repetition plans through the shared lowerer. After placement and internal relations resolve, groups rotate inner to outer about the combined child-shape bounding-box center. Connected to an external prior shape translates the whole group while preserving internal placement. Numeric-position constraints, named clipping, Stop / OmitAndContinue, and original references, ownership, and seeds remain intact. Repeated plans retain relation intent referencing original objects without materializing instances.

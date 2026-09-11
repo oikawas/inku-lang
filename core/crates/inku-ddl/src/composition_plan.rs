@@ -30,6 +30,10 @@ pub struct TransformGroupPlan {
     pub(crate) start: usize,
     pub(crate) end: usize,
     pub(crate) rotation_degrees: f64,
+    pub(crate) scale_x: f64,
+    pub(crate) scale_y: f64,
+    pub(crate) translate_x: f64,
+    pub(crate) translate_y: f64,
     pub(crate) fixed_position_indices: Vec<usize>,
     pub(crate) provenance: crate::GeneratedNodeProvenance,
 }
@@ -77,6 +81,22 @@ impl TransformGroupPlan {
 
     pub const fn rotation_degrees(&self) -> f64 {
         self.rotation_degrees
+    }
+
+    pub const fn scale_x(&self) -> f64 {
+        self.scale_x
+    }
+
+    pub const fn scale_y(&self) -> f64 {
+        self.scale_y
+    }
+
+    pub const fn translate_x(&self) -> f64 {
+        self.translate_x
+    }
+
+    pub const fn translate_y(&self) -> f64 {
+        self.translate_y
     }
 
     pub fn fixed_position_indices(&self) -> &[usize] {

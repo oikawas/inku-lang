@@ -647,7 +647,11 @@ pub fn render_surface(
         render_vectors(&mut group, instruction, context, &contour, seed);
     }
     Some(SurfaceRender {
-        group: rotate(group, instruction, context.canvas),
+        group: if context.geometry_transform.is_identity() {
+            rotate(group, instruction, context.canvas)
+        } else {
+            group
+        },
         definitions,
     })
 }
@@ -673,6 +677,7 @@ mod tests {
             use_filters: false,
             profile: crate::types::SvgProfile::Editable,
             support: DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::identity(),
         }
     }
 

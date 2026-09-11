@@ -13,9 +13,11 @@ use crate::geometry::{
     ellipse_perimeter, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
 };
 use crate::mark_paths::{
-    amplitude, cloudform_path, hand_contour, hand_line, points_attribute, rotate, uses_hand_stroke,
+    amplitude, cloudform_path, hand_contour, hand_line, points_attribute, polygon_path, rotate,
+    uses_hand_stroke,
 };
 use crate::palette::resolve_color;
+use crate::planning::instruction_anchor_on_canvas;
 use crate::support::Support;
 use crate::svg::{Element, format_number};
 use crate::types::{
@@ -56,6 +58,7 @@ pub struct MarkContext<'a> {
     pub use_filters: bool,
     pub profile: SvgProfile,
     pub support: Support,
+    pub geometry_transform: crate::affine::AffineTransform,
 }
 
 impl MarkContext<'_> {
@@ -63,6 +66,47 @@ impl MarkContext<'_> {
         self.instruction_seed_override
             .unwrap_or_else(|| instruction_seed(instruction, self.render_seed))
     }
+}
+
+/// Applies the instruction's own rotation before its containing Transform groups.
+///
+/// The identity path keeps its established SVG rotation representation. The general
+/// affine path instead feeds transformed geometry into every mark and material
+/// generator, so physical stroke and texture measurements remain in canvas pixels.
+pub(crate) fn geometry_point(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    point: Point,
+) -> Point {
+    if context.geometry_transform.is_identity() {
+        return point;
+    }
+    let rotated = instruction.rotation.map_or(point, |degrees| {
+        let pivot = point_to_pixels(
+            instruction_anchor_on_canvas(instruction, Some(context.canvas)),
+            context.canvas,
+        );
+        let radians = degrees.to_radians();
+        let dx = point.x - pivot.x;
+        let dy = point.y - pivot.y;
+        Point::new(
+            pivot.x + dx * radians.cos() - dy * radians.sin(),
+            pivot.y + dx * radians.sin() + dy * radians.cos(),
+        )
+    });
+    context.geometry_transform.apply(rotated)
+}
+
+pub(crate) fn geometry_points(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    points: &[Point],
+) -> Vec<Point> {
+    points
+        .iter()
+        .copied()
+        .map(|point| geometry_point(instruction, context, point))
+        .collect()
 }
 
 #[derive(Clone)]
@@ -403,6 +447,420 @@ fn render_crescent(
     }
 }
 
+fn open_path(points: &[Point]) -> String {
+    let Some(first) = points.first() else {
+        return String::new();
+    };
+    let rest = points[1..]
+        .iter()
+        .map(|point| format!("{} {}", format_number(point.x), format_number(point.y)))
+        .collect::<Vec<_>>()
+        .join(" L ");
+    if rest.is_empty() {
+        format!("M {} {}", format_number(first.x), format_number(first.y))
+    } else {
+        format!(
+            "M {} {} L {rest}",
+            format_number(first.x),
+            format_number(first.y)
+        )
+    }
+}
+
+fn has_closed_area(points: &[Point]) -> bool {
+    points.len() >= 3
+        && points
+            .iter()
+            .zip(points.iter().cycle().skip(1))
+            .take(points.len())
+            .map(|(left, right)| left.x * right.y - left.y * right.x)
+            .sum::<f64>()
+            .abs()
+            > 1.0e-9
+}
+
+fn contour_length(points: &[Point], closed: bool) -> f64 {
+    let segments = points
+        .windows(2)
+        .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y));
+    let closing = closed
+        .then(|| points.first().zip(points.last()))
+        .flatten()
+        .map_or(0.0, |(first, last)| {
+            (first.x - last.x).hypot(first.y - last.y)
+        });
+    segments.sum::<f64>() + closing
+}
+
+fn affine_curve_samples(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    provisional: &[Point],
+    closed: bool,
+    current: usize,
+) -> usize {
+    current.max(stroke_sample_count(
+        contour_length(&geometry_points(instruction, context, provisional), closed),
+        context.canvas,
+    ))
+}
+
+fn render_affine_closed(
+    instruction: &Instruction,
+    contour: &[Point],
+    anchors: &BTreeSet<usize>,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Element {
+    let contour = geometry_points(instruction, context, contour);
+    let geometry = apply_style(
+        Element::new("path").attr("d", polygon_path(&contour)),
+        style,
+        true,
+    );
+    if !has_closed_area(&contour) {
+        return apply_style(
+            Element::new("path").attr("d", polygon_path(&contour)),
+            style,
+            false,
+        );
+    }
+    if uses_hand_stroke(instruction.weight) {
+        let mut group = accepted_fills::group(instruction, context);
+        if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
+            group.push(fill);
+        }
+        group.push(hand_contour(
+            instruction,
+            &contour,
+            anchors,
+            style,
+            context,
+            true,
+        ));
+        group
+    } else {
+        mechanical_closed_mark(instruction, &contour, geometry, style, context)
+    }
+}
+
+fn render_affine_instruction(
+    instruction: &Instruction,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Result<Element, MarkError> {
+    debug_assert!(!context.geometry_transform.is_identity());
+    match instruction.primitive {
+        Primitive::Line => {
+            let start = geometry_point(
+                instruction,
+                context,
+                point_to_pixels(
+                    instruction.from_.unwrap_or(Point::new(0.5, 0.0)),
+                    context.canvas,
+                ),
+            );
+            let end = geometry_point(
+                instruction,
+                context,
+                point_to_pixels(
+                    instruction.to.unwrap_or(Point::new(0.5, 1.0)),
+                    context.canvas,
+                ),
+            );
+            if uses_hand_stroke(instruction.weight) {
+                if (end.x - start.x).hypot(end.y - start.y) <= 1.0e-9 {
+                    Ok(apply_style(
+                        Element::new("line")
+                            .attr("x1", format_number(start.x))
+                            .attr("y1", format_number(start.y))
+                            .attr("x2", format_number(end.x))
+                            .attr("y2", format_number(end.y)),
+                        style,
+                        false,
+                    ))
+                } else {
+                    Ok(hand_line(instruction, start, end, style, context))
+                }
+            } else {
+                Ok(apply_style(
+                    Element::new("line")
+                        .attr("x1", format_number(start.x))
+                        .attr("y1", format_number(start.y))
+                        .attr("x2", format_number(end.x))
+                        .attr("y2", format_number(end.y)),
+                    style,
+                    false,
+                ))
+            }
+        }
+        Primitive::Circle | Primitive::Point | Primitive::Ellipse => {
+            let center = point_to_pixels(
+                instruction
+                    .center
+                    .ok_or_else(|| missing(instruction, "center"))?,
+                context.canvas,
+            );
+            let (rx, ry) = if matches!(instruction.primitive, Primitive::Circle | Primitive::Point)
+            {
+                let radius = instruction
+                    .radius
+                    .ok_or_else(|| missing(instruction, "radius"))?
+                    * context.canvas.unit();
+                (radius, radius)
+            } else {
+                let size = size_to_pixels(
+                    instruction
+                        .size
+                        .ok_or_else(|| missing(instruction, "size"))?,
+                    context.canvas,
+                );
+                (size.x / 2.0, size.y / 2.0)
+            };
+            let length = if matches!(instruction.primitive, Primitive::Circle | Primitive::Point) {
+                std::f64::consts::TAU * rx
+            } else {
+                ellipse_perimeter(rx, ry)
+            };
+            let current = stroke_sample_count(length, context.canvas);
+            let provisional = circle_points(center, rx, ry, current);
+            let samples = affine_curve_samples(instruction, context, &provisional, true, current);
+            let mut contour = if samples == current {
+                provisional
+            } else {
+                circle_points(center, rx, ry, samples)
+            };
+            if let Some(variation) = instruction
+                .variation
+                .as_ref()
+                .filter(|variation| needs_contour_variation(variation))
+            {
+                contour = closed_contour_with_variation(
+                    &contour,
+                    center,
+                    variation,
+                    context.seed_for(instruction),
+                    amplitude(instruction, context.canvas),
+                );
+            }
+            Ok(render_affine_closed(
+                instruction,
+                &contour,
+                &BTreeSet::new(),
+                style,
+                context,
+            ))
+        }
+        Primitive::Square | Primitive::Triangle => {
+            let position = point_to_pixels(
+                instruction
+                    .position
+                    .ok_or_else(|| missing(instruction, "position"))?,
+                context.canvas,
+            );
+            let size = size_to_pixels(
+                instruction
+                    .size
+                    .ok_or_else(|| missing(instruction, "size"))?,
+                context.canvas,
+            );
+            let corners = if instruction.primitive == Primitive::Square {
+                vec![
+                    position,
+                    Point::new(position.x + size.x, position.y),
+                    Point::new(position.x + size.x, position.y + size.y),
+                    Point::new(position.x, position.y + size.y),
+                ]
+            } else {
+                vec![
+                    Point::new(position.x + size.x / 2.0, position.y),
+                    Point::new(position.x, position.y + size.y),
+                    Point::new(position.x + size.x, position.y + size.y),
+                ]
+            };
+            let contour = edge_contour_with_anchors(
+                &corners,
+                instruction
+                    .variation
+                    .as_ref()
+                    .filter(|variation| needs_contour_variation(variation)),
+                context.seed_for(instruction),
+                amplitude(instruction, context.canvas),
+                context.canvas,
+            );
+            Ok(render_affine_closed(
+                instruction,
+                &contour.points,
+                &contour.anchors,
+                style,
+                context,
+            ))
+        }
+        Primitive::Polygon => {
+            let center = point_to_pixels(
+                instruction
+                    .center
+                    .ok_or_else(|| missing(instruction, "center"))?,
+                context.canvas,
+            );
+            let radius = instruction
+                .radius
+                .ok_or_else(|| missing(instruction, "radius"))?
+                * context.canvas.unit();
+            let corners = polygon_points(
+                center,
+                radius,
+                usize::from(instruction.sides.unwrap_or(5)),
+                0.0,
+            );
+            let contour = edge_contour_with_anchors(
+                &corners,
+                instruction
+                    .variation
+                    .as_ref()
+                    .filter(|variation| needs_contour_variation(variation)),
+                context.seed_for(instruction),
+                amplitude(instruction, context.canvas),
+                context.canvas,
+            );
+            Ok(render_affine_closed(
+                instruction,
+                &contour.points,
+                &contour.anchors,
+                style,
+                context,
+            ))
+        }
+        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
+            let center = point_to_pixels(
+                instruction
+                    .center
+                    .ok_or_else(|| missing(instruction, "center"))?,
+                context.canvas,
+            );
+            let size = size_to_pixels(
+                instruction
+                    .size
+                    .ok_or_else(|| missing(instruction, "size"))?,
+                context.canvas,
+            );
+            let provisional = crescent_contour_points(center, size, 25);
+            let total_samples =
+                affine_curve_samples(instruction, context, &provisional, true, provisional.len());
+            let samples_per_cubic = (total_samples + 3) / 4;
+            let contour = if samples_per_cubic == 25 {
+                provisional
+            } else {
+                crescent_contour_points(center, size, samples_per_cubic)
+            };
+            Ok(render_affine_closed(
+                instruction,
+                &contour,
+                &BTreeSet::new(),
+                style,
+                context,
+            ))
+        }
+        Primitive::Arc => {
+            let center = point_to_pixels(
+                instruction
+                    .center
+                    .ok_or_else(|| missing(instruction, "center"))?,
+                context.canvas,
+            );
+            let radius = instruction
+                .radius
+                .ok_or_else(|| missing(instruction, "radius"))?
+                * context.canvas.unit();
+            let start = instruction
+                .angle_start
+                .ok_or_else(|| missing(instruction, "angle_start"))?;
+            let end = instruction
+                .angle_end
+                .ok_or_else(|| missing(instruction, "angle_end"))?;
+            let length = radius * (end - start).to_radians().abs();
+            let centerline = if let Some(variation) = instruction
+                .variation
+                .as_ref()
+                .filter(|variation| needs_contour_variation(variation))
+            {
+                arc_points_with_variation(
+                    ArcGeometry {
+                        center,
+                        radius,
+                        start_degrees: start,
+                        end_degrees: end,
+                    },
+                    variation,
+                    context.seed_for(instruction),
+                    amplitude(instruction, context.canvas),
+                    context.canvas,
+                )
+            } else {
+                let current = stroke_sample_count(length, context.canvas);
+                let provisional = arc_points(center, radius, start, end, current);
+                let samples =
+                    affine_curve_samples(instruction, context, &provisional, false, current);
+                arc_points(center, radius, start, end, samples)
+            };
+            let centerline = geometry_points(instruction, context, &centerline);
+            if uses_hand_stroke(instruction.weight) {
+                if centerline
+                    .windows(2)
+                    .any(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y) > 1.0e-9)
+                {
+                    Ok(hand_contour(
+                        instruction,
+                        &centerline,
+                        &BTreeSet::new(),
+                        style,
+                        context,
+                        false,
+                    ))
+                } else {
+                    Ok(apply_style(
+                        Element::new("path").attr("d", open_path(&centerline)),
+                        style,
+                        false,
+                    ))
+                }
+            } else {
+                Ok(apply_style(
+                    Element::new("path").attr("d", open_path(&centerline)),
+                    style,
+                    false,
+                ))
+            }
+        }
+        Primitive::Cloudform => {
+            let center = instruction
+                .center
+                .ok_or_else(|| missing(instruction, "center"))?;
+            let size = instruction
+                .size
+                .ok_or_else(|| missing(instruction, "size"))?;
+            let controls = generate_cloudform_contour(CloudformRequest {
+                center: point_to_pixels(center, context.canvas),
+                size: size_to_pixels(size, context.canvas),
+                performance_seed: Some(context.seed_for(instruction)),
+                instruction_index: context.instruction_index,
+                mark_index: context.mark_index,
+                variation: instruction.variation.as_ref(),
+                weight: instruction.weight,
+                point_count: 49,
+            });
+            let sampled = sample_closed_catmull_rom(&controls, 5);
+            Ok(render_affine_closed(
+                instruction,
+                &sampled,
+                &BTreeSet::new(),
+                style,
+                context,
+            ))
+        }
+    }
+}
+
 /// Render one expanded, performed instruction into an SVG-specific element tree.
 pub fn render_instruction(
     instruction: &Instruction,
@@ -410,6 +868,9 @@ pub fn render_instruction(
 ) -> Result<Element, MarkError> {
     let mut style = mark_style(instruction, context);
     accepted_fills::prepare_style(instruction, &mut style);
+    if !context.geometry_transform.is_identity() {
+        return render_affine_instruction(instruction, &style, context);
+    }
     match instruction.primitive {
         Primitive::Line => {
             let start = point_to_pixels(

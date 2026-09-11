@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "518648e384cad82fb7570ce7dffcb8e5d070371c0e1f16ef398de27cb91634fd";
+    "d3cafc319dce068afacaf571cd93e9a44edc94f4df3d9a5f159938c935fdb0ea";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -64,7 +64,16 @@ fn canonical_score_schema_identity_is_stable() {
     let transform_group = schema["$defs"]["TransformGroup"]["properties"]
         .as_object()
         .expect("TransformGroup properties must be an object");
-    for required in ["start", "end", "rotation_degrees", "fixed_position_indices"] {
+    for required in [
+        "start",
+        "end",
+        "rotation_degrees",
+        "scale_x",
+        "scale_y",
+        "translate_x",
+        "translate_y",
+        "fixed_position_indices",
+    ] {
         assert!(
             transform_group.contains_key(required),
             "missing TransformGroup property {required}"

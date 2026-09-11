@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -802,6 +802,10 @@ class TransformGroup(BaseModel):
     start: int = Field(ge=0, description="変換する Score instruction 範囲の開始 index")
     end: int = Field(ge=0, description="変換する Score instruction 範囲の終端 exclusive index")
     rotation_degrees: float = Field(description="まとまり全体の回転角(度)。正=時計回り")
+    scale_x: float = Field(default=1.0, exclude_if=lambda value: value == 1.0)
+    scale_y: float = Field(default=1.0, exclude_if=lambda value: value == 1.0)
+    translate_x: float = Field(default=0.0, exclude_if=lambda value: value == 0.0)
+    translate_y: float = Field(default=0.0, exclude_if=lambda value: value == 0.0)
     fixed_position_indices: list[Annotated[int, Field(ge=0)]] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
@@ -815,11 +819,18 @@ class TransformGroup(BaseModel):
             raise ValueError("transform group rotation_degrees must be finite")
         return value
 
+    @field_validator("scale_x", "scale_y", "translate_x", "translate_y")
+    @classmethod
+    def _require_finite_affine_axis(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("transform group affine axes must be finite")
+        return value
+
 
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.4.0"
+    version: ScoreVersion = "0.5.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -906,13 +917,20 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.transform_groups and self.version != "0.4.0":
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start >= group.end:
                 raise ValueError("transform group range must be nonempty")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
+            if self.version != "0.5.0" and (
+                group.scale_x != 1.0
+                or group.scale_y != 1.0
+                or group.translate_x != 0.0
+                or group.translate_y != 0.0
+            ):
+                raise ValueError("scale or translation requires Score version 0.5.0")
             if any(instruction.arrangement is not None for instruction in self.instructions[group.start:group.end]):
                 raise ValueError("transform group members cannot carry arrangements")
             fixed_indices = set(group.fixed_position_indices)

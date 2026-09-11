@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — まとまりのscaleと平行移動
+
+Macro Transformは有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`を受け入れる。負のscaleは反転、0は退化を表す。子図形のgeometryだけを、回転前の子図形全体のbbox中心でscaleし、同じ中心でrotateし、normalized canvas軸の差分でtranslateする。stroke幅とgrain pitchは保持し、入れ子ではgeneral affineを内側から外側へ合成する。
+
+Scoreは0.5.0、render engineは51、DDL engineは26へ進める。Score 0.4.0の回転だけのgroupと既存保存互換を保ち、DDL語彙版、APP_VERSION、BUILD_NUMBERは変更しない。Count1とsymbolic反復planを保持し、Step11 materialization、Step13 runtime接続、外部nonConnected relationは未完了である。
+
+---
+
 ### 2026-09-11 — まとまりの回転と外部接続
 
 回転だけのMacro Transformを共通lowererからScoreと反復planへ届ける。配置と内部関係の確定後、子図形全体の外接矩形中心で内側から外側へ回転する。外の先行図形へConnectedでつなぐ場合は、内部配置を保ってまとまり全体を移動する。数値位置の子による移動制約、Named位置の見切れ、Stop / OmitAndContinueと元の参照・owner・seedを保持する。反復planにも元objectを指すrelation intentを残し、個体生成は行わない。

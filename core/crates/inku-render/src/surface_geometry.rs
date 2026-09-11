@@ -3,16 +3,36 @@
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::hash01;
 use crate::geometry::{
-    circle_points, ellipse_perimeter, point_to_pixels, polygon_points, size_to_pixels,
-    stroke_sample_count,
+    circle_points, crescent_contour_points, ellipse_perimeter, point_to_pixels, polygon_points,
+    size_to_pixels, stroke_sample_count,
 };
-use crate::marks::MarkContext;
-use crate::types::{Instruction, Point, Primitive, Seed};
+use crate::marks::{MarkContext, geometry_points};
+use crate::types::{ArcForm, Instruction, Point, Primitive, Seed};
 
 pub(crate) fn shape_bbox(
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Option<(f64, f64, f64, f64)> {
+    if !context.geometry_transform.is_identity() {
+        let contour = surface_contour(instruction, context)?;
+        let min_x = contour
+            .iter()
+            .map(|point| point.x)
+            .fold(f64::INFINITY, f64::min);
+        let max_x = contour
+            .iter()
+            .map(|point| point.x)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let min_y = contour
+            .iter()
+            .map(|point| point.y)
+            .fold(f64::INFINITY, f64::min);
+        let max_y = contour
+            .iter()
+            .map(|point| point.y)
+            .fold(f64::NEG_INFINITY, f64::max);
+        return Some((min_x, min_y, max_x - min_x, max_y - min_y));
+    }
     let canvas = context.canvas;
     match instruction.primitive {
         Primitive::Circle | Primitive::Point => {
@@ -69,7 +89,7 @@ pub(crate) fn surface_contour(
     context: MarkContext<'_>,
 ) -> Option<Vec<Point>> {
     let canvas = context.canvas;
-    match instruction.primitive {
+    let contour = match instruction.primitive {
         Primitive::Circle | Primitive::Point => {
             let center = point_to_pixels(instruction.center?, canvas);
             let radius = instruction.radius? * canvas.unit();
@@ -132,8 +152,20 @@ pub(crate) fn surface_contour(
             });
             Some(sample_closed_catmull_rom(&controls, 5))
         }
+        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
+            Some(crescent_contour_points(
+                point_to_pixels(instruction.center?, canvas),
+                size_to_pixels(instruction.size?, canvas),
+                25,
+            ))
+        }
         Primitive::Line | Primitive::Arc => None,
-    }
+    };
+    contour.map(|points| {
+        (!context.geometry_transform.is_identity())
+            .then(|| geometry_points(instruction, context, &points))
+            .unwrap_or(points)
+    })
 }
 
 pub(crate) fn point_in_polygon(point: Point, contour: &[Point]) -> bool {

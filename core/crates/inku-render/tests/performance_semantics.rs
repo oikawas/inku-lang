@@ -2,12 +2,134 @@ use inku_render::checked_performance::resolve_checked_performance;
 use inku_render::cloudform::{CloudformRequest, generate_cloudform_contour};
 use inku_render::performance::{PerformanceRequest, resolve_performance};
 use inku_render::planning::{endpoint_geometry, instruction_anchor_on_canvas};
+use inku_render::types::Point;
 use inku_render::types::{
     CanvasSize, Score, ScoreErrorPolicy, ScoreExecutionDisposition, ScoreExecutionReason,
 };
 
 fn score(json: &str) -> Score {
     serde_json::from_str(json).unwrap()
+}
+
+#[test]
+fn affine_groups_scale_geometry_spacing_and_compose_in_physical_order() {
+    let input = score(
+        r#"{"version":"0.5.0","instructions":[
+      {"primitive":"circle","center":[0.3,0.5],"radius":0.05},
+      {"primitive":"circle","center":[0.6,0.5],"radius":0.05}
+    ],"transform_groups":[{"start":0,"end":2,"rotation_degrees":90,
+      "scale_x":1.5,"scale_y":0.5,"translate_x":0.1,"translate_y":-0.1}]}"#,
+    );
+    let canvas = CanvasSize::new(2000.0, 1000.0);
+    let request = |score| PerformanceRequest {
+        score,
+        performance_seed: Some(71),
+        composition_seed: Some(71),
+        canvas: Some(canvas),
+    };
+    let result = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
+    assert_eq!(
+        result.score.instructions, input.instructions,
+        "primitive identity and pre-transform dimensions stay intact"
+    );
+    let first = result.instruction_transforms[0].apply(Point::new(0.6, 0.5));
+    let second = result.instruction_transforms[1].apply(Point::new(1.2, 0.5));
+    assert!((first.x - 1.1).abs() < 1e-9 && (first.y + 0.05).abs() < 1e-9);
+    assert!((second.x - first.x).abs() < 1e-9 && (second.y - first.y - 0.9).abs() < 1e-9);
+    let mut fixed = input.clone();
+    fixed.transform_groups[0].fixed_position_indices = vec![0];
+    assert_eq!(
+        resolve_checked_performance(request(&fixed), ScoreErrorPolicy::Stop)
+            .unwrap_err()
+            .diagnostics[0]
+            .reason,
+        ScoreExecutionReason::NumericTransformGroupPositionConflict
+    );
+
+    let nested = score(
+        r#"{"version":"0.5.0","instructions":[
+      {"primitive":"ellipse","center":[0.5,0.5],"size":[0.2,0.1]}
+    ],"transform_groups":[
+      {"start":0,"end":1,"rotation_degrees":45},
+      {"start":0,"end":1,"rotation_degrees":0,"scale_x":2,"scale_y":0.5}
+    ]}"#,
+    );
+    let nested = resolve_checked_performance(request(&nested), ScoreErrorPolicy::Stop).unwrap();
+    let transform = nested.instruction_transforms[0];
+    let diagonal = 0.5_f64.sqrt();
+    assert!((transform.a - 2.0 * diagonal).abs() < 1e-9);
+    assert!((transform.b - 0.5 * diagonal).abs() < 1e-9);
+    assert!((transform.c + 2.0 * diagonal).abs() < 1e-9);
+    assert!((transform.d - 0.5 * diagonal).abs() < 1e-9);
+    assert_eq!(
+        nested.score.instructions[0].primitive,
+        inku_render::types::Primitive::Ellipse
+    );
+}
+
+#[test]
+fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
+    let input = score(
+        r#"{"version":"0.5.0","instructions":[
+      {"primitive":"line","from":[0.1,0.1],"to":[0.1,0.3]},
+      {"primitive":"line","from":[0.3,0.5],"to":[0.4,0.5],
+        "relation":{"type":"connected","target_instruction_index":0,"position_authority":"named_movable"}},
+      {"primitive":"point","center":[0.6,0.5],"radius":0.02},
+      {"primitive":"line","from":[0.7,0.7],"to":[0.8,0.7],
+        "relation":{"type":"connected","target_instruction_index":2,"position_authority":"named_movable"}}
+    ],"transform_groups":[{"start":1,"end":3,"rotation_degrees":90,
+      "scale_x":2,"scale_y":0.5,"translate_x":0.1}]}"#,
+    );
+    let request = |score| PerformanceRequest {
+        score,
+        performance_seed: Some(71),
+        composition_seed: Some(71),
+        canvas: None,
+    };
+    let result = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
+    let start = result.instruction_transforms[1].apply(Point::new(0.3, 0.5));
+    let end = result.instruction_transforms[1].apply(Point::new(0.4, 0.5));
+    let point = result.instruction_transforms[2].apply(Point::new(0.6, 0.5));
+    assert!((start.x - 0.1).abs() < 1e-9 && (start.y - 0.3).abs() < 1e-9);
+    assert!((end.x - start.x).abs() < 1e-9 && (end.y - start.y - 0.2).abs() < 1e-9);
+    assert!((point.y - start.y - 0.6).abs() < 1e-9);
+    let follow_start = endpoint_geometry(&result.score.instructions[3], None)
+        .unwrap()
+        .0;
+    assert!((follow_start.x - point.x).hypot(follow_start.y - point.y) < 1e-9);
+    assert_eq!(result.instruction_transforms.len(), 4);
+    let mut legacy = input.clone();
+    let relation = legacy.instructions[3].relation.as_mut().unwrap();
+    relation.kind = inku_render::types::RelationType::NotTouching;
+    relation.target_instruction_index = None;
+    relation.position_authority = None;
+    assert_eq!(
+        resolve_checked_performance(request(&legacy), ScoreErrorPolicy::Stop)
+            .unwrap_err()
+            .diagnostics[0]
+            .reason,
+        ScoreExecutionReason::UnsupportedTransformGroupRelation
+    );
+    let mut fixed = input.clone();
+    fixed.transform_groups[0].fixed_position_indices = vec![2];
+    let continued =
+        resolve_checked_performance(request(&fixed), ScoreErrorPolicy::OmitAndContinue).unwrap();
+    assert_eq!(continued.original_instruction_indices, vec![0]);
+    assert_eq!(continued.instruction_transforms.len(), 1);
+    let reasons = continued
+        .execution
+        .unwrap()
+        .diagnostics
+        .into_iter()
+        .map(|d| d.reason)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        reasons,
+        vec![
+            ScoreExecutionReason::NumericConnectedPositionConflict,
+            ScoreExecutionReason::ConnectedReferenceOmitted
+        ]
+    );
 }
 
 #[test]

@@ -28,6 +28,8 @@ pub struct PerformancePlan {
     /// Stable seed material for rigid group transforms, parallel to `score.instructions`.
     /// `None` retains the normal seed derived from the performed instruction.
     pub instruction_seed_overrides: Vec<Option<Seed>>,
+    /// Geometry-only transforms in physical short-side units, parallel to instructions.
+    pub instruction_transforms: Vec<crate::affine::AffineTransform>,
     pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
@@ -170,6 +172,10 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
             original_instruction_indices,
             score: expanded,
             warnings: Vec::new(),
+            instruction_transforms: vec![
+                crate::affine::AffineTransform::identity();
+                instruction_seed_overrides.len()
+            ],
             instruction_seed_overrides,
             execution: None,
         };
@@ -210,6 +216,10 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
         warnings,
         instruction_indices,
         original_instruction_indices,
+        instruction_transforms: vec![
+            crate::affine::AffineTransform::identity();
+            instruction_seed_overrides.len()
+        ],
         instruction_seed_overrides,
         execution: None,
     }

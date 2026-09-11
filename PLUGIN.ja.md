@@ -93,7 +93,7 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 ## 現在の実装状態
 
-回転だけの`transform`は、透明な`group`が保つEmit連続範囲を`TransformGroupPlan { start, end, rotation_degrees, fixed_position_indices, provenance }`として内側から外側へ保持する。Count1はScore 0.4.0の`transform_groups`へ、反復は個体を作らないsymbolic planへ届く。反復planの`PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`はchecked relation intentを保つ。外部Connectedは先行を変えず接続する子と先行を隔てる最外group全体を移すが、numeric fixed memberがあればnonzero移動を拒否し、そのmemberだけmust-fitする。Stopは描画前に停止し、OmitAndContinueでのgroup失敗は全groupを省略しowner・index・seed・lost referenceを保つ。`translate` / `scale`を含むtransformは未対応structural subtreeであり、Step11 materializationとStep13 runtime / UI / 保存cutoverは未完了である。
+`transform`は透明な`group`のEmit連続範囲を内側から外側へ保ち、Count1ではScore 0.5.0の`transform_groups`へ、反復では個体を作らないsymbolic planへ届く。有限の`scale_x` / `scale_y`と`translate_x` / `translate_y`は、bbox中心でのscale、同中心でのrotate、normalized canvas軸のtranslateをgeneral affineとして合成する。geometryと間隔だけを変え、stroke幅とgrain pitchは保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部Connected以外のnonConnected relationは未対応であり、Step11 materializationとStep13 runtime / UI / 保存cutoverも未完了である。
 
 Runtime未接続のfinite flat Emit consumerは、明示movement:placeとcircle / ellipse / cloudform /
 square / triangle / polygon / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と

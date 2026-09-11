@@ -171,10 +171,11 @@ fn score_wire_maps_keep_order_and_explicit_surface_exclusion() {
     let maps = saijiki_score_wire_maps().unwrap();
     assert_eq!(maps.weight[0].surface, "銀筆");
     assert_eq!(maps.weight[0].score_value, "silverpoint");
-    assert!(maps
-        .weight
-        .iter()
-        .any(|pair| pair.surface == "oil paint" && pair.score_value == "oil_paint"));
+    assert!(
+        maps.weight
+            .iter()
+            .any(|pair| pair.surface == "oil paint" && pair.score_value == "oil_paint")
+    );
     assert_eq!(maps.color[0].surface, "白");
     assert_eq!(maps.surface_texture[0].surface, "空");
     assert!(

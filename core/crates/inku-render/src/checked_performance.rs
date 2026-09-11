@@ -6,14 +6,16 @@ use inku_score::{
     ScoreExecutionReason, ScoreExecutionSummary, TransformGroup, canonical_score_digest,
 };
 
+use crate::affine::AffineTransform;
 use crate::performance::{
     PerformancePlan, PerformanceRequest, expand_composite_groups_with_indices, resolve_performance,
 };
 use crate::planning::{
-    endpoint_geometry, ensure_line_coordinates, group_instruction_bounds_on_canvas,
-    instruction_anchor_on_canvas, performed_arc_sagitta, performed_instruction_bounds_on_canvas,
-    resolve_at_region, resolve_relation_on_canvas, rotate_instruction_about_on_canvas,
-    touching_candidate, translate_endpoint_instruction_on_canvas, translate_instruction_on_canvas,
+    endpoint_geometry, ensure_line_coordinates, instruction_anchor_on_canvas,
+    performed_arc_sagitta, performed_instruction_bounds_on_canvas, resolve_at_region,
+    resolve_relation_on_canvas, rotate_instruction_about_on_canvas,
+    touching_candidate_with_transform, translate_endpoint_instruction_on_canvas,
+    translate_instruction_on_canvas,
 };
 
 const GEOMETRY_EPSILON: f64 = 1.0e-9;
@@ -22,6 +24,7 @@ fn checked_touching_candidate(
     instruction: &Instruction,
     prior: &Instruction,
     canvas: Option<crate::types::CanvasSize>,
+    prior_transform: AffineTransform,
 ) -> Result<Instruction, ScoreExecutionReason> {
     let relation = instruction.relation.as_ref().expect("checked Touching");
     let facts = relation
@@ -30,7 +33,7 @@ fn checked_touching_candidate(
     let authority = relation
         .position_authority
         .ok_or(ScoreExecutionReason::MissingTouchingPositionAuthority)?;
-    let candidate = touching_candidate(instruction, prior, canvas)
+    let candidate = touching_candidate_with_transform(instruction, prior, canvas, prior_transform)
         .map_err(|_| ScoreExecutionReason::UnsupportedTouchingPrimitive)?;
     let endpoints = |value: &Instruction| {
         endpoint_geometry(value, canvas).ok_or(ScoreExecutionReason::UnsupportedTouchingPrimitive)
@@ -304,12 +307,14 @@ fn checked_along_candidate(
     seed: crate::types::Seed,
     index: usize,
     canvas: Option<crate::types::CanvasSize>,
+    prior_transform: AffineTransform,
 ) -> Result<Instruction, ScoreExecutionReason> {
     let authority = relation
         .position_authority
         .ok_or(ScoreExecutionReason::MissingAlongPositionAuthority)?;
     let (prior_start, prior_end, _, _) =
-        endpoint_geometry(prior, canvas).ok_or(ScoreExecutionReason::UnsupportedAlongPrimitive)?;
+        crate::affine_geometry::endpoints(prior, canvas, prior_transform)
+            .ok_or(ScoreExecutionReason::UnsupportedAlongPrimitive)?;
     let (start, end, _, _) = endpoint_geometry(instruction, canvas)
         .ok_or(ScoreExecutionReason::UnsupportedAlongPrimitive)?;
     let center = crate::types::Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
@@ -362,12 +367,14 @@ fn checked_cutting_candidate(
     seed: crate::types::Seed,
     index: usize,
     canvas: Option<crate::types::CanvasSize>,
+    prior_transform: AffineTransform,
 ) -> Result<Instruction, ScoreExecutionReason> {
     let authority = relation
         .position_authority
         .ok_or(ScoreExecutionReason::MissingCuttingPositionAuthority)?;
-    let (prior_start, prior_end, _, _) = endpoint_geometry(prior, canvas)
-        .ok_or(ScoreExecutionReason::UnsupportedCuttingPrimitive)?;
+    let (prior_start, prior_end, _, _) =
+        crate::affine_geometry::endpoints(prior, canvas, prior_transform)
+            .ok_or(ScoreExecutionReason::UnsupportedCuttingPrimitive)?;
     let (start, end, _, _) = endpoint_geometry(instruction, canvas)
         .ok_or(ScoreExecutionReason::UnsupportedCuttingPrimitive)?;
     let center = crate::types::Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
@@ -612,6 +619,13 @@ pub fn resolve_checked_performance(
         });
     }
     let has_transform_groups = !request.score.transform_groups.is_empty();
+    let affine_groups = request.score.transform_groups.iter().any(|group| {
+        group.scale_x != 1.0
+            || group.scale_y != 1.0
+            || group.translate_x != 0.0
+            || group.translate_y != 0.0
+    });
+    let mut transforms = vec![AffineTransform::identity(); request.score.instructions.len()];
     let has_checked_relation = request.score.instructions.iter().any(|instruction| {
         instruction.relation.as_ref().is_some_and(|relation| {
             relation.kind == RelationType::Connected
@@ -771,7 +785,12 @@ pub fn resolve_checked_performance(
                 .and_then(|index| by_original_index.get(index))
                 .and_then(Option::as_ref)
             {
-                checked_touching_candidate(&instruction, prior, request.canvas)
+                checked_touching_candidate(
+                    &instruction,
+                    prior,
+                    request.canvas,
+                    transforms[dependency.expect("validated dependency")],
+                )
             } else {
                 Err(ScoreExecutionReason::TouchingReferenceOmitted)
             };
@@ -903,6 +922,7 @@ pub fn resolve_checked_performance(
                     relation_seed,
                     performance_index,
                     request.canvas,
+                    transforms[dependency],
                 )
             } else {
                 checked_cutting_candidate(
@@ -912,6 +932,7 @@ pub fn resolve_checked_performance(
                     relation_seed,
                     performance_index,
                     request.canvas,
+                    transforms[dependency],
                 )
             };
             match candidate {
@@ -1010,8 +1031,9 @@ pub fn resolve_checked_performance(
                 );
                 continue;
             }
-            let geometry = endpoint_geometry(prior, request.canvas)
-                .zip(endpoint_geometry(&instruction, request.canvas));
+            let geometry =
+                crate::affine_geometry::endpoints(prior, request.canvas, transforms[dependency])
+                    .zip(endpoint_geometry(&instruction, request.canvas));
             let Some((prior_geometry, current_geometry)) = geometry else {
                 diagnostics.push(connected_failure(
                     original_index,
@@ -1099,6 +1121,35 @@ pub fn resolve_checked_performance(
                 );
                 continue;
             }
+            let legacy_affine_dependency = instruction.relation.as_ref().is_some_and(|relation| {
+                let dependency_count = usize::from(relation.kind == RelationType::Between) + 1;
+                original_instruction_indices
+                    .iter()
+                    .rev()
+                    .take(dependency_count)
+                    .any(|&owner| !transforms[owner].is_identity())
+            });
+            if legacy_affine_dependency {
+                diagnostics.push(connected_failure(
+                    original_index,
+                    None,
+                    ScoreExecutionReason::UnsupportedTransformGroupRelation,
+                    policy,
+                ));
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
+                continue;
+            }
             let relation = resolve_relation_on_canvas(
                 &instruction,
                 &resolved,
@@ -1144,13 +1195,14 @@ pub fn resolve_checked_performance(
                 let seed_override = seed_material[member_index]
                     .as_ref()
                     .map(|material| crate::determinism::instruction_seed(material, seed));
-                let Some(member_bounds) = group_instruction_bounds_on_canvas(
+                let Some(member_bounds) = crate::affine_geometry::bounds(
                     member,
                     seed,
                     performance_index_by_original[member_index]
                         .expect("group member has a performance ordinal"),
                     request.canvas,
                     seed_override,
+                    transforms[member_index],
                 ) else {
                     record_transform_group_failure(
                         group,
@@ -1191,7 +1243,36 @@ pub fn resolve_checked_performance(
                 }
                 continue;
             };
+            let group_transform = AffineTransform::around(
+                bounds.center(),
+                group.scale_x,
+                group.scale_y,
+                group.rotation_degrees,
+                crate::geometry::point_to_short_side_units(
+                    crate::types::Point::new(group.translate_x, group.translate_y),
+                    request.canvas,
+                ),
+            );
             for member_index in group.start..group.end {
+                if affine_groups {
+                    let transformed = group_transform.compose(transforms[member_index]);
+                    if !transformed.is_finite() {
+                        record_transform_group_failure(
+                            group,
+                            ScoreExecutionReason::InvalidTransformGroup,
+                            policy,
+                            &mut diagnostics,
+                            &mut omitted_original,
+                            &mut by_original_index,
+                            &mut resolved,
+                            &mut instruction_indices,
+                            &mut original_instruction_indices,
+                        );
+                        break;
+                    }
+                    transforms[member_index] = transformed;
+                    continue;
+                }
                 let member = by_original_index[member_index]
                     .as_ref()
                     .expect("group bounds validated every member");
@@ -1239,8 +1320,16 @@ pub fn resolve_checked_performance(
                     .as_ref()
                     .expect("deferred Connected relation")
                     .position_authority;
-                let geometry = endpoint_geometry(&prior, request.canvas)
-                    .zip(endpoint_geometry(&source, request.canvas));
+                let geometry = crate::affine_geometry::endpoints(
+                    &prior,
+                    request.canvas,
+                    transforms[dependency_index],
+                )
+                .zip(crate::affine_geometry::endpoints(
+                    &source,
+                    request.canvas,
+                    transforms[source_index],
+                ));
                 let Some((prior_geometry, source_geometry)) = geometry else {
                     record_transform_group_failure(
                         group,
@@ -1278,6 +1367,11 @@ pub fn resolve_checked_performance(
                 }
                 if delta.x.hypot(delta.y) > GEOMETRY_EPSILON {
                     for member_index in group.start..group.end {
+                        if affine_groups {
+                            transforms[member_index] = AffineTransform::translation(delta)
+                                .compose(transforms[member_index]);
+                            continue;
+                        }
                         let member = by_original_index[member_index]
                             .as_ref()
                             .expect("group still has every member");
@@ -1321,7 +1415,7 @@ pub fn resolve_checked_performance(
                     let seed_override = seed_material[fixed_index]
                         .as_ref()
                         .map(|material| crate::determinism::instruction_seed(material, seed));
-                    if !group_instruction_bounds_on_canvas(
+                    if !crate::affine_geometry::bounds(
                         by_original_index[fixed_index]
                             .as_ref()
                             .expect("fixed group member remains"),
@@ -1330,6 +1424,7 @@ pub fn resolve_checked_performance(
                             .expect("fixed group member has a performance ordinal"),
                         request.canvas,
                         seed_override,
+                        transforms[fixed_index],
                     )
                     .is_some_and(|member_bounds| {
                         let extent = crate::geometry::short_side_scales(request.canvas);
@@ -1406,6 +1501,10 @@ pub fn resolve_checked_performance(
         score,
         warnings,
         instruction_indices,
+        instruction_transforms: original_instruction_indices
+            .iter()
+            .map(|&index| transforms[index])
+            .collect(),
         original_instruction_indices,
         instruction_seed_overrides,
         execution,

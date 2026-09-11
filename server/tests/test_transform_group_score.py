@@ -12,13 +12,17 @@ def test_old_and_transform_group_scores_roundtrip_without_dropping_metadata() ->
 
     score = Score.model_validate(
         {
-            "version": "0.4.0",
+            "version": "0.5.0",
             "instructions": [{"primitive": "line"}, {"primitive": "line"}],
             "transform_groups": [
                 {
                     "start": 0,
                     "end": 2,
                     "rotation_degrees": 90.0,
+                    "scale_x": -1.5,
+                    "scale_y": 0.0,
+                    "translate_x": 0.125,
+                    "translate_y": -0.25,
                     "fixed_position_indices": [1],
                 }
             ],
@@ -26,7 +30,7 @@ def test_old_and_transform_group_scores_roundtrip_without_dropping_metadata() ->
     )
     payload = json.loads(score.model_dump_json(exclude_none=True))
     assert payload["transform_groups"] == [
-        {"start": 0, "end": 2, "rotation_degrees": 90.0, "fixed_position_indices": [1]}
+        {"start": 0, "end": 2, "rotation_degrees": 90.0, "scale_x": -1.5, "scale_y": 0.0, "translate_x": 0.125, "translate_y": -0.25, "fixed_position_indices": [1]}
     ]
 
 

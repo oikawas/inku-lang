@@ -292,11 +292,12 @@ pub(crate) fn hand_line(
             false,
         ));
     }
-    rotate(
-        with_texture_filter(group, instruction.weight, context.use_filters),
-        instruction,
-        context.canvas,
-    )
+    let group = with_texture_filter(group, instruction.weight, context.use_filters);
+    if context.geometry_transform.is_identity() {
+        rotate(group, instruction, context.canvas)
+    } else {
+        group
+    }
 }
 
 pub(crate) fn hand_contour(

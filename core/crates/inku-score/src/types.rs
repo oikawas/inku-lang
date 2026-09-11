@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.4.0".to_owned()
+    "0.5.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -834,8 +834,34 @@ pub struct TransformGroup {
     pub start: usize,
     pub end: usize,
     pub rotation_degrees: f64,
+    #[serde(
+        default = "default_transform_scale",
+        skip_serializing_if = "is_identity_scale"
+    )]
+    pub scale_x: f64,
+    #[serde(
+        default = "default_transform_scale",
+        skip_serializing_if = "is_identity_scale"
+    )]
+    pub scale_y: f64,
+    #[serde(default, skip_serializing_if = "is_zero_translation")]
+    pub translate_x: f64,
+    #[serde(default, skip_serializing_if = "is_zero_translation")]
+    pub translate_y: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixed_position_indices: Vec<usize>,
+}
+
+const fn default_transform_scale() -> f64 {
+    1.0
+}
+
+fn is_identity_scale(value: &f64) -> bool {
+    *value == 1.0
+}
+
+fn is_zero_translation(value: &f64) -> bool {
+    *value == 0.0
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -860,7 +886,7 @@ impl Score {
         self.validate_transform_groups()?;
         for instruction in &self.instructions {
             if instruction.surface_intensity != SurfaceIntensity::Normal {
-                if self.version != "0.3.0" && self.version != "0.4.0" {
+                if self.version != "0.3.0" && self.version != "0.4.0" && self.version != "0.5.0" {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
                 let closed = matches!(
@@ -891,7 +917,11 @@ impl Score {
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
-            if self.version != "0.2.0" && self.version != "0.3.0" && self.version != "0.4.0" {
+            if self.version != "0.2.0"
+                && self.version != "0.3.0"
+                && self.version != "0.4.0"
+                && self.version != "0.5.0"
+            {
                 return Err("arc_form requires Score version 0.2.0");
             }
             if instruction.primitive != Primitive::Arc {
@@ -927,7 +957,7 @@ impl Score {
         if self.transform_groups.is_empty() {
             return Ok(());
         }
-        if self.version != "0.4.0" {
+        if self.version != "0.4.0" && self.version != "0.5.0" {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
@@ -940,6 +970,20 @@ impl Score {
             }
             if !group.rotation_degrees.is_finite() {
                 return Err("transform group rotation_degrees must be finite");
+            }
+            if !group.scale_x.is_finite() || !group.scale_y.is_finite() {
+                return Err("transform group scale must be finite");
+            }
+            if !group.translate_x.is_finite() || !group.translate_y.is_finite() {
+                return Err("transform group translation must be finite");
+            }
+            if self.version != "0.5.0"
+                && (group.scale_x != 1.0
+                    || group.scale_y != 1.0
+                    || group.translate_x != 0.0
+                    || group.translate_y != 0.0)
+            {
+                return Err("scale or translation requires Score version 0.5.0");
             }
             if self.instructions[group.start..group.end]
                 .iter()
@@ -975,7 +1019,9 @@ impl Score {
                     .iter()
                     .all(|index| fixed_indices.contains(index))
                 {
-                    return Err("outer transform groups must include descendant fixed_position_indices");
+                    return Err(
+                        "outer transform groups must include descendant fixed_position_indices",
+                    );
                 }
             }
         }

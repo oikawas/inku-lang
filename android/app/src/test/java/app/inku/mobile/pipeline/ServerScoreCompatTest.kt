@@ -30,8 +30,9 @@ class ServerScoreCompatTest {
     @Test
     fun transformGroupsSurviveScoreMigrationForSaveAndReplay() {
         val score = JSONObject(
-            """{"version":"0.4.0","instructions":[{"primitive":"line"},{"primitive":"line"}],
+            """{"version":"0.5.0","instructions":[{"primitive":"line"},{"primitive":"line"}],
                 "transform_groups":[{"start":0,"end":2,"rotation_degrees":90.0,
+                "scale_x":-1.5,"scale_y":0.0,"translate_x":0.125,"translate_y":-0.25,
                 "fixed_position_indices":[1]}]}""",
         )
 
@@ -41,6 +42,10 @@ class ServerScoreCompatTest {
         assertEquals(0, group.getInt("start"))
         assertEquals(2, group.getInt("end"))
         assertEquals(90.0, group.getDouble("rotation_degrees"), 0.0)
+        assertEquals(-1.5, group.getDouble("scale_x"), 0.0)
+        assertEquals(0.0, group.getDouble("scale_y"), 0.0)
+        assertEquals(0.125, group.getDouble("translate_x"), 0.0)
+        assertEquals(-0.25, group.getDouble("translate_y"), 0.0)
         assertEquals(1, group.getJSONArray("fixed_position_indices").getInt(0))
     }
 }

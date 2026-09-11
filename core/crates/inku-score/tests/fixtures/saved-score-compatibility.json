@@ -24,7 +24,7 @@
     },
     {
       "id": "unsupported-version",
-      "input": {"version": "0.5.0", "instructions": []}
+      "input": {"version": "0.6.0", "instructions": []}
     },
     {
       "id": "non-object-root",

@@ -355,15 +355,30 @@ fn collect_macro_delivery_nodes<'a>(
     }
 }
 
-fn macro_rotation_degrees(scope: MacroTransformScope<'_>) -> Option<f64> {
+#[derive(Clone, Copy)]
+struct MacroTransformValues {
+    rotation_degrees: f64,
+    scale_x: f64,
+    scale_y: f64,
+    translate_x: f64,
+    translate_y: f64,
+}
+
+fn macro_transform_values(scope: MacroTransformScope<'_>) -> Option<MacroTransformValues> {
     let transform = scope.transform;
-    (transform.translate_x.is_none()
-        && transform.translate_y.is_none()
-        && transform.scale_x.is_none()
-        && transform.scale_y.is_none())
-    .then_some(transform.rotate_degrees)
-    .flatten()
-    .filter(|degrees| degrees.is_finite())
+    let values = MacroTransformValues {
+        rotation_degrees: transform.rotate_degrees.unwrap_or(0.0),
+        scale_x: transform.scale_x.unwrap_or(1.0),
+        scale_y: transform.scale_y.unwrap_or(1.0),
+        translate_x: transform.translate_x.unwrap_or(0.0),
+        translate_y: transform.translate_y.unwrap_or(0.0),
+    };
+    (values.rotation_degrees.is_finite()
+        && values.scale_x.is_finite()
+        && values.scale_y.is_finite()
+        && values.translate_x.is_finite()
+        && values.translate_y.is_finite())
+    .then_some(values)
 }
 
 fn scope_contains(scope: MacroTransformScope<'_>, child: MacroTransformScope<'_>) -> bool {
@@ -389,6 +404,10 @@ fn is_in_invalid_transform(
 struct MacroTransformRange {
     scope: GeneratedNodeProvenance,
     rotation_degrees: f64,
+    scale_x: f64,
+    scale_y: f64,
+    translate_x: f64,
+    translate_y: f64,
     start: usize,
     end: usize,
     fixed_position_indices: Vec<usize>,
@@ -550,7 +569,7 @@ fn lower_macro_instruction(
     let invalid_transforms = transforms
         .iter()
         .copied()
-        .filter(|scope| macro_rotation_degrees(*scope).is_none())
+        .filter(|scope| macro_transform_values(*scope).is_none())
         .collect::<Vec<_>>();
     for scope in invalid_transforms.iter().copied().filter(|scope| {
         !invalid_transforms
@@ -579,7 +598,7 @@ fn lower_macro_instruction(
         .iter()
         .copied()
         .filter_map(|scope| {
-            macro_rotation_degrees(scope).and_then(|rotation_degrees| {
+            macro_transform_values(scope).and_then(|transform| {
                 (!invalid_transforms
                     .iter()
                     .copied()
@@ -588,7 +607,11 @@ fn lower_macro_instruction(
                     scope.provenance.generated_ordinal,
                     MacroTransformRange {
                         scope: scope.provenance.clone(),
-                        rotation_degrees,
+                        rotation_degrees: transform.rotation_degrees,
+                        scale_x: transform.scale_x,
+                        scale_y: transform.scale_y,
+                        translate_x: transform.translate_x,
+                        translate_y: transform.translate_y,
                         start: usize::MAX,
                         end: 0,
                         fixed_position_indices: Vec::new(),
@@ -1020,6 +1043,10 @@ fn lower_macro_instruction(
                     start: range.start,
                     end: range.end,
                     rotation_degrees: range.rotation_degrees,
+                    scale_x: range.scale_x,
+                    scale_y: range.scale_y,
+                    translate_x: range.translate_x,
+                    translate_y: range.translate_y,
                     fixed_position_indices: range.fixed_position_indices,
                     provenance: range.scope,
                 }),
@@ -1029,6 +1056,10 @@ fn lower_macro_instruction(
             start: range.start,
             end: range.end,
             rotation_degrees: range.rotation_degrees,
+            scale_x: range.scale_x,
+            scale_y: range.scale_y,
+            translate_x: range.translate_x,
+            translate_y: range.translate_y,
             fixed_position_indices: range.fixed_position_indices,
         }));
     }

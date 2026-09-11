@@ -3769,7 +3769,7 @@ fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
         "color":{"expr":"semantic_ref","category":"color","id":"red"}
     }});
     let definition = macro_group_definition(json!([
-        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":90.0}},"body":[
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":90.0},"scale_x":{"expr":"number","value":-1.5},"scale_y":{"expr":"number","value":0.0},"translate_x":{"expr":"number","value":0.125},"translate_y":{"expr":"number","value":-0.25}},"body":[
             fixed,
             {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":45.0}},"body":[
                 macro_group_emit("named", "blue")
@@ -3795,6 +3795,10 @@ fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
     assert_eq!(score.transform_groups[1].start, 0);
     assert_eq!(score.transform_groups[1].end, 2);
     assert_eq!(score.transform_groups[1].rotation_degrees, 90.0);
+    assert_eq!(score.transform_groups[1].scale_x, -1.5);
+    assert_eq!(score.transform_groups[1].scale_y, 0.0);
+    assert_eq!(score.transform_groups[1].translate_x, 0.125);
+    assert_eq!(score.transform_groups[1].translate_y, -0.25);
     assert_eq!(score.transform_groups[1].fixed_position_indices, [0]);
     assert!(
         score
@@ -3809,6 +3813,10 @@ fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
     assert_eq!(plan.transform_groups()[0].provenance().generated_ordinal, 2);
     assert_eq!(plan.transform_groups()[1].provenance().generated_ordinal, 0);
     assert_eq!(plan.transform_groups()[1].fixed_position_indices(), [0]);
+    assert_eq!(plan.transform_groups()[1].scale_x(), -1.5);
+    assert_eq!(plan.transform_groups()[1].scale_y(), 0.0);
+    assert_eq!(plan.transform_groups()[1].translate_x(), 0.125);
+    assert_eq!(plan.transform_groups()[1].translate_y(), -0.25);
 }
 
 #[test]
@@ -3994,7 +4002,7 @@ fn macro_group_delivery_keeps_nested_order_scope_ids_and_relation_targets() {
 fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree() {
     use serde_json::json;
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
-    for obstruction in ["failed_between", "failed_source", "transform", "anchor"] {
+    for obstruction in ["failed_between", "failed_source", "anchor"] {
         let mut first = macro_group_emit("first", "red");
         let mut failed = macro_group_emit("failed", "black");
         failed["fields"].as_object_mut().unwrap().remove("movement");
@@ -4005,10 +4013,6 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
         body.push(first);
         match obstruction {
             "failed_between" => body.push(json!({"op":"group","body":[failed]})),
-            "transform" => body.push(json!({"op":"group","body":[{
-                "op":"transform","transform":{"translate_x":{"expr":"number","value":0.1}},
-                "body":[macro_group_emit("hidden", "black")]
-            }]})),
             "anchor" => body.push(json!({"op":"group","body":[{"op":"anchor","name":"pivot"}]})),
             _ => {}
         }
@@ -4067,7 +4071,7 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
 }
 
 #[test]
-fn macro_group_delivery_keeps_transform_subtree_and_emit_omission_units() {
+fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
     let definition = mixed_omission_definition();
     let result = stage15_locked(
         "Mixed.Omissions",
@@ -4098,20 +4102,12 @@ fn macro_group_delivery_keeps_transform_subtree_and_emit_omission_units() {
             .collect::<Vec<_>>(),
         [Primitive::Circle, Primitive::Square]
     );
-    assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition),
-        (
-            ScoreDiagnosticOwner::GeneratedNode {
-                invocation_ordinal: 0,
-                key: None,
-                spans,
-                ..
-            },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::MacroStructuralSubtree { .. },
-                ..
-            }
-        ) if spans.len() == 1
+    assert!(!continued.diagnostics().iter().any(|diagnostic| matches!(
+        diagnostic.disposition,
+        ScoreDiagnosticDisposition::Omitted {
+            unit: ScoreOmissionUnit::MacroStructuralSubtree { .. },
+            ..
+        }
     )));
     assert!(continued.diagnostics().iter().any(|diagnostic| matches!(
         (&diagnostic.owner, &diagnostic.disposition),

@@ -243,13 +243,22 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         .copied()
         .zip(performance.score.instructions.iter())
         .zip(performance.instruction_seed_overrides.iter().copied())
+        .zip(performance.instruction_transforms.iter().copied())
         .map(
-            |((instruction_index, instruction), instruction_seed_override)| {
-                (instruction_index, instruction, instruction_seed_override)
+            |(
+                ((instruction_index, instruction), instruction_seed_override),
+                instruction_transform,
+            )| {
+                (
+                    instruction_index,
+                    instruction,
+                    instruction_seed_override,
+                    instruction_transform,
+                )
             },
         )
         .collect::<Vec<_>>();
-    ordered.sort_by_key(|(_, instruction, _)| instruction.mode_ == InstructionMode::Carve);
+    ordered.sort_by_key(|(_, instruction, _, _)| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
         .options
         .composition_seed
@@ -283,7 +292,9 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         }
     }
     let mut surface_definitions = Vec::new();
-    for (instruction_index, instruction, instruction_seed_override) in ordered {
+    for (instruction_index, instruction, instruction_seed_override, instruction_transform) in
+        ordered
+    {
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
                 instruction,
@@ -311,6 +322,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
                 use_filters,
                 profile,
                 support,
+                geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
             };
             if profile != SvgProfile::Compat
                 && owns_surface(single.primitive)

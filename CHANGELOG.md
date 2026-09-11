@@ -15,6 +15,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Animate checked lineage works
+
+Added Export animation to the lineage tab. Checking at least two works opens
+the same export modal as history management, with format, timing, resolution,
+and destination controls. The export includes only works checked when the
+button was pressed, ordered from oldest to newest.
+
+---
+
 ### 2026-09-11 — History animation export modal
 
 The history Animation button now opens a modal to adjust format, transitions,

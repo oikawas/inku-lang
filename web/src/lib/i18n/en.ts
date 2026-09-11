@@ -722,6 +722,8 @@ export const en: LangPack = {
 	animationExportWorkUnavailable: "A selected work could not be loaded. Please check the history.",
 	lineageAnimationExport: "Export to origin",
 	lineageAnimationExportHint: "Exports the selected work’s lineage as an animation, ordered from the origin to the selected work.",
+	lineageCheckedAnimationExport: "Export animation",
+	lineageCheckedAnimationExportHint: "Opens animation export settings for the checked works, ordered from oldest to newest.",
 	animationExportBusy: "Exporting…",
 	animationExportFailed: (reason) => `The animation could not be exported. ${reason}`,
 	historyCardExport: "Share card",

@@ -993,6 +993,11 @@ browsers without folder selection use their own download settings. Failure to
 write to a folder chosen for this export stays visible in the modal and does
 not redirect the file to another destination.
 
+The lineage tab's Export animation button opens the same modal when at least
+two works are checked. It snapshots the checked works when pressed and exports
+them from oldest to newest. Unchecked ancestors and the currently displayed
+work are not added automatically.
+
 ---
 
 ## 8. The Cost of Choosing and the Balance of Making

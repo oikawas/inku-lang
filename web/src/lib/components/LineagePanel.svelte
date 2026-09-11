@@ -5,6 +5,7 @@
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
+	import AnimationExportModal from './AnimationExportModal.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import { derivationKindLabel } from '$lib/derivation';
@@ -94,6 +95,7 @@
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
+	let checkedAnimationExportIds = $state<string[] | null>(null);
 	let animationExportBusy = $state(false);
 	let contactSheetBusy = $state<SheetVariant | null>(null);
 	let contactSheetError = $state<string | null>(null);
@@ -160,6 +162,15 @@
 		}
 		return ids;
 	});
+	const checkedAnimationHistoryIds = $derived.by(() => (graph?.nodes ?? [])
+		.flatMap((node) => {
+			const history = node.history;
+			return history?.id && !history.trashed && checkedHistoryIds.includes(history.id)
+				? [{ id: history.id, at: history.at }]
+				: [];
+		})
+		.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id))
+		.map((history) => history.id));
 	const childrenByParent = $derived.by(() => {
 		const children = new Map<string, LineageNode[]>();
 		for (const edge of graph?.edges ?? []) {
@@ -303,6 +314,11 @@ function toggleCheckedHistory(historyId: string): void {
 
 function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
+
+function openCheckedAnimationExport(): void {
+	if (checkedAnimationHistoryIds.length < 2) return;
+	checkedAnimationExportIds = [...checkedAnimationHistoryIds];
 }
 
 // The same implementation the history manager uses -- see
@@ -769,6 +785,10 @@ $effect(() => {
 		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
 		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
 	</button>
+	<button type="button" disabled={checkedAnimationHistoryIds.length < 2} title={t().lineageCheckedAnimationExportHint} onclick={openCheckedAnimationExport}>
+		{t().lineageCheckedAnimationExport}
+		{#if checkedAnimationHistoryIds.length > 0}<span>({checkedAnimationHistoryIds.length})</span>{/if}
+	</button>
 	<!-- The AI contact sheet over the checked works, same builder as the history
 	     manager (features/contact-sheet/run) and the same save path. -->
 	<button type="button" title={t().historyContactSheetAiHint} disabled={checkedHistoryIds.length === 0 || contactSheetBusy !== null} onclick={() => downloadCheckedContactSheet('ai')}>
@@ -1106,6 +1126,15 @@ $effect(() => {
 			onLoadBranch={onLoadBranch}
 		/>
 	{/await}
+{/if}
+
+{#if checkedAnimationExportIds}
+	<AnimationExportModal
+		initialSettings={animationExportSettings}
+		count={checkedAnimationExportIds.length}
+		onSave={(settings, directory) => downloadAnimation(apiFetch, checkedAnimationExportIds ?? [], settings, directory)}
+		onClose={() => { checkedAnimationExportIds = null; }}
+	/>
 {/if}
 
 

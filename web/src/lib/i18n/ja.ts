@@ -722,6 +722,8 @@ export const ja: LangPack = {
 	animationExportWorkUnavailable: "選択した作品を読み込めませんでした。履歴を確認してください。",
 	lineageAnimationExport: "起点までを書き出す",
 	lineageAnimationExportHint: "選択中の作品へ至る系譜を、起点から選択作品の順でアニメーションとして書き出します。",
+	lineageCheckedAnimationExport: "アニメーションを書き出す",
+	lineageCheckedAnimationExportHint: "チェックした作品のアニメーション出力設定を開きます。作品は古い順に並びます。",
 	animationExportBusy: "書き出し中…",
 	animationExportFailed: (reason) => `アニメーションを書き出せませんでした。${reason}`,
 	historyCardExport: "共有カード",

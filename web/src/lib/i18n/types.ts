@@ -691,6 +691,8 @@ export interface LangPack {
 	animationExportWorkUnavailable: string;
 	lineageAnimationExport: string;
 	lineageAnimationExportHint: string;
+	lineageCheckedAnimationExport: string;
+	lineageCheckedAnimationExportHint: string;
 	animationExportBusy: string;
 	animationExportFailed: (reason: string) => string;
 	historyCardExport: string;

@@ -9,8 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use inku_score::{
     AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
-    Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score, SurfaceSpec,
-    SurfaceTexture, Thinness, TouchingConstraints, Weight, lookup_canvas_format,
+    Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score,
+    SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, Weight,
+    lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -922,7 +923,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 30] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 31] = [
     "radius",
     "diameter",
     "length",
@@ -946,6 +947,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 30] = [
     "touch",
     "continuity",
     "surface",
+    "surface_intensity",
     "count",
     "angle",
     "thinness",
@@ -1039,6 +1041,9 @@ fn project_macro_emit<'a>(
         .flatten();
     let surface = (!omitted_appearance.contains(&ScoreAppearanceField::SurfaceQuality))
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
+        .flatten();
+    let surface_intensity = (!omitted_appearance.contains(&ScoreAppearanceField::SurfaceIntensity))
+        .then(|| macro_semantic_field(fields, "surface_intensity", "surface", false, &mut gaps))
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
     let layout_direction =
@@ -1163,7 +1168,7 @@ fn project_macro_emit<'a>(
         touch,
         continuity,
         surface,
-        surface_intensity: None,
+        surface_intensity,
         thinness: thinness.map(|identity| match identity.id {
             "fine" => CoreModifierValue::Fine,
             "extra_fine" => CoreModifierValue::ExtraFine,
@@ -2351,7 +2356,7 @@ fn macro_key_for_appearance(field: ScoreAppearanceField) -> Option<&'static str>
         ScoreAppearanceField::Touch => Some("touch"),
         ScoreAppearanceField::Continuity => Some("continuity"),
         ScoreAppearanceField::SurfaceQuality => Some("surface"),
-        ScoreAppearanceField::SurfaceIntensity => None,
+        ScoreAppearanceField::SurfaceIntensity => Some("surface_intensity"),
     }
 }
 
@@ -2377,6 +2382,7 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedSurfaceIdentity { .. } | ScoreFieldGap::MissingEmptySurface => {
             Some("surface".to_owned())
         }
+        ScoreFieldGap::UnsupportedSurfaceIntensity { .. } => Some("surface_intensity".to_owned()),
         ScoreFieldGap::UnsupportedActionIdentity { .. } | ScoreFieldGap::MissingPlaceAction => {
             Some("movement".to_owned())
         }
@@ -2407,6 +2413,7 @@ fn appearance_field_for_macro_projection_gap(gap: &ScoreFieldGap) -> Option<Scor
         "touch" => Some(ScoreAppearanceField::Touch),
         "continuity" => Some(ScoreAppearanceField::Continuity),
         "surface" => Some(ScoreAppearanceField::SurfaceQuality),
+        "surface_intensity" => Some(ScoreAppearanceField::SurfaceIntensity),
         _ => None,
     }
 }
@@ -2519,6 +2526,7 @@ fn lower_complete_instruction(
         arrangement: None,
         at: geometric.at,
         relation: None,
+        surface_intensity: appearance.surface_intensity,
         thinness: appearance.thinness,
         surface: appearance.surface,
     })
@@ -2911,12 +2919,29 @@ fn resolve_complete_object<'a>(
             None => (closes_area, None),
         }
     };
-    if let Some(identity) = input.surface_intensity {
-        gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensity {
-            category: identity.category.to_owned(),
-            id: identity.id.to_owned(),
-        });
-    }
+    let surface_intensity = match input.surface_intensity {
+        None => SurfaceIntensity::Normal,
+        Some(identity)
+            if identity.category == "surface"
+                && filled
+                && surface.is_none()
+                && primitive != Primitive::Point
+                && matches!(identity.id, "dense" | "faint") =>
+        {
+            if identity.id == "dense" {
+                SurfaceIntensity::Dense
+            } else {
+                SurfaceIntensity::Faint
+            }
+        }
+        Some(identity) => {
+            gaps.push(ScoreFieldGap::UnsupportedSurfaceIntensity {
+                category: identity.category.to_owned(),
+                id: identity.id.to_owned(),
+            });
+            SurfaceIntensity::Normal
+        }
+    };
     let thinness = match input.thinness {
         None => None,
         Some(CoreModifierValue::Fine) => Some(Thinness::Fine),
@@ -3075,6 +3100,7 @@ fn resolve_complete_object<'a>(
             fluctuation: variation,
             thinness,
             surface,
+            surface_intensity,
         },
     })
 }

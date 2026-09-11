@@ -200,6 +200,7 @@ impl From<&SurfaceSpec> for SeedSurface {
 
 #[derive(Serialize)]
 struct SeedPayload {
+    // Surface intensity changes deposition only, never geometry or the seeded field placement.
     primitive: Primitive,
     from_: Option<Point>,
     to: Option<Point>,

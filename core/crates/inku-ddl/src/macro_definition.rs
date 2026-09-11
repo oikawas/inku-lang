@@ -914,6 +914,8 @@ fn validate_body(
                         "variation"
                     } else if field == "layout_direction" {
                         "angle"
+                    } else if field == "surface_intensity" {
+                        "surface"
                     } else if matches!(
                         field.as_str(),
                         "proportion_aspect" | "proportion_width_extent" | "proportion_arc_form"

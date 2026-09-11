@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — 道具別の塗りと濃淡
+
+12道具の通常・濃い・薄いを共有Rust rendererへ実装した。粉、蝋、墨、製図インク、彫線、銀筆・鉛筆の擦り跡、CRTの走査線、油彩の幅広い筆跡を、それぞれの道具に合わせた小さなpattern／mask／filterまたはpathで表す。油彩は下地と輪郭を保ち、幅と間隔を3倍にした穏やかな筋を使う。コンピュータの濃い・薄いは明度の暗・明で表す。
+
+Scoreの`surface_intensity`はnormal／dense／faintを保持し、省略時のnormalは既存wire表現を変えない。Typed DDLのsolidな閉じた塗りは通常DDLとMacroの共通lowererからこの値を届け、反復計画も個体生成なしで保持する。非solidなど未対応の意味は既存の診断へ残す。typed runtime／UI／saveの全面接続、配備・公開releaseは含まない。
+
+---
+
 ### v2.14.2 — アニメーション出力と詞書き表示（2026-09-11）
 
 履歴・系譜の共通アニメーション出力モーダルと、日本語の詞書きの横書き／縦書き・左右の保存設定をアプリのpatch版として採番した。下記の各実装記録を含む。既に統合済みの油彩・月形を含む現行mainのDDL 6、DDL engine 23、render engine 47、Score 0.2.0を継承し、今回のUI変更ではそれらを再採番しない。Typed DDLのruntime全面接続とwhole Step10は未完了である。

@@ -67,6 +67,7 @@ CLOSED_SHAPES = frozenset(
 # the renderer draws it as a broader, paler band instead (render engine 38).
 MARK_SURFACE_WORDS = frozenset({"grain", "bleed", "wash"})
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
+SurfaceIntensity = Literal["normal", "dense", "faint"]
 Weight = Literal[
     "silverpoint",
     "pencil",
@@ -667,6 +668,11 @@ class Instruction(BaseModel):
     #
     # The last slot in `Instruction` is reserved for `surface`. Appending any new
     # optional field after it repeats the same regression.
+    surface_intensity: SurfaceIntensity = Field(
+        default="normal",
+        exclude_if=lambda value: value == "normal",
+        description="閉じた図形の塗りの濃淡。normal=通常 / dense=濃い / faint=薄い。非solidの質感には指定しない",
+    )
     thinness: Optional[Thinness] = Field(
         default=None,
         description=(
@@ -718,6 +724,15 @@ class Instruction(BaseModel):
             raise ValueError("arc_form=crescent cannot carry open-arc geometry")
         if self.surface is not None and self.surface.texture != "none":
             raise ValueError("arc_form=crescent uses filled instead of a surface texture")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_surface_intensity(self) -> "Instruction":
+        if self.surface_intensity != "normal":
+            closed = self.primitive in CLOSED_SHAPES or self.primitive == "point" or self.arc_form == "crescent"
+            solid = self.surface is None or self.surface.texture in {"none", "solid"}
+            if not closed or not solid or not fill_is_asked_for(self):
+                raise ValueError("surface_intensity requires a closed solid fill")
         return self
 
 

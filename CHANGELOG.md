@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Tool-specific fills and intensity
+
+Implemented normal, dense, and faint fills for all twelve tools in the shared Rust renderer. Compact patterns, masks, filters, or paths express powder, wax, brush ink, drafting ink, engraving, silverpoint and pencil rubbing, CRT scanlines, and broad oil-paint strokes. Oil widens both paint tracks and spacing threefold with gentle bristle contrast while retaining the base and outline. Computer density is expressed as darker or lighter brightness.
+
+Score `surface_intensity` retains normal / dense / faint; the default normal value does not change existing wire output. Solid closed fills in typed DDL use the same lowerer for direct instructions and Macro, and repeated plans retain the value without materialization. Unsupported meanings such as non-solid intensity keep their diagnostics. Full typed runtime / UI / save integration, deployment, and public release are outside this change.
+
+---
+
 ### v2.14.2 — Animation export and headnote display (2026-09-11)
 
 Assign the application patch version to the shared history/lineage animation

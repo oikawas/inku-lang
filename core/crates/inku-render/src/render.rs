@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use crate::accepted_fills;
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
 use crate::checked_performance::{CheckedPerformanceError, resolve_checked_performance};
 use crate::determinism::hash01;
@@ -308,10 +309,12 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
                 && owns_surface(single.primitive)
                 && is_noncomputer_solid_fill(single)
                 && single.weight != crate::types::Weight::OilPaint
+                && !accepted_fills::active(single)
             {
                 let (filter_id, seed) = solid_mottle_filter_id(single, context);
                 material_definitions.push(solid_mottle_filter(&filter_id, seed));
             }
+            material_definitions.extend(accepted_fills::definitions(single, context));
             let base_mark = render_instruction(single, context)?;
             let mut mark = if let Some(surface) = render_surface(single, context) {
                 let mut combined = Element::new("g");

@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use crate::accepted_fills;
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
 use crate::determinism::{instruction_seed, needs_contour_variation};
 use crate::fills::{is_noncomputer_solid_fill, render_interior_fill};
@@ -304,10 +305,10 @@ fn mechanical_closed_mark(
     style: &MarkStyle,
     context: MarkContext<'_>,
 ) -> Element {
-    if !is_noncomputer_solid_fill(instruction) {
+    if !is_noncomputer_solid_fill(instruction) && !accepted_fills::active(instruction) {
         return apply_style(geometry, style, true);
     }
-    let mut group = Element::new("g");
+    let mut group = accepted_fills::group(instruction, context);
     if let Some(fill) = render_interior_fill(instruction, contour, style, context) {
         group.push(fill);
     }
@@ -372,7 +373,7 @@ fn render_crescent(
         true,
     );
     if uses_hand_stroke(instruction.weight) {
-        let mut group = Element::new("g");
+        let mut group = accepted_fills::group(instruction, context);
         if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
             group.push(fill);
         }
@@ -399,7 +400,8 @@ pub fn render_instruction(
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Result<Element, MarkError> {
-    let style = mark_style(instruction, context);
+    let mut style = mark_style(instruction, context);
+    accepted_fills::prepare_style(instruction, &mut style);
     match instruction.primitive {
         Primitive::Line => {
             let start = point_to_pixels(
@@ -485,7 +487,7 @@ pub fn render_instruction(
                     .attr("ry", format_number(ry))
             };
             if uses_hand_stroke(instruction.weight) {
-                let mut group = Element::new("g");
+                let mut group = accepted_fills::group(instruction, context);
                 if let Some(fill) = render_interior_fill(instruction, &contour, &style, context) {
                     group.push(fill);
                 }
@@ -669,7 +671,7 @@ pub fn render_instruction(
                 true,
             );
             if uses_hand_stroke(instruction.weight) {
-                let mut group = Element::new("g");
+                let mut group = accepted_fills::group(instruction, context);
                 if let Some(fill) = render_interior_fill(instruction, &sampled, &style, context) {
                     group.push(fill);
                 }
@@ -722,7 +724,7 @@ fn render_corner_shape(
         true,
     );
     if uses_hand_stroke(instruction.weight) {
-        let mut group = Element::new("g");
+        let mut group = accepted_fills::group(instruction, context);
         if let Some(fill) = render_interior_fill(instruction, &contour.points, style, context) {
             group.push(fill);
         }

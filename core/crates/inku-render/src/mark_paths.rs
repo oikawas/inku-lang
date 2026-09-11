@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::determinism::{instruction_seed, needs_path_variation};
 use crate::geometry::{line_with_variation, point_to_pixels, size_to_pixels, stroke_sample_count};
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
-use crate::materials::{oil_paint_stroke, with_texture_filter};
+use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
     ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
@@ -266,8 +266,7 @@ pub(crate) fn hand_line(
             polygon_path(&outline),
             &outline[..middle],
             &right,
-            &style.color,
-            style.stroke_opacity,
+            OilPaintStyle::plain(&style.color, style.stroke_opacity),
             seed,
             false,
         ));
@@ -325,8 +324,17 @@ pub(crate) fn hand_contour(
             contour_stroke_path(&stroke),
             &stroke.left,
             &stroke.right,
-            &style.color,
-            style.stroke_opacity,
+            if closed && style.fill && crate::accepted_fills::solid_fill(instruction) {
+                OilPaintStyle::filled(
+                    &style.color,
+                    style.stroke_opacity,
+                    instruction.surface_intensity,
+                    context.canvas,
+                    false,
+                )
+            } else {
+                OilPaintStyle::plain(&style.color, style.stroke_opacity)
+            },
             instruction_seed(instruction, context.render_seed),
             closed,
         );

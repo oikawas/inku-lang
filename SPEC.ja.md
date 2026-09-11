@@ -1553,7 +1553,7 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
 - `connected` → Line / Arc / Pointに適用し、currentのcanonical始端（Pointはcenter）をpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
 
-Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は互換用に保持し、Typed DDL本番pipeline／UI／saveの全面接続とは区別する。
+現行のtyped Along / Cutting配送はCount1のactual Scoreを対象とし、反復CompositionPlanのrelation配送は未対応である。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は互換用に保持し、Typed DDL本番pipeline／UI／saveの全面接続とは区別する。
 
 `touching` で当該要素が弧なら、直前要素の確定端点を P1, P2、弦長を `c=|P2-P1|`、当該弧の演奏後の符号付き矢高を `b` とし、`r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は弦の中点から膨らみと反対側へ `r-|b|` だけ置き、掃引角は必ず180°未満とする。直前要素が弧なら膨らみ側はその反対側を既定とする。劣弧の符号・掃引規約はRendererのSVG弧描画と一つの実装を共有する。variationと筆致は端点を固定し、中間区間だけへ作用する。閉形、端点のない直前要素、退化した弦・矢高ではrelationをdropし、座標推定による修復やgovernorは行わない。
 

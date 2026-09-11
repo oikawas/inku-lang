@@ -17,9 +17,11 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-11 — Preserve Along direction and Cutting dimensions
 
-Ordinary DDL and adjacent Macro Line Emits now deliver `along` / `cutting` through the shared checked performer. Along aligns an unspecified current direction parallel to the prior line. Cutting retains normal or explicit dimensions instead of generating a relation-specific random length. Explicit direction and numeric position remain authoritative; incompatible constraints and lost references follow Stop / OmitAndContinue. Original references, ownership, and seeds are retained without retargeting to another surviving line.
+Ordinary DDL and adjacent Macro Line Emits with count one now deliver `along` / `cutting` through the shared checked performer. Along aligns an unspecified current direction parallel to the prior line. Cutting retains normal or explicit dimensions instead of generating a relation-specific random length. Explicit direction and numeric position remain authoritative; incompatible constraints and lost references follow Stop / OmitAndContinue. Original references, ownership, and seeds are retained without retargeting to another surviving line.
 
 The existing optional relation metadata keeps Score at 0.3.0 and DDL engine at 24. Render engine advances to 49 for the new checked performance, while metadata-free legacy Scores retain their previous behavior. General Group transformation semantics and full typed runtime / UI / save integration remain incomplete.
+
+Two focused DDL/Macro checks and three Linux render-relation checks passed. The [render engine49 corpus](server/reference/render-engine-49/manifest.json) was generated once on Linux: all 614 existing inputs and outputs remain unchanged, and two new cases bring the total to 616. The manifest and two new SVGs are stored while older references are retained. Repeated relation-plan delivery remains unsupported.
 
 ---
 

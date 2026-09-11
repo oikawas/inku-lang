@@ -2358,7 +2358,9 @@ sequential resolution.
   (Point center) is translated to the prior canonical end (Point center), while
   the prior, dimensions, curvature, and rotation remain unchanged
 
-Typed Along aligns the current line parallel to the preceding line when both
+Current typed Along / Cutting delivery covers count-one actual Scores; relation
+delivery in repeated CompositionPlans remains unsupported. Typed Along aligns
+the current line parallel to the preceding line when both
 elements are lines and the current direction is unspecified. Explicit direction,
 dimensions, and numeric position remain authoritative. Typed Cutting likewise
 retains the normal dimensions from the shared resolver or explicit dimensions;

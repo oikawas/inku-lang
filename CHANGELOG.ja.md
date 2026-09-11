@@ -17,9 +17,11 @@
 
 ### 2026-09-11 — 「沿う」の方向と「切る」の寸法を保持
 
-通常DDLとMacroの隣接する線の`along` / `cutting`を共有checked performerへ接続した。「沿う」で後の線の方向が未指定なら、前の線と平行に揃える。「切る」は通常寸法または明示寸法を保持し、専用のランダム長へ作り直さない。明示方向・数値位置を優先し、両立しない指定や失われた参照は既存のStop / OmitAndContinueで扱う。元の参照・owner・seedを保持し、残った別の線へ参照を付け替えない。
+通常DDLとMacroの単独・隣接する線（Count1）の`along` / `cutting`を共有checked performerへ接続した。「沿う」で後の線の方向が未指定なら、前の線と平行に揃える。「切る」は通常寸法または明示寸法を保持し、専用のランダム長へ作り直さない。明示方向・数値位置を優先し、両立しない指定や失われた参照は既存のStop / OmitAndContinueで扱う。元の参照・owner・seedを保持し、残った別の線へ参照を付け替えない。
 
 既存の任意relation metadataを使い、Score 0.3.0とDDL engine24は維持する。新しいchecked描画のためrender engineを49へ進め、metadataのない旧Scoreは従来の演奏を保つ。一般Groupの変換意味とtyped runtime／UI／saveの全面接続は未完了である。
+
+通常DDL／Macroの局所2件とLinuxの描画関係3件が成功した。[render engine49の参照](server/reference/render-engine-49/manifest.json)はLinuxで1回生成し、旧614例の入力・出力はすべて不変、新規2例を加えた616例となった。manifestと新規2SVGを保存し、旧参照を保持する。反復するrelation planの配送は未対応のままである。
 
 ---
 

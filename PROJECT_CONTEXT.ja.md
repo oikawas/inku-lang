@@ -99,7 +99,7 @@ TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから
 日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、
 明示寸法・relative scale（normal含む）・弦方向は固定、省略normalは可変、numeric anchorと最終must-fitは固定する。
 失敗時はStopまたはcurrent / Emit省略となり、元dependency、owner、drawing ordinal、seedを保つ。旧metadataなしの
-Touchingは従来互換を維持する。Engine49のtyped Along / Cuttingも隣接するLine間を共通配送する。
+Touchingは従来互換を維持する。Engine49のtyped Along / CuttingもCount1の隣接するLine間を共通配送する。反復planのrelation配送は未対応。
 Alongは未指定方向だけを平行に揃え、Cuttingは解決済みの長さを保持する。明示方向・寸法・数値位置を保ち、
 両立しない指定や参照消失は停止またはcurrent / Emit省略となる。旧metadata-free Scoreの挙動は保持する。
 whole Step10とtyped本番 / UI / 保存cutoverは残る。

@@ -4,7 +4,7 @@ use crate::arc::{arc_from_endpoints_and_sagitta, arc_point, minor_arc_delta};
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour};
 use crate::determinism::{hash01, instruction_seed};
 use crate::geometry::{
-    point_from_short_side_units, point_to_short_side_units, size_in_normalized_axes,
+    point_from_short_side_units, point_to_short_side_units, polygon_points, size_in_normalized_axes,
 };
 use crate::placement::region_in_short_side_units;
 use crate::types::{
@@ -198,13 +198,43 @@ pub fn resolve_at_region(
     move_anchor_to_on_canvas(instruction, target, true, canvas)
 }
 
-fn rotate_point(point: Point, center: Point, degrees: f64) -> Point {
+pub(crate) fn rotate_point(point: Point, center: Point, degrees: f64) -> Point {
     let angle = degrees.to_radians();
     let delta = Point::new(point.x - center.x, point.y - center.y);
     Point::new(
         center.x + delta.x * angle.cos() - delta.y * angle.sin(),
         center.y + delta.x * angle.sin() + delta.y * angle.cos(),
     )
+}
+
+fn group_arc_sweep_points(
+    center: Point,
+    radius: f64,
+    start: f64,
+    end: f64,
+    rotation: f64,
+) -> Vec<Point> {
+    let mut points = vec![
+        arc_point(center, radius, start),
+        arc_point(center, radius, end),
+    ];
+    let lower = start.min(end);
+    let upper = start.max(end);
+    // `rotate_point` uses SVG-space clockwise rotation. A pre-rotation angle
+    // of `rotation + cardinal` reaches a horizontal or vertical world extremum.
+    for cardinal in [0.0, 90.0, 180.0, 270.0] {
+        let cardinal = cardinal + rotation;
+        let first = ((lower - cardinal) / 360.0).ceil() as i32;
+        let last = ((upper - cardinal) / 360.0).floor() as i32;
+        for turn in first..=last {
+            points.push(arc_point(
+                center,
+                radius,
+                cardinal + 360.0 * f64::from(turn),
+            ));
+        }
+    }
+    points
 }
 
 fn rotate_vector(vector: Point, degrees: f64) -> Point {
@@ -253,6 +283,44 @@ pub fn performed_instruction_bounds_on_canvas(
     instruction_index: usize,
     canvas: Option<CanvasSize>,
 ) -> Option<Bounds> {
+    performed_instruction_bounds_with_options(
+        instruction,
+        performance_seed,
+        instruction_index,
+        canvas,
+        false,
+        None,
+    )
+}
+
+/// Exact rendered bounds for transform-group pivots. Legacy relation planning
+/// intentionally retains its historical sampled/circumcircle bounds.
+#[must_use]
+pub(crate) fn group_instruction_bounds_on_canvas(
+    instruction: &Instruction,
+    performance_seed: Option<Seed>,
+    instruction_index: usize,
+    canvas: Option<CanvasSize>,
+    seed_override: Option<Seed>,
+) -> Option<Bounds> {
+    performed_instruction_bounds_with_options(
+        instruction,
+        performance_seed,
+        instruction_index,
+        canvas,
+        true,
+        seed_override,
+    )
+}
+
+fn performed_instruction_bounds_with_options(
+    instruction: &Instruction,
+    performance_seed: Option<Seed>,
+    instruction_index: usize,
+    canvas: Option<CanvasSize>,
+    exact_group_bounds: bool,
+    seed_override: Option<Seed>,
+) -> Option<Bounds> {
     let rotation = instruction.rotation.unwrap_or(0.0);
     match instruction.primitive {
         Primitive::Line => {
@@ -264,7 +332,33 @@ pub fn performed_instruction_bounds_on_canvas(
             );
             bounds_for_points(&points.map(|point| rotate_point(point, anchor, rotation)))
         }
-        Primitive::Circle | Primitive::Point | Primitive::Polygon => {
+        Primitive::Circle | Primitive::Point => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let radius = instruction.radius?;
+            Some(Bounds {
+                min: Point::new(center.x - radius, center.y - radius),
+                max: Point::new(center.x + radius, center.y + radius),
+            })
+        }
+        Primitive::Polygon if exact_group_bounds => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let radius = instruction.radius?;
+            let anchor = point_to_short_side_units(
+                instruction_anchor_on_canvas(instruction, canvas),
+                canvas,
+            );
+            let points = polygon_points(
+                center,
+                radius,
+                usize::from(instruction.sides.unwrap_or(5)),
+                0.0,
+            )
+            .into_iter()
+            .map(|point| rotate_point(point, anchor, rotation))
+            .collect::<Vec<_>>();
+            bounds_for_points(&points)
+        }
+        Primitive::Polygon => {
             let center = point_to_short_side_units(instruction.center?, canvas);
             let radius = instruction.radius?;
             Some(Bounds {
@@ -278,6 +372,22 @@ pub fn performed_instruction_bounds_on_canvas(
             let (min, max) = crescent_contour_bounds(center, size, rotation);
             Some(Bounds { min, max })
         }
+        Primitive::Arc if exact_group_bounds => {
+            let center = point_to_short_side_units(instruction.center?, canvas);
+            let radius = instruction.radius?;
+            let start_angle = instruction.angle_start?;
+            let end_angle = instruction.angle_end?;
+            let anchor = point_to_short_side_units(
+                instruction_anchor_on_canvas(instruction, canvas),
+                canvas,
+            );
+            let rotation = instruction.rotation.unwrap_or(0.0);
+            let points = group_arc_sweep_points(center, radius, start_angle, end_angle, rotation)
+                .into_iter()
+                .map(|point| rotate_point(point, anchor, rotation))
+                .collect::<Vec<_>>();
+            bounds_for_points(&points)
+        }
         Primitive::Arc if instruction.position.is_some() => {
             let (start, end, _, _) = endpoint_geometry(instruction, canvas)?;
             let center = point_to_short_side_units(instruction.center?, canvas);
@@ -288,7 +398,6 @@ pub fn performed_instruction_bounds_on_canvas(
                 instruction_anchor_on_canvas(instruction, canvas),
                 canvas,
             );
-            let rotation = instruction.rotation.unwrap_or(0.0);
             let mut points = vec![start, end];
             for step in 1..64 {
                 let t = f64::from(step) / 64.0;
@@ -354,7 +463,10 @@ pub fn performed_instruction_bounds_on_canvas(
             let contour = generate_cloudform_contour(CloudformRequest {
                 center,
                 size,
-                performance_seed: Some(instruction_seed(instruction, performance_seed)),
+                performance_seed: Some(
+                    seed_override
+                        .unwrap_or_else(|| instruction_seed(instruction, performance_seed)),
+                ),
                 instruction_index,
                 mark_index: 0,
                 variation: instruction.variation.as_ref(),
@@ -479,6 +591,67 @@ pub(crate) fn translate_endpoint_instruction_on_canvas(
         _ => return None,
     }
     Some(moved)
+}
+
+/// Translate every rendered primitive by an exact physical short-side delta.
+/// This deliberately avoids the normal placement clamp because group transforms
+/// preserve rigid geometry before fixed-position validation decides whether it fits.
+#[must_use]
+pub(crate) fn translate_instruction_on_canvas(
+    instruction: &Instruction,
+    delta: Point,
+    canvas: Option<CanvasSize>,
+) -> Option<Instruction> {
+    let move_point = |point: Point| {
+        point_from_short_side_units(
+            Point::new(
+                point_to_short_side_units(point, canvas).x + delta.x,
+                point_to_short_side_units(point, canvas).y + delta.y,
+            ),
+            canvas,
+        )
+    };
+    let mut moved = instruction.clone();
+    match instruction.primitive {
+        Primitive::Line => {
+            moved.from_ = Some(move_point(instruction.from_?));
+            moved.to = Some(move_point(instruction.to?));
+        }
+        Primitive::Arc => {
+            moved.center = Some(move_point(instruction.center?));
+            moved.position = instruction.position.map(move_point);
+        }
+        Primitive::Circle
+        | Primitive::Ellipse
+        | Primitive::Point
+        | Primitive::Polygon
+        | Primitive::Cloudform => moved.center = Some(move_point(instruction.center?)),
+        Primitive::Square | Primitive::Triangle => {
+            moved.position = Some(move_point(instruction.position?))
+        }
+    }
+    Some(moved)
+}
+
+/// Rotate a rendered primitive rigidly about a physical short-side pivot.
+/// Its local shape stays intact; only its anchor moves and its own orientation composes.
+#[must_use]
+pub(crate) fn rotate_instruction_about_on_canvas(
+    instruction: &Instruction,
+    pivot: Point,
+    degrees: f64,
+    canvas: Option<CanvasSize>,
+) -> Option<Instruction> {
+    let anchor =
+        point_to_short_side_units(instruction_anchor_on_canvas(instruction, canvas), canvas);
+    let target = rotate_point(anchor, pivot, degrees);
+    let mut rotated = translate_instruction_on_canvas(
+        instruction,
+        Point::new(target.x - anchor.x, target.y - anchor.y),
+        canvas,
+    )?;
+    rotated.rotation = Some(rotated.rotation.unwrap_or(0.0) + degrees);
+    Some(rotated)
 }
 
 pub(crate) fn performed_arc_sagitta(

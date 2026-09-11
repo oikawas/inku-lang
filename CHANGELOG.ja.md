@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — まとまりの回転と外部接続
+
+回転だけのMacro Transformを共通lowererからScoreと反復planへ届ける。配置と内部関係の確定後、子図形全体の外接矩形中心で内側から外側へ回転する。外の先行図形へConnectedでつなぐ場合は、内部配置を保ってまとまり全体を移動する。数値位置の子による移動制約、Named位置の見切れ、Stop / OmitAndContinueと元の参照・owner・seedを保持する。反復planにも元objectを指すrelation intentを残し、個体生成は行わない。
+
+Scoreは任意の`transform_groups`を持つ0.4.0へ進め、旧0.1.0／0.2.0／0.3.0と版省略の保存互換を保つ。共有契約、server schema、Androidの保存保持を揃えた。決定的なgroup配送と演奏の追加によりDDL engineは25、render engineは50とする。DDL語彙版6とAPP/buildは変更しない。Transformのtranslate／scaleとtyped runtime／UI／save全面接続は未完了である。
+
+---
+
 ### 2026-09-11 — まとまりの回転中心を確定
 
 Macro Transformの回転中心は、回転前の子図形全体の外接矩形中心を採用した。子同士の配置と向きをまとめて回す。TransformのScore配送はまだ未実装であり、この裁定記録では描画挙動や版を変更しない。

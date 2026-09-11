@@ -56,7 +56,7 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 全幅・半幅は通常サイズの短辺基準と異なり、キャンバス横幅の100%・50%を回転前の基準寸法へ適用する。通常DDLと宣言Macroで同じ寸法解決を使い、線長・開弧の弦長・閉形の輪郭幅を区別する。半円は上、上弦は右、下弦は左へ膨らむ開弧で、三日月は歳時記の細い塗り面としてScore 0.2.0の`arc_form: crescent`、center/sizeへ届ける。保存済みScore 0.1.0はそのまま読む。重複サイズだけは全候補と原文を保持し、`ConflictingSizeSpecifications`と採用寸法を示しながら小さい方で描く。`Recovered`はStop/Continueとも描画を続ける処置であり、他の整合性・未対応エラーの停止規則は変えない。詳細はSPEC §12.11。
 
-共有Rustは12道具の通常／濃い／薄いを道具別の塗りとして描く。Score 0.3.0の`surface_intensity`へ通常DDLとMacroの共通lowererから届け、既存0.1.0／0.2.0の読み書きは保持する。配置を持たないMacro Group内も生成順と参照・ownerを保持して共通配送し、未対応transform等を飛び越して関係をつなぎ直さない。Typed runtime/UI/save全面接続は引き続き未完了。
+共有Rustは12道具の通常／濃い／薄いを道具別の塗りとして描く。`surface_intensity`はScore 0.3.0以後で通常DDLとMacroの共通lowererから届き、既存0.1.0／0.2.0／0.3.0とversionなしartifactの読み書きは保持する。回転だけのMacro TransformはCount1 Score 0.4.0の`transform_groups`と反復symbolic planへ届く。Groupは透明で、内側から外側の正確なbbox中心を使う。外部Connectedは先行を変えず接続する子と先行を隔てる最外group全体を動かすが、numeric fixed memberがあればnonzero移動を拒否し、そのmemberだけmust-fitする。失敗時はStopが描画前に停止し、OmitAndContinueはgroup全体の省略となりowner・index・seed・lost referenceを保つ。translate / scale transform、Step11の個体materialization、Step13のruntime / UI / 保存全面接続は未完了である。
 
 Verified Stage 1.5からの共有object placement plan APIは、通常DDLと宣言済みflat Macroのline-up / scatter / tileを、一instruction / 一Emitにつき一件の解決済みplanへ届ける。数量省略は8（placeは1）、sizeはcount非依存のcanvas短辺基準で既存normal / 大小倍率を共有する。Line-upはshape angleと独立したaction-side layout_directionから横 / 縦 / 物理45度の列を解決し、省略は従来の横一列とする。方向のidentityとexact軸を保ち、bare diagonalだけが元meaning・attestされたoptional composition seed・元occurrenceの専用roleで二軸から選ぶ。日英source、single-head continuation、宣言済みMacro Emitへ接続し、未対応action / group方向や未宣言caller方向を黙って捨てない。物理aspectに沿うtile行列、performance seedを後続へ要求するscatter重心移動recipeも持ち、個体配列・乱数・Score化は実行しない。9primitiveは同じresolverへ届き、triangle / squareの縦長・横長、正三角 / 正方形、五〜八角形の制約もbase headと別に保持する。通常三角はnormal幅=高さ6/25、aspectは長辺6/25×size係数と短辺半分、正三角はexact sideと高さs√3/2の固定規則、polygonは外接円半径と省略5辺を使う。元のexact geometry・外観・angle・位置・originとStop / Continueを保ち、place / count1のactual Scoreと反復のReady planを区別する。Whole Step10、Step11の個体materializationとruntime / UI / 保存cutoverは未完了である。詳細はSPEC §12末尾。
 
@@ -99,7 +99,7 @@ TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから
 日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、
 明示寸法・relative scale（normal含む）・弦方向は固定、省略normalは可変、numeric anchorと最終must-fitは固定する。
 失敗時はStopまたはcurrent / Emit省略となり、元dependency、owner、drawing ordinal、seedを保つ。旧metadataなしの
-Touchingは従来互換を維持する。Engine49のtyped Along / CuttingもCount1の隣接するLine間を共通配送する。反復planのrelation配送は未対応。
+Touchingは従来互換を維持する。Engine49のtyped Along / CuttingもCount1の隣接するLine間を共通配送する。反復planは`PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`としてchecked relation intentを保持する。
 Alongは未指定方向だけを平行に揃え、Cuttingは解決済みの長さを保持する。明示方向・寸法・数値位置を保ち、
 両立しない指定や参照消失は停止またはcurrent / Emit省略となる。旧metadata-free Scoreの挙動は保持する。
 whole Step10とtyped本番 / UI / 保存cutoverは残る。

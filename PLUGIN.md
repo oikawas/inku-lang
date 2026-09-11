@@ -210,9 +210,11 @@ O(count) allocation or materialization.
 
 ## Current Implementation Status
 
+Rotation-only `transform` retains the contiguous Emit range carried by transparent `group` as `TransformGroupPlan { start, end, rotation_degrees, fixed_position_indices, provenance }`, from inner to outer. Count-one reaches Score 0.4.0 `transform_groups`; repetition reaches a symbolic plan without materializing instances. Repeated-plan `PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }` retains checked relation intent. External Connected leaves the prior unchanged and moves the entire outermost group separating the connected member from the prior, but rejects a nonzero move when it has a numeric fixed member and must-fits only that member. Stop halts before drawing; under OmitAndContinue, group failure omits the whole group while retaining owner, index, seed, and lost-reference identity. A transform containing `translate` / `scale` remains an unsupported structural subtree; Step11 materialization and Step13 runtime / UI / persistence cutover remain incomplete.
+
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
-and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including placement-free Groups,
-subset also reaches an actual Score through the same lowerer used by ordinary
+and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including Groups and rotation-only Transforms,
+also reaches an actual Score through the same lowerer used by ordinary
 DDL, with shared Stop / OmitAndContinue outcomes and typed omission diagnostics.
 The compile-once facade retains the original document, compiler state, lock, and
 issues. Explicit Continue can omit typed upstream holes, conflicts, and dependent

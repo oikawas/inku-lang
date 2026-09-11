@@ -93,6 +93,8 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 ## 現在の実装状態
 
+回転だけの`transform`は、透明な`group`が保つEmit連続範囲を`TransformGroupPlan { start, end, rotation_degrees, fixed_position_indices, provenance }`として内側から外側へ保持する。Count1はScore 0.4.0の`transform_groups`へ、反復は個体を作らないsymbolic planへ届く。反復planの`PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`はchecked relation intentを保つ。外部Connectedは先行を変えず接続する子と先行を隔てる最外group全体を移すが、numeric fixed memberがあればnonzero移動を拒否し、そのmemberだけmust-fitする。Stopは描画前に停止し、OmitAndContinueでのgroup失敗は全groupを省略しowner・index・seed・lost referenceを保つ。`translate` / `scale`を含むtransformは未対応structural subtreeであり、Step11 materializationとStep13 runtime / UI / 保存cutoverは未完了である。
+
 Runtime未接続のfinite flat Emit consumerは、明示movement:placeとcircle / ellipse / cloudform /
 square / triangle / polygon / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と
 top / bottom / left_edge / right_edge / top_edge / bottom_edge / cornerを受け入れ、SPEC §18の領域を使う。

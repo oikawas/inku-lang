@@ -28,15 +28,14 @@ from inku_server.schema import GroundMaterial, Score
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
 CORPUS_FORMAT_VERSION = "2"
-SCHEMA_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "Engine 49 delivers typed Along and Cutting through the checked relation "
-    "performer. Along aligns an unspecified line direction with its prior line; "
-    "Cutting retains the resolved line length. Explicit directions and numeric "
-    "positions remain authoritative. Metadata-free legacy relations and frozen "
-    "Engine 48 inputs and artifacts remain unchanged."
+    "Engine 50 rotates groups around their combined bounds and connects a "
+    "member to an external line by translating the complete group. Numeric "
+    "position constraints and original dependencies remain authoritative. "
+    "Existing Engine 49 literal inputs and artifacts are retained."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -868,8 +867,37 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                                        "position_authority": "named_movable"},
                              **{"from": current_start, "to": current_end}),
             ],
-            aspect="wide", score_version=SCHEMA_VERSION,
+            aspect="wide", score_version="0.3.0",
         )
+
+    # J: rotate a complete group, then connect its first member to an outside line.
+    _case_unit(
+        cases, "J-group-rotation-wide",
+        [_instruction("line", weight="rotring",
+                      **{"from": [0.20, 0.50], "to": [0.40, 0.50]}),
+         _instruction("ellipse", weight="rotring", center=[0.65, 0.50],
+                      size=[0.12, 0.20])],
+        aspect="wide", score_version=SCHEMA_VERSION,
+    )
+    cases["J-group-rotation-wide"]["score"]["transform_groups"] = [
+        {"start": 0, "end": 2, "rotation_degrees": 90.0},
+    ]
+    _case_unit(
+        cases, "J-group-connected-whole",
+        [_instruction("line", weight="rotring",
+                      **{"from": [0.10, 0.10], "to": [0.10, 0.30]}),
+         _instruction("line", weight="rotring",
+                      relation={"type": "connected", "gap": "medium",
+                                "target_instruction_index": 0,
+                                "position_authority": "named_movable"},
+                      **{"from": [0.30, 0.50], "to": [0.40, 0.50]}),
+         _instruction("line", weight="rotring",
+                      **{"from": [0.60, 0.50], "to": [0.70, 0.50]})],
+        score_version=SCHEMA_VERSION,
+    )
+    cases["J-group-connected-whole"]["score"]["transform_groups"] = [
+        {"start": 1, "end": 3, "rotation_degrees": 90.0},
+    ]
 
     # C gained two with `canvas` and `drawing_paper`. The count stays written
     # out by hand on purpose: the ground cases are read from the enum now, so
@@ -886,10 +914,11 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # deliberately stay in place, so their unchanged SVGs remain controls.
     # Engine 47 adds one oil-paint line to A and one solid fill to C.
     # Engine 49 adds one checked Along and one checked Cutting case to I.
+    # Engine 50 adds one group rotation and one external group connection to J.
     expected = {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128,
-                "G": 50, "H": 4, "I": 2}
+                "G": 50, "H": 4, "I": 2, "J": 2}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 616:
+    if actual != expected or len(cases) != 618:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

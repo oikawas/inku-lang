@@ -666,6 +666,7 @@ mod tests {
             color_map: colors,
             work_assignment: colors,
             render_seed: Some(431),
+            instruction_seed_override: None,
             instruction_index: 2,
             mark_index: 3,
             wild: false,

@@ -28,14 +28,13 @@ PLUGIN_DIR = REFERENCE_ROOT.parent / "plugins"
 OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
-SCHEMA_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "DDL engine 24 records the Instruction declaration-order change that inserts "
-    "surface_intensity before the final surface field in Score 0.3. The existing "
-    "literal Score 0.1 and 0.2 inputs remain fixed; normal intensity is omitted "
-    "from serialized instructions. This legacy expander/coerce/plugin corpus "
-    "does not exercise or activate the typed compiler."
+    "DDL engine 25 delivers typed Macro rotation groups into Score 0.4 and "
+    "symbolic placement plans. Existing literal inputs remain fixed, and empty "
+    "transform groups remain omitted from saved Scores. This legacy "
+    "expander/coerce/plugin corpus does not exercise or activate the typed compiler."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")

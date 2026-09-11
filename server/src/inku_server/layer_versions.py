@@ -260,7 +260,8 @@
 # lower deterministically to `weight=oil_paint`; thick brush remains independent.
 # 24: surface_intensity is inserted before surface in Instruction declaration
 # order. This is independent of activating the typed compiler.
-DDL_ENGINE_VERSION = "24"
+# 25: typed Macro rotation groups reach Score 0.4 and symbolic placement plans.
+DDL_ENGINE_VERSION = "25"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

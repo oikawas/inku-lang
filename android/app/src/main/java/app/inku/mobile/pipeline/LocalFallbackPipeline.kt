@@ -628,6 +628,7 @@ class LocalFallbackPipeline(
             .put("canvas", canvasAspect)
             .put("background", background)
             .put("instructions", repaired)
+        score.optJSONArray("transform_groups")?.let { result.put("transform_groups", JSONArray(it.toString())) }
         if (presence != null && presence.optString("kind", "none") != "none") result.put("presence", presence)
         return enforceModifierTargeting(result, ddl)
     }

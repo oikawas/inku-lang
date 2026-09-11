@@ -9,7 +9,7 @@ use inku_ddl::{
     Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
     VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
     lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
-    lower_verified_stage15_view, score_primitive_from_semantic_identity,
+    lower_verified_stage15_view, plan_verified_stage15, score_primitive_from_semantic_identity,
     stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
@@ -3755,6 +3755,114 @@ fn placement_free_nested_macro_group_delivers_typed_along_and_cutting() {
         );
         assert!(relation.touching_constraints.is_none());
     }
+}
+
+#[test]
+fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
+    use serde_json::json;
+
+    let fixed = json!({"op":"emit","binding":"fixed","fields":{
+        "shape":{"expr":"semantic_ref","category":"shape","id":"line"},
+        "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+        "position_x":{"expr":"exact_decimal","value":"0.35"},
+        "position_y":{"expr":"exact_decimal","value":"0.50"},
+        "color":{"expr":"semantic_ref","category":"color","id":"red"}
+    }});
+    let definition = macro_group_definition(json!([
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":90.0}},"body":[
+            fixed,
+            {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":45.0}},"body":[
+                macro_group_emit("named", "blue")
+            ]}
+        ]}
+    ]));
+    let transformed = stage15_locked(
+        "Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+    let score = lowered
+        .score()
+        .unwrap_or_else(|| panic!("{:?}", lowered.diagnostics()));
+    assert_eq!(score.instructions.len(), 2);
+    assert_eq!(score.transform_groups.len(), 2);
+    assert_eq!(score.transform_groups[0].start, 1);
+    assert_eq!(score.transform_groups[0].end, 2);
+    assert_eq!(score.transform_groups[0].rotation_degrees, 45.0);
+    assert!(score.transform_groups[0].fixed_position_indices.is_empty());
+    assert_eq!(score.transform_groups[1].start, 0);
+    assert_eq!(score.transform_groups[1].end, 2);
+    assert_eq!(score.transform_groups[1].rotation_degrees, 90.0);
+    assert_eq!(score.transform_groups[1].fixed_position_indices, [0]);
+    assert!(
+        score
+            .instructions
+            .iter()
+            .all(|instruction| instruction.rotation.is_none())
+    );
+
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context);
+    assert_eq!(plan.objects().unwrap().len(), 2);
+    assert_eq!(plan.transform_groups().len(), 2);
+    assert_eq!(plan.transform_groups()[0].provenance().generated_ordinal, 2);
+    assert_eq!(plan.transform_groups()[1].provenance().generated_ordinal, 0);
+    assert_eq!(plan.transform_groups()[1].fixed_position_indices(), [0]);
+}
+
+#[test]
+fn macro_rotation_keeps_external_connected_intent_in_score_and_plan() {
+    use serde_json::json;
+
+    let definition = macro_group_definition(json!([
+        macro_group_emit("outer", "black"),
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":90.0}},"body":[
+            macro_group_emit("connected", "red"),
+            {"op":"relation","kind":"connected","from":"outer","to":"connected"},
+            macro_group_emit("mate", "blue")
+        ]}
+    ]));
+    let transformed = stage15_locked(
+        "Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+    let score = lowered
+        .score()
+        .unwrap_or_else(|| panic!("{:?}", lowered.diagnostics()));
+    assert_eq!(score.instructions.len(), 3);
+    assert_eq!(score.transform_groups.len(), 1);
+    assert_eq!(score.transform_groups[0].start, 1);
+    assert_eq!(score.transform_groups[0].end, 3);
+    assert_eq!(score.transform_groups[0].rotation_degrees, 90.0);
+    assert!(score.transform_groups[0].fixed_position_indices.is_empty());
+    let relation = score.instructions[1].relation.as_ref().unwrap();
+    assert_eq!(relation.kind, RelationType::Connected);
+    assert_eq!(relation.target_instruction_index, Some(0));
+    assert_eq!(
+        relation.position_authority,
+        Some(ConnectedPositionAuthority::NamedMovable)
+    );
+    assert!(matches!(
+        lowered.instruction_origins()[1],
+        ScoreInstructionOrigin::MacroEmit { ref binding, .. }
+            if binding.as_ref().is_some_and(|binding| binding.local_name == "connected")
+    ));
+
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context);
+    assert_eq!(plan.transform_groups().len(), 1);
+    assert_eq!(plan.transform_groups()[0].start(), 1);
+    assert_eq!(plan.transform_groups()[0].end(), 3);
+    let relation = plan.objects().unwrap()[1].relation().unwrap();
+    assert_eq!(relation.kind(), RelationType::Connected);
+    assert_eq!(relation.target_object_index(), Some(0));
+    assert_eq!(
+        relation.position_authority(),
+        Some(ConnectedPositionAuthority::NamedMovable)
+    );
 }
 
 #[test]

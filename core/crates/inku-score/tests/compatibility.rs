@@ -159,3 +159,20 @@ fn connected_fields_roundtrip_while_legacy_relations_keep_them_absent() {
     let reread = read_saved_score_json(&canonical).expect("Connected Score rereads");
     assert_eq!(reread, score);
 }
+
+#[test]
+fn old_and_transform_group_scores_roundtrip_through_saved_compatibility() {
+    for source in [
+        br#"{"version":"0.3.0","instructions":[{"primitive":"line"}]}"#.as_slice(),
+        br#"{"version":"0.4.0","instructions":[
+            {"primitive":"line"},{"primitive":"line"},{"primitive":"circle"}],
+            "transform_groups":[
+                {"start":0,"end":2,"rotation_degrees":30.0,"fixed_position_indices":[1]},
+                {"start":0,"end":3,"rotation_degrees":90.0,"fixed_position_indices":[1]}
+            ]}"#.as_slice(),
+    ] {
+        let score = read_saved_score_json(source).expect("saved Score must parse");
+        let canonical = canonical_json_bytes(&score).expect("saved Score must canonicalize");
+        assert_eq!(read_saved_score_json(&canonical).expect("canonical Score must reread"), score);
+    }
+}

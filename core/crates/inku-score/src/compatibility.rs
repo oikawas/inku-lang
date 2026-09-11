@@ -25,7 +25,7 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
         None => {
             object.insert("version".to_owned(), Value::String("0.1.0".to_owned()));
         }
-        Some(Value::String(version)) if matches!(version.as_str(), "0.1.0" | "0.2.0" | "0.3.0") => {
+        Some(Value::String(version)) if matches!(version.as_str(), "0.1.0" | "0.2.0" | "0.3.0" | "0.4.0") => {
         }
         _ => return Err(invalid_saved_score("unsupported saved Score version")),
     }

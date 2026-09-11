@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Group rotation and external connections
+
+Rotation-only Macro Transforms now reach Scores and repetition plans through the shared lowerer. After placement and internal relations resolve, groups rotate inner to outer about the combined child-shape bounding-box center. Connected to an external prior shape translates the whole group while preserving internal placement. Numeric-position constraints, named clipping, Stop / OmitAndContinue, and original references, ownership, and seeds remain intact. Repeated plans retain relation intent referencing original objects without materializing instances.
+
+Score advances to 0.4.0 with optional `transform_groups`, preserving saved 0.1.0 / 0.2.0 / 0.3.0 and versionless compatibility. The shared contract, server schema, and Android preservation agree. DDL engine advances to 25 for deterministic group delivery and render engine to 50 for group performance. DDL vocabulary version 6 and APP/build are unchanged. Transform translate / scale and full typed runtime / UI / save integration remain incomplete.
+
+---
+
 ### 2026-09-11 — Define the pivot for a group rotation
 
 The Macro Transform pivot is the center of the combined child-shape bounding box before rotation, rotating relative positions and orientations together. Transform delivery to Score remains unimplemented; recording this decision changes no rendering behavior or version.

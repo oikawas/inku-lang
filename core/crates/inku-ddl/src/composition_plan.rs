@@ -1,8 +1,8 @@
 //! Sealed, runtime-disconnected object and placement recipes; never instances or Score.
 
 use inku_score::{
-    CanvasGroundSpec, Color, LineStyle, Primitive, SurfaceIntensity, SurfaceSpec, Thinness,
-    Variation, Weight,
+    CanvasGroundSpec, Color, ConnectedPositionAuthority, LineStyle, Primitive, RelationGap,
+    RelationType, SurfaceIntensity, SurfaceSpec, Thinness, TouchingConstraints, Variation, Weight,
 };
 
 pub use crate::score_lowering::{Rational, ResolvedGeometryDimensions};
@@ -18,6 +18,74 @@ pub enum PlacementAction {
     LineUp,
     Tile,
     Scatter,
+}
+
+/// A deferred Macro rotation over the half-open object range it owns.
+///
+/// The renderer materializes members and resolves named placement before it computes this
+/// group's pre-rotation bounds and applies the rigid rotation. `provenance` keeps the generated
+/// Transform node that declared the group distinct from its member Emit owners.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TransformGroupPlan {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) rotation_degrees: f64,
+    pub(crate) fixed_position_indices: Vec<usize>,
+    pub(crate) provenance: crate::GeneratedNodeProvenance,
+}
+
+/// Deferred relation intent between symbolic objects.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlanRelation {
+    pub(crate) kind: RelationType,
+    pub(crate) gap: RelationGap,
+    pub(crate) target_object_index: Option<usize>,
+    pub(crate) position_authority: Option<ConnectedPositionAuthority>,
+    pub(crate) touching_constraints: Option<TouchingConstraints>,
+}
+
+impl PlanRelation {
+    pub const fn kind(&self) -> RelationType {
+        self.kind
+    }
+
+    pub const fn gap(&self) -> RelationGap {
+        self.gap
+    }
+
+    pub const fn target_object_index(&self) -> Option<usize> {
+        self.target_object_index
+    }
+
+    pub const fn position_authority(&self) -> Option<ConnectedPositionAuthority> {
+        self.position_authority
+    }
+
+    pub const fn touching_constraints(&self) -> Option<TouchingConstraints> {
+        self.touching_constraints
+    }
+}
+
+impl TransformGroupPlan {
+    pub const fn start(&self) -> usize {
+        self.start
+    }
+
+    pub const fn end(&self) -> usize {
+        self.end
+    }
+
+    pub const fn rotation_degrees(&self) -> f64 {
+        self.rotation_degrees
+    }
+
+    pub fn fixed_position_indices(&self) -> &[usize] {
+        &self.fixed_position_indices
+    }
+
+    pub const fn provenance(&self) -> &crate::GeneratedNodeProvenance {
+        &self.provenance
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,6 +165,7 @@ pub struct ObjectPlacementPlan {
     pub(crate) anchor: ObjectAnchor,
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
+    pub(crate) relation: Option<PlanRelation>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -171,6 +240,9 @@ impl ObjectPlacementPlan {
     pub fn recipe(&self) -> &PlacementRecipe {
         &self.recipe
     }
+    pub fn relation(&self) -> Option<&PlanRelation> {
+        self.relation.as_ref()
+    }
     pub fn requires_numeric_must_fit(&self) -> bool {
         matches!(
             self.anchor,
@@ -194,6 +266,7 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) error_policy: ScoreErrorPolicy,
     pub(crate) outcome: CompositionPlanOutcome,
     pub(crate) objects: Vec<ObjectPlacementPlan>,
+    pub(crate) transform_groups: Vec<TransformGroupPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
 }
@@ -219,6 +292,9 @@ impl<'a> CompositionPlanResult<'a> {
     }
     pub fn diagnostics(&self) -> &[ScoreLoweringDiagnostic] {
         &self.diagnostics
+    }
+    pub fn transform_groups(&self) -> &[TransformGroupPlan] {
+        &self.transform_groups
     }
     pub fn ground(&self) -> Option<&CanvasGroundSpec> {
         self.ground.as_ref()

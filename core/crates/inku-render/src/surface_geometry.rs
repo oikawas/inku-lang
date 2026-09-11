@@ -1,7 +1,7 @@
 //! Pure contour and scan geometry used by surface painting.
 
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
-use crate::determinism::{hash01, instruction_seed};
+use crate::determinism::hash01;
 use crate::geometry::{
     circle_points, ellipse_perimeter, point_to_pixels, polygon_points, size_to_pixels,
     stroke_sample_count,
@@ -123,7 +123,7 @@ pub(crate) fn surface_contour(
             let controls = generate_cloudform_contour(CloudformRequest {
                 center: point_to_pixels(instruction.center?, canvas),
                 size: size_to_pixels(instruction.size?, canvas),
-                performance_seed: Some(instruction_seed(instruction, context.render_seed)),
+                performance_seed: Some(context.seed_for(instruction)),
                 instruction_index: context.instruction_index,
                 mark_index: context.mark_index,
                 variation: instruction.variation.as_ref(),

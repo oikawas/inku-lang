@@ -1,6 +1,7 @@
 use inku_render::checked_performance::resolve_checked_performance;
+use inku_render::cloudform::{CloudformRequest, generate_cloudform_contour};
 use inku_render::performance::{PerformanceRequest, resolve_performance};
-use inku_render::planning::endpoint_geometry;
+use inku_render::planning::{endpoint_geometry, instruction_anchor_on_canvas};
 use inku_render::types::{
     CanvasSize, Score, ScoreErrorPolicy, ScoreExecutionDisposition, ScoreExecutionReason,
 };
@@ -725,5 +726,239 @@ fn continue_stops_instead_of_returning_an_all_omitted_work() {
     assert_eq!(
         stopped.diagnostics[1].disposition,
         ScoreExecutionDisposition::Stopped
+    );
+}
+
+#[test]
+fn transform_groups_use_physical_precise_bounds_nested_rotation_and_stable_cloudform_seed() {
+    let input = score(
+        r#"{"version":"0.4.0","instructions":[
+        {"primitive":"line","from":[0.1,0.1],"to":[0.2,0.1],"arrangement":{"count":2,"group_size":2,"layout":"horizontal"}},
+        {"primitive":"point","center":[0.2,0.2],"radius":0.01},
+        {"primitive":"polygon","center":[0.18,0.50],"radius":0.11,"sides":5},
+        {"primitive":"arc","center":[0.44,0.50],"position":[0.44,0.50],"radius":0.18,"angle_start":18,"angle_end":71},
+        {"primitive":"cloudform","center":[0.70,0.50],"size":[0.20,0.12],"weight":"pencil"}
+        ],"transform_groups":[
+          {"start":3,"end":5,"rotation_degrees":31},
+          {"start":2,"end":5,"rotation_degrees":90}
+        ]}"#,
+    );
+    let result = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(71),
+            composition_seed: Some(71),
+            canvas: Some(CanvasSize::new(2000.0, 1000.0)),
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("nested transform groups perform");
+    assert!(result.score.transform_groups.is_empty());
+    assert_eq!(result.instruction_seed_overrides.len(), 7);
+    assert_eq!(result.score.instructions[4].rotation, Some(90.0));
+    assert_eq!(result.score.instructions[5].rotation, Some(121.0));
+    assert_eq!(result.score.instructions[6].rotation, Some(121.0));
+    assert_eq!(result.instruction_indices[6], 6);
+    assert_eq!(
+        result.instruction_seed_overrides[6],
+        Some(inku_render::determinism::instruction_seed(
+            &input.instructions[4],
+            Some(71)
+        ))
+    );
+    let before_center = inku_render::types::Point::new(1400.0, 500.0);
+    let after_center = inku_render::types::Point::new(
+        result.score.instructions[6].center.unwrap().x * 2000.0,
+        result.score.instructions[6].center.unwrap().y * 1000.0,
+    );
+    let before_contour = generate_cloudform_contour(CloudformRequest {
+        center: before_center,
+        size: inku_render::types::Point::new(200.0, 120.0),
+        performance_seed: result.instruction_seed_overrides[6],
+        instruction_index: result.instruction_indices[6],
+        mark_index: 0,
+        variation: input.instructions[4].variation.as_ref(),
+        weight: input.instructions[4].weight,
+        point_count: 49,
+    });
+    let after_contour = generate_cloudform_contour(CloudformRequest {
+        center: after_center,
+        size: inku_render::types::Point::new(200.0, 120.0),
+        performance_seed: result.instruction_seed_overrides[6],
+        instruction_index: result.instruction_indices[6],
+        mark_index: 0,
+        variation: result.score.instructions[6].variation.as_ref(),
+        weight: result.score.instructions[6].weight,
+        point_count: 49,
+    });
+    assert!(
+        before_contour
+            .iter()
+            .zip(&after_contour)
+            .all(|(before, after)| {
+                ((before.x - before_center.x) - (after.x - after_center.x)).abs() < 1.0e-9
+                    && ((before.y - before_center.y) - (after.y - after_center.y)).abs() < 1.0e-9
+            })
+    );
+
+    let precise = score(
+        r#"{"version":"0.4.0","instructions":[
+        {"primitive":"line","from":[0.10,0.20],"to":[0.30,0.20]},
+        {"primitive":"arc","center":[0.50,0.50],"radius":0.20,"angle_start":0,"angle_end":90},
+        {"primitive":"polygon","center":[0.40,0.50],"radius":0.10,"sides":5}
+        ],"transform_groups":[{"start":0,"end":3,"rotation_degrees":90}]}"#,
+    );
+    let precise_canvas = CanvasSize::new(2000.0, 1000.0);
+    let precise_result = resolve_checked_performance(
+        PerformanceRequest {
+            score: &precise,
+            performance_seed: Some(71),
+            composition_seed: Some(71),
+            canvas: Some(precise_canvas),
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .expect("precise group geometry performs");
+    let line_anchor =
+        instruction_anchor_on_canvas(&precise_result.score.instructions[0], Some(precise_canvas));
+    // The upright pentagon's lower vertices have y = cy + r * cos(36 degrees).
+    // In short-side units the combined bounds are x=[0.2, 1.2], y=[0.2, bottom].
+    let bottom = 0.5 + 0.1 * (1.0 + 5.0_f64.sqrt()) / 4.0;
+    let pivot_x = 0.7;
+    let pivot_y = (0.2 + bottom) / 2.0;
+    let expected_line_x = (pivot_x + pivot_y - 0.2) / 2.0;
+    let expected_line_y = pivot_y + 0.4 - pivot_x;
+    assert!(
+        (line_anchor.x - expected_line_x).abs() < 1.0e-9,
+        "{line_anchor:?}"
+    );
+    assert!(
+        (line_anchor.y - expected_line_y).abs() < 1.0e-9,
+        "{line_anchor:?}"
+    );
+    let arc = endpoint_geometry(&precise_result.score.instructions[1], Some(precise_canvas))
+        .expect("group arc retains endpoint geometry");
+    assert!(
+        (arc.0.x - (pivot_x + pivot_y - 0.5)).abs() < 1.0e-9,
+        "{arc:?}"
+    );
+    assert!(
+        (arc.0.y - (pivot_y + 1.2 - pivot_x)).abs() < 1.0e-9,
+        "{arc:?}"
+    );
+}
+
+#[test]
+fn external_connected_moves_its_whole_group_and_fixed_member_conflicts_omit_the_range() {
+    let input = score(
+        r#"{"version":"0.4.0","instructions":[
+        {"primitive":"line","from":[0.10,0.20],"to":[0.30,0.20]},
+        {"primitive":"line","from":[0.50,0.45],"to":[0.70,0.45],"relation":{"type":"connected","target_instruction_index":0,"position_authority":"named_movable"}},
+        {"primitive":"point","center":[0.82,0.55],"radius":0.01},
+        {"primitive":"point","center":[0.80,0.80],"radius":0.01}
+        ],"transform_groups":[
+          {"start":1,"end":3,"rotation_degrees":0},
+          {"start":1,"end":3,"rotation_degrees":90}
+        ]}"#,
+    );
+    let request = |score| PerformanceRequest {
+        score,
+        performance_seed: Some(91),
+        composition_seed: Some(91),
+        canvas: None,
+    };
+    let moved = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop)
+        .expect("external Connected translates the enclosing group");
+    let prior = endpoint_geometry(&moved.score.instructions[0], None).unwrap();
+    let member = endpoint_geometry(&moved.score.instructions[1], None).unwrap();
+    assert!((prior.1.x - member.0.x).hypot(prior.1.y - member.0.y) < 1.0e-9);
+    assert!((moved.score.instructions[2].center.unwrap().x - 0.20).abs() < 1.0e-9);
+    assert!((moved.score.instructions[2].center.unwrap().y - 0.52).abs() < 1.0e-9);
+
+    let mut fixed = input.clone();
+    for group in &mut fixed.transform_groups {
+        group.fixed_position_indices = vec![2];
+    }
+    let stopped = resolve_checked_performance(request(&fixed), ScoreErrorPolicy::Stop)
+        .expect_err("a fixed member prevents external translation");
+    assert_eq!(
+        stopped.diagnostics[0].reason,
+        ScoreExecutionReason::NumericConnectedPositionConflict
+    );
+    let continued = resolve_checked_performance(request(&fixed), ScoreErrorPolicy::OmitAndContinue)
+        .expect("independent sibling survives group omission");
+    assert_eq!(continued.original_instruction_indices, [0, 3]);
+}
+
+#[test]
+fn transform_group_integrity_stops_both_policies_and_empty_groups_preserve_legacy_execution() {
+    let malformed = score(
+        r#"{"version":"0.4.0","instructions":[{"primitive":"point","center":[0.5,0.5],"radius":0.01}],"transform_groups":[{"start":1,"end":1,"rotation_degrees":0}]}"#,
+    );
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let stopped = resolve_checked_performance(
+            PerformanceRequest {
+                score: &malformed,
+                performance_seed: Some(11),
+                composition_seed: Some(11),
+                canvas: None,
+            },
+            policy,
+        )
+        .expect_err("malformed transform groups are whole-score integrity errors");
+        assert_eq!(
+            stopped.diagnostics[0].reason,
+            ScoreExecutionReason::InvalidTransformGroup
+        );
+        assert_eq!(
+            stopped.diagnostics[0].disposition,
+            ScoreExecutionDisposition::Stopped
+        );
+    }
+    let failed_member = score(
+        r#"{"version":"0.4.0","instructions":[
+        {"primitive":"line","from":[0.1,0.2],"to":[0.3,0.2]},
+        {"primitive":"point","center":[0.5,0.5],"radius":0.01},
+        {"primitive":"line","from":[0.5,0.4],"to":[0.7,0.4],"relation":{"type":"connected","target_instruction_index":1,"position_authority":"numeric_fixed"}},
+        {"primitive":"point","center":[0.8,0.7],"radius":0.01,"relation":{"type":"connected","target_instruction_index":2,"position_authority":"named_movable"}},
+        {"primitive":"point","center":[0.8,0.8],"radius":0.01}
+        ],"transform_groups":[{"start":1,"end":3,"rotation_degrees":0}]}"#,
+    );
+    let continued = resolve_checked_performance(
+        PerformanceRequest {
+            score: &failed_member,
+            performance_seed: Some(11),
+            composition_seed: Some(11),
+            canvas: None,
+        },
+        ScoreErrorPolicy::OmitAndContinue,
+    )
+    .expect("failed final member omits its full group while independent work remains");
+    assert_eq!(continued.original_instruction_indices, [0, 4]);
+    let execution = continued
+        .execution
+        .expect("omission diagnostics remain typed");
+    assert_eq!(
+        execution.diagnostics[0].reason,
+        ScoreExecutionReason::NumericConnectedPositionConflict
+    );
+    assert_eq!(
+        execution.diagnostics[1].reason,
+        ScoreExecutionReason::ConnectedReferenceOmitted
+    );
+    let legacy = score(
+        r#"{"instructions":[{"primitive":"line","from":[0.1,0.2],"to":[0.3,0.2]}],"transform_groups":[]}"#,
+    );
+    let request = PerformanceRequest {
+        score: &legacy,
+        performance_seed: Some(11),
+        composition_seed: Some(11),
+        canvas: None,
+    };
+    assert_eq!(
+        resolve_checked_performance(request, ScoreErrorPolicy::Stop)
+            .expect("empty groups preserve legacy execution")
+            .score,
+        resolve_performance(request).score
     );
 }

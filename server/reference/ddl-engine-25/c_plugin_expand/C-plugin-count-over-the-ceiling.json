@@ -1,0 +1,276 @@
+{
+  "ddl": "面: 薄墨。",
+  "instructions": [
+    {
+      "angle_end": 300.0,
+      "angle_start": 240.0,
+      "at": {
+        "region": [
+          0.1703,
+          0.4055,
+          0.277,
+          0.5788
+        ]
+      },
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -27.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 296.0,
+      "angle_start": 244.0,
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "at": {
+        "region": [
+          0.2962,
+          0.4211,
+          0.4029,
+          0.5944
+        ]
+      },
+      "center": [
+        0.3495,
+        0.5077
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 34.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "center": [
+        0.3495,
+        0.5077
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "at": {
+        "region": [
+          0.3947,
+          0.4145,
+          0.5014,
+          0.5878
+        ]
+      },
+      "center": [
+        0.448,
+        0.5011
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 4.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "center": [
+        0.448,
+        0.5011
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 308.0,
+      "angle_start": 232.0,
+      "at": {
+        "region": [
+          0.4857,
+          0.4017,
+          0.5924,
+          0.5751
+        ]
+      },
+      "center": [
+        0.539,
+        0.4884
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 22.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.539,
+        0.4884
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "at": {
+        "region": [
+          0.5879,
+          0.3981,
+          0.6945,
+          0.5714
+        ]
+      },
+      "center": [
+        0.6412,
+        0.4847
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 18.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 294.0,
+      "angle_start": 246.0,
+      "center": [
+        0.6412,
+        0.4847
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 302.0,
+      "angle_start": 238.0,
+      "at": {
+        "region": [
+          0.7074,
+          0.4085,
+          0.8141,
+          0.5819
+        ]
+      },
+      "center": [
+        0.7608,
+        0.4952
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -19.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.7608,
+        0.4952
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    }
+  ],
+  "provenance": [
+    {
+      "input_term": "Nature.青葉",
+      "plugin_name": "leaves",
+      "plugin_term": "Nature.青葉",
+      "plugin_version": "0.3.0",
+      "units": "1"
+    }
+  ],
+  "score_instructions": [
+    {
+      "angle_end": 300.0,
+      "angle_start": 240.0,
+      "arrangement": {
+        "count": 6,
+        "group_size": 2,
+        "layout": "scatter"
+      },
+      "at": {
+        "region": [
+          0.18,
+          0.24,
+          0.82,
+          0.76
+        ]
+      },
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -27.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 296.0,
+      "angle_start": 244.0,
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    }
+  ],
+  "warnings": [
+    "Nature.青葉: 120 units of 13 marks exceeds the 400-mark work budget; expansion kept at one unit"
+  ]
+}

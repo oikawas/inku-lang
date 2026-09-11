@@ -106,11 +106,11 @@ class ServerScoreVocabularyTest {
     }
 
     @Test
-    fun testTheSchemaOffersScore0_3AndKeepsOldEditions() {
+    fun testTheSchemaOffersScore0_4AndKeepsOldEditions() {
         val root = JSONObject(ServerScoreSchemaJson.parameters)
         val properties = root.getJSONObject("properties")
-        assertEquals("0.3.0", properties.getJSONObject("version").getString("default"))
-        assertEquals("[\"0.3.0\",\"0.2.0\",\"0.1.0\"]",
+        assertEquals("0.4.0", properties.getJSONObject("version").getString("default"))
+        assertEquals("[\"0.4.0\",\"0.3.0\",\"0.2.0\",\"0.1.0\"]",
             properties.getJSONObject("version").getJSONArray("enum").toString())
 
         val instruction = properties

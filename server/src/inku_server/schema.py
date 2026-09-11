@@ -5,7 +5,8 @@
 システムプロンプトにフィールド仕様を書かないこと — ここに書く。
 """
 
-from typing import Literal, Optional
+import math
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -30,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -793,10 +794,32 @@ def migrate_score_payload(value: object) -> object:
     return migrated
 
 
+class TransformGroup(BaseModel):
+    """One postorder Macro transform over a contiguous Score instruction span."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start: int = Field(ge=0, description="変換する Score instruction 範囲の開始 index")
+    end: int = Field(ge=0, description="変換する Score instruction 範囲の終端 exclusive index")
+    rotation_degrees: float = Field(description="まとまり全体の回転角(度)。正=時計回り")
+    fixed_position_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="追加平行移動できない、範囲内の元 Score instruction index",
+    )
+
+    @field_validator("rotation_degrees")
+    @classmethod
+    def _require_finite_rotation(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("transform group rotation_degrees must be finite")
+        return value
+
+
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.3.0"
+    version: ScoreVersion = "0.4.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -820,6 +843,14 @@ class Score(BaseModel):
         ),
     )
     instructions: list[Instruction]
+    transform_groups: list[TransformGroup] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description=(
+            "Macro のまとまり変換。内側から外側の postorder で、各範囲は Score instruction "
+            "index の連続区間を表す"
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -875,4 +906,27 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
+        if self.transform_groups and self.version != "0.4.0":
+            raise ValueError("transform_groups requires Score version 0.4.0")
+        for group_index, group in enumerate(self.transform_groups):
+            if group.start >= group.end:
+                raise ValueError("transform group range must be nonempty")
+            if group.end > len(self.instructions):
+                raise ValueError("transform group range exceeds the instruction list")
+            if any(instruction.arrangement is not None for instruction in self.instructions[group.start:group.end]):
+                raise ValueError("transform group members cannot carry arrangements")
+            fixed_indices = set(group.fixed_position_indices)
+            if len(fixed_indices) != len(group.fixed_position_indices):
+                raise ValueError("transform group fixed_position_indices must be unique")
+            if any(index < group.start or index >= group.end for index in fixed_indices):
+                raise ValueError("transform group fixed_position_indices must be within its range")
+            for prior in self.transform_groups[:group_index]:
+                if prior.end <= group.start or group.end <= prior.start:
+                    continue
+                if not (group.start <= prior.start and prior.end <= group.end):
+                    if prior.start <= group.start and group.end <= prior.end:
+                        raise ValueError("transform groups must be stored inner-before-outer")
+                    raise ValueError("transform group ranges cannot cross")
+                if not set(prior.fixed_position_indices) <= fixed_indices:
+                    raise ValueError("outer transform groups must include descendant fixed_position_indices")
         return self

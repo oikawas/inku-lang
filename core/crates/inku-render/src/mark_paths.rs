@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::determinism::{instruction_seed, needs_path_variation};
+use crate::determinism::needs_path_variation;
 use crate::geometry::{line_with_variation, point_to_pixels, size_to_pixels, stroke_sample_count};
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
@@ -202,7 +202,7 @@ pub(crate) fn hand_line(
     style: &MarkStyle,
     context: MarkContext<'_>,
 ) -> Element {
-    let seed = instruction_seed(instruction, context.render_seed);
+    let seed = context.seed_for(instruction);
     let sample_count =
         stroke_sample_count((end.x - start.x).hypot(end.y - start.y), context.canvas);
     let support = instruction_support(instruction, context.support);
@@ -311,7 +311,7 @@ pub(crate) fn hand_contour(
         centerline,
         base_width: style.width,
         weight: instruction.weight,
-        seed: instruction_seed(instruction, context.render_seed),
+        seed: context.seed_for(instruction),
         closed,
         anchors,
         grid_step: grid_step(instruction.weight, context.canvas),
@@ -335,7 +335,7 @@ pub(crate) fn hand_contour(
             } else {
                 OilPaintStyle::plain(&style.color, style.stroke_opacity)
             },
-            instruction_seed(instruction, context.render_seed),
+            context.seed_for(instruction),
             closed,
         );
     }

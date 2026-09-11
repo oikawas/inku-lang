@@ -4,7 +4,7 @@
 //! already validated Score and resolved host data; they are not a second tool
 //! schema and deliberately contain no Python or server-registry concepts.
 
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Serialize};
@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.3.0".to_owned()
+    "0.4.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -824,6 +824,20 @@ const fn default_contour_density() -> ContourDensity {
     ContourDensity::Low
 }
 
+/// One postorder Macro transform over a contiguous Score instruction range.
+///
+/// The renderer rotates the range about its pre-transform bounding-box center.
+/// `fixed_position_indices` names the absolute Score members that cannot move
+/// when a connected member would otherwise translate this group.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TransformGroup {
+    pub start: usize,
+    pub end: usize,
+    pub rotation_degrees: f64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fixed_position_indices: Vec<usize>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
     #[serde(default = "default_score_version")]
@@ -835,15 +849,18 @@ pub struct Score {
     #[serde(default)]
     pub presence: Option<Presence>,
     pub instructions: Vec<Instruction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transform_groups: Vec<TransformGroup>,
 }
 
 impl Score {
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
+        self.validate_transform_groups()?;
         for instruction in &self.instructions {
             if instruction.surface_intensity != SurfaceIntensity::Normal {
-                if self.version != "0.3.0" {
+                if self.version != "0.3.0" && self.version != "0.4.0" {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
                 let closed = matches!(
@@ -874,7 +891,7 @@ impl Score {
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
-            if self.version != "0.2.0" && self.version != "0.3.0" {
+            if self.version != "0.2.0" && self.version != "0.3.0" && self.version != "0.4.0" {
                 return Err("arc_form requires Score version 0.2.0");
             }
             if instruction.primitive != Primitive::Arc {
@@ -899,6 +916,67 @@ impl Score {
             if matches!(instruction.surface, Some(ref surface) if surface.texture != SurfaceTexture::None)
             {
                 return Err("arc_form=crescent uses filled instead of a surface texture");
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates the structural contract shared by Score-producing hosts and
+    /// the renderer before it performs any transform.
+    pub fn validate_transform_groups(&self) -> Result<(), &'static str> {
+        if self.transform_groups.is_empty() {
+            return Ok(());
+        }
+        if self.version != "0.4.0" {
+            return Err("transform_groups requires Score version 0.4.0");
+        }
+
+        for (group_index, group) in self.transform_groups.iter().enumerate() {
+            if group.start >= group.end {
+                return Err("transform group range must be nonempty");
+            }
+            if group.end > self.instructions.len() {
+                return Err("transform group range exceeds the instruction list");
+            }
+            if !group.rotation_degrees.is_finite() {
+                return Err("transform group rotation_degrees must be finite");
+            }
+            if self.instructions[group.start..group.end]
+                .iter()
+                .any(|instruction| instruction.arrangement.is_some())
+            {
+                return Err("transform group members cannot carry arrangements");
+            }
+
+            let mut fixed_indices = HashSet::new();
+            for &fixed_index in &group.fixed_position_indices {
+                if fixed_index < group.start || fixed_index >= group.end {
+                    return Err("transform group fixed_position_indices must be within its range");
+                }
+                if !fixed_indices.insert(fixed_index) {
+                    return Err("transform group fixed_position_indices must be unique");
+                }
+            }
+
+            for prior in &self.transform_groups[..group_index] {
+                let disjoint = prior.end <= group.start || group.end <= prior.start;
+                if disjoint {
+                    continue;
+                }
+                let current_contains_prior = group.start <= prior.start && prior.end <= group.end;
+                if !current_contains_prior {
+                    if prior.start <= group.start && group.end <= prior.end {
+                        return Err("transform groups must be stored inner-before-outer");
+                    }
+                    return Err("transform group ranges cannot cross");
+                }
+                if !prior
+                    .fixed_position_indices
+                    .iter()
+                    .all(|index| fixed_indices.contains(index))
+                {
+                    return Err("outer transform groups must include descendant fixed_position_indices");
+                }
             }
         }
         Ok(())

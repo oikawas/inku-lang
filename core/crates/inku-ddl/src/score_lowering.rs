@@ -2,7 +2,7 @@
 
 use crate::composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
-    PlacementAction, PlacementRecipe, ResolvedObjectAppearance,
+    PlacementAction, PlacementRecipe, PlanRelation, ResolvedObjectAppearance, TransformGroupPlan,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,8 +10,8 @@ use inku_score::{
     AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
     Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score,
-    SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, Weight,
-    lookup_canvas_format,
+    SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, TransformGroup,
+    Weight, lookup_canvas_format,
 };
 
 use crate::geometry::{
@@ -309,17 +309,190 @@ fn project_source_instruction<'a>(
     })
 }
 
-/// Visit pure containers without changing the already resolved lexical identities.
-/// Transforms remain atomic unsupported subtrees; their children are not delivered.
+#[derive(Clone, Copy)]
+struct MacroTransformScope<'a> {
+    transform: &'a crate::ExpandedTransform,
+    provenance: &'a GeneratedNodeProvenance,
+}
+
+#[derive(Clone)]
+struct MacroDeliveryNode<'a> {
+    node: &'a ExpandedMacroNode,
+    transform_stack: Vec<MacroTransformScope<'a>>,
+}
+
+/// Visit pure containers while retaining every containing Transform in lexical order.
 fn collect_macro_delivery_nodes<'a>(
     nodes: &'a [ExpandedMacroNode],
-    output: &mut Vec<&'a ExpandedMacroNode>,
+    transform_stack: &mut Vec<MacroTransformScope<'a>>,
+    output: &mut Vec<MacroDeliveryNode<'a>>,
+    transforms: &mut Vec<MacroTransformScope<'a>>,
 ) {
     for node in nodes {
         match node {
-            ExpandedMacroNode::Group { body, .. } => collect_macro_delivery_nodes(body, output),
-            _ => output.push(node),
+            ExpandedMacroNode::Group { body, .. } => {
+                collect_macro_delivery_nodes(body, transform_stack, output, transforms)
+            }
+            ExpandedMacroNode::Transform {
+                transform,
+                body,
+                provenance,
+            } => {
+                let scope = MacroTransformScope {
+                    transform,
+                    provenance,
+                };
+                transforms.push(scope);
+                transform_stack.push(scope);
+                collect_macro_delivery_nodes(body, transform_stack, output, transforms);
+                transform_stack.pop();
+            }
+            _ => output.push(MacroDeliveryNode {
+                node,
+                transform_stack: transform_stack.clone(),
+            }),
         }
+    }
+}
+
+fn macro_rotation_degrees(scope: MacroTransformScope<'_>) -> Option<f64> {
+    let transform = scope.transform;
+    (transform.translate_x.is_none()
+        && transform.translate_y.is_none()
+        && transform.scale_x.is_none()
+        && transform.scale_y.is_none())
+    .then_some(transform.rotate_degrees)
+    .flatten()
+    .filter(|degrees| degrees.is_finite())
+}
+
+fn scope_contains(scope: MacroTransformScope<'_>, child: MacroTransformScope<'_>) -> bool {
+    scope.provenance.expansion_path.len() < child.provenance.expansion_path.len()
+        && child
+            .provenance
+            .expansion_path
+            .starts_with(&scope.provenance.expansion_path)
+}
+
+fn is_in_invalid_transform(
+    delivery: &MacroDeliveryNode<'_>,
+    invalid_transforms: &[MacroTransformScope<'_>],
+) -> bool {
+    delivery.transform_stack.iter().any(|scope| {
+        invalid_transforms.iter().any(|invalid| {
+            invalid.provenance.generated_ordinal == scope.provenance.generated_ordinal
+        })
+    })
+}
+
+#[derive(Clone)]
+struct MacroTransformRange {
+    scope: GeneratedNodeProvenance,
+    rotation_degrees: f64,
+    start: usize,
+    end: usize,
+    fixed_position_indices: Vec<usize>,
+}
+
+impl MacroTransformRange {
+    fn record(&mut self, index: usize, numeric_anchor: bool) {
+        self.start = self.start.min(index);
+        self.end = self.end.max(index + 1);
+        if numeric_anchor && !self.fixed_position_indices.contains(&index) {
+            self.fixed_position_indices.push(index);
+        }
+    }
+}
+
+fn record_macro_transform_ranges(
+    ranges: &mut BTreeMap<u64, MacroTransformRange>,
+    transform_stack: &[MacroTransformScope<'_>],
+    index: usize,
+    numeric_anchor: bool,
+) {
+    for scope in transform_stack {
+        if let Some(range) = ranges.get_mut(&scope.provenance.generated_ordinal) {
+            range.record(index, numeric_anchor);
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn checked_macro_relation(
+    kind: &str,
+    input: ScoreLoweringInput<'_>,
+    target_instruction_index: Option<usize>,
+    prior_primitive: Option<Primitive>,
+    prior_arc_form: Option<inku_score::ArcForm>,
+    target_is_center: bool,
+    current_primitive: Primitive,
+    current_arc_form: Option<inku_score::ArcForm>,
+) -> Result<Relation, ScoreFieldGap> {
+    if kind == "not_touching" {
+        return input
+            .effective_focus
+            .is_some()
+            .then_some(Relation {
+                kind: RelationType::NotTouching,
+                gap: RelationGap::Medium,
+                target_instruction_index: None,
+                position_authority: None,
+                touching_constraints: None,
+            })
+            .ok_or(ScoreFieldGap::UnsupportedMacroRelation);
+    }
+    let Some(target_instruction_index) = target_instruction_index else {
+        return Err(ScoreFieldGap::UnavailableMacroRelationReference);
+    };
+    let touching = kind == "touching";
+    let line_relation = matches!(kind, "along" | "cutting");
+    let prior_supported = if line_relation {
+        prior_primitive == Some(Primitive::Line)
+    } else {
+        (matches!(prior_primitive, Some(Primitive::Line | Primitive::Arc))
+            && prior_arc_form.is_none())
+            || (!touching && prior_primitive == Some(Primitive::Point))
+    };
+    let current_supported = if line_relation {
+        current_primitive == Primitive::Line
+    } else {
+        (matches!(current_primitive, Primitive::Line | Primitive::Arc)
+            && current_arc_form.is_none())
+            || (!touching && current_primitive == Primitive::Point)
+    };
+    if !prior_supported
+        || !current_supported
+        || (!line_relation && (input.effective_focus.is_none() || !target_is_center))
+    {
+        return Err(ScoreFieldGap::UnsupportedMacroRelation);
+    }
+    Ok(Relation {
+        kind: match kind {
+            "along" => RelationType::Along,
+            "cutting" => RelationType::Cutting,
+            "touching" => RelationType::Touching,
+            "connected" => RelationType::Connected,
+            _ => return Err(ScoreFieldGap::UnsupportedMacroRelation),
+        },
+        gap: RelationGap::Medium,
+        target_instruction_index: Some(target_instruction_index),
+        position_authority: Some(ConnectedPositionAuthority::NamedMovable),
+        touching_constraints: touching.then_some(TouchingConstraints {
+            dimensions_fixed: input.exact_geometry().is_some()
+                || input.relative_scale.is_some()
+                || input.proportion_width_extent.is_some(),
+            direction_fixed: input.angle.is_some() || input.proportion_arc_form.is_some(),
+        }),
+    })
+}
+
+fn plan_relation(relation: Relation) -> PlanRelation {
+    PlanRelation {
+        kind: relation.kind,
+        gap: relation.gap,
+        target_object_index: relation.target_instruction_index,
+        position_authority: relation.position_authority,
+        touching_constraints: relation.touching_constraints,
     }
 }
 
@@ -335,6 +508,8 @@ fn lower_macro_instruction(
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
     mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
+    mut transform_groups: Option<&mut Vec<TransformGroupPlan>>,
+    score_transform_groups: &mut Vec<TransformGroup>,
 ) {
     let caller_invalid = append_macro_caller_diagnostics(
         source_instruction_index,
@@ -364,11 +539,71 @@ fn lower_macro_instruction(
     };
 
     let mut delivery_nodes = Vec::new();
-    collect_macro_delivery_nodes(&expansion.nodes, &mut delivery_nodes);
+    let mut transform_stack = Vec::new();
+    let mut transforms = Vec::new();
+    collect_macro_delivery_nodes(
+        &expansion.nodes,
+        &mut transform_stack,
+        &mut delivery_nodes,
+        &mut transforms,
+    );
+    let invalid_transforms = transforms
+        .iter()
+        .copied()
+        .filter(|scope| macro_rotation_degrees(*scope).is_none())
+        .collect::<Vec<_>>();
+    for scope in invalid_transforms.iter().copied().filter(|scope| {
+        !invalid_transforms
+            .iter()
+            .copied()
+            .any(|ancestor| scope_contains(ancestor, *scope))
+    }) {
+        let reason = ScoreFieldGap::UnsupportedMacroStructure;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: generated_owner(source_instruction_index, scope.provenance, None),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::MacroStructuralSubtree {
+                    source_instruction_index,
+                    invocation_ordinal: scope.provenance.invocation.invocation_ordinal,
+                    expansion_path: scope.provenance.expansion_path.clone(),
+                    generated_ordinal: scope.provenance.generated_ordinal,
+                },
+                None,
+            ),
+            reason,
+        });
+    }
+    let mut transform_ranges = transforms
+        .iter()
+        .copied()
+        .filter_map(|scope| {
+            macro_rotation_degrees(scope).and_then(|rotation_degrees| {
+                (!invalid_transforms
+                    .iter()
+                    .copied()
+                    .any(|ancestor| scope_contains(ancestor, scope)))
+                .then_some((
+                    scope.provenance.generated_ordinal,
+                    MacroTransformRange {
+                        scope: scope.provenance.clone(),
+                        rotation_degrees,
+                        start: usize::MAX,
+                        end: 0,
+                        fixed_position_indices: Vec::new(),
+                    },
+                ))
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
     let emit_nodes = delivery_nodes
         .iter()
         .enumerate()
-        .filter_map(|(index, node)| match node {
+        .filter_map(|(index, delivery)| {
+            (!is_in_invalid_transform(delivery, &invalid_transforms)).then_some((index, delivery))
+        })
+        .filter_map(|(index, delivery)| match delivery.node {
             ExpandedMacroNode::Emit {
                 binding,
                 provenance,
@@ -379,7 +614,11 @@ fn lower_macro_instruction(
         .collect::<Vec<_>>();
     let mut relation_by_to = BTreeMap::new();
     let mut invalid_relation_targets = BTreeSet::new();
-    for &node in &delivery_nodes {
+    for delivery in &delivery_nodes {
+        if is_in_invalid_transform(delivery, &invalid_transforms) {
+            continue;
+        }
+        let node = delivery.node;
         let ExpandedMacroNode::Relation {
             kind,
             from,
@@ -405,12 +644,7 @@ fn lower_macro_instruction(
             to == from + 1
                 && delivery_nodes[emit_nodes[from].2 + 1..emit_nodes[to].2]
                     .iter()
-                    .all(|node| {
-                        !matches!(
-                            node,
-                            ExpandedMacroNode::Transform { .. } | ExpandedMacroNode::Anchor { .. }
-                        )
-                    })
+                    .all(|node| !matches!(node.node, ExpandedMacroNode::Anchor { .. }))
         }) && relation_by_to
             .insert(to.clone(), (from.clone(), kind.as_str()))
             .is_none()
@@ -446,7 +680,11 @@ fn lower_macro_instruction(
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut center_bindings = BTreeSet::new();
 
-    for &node in &delivery_nodes {
+    for delivery in &delivery_nodes {
+        let node = delivery.node;
+        if is_in_invalid_transform(delivery, &invalid_transforms) {
+            continue;
+        }
         let ExpandedMacroNode::Emit {
             binding,
             fields,
@@ -485,20 +723,6 @@ fn lower_macro_instruction(
         let relation_dependency = binding
             .as_ref()
             .and_then(|binding| relation_by_to.get(binding));
-        if objects.is_some() && relation_dependency.is_some() {
-            let reason = ScoreFieldGap::UnsupportedMacroRelation;
-            diagnostics.push(ScoreLoweringDiagnostic {
-                owner: generated_owner(source_instruction_index, provenance, None),
-                disposition: diagnostic_disposition(
-                    error_policy,
-                    &reason,
-                    macro_emit_unit(source_instruction_index, provenance),
-                    None,
-                ),
-                reason,
-            });
-            continue;
-        }
         if let Some((dependency, _)) = relation_dependency
             && !successful_bindings.contains_key(dependency)
         {
@@ -624,7 +848,7 @@ fn lower_macro_instruction(
                 resolve_projected_instruction(input, context, error_policy, |input, context| {
                     resolve_object_plan(input, context, origin.clone())
                 });
-            append_plan_attempt(
+            let object_index = append_plan_attempt(
                 attempt,
                 |reason| {
                     generated_owner(
@@ -638,6 +862,53 @@ fn lower_macro_instruction(
                 objects,
                 diagnostics,
             );
+            let Some(object_index) = object_index else {
+                continue;
+            };
+            if let Some((dependency, kind)) = relation_dependency {
+                let target_object_index = successful_bindings[dependency];
+                let prior = &objects[target_object_index];
+                let current = &objects[object_index];
+                let relation = checked_macro_relation(
+                    kind,
+                    input,
+                    Some(target_object_index),
+                    Some(prior.primitive()),
+                    prior.arc_form(),
+                    center_bindings.contains(dependency),
+                    current.primitive(),
+                    current.arc_form(),
+                );
+                match relation {
+                    Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
+                    Err(reason) => {
+                        objects.pop();
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: generated_owner(source_instruction_index, provenance, None),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                macro_emit_unit(source_instruction_index, provenance),
+                                None,
+                            ),
+                            reason,
+                        });
+                        continue;
+                    }
+                }
+            }
+            record_macro_transform_ranges(
+                &mut transform_ranges,
+                &delivery.transform_stack,
+                object_index,
+                input.exact_position().is_some(),
+            );
+            if let Some(binding) = binding {
+                successful_bindings.insert(binding.clone(), object_index);
+                if input.effective_focus.is_some() {
+                    center_bindings.insert(binding.clone());
+                }
+            }
             continue;
         }
         let attempt = lower_projected_instruction(input, context, error_policy);
@@ -677,9 +948,20 @@ fn lower_macro_instruction(
         }
         if let Some(mut score_instruction) = attempt.instruction {
             if let Some((dependency, kind)) = relation_dependency {
-                if *kind == "not_touching" {
-                    if input.effective_focus.is_none() {
-                        let reason = ScoreFieldGap::UnsupportedMacroRelation;
+                let target_instruction_index = successful_bindings.get(dependency).copied();
+                let prior = target_instruction_index.and_then(|index| instructions.get(index));
+                match checked_macro_relation(
+                    kind,
+                    input,
+                    target_instruction_index,
+                    prior.map(|instruction| instruction.primitive),
+                    prior.and_then(|instruction| instruction.arc_form),
+                    center_bindings.contains(dependency),
+                    score_instruction.primitive,
+                    score_instruction.arc_form,
+                ) {
+                    Ok(relation) => score_instruction.relation = Some(relation),
+                    Err(reason) => {
                         diagnostics.push(ScoreLoweringDiagnostic {
                             owner: generated_owner(source_instruction_index, provenance, None),
                             disposition: diagnostic_disposition(
@@ -692,80 +974,16 @@ fn lower_macro_instruction(
                         });
                         continue;
                     }
-                    score_instruction.relation = Some(Relation {
-                        kind: RelationType::NotTouching,
-                        gap: RelationGap::Medium,
-                        target_instruction_index: None,
-                        position_authority: None,
-                        touching_constraints: None,
-                    });
-                } else {
-                    let touching = *kind == "touching";
-                    let line_relation = matches!(*kind, "along" | "cutting");
-                    let target_instruction_index = successful_bindings[dependency];
-                    let prior_supported =
-                        instructions
-                            .get(target_instruction_index)
-                            .is_some_and(|prior| {
-                                if line_relation {
-                                    prior.primitive == Primitive::Line
-                                } else {
-                                    (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-                                        && prior.arc_form.is_none())
-                                        || (!touching && prior.primitive == Primitive::Point)
-                                }
-                            });
-                    let current_supported = if line_relation {
-                        score_instruction.primitive == Primitive::Line
-                    } else {
-                        matches!(
-                            score_instruction.primitive,
-                            Primitive::Line | Primitive::Arc
-                        ) && score_instruction.arc_form.is_none()
-                            || (!touching && score_instruction.primitive == Primitive::Point)
-                    };
-                    if !prior_supported
-                        || !current_supported
-                        || (!line_relation
-                            && (input.effective_focus.is_none()
-                                || !center_bindings.contains(dependency)))
-                    {
-                        let reason = ScoreFieldGap::UnsupportedMacroRelation;
-                        diagnostics.push(ScoreLoweringDiagnostic {
-                            owner: generated_owner(source_instruction_index, provenance, None),
-                            disposition: diagnostic_disposition(
-                                error_policy,
-                                &reason,
-                                macro_emit_unit(source_instruction_index, provenance),
-                                None,
-                            ),
-                            reason,
-                        });
-                        continue;
-                    }
-                    score_instruction.relation = Some(Relation {
-                        kind: match *kind {
-                            "along" => RelationType::Along,
-                            "cutting" => RelationType::Cutting,
-                            "touching" => RelationType::Touching,
-                            "connected" => RelationType::Connected,
-                            _ => unreachable!("checked macro relation kind"),
-                        },
-                        gap: RelationGap::Medium,
-                        target_instruction_index: Some(target_instruction_index),
-                        position_authority: Some(ConnectedPositionAuthority::NamedMovable),
-                        touching_constraints: touching.then_some(TouchingConstraints {
-                            dimensions_fixed: input.exact_geometry().is_some()
-                                || input.relative_scale.is_some()
-                                || input.proportion_width_extent.is_some(),
-                            direction_fixed: input.angle.is_some()
-                                || input.proportion_arc_form.is_some(),
-                        }),
-                    });
                 }
             }
             let score_index = instructions.len();
             instructions.push(score_instruction);
+            record_macro_transform_ranges(
+                &mut transform_ranges,
+                &delivery.transform_stack,
+                score_index,
+                input.exact_position().is_some(),
+            );
             if let Some(binding) = binding {
                 successful_bindings.insert(binding.clone(), score_index);
                 if input.effective_focus.is_some() {
@@ -778,6 +996,41 @@ fn lower_macro_instruction(
                 provenance: provenance.clone(),
             });
         }
+    }
+    let mut completed_ranges = transform_ranges
+        .into_values()
+        .filter(|range| range.end > range.start)
+        .collect::<Vec<_>>();
+    completed_ranges.sort_by(|left, right| {
+        let left_path = &left.scope.expansion_path;
+        let right_path = &right.scope.expansion_path;
+        if left_path.len() < right_path.len() && right_path.starts_with(left_path) {
+            std::cmp::Ordering::Greater
+        } else if right_path.len() < left_path.len() && left_path.starts_with(right_path) {
+            std::cmp::Ordering::Less
+        } else {
+            left_path.cmp(right_path)
+        }
+    });
+    if let Some(groups) = transform_groups.as_deref_mut() {
+        groups.extend(
+            completed_ranges
+                .into_iter()
+                .map(|range| TransformGroupPlan {
+                    start: range.start,
+                    end: range.end,
+                    rotation_degrees: range.rotation_degrees,
+                    fixed_position_indices: range.fixed_position_indices,
+                    provenance: range.scope,
+                }),
+        );
+    } else {
+        score_transform_groups.extend(completed_ranges.into_iter().map(|range| TransformGroup {
+            start: range.start,
+            end: range.end,
+            rotation_degrees: range.rotation_degrees,
+            fixed_position_indices: range.fixed_position_indices,
+        }));
     }
 }
 
@@ -1469,7 +1722,7 @@ pub fn lower_verified_stage15_score_with_policy<'a>(
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
 ) -> ExplicitScoreLoweringResult<'a> {
-    lower_verified_stage15_shared(view, context, error_policy, None)
+    lower_verified_stage15_shared(view, context, error_policy, None, None)
 }
 
 pub(crate) fn resolve_composition_plan<'a>(
@@ -1478,7 +1731,14 @@ pub(crate) fn resolve_composition_plan<'a>(
     error_policy: ScoreErrorPolicy,
 ) -> CompositionPlanResult<'a> {
     let mut objects = Vec::new();
-    let result = lower_verified_stage15_shared(view, context, error_policy, Some(&mut objects));
+    let mut transform_groups = Vec::new();
+    let result = lower_verified_stage15_shared(
+        view,
+        context,
+        error_policy,
+        Some(&mut objects),
+        Some(&mut transform_groups),
+    );
     let outcome = match result.outcome {
         ScoreLoweringOutcome::Stopped => CompositionPlanOutcome::Stopped,
         _ if objects.is_empty() => CompositionPlanOutcome::Stopped,
@@ -1487,6 +1747,7 @@ pub(crate) fn resolve_composition_plan<'a>(
     };
     if outcome == CompositionPlanOutcome::Stopped {
         objects.clear();
+        transform_groups.clear();
     }
     CompositionPlanResult {
         view,
@@ -1495,6 +1756,7 @@ pub(crate) fn resolve_composition_plan<'a>(
         policy_digest: result.policy_digest,
         outcome,
         objects,
+        transform_groups,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
     }
@@ -1505,12 +1767,14 @@ fn lower_verified_stage15_shared<'a>(
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
     mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
+    mut transform_groups: Option<&mut Vec<TransformGroupPlan>>,
 ) -> ExplicitScoreLoweringResult<'a> {
     let candidate = lower_verified_stage15_view(view);
     let document = candidate
         .verified_effective_view()
         .original_semantic_document();
     let mut diagnostics = Vec::new();
+    let mut score_transform_groups = Vec::new();
     let mut omitted_group_members = BTreeSet::new();
 
     let ground =
@@ -1730,6 +1994,8 @@ fn lower_verified_stage15_shared<'a>(
                     &mut instruction_origins,
                     &mut diagnostics,
                     objects.as_deref_mut(),
+                    transform_groups.as_deref_mut(),
+                    &mut score_transform_groups,
                 );
             }
         }
@@ -1769,6 +2035,7 @@ fn lower_verified_stage15_shared<'a>(
         background: context.background,
         presence: None,
         instructions,
+        transform_groups: score_transform_groups,
     });
     if score.is_none() {
         instruction_origins.clear();
@@ -2753,6 +3020,7 @@ fn resolve_object_plan(
             anchor,
             domain,
             recipe,
+            relation: None,
         })
     };
     build().map_err(|gap| vec![gap])
@@ -2765,7 +3033,7 @@ fn append_plan_attempt(
     error_policy: ScoreErrorPolicy,
     objects: &mut Vec<ObjectPlacementPlan>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
-) {
+) -> Option<usize> {
     for omission in attempt.appearance_omissions {
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: owner(&omission.reason),
@@ -2788,7 +3056,11 @@ fn append_plan_attempt(
         });
     }
     if let Some(object) = attempt.instruction {
+        let index = objects.len();
         objects.push(object);
+        Some(index)
+    } else {
+        None
     }
 }
 

@@ -242,8 +242,14 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         .iter()
         .copied()
         .zip(performance.score.instructions.iter())
+        .zip(performance.instruction_seed_overrides.iter().copied())
+        .map(
+            |((instruction_index, instruction), instruction_seed_override)| {
+                (instruction_index, instruction, instruction_seed_override)
+            },
+        )
         .collect::<Vec<_>>();
-    ordered.sort_by_key(|(_, instruction)| instruction.mode_ == InstructionMode::Carve);
+    ordered.sort_by_key(|(_, instruction, _)| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
         .options
         .composition_seed
@@ -277,7 +283,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         }
     }
     let mut surface_definitions = Vec::new();
-    for (instruction_index, instruction) in ordered {
+    for (instruction_index, instruction, instruction_seed_override) in ordered {
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
                 instruction,
@@ -298,6 +304,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
                 color_map: &request.options.resolved_color_map,
                 work_assignment: &assignment,
                 render_seed: request.options.render_seed,
+                instruction_seed_override,
                 instruction_index,
                 mark_index,
                 wild: request.options.wild,

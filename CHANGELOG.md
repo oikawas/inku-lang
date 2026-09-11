@@ -15,6 +15,22 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Group rotation and external connections
+
+Rotation-only Macro Transforms now reach Scores and repetition plans through the shared lowerer. After placement and internal relations resolve, groups rotate inner to outer about the combined child-shape bounding-box center. Connected to an external prior shape translates the whole group while preserving internal placement. Numeric-position constraints, named clipping, Stop / OmitAndContinue, and original references, ownership, and seeds remain intact. Repeated plans retain relation intent referencing original objects without materializing instances.
+
+Score advances to 0.4.0 with optional `transform_groups`, preserving saved 0.1.0 / 0.2.0 / 0.3.0 and versionless compatibility. The shared contract, server schema, and Android preservation agree. DDL engine advances to 25 for deterministic group delivery and render engine to 50 for group performance. DDL vocabulary version 6 and APP/build are unchanged. Transform translate / scale and full typed runtime / UI / save integration remain incomplete.
+
+Focused shared Score, server, and Android compatibility and malformed-group checks passed, along with two Macro-delivery tests and three Linux tests for rotation, external connections, and Stop / Omit. One rotation expectation used the wrong pentagon orientation; only that test was corrected and rerun successfully. The [render50 corpus](server/reference/render-engine-50/manifest.json) was generated once: all 616 prior inputs and outputs are unchanged, with two new rotation/connection cases bringing the total to 618. The [DDL25 corpus](server/reference/ddl-engine-25/manifest.json) was also generated once; all 55 prior inputs and outputs are unchanged. Older references remain, and full-work PNGs and passing tests were not rerun solely for the reference update.
+
+---
+
+### 2026-09-11 — Define the pivot for a group rotation
+
+The Macro Transform pivot is the center of the combined child-shape bounding box before rotation, rotating relative positions and orientations together. Transform delivery to Score remains unimplemented; recording this decision changes no rendering behavior or version.
+
+---
+
 ### 2026-09-11 — Preserve Along direction and Cutting dimensions
 
 Ordinary DDL and adjacent Macro Line Emits with count one now deliver `along` / `cutting` through the shared checked performer. Along aligns an unspecified current direction parallel to the prior line. Cutting retains normal or explicit dimensions instead of generating a relation-specific random length. Explicit direction and numeric position remain authoritative; incompatible constraints and lost references follow Stop / OmitAndContinue. Original references, ownership, and seeds are retained without retargeting to another surviving line.

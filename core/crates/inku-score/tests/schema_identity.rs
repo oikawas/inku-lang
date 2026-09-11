@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "72666c47e813037ae6781a94ed745c54b55bc017fa5664e2748786f449622e4a";
+    "518648e384cad82fb7570ce7dffcb8e5d070371c0e1f16ef398de27cb91634fd";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -22,6 +22,7 @@ fn canonical_score_schema_identity_is_stable() {
         "background",
         "presence",
         "instructions",
+        "transform_groups",
     ] {
         assert!(
             properties.contains_key(required),
@@ -59,6 +60,16 @@ fn canonical_score_schema_identity_is_stable() {
     );
     assert!(relation.contains_key("target_instruction_index"));
     assert!(relation.contains_key("position_authority"));
+
+    let transform_group = schema["$defs"]["TransformGroup"]["properties"]
+        .as_object()
+        .expect("TransformGroup properties must be an object");
+    for required in ["start", "end", "rotation_degrees", "fixed_position_indices"] {
+        assert!(
+            transform_group.contains_key(required),
+            "missing TransformGroup property {required}"
+        );
+    }
 
     assert_eq!(SCORE_SCHEMA_DIGEST_DOMAIN, "inku.score.schema.v1");
     let mut hasher = Sha256::new();

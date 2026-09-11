@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
-use crate::determinism::{hash01, instruction_seed};
+use crate::determinism::hash01;
 use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle};
@@ -152,7 +152,7 @@ pub(crate) fn solid_mottle_filter_id(
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> (String, u32) {
-    let seed = instruction_seed(instruction, context.render_seed);
+    let seed = context.seed_for(instruction);
     let identity = format!(
         "{seed}:{}:{}:solid-mottle",
         context.instruction_index, context.mark_index
@@ -284,7 +284,7 @@ fn oil_paint_fill(
     opacity: f64,
 ) -> Element {
     let accepted = style.fill && crate::accepted_fills::solid_fill(instruction);
-    let seed = instruction_seed(instruction, context.render_seed);
+    let seed = context.seed_for(instruction);
     let angle = hash01(0, seed, "oil-fill-angle") * std::f64::consts::PI;
     let normal = Point::new(-angle.sin(), angle.cos());
     let (low, high) = contour
@@ -506,7 +506,7 @@ pub(crate) fn render_interior_fill(
     if !uses_hand_stroke(instruction.weight) {
         return None;
     }
-    let seed = instruction_seed(instruction, context.render_seed);
+    let seed = context.seed_for(instruction);
     let angle = hash01(0, seed, "fill-angle") * std::f64::consts::PI;
     let classic_spacing = (style.width * FILL_SPACING_WIDTH_GAIN)
         .max(context.canvas.unit() * FILL_SPACING_UNIT_RATIO);

@@ -3,16 +3,17 @@
 use inku_score::{
     Canvas, ConnectedPositionAuthority, Instruction, Layout, Primitive, RelationGap, RelationType,
     Score, ScoreErrorPolicy, ScoreExecutionDiagnostic, ScoreExecutionDisposition,
-    ScoreExecutionReason, ScoreExecutionSummary, canonical_score_digest,
+    ScoreExecutionReason, ScoreExecutionSummary, TransformGroup, canonical_score_digest,
 };
 
 use crate::performance::{
     PerformancePlan, PerformanceRequest, expand_composite_groups_with_indices, resolve_performance,
 };
 use crate::planning::{
-    endpoint_geometry, ensure_line_coordinates, instruction_anchor_on_canvas,
-    performed_arc_sagitta, performed_instruction_bounds_on_canvas, resolve_at_region,
-    resolve_relation_on_canvas, touching_candidate, translate_endpoint_instruction_on_canvas,
+    endpoint_geometry, ensure_line_coordinates, group_instruction_bounds_on_canvas,
+    instruction_anchor_on_canvas, performed_arc_sagitta, performed_instruction_bounds_on_canvas,
+    resolve_at_region, resolve_relation_on_canvas, rotate_instruction_about_on_canvas,
+    touching_candidate, translate_endpoint_instruction_on_canvas, translate_instruction_on_canvas,
 };
 
 const GEOMETRY_EPSILON: f64 = 1.0e-9;
@@ -474,11 +475,143 @@ fn structural_instruction_indices(score: &Score) -> Vec<bool> {
     structural
 }
 
+fn enclosing_external_group(
+    groups: &[TransformGroup],
+    source: usize,
+    dependency: usize,
+) -> Option<usize> {
+    groups
+        .iter()
+        .enumerate()
+        .filter(|(_, group)| {
+            group.start <= source
+                && source < group.end
+                && !(group.start <= dependency && dependency < group.end)
+        })
+        .min_by(|(left_index, left), (right_index, right)| {
+            left.start
+                .cmp(&right.start)
+                .then_with(|| right.end.cmp(&left.end))
+                .then_with(|| right_index.cmp(left_index))
+        })
+        .map(|(index, _)| index)
+}
+
+fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
+    groups
+        .iter()
+        .any(|group| group.start <= index && index < group.end)
+}
+
+fn remove_omitted(
+    resolved: &mut Vec<Instruction>,
+    instruction_indices: &mut Vec<usize>,
+    original_instruction_indices: &mut Vec<usize>,
+    omitted_original: &[bool],
+) {
+    let mut kept = Vec::with_capacity(resolved.len());
+    for ((instruction, performance_index), original_index) in std::mem::take(resolved)
+        .into_iter()
+        .zip(std::mem::take(instruction_indices))
+        .zip(std::mem::take(original_instruction_indices))
+    {
+        if !omitted_original[original_index] {
+            kept.push((instruction, performance_index, original_index));
+        }
+    }
+    for (instruction, performance_index, original_index) in kept {
+        resolved.push(instruction);
+        instruction_indices.push(performance_index);
+        original_instruction_indices.push(original_index);
+    }
+}
+
+fn omit_transform_group(
+    group: &TransformGroup,
+    omitted_original: &mut [bool],
+    by_original_index: &mut [Option<Instruction>],
+    resolved: &mut Vec<Instruction>,
+    instruction_indices: &mut Vec<usize>,
+    original_instruction_indices: &mut Vec<usize>,
+) {
+    for index in group.start..group.end {
+        omitted_original[index] = true;
+        by_original_index[index] = None;
+    }
+    remove_omitted(
+        resolved,
+        instruction_indices,
+        original_instruction_indices,
+        omitted_original,
+    );
+}
+
+fn record_transform_group_failure(
+    group: &TransformGroup,
+    reason: ScoreExecutionReason,
+    policy: ScoreErrorPolicy,
+    diagnostics: &mut Vec<ScoreExecutionDiagnostic>,
+    omitted_original: &mut [bool],
+    by_original_index: &mut [Option<Instruction>],
+    resolved: &mut Vec<Instruction>,
+    instruction_indices: &mut Vec<usize>,
+    original_instruction_indices: &mut Vec<usize>,
+) {
+    diagnostics.push(connected_failure(group.start, None, reason, policy));
+    omit_transform_group(
+        group,
+        omitted_original,
+        by_original_index,
+        resolved,
+        instruction_indices,
+        original_instruction_indices,
+    );
+}
+
+fn omit_current_or_enclosing_group(
+    groups: &[TransformGroup],
+    original_index: usize,
+    omitted_original: &mut [bool],
+    by_original_index: &mut [Option<Instruction>],
+    resolved: &mut Vec<Instruction>,
+    instruction_indices: &mut Vec<usize>,
+    original_instruction_indices: &mut Vec<usize>,
+) {
+    if let Some(group) = groups
+        .iter()
+        .rev()
+        .find(|group| group.start <= original_index && original_index < group.end)
+    {
+        omit_transform_group(
+            group,
+            omitted_original,
+            by_original_index,
+            resolved,
+            instruction_indices,
+            original_instruction_indices,
+        );
+    } else {
+        omitted_original[original_index] = true;
+        by_original_index[original_index] = None;
+    }
+}
+
 /// Resolve checked endpoint relations before SVG construction with original Score indices.
 pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
+    if request.score.validate_transform_groups().is_err() {
+        return Err(CheckedPerformanceError {
+            diagnostics: vec![ScoreExecutionDiagnostic {
+                instruction_index: 0,
+                dependency_instruction_index: None,
+                reason: ScoreExecutionReason::InvalidTransformGroup,
+                disposition: ScoreExecutionDisposition::Stopped,
+            }],
+        });
+    }
+    let has_transform_groups = !request.score.transform_groups.is_empty();
     let has_checked_relation = request.score.instructions.iter().any(|instruction| {
         instruction.relation.as_ref().is_some_and(|relation| {
             relation.kind == RelationType::Connected
@@ -487,7 +620,7 @@ pub fn resolve_checked_performance(
                 || is_checked_line_relation(relation, RelationType::Cutting)
         })
     });
-    if !has_checked_relation {
+    if !has_checked_relation && !has_transform_groups {
         return Ok(resolve_performance(request));
     }
 
@@ -505,6 +638,11 @@ pub fn resolve_checked_performance(
     let mut omitted_original = vec![false; request.score.instructions.len()];
     let mut by_original_index: Vec<Option<Instruction>> =
         vec![None; request.score.instructions.len()];
+    let mut performance_index_by_original: Vec<Option<usize>> =
+        vec![None; request.score.instructions.len()];
+    let mut seed_material: Vec<Option<Instruction>> = vec![None; request.score.instructions.len()];
+    let mut deferred_external_connected =
+        vec![Vec::<(usize, usize)>::new(); request.score.transform_groups.len()];
     let mut resolved = Vec::with_capacity(expanded.instructions.len());
     let mut instruction_indices = Vec::with_capacity(expanded.instructions.len());
     let mut original_instruction_indices = Vec::with_capacity(expanded.instructions.len());
@@ -517,6 +655,9 @@ pub fn resolve_checked_performance(
         .zip(&expanded.instructions)
         .enumerate()
     {
+        if omitted_original[original_index] {
+            continue;
+        }
         let mut instruction = ensure_line_coordinates(original);
         if let Some(seed) = seed {
             instruction = resolve_at_region(&instruction, seed, performance_index, request.canvas);
@@ -537,7 +678,87 @@ pub fn resolve_checked_performance(
             .relation
             .as_ref()
             .is_some_and(|relation| is_checked_line_relation(relation, RelationType::Cutting));
-        if touching {
+        let external_group = instruction.relation.as_ref().and_then(|relation| {
+            let dependency = relation
+                .target_instruction_index
+                .or_else(|| match relation.kind {
+                    RelationType::Between => original_index.checked_sub(2),
+                    _ => original_index.checked_sub(1),
+                })?;
+            enclosing_external_group(&request.score.transform_groups, original_index, dependency)
+        });
+        if let Some(group_index) = external_group
+            && !connected
+        {
+            diagnostics.push(connected_failure(
+                original_index,
+                instruction
+                    .relation
+                    .as_ref()
+                    .and_then(|relation| relation.target_instruction_index),
+                ScoreExecutionReason::UnsupportedTransformGroupRelation,
+                policy,
+            ));
+            if policy == ScoreErrorPolicy::Stop {
+                return Err(CheckedPerformanceError { diagnostics });
+            }
+            omit_transform_group(
+                &request.score.transform_groups[group_index],
+                &mut omitted_original,
+                &mut by_original_index,
+                &mut resolved,
+                &mut instruction_indices,
+                &mut original_instruction_indices,
+            );
+            continue;
+        }
+        if let Some(group_index) = external_group {
+            let relation = instruction.relation.as_ref().expect("external Connected");
+            let dependency = relation.target_instruction_index;
+            let reason = if structural[original_index]
+                || dependency
+                    .is_some_and(|dependency| structural.get(dependency).copied().unwrap_or(false))
+                || !supports_connected(&instruction)
+            {
+                Some(ScoreExecutionReason::UnsupportedConnectedStructure)
+            } else if dependency != original_index.checked_sub(1) {
+                Some(ScoreExecutionReason::MissingConnectedReference)
+            } else if dependency
+                .and_then(|dependency| by_original_index.get(dependency))
+                .and_then(Option::as_ref)
+                .is_none()
+            {
+                Some(ScoreExecutionReason::ConnectedReferenceOmitted)
+            } else if relation.position_authority.is_none() {
+                Some(ScoreExecutionReason::MissingConnectedPositionAuthority)
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                diagnostics.push(connected_failure(
+                    original_index,
+                    dependency,
+                    reason,
+                    policy,
+                ));
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                omit_transform_group(
+                    &request.score.transform_groups[group_index],
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
+                continue;
+            }
+            deferred_external_connected[group_index].push((
+                original_index,
+                dependency.expect("validated previous dependency"),
+            ));
+        } else if touching {
             let relation = instruction.relation.as_ref().expect("checked above");
             let dependency = relation.target_instruction_index;
             let candidate = if structural[original_index]
@@ -569,8 +790,15 @@ pub fn resolve_checked_performance(
                     if policy == ScoreErrorPolicy::Stop {
                         return Err(CheckedPerformanceError { diagnostics });
                     }
-                    omitted_original[original_index] = true;
-                    by_original_index[original_index] = None;
+                    omit_current_or_enclosing_group(
+                        &request.score.transform_groups,
+                        original_index,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
                     continue;
                 }
             }
@@ -631,8 +859,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
             let dependency = dependency.expect("validated previous dependency");
@@ -649,8 +884,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
             let candidate = if along {
@@ -684,8 +926,15 @@ pub fn resolve_checked_performance(
                     if policy == ScoreErrorPolicy::Stop {
                         return Err(CheckedPerformanceError { diagnostics });
                     }
-                    omitted_original[original_index] = true;
-                    by_original_index[original_index] = None;
+                    omit_current_or_enclosing_group(
+                        &request.score.transform_groups,
+                        original_index,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
                     continue;
                 }
             }
@@ -724,8 +973,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
 
@@ -743,8 +999,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
             let geometry = endpoint_geometry(prior, request.canvas)
@@ -759,8 +1022,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             };
             let delta = crate::types::Point::new(
@@ -779,8 +1049,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
             instruction = translate_endpoint_instruction_on_canvas(
@@ -811,8 +1088,15 @@ pub fn resolve_checked_performance(
                 if policy == ScoreErrorPolicy::Stop {
                     return Err(CheckedPerformanceError { diagnostics });
                 }
-                omitted_original[original_index] = true;
-                by_original_index[original_index] = None;
+                omit_current_or_enclosing_group(
+                    &request.score.transform_groups,
+                    original_index,
+                    &mut omitted_original,
+                    &mut by_original_index,
+                    &mut resolved,
+                    &mut instruction_indices,
+                    &mut original_instruction_indices,
+                );
                 continue;
             }
             let relation = resolve_relation_on_canvas(
@@ -828,9 +1112,265 @@ pub fn resolve_checked_performance(
             }
         }
         by_original_index[original_index] = Some(instruction.clone());
+        performance_index_by_original[original_index] = Some(performance_index);
+        if in_any_transform_group(&request.score.transform_groups, original_index) {
+            seed_material[original_index] = Some(instruction.clone());
+        }
         instruction_indices.push(performance_index);
         original_instruction_indices.push(original_index);
         resolved.push(instruction);
+
+        for group_index in 0..request.score.transform_groups.len() {
+            let group = &request.score.transform_groups[group_index];
+            if group.end != original_index + 1 {
+                continue;
+            }
+            let mut bounds: Option<crate::planning::Bounds> = None;
+            for member_index in group.start..group.end {
+                let Some(member) = by_original_index[member_index].as_ref() else {
+                    record_transform_group_failure(
+                        group,
+                        ScoreExecutionReason::ConnectedReferenceOmitted,
+                        policy,
+                        &mut diagnostics,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
+                    break;
+                };
+                let seed_override = seed_material[member_index]
+                    .as_ref()
+                    .map(|material| crate::determinism::instruction_seed(material, seed));
+                let Some(member_bounds) = group_instruction_bounds_on_canvas(
+                    member,
+                    seed,
+                    performance_index_by_original[member_index]
+                        .expect("group member has a performance ordinal"),
+                    request.canvas,
+                    seed_override,
+                ) else {
+                    record_transform_group_failure(
+                        group,
+                        ScoreExecutionReason::UnsupportedTransformGroupRelation,
+                        policy,
+                        &mut diagnostics,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
+                    break;
+                };
+                bounds = Some(match bounds {
+                    Some(mut combined) => {
+                        combined.min.x = combined.min.x.min(member_bounds.min.x);
+                        combined.min.y = combined.min.y.min(member_bounds.min.y);
+                        combined.max.x = combined.max.x.max(member_bounds.max.x);
+                        combined.max.y = combined.max.y.max(member_bounds.max.y);
+                        combined
+                    }
+                    None => member_bounds,
+                });
+            }
+            if omitted_original[group.start..group.end]
+                .iter()
+                .any(|omitted| *omitted)
+            {
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                continue;
+            }
+            let Some(bounds) = bounds else {
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                continue;
+            };
+            for member_index in group.start..group.end {
+                let member = by_original_index[member_index]
+                    .as_ref()
+                    .expect("group bounds validated every member");
+                let Some(rotated) = rotate_instruction_about_on_canvas(
+                    member,
+                    bounds.center(),
+                    group.rotation_degrees,
+                    request.canvas,
+                ) else {
+                    record_transform_group_failure(
+                        group,
+                        ScoreExecutionReason::UnsupportedTransformGroupRelation,
+                        policy,
+                        &mut diagnostics,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
+                    break;
+                };
+                by_original_index[member_index] = Some(rotated);
+            }
+            if omitted_original[group.start..group.end]
+                .iter()
+                .any(|omitted| *omitted)
+            {
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                continue;
+            }
+            for &(source_index, dependency_index) in &deferred_external_connected[group_index] {
+                let source = by_original_index[source_index]
+                    .as_ref()
+                    .expect("deferred source remains in its group")
+                    .clone();
+                let prior = by_original_index[dependency_index]
+                    .as_ref()
+                    .expect("deferred dependency was validated")
+                    .clone();
+                let authority = source
+                    .relation
+                    .as_ref()
+                    .expect("deferred Connected relation")
+                    .position_authority;
+                let geometry = endpoint_geometry(&prior, request.canvas)
+                    .zip(endpoint_geometry(&source, request.canvas));
+                let Some((prior_geometry, source_geometry)) = geometry else {
+                    record_transform_group_failure(
+                        group,
+                        ScoreExecutionReason::UnsupportedConnectedPrimitive,
+                        policy,
+                        &mut diagnostics,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
+                    break;
+                };
+                let delta = crate::types::Point::new(
+                    prior_geometry.1.x - source_geometry.0.x,
+                    prior_geometry.1.y - source_geometry.0.y,
+                );
+                if (authority == Some(ConnectedPositionAuthority::NumericFixed)
+                    || !group.fixed_position_indices.is_empty())
+                    && delta.x.hypot(delta.y) > GEOMETRY_EPSILON
+                {
+                    record_transform_group_failure(
+                        group,
+                        ScoreExecutionReason::NumericConnectedPositionConflict,
+                        policy,
+                        &mut diagnostics,
+                        &mut omitted_original,
+                        &mut by_original_index,
+                        &mut resolved,
+                        &mut instruction_indices,
+                        &mut original_instruction_indices,
+                    );
+                    break;
+                }
+                if delta.x.hypot(delta.y) > GEOMETRY_EPSILON {
+                    for member_index in group.start..group.end {
+                        let member = by_original_index[member_index]
+                            .as_ref()
+                            .expect("group still has every member");
+                        let Some(translated) =
+                            translate_instruction_on_canvas(member, delta, request.canvas)
+                        else {
+                            record_transform_group_failure(
+                                group,
+                                ScoreExecutionReason::UnsupportedConnectedPrimitive,
+                                policy,
+                                &mut diagnostics,
+                                &mut omitted_original,
+                                &mut by_original_index,
+                                &mut resolved,
+                                &mut instruction_indices,
+                                &mut original_instruction_indices,
+                            );
+                            break;
+                        };
+                        by_original_index[member_index] = Some(translated);
+                    }
+                }
+                if let Some(source) = by_original_index[source_index].as_mut() {
+                    source.relation = None;
+                }
+            }
+            if omitted_original[group.start..group.end]
+                .iter()
+                .any(|omitted| *omitted)
+            {
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                continue;
+            }
+            let has_enclosing_group = request.score.transform_groups[group_index + 1..]
+                .iter()
+                .any(|outer| outer.start <= group.start && group.end <= outer.end);
+            if !has_enclosing_group {
+                for &fixed_index in &group.fixed_position_indices {
+                    let seed_override = seed_material[fixed_index]
+                        .as_ref()
+                        .map(|material| crate::determinism::instruction_seed(material, seed));
+                    if !group_instruction_bounds_on_canvas(
+                        by_original_index[fixed_index]
+                            .as_ref()
+                            .expect("fixed group member remains"),
+                        seed,
+                        performance_index_by_original[fixed_index]
+                            .expect("fixed group member has a performance ordinal"),
+                        request.canvas,
+                        seed_override,
+                    )
+                    .is_some_and(|member_bounds| {
+                        let extent = crate::geometry::short_side_scales(request.canvas);
+                        member_bounds.min.x >= -GEOMETRY_EPSILON
+                            && member_bounds.min.y >= -GEOMETRY_EPSILON
+                            && member_bounds.max.x <= extent.x + GEOMETRY_EPSILON
+                            && member_bounds.max.y <= extent.y + GEOMETRY_EPSILON
+                    }) {
+                        record_transform_group_failure(
+                            group,
+                            ScoreExecutionReason::NumericTransformGroupPositionConflict,
+                            policy,
+                            &mut diagnostics,
+                            &mut omitted_original,
+                            &mut by_original_index,
+                            &mut resolved,
+                            &mut instruction_indices,
+                            &mut original_instruction_indices,
+                        );
+                        break;
+                    }
+                }
+            }
+            if omitted_original[group.start..group.end]
+                .iter()
+                .any(|omitted| *omitted)
+            {
+                if policy == ScoreErrorPolicy::Stop {
+                    return Err(CheckedPerformanceError { diagnostics });
+                }
+                continue;
+            }
+            for (performed, owner) in resolved.iter_mut().zip(&original_instruction_indices) {
+                if group.start <= *owner && *owner < group.end {
+                    *performed = by_original_index[*owner]
+                        .as_ref()
+                        .expect("group members remain after transform")
+                        .clone();
+                }
+            }
+        }
     }
 
     let has_drawable_content = !resolved.is_empty()
@@ -847,6 +1387,15 @@ pub fn resolve_checked_performance(
 
     let mut score: Score = request.score.clone();
     score.instructions = resolved;
+    score.transform_groups.clear();
+    let instruction_seed_overrides = original_instruction_indices
+        .iter()
+        .map(|&index| {
+            seed_material[index]
+                .as_ref()
+                .map(|material| crate::determinism::instruction_seed(material, seed))
+        })
+        .collect();
     let execution = (!diagnostics.is_empty()).then(|| ScoreExecutionSummary {
         input_score_digest: canonical_score_digest(request.score)
             .expect("typed Score canonicalization is infallible"),
@@ -858,6 +1407,7 @@ pub fn resolve_checked_performance(
         warnings,
         instruction_indices,
         original_instruction_indices,
+        instruction_seed_overrides,
         execution,
     })
 }

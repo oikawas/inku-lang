@@ -49,12 +49,20 @@ pub struct MarkContext<'a> {
     pub color_map: &'a BTreeMap<String, String>,
     pub work_assignment: &'a BTreeMap<String, String>,
     pub render_seed: Option<Seed>,
+    pub instruction_seed_override: Option<Seed>,
     pub instruction_index: usize,
     pub mark_index: usize,
     pub wild: bool,
     pub use_filters: bool,
     pub profile: SvgProfile,
     pub support: Support,
+}
+
+impl MarkContext<'_> {
+    pub(crate) fn seed_for(self, instruction: &Instruction) -> Seed {
+        self.instruction_seed_override
+            .unwrap_or_else(|| instruction_seed(instruction, self.render_seed))
+    }
 }
 
 #[derive(Clone)]
@@ -469,7 +477,7 @@ pub fn render_instruction(
                     &contour,
                     center,
                     variation,
-                    instruction_seed(instruction, context.render_seed),
+                    context.seed_for(instruction),
                     amplitude(instruction, context.canvas),
                 );
             }
@@ -591,7 +599,7 @@ pub fn render_instruction(
                             end_degrees: end,
                         },
                         variation,
-                        instruction_seed(instruction, context.render_seed),
+                        context.seed_for(instruction),
                         amplitude(instruction, context.canvas),
                         context.canvas,
                     )
@@ -655,7 +663,7 @@ pub fn render_instruction(
             let controls = generate_cloudform_contour(CloudformRequest {
                 center: point_to_pixels(center, context.canvas),
                 size: size_to_pixels(size, context.canvas),
-                performance_seed: Some(instruction_seed(instruction, context.render_seed)),
+                performance_seed: Some(context.seed_for(instruction)),
                 instruction_index: context.instruction_index,
                 mark_index: context.mark_index,
                 variation: instruction.variation.as_ref(),
@@ -713,7 +721,7 @@ fn render_corner_shape(
     let contour = edge_contour_with_anchors(
         corners,
         variation,
-        instruction_seed(instruction, context.render_seed),
+        context.seed_for(instruction),
         amplitude(instruction, context.canvas),
         context.canvas,
     );

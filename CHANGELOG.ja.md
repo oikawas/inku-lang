@@ -15,6 +15,22 @@
 
 ---
 
+### 2026-09-11 — まとまりの回転と外部接続
+
+回転だけのMacro Transformを共通lowererからScoreと反復planへ届ける。配置と内部関係の確定後、子図形全体の外接矩形中心で内側から外側へ回転する。外の先行図形へConnectedでつなぐ場合は、内部配置を保ってまとまり全体を移動する。数値位置の子による移動制約、Named位置の見切れ、Stop / OmitAndContinueと元の参照・owner・seedを保持する。反復planにも元objectを指すrelation intentを残し、個体生成は行わない。
+
+Scoreは任意の`transform_groups`を持つ0.4.0へ進め、旧0.1.0／0.2.0／0.3.0と版省略の保存互換を保つ。共有契約、server schema、Androidの保存保持を揃えた。決定的なgroup配送と演奏の追加によりDDL engineは25、render engineは50とする。DDL語彙版6とAPP/buildは変更しない。Transformのtranslate／scaleとtyped runtime／UI／save全面接続は未完了である。
+
+共有Score／server／Androidの保存互換と不正groupの局所確認、Macro配送2件、Linuxの回転・外部接続・停止／省略3件を確認した。回転1件の五角形の期待計算を訂正した後、その1件だけ再実行し成功した。[render50参照](server/reference/render-engine-50/manifest.json)は1回生成し、旧616例の入力・出力は全て不変、回転と外部接続の2例を追加した618例となった。[DDL25参照](server/reference/ddl-engine-25/manifest.json)も1回生成し、旧55例の入力・出力は全て不変だった。旧参照を保持し、参照だけを理由に全作品PNGや成功済み試験を再実行していない。
+
+---
+
+### 2026-09-11 — まとまりの回転中心を確定
+
+Macro Transformの回転中心は、回転前の子図形全体の外接矩形中心を採用した。子同士の配置と向きをまとめて回す。TransformのScore配送はまだ未実装であり、この裁定記録では描画挙動や版を変更しない。
+
+---
+
 ### 2026-09-11 — 「沿う」の方向と「切る」の寸法を保持
 
 通常DDLとMacroの単独・隣接する線（Count1）の`along` / `cutting`を共有checked performerへ接続した。「沿う」で後の線の方向が未指定なら、前の線と平行に揃える。「切る」は通常寸法または明示寸法を保持し、専用のランダム長へ作り直さない。明示方向・数値位置を優先し、両立しない指定や失われた参照は既存のStop / OmitAndContinueで扱う。元の参照・owner・seedを保持し、残った別の線へ参照を付け替えない。

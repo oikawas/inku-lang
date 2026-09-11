@@ -25,6 +25,9 @@ pub struct PerformancePlan {
     pub instruction_indices: Vec<usize>,
     /// Original Score owners corresponding to each performed instruction.
     pub original_instruction_indices: Vec<usize>,
+    /// Stable seed material for rigid group transforms, parallel to `score.instructions`.
+    /// `None` retains the normal seed derived from the performed instruction.
+    pub instruction_seed_overrides: Vec<Option<Seed>>,
     pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
@@ -161,11 +164,13 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
         request.canvas,
     );
     let Some(seed) = request.performance_seed else {
+        let instruction_seed_overrides = vec![None; original_instruction_indices.len()];
         return PerformancePlan {
             instruction_indices: (0..expanded.instructions.len()).collect(),
             original_instruction_indices,
             score: expanded,
             warnings: Vec::new(),
+            instruction_seed_overrides,
             execution: None,
         };
     };
@@ -199,11 +204,13 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     let mut score = expanded;
     score.instructions = resolved;
     let instruction_indices = (0..score.instructions.len()).collect();
+    let instruction_seed_overrides = vec![None; score.instructions.len()];
     PerformancePlan {
         score,
         warnings,
         instruction_indices,
         original_instruction_indices,
+        instruction_seed_overrides,
         execution: None,
     }
 }

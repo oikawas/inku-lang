@@ -15,6 +15,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Define the pivot for a group rotation
+
+The Macro Transform pivot is the center of the combined child-shape bounding box before rotation, rotating relative positions and orientations together. Transform delivery to Score remains unimplemented; recording this decision changes no rendering behavior or version.
+
+---
+
 ### 2026-09-11 — Preserve Along direction and Cutting dimensions
 
 Ordinary DDL and adjacent Macro Line Emits with count one now deliver `along` / `cutting` through the shared checked performer. Along aligns an unspecified current direction parallel to the prior line. Cutting retains normal or explicit dimensions instead of generating a relation-specific random length. Explicit direction and numeric position remain authoritative; incompatible constraints and lost references follow Stop / OmitAndContinue. Original references, ownership, and seeds are retained without retargeting to another surviving line.

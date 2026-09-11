@@ -209,6 +209,8 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 ### 4.6 Generic MacroDefinition v1
 
+`transform`で複数の子図形をまとめて回転するときは、回転前の子図形全体の外接矩形中心を使い、子同士の位置関係と各図形の向きを一緒に回す。キャンバス中心や各子の個別中心を、まとまりの回転中心の代わりにしない。配置が演奏時に決まる場合は、その配置が確定してから中心を求める。これは採用済みの回転意味であり、以下の現行consumerでは`transform`のScore配送はまだ未実装である。
+
 揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ8語分類を検査する。
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。

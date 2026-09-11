@@ -4071,6 +4071,82 @@ fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree()
 }
 
 #[test]
+fn explicit_anchor_delivery_keeps_forward_target_owner_and_anchor_only_groups() {
+    use serde_json::json;
+
+    let mut current = macro_group_emit("current", "blue");
+    let fields = current["fields"].as_object_mut().unwrap();
+    fields.remove("place");
+    fields.insert(
+        "position_x".to_owned(),
+        json!({"expr":"exact_decimal","value":"0.7"}),
+    );
+    fields.insert(
+        "position_y".to_owned(),
+        json!({"expr":"exact_decimal","value":"0.5"}),
+    );
+    let definition = macro_group_definition(json!([
+        macro_group_emit("preceding", "black"),
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":15.0},"translate_x":null,"translate_y":null,"scale_x":null,"scale_y":null},"body":[
+            current,
+            {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":20.0},"translate_x":null,"translate_y":null,"scale_x":null,"scale_y":null},"body":[
+                {"op":"anchor","name":"inner","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}
+            ]},
+            {"op":"anchor","name":"later","fields":{"position_x":{"expr":"exact_decimal","value":"0.25"},"position_y":{"expr":"exact_decimal","value":"0.5"}}},
+            {"op":"relation","kind":"connected","from":"later","to":"current"}
+        ]},
+        {"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":0.0},"translate_x":null,"translate_y":null,"scale_x":null,"scale_y":null},"body":[
+            {"op":"anchor","name":"sibling","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}
+        ]}
+    ]));
+    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    let lowered = lower_verified_stage15_score_with_policy(
+        transformed.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
+    let score = lowered.score().expect("explicit Anchor delivery");
+    assert_eq!(score.anchors.len(), 3);
+    assert!(score.validate_schema_edition().is_ok());
+    assert_eq!(
+        score.anchors[1].position,
+        Some(inku_score::Point::new(0.25, 0.5))
+    );
+    assert_eq!(score.anchors[0].at.as_ref().unwrap().region, [0.5; 4]);
+    assert_eq!(lowered.anchor_origins().len(), 3);
+    assert_eq!(
+        score.instructions[1]
+            .relation
+            .as_ref()
+            .unwrap()
+            .target_anchor_index,
+        Some(1)
+    );
+    assert!(
+        score
+            .transform_groups
+            .iter()
+            .any(|group| group.start == 1 && group.end == 2 && group.anchor_indices == vec![0, 1])
+    );
+    assert!(
+        score
+            .transform_groups
+            .iter()
+            .any(|group| group.start == group.end && group.anchor_indices == vec![2])
+    );
+    assert_eq!(score.transform_groups[0].anchor_indices, vec![0]);
+    assert_eq!(score.transform_groups[1].anchor_indices, vec![0, 1]);
+    assert!(inku_score::transform_group_contains(
+        &score.transform_groups[1],
+        &score.transform_groups[0]
+    ));
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context);
+    assert_eq!(plan.anchors().len(), 3);
+    assert_eq!(plan.anchor_origins().len(), 3);
+}
+
+#[test]
 fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
     let definition = mixed_omission_definition();
     let result = stage15_locked(

@@ -2,7 +2,7 @@
 
 use inku_score::{Score, ScoreExecutionDiagnostic, ScoreExecutionSummary, canonical_score_digest};
 
-use crate::{CompilerExecutionResult, ScoreInstructionOrigin};
+use crate::{CompilerExecutionResult, ScoreAnchorOrigin, ScoreInstructionOrigin};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompilerRenderExecutionError {
@@ -10,13 +10,20 @@ pub enum CompilerRenderExecutionError {
     ScoreIdentityMismatch,
     InstructionOriginCountMismatch,
     DiagnosticInstructionIndexOutOfRange { instruction_index: usize },
+    DiagnosticAnchorIndexOutOfRange { anchor_index: usize },
     RenderedInstructionIndexOutOfRange { instruction_index: usize },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerRenderDiagnostic {
     pub diagnostic: ScoreExecutionDiagnostic,
-    pub owner: ScoreInstructionOrigin,
+    pub owner: CompilerRenderOwner,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CompilerRenderOwner {
+    Instruction(ScoreInstructionOrigin),
+    Anchor(ScoreAnchorOrigin),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -71,15 +78,31 @@ pub fn map_compiler_render_execution(
         .into_iter()
         .flat_map(|summary| &summary.diagnostics)
         .map(|diagnostic| {
-            let owner = execution
-                .instruction_origins()
-                .get(diagnostic.instruction_index)
-                .cloned()
-                .ok_or(
-                    CompilerRenderExecutionError::DiagnosticInstructionIndexOutOfRange {
-                        instruction_index: diagnostic.instruction_index,
-                    },
-                )?;
+            let owner = if let Some(anchor_index) = diagnostic.anchor_index {
+                CompilerRenderOwner::Anchor(
+                    execution
+                        .anchor_origins()
+                        .get(anchor_index)
+                        .cloned()
+                        .ok_or(
+                            CompilerRenderExecutionError::DiagnosticAnchorIndexOutOfRange {
+                                anchor_index,
+                            },
+                        )?,
+                )
+            } else {
+                CompilerRenderOwner::Instruction(
+                    execution
+                        .instruction_origins()
+                        .get(diagnostic.instruction_index)
+                        .cloned()
+                        .ok_or(
+                            CompilerRenderExecutionError::DiagnosticInstructionIndexOutOfRange {
+                                instruction_index: diagnostic.instruction_index,
+                            },
+                        )?,
+                )
+            };
             Ok(CompilerRenderDiagnostic {
                 diagnostic: diagnostic.clone(),
                 owner,

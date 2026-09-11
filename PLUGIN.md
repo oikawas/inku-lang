@@ -212,6 +212,8 @@ O(count) allocation or materialization.
 
 `transform` retains the contiguous Emit range carried by transparent `group` from inner to outer. Count-one reaches Score 0.5.0 `transform_groups`; repetition reaches a symbolic plan without materializing instances. Finite `scale_x` / `scale_y` and `translate_x` / `translate_y` compose as a general affine transform: scale at the bounding-box center, rotate at that center, then translate on normalized canvas axes. They change geometry and spacing only, retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External nonConnected relations remain unsupported; Step11 materialization and Step13 runtime / UI / persistence cutover remain incomplete.
 
+Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the canvas center and does not borrow an Emit's focus-dependent placement. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
+
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
 and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including Groups and rotation-only Transforms,
 also reaches an actual Score through the same lowerer used by ordinary

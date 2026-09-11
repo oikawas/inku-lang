@@ -48,4 +48,24 @@ class ServerScoreCompatTest {
         assertEquals(-0.25, group.getDouble("translate_y"), 0.0)
         assertEquals(1, group.getJSONArray("fixed_position_indices").getInt(0))
     }
+
+    @Test
+    fun anchorsAndAnchorRelationTargetsSurviveScoreMigrationForSaveAndReplay() {
+        val score = JSONObject(
+            """{"version":"0.6.0","instructions":[{"primitive":"line","relation":
+                {"type":"connected","target_anchor_index":0,"position_authority":"named_movable"}}],
+                "anchors":[{"at":{"region":[0.5,0.5,0.5,0.5]}}],
+                "transform_groups":[{"start":0,"end":1,"rotation_degrees":15.0,
+                "anchor_indices":[0]}]}""",
+        )
+
+        val migrated = ServerScoreCompat.migrateScore(score)
+
+        assertEquals(0, migrated.getJSONArray("instructions").getJSONObject(0)
+            .getJSONObject("relation").getInt("target_anchor_index"))
+        assertEquals(0.5, migrated.getJSONArray("anchors").getJSONObject(0)
+            .getJSONObject("at").getJSONArray("region").getDouble(0), 0.0)
+        assertEquals(0, migrated.getJSONArray("transform_groups").getJSONObject(0)
+            .getJSONArray("anchor_indices").getInt(0))
+    }
 }

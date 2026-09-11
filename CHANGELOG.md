@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Explicit non-drawing Anchor positions and connections
+
+Macro Anchors specify named positions or numeric coordinates and reach Connected as non-drawing Score targets. Anchor center means the canvas center, without inferring placement from nearby shapes. Anchors follow enclosing Transforms. A group without drawable shapes rotates and scales about the combined Anchor bounding-box center; a group with drawable shapes retains its existing combined shape center.
+
+Score advances to 0.6.0, render engine to 52, and DDL engine to 27. Anchor order and generated origins remain separate from drawing instructions, preserving saved-version compatibility, stroke seeds, numeric-position authority, and Stop / OmitAndContinue. DDL vocabulary, APP_VERSION, and BUILD_NUMBER do not change. One full reference update is deferred until all migration implementation Steps finish.
+
+---
+
 ### 2026-09-11 — Group scale and translation
 
 Macro Transform accepts finite `scale_x` / `scale_y` / `translate_x` / `translate_y`. Negative scale reflects and zero scale degenerates. It transforms child geometry only: scale at the combined child bounding-box center before rotation, rotate at that center, then translate by a normalized-canvas-axis delta. Stroke width and grain pitch remain fixed, and nested groups compose general affine transforms inner to outer.

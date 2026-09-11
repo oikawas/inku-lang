@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — 描かない基準点Anchorの位置と接続
+
+Macro Anchorはnamed位置または数値座標を明示し、Scoreの非描画targetとしてConnectedへ届ける。Anchorの中央指定は画面中央で、前後の図形から位置を推測しない。包含Transformに従い、描画図形がないまとまりはAnchor全体の外接矩形中心で回転・拡縮する。描画図形もあれば従来の図形全体の中心を使う。
+
+Scoreは0.6.0、render engineは52、DDL engineは27へ進める。Anchorの順序と生成元は描画instructionから分離し、旧版保存互換・筆致seed・数値位置の固定・Stop / OmitAndContinueを保持する。DDL語彙版、APP_VERSION、BUILD_NUMBERは変更しない。全件参照更新は移行の全実装Step完了時にまとめて一度行う。
+
+---
+
 ### 2026-09-11 — まとまりのscaleと平行移動
 
 Macro Transformは有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`を受け入れる。負のscaleは反転、0は退化を表す。子図形のgeometryだけを、回転前の子図形全体のbbox中心でscaleし、同じ中心でrotateし、normalized canvas軸の差分でtranslateする。stroke幅とgrain pitchは保持し、入れ子ではgeneral affineを内側から外側へ合成する。

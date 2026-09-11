@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -298,6 +298,29 @@ class AtRegion(BaseModel):
         )
 
 
+class AnchorPoint(BaseModel):
+    """A non-drawing explicit point that Relations may target."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    position: Optional[Coord] = Field(default=None, exclude_if=lambda value: value is None)
+    at: Optional[AtRegion] = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def _require_one_finite_placement(self) -> "AnchorPoint":
+        if (self.position is None) == (self.at is None):
+            raise ValueError("anchors require exactly one position or at")
+        if self.position is not None and (
+            not all(math.isfinite(value) and 0.0 <= value <= 1.0 for value in self.position)
+        ):
+            raise ValueError("anchor position must be finite and within the unit canvas")
+        if self.at is not None:
+            x0, y0, x1, y1 = self.at.region
+            if not all(math.isfinite(value) for value in self.at.region) or x0 > x1 or y0 > y1:
+                raise ValueError("anchor at region must be finite and ordered")
+        return self
+
+
 class TouchingConstraints(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -323,6 +346,12 @@ class Relation(BaseModel):
         exclude_if=lambda value: value is None,
         description="checked connected / touching が参照する元 Score instruction index。旧 relation では省略",
     )
+    target_anchor_index: Optional[int] = Field(
+        default=None,
+        ge=0,
+        exclude_if=lambda value: value is None,
+        description="checked relation が参照する非描画 Score anchor index。instruction target と排他的",
+    )
     position_authority: Optional[ConnectedPositionAuthority] = Field(
         default=None,
         exclude_if=lambda value: value is None,
@@ -343,6 +372,12 @@ class Relation(BaseModel):
         if isinstance(v, dict) and "contact" in v:
             v = {k: val for k, val in v.items() if k != "contact"}
         return v
+
+    @model_validator(mode="after")
+    def _require_one_explicit_target(self) -> "Relation":
+        if self.target_instruction_index is not None and self.target_anchor_index is not None:
+            raise ValueError("relation target instruction and anchor are exclusive")
+        return self
 
 
 class Variation(BaseModel):
@@ -811,6 +846,11 @@ class TransformGroup(BaseModel):
         exclude_if=lambda value: not value,
         description="追加平行移動できない、範囲内の元 Score instruction index",
     )
+    anchor_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="この lexical transform に属する非描画 Score anchor index",
+    )
 
     @field_validator("rotation_degrees")
     @classmethod
@@ -830,7 +870,7 @@ class TransformGroup(BaseModel):
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.5.0"
+    version: ScoreVersion = "0.6.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -854,6 +894,11 @@ class Score(BaseModel):
         ),
     )
     instructions: list[Instruction]
+    anchors: list["AnchorPoint"] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="Relation が参照できる非描画の明示基準点",
+    )
     transform_groups: list[TransformGroup] = Field(
         default_factory=list,
         exclude_if=lambda value: not value,
@@ -917,14 +962,18 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0"}:
+        if self.anchors and self.version != "0.6.0":
+            raise ValueError("anchors requires Score version 0.6.0")
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
-            if group.start >= group.end:
-                raise ValueError("transform group range must be nonempty")
+            if group.start > group.end or (
+                group.start == group.end and not group.anchor_indices
+            ):
+                raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version != "0.5.0" and (
+            if self.version not in {"0.5.0", "0.6.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
@@ -938,13 +987,42 @@ class Score(BaseModel):
                 raise ValueError("transform group fixed_position_indices must be unique")
             if any(index < group.start or index >= group.end for index in fixed_indices):
                 raise ValueError("transform group fixed_position_indices must be within its range")
+            anchor_indices = set(group.anchor_indices)
+            if len(anchor_indices) != len(group.anchor_indices):
+                raise ValueError("transform group anchor_indices must be unique")
+            if any(index >= len(self.anchors) for index in anchor_indices):
+                raise ValueError("transform group anchor_indices exceeds anchors")
+            if group.anchor_indices and self.version != "0.6.0":
+                raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
-                if prior.end <= group.start or group.end <= prior.start:
+                current_contains_prior = (
+                    (prior.start == prior.end or (group.start <= prior.start and prior.end <= group.end))
+                    and set(prior.anchor_indices) <= anchor_indices
+                )
+                prior_contains_current = (
+                    (group.start == group.end or (prior.start <= group.start and group.end <= prior.end))
+                    and anchor_indices <= set(prior.anchor_indices)
+                )
+                drawable_overlap = (
+                    group.start < group.end and prior.start < prior.end
+                    and group.start < prior.end and prior.start < group.end
+                )
+                anchor_overlap = bool(anchor_indices.intersection(prior.anchor_indices))
+                if not drawable_overlap and not anchor_overlap:
                     continue
-                if not (group.start <= prior.start and prior.end <= group.end):
-                    if prior.start <= group.start and group.end <= prior.end:
+                if not current_contains_prior:
+                    if prior_contains_current:
                         raise ValueError("transform groups must be stored inner-before-outer")
                     raise ValueError("transform group ranges cannot cross")
                 if not set(prior.fixed_position_indices) <= fixed_indices:
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
+                if not set(prior.anchor_indices) <= anchor_indices:
+                    raise ValueError("outer transform groups must include descendant anchor_indices")
+        for instruction in self.instructions:
+            relation = instruction.relation
+            if relation is not None and relation.target_anchor_index is not None:
+                if self.version != "0.6.0":
+                    raise ValueError("relation target_anchor_index requires Score version 0.6.0")
+                if relation.target_anchor_index >= len(self.anchors):
+                    raise ValueError("relation target_anchor_index exceeds anchors")
         return self

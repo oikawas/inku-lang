@@ -18,6 +18,9 @@ use crate::planning::{
     translate_instruction_on_canvas,
 };
 
+#[path = "anchor_execution.rs"]
+mod anchor_execution;
+
 const GEOMETRY_EPSILON: f64 = 1.0e-9;
 
 fn checked_touching_candidate(
@@ -450,6 +453,7 @@ fn connected_failure(
 ) -> ScoreExecutionDiagnostic {
     ScoreExecutionDiagnostic {
         instruction_index: index,
+        anchor_index: None,
         dependency_instruction_index: dependency,
         reason,
         disposition: if policy == ScoreErrorPolicy::OmitAndContinue {
@@ -608,10 +612,18 @@ pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
+    if !request.score.anchors.is_empty()
+        || request.score.instructions.iter().any(|instruction| {
+            instruction.relation.as_ref().is_some_and(|relation| relation.target_anchor_index.is_some())
+        })
+    {
+        return anchor_execution::resolve(request, policy);
+    }
     if request.score.validate_transform_groups().is_err() {
         return Err(CheckedPerformanceError {
             diagnostics: vec![ScoreExecutionDiagnostic {
                 instruction_index: 0,
+                anchor_index: None,
                 dependency_instruction_index: None,
                 reason: ScoreExecutionReason::InvalidTransformGroup,
                 disposition: ScoreExecutionDisposition::Stopped,
@@ -1473,6 +1485,7 @@ pub fn resolve_checked_performance(
     if !has_drawable_content {
         diagnostics.push(ScoreExecutionDiagnostic {
             instruction_index: request.score.instructions.len().saturating_sub(1),
+            anchor_index: None,
             dependency_instruction_index: None,
             reason: ScoreExecutionReason::NoDrawableInstructions,
             disposition: ScoreExecutionDisposition::Stopped,

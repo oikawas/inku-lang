@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.5.0".to_owned()
+    "0.6.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -714,6 +714,19 @@ pub struct AtRegion {
     pub region: [f64; 4],
 }
 
+/// A non-drawing explicit point that Relations may target.
+///
+/// Exactly one placement authority is required: `position` retains a numeric
+/// point while `at` retains a named region for deterministic performance-time
+/// resolution.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AnchorPoint {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position: Option<Point>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<AtRegion>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Relation {
     #[serde(rename = "type")]
@@ -722,6 +735,8 @@ pub struct Relation {
     pub gap: RelationGap,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_instruction_index: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_anchor_index: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position_authority: Option<ConnectedPositionAuthority>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -850,6 +865,30 @@ pub struct TransformGroup {
     pub translate_y: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixed_position_indices: Vec<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchor_indices: Vec<usize>,
+}
+
+/// Whether `outer` lexically contains `inner` for postorder transform validation.
+///
+/// Empty instruction ranges are only meaningful for Anchor-only groups. Two such
+/// groups are siblings unless the outer group explicitly lists every inner
+/// anchor; their empty instruction boundary does not locate them in a parent.
+pub fn transform_group_contains(outer: &TransformGroup, inner: &TransformGroup) -> bool {
+    let range_contains =
+        inner.start == inner.end || (outer.start <= inner.start && inner.end <= outer.end);
+    let anchors_contained = inner
+        .anchor_indices
+        .iter()
+        .all(|index| outer.anchor_indices.contains(index));
+    range_contains && anchors_contained
+}
+
+fn transform_groups_have_drawable_overlap(left: &TransformGroup, right: &TransformGroup) -> bool {
+    left.start < left.end
+        && right.start < right.end
+        && left.start < right.end
+        && right.start < left.end
 }
 
 const fn default_transform_scale() -> f64 {
@@ -876,6 +915,8 @@ pub struct Score {
     pub presence: Option<Presence>,
     pub instructions: Vec<Instruction>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<AnchorPoint>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transform_groups: Vec<TransformGroup>,
 }
 
@@ -883,10 +924,51 @@ impl Score {
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
+        if !self.anchors.is_empty() && self.version != "0.6.0" {
+            return Err("anchors requires Score version 0.6.0");
+        }
+        for anchor in &self.anchors {
+            if anchor.position.is_some() == anchor.at.is_some() {
+                return Err("anchors require exactly one position or at");
+            }
+            if let Some(position) = anchor.position
+                && (!position.x.is_finite()
+                    || !position.y.is_finite()
+                    || !(0.0..=1.0).contains(&position.x)
+                    || !(0.0..=1.0).contains(&position.y))
+            {
+                return Err("anchor position must be finite and within the unit canvas");
+            }
+            if let Some(at) = &anchor.at {
+                let [x0, y0, x1, y1] = at.region;
+                if ![x0, y0, x1, y1].into_iter().all(f64::is_finite) || x0 > x1 || y0 > y1 {
+                    return Err("anchor at region must be finite and ordered");
+                }
+            }
+        }
         self.validate_transform_groups()?;
         for instruction in &self.instructions {
+            if let Some(relation) = &instruction.relation {
+                if relation.target_instruction_index.is_some()
+                    && relation.target_anchor_index.is_some()
+                {
+                    return Err("relation target instruction and anchor are exclusive");
+                }
+                if let Some(anchor_index) = relation.target_anchor_index {
+                    if self.version != "0.6.0" {
+                        return Err("relation target_anchor_index requires Score version 0.6.0");
+                    }
+                    if anchor_index >= self.anchors.len() {
+                        return Err("relation target_anchor_index exceeds anchors");
+                    }
+                }
+            }
             if instruction.surface_intensity != SurfaceIntensity::Normal {
-                if self.version != "0.3.0" && self.version != "0.4.0" && self.version != "0.5.0" {
+                if self.version != "0.3.0"
+                    && self.version != "0.4.0"
+                    && self.version != "0.5.0"
+                    && self.version != "0.6.0"
+                {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
                 let closed = matches!(
@@ -921,6 +1003,7 @@ impl Score {
                 && self.version != "0.3.0"
                 && self.version != "0.4.0"
                 && self.version != "0.5.0"
+                && self.version != "0.6.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -957,13 +1040,15 @@ impl Score {
         if self.transform_groups.is_empty() {
             return Ok(());
         }
-        if self.version != "0.4.0" && self.version != "0.5.0" {
+        if self.version != "0.4.0" && self.version != "0.5.0" && self.version != "0.6.0" {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
         for (group_index, group) in self.transform_groups.iter().enumerate() {
-            if group.start >= group.end {
-                return Err("transform group range must be nonempty");
+            if group.start > group.end
+                || (group.start == group.end && group.anchor_indices.is_empty())
+            {
+                return Err("transform group range must be nonempty unless it owns anchors");
             }
             if group.end > self.instructions.len() {
                 return Err("transform group range exceeds the instruction list");
@@ -978,6 +1063,7 @@ impl Score {
                 return Err("transform group translation must be finite");
             }
             if self.version != "0.5.0"
+                && self.version != "0.6.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -1002,14 +1088,31 @@ impl Score {
                 }
             }
 
+            let mut anchor_indices = HashSet::new();
+            for &anchor_index in &group.anchor_indices {
+                if anchor_index >= self.anchors.len() {
+                    return Err("transform group anchor_indices exceeds anchors");
+                }
+                if !anchor_indices.insert(anchor_index) {
+                    return Err("transform group anchor_indices must be unique");
+                }
+            }
+            if !group.anchor_indices.is_empty() && self.version != "0.6.0" {
+                return Err("transform group anchor_indices requires Score version 0.6.0");
+            }
+
             for prior in &self.transform_groups[..group_index] {
-                let disjoint = prior.end <= group.start || group.end <= prior.start;
-                if disjoint {
+                let current_contains_prior = transform_group_contains(group, prior);
+                let prior_contains_current = transform_group_contains(prior, group);
+                let anchor_overlap = prior
+                    .anchor_indices
+                    .iter()
+                    .any(|index| anchor_indices.contains(index));
+                if !transform_groups_have_drawable_overlap(group, prior) && !anchor_overlap {
                     continue;
                 }
-                let current_contains_prior = group.start <= prior.start && prior.end <= group.end;
                 if !current_contains_prior {
-                    if prior.start <= group.start && group.end <= prior.end {
+                    if prior_contains_current {
                         return Err("transform groups must be stored inner-before-outer");
                     }
                     return Err("transform group ranges cannot cross");
@@ -1022,6 +1125,13 @@ impl Score {
                     return Err(
                         "outer transform groups must include descendant fixed_position_indices",
                     );
+                }
+                if !prior
+                    .anchor_indices
+                    .iter()
+                    .all(|index| anchor_indices.contains(index))
+                {
+                    return Err("outer transform groups must include descendant anchor_indices");
                 }
             }
         }

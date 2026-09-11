@@ -7,7 +7,7 @@ use crate::composition_plan::{
 use std::collections::{BTreeMap, BTreeSet};
 
 use inku_score::{
-    AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
+    AnchorPoint, AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
     Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score,
     SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, TransformGroup,
@@ -411,6 +411,7 @@ struct MacroTransformRange {
     start: usize,
     end: usize,
     fixed_position_indices: Vec<usize>,
+    anchor_indices: Vec<usize>,
 }
 
 impl MacroTransformRange {
@@ -419,6 +420,24 @@ impl MacroTransformRange {
         self.end = self.end.max(index + 1);
         if numeric_anchor && !self.fixed_position_indices.contains(&index) {
             self.fixed_position_indices.push(index);
+        }
+    }
+
+    fn record_anchor(&mut self, index: usize) {
+        if !self.anchor_indices.contains(&index) {
+            self.anchor_indices.push(index);
+        }
+    }
+}
+
+fn record_macro_transform_anchors(
+    ranges: &mut BTreeMap<u64, MacroTransformRange>,
+    transform_stack: &[MacroTransformScope<'_>],
+    index: usize,
+) {
+    for scope in transform_stack {
+        if let Some(range) = ranges.get_mut(&scope.provenance.generated_ordinal) {
+            range.record_anchor(index);
         }
     }
 }
@@ -455,6 +474,7 @@ fn checked_macro_relation(
                 kind: RelationType::NotTouching,
                 gap: RelationGap::Medium,
                 target_instruction_index: None,
+                target_anchor_index: None,
                 position_authority: None,
                 touching_constraints: None,
             })
@@ -495,6 +515,7 @@ fn checked_macro_relation(
         },
         gap: RelationGap::Medium,
         target_instruction_index: Some(target_instruction_index),
+        target_anchor_index: None,
         position_authority: Some(ConnectedPositionAuthority::NamedMovable),
         touching_constraints: touching.then_some(TouchingConstraints {
             dimensions_fixed: input.exact_geometry().is_some()
@@ -505,11 +526,39 @@ fn checked_macro_relation(
     })
 }
 
+fn checked_macro_anchor_relation(
+    kind: &str,
+    input: ScoreLoweringInput<'_>,
+    target_anchor_index: usize,
+    current_primitive: Primitive,
+    current_arc_form: Option<inku_score::ArcForm>,
+) -> Result<Relation, ScoreFieldGap> {
+    let current_supported = (matches!(current_primitive, Primitive::Line | Primitive::Arc)
+        && current_arc_form.is_none())
+        || current_primitive == Primitive::Point;
+    if kind != "connected" || !current_supported {
+        return Err(ScoreFieldGap::UnsupportedMacroRelation);
+    }
+    Ok(Relation {
+        kind: RelationType::Connected,
+        gap: RelationGap::Medium,
+        target_instruction_index: None,
+        target_anchor_index: Some(target_anchor_index),
+        position_authority: Some(if input.exact_position().is_some() {
+            ConnectedPositionAuthority::NumericFixed
+        } else {
+            ConnectedPositionAuthority::NamedMovable
+        }),
+        touching_constraints: None,
+    })
+}
+
 fn plan_relation(relation: Relation) -> PlanRelation {
     PlanRelation {
         kind: relation.kind,
         gap: relation.gap,
         target_object_index: relation.target_instruction_index,
+        target_anchor_index: relation.target_anchor_index,
         position_authority: relation.position_authority,
         touching_constraints: relation.touching_constraints,
     }
@@ -524,6 +573,8 @@ fn lower_macro_instruction(
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
     instructions: &mut Vec<Instruction>,
+    anchors: &mut Vec<AnchorPoint>,
+    anchor_origins: &mut Vec<ScoreAnchorOrigin>,
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
     mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
@@ -615,6 +666,7 @@ fn lower_macro_instruction(
                         start: usize::MAX,
                         end: 0,
                         fixed_position_indices: Vec::new(),
+                        anchor_indices: Vec::new(),
                     },
                 ))
             })
@@ -635,7 +687,72 @@ fn lower_macro_instruction(
             _ => None,
         })
         .collect::<Vec<_>>();
+    let mut successful_anchors: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
+    let mut unavailable_anchor_targets = BTreeSet::new();
+    for delivery in &delivery_nodes {
+        if is_in_invalid_transform(delivery, &invalid_transforms) {
+            continue;
+        }
+        let ExpandedMacroNode::Anchor {
+            target,
+            fields,
+            provenance,
+        } = delivery.node
+        else {
+            continue;
+        };
+        let angle_context = ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::MacroEmit {
+                macro_semantic_ordinal: view
+                    .macro_semantic_ordinal(provenance.invocation.invocation_ordinal)
+                    .expect("verified Stage 1.5 view preserves every Macro semantic ordinal"),
+                expansion_path: &provenance.expansion_path,
+                generated_ordinal: provenance.generated_ordinal,
+            },
+        };
+        match project_macro_anchor(fields, angle_context) {
+            Ok(anchor) => {
+                let anchor_index = anchors.len();
+                anchors.push(anchor);
+                anchor_origins.push(ScoreAnchorOrigin::MacroAnchor {
+                    source_instruction_index,
+                    target: target.clone(),
+                    provenance: provenance.clone(),
+                });
+                record_macro_transform_anchors(
+                    &mut transform_ranges,
+                    &delivery.transform_stack,
+                    anchor_index,
+                );
+                successful_anchors.insert(target.clone(), anchor_index);
+            }
+            Err(gaps) => {
+                unavailable_anchor_targets.insert(target.clone());
+                for reason in gaps {
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner: generated_owner(source_instruction_index, provenance, None),
+                        disposition: diagnostic_disposition(
+                            error_policy,
+                            &reason,
+                            ScoreOmissionUnit::MacroStructuralSubtree {
+                                source_instruction_index,
+                                invocation_ordinal: provenance.invocation.invocation_ordinal,
+                                expansion_path: provenance.expansion_path.clone(),
+                                generated_ordinal: provenance.generated_ordinal,
+                            },
+                            None,
+                        ),
+                        reason,
+                    });
+                }
+            }
+        }
+    }
     let mut relation_by_to = BTreeMap::new();
+    let mut anchor_relation_by_to = BTreeMap::new();
     let mut invalid_relation_targets = BTreeSet::new();
     for delivery in &delivery_nodes {
         if is_in_invalid_transform(delivery, &invalid_transforms) {
@@ -656,6 +773,19 @@ fn lower_macro_instruction(
             "along" | "cutting" | "connected" | "touching" | "not_touching"
         ) {
             continue;
+        }
+        if let Some(anchor_index) = successful_anchors.get(from) {
+            let to_position = emit_nodes
+                .iter()
+                .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+            if to_position.is_some()
+                && kind == "connected"
+                && anchor_relation_by_to
+                    .insert(to.clone(), (*anchor_index, kind.as_str()))
+                    .is_none()
+            {
+                continue;
+            }
         }
         let from_position = emit_nodes
             .iter()
@@ -714,7 +844,8 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
-            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if matches!(kind.as_str(), "along" | "cutting" | "connected" | "touching" | "not_touching"))
+            if matches!(node, ExpandedMacroNode::Anchor { .. })
+                || matches!(node, ExpandedMacroNode::Relation { kind, .. } if matches!(kind.as_str(), "along" | "cutting" | "connected" | "touching" | "not_touching"))
             {
                 continue;
             }
@@ -746,6 +877,9 @@ fn lower_macro_instruction(
         let relation_dependency = binding
             .as_ref()
             .and_then(|binding| relation_by_to.get(binding));
+        let anchor_relation_dependency = binding
+            .as_ref()
+            .and_then(|binding| anchor_relation_by_to.get(binding));
         if let Some((dependency, _)) = relation_dependency
             && !successful_bindings.contains_key(dependency)
         {
@@ -919,6 +1053,31 @@ fn lower_macro_instruction(
                         continue;
                     }
                 }
+            } else if let Some((target_anchor_index, kind)) = anchor_relation_dependency {
+                let current = &objects[object_index];
+                match checked_macro_anchor_relation(
+                    kind,
+                    input,
+                    *target_anchor_index,
+                    current.primitive(),
+                    current.arc_form(),
+                ) {
+                    Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
+                    Err(reason) => {
+                        objects.pop();
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: generated_owner(source_instruction_index, provenance, None),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                macro_emit_unit(source_instruction_index, provenance),
+                                None,
+                            ),
+                            reason,
+                        });
+                        continue;
+                    }
+                }
             }
             record_macro_transform_ranges(
                 &mut transform_ranges,
@@ -998,6 +1157,29 @@ fn lower_macro_instruction(
                         continue;
                     }
                 }
+            } else if let Some((target_anchor_index, kind)) = anchor_relation_dependency {
+                match checked_macro_anchor_relation(
+                    kind,
+                    input,
+                    *target_anchor_index,
+                    score_instruction.primitive,
+                    score_instruction.arc_form,
+                ) {
+                    Ok(relation) => score_instruction.relation = Some(relation),
+                    Err(reason) => {
+                        diagnostics.push(ScoreLoweringDiagnostic {
+                            owner: generated_owner(source_instruction_index, provenance, None),
+                            disposition: diagnostic_disposition(
+                                error_policy,
+                                &reason,
+                                macro_emit_unit(source_instruction_index, provenance),
+                                None,
+                            ),
+                            reason,
+                        });
+                        continue;
+                    }
+                }
             }
             let score_index = instructions.len();
             instructions.push(score_instruction);
@@ -1022,7 +1204,13 @@ fn lower_macro_instruction(
     }
     let mut completed_ranges = transform_ranges
         .into_values()
-        .filter(|range| range.end > range.start)
+        .map(|mut range| {
+            if range.end == 0 && !range.anchor_indices.is_empty() {
+                range.start = 0;
+            }
+            range
+        })
+        .filter(|range| range.end > range.start || !range.anchor_indices.is_empty())
         .collect::<Vec<_>>();
     completed_ranges.sort_by(|left, right| {
         let left_path = &left.scope.expansion_path;
@@ -1048,6 +1236,7 @@ fn lower_macro_instruction(
                     translate_x: range.translate_x,
                     translate_y: range.translate_y,
                     fixed_position_indices: range.fixed_position_indices,
+                    anchor_indices: range.anchor_indices,
                     provenance: range.scope,
                 }),
         );
@@ -1061,6 +1250,7 @@ fn lower_macro_instruction(
             translate_x: range.translate_x,
             translate_y: range.translate_y,
             fixed_position_indices: range.fixed_position_indices,
+            anchor_indices: range.anchor_indices,
         }));
     }
 }
@@ -1513,6 +1703,53 @@ fn project_macro_emit<'a>(
     })
 }
 
+fn project_macro_anchor(
+    fields: &BTreeMap<String, ExpandedMacroValue>,
+    context: ScoreAngleContext<'_>,
+) -> Result<AnchorPoint, Vec<ScoreFieldGap>> {
+    if fields.is_empty() {
+        return Err(vec![ScoreFieldGap::UnsupportedMacroStructure]);
+    }
+    let mut gaps = fields
+        .keys()
+        .filter(|key| !matches!(key.as_str(), "place" | "position_x" | "position_y"))
+        .map(|key| ScoreFieldGap::UnknownMacroEmitField { key: key.clone() })
+        .collect::<Vec<_>>();
+    let place = macro_semantic_field(fields, "place", "place", false, &mut gaps);
+    let numeric = macro_exact_pair(fields, "position_x", "position_y", &mut gaps);
+    if place.is_some() == numeric.is_some() {
+        gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
+    }
+    if !gaps.is_empty() {
+        return Err(gaps);
+    }
+    if let Some((x, y)) = numeric {
+        let x = Rational::from_decimal(x).map_err(|gap| vec![gap])?;
+        let y = Rational::from_decimal(y).map_err(|gap| vec![gap])?;
+        if !x.in_unit_interval() || !y.in_unit_interval() {
+            return Err(vec![ScoreFieldGap::PositionOutOfRange]);
+        }
+        return Ok(AnchorPoint {
+            position: Some(Point::new(
+                x.to_f64().map_err(|gap| vec![gap])?,
+                y.to_f64().map_err(|gap| vec![gap])?,
+            )),
+            at: None,
+        });
+    }
+    let place = place.expect("one explicit Anchor position was checked");
+    let region = if place.id == "center" {
+        [0.5, 0.5, 0.5, 0.5]
+    } else {
+        named_region_bounds(place.id, None, context)
+            .ok_or_else(|| vec![ScoreFieldGap::UnsupportedNamedPosition])?
+    };
+    Ok(AnchorPoint {
+        position: None,
+        at: Some(AtRegion { region }),
+    })
+}
+
 fn macro_exact_field(
     fields: &BTreeMap<String, ExpandedMacroValue>,
     key: &str,
@@ -1600,6 +1837,8 @@ pub struct ExplicitScoreLoweringResult<'a> {
     error_policy: ScoreErrorPolicy,
     outcome: ScoreLoweringOutcome,
     score: Option<Score>,
+    anchors: Vec<AnchorPoint>,
+    anchor_origins: Vec<ScoreAnchorOrigin>,
     instruction_origins: Vec<ScoreInstructionOrigin>,
     gaps: Vec<ScoreFieldGap>,
     diagnostics: Vec<ScoreLoweringDiagnostic>,
@@ -1642,6 +1881,14 @@ impl<'a> ExplicitScoreLoweringResult<'a> {
         &self.instruction_origins
     }
 
+    pub fn anchors(&self) -> &[AnchorPoint] {
+        &self.anchors
+    }
+
+    pub fn anchor_origins(&self) -> &[ScoreAnchorOrigin] {
+        &self.anchor_origins
+    }
+
     pub fn gaps(&self) -> &[ScoreFieldGap] {
         &self.gaps
     }
@@ -1660,6 +1907,16 @@ pub enum ScoreInstructionOrigin {
     MacroEmit {
         source_instruction_index: usize,
         binding: Option<GeneratedTargetId>,
+        provenance: GeneratedNodeProvenance,
+    },
+}
+
+/// Exact generated owner for one non-drawing Anchor in a successful Score.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ScoreAnchorOrigin {
+    MacroAnchor {
+        source_instruction_index: usize,
+        target: GeneratedTargetId,
         provenance: GeneratedNodeProvenance,
     },
 }
@@ -1772,7 +2029,7 @@ pub(crate) fn resolve_composition_plan<'a>(
     );
     let outcome = match result.outcome {
         ScoreLoweringOutcome::Stopped => CompositionPlanOutcome::Stopped,
-        _ if objects.is_empty() => CompositionPlanOutcome::Stopped,
+        _ if objects.is_empty() && result.anchors.is_empty() => CompositionPlanOutcome::Stopped,
         ScoreLoweringOutcome::Complete => CompositionPlanOutcome::Ready,
         ScoreLoweringOutcome::CompleteWithOmissions => CompositionPlanOutcome::ReadyWithOmissions,
     };
@@ -1787,6 +2044,8 @@ pub(crate) fn resolve_composition_plan<'a>(
         policy_digest: result.policy_digest,
         outcome,
         objects,
+        anchors: result.anchors,
+        anchor_origins: result.anchor_origins,
         transform_groups,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
@@ -1886,6 +2145,8 @@ fn lower_verified_stage15_shared<'a>(
     }
 
     let mut instructions = Vec::new();
+    let mut anchors = Vec::new();
+    let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
         if omitted_group_members.contains(&projected_index) {
@@ -2022,6 +2283,8 @@ fn lower_verified_stage15_shared<'a>(
                     context,
                     error_policy,
                     &mut instructions,
+                    &mut anchors,
+                    &mut anchor_origins,
                     &mut instruction_origins,
                     &mut diagnostics,
                     objects.as_deref_mut(),
@@ -2066,6 +2329,7 @@ fn lower_verified_stage15_shared<'a>(
         background: context.background,
         presence: None,
         instructions,
+        anchors: anchors.clone(),
         transform_groups: score_transform_groups,
     });
     if score.is_none() {
@@ -2083,6 +2347,8 @@ fn lower_verified_stage15_shared<'a>(
         error_policy,
         outcome,
         score,
+        anchors,
+        anchor_origins,
         instruction_origins,
         gaps,
         diagnostics,
@@ -2241,6 +2507,7 @@ fn direct_score_relation(
         },
         gap: RelationGap::Medium,
         target_instruction_index: checked.then(|| score_instructions.len() - 1),
+        target_anchor_index: None,
         position_authority: checked.then_some(if instruction.entity.numeric_position.is_some() {
             ConnectedPositionAuthority::NumericFixed
         } else {

@@ -4,9 +4,9 @@ use inku_score::{Canvas, Score};
 
 use crate::{
     CompilerExecutionDiagnostic, CompilerLockState, MacroDefinition, MacroExpansionLimits,
-    NormalizedDdlDocument, ScoreErrorPolicy, ScoreInstructionOrigin, ScoreLoweringContext,
-    ScoreLoweringDiagnostic, ScoreLoweringOutcome, Stage15Variation, TypedDdlCompilation,
-    compile_typed_ddl,
+    NormalizedDdlDocument, ScoreAnchorOrigin, ScoreErrorPolicy, ScoreInstructionOrigin,
+    ScoreLoweringContext, ScoreLoweringDiagnostic, ScoreLoweringOutcome, Stage15Variation,
+    TypedDdlCompilation, compile_typed_ddl,
     execution_projection::{
         ExecutionProjectionResult, project_compilation_for_execution, stopped_diagnostics,
     },
@@ -25,6 +25,7 @@ pub struct CompilerExecutionResult {
     error_policy: ScoreErrorPolicy,
     outcome: ScoreLoweringOutcome,
     score: Option<Score>,
+    anchor_origins: Vec<ScoreAnchorOrigin>,
     instruction_origins: Vec<ScoreInstructionOrigin>,
     upstream_diagnostics: Vec<CompilerExecutionDiagnostic>,
     downstream_diagnostics: Vec<ScoreLoweringDiagnostic>,
@@ -55,6 +56,11 @@ impl CompilerExecutionResult {
 
     pub fn instruction_origins(&self) -> &[ScoreInstructionOrigin] {
         &self.instruction_origins
+    }
+
+    /// Provenance for each non-drawing Anchor in the retained Score.
+    pub fn anchor_origins(&self) -> &[ScoreAnchorOrigin] {
+        &self.anchor_origins
     }
 
     pub fn upstream_diagnostics(&self) -> &[CompilerExecutionDiagnostic] {
@@ -132,6 +138,7 @@ fn execute_compilation(
             error_policy,
             outcome: lowered.outcome(),
             score: lowered.score().cloned(),
+            anchor_origins: lowered.anchor_origins().to_vec(),
             instruction_origins: lowered.instruction_origins().to_vec(),
             upstream_diagnostics: Vec::new(),
             downstream_diagnostics: lowered.diagnostics().to_vec(),
@@ -156,6 +163,7 @@ fn execute_compilation(
             error_policy,
             outcome: ScoreLoweringOutcome::Stopped,
             score: None,
+            anchor_origins: Vec::new(),
             instruction_origins: Vec::new(),
             upstream_diagnostics,
             downstream_diagnostics: Vec::new(),
@@ -205,6 +213,11 @@ fn execute_compilation(
                 score: (outcome != ScoreLoweringOutcome::Stopped)
                     .then(|| lowered.score().cloned())
                     .flatten(),
+                anchor_origins: if outcome == ScoreLoweringOutcome::Stopped {
+                    Vec::new()
+                } else {
+                    lowered.anchor_origins().to_vec()
+                },
                 instruction_origins: if outcome == ScoreLoweringOutcome::Stopped {
                     Vec::new()
                 } else {
@@ -229,6 +242,7 @@ fn stopped(
         error_policy,
         outcome: ScoreLoweringOutcome::Stopped,
         score: None,
+        anchor_origins: Vec::new(),
         instruction_origins: Vec::new(),
         upstream_diagnostics,
         downstream_diagnostics: Vec::new(),

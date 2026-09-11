@@ -1,7 +1,7 @@
 use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
-    CompilerRenderExecutionError, MacroDefinition, MacroExpansionLimits, MacroLock,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticDisposition,
+    CompilerRenderExecutionError, CompilerRenderOwner, MacroDefinition, MacroExpansionLimits,
+    MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticDisposition,
     ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin, ScoreLoweringContext,
     ScoreLoweringOutcome, ScoreOmissionUnit, SemanticPreviousReference, SemanticRelationKind,
     compile_ddl_to_score, compile_typed_ddl, map_compiler_render_execution, saijiki_asset,
@@ -435,7 +435,7 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
         map_compiler_render_execution(&conflict, score, omitted.execution.as_ref()).unwrap();
     assert!(matches!(
         joined.diagnostics[0].owner,
-        ScoreInstructionOrigin::MacroEmit { .. }
+        CompilerRenderOwner::Instruction(ScoreInstructionOrigin::MacroEmit { .. })
     ));
 }
 
@@ -526,7 +526,7 @@ fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
                     .unwrap();
             assert!(matches!(
                 joined.diagnostics[0].owner,
-                ScoreInstructionOrigin::MacroEmit { .. }
+                CompilerRenderOwner::Instruction(ScoreInstructionOrigin::MacroEmit { .. })
             ));
         }
     }
@@ -1280,6 +1280,7 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
         input_score_digest: canonical_score_digest(score).unwrap(),
         diagnostics: vec![ScoreExecutionDiagnostic {
             instruction_index: 1,
+            anchor_index: None,
             dependency_instruction_index: Some(0),
             reason: ScoreExecutionReason::NumericConnectedPositionConflict,
             disposition: ScoreExecutionDisposition::Omitted,
@@ -1295,9 +1296,9 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
     );
     assert_eq!(
         joined.diagnostics[0].owner,
-        ScoreInstructionOrigin::SourceInstruction {
+        CompilerRenderOwner::Instruction(ScoreInstructionOrigin::SourceInstruction {
             instruction_index: 1
-        }
+        })
     );
 
     let mut different = score.clone();
@@ -1322,10 +1323,40 @@ fn checked_render_indices_join_only_to_the_exact_compiler_score_and_owner() {
         map_compiler_render_execution(&macro_result, macro_score, Some(&macro_summary)).unwrap();
     assert!(matches!(
         &macro_joined.diagnostics[0].owner,
-        ScoreInstructionOrigin::MacroEmit {
+        CompilerRenderOwner::Instruction(ScoreInstructionOrigin::MacroEmit {
             binding: Some(binding),
             ..
-        } if binding.local_name == "second"
+        }) if binding.local_name == "second"
+    ));
+
+    let anchor_definition = definition_from(
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"AnchorOwner","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"mark","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"anchor","name":"origin","fields":{"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}"#,
+    );
+    let anchor_result = execute_locked(
+        "Path.AnchorOwner",
+        &[anchor_definition],
+        LIMITS,
+        ScoreErrorPolicy::Stop,
+    );
+    let anchor_score = anchor_result.score().unwrap();
+    assert_eq!(anchor_result.anchor_origins().len(), 1);
+    let anchor_summary = ScoreExecutionSummary {
+        input_score_digest: canonical_score_digest(anchor_score).unwrap(),
+        diagnostics: vec![ScoreExecutionDiagnostic {
+            instruction_index: 0,
+            anchor_index: Some(0),
+            dependency_instruction_index: None,
+            reason: ScoreExecutionReason::InvalidTransformGroup,
+            disposition: ScoreExecutionDisposition::Omitted,
+        }],
+        rendered_instruction_indices: vec![0],
+    };
+    let anchor_joined =
+        map_compiler_render_execution(&anchor_result, anchor_score, Some(&anchor_summary)).unwrap();
+    assert!(matches!(
+        &anchor_joined.diagnostics[0].owner,
+        CompilerRenderOwner::Anchor(inku_ddl::ScoreAnchorOrigin::MacroAnchor { target, .. })
+            if target.local_name == "origin"
     ));
 }
 

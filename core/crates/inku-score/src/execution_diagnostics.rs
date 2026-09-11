@@ -21,6 +21,9 @@ pub enum ScoreExecutionReason {
     UnsupportedConnectedStructure,
     MissingConnectedPositionAuthority,
     NumericConnectedPositionConflict,
+    CyclicConnectedDependency,
+    ConflictingConnectedConstraints,
+    UnsupportedAnchorRelation,
     InvalidTransformGroup,
     UnsupportedTransformGroupRelation,
     NumericTransformGroupPositionConflict,
@@ -50,6 +53,10 @@ pub enum ScoreExecutionDisposition {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ScoreExecutionDiagnostic {
     pub instruction_index: usize,
+    /// Non-drawing Anchor owner. When present, consumers must use this instead
+    /// of `instruction_index`, which remains for legacy diagnostic compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor_index: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency_instruction_index: Option<usize>,
     pub reason: ScoreExecutionReason,

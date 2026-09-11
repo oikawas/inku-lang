@@ -260,6 +260,10 @@ pub struct TransformExpression {
     pub rotate_degrees: Option<Expression>,
 }
 
+fn empty_anchor_fields() -> SemanticMap<Expression> {
+    SemanticMap(BTreeMap::new())
+}
+
 /// The exact generic statement set. `component` exists only as a top-level definition.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
@@ -277,6 +281,11 @@ pub enum Statement {
     },
     Anchor {
         name: String,
+        #[serde(
+            default = "empty_anchor_fields",
+            skip_serializing_if = "SemanticMap::is_empty"
+        )]
+        fields: SemanticMap<Expression>,
     },
     Relation {
         kind: String,
@@ -672,7 +681,7 @@ fn normalize_definition_semantic_aliases(definition: &mut MacroDefinition) {
 fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
     for statement in statements {
         match statement {
-            Statement::Emit { fields, .. } => {
+            Statement::Emit { fields, .. } | Statement::Anchor { fields, .. } => {
                 for expression in fields.0.values_mut() {
                     normalize_expression_semantic_aliases(expression);
                 }
@@ -710,7 +719,7 @@ fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
                 }
                 normalize_statement_semantic_aliases(body);
             }
-            Statement::Anchor { .. } | Statement::Relation { .. } => {}
+            Statement::Relation { .. } => {}
         }
     }
 }
@@ -844,7 +853,7 @@ fn validate_body(
     for (index, statement) in body.iter().enumerate() {
         let statement_path = format!("{path}[{index}]");
         let declared = match statement {
-            Statement::Anchor { name } => Some((name, format!("{statement_path}.name"))),
+            Statement::Anchor { name, .. } => Some((name, format!("{statement_path}.name"))),
             Statement::Emit {
                 binding: Some(binding),
                 ..
@@ -1026,7 +1035,69 @@ fn validate_body(
                 definition,
                 diagnostics,
             ),
-            Statement::Anchor { .. } => {}
+            Statement::Anchor { fields, .. } => {
+                if fields.is_empty() {
+                    continue;
+                }
+                let has_place = fields.0.contains_key("place");
+                let has_x = fields.0.contains_key("position_x");
+                let has_y = fields.0.contains_key("position_y");
+                if has_place == (has_x && has_y) || has_x != has_y {
+                    push_diagnostic(
+                        diagnostics,
+                        "anchor_requires_one_explicit_position",
+                        format!("{statement_path}.fields"),
+                    );
+                }
+                for (field, expression) in fields.iter() {
+                    let expression_path = format!("{statement_path}.fields.{field}");
+                    if matches!(field.as_str(), "position_x" | "position_y") {
+                        let kind = validate_expression(
+                            expression,
+                            &expression_path,
+                            parameters,
+                            locals,
+                            diagnostics,
+                        );
+                        if !matches!(
+                            kind,
+                            Some(ValueKind::ExactDecimal) | Some(ValueKind::Unknown)
+                        ) {
+                            push_diagnostic(
+                                diagnostics,
+                                "geometry_field_requires_exact_decimal",
+                                &expression_path,
+                            );
+                        }
+                    } else if field == "place" {
+                        let kind = validate_expression(
+                            expression,
+                            &expression_path,
+                            parameters,
+                            locals,
+                            diagnostics,
+                        );
+                        match kind {
+                            Some(ValueKind::SemanticRef(category, _)) if category == "place" => {}
+                            Some(ValueKind::Unknown) | None => {}
+                            _ => push_diagnostic(
+                                diagnostics,
+                                "semantic_field_requires_matching_reference",
+                                &expression_path,
+                            ),
+                        }
+                    } else {
+                        push_diagnostic(diagnostics, "unknown_anchor_field", &expression_path);
+                        validate_expression(
+                            expression,
+                            &expression_path,
+                            parameters,
+                            locals,
+                            diagnostics,
+                        );
+                    }
+                }
+            }
             Statement::Relation { kind, from, to } => {
                 if !known_relation(kind) {
                     push_diagnostic(

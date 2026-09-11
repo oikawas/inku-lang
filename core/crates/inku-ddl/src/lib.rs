@@ -172,6 +172,7 @@ pub use relation_reference::{
 };
 pub use render_execution::{
     CompilerRenderDiagnostic, CompilerRenderExecution, CompilerRenderExecutionError,
+    CompilerRenderOwner,
     map_compiler_render_execution,
 };
 pub use saijiki::{
@@ -190,9 +191,9 @@ pub use score_diagnostics::{
 };
 pub use score_lowering::{
     EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitScoreLoweringResult,
-    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreInstructionFieldCandidate, ScoreInstructionOrigin,
-    ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringContextError,
-    ScorePrimitiveMappingError, lower_verified_stage15_score,
+    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreAnchorOrigin, ScoreInstructionFieldCandidate,
+    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
+    ScoreLoweringContextError, ScorePrimitiveMappingError, lower_verified_stage15_score,
     lower_verified_stage15_score_with_policy, lower_verified_stage15_view,
     score_primitive_from_semantic_identity,
 };

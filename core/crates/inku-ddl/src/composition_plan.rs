@@ -1,15 +1,16 @@
 //! Sealed, runtime-disconnected object and placement recipes; never instances or Score.
 
 use inku_score::{
-    CanvasGroundSpec, Color, ConnectedPositionAuthority, LineStyle, Primitive, RelationGap,
-    RelationType, SurfaceIntensity, SurfaceSpec, Thinness, TouchingConstraints, Variation, Weight,
+    AnchorPoint, CanvasGroundSpec, Color, ConnectedPositionAuthority, LineStyle, Primitive,
+    RelationGap, RelationType, SurfaceIntensity, SurfaceSpec, Thinness, TouchingConstraints,
+    Variation, Weight,
 };
 
 pub use crate::score_lowering::{Rational, ResolvedGeometryDimensions};
 use crate::{
-    CoreModifierValue, ScoreErrorPolicy, ScoreInstructionOrigin, ScoreLoweringContext,
-    ScoreLoweringDiagnostic, SemanticExplicitGeometry, SemanticNumericPosition,
-    VerifiedStage15EffectiveView,
+    CoreModifierValue, ScoreAnchorOrigin, ScoreErrorPolicy, ScoreInstructionOrigin,
+    ScoreLoweringContext, ScoreLoweringDiagnostic, SemanticExplicitGeometry,
+    SemanticNumericPosition, VerifiedStage15EffectiveView,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,6 +36,7 @@ pub struct TransformGroupPlan {
     pub(crate) translate_x: f64,
     pub(crate) translate_y: f64,
     pub(crate) fixed_position_indices: Vec<usize>,
+    pub(crate) anchor_indices: Vec<usize>,
     pub(crate) provenance: crate::GeneratedNodeProvenance,
 }
 
@@ -44,6 +46,7 @@ pub struct PlanRelation {
     pub(crate) kind: RelationType,
     pub(crate) gap: RelationGap,
     pub(crate) target_object_index: Option<usize>,
+    pub(crate) target_anchor_index: Option<usize>,
     pub(crate) position_authority: Option<ConnectedPositionAuthority>,
     pub(crate) touching_constraints: Option<TouchingConstraints>,
 }
@@ -59,6 +62,10 @@ impl PlanRelation {
 
     pub const fn target_object_index(&self) -> Option<usize> {
         self.target_object_index
+    }
+
+    pub const fn target_anchor_index(&self) -> Option<usize> {
+        self.target_anchor_index
     }
 
     pub const fn position_authority(&self) -> Option<ConnectedPositionAuthority> {
@@ -101,6 +108,10 @@ impl TransformGroupPlan {
 
     pub fn fixed_position_indices(&self) -> &[usize] {
         &self.fixed_position_indices
+    }
+
+    pub fn anchor_indices(&self) -> &[usize] {
+        &self.anchor_indices
     }
 
     pub const fn provenance(&self) -> &crate::GeneratedNodeProvenance {
@@ -286,6 +297,8 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) error_policy: ScoreErrorPolicy,
     pub(crate) outcome: CompositionPlanOutcome,
     pub(crate) objects: Vec<ObjectPlacementPlan>,
+    pub(crate) anchors: Vec<AnchorPoint>,
+    pub(crate) anchor_origins: Vec<ScoreAnchorOrigin>,
     pub(crate) transform_groups: Vec<TransformGroupPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
@@ -315,6 +328,12 @@ impl<'a> CompositionPlanResult<'a> {
     }
     pub fn transform_groups(&self) -> &[TransformGroupPlan] {
         &self.transform_groups
+    }
+    pub fn anchors(&self) -> &[AnchorPoint] {
+        &self.anchors
+    }
+    pub fn anchor_origins(&self) -> &[ScoreAnchorOrigin] {
+        &self.anchor_origins
     }
     pub fn ground(&self) -> Option<&CanvasGroundSpec> {
         self.ground.as_ref()

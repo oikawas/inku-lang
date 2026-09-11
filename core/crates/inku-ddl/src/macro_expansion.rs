@@ -130,6 +130,7 @@ pub enum ExpandedMacroNode {
     },
     Anchor {
         target: GeneratedTargetId,
+        fields: BTreeMap<String, ExpandedMacroValue>,
         provenance: GeneratedNodeProvenance,
     },
     Relation {
@@ -1031,7 +1032,7 @@ impl<'a> Evaluator<'a> {
                     binding: Some(name),
                     ..
                 }
-                | Statement::Anchor { name } => Some(name),
+                | Statement::Anchor { name, .. } => Some(name),
                 _ => None,
             };
             if let Some(name) = declaration {
@@ -1161,12 +1162,14 @@ impl<'a> Evaluator<'a> {
                     Ok(Vec::new())
                 }
             }
-            Statement::Anchor { name } => {
+            Statement::Anchor { name, fields } => {
                 let target = self.target(targets, name, path)?;
+                let fields = self.evaluate_fields(fields, environment, path)?;
                 let ordinal = self.bump_node(path)?;
                 if self.materialize {
                     Ok(vec![ExpandedMacroNode::Anchor {
                         target,
+                        fields,
                         provenance: self.node_provenance(ordinal, path),
                     }])
                 } else {

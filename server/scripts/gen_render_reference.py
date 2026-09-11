@@ -945,7 +945,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     expected = {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4, "I": 2, "J": 2, "K": 2}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 618:
+    if actual != expected or len(cases) != sum(expected.values()):
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

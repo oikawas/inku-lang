@@ -21,6 +21,8 @@ Macro Anchorはnamed位置または数値座標を明示し、Scoreの非描画t
 
 Scoreは0.6.0、render engineは52、DDL engineは27へ進める。Anchorの順序と生成元は描画instructionから分離し、旧版保存互換・筆致seed・数値位置の固定・Stop / OmitAndContinueを保持する。DDL語彙版、APP_VERSION、BUILD_NUMBERは変更しない。全件参照更新は移行の全実装Step完了時にまとめて一度行う。
 
+共有Score・DDL・server・Androidの局所確認と、LinuxのAnchor描画関係4件が成功した。前方参照、描画図形／Anchorだけの入れ子変換、数値固定・循環・省略時の元の生成元、群全体の共通移動を確認した。一般の外部Touching／Along／Cuttingと移行全体は未完了である。
+
 ---
 
 ### 2026-09-11 — まとまりのscaleと平行移動

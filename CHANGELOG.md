@@ -21,6 +21,8 @@ Macro Anchors specify named positions or numeric coordinates and reach Connected
 
 Score advances to 0.6.0, render engine to 52, and DDL engine to 27. Anchor order and generated origins remain separate from drawing instructions, preserving saved-version compatibility, stroke seeds, numeric-position authority, and Stop / OmitAndContinue. DDL vocabulary, APP_VERSION, and BUILD_NUMBER do not change. One full reference update is deferred until all migration implementation Steps finish.
 
+Focused shared Score, DDL, server, and Android checks passed, along with four Linux Anchor rendering cases. They cover forward references, nested drawable and Anchor-only transforms, numeric authority, cycles, omission ownership, and one compatible translation for a group. General external Touching / Along / Cutting and the complete migration remain unfinished.
+
 ---
 
 ### 2026-09-11 — Group scale and translation

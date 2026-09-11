@@ -203,6 +203,13 @@ export interface LangPack {
 	// Canvas
 	canvasPlaceholder: string;
 	canvasCaptionToggle: string;
+	canvasCaptionWritingMode: string;
+	canvasCaptionHorizontal: string;
+	canvasCaptionVertical: string;
+	settingsCaptionPosition: string;
+	settingsCaptionPositionDescription: string;
+	settingsCaptionPositionLeft: string;
+	settingsCaptionPositionRight: string;
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;

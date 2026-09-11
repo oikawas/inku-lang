@@ -9,6 +9,7 @@
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
+	import type { CaptionPosition, CaptionWritingMode } from '$lib/captionWritingMode';
 
 	type Props = {
 		result: PaintResult | null;
@@ -26,6 +27,10 @@
 		instructionCaptionVisible: boolean;
 		canShowInstructionCaption: boolean;
 		displayInstructionText: string;
+		instructionCaptionWritingMode: CaptionWritingMode;
+		instructionCaptionPosition: CaptionPosition;
+		canUseVerticalInstructionCaption: boolean;
+		instructionCaptionVertical: boolean;
 		statusHistoryItem: CanvasStatusHistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
@@ -42,6 +47,7 @@
 		pngTemplates: ExportTemplate[];
 		isJapanese: boolean;
 		onToggleInstructionCaption: () => void;
+		onInstructionCaptionWritingModeChange: (event: Event) => void;
 		onToggleStar: (item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onToggleForShare?: ((item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
@@ -71,6 +77,10 @@
 		instructionCaptionVisible,
 		canShowInstructionCaption,
 		displayInstructionText,
+		instructionCaptionWritingMode,
+		instructionCaptionPosition,
+		canUseVerticalInstructionCaption,
+		instructionCaptionVertical,
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
@@ -87,6 +97,7 @@
 		pngTemplates,
 		isJapanese,
 		onToggleInstructionCaption,
+		onInstructionCaptionWritingModeChange,
 		onToggleStar,
 		onToggleForRevision,
 		onToggleForShare = null,
@@ -124,7 +135,13 @@
 	class="canvas-content"
 	class:can-pan={viewport.canPan}
 	class:dragging={viewport.dragging}
-	onpointerdown={(event) => viewport.startDrag(event, true)}
+	onpointerdown={(event) => {
+		if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode')) {
+			event.stopPropagation();
+			return;
+		}
+		viewport.startDrag(event, true);
+	}}
 	onpointermove={(event) => viewport.moveDrag(event)}
 	onpointerup={(event) => viewport.endDrag(event)}
 	onpointercancel={(event) => viewport.endDrag(event)}
@@ -204,6 +221,15 @@
 							</svg>
 						</button>
 					</Tooltip>
+					{#if canUseVerticalInstructionCaption}
+						<label class="caption-writing-mode canvas-caption-writing-mode">
+							<span>{t().canvasCaptionWritingMode}</span>
+							<select value={instructionCaptionWritingMode} aria-label={t().canvasCaptionWritingMode} disabled={!instructionCaptionVisible || !canShowInstructionCaption} onchange={onInstructionCaptionWritingModeChange}>
+								<option value="horizontal">{t().canvasCaptionHorizontal}</option>
+								<option value="vertical">{t().canvasCaptionVertical}</option>
+							</select>
+						</label>
+					{/if}
 					<Tooltip placement="top-right" text={statusHistoryItem?.starred ? t().starOn : t().starOff}>
 						<button
 							type="button"
@@ -424,7 +450,7 @@
 					</Tooltip>
 				</div>
 				{#if instructionCaptionVisible && canShowInstructionCaption}
-					<div class="instruction-caption" aria-live="polite"><CaptionText text={displayInstructionText} /></div>
+					<div class="instruction-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'} aria-live="polite"><CaptionText text={displayInstructionText} /></div>
 				{/if}
 </div>
 			<div class="zoom-controls">
@@ -579,6 +605,24 @@
 		max-height: 5.1em;
 		overflow: hidden;
 	}
+	.instruction-caption.vertical {
+		top: 58px;
+		right: auto;
+		bottom: 58px;
+		left: 12px;
+		width: fit-content;
+		max-width: min(40%, 13em);
+		max-height: none;
+		overflow: auto;
+		white-space: pre-wrap;
+		writing-mode: vertical-rl;
+		text-orientation: mixed;
+		text-align: start;
+	}
+	.instruction-caption.caption-right:not(.vertical) { text-align: right; }
+	.instruction-caption.vertical.caption-right { right: 12px; left: auto; }
+	.caption-writing-mode { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); font-size: var(--btn-sm-font-size); white-space: nowrap; }
+	.caption-writing-mode select { max-width: 88px; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--panel); color: var(--fg); font: inherit; }
 	.zoom-controls {
 		position: absolute;
 		bottom: 14px;
@@ -742,5 +786,8 @@
 			bottom: 58px;
 			font-size: 13px;
 		}
+		.instruction-caption.vertical { top: 50px; right: auto; bottom: 56px; left: 8px; max-width: min(46%, 12em); }
+		.instruction-caption.vertical.caption-right { right: 8px; left: auto; }
+		.caption-writing-mode span { display: none; }
 	}
 </style>

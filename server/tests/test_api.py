@@ -39,9 +39,12 @@ from inku_server.layer_versions import DDL_ENGINE_VERSION
 from inku_server.model_settings import (
     connection_for,
     default_model_settings,
+    default_user_model_settings,
     model_provider_catalog,
     normalize_model_settings,
+    normalize_user_model_settings,
     update_model_settings,
+    update_user_model_settings,
 )
 from inku_server.schema import Score
 
@@ -614,14 +617,144 @@ def test_a_saved_work_records_how_its_catalog_was_asked_for(auth_context):
         [asked_auto.json()["id"], chosen.json()["id"], silent.json()["id"]],
     )
 
+
+def test_instruction_caption_layout_normalization():
+    assert default_user_model_settings()["instruction_caption_writing_mode"] == "horizontal"
+    assert default_user_model_settings()["instruction_caption_position"] == "left"
+    assert normalize_user_model_settings({})["instruction_caption_writing_mode"] == "horizontal"
+    assert normalize_user_model_settings({})["instruction_caption_position"] == "left"
+    assert normalize_user_model_settings(
+        {"instruction_caption_writing_mode": "vertical"}
+    )["instruction_caption_writing_mode"] == "vertical"
+    assert normalize_user_model_settings(
+        {"instruction_caption_writing_mode": "diagonal"}
+    )["instruction_caption_writing_mode"] == "horizontal"
+    assert normalize_user_model_settings(
+        {"instruction_caption_position": "right"}
+    )["instruction_caption_position"] == "right"
+    assert normalize_user_model_settings(
+        {"instruction_caption_position": "center"}
+    )["instruction_caption_position"] == "left"
+
+    current = {
+        "instruction_caption_writing_mode": "vertical",
+        "instruction_caption_position": "right",
+        "instruction_caption_visible": False,
+        "stage1_model": "selected-model",
+    }
+    preserved = update_user_model_settings(current, {"instruction_caption_visible": True})
+    assert preserved["instruction_caption_writing_mode"] == "vertical"
+    assert preserved["instruction_caption_position"] == "right"
+    assert preserved["stage1_model"] == "selected-model"
+    normalized_mode = update_user_model_settings(
+        current, {"instruction_caption_writing_mode": "diagonal"}
+    )
+    assert normalized_mode["instruction_caption_writing_mode"] == "horizontal"
+    assert normalized_mode["instruction_caption_position"] == "right"
+    assert normalized_mode["instruction_caption_visible"] is False
+    assert normalized_mode["stage1_model"] == "selected-model"
+    normalized_position = update_user_model_settings(
+        current, {"instruction_caption_position": "center"}
+    )
+    assert normalized_position["instruction_caption_position"] == "left"
+    assert normalized_position["instruction_caption_writing_mode"] == "vertical"
+    assert normalized_position["instruction_caption_visible"] is False
+    assert normalized_position["stage1_model"] == "selected-model"
+
+
 def test_current_user_instruction_caption_setting_is_persisted(auth_context):
     headers, _, _ = auth_context
-    updated = client.patch("/api/auth/me/settings", headers=headers, json={"model_settings": {"instruction_caption_visible": False}})
+    initial = client.get("/api/auth/me", headers=headers)
+    assert initial.status_code == 200
+    initial_settings = initial.json()["model_settings"]
+    assert initial_settings["instruction_caption_writing_mode"] == "horizontal"
+    assert initial_settings["instruction_caption_position"] == "left"
+    model_keys = (
+        "stage1_provider",
+        "stage1_model",
+        "stage2_provider",
+        "stage2_model",
+        "vision_provider",
+        "vision_model",
+        "okugaki_provider",
+        "okugaki_model",
+    )
+
+    hidden = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_visible": False}},
+    )
+    assert hidden.status_code == 200
+    assert hidden.json()["model_settings"]["instruction_caption_visible"] is False
+
+    positioned = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_position": "right"}},
+    )
+    assert positioned.status_code == 200
+    positioned_settings = positioned.json()["model_settings"]
+    assert positioned_settings["instruction_caption_position"] == "right"
+    assert positioned_settings["instruction_caption_writing_mode"] == "horizontal"
+    assert positioned_settings["instruction_caption_visible"] is False
+
+    updated = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_writing_mode": "vertical"}},
+    )
     assert updated.status_code == 200
-    assert updated.json()["model_settings"]["instruction_caption_visible"] is False
+    updated_settings = updated.json()["model_settings"]
+    assert updated_settings["instruction_caption_writing_mode"] == "vertical"
+    assert updated_settings["instruction_caption_position"] == "right"
+    assert updated_settings["instruction_caption_visible"] is False
+    assert {key: updated_settings[key] for key in model_keys} == {
+        key: initial_settings[key] for key in model_keys
+    }
+
     current = client.get("/api/auth/me", headers=headers)
     assert current.status_code == 200
+    assert current.json()["model_settings"]["instruction_caption_writing_mode"] == "vertical"
+    assert current.json()["model_settings"]["instruction_caption_position"] == "right"
     assert current.json()["model_settings"]["instruction_caption_visible"] is False
+
+    preserved = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_visible": True}},
+    )
+    assert preserved.status_code == 200
+    assert preserved.json()["model_settings"]["instruction_caption_writing_mode"] == "vertical"
+    assert preserved.json()["model_settings"]["instruction_caption_position"] == "right"
+
+    invalid = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_writing_mode": "diagonal"}},
+    )
+    assert invalid.status_code == 200
+    invalid_settings = invalid.json()["model_settings"]
+    assert invalid_settings["instruction_caption_writing_mode"] == "horizontal"
+    assert invalid_settings["instruction_caption_position"] == "right"
+    assert invalid_settings["instruction_caption_visible"] is True
+    assert {key: invalid_settings[key] for key in model_keys} == {
+        key: initial_settings[key] for key in model_keys
+    }
+
+    invalid_position = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"model_settings": {"instruction_caption_position": "center"}},
+    )
+    assert invalid_position.status_code == 200
+    invalid_position_settings = invalid_position.json()["model_settings"]
+    assert invalid_position_settings["instruction_caption_position"] == "left"
+    assert invalid_position_settings["instruction_caption_writing_mode"] == "horizontal"
+    assert invalid_position_settings["instruction_caption_visible"] is True
+    assert {key: invalid_position_settings[key] for key in model_keys} == {
+        key: initial_settings[key] for key in model_keys
+    }
 
 
 def test_current_user_demo_settings_are_persisted(auth_context):

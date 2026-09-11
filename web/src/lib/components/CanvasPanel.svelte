@@ -11,6 +11,7 @@
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity } from '$lib/formatNumber';
+	import { normalizeCaptionWritingMode, supportsVerticalCaption, type CaptionPosition, type CaptionWritingMode } from '$lib/captionWritingMode';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 
@@ -122,6 +123,9 @@
 		onVaryInterpretation: () => void | Promise<void>;
 		instructionCaptionVisible: boolean;
 		onInstructionCaptionVisibleChange: (visible: boolean) => void | Promise<void>;
+		instructionCaptionWritingMode: CaptionWritingMode;
+		onInstructionCaptionWritingModeChange: (mode: CaptionWritingMode) => void | Promise<void>;
+		instructionCaptionPosition: CaptionPosition;
 		refinementSession: RefinementSession;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
@@ -242,6 +246,9 @@
 		onVaryInterpretation,
 		instructionCaptionVisible = $bindable(true),
 		onInstructionCaptionVisibleChange,
+		instructionCaptionWritingMode,
+		onInstructionCaptionWritingModeChange,
+		instructionCaptionPosition,
 		refinementSession,
 		runTokensIn = null,
 		runTokensOut = null,
@@ -412,10 +419,19 @@
 	const canvasBaseHeight = $derived(400 * canvasAspectHeight / canvasMaxRatio);
 	const displayInstructionText = $derived((instructionText || '').trim());
 	const canShowInstructionCaption = $derived(!!displayInstructionText);
+	const canUseVerticalInstructionCaption = $derived(supportsVerticalCaption(displayInstructionText));
+	const instructionCaptionVertical = $derived(
+		instructionCaptionWritingMode === 'vertical' && canUseVerticalInstructionCaption
+	);
 
 	function toggleInstructionCaption() {
 		instructionCaptionVisible = !instructionCaptionVisible;
 		void onInstructionCaptionVisibleChange(instructionCaptionVisible);
+	}
+
+	function setInstructionCaptionWritingMode(event: Event): void {
+		const mode = normalizeCaptionWritingMode((event.currentTarget as HTMLSelectElement).value);
+		void onInstructionCaptionWritingModeChange(mode);
 	}
 
 	function updateFitZoom() {
@@ -434,6 +450,7 @@
 		const wheelTarget = canvasContentEl;
 		const onWheel = (event: WheelEvent) => {
 			if (outputTab !== 'canvas' || !result) return;
+			if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode')) return;
 			event.preventDefault();
 			const step = event.deltaY < 0 ? 0.15 : -0.15;
 			viewport.setZoom(viewport.zoom + step);
@@ -580,6 +597,10 @@
 				{instructionCaptionVisible}
 				{canShowInstructionCaption}
 				{displayInstructionText}
+				{instructionCaptionWritingMode}
+				{instructionCaptionPosition}
+				{canUseVerticalInstructionCaption}
+				{instructionCaptionVertical}
 				{statusHistoryItem}
 				{statusHashLabel}
 				{statusHashCopied}
@@ -596,6 +617,7 @@
 				{pngTemplates}
 				{isJapanese}
 				onToggleInstructionCaption={toggleInstructionCaption}
+				onInstructionCaptionWritingModeChange={setInstructionCaptionWritingMode}
 				{onToggleStar}
 				{onToggleForRevision}
 				{onToggleForShare}
@@ -718,6 +740,10 @@
 		{instructionCaptionVisible}
 		{canShowInstructionCaption}
 		{displayInstructionText}
+		{instructionCaptionWritingMode}
+		{instructionCaptionPosition}
+		{canUseVerticalInstructionCaption}
+		{instructionCaptionVertical}
 		{interactionLocked}
 		{navNewerDisabled}
 		{navLatestDisabled}
@@ -730,6 +756,7 @@
 		{onGotoPrev}
 		onToggleStar={(event) => onToggleStar(statusHistoryItem, event)}
 		onToggleCaption={toggleInstructionCaption}
+		onInstructionCaptionWritingModeChange={setInstructionCaptionWritingMode}
 		onClose={closePresentationMode}
 	/>
 {/if}

@@ -62,6 +62,7 @@
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
+	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload } from '$lib/features/render-payload';
@@ -940,6 +941,26 @@
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
+
+	// Serialize quick direction changes so the last choice is also the saved one.
+	let captionSettingsWrite = Promise.resolve();
+	bindCaptionSettingsPersist((fields) => {
+		const userId = session.currentUser?.id;
+		if (!userId) return;
+		captionSettingsWrite = captionSettingsWrite.then(async () => {
+			if (session.currentUser?.id !== userId) return;
+			try {
+				const response = await apiFetch('/api/auth/me/settings', {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ model_settings: fields })
+				});
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				const actor = await response.json() as UserItem;
+				if (session.currentUser?.id === userId) session.setCurrentUser(actor);
+			} catch (cause) { console.warn('failed to save headnote direction', cause); }
+		});
+	});
 	// Where `auto` lands when the server cannot read a description.
 	bindColorCatalogFallback(() => defaultCatalogId);
 
@@ -2896,6 +2917,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onVaryInterpretation={refinement.varyInterpretation}
 				bind:instructionCaptionVisible
 				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
+				instructionCaptionWritingMode={captionSettings.writingMode}
+				instructionCaptionPosition={captionSettings.position}
+				onInstructionCaptionWritingModeChange={captionSettings.setWritingMode}
 				{refinementSession}
 				runTokensIn={work.activeRunTokensIn}
 				runTokensOut={work.activeRunTokensOut}
@@ -3435,6 +3459,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	   not to work_tools, and a rule on the row would take them with it in any
 	   custom mode that keeps one group and drops the other. */
 	.ui-hide-work-tools :global(.canvas-caption-btn),
+	.ui-hide-work-tools :global(.canvas-caption-writing-mode),
 	.ui-hide-work-tools :global(.canvas-presentation-btn),
 	.ui-hide-work-tools :global(.zoom-controls),
 	.ui-hide-work-tools :global(.canvas-star-btn),

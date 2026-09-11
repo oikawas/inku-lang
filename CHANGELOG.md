@@ -15,6 +15,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Select vertical or horizontal Japanese headnotes
+
+Added a horizontal/vertical choice for Japanese headnotes in the normal canvas
+and presentation mode. Vertical text preserves line breaks and emphasis and
+scrolls for longer passages. Settings > Other offers left/right placement for
+vertical text and alignment for horizontal text. Choices are saved per user
+and shared by both views. The defaults are horizontal and left; text without
+Japanese continues to display horizontally.
+
+---
+
 ### 2026-09-11 — Animate checked lineage works
 
 Added Export animation to the lineage tab. Checking at least two works opens

@@ -281,6 +281,8 @@ def default_user_model_settings() -> dict[str, Any]:
         "okugaki_model": "meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
+        "instruction_caption_writing_mode": "horizontal",
+        "instruction_caption_position": "left",
         # The colour catalogue the user draws with. "auto" is not a catalogue:
         # it asks the server to read each description (see color_selector).
         "color_catalog_id": "default",
@@ -439,6 +441,20 @@ def _normalize_catalog_choice(value: Any) -> str:
 
 _USER_PROVIDER_KEYS = ("stage1_provider", "stage2_provider", "vision_provider", "okugaki_provider")
 _USER_MODEL_KEYS = ("stage1_model", "stage2_model", "vision_model", "okugaki_model")
+_INSTRUCTION_CAPTION_WRITING_MODES = {"horizontal", "vertical"}
+_INSTRUCTION_CAPTION_POSITIONS = {"left", "right"}
+
+
+def _normalize_instruction_caption_writing_mode(value: Any) -> str:
+    if isinstance(value, str) and value in _INSTRUCTION_CAPTION_WRITING_MODES:
+        return value
+    return "horizontal"
+
+
+def _normalize_instruction_caption_position(value: Any) -> str:
+    if isinstance(value, str) and value in _INSTRUCTION_CAPTION_POSITIONS:
+        return value
+    return "left"
 
 
 def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
@@ -465,6 +481,12 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
         clean["okugaki_model"] = okugaki_bare
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
+    clean["instruction_caption_writing_mode"] = _normalize_instruction_caption_writing_mode(
+        settings.get("instruction_caption_writing_mode")
+    )
+    clean["instruction_caption_position"] = _normalize_instruction_caption_position(
+        settings.get("instruction_caption_position")
+    )
     clean["color_catalog_id"] = _normalize_catalog_choice(settings.get("color_catalog_id"))
     # Each fold keeps its own default, so the test is written against the
     # default rather than as one shared shape: absent means "never folded".
@@ -483,6 +505,14 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
             clean[key] = patch[key].strip()
     if "instruction_caption_visible" in patch:
         clean["instruction_caption_visible"] = bool(patch["instruction_caption_visible"])
+    if "instruction_caption_writing_mode" in patch:
+        clean["instruction_caption_writing_mode"] = _normalize_instruction_caption_writing_mode(
+            patch.get("instruction_caption_writing_mode")
+        )
+    if "instruction_caption_position" in patch:
+        clean["instruction_caption_position"] = _normalize_instruction_caption_position(
+            patch.get("instruction_caption_position")
+        )
     if "model_inspection_selected_models" in patch:
         clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
     if "color_catalog_id" in patch:

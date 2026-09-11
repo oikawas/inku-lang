@@ -4,6 +4,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
+	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import './appearance-settings.css';
@@ -42,6 +43,20 @@
 						value={batchSettings.maxRetries}
 						onChange={(value) => batchSettings.setMaxRetries(value)}
 					/>
+				</div>
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsCaptionPosition}</div>
+				<div class="db-test-result">{t().settingsCaptionPositionDescription}</div>
+				<div class="settings-radio-set" role="group" aria-label={t().settingsCaptionPosition}>
+					<label class="setting-toggle">
+						<input type="radio" name="caption-position" value="left" checked={captionSettings.position === 'left'} onchange={() => captionSettings.setPosition('left')} />
+						<span>{t().settingsCaptionPositionLeft}</span>
+					</label>
+					<label class="setting-toggle">
+						<input type="radio" name="caption-position" value="right" checked={captionSettings.position === 'right'} onchange={() => captionSettings.setPosition('right')} />
+						<span>{t().settingsCaptionPositionRight}</span>
+					</label>
 				</div>
 			</div>
 			<div class="popover-group ui-mode-settings">

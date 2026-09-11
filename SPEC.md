@@ -890,7 +890,7 @@ Render and vary seeds are independent JavaScript-safe random integers carried fr
 
 A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs.
 
-The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work.
+Caption visibility, horizontal/vertical writing mode, and left/right position are persisted per user and shared by the normal canvas and presentation mode. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work.
 
 Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
@@ -957,10 +957,16 @@ The canvas panel also supports viewing-oriented controls.  A fullscreen icon in
 the drawing tab opens presentation mode, which maximizes the current SVG and
 shows a compact control bar for history navigation, latest item, star toggle,
 instruction caption toggle, and close.  Escape closes presentation mode.  A
-caption icon in the drawing tab toggles an instruction caption.  In normal
-canvas view, the caption uses 10% left and right margins relative to the drawing
-tab and is clipped inside that tab.  In presentation mode, the caption uses 10%
-left and right margins relative to the window.  Captions display the original
+caption icon in the drawing tab toggles an instruction caption. In horizontal
+mode, the normal canvas caption uses 10% left and right margins relative to the
+drawing tab and is clipped inside that tab; presentation captions use 10% left
+and right margins relative to the window. Headnotes containing Japanese offer
+Horizontal/Vertical controls in both views. Vertical text reads top to bottom
+and right to left, preserving line breaks and emphasis. Long vertical headnotes
+scroll within their frame. The defaults are horizontal and left; text without
+Japanese stays horizontal without changing the saved preference. Headnote
+position in Settings > Other selects left or right for vertical placement and
+horizontal text alignment. Captions display the original
 user-facing instruction text, not the internally augmented Stage 1 prompt; this
 keeps emotion-hint or system prompt material out of presentation captions.
 

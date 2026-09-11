@@ -2,6 +2,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import type { CaptionPosition, CaptionWritingMode } from '$lib/captionWritingMode';
 
 	export type PresentationWorkMark = {
 		id?: string | null;
@@ -13,6 +14,10 @@
 		instructionCaptionVisible: boolean;
 		canShowInstructionCaption: boolean;
 		displayInstructionText: string;
+		instructionCaptionWritingMode: CaptionWritingMode;
+		instructionCaptionPosition: CaptionPosition;
+		canUseVerticalInstructionCaption: boolean;
+		instructionCaptionVertical: boolean;
 		interactionLocked: boolean;
 		navNewerDisabled: boolean;
 		navLatestDisabled: boolean;
@@ -25,6 +30,7 @@
 		onGotoPrev: () => void | Promise<void>;
 		onToggleStar: (event: Event) => void | Promise<void>;
 		onToggleCaption: () => void | Promise<void>;
+		onInstructionCaptionWritingModeChange: (event: Event) => void;
 		onClose: () => void;
 	};
 
@@ -33,6 +39,10 @@
 		instructionCaptionVisible,
 		canShowInstructionCaption,
 		displayInstructionText,
+		instructionCaptionWritingMode,
+		instructionCaptionPosition,
+		canUseVerticalInstructionCaption,
+		instructionCaptionVertical,
 		interactionLocked,
 		navNewerDisabled,
 		navLatestDisabled,
@@ -45,6 +55,7 @@
 		onGotoPrev,
 		onToggleStar,
 		onToggleCaption,
+		onInstructionCaptionWritingModeChange,
 		onClose
 	}: Props = $props();
 </script>
@@ -58,7 +69,7 @@
 			{/if}
 		</div>
 		{#if instructionCaptionVisible && canShowInstructionCaption}
-			<div class="presentation-caption"><CaptionText text={displayInstructionText} /></div>
+			<div class="presentation-caption" class:vertical={instructionCaptionVertical} class:caption-right={instructionCaptionPosition === 'right'}><CaptionText text={displayInstructionText} /></div>
 		{/if}
 	</div>
 	<div class="presentation-controls" aria-label={t().canvasPresentationControls}>
@@ -103,6 +114,15 @@
 				</svg>
 			</button>
 		</Tooltip>
+		{#if canUseVerticalInstructionCaption}
+			<label class="caption-writing-mode">
+				<span>{t().canvasCaptionWritingMode}</span>
+				<select value={instructionCaptionWritingMode} aria-label={t().canvasCaptionWritingMode} disabled={!instructionCaptionVisible || !canShowInstructionCaption} onchange={onInstructionCaptionWritingModeChange}>
+					<option value="horizontal">{t().canvasCaptionHorizontal}</option>
+					<option value="vertical">{t().canvasCaptionVertical}</option>
+				</select>
+			</label>
+		{/if}
 		<Tooltip text={t().canvasPresentationClose}>
 			<button type="button" class="presentation-icon-btn" onclick={onClose} aria-label={t().canvasPresentationClose}>
 				<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -141,11 +161,27 @@
 		color: #fffdf8;
 		font-size: clamp(15px, 1.6vw, 24px);
 		line-height: 1.55;
-		text-align: center;
+		text-align: left;
 		box-shadow: 0 8px 30px rgba(0,0,0,0.34);
 		max-height: 5.2em;
 		overflow: hidden;
 	}
+	.presentation-caption.vertical {
+		top: clamp(14px, 3vh, 32px);
+		right: auto;
+		bottom: clamp(14px, 3vh, 32px);
+		left: clamp(14px, 3vw, 32px);
+		width: fit-content;
+		max-width: min(40%, 13em);
+		max-height: none;
+		overflow: auto;
+		white-space: pre-wrap;
+		writing-mode: vertical-rl;
+		text-orientation: mixed;
+		text-align: start;
+	}
+	.presentation-caption.caption-right:not(.vertical) { text-align: right; }
+	.presentation-caption.vertical.caption-right { right: clamp(14px, 3vw, 32px); left: auto; }
 	.presentation-controls {
 		min-height: 46px;
 		margin: 14px auto 0;
@@ -182,9 +218,14 @@
 	.presentation-text-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.presentation-icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 	.presentation-counter { min-width: 44px; padding: 0 6px; color: rgba(255,253,248,0.72); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
+	.caption-writing-mode { display: inline-flex; align-items: center; gap: 4px; color: rgba(255,253,248,0.72); font-size: var(--btn-sm-font-size); white-space: nowrap; }
+	.caption-writing-mode select { max-width: 88px; border: 1px solid var(--action-bg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--action-bg); color: var(--action-fg); font: inherit; }
 
 	@media (max-width: 720px) {
 		.presentation-overlay { padding: 12px; }
 		.presentation-controls { width: 100%; box-sizing: border-box; border-radius: 12px; flex-wrap: wrap; }
+		.presentation-caption.vertical { top: 12px; right: auto; bottom: 12px; left: 12px; max-width: min(46%, 12em); }
+		.presentation-caption.vertical.caption-right { right: 12px; left: auto; }
+		.caption-writing-mode span { display: none; }
 	}
 </style>

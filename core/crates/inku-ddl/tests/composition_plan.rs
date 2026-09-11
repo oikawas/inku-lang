@@ -11,6 +11,50 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 };
 
 #[test]
+fn surface_intensity_stays_one_recipe_at_maximum_repetition() {
+    for (level, expected) in [
+        ("dense", inku_score::SurfaceIntensity::Dense),
+        ("faint", inku_score::SurfaceIntensity::Faint),
+    ] {
+        let transformed = stage(
+            &format!("tile 4294967295 red flat {level} circle at center."),
+            ResolvedInstructionLanguage::En,
+            &[],
+        );
+        let plan = plan_verified_stage15(transformed.verified_effective_view(), context("wide"));
+        let objects = plan
+            .objects()
+            .unwrap_or_else(|| panic!("{:?}", plan.diagnostics()));
+        assert_eq!(objects.len(), 1);
+        assert_eq!(objects[0].count(), u32::MAX);
+        assert_eq!(objects[0].appearance().surface_intensity, expected);
+        assert!(objects[0].appearance().filled);
+        let definition = MacroDefinition::from_json(&json!({
+            "schema":"inku.macro-definition.v1", "namespace":"Fill", "heading":"Row", "version":"1.0.0",
+            "parameters":{}, "components":{}, "body":[{"op":"emit", "binding":null, "fields":{
+                "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"tile"},
+                "place":{"expr":"semantic_ref","category":"place","id":"center"},
+                "color":{"expr":"semantic_ref","category":"color","id":"red"},
+                "count":{"expr":"integer","value":u32::MAX},
+                "surface":{"expr":"semantic_ref","category":"surface","id":"solid"},
+                "surface_intensity":{"expr":"semantic_ref","category":"surface","id":level}
+            }}]
+        }).to_string()).unwrap();
+        let generated = stage("Fill.Row", ResolvedInstructionLanguage::En, &[definition]);
+        let generated_plan =
+            plan_verified_stage15(generated.verified_effective_view(), context("wide"));
+        let generated_objects = generated_plan
+            .objects()
+            .unwrap_or_else(|| panic!("{:?}", generated_plan.diagnostics()));
+        assert_eq!(generated_objects.len(), 1);
+        assert_eq!(generated_objects[0].count(), u32::MAX);
+        assert_eq!(generated_objects[0].appearance(), objects[0].appearance());
+        assert_eq!(generated_objects[0].recipe(), objects[0].recipe());
+    }
+}
+
+#[test]
 fn exact_decimal_generated_repetition_plan_keeps_must_fit_anchor_and_dimensions() {
     let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Row","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"movement":{"expr":"semantic_ref","category":"movement","id":"tile"},"color":{"expr":"semantic_ref","category":"color","id":"red"},"count":{"expr":"integer","value":3},"width":{"expr":"exact_decimal","value":"0.3"},"height":{"expr":"exact_decimal","value":"0.2"},"position_x":{"expr":"exact_decimal","value":"0.4"},"position_y":{"expr":"exact_decimal","value":"0.5"}

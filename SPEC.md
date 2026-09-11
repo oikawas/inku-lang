@@ -1758,6 +1758,24 @@ that quality implicitly:
 Reference §6 is the source of truth for the numeric characteristics (stroke
 width, opacity, dasharray, presence of a filter).
 
+#### Tool-specific fills and intensity
+
+Closed fills carry the selected tool's texture. Score `surface_intensity` is `normal` (the default), `dense`, or `faint`; the normal value is omitted from serialized output. Direct DDL and Macro use the same lowerer, and repeated plans retain intensity in their appearance before materialization. Changing intensity does not change the selected color identity or the seed that determines shape and stroke geometry.
+
+| Tool | Fill appearance |
+|---|---|
+| Silverpoint / pencil | Fine, quiet silver traces; broad side-of-lead pencil rubbing. Dense pencil reduces gaps, while faint pencil suppresses dark overlaps |
+| Pen / rotring | Slight ink variation for pen; even, hard drafting ink for rotring |
+| Chalk / crayon | Powder and paper gaps for chalk; wax rubbing with greater coverage for crayon |
+| Thick / fine brush | Ink variation and brush drag. Normal is already dark; dense is darker |
+| Burin / drypoint | Sharp, controlled engraved lines for burin; soft, furry black lines for drypoint. Irregular placement breaks the visible repetition |
+| Oil paint | Broad paint tracks and pigment-derived bristle relief. Dense strengthens and simplifies the ridges; faint makes deposited paint translucent |
+| Computer | Vertical RGB bands, black interlaced scanlines, and a soft glow evoke a CRT. Dense lowers brightness; faint raises it |
+
+Compact shared patterns, masks, and filters carry grain and line textures; oil paint uses filter-free paths. Oil fill width and spacing are three times the baseline. Interior ridge contrast is 0.6 / 1.05 / 0.6 for normal / dense / faint. Dense simplifies paired ridge banks within 0.25 per 1000 short-edge units before widening; faint applies opacity 0.54 to each paint stroke. The base and outline are not widened. Compat preserves its filter-free approximation and does not promise pixel equality with Display.
+
+Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
+
 **Kinds of sway noise:**
 
 - **White noise**: each point independent, uncorrelated, jagged
@@ -2825,8 +2843,8 @@ actual `Score`. Existing fill behavior for `none`, `solid`, and omitted surface 
 existing Renderer `SurfaceSpec`, while verified `paper`, `washi`, `ink_wash`,
 `charcoal_ground`, `canvas`, `drawing_paper`, and `mezzotint` reach the existing
 `CanvasGroundSpec` in a `Canvas::Spec` carrying the host-resolved aspect. The compiler
-does not create texture or material numeric defaults or seeds. Surface intensity remains
-unsupported: Stop stops and Continue omits intensity while retaining quality. Ground alone
+does not create texture or material numeric defaults or seeds. Surface intensity on solid closed fills reaches the tool-specific normal / dense / faint appearance.
+For unsupported combinations such as non-solid textures and explicit Point surfaces, Stop stops and Continue omits intensity while retaining quality. Ground alone
 is drawable content, and Continue retaining Ground preserves its original omission
 diagnostics. The default Stop mode rejects the entire Score when the document contains
 unsupported meaning. Explicit OmitAndContinue records the original owner and spans plus

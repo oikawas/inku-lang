@@ -1191,6 +1191,24 @@ typed identityとして保持し、対応範囲のdirect instructionとflat Macr
 
 数値特性（stroke 幅・不透明度・dasharray・filter 有無）の正は reference §6 とする。
 
+#### 道具別の塗りと濃淡
+
+閉じた塗りは、選んだ道具の質感を持つ。Scoreの`surface_intensity`は`normal`（省略時）／`dense`／`faint`で、通常の値はwire出力へ追加しない。通常DDLとMacroは同じ濃淡を共通lowererから渡し、反復planも個体生成前のappearanceへ保持する。濃淡だけを変えて、選択色のidentity、図形や筆跡を決めるseedを変えない。
+
+| 道具 | 塗りの表現 |
+|---|---|
+| 銀筆・鉛筆 | 銀筆は細かく静かな銀の痕。鉛筆は芯を寝かせた幅広い擦り跡で、濃いほど余白を減らす。薄いは重なりの黒みを抑える |
+| ペン・ロットリング | ペンはわずかなインクのむら、ロットリングは均一で硬い製図インク |
+| チョーク・クレヨン | チョークは粉と紙の隙間。クレヨンは蝋の擦れを持ち、チョークより面を覆う |
+| 太筆・細筆 | 筆の墨の濃淡と擦れ。通常も十分に濃く、濃いはさらに濃くする |
+| ビュラン・ドライポイント | ビュランはシャープで制御された彫線。ドライポイントは柔らかく毛羽立つ黒い線。彫線の並びは規則性を崩す |
+| 油彩 | 幅広い筆跡と同色の明暗による刷毛筋。濃いは筋を強めて座標を軽量化し、薄いは筆跡の絵具を透かす |
+| コンピュータ | 縦RGB帯、黒いインターレース走査線、淡い光のにじみでCRTを表す。濃いは明度を下げ、薄いは明度を上げる |
+
+粒子や線は小さな共有pattern／mask／filterで表し、油彩はfilterを使わずpathで表す。油彩の塗り幅と間隔は基準の3倍、内部筋の明暗差は通常0.6／濃い1.05／薄い0.6、濃いの座標簡略化は短辺1000当たり許容差0.25（拡幅前）、薄いの各筆跡opacityは0.54とする。下地と輪郭を拡幅しない。Compatはfilterを持たない近似表現であり、Displayと同一画像とはしない。
+
+Typed DDLの濃淡接続はsolidな閉じた塗りを対象とし、非solidなtexture、塗りのない線・弧、Pointの明示surfaceは既存の未対応診断を維持する。Scoreの描画能力と、typed DDLの意味が接続済みの範囲を混同しない。アプリのtyped runtime／UI／save全面接続は後続工程である。
+
 **揺らぎのノイズ種別:**
 - **ホワイトノイズ**: 各点独立・相関なし・ギザギザ
 - **パーリンノイズ**: 連続的・隣接点が似る・滑らかな波
@@ -1775,7 +1793,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。Surface intensityは未対応のままで、Stopは止まり、Continueはintensityだけを省略してqualityを残す。Groundだけも描画内容であり、Groundを残したContinueは元の省略診断を保つ。既定のStopは文書内の未対応意味でScore全体を止める。明示OmitAndContinueはtyped診断へ元owner / spanと実際のfieldまたは実行単位の省略を残し、描画対象が残る場合だけそのScoreを成功として返す。整合性不良または全省略はstoppedである。このRust経路はruntimeにはまだ接続しない。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等の未対応組合せでは、Stopは止まり、Continueはintensityだけを省略してqualityを残す。Groundだけも描画内容であり、Groundを残したContinueは元の省略診断を保つ。既定のStopは文書内の未対応意味でScore全体を止める。明示OmitAndContinueはtyped診断へ元owner / spanと実際のfieldまたは実行単位の省略を残し、描画対象が残る場合だけそのScoreを成功として返す。整合性不良または全省略はstoppedである。このRust経路はruntimeにはまだ接続しない。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 

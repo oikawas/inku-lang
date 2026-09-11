@@ -2463,9 +2463,9 @@ fn supported_input_is_identical_under_both_error_modes() {
 }
 
 #[test]
-fn ordinary_surface_intensity_omits_only_that_field_and_keeps_quality() {
+fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality() {
     let result = stage15(
-        "place one red flat dense circle at center.",
+        "place one red bleeding dense circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
@@ -2483,6 +2483,14 @@ fn ordinary_surface_intensity_omits_only_that_field_and_keeps_quality() {
         ScoreLoweringOutcome::CompleteWithOmissions
     );
     assert!(continued.score().unwrap().instructions[0].filled);
+    assert_eq!(
+        continued.score().unwrap().instructions[0]
+            .surface
+            .as_ref()
+            .unwrap()
+            .texture,
+        SurfaceTexture::Bleed
+    );
     assert!(matches!(
         continued.diagnostics(),
         [inku_ddl::ScoreLoweringDiagnostic {
@@ -2502,6 +2510,61 @@ fn ordinary_surface_intensity_omits_only_that_field_and_keeps_quality() {
             ..
         }] if spans.len() == 1
     ));
+}
+
+#[test]
+fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    for (level, expected) in [
+        ("dense", inku_score::SurfaceIntensity::Dense),
+        ("faint", inku_score::SurfaceIntensity::Faint),
+    ] {
+        let definition = MacroDefinition::from_json(&serde_json::json!({
+            "schema":"inku.macro-definition.v1", "namespace":"Draw", "heading":"Intensity", "version":"1.0.0",
+            "parameters":{}, "components":{}, "body":[{"op":"emit", "binding":null, "fields":{
+                "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+                "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+                "place":{"expr":"semantic_ref","category":"place","id":"center"},
+                "color":{"expr":"semantic_ref","category":"color","id":"red"},
+                "surface":{"expr":"semantic_ref","category":"surface","id":"solid"},
+                "surface_intensity":{"expr":"semantic_ref","category":"surface","id":level}
+            }}]
+        }).to_string()).unwrap();
+        let transformed = stage15_locked(
+            &format!("place one red flat {level} circle at center. Draw.Intensity"),
+            ResolvedInstructionLanguage::En,
+            &[definition],
+        );
+        let result = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+        assert!(
+            result.diagnostics().is_empty(),
+            "{:?}",
+            result.diagnostics()
+        );
+        let instructions = &result.score().unwrap().instructions;
+        assert_eq!(instructions[0], instructions[1]);
+        assert_eq!(instructions[0].surface_intensity, expected);
+        assert!(instructions[0].filled);
+        assert!(instructions[0].surface.is_none());
+        assert!(matches!(
+            result.instruction_origins(),
+            [
+                ScoreInstructionOrigin::SourceInstruction { .. },
+                ScoreInstructionOrigin::MacroEmit { .. }
+            ]
+        ));
+    }
+    for shape in ["line", "point"] {
+        let transformed = stage15(
+            &format!("place one red dense {shape} at center."),
+            ResolvedInstructionLanguage::En,
+        );
+        let result = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+        assert!(result.diagnostics().iter().any(|diagnostic| matches!(
+            diagnostic.reason,
+            ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
+        )));
+    }
 }
 
 #[test]

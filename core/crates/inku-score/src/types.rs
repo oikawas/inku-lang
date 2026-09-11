@@ -217,6 +217,21 @@ string_enum!(Weight {
     Computer,
 });
 string_enum!(Thinness { Fine, ExtraFine });
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SurfaceIntensity {
+    #[default]
+    Normal,
+    Dense,
+    Faint,
+}
+
+impl SurfaceIntensity {
+    const fn is_normal(&self) -> bool {
+        matches!(self, Self::Normal)
+    }
+}
+
 string_enum!(Color {
     White,
     Black,
@@ -769,6 +784,8 @@ pub struct Instruction {
     pub at: Option<AtRegion>,
     #[serde(default)]
     pub relation: Option<Relation>,
+    #[serde(default, skip_serializing_if = "SurfaceIntensity::is_normal")]
+    pub surface_intensity: SurfaceIntensity,
     #[serde(default)]
     pub thinness: Option<Thinness>,
     #[serde(default)]
@@ -825,6 +842,32 @@ impl Score {
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         for instruction in &self.instructions {
+            if instruction.surface_intensity != SurfaceIntensity::Normal {
+                let closed = matches!(
+                    instruction.primitive,
+                    Primitive::Circle
+                        | Primitive::Ellipse
+                        | Primitive::Square
+                        | Primitive::Triangle
+                        | Primitive::Polygon
+                        | Primitive::Cloudform
+                        | Primitive::Point
+                ) || instruction.arc_form == Some(ArcForm::Crescent);
+                let solid = instruction.surface.as_ref().is_none_or(|surface| {
+                    matches!(
+                        surface.texture,
+                        SurfaceTexture::None | SurfaceTexture::Solid
+                    )
+                });
+                let filled = instruction.filled
+                    || instruction
+                        .surface
+                        .as_ref()
+                        .is_some_and(|surface| surface.texture == SurfaceTexture::Solid);
+                if !closed || !solid || !filled {
+                    return Err("surface_intensity requires a closed solid fill");
+                }
+            }
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
@@ -850,7 +893,8 @@ impl Score {
             {
                 return Err("arc_form=crescent cannot carry open-arc geometry");
             }
-            if matches!(instruction.surface, Some(ref surface) if surface.texture != SurfaceTexture::None) {
+            if matches!(instruction.surface, Some(ref surface) if surface.texture != SurfaceTexture::None)
+            {
                 return Err("arc_form=crescent uses filled instead of a surface texture");
             }
         }

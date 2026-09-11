@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-11 — 道具別の塗りと濃淡
+
+12道具の通常・濃い・薄いを共有Rust rendererへ実装した。粉、蝋、墨、製図インク、彫線、銀筆・鉛筆の擦り跡、CRTの走査線、油彩の幅広い筆跡を、それぞれの道具に合わせた小さなpattern／mask／filterまたはpathで表す。油彩は下地と輪郭を保ち、幅と間隔を3倍にした穏やかな筋を使う。コンピュータの濃い・薄いは明度の暗・明で表す。
+
+Scoreの`surface_intensity`はnormal／dense／faintを保持し、省略時のnormalは既存wire表現を変えない。Typed DDLのsolidな閉じた塗りは通常DDLとMacroの共通lowererからこの値を届け、反復計画も個体生成なしで保持する。非solidなど未対応の意味は既存の診断へ残す。typed runtime／UI／saveの全面接続、配備・公開releaseは含まない。
+
+---
+
 ### 2026-09-11 — てざわりに油彩を追加
 
 てざわりに「油彩」／`oil paint`（Scoreの`oil_paint`）を追加した。語彙、Typed DDL、現在の解釈・構図prompt、Scoreの読み書き、Web／Androidの選択・表示へ接続する。共有rendererは絵具の残る筆跡と選択色由来の明暗の刷毛筋を描き、線・弧・閉輪郭・塗り面で厚塗りの質感を表す。Compatを含むSVG profileで刷毛筋を形状として保持する。

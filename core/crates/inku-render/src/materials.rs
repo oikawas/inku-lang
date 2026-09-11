@@ -2,7 +2,114 @@
 
 use crate::determinism::hash01;
 use crate::svg::{Element, format_number};
-use crate::types::{CanvasSize, Point, Seed, Weight};
+use crate::types::{CanvasSize, Point, Seed, SurfaceIntensity, Weight};
+
+pub(crate) struct OilPaintStyle<'a> {
+    pub color: &'a str,
+    pub opacity: f64,
+    relief: f64,
+    tolerance: f64,
+}
+
+impl<'a> OilPaintStyle<'a> {
+    pub fn plain(color: &'a str, opacity: f64) -> Self {
+        Self {
+            color,
+            opacity,
+            relief: 1.0,
+            tolerance: 0.0,
+        }
+    }
+
+    pub fn filled(
+        color: &'a str,
+        opacity: f64,
+        intensity: SurfaceIntensity,
+        canvas: CanvasSize,
+        interior: bool,
+    ) -> Self {
+        let dense = intensity == SurfaceIntensity::Dense;
+        Self {
+            color,
+            opacity: opacity
+                * if intensity == SurfaceIntensity::Faint {
+                    0.54
+                } else {
+                    1.0
+                },
+            relief: (if dense { 1.75 } else { 1.0 }) * if interior { 0.6 } else { 1.0 },
+            tolerance: if dense { canvas.unit() * 0.00025 } else { 0.0 },
+        }
+    }
+}
+
+fn segment_distance(point: Point, start: Point, end: Point) -> f64 {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let length = dx * dx + dy * dy;
+    let t = if length == 0.0 {
+        0.0
+    } else {
+        ((point.x - start.x) * dx + (point.y - start.y) * dy) / length
+    }
+    .clamp(0.0, 1.0);
+    (point.x - start.x - t * dx).hypot(point.y - start.y - t * dy)
+}
+
+/// Select the same vertices on both banks, preserving loaded shoulders and width.
+fn simplify_oil_ridge(left: &mut Vec<Point>, right: &mut Vec<Point>, closed: bool, tolerance: f64) {
+    if tolerance <= 0.0 || left.len() < 3 {
+        return;
+    }
+    let original_len = left.len();
+    if closed {
+        left.push(left[0]);
+        right.push(right[0]);
+    }
+    let last = left.len() - 1;
+    let mut keep = std::collections::BTreeSet::from([0, last]);
+    if !closed {
+        keep.insert(last.div_ceil(12));
+        keep.insert(last * 11 / 12);
+        let widest = (0..=last)
+            .max_by(|&a, &b| {
+                (left[a].x - right[a].x)
+                    .hypot(left[a].y - right[a].y)
+                    .total_cmp(&(left[b].x - right[b].x).hypot(left[b].y - right[b].y))
+                    .then_with(|| (2 * b).abs_diff(last).cmp(&(2 * a).abs_diff(last)))
+            })
+            .unwrap();
+        keep.insert(widest);
+    }
+    let anchors = keep.iter().copied().collect::<Vec<_>>();
+    let mut pending = anchors
+        .windows(2)
+        .map(|pair| (pair[0], pair[1]))
+        .collect::<Vec<_>>();
+    while let Some((start, end)) = pending.pop() {
+        let candidate = (start + 1..end)
+            .map(|index| {
+                let error = segment_distance(left[index], left[start], left[end])
+                    .max(segment_distance(right[index], right[start], right[end]));
+                (index, error)
+            })
+            .max_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+        if let Some((index, _)) = candidate.filter(|(_, error)| *error > tolerance) {
+            keep.insert(index);
+            pending.extend([(start, index), (index, end)]);
+        }
+    }
+    if closed && keep.len() < 4 {
+        left.truncate(original_len);
+        right.truncate(original_len);
+        return;
+    }
+    if closed {
+        keep.remove(&last);
+    }
+    *left = keep.iter().map(|&index| left[index]).collect();
+    *right = keep.iter().map(|&index| right[index]).collect();
+}
 
 /// Preserve the selected pigment while shading the sides of a raised paint ridge.
 pub(crate) fn oil_paint_shade(color: &str, amount: f64) -> String {
@@ -27,19 +134,18 @@ pub(crate) fn oil_paint_stroke(
     path: String,
     left: &[Point],
     right: &[Point],
-    color: &str,
-    opacity: f64,
+    style: OilPaintStyle<'_>,
     seed: Seed,
     closed: bool,
 ) -> Element {
     let mut group = Element::new("g")
         .attr("class", "oil-paint-stroke-v1")
-        .attr("opacity", format_number(opacity));
+        .attr("opacity", format_number(style.opacity));
     group.push(
         Element::new("path")
             .attr("d", path)
             .attr("class", "oil-paint-body-v1")
-            .attr("fill", color)
+            .attr("fill", style.color)
             .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
             .attr("stroke", "none"),
     );
@@ -70,6 +176,7 @@ pub(crate) fn oil_paint_stroke(
                 bank_a.push(at(center));
                 bank_b.push(at(center + band_width * end));
             }
+            simplify_oil_ridge(&mut bank_a, &mut bank_b, closed, style.tolerance);
             let d = if closed {
                 format!(
                     "{} {}",
@@ -84,7 +191,7 @@ pub(crate) fn oil_paint_stroke(
                 Element::new("path")
                     .attr("d", d)
                     .attr("class", class)
-                    .attr("fill", oil_paint_shade(color, shade))
+                    .attr("fill", oil_paint_shade(style.color, shade * style.relief))
                     .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
                     .attr("stroke", "none"),
             );

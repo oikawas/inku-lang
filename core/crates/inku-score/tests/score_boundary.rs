@@ -1,4 +1,4 @@
-use inku_score::{Canvas, Color, InstructionMode, Score, Weight};
+use inku_score::{Canvas, Color, InstructionMode, Score, SurfaceIntensity, Weight};
 use serde_json::{Value, json};
 
 fn score(json: &str) -> Score {
@@ -62,5 +62,58 @@ fn default_bearing_score_keeps_its_declared_defaults() {
                 "surface": null,
             }],
         })
+    );
+}
+
+#[test]
+fn surface_intensity_keeps_normal_bytes_and_rejects_unaccepted_texture_meanings() {
+    let old = score(r#"{"instructions":[{"primitive":"circle","filled":true}]}"#);
+    let old_bytes = serde_json::to_vec(&old).unwrap();
+    assert!(
+        !String::from_utf8(old_bytes.clone())
+            .unwrap()
+            .contains("surface_intensity")
+    );
+    for (value, expected) in [
+        ("normal", SurfaceIntensity::Normal),
+        ("dense", SurfaceIntensity::Dense),
+        ("faint", SurfaceIntensity::Faint),
+    ] {
+        let mut wire = serde_json::to_value(&old).unwrap();
+        wire["instructions"][0]["surface_intensity"] = json!(value);
+        let parsed: Score = serde_json::from_value(wire).unwrap();
+        assert_eq!(parsed.instructions[0].surface_intensity, expected);
+        assert!(parsed.validate_schema_edition().is_ok());
+        if expected == SurfaceIntensity::Normal {
+            assert_eq!(serde_json::to_vec(&parsed).unwrap(), old_bytes);
+        } else {
+            assert_eq!(
+                serde_json::to_value(&parsed).unwrap()["instructions"][0]["surface_intensity"],
+                value
+            );
+        }
+    }
+    for primitive in ["circle", "point"] {
+        let parsed = score(&format!(
+            r#"{{"instructions":[{{"primitive":"{primitive}","filled":true,"surface_intensity":"dense"}}]}}"#
+        ));
+        assert!(parsed.validate_schema_edition().is_ok());
+    }
+    for instruction in [
+        json!({"primitive":"line","filled":true,"surface_intensity":"dense"}),
+        json!({"primitive":"circle","surface_intensity":"dense"}),
+        json!({"primitive":"circle","filled":true,"surface":{"texture":"wash"},"surface_intensity":"dense"}),
+    ] {
+        let parsed: Score = serde_json::from_value(json!({"instructions":[instruction]})).unwrap();
+        assert_eq!(
+            parsed.validate_schema_edition(),
+            Err("surface_intensity requires a closed solid fill")
+        );
+    }
+    assert!(
+        serde_json::from_str::<Score>(
+            r#"{"instructions":[{"primitive":"circle","surface_intensity":"unknown"}]}"#
+        )
+        .is_err()
     );
 }

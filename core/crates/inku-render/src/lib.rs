@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod accepted_fills;
 pub mod arc;
 pub mod arrangement;
 pub mod checked_performance;

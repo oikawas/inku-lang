@@ -1,7 +1,8 @@
 //! Sealed, runtime-disconnected object and placement recipes; never instances or Score.
 
 use inku_score::{
-    CanvasGroundSpec, Color, LineStyle, Primitive, SurfaceSpec, Thinness, Variation, Weight,
+    CanvasGroundSpec, Color, LineStyle, Primitive, SurfaceIntensity, SurfaceSpec, Thinness,
+    Variation, Weight,
 };
 
 pub use crate::score_lowering::{Rational, ResolvedGeometryDimensions};
@@ -26,6 +27,7 @@ pub struct ResolvedObjectAppearance {
     pub continuity: LineStyle,
     pub filled: bool,
     pub surface: Option<SurfaceSpec>,
+    pub surface_intensity: SurfaceIntensity,
     pub thinness: Option<Thinness>,
     pub fluctuation: Option<Variation>,
 }

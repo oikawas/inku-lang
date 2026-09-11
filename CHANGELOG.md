@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — Tool-specific fills and intensity
+
+Implemented normal, dense, and faint fills for all twelve tools in the shared Rust renderer. Compact patterns, masks, filters, or paths express powder, wax, brush ink, drafting ink, engraving, silverpoint and pencil rubbing, CRT scanlines, and broad oil-paint strokes. Oil widens both paint tracks and spacing threefold with gentle bristle contrast while retaining the base and outline. Computer density is expressed as darker or lighter brightness.
+
+Score `surface_intensity` retains normal / dense / faint; the default normal value does not change existing wire output. Solid closed fills in typed DDL use the same lowerer for direct instructions and Macro, and repeated plans retain the value without materialization. Unsupported meanings such as non-solid intensity keep their diagnostics. Full typed runtime / UI / save integration, deployment, and public release are outside this change.
+
+---
+
 ### 2026-09-11 — Add oil paint to touches
 
 Added Japanese `油彩` / English `oil paint` with Score weight `oil_paint` to vocabulary, typed DDL, current interpretation/composition prompts, Score preservation, and Web/Android selection and display. The shared renderer suggests impasto with loaded paint strokes and bristle ridges shaded from the selected color across lines, arcs, closed contours, and filled surfaces. The ridges remain geometry in every SVG profile, including Compat.

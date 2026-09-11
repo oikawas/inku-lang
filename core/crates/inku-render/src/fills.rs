@@ -5,10 +5,11 @@ use std::collections::BTreeSet;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash01, instruction_seed};
-use crate::geometry::stroke_sample_count;
+use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle};
-use crate::materials::{oil_paint_shade, oil_paint_stroke, with_texture_filter};
+use crate::materials::{OilPaintStyle, oil_paint_shade, oil_paint_stroke, with_texture_filter};
+use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
 use crate::types::{Instruction, Point, Seed, SurfaceTexture, SvgProfile, Weight};
@@ -111,8 +112,17 @@ fn stroke_path(
             contour_stroke_path(&stroke),
             &stroke.left,
             &stroke.right,
-            &style.color,
-            opacity,
+            if style.fill && crate::accepted_fills::solid_fill(instruction) {
+                OilPaintStyle::filled(
+                    &style.color,
+                    opacity,
+                    instruction.surface_intensity,
+                    context.canvas,
+                    true,
+                )
+            } else {
+                OilPaintStyle::plain(&style.color, opacity)
+            },
             seed,
             false,
         );
@@ -273,6 +283,7 @@ fn oil_paint_fill(
     context: MarkContext<'_>,
     opacity: f64,
 ) -> Element {
+    let accepted = style.fill && crate::accepted_fills::solid_fill(instruction);
     let seed = instruction_seed(instruction, context.render_seed);
     let angle = hash01(0, seed, "oil-fill-angle") * std::f64::consts::PI;
     let normal = Point::new(-angle.sin(), angle.cos());
@@ -299,6 +310,8 @@ fn oil_paint_fill(
             .attr("fill", &style.color)
             .attr("stroke", "none"),
     );
+    let mut passes = Vec::new();
+    let (mut xx, mut xy, mut yy) = (0.0_f64, 0.0_f64, 0.0_f64);
     for (order, (row, mut start, mut end)) in scanline_segments(contour, angle, spacing, seed, 0.24)
         .into_iter()
         .enumerate()
@@ -330,15 +343,110 @@ fn oil_paint_fill(
             &style.color,
             (hash01(order as i64, seed, "oil-fill-load") - 0.5) * 0.10,
         );
-        group.push(stroke_path(
-            instruction,
-            context,
-            &centerline,
-            &pass_style,
-            1.0,
-            fill_seed(seed, order),
-            width,
+        let pass_seed = fill_seed(seed, order);
+        let stroke = synthesize_contour(ContourStrokeRequest {
+            centerline: &centerline,
+            base_width: width,
+            weight: instruction.weight,
+            seed: pass_seed,
+            closed: false,
+            anchors: &BTreeSet::new(),
+            grid_step: grid_step(instruction.weight, context.canvas),
+            wild: context.wild,
+            support: context.support,
+            terminal: StrokeTerminal::Loaded,
+        });
+        let centers = stroke
+            .left
+            .iter()
+            .zip(&stroke.right)
+            .map(|(a, b)| Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5))
+            .collect::<Vec<_>>();
+        if !centers.is_empty() {
+            let center = Point::new(
+                centers.iter().map(|p| p.x).sum::<f64>() / centers.len() as f64,
+                centers.iter().map(|p| p.y).sum::<f64>() / centers.len() as f64,
+            );
+            for point in centers {
+                let dx = point.x - center.x;
+                let dy = point.y - center.y;
+                xx += dx * dx;
+                xy += dx * dy;
+                yy += dy * dy;
+            }
+        }
+        passes.push(oil_paint_stroke(
+            contour_stroke_path(&stroke),
+            &stroke.left,
+            &stroke.right,
+            if accepted {
+                OilPaintStyle::filled(
+                    &pass_style.color,
+                    1.0,
+                    instruction.surface_intensity,
+                    context.canvas,
+                    true,
+                )
+            } else {
+                OilPaintStyle::plain(&pass_style.color, 1.0)
+            },
+            pass_seed,
+            false,
         ));
+    }
+    // A single bank-derived field widens passes and their spacing together.
+    // Degenerate marks retain their native passes and solid underlay.
+    if accepted
+        && !passes.is_empty()
+        && xx + yy > 0.0
+        && (xx - yy).hypot(2.0 * xy) >= 0.9 * (xx + yy)
+    {
+        let tangent = (2.0 * xy).atan2(xx - yy) * 0.5;
+        let nx = -tangent.sin();
+        let ny = tangent.cos();
+        let a = 1.0 + 2.0 * nx * nx;
+        let b = 2.0 * nx * ny;
+        let d = 1.0 + 2.0 * ny * ny;
+        let center = point_to_pixels(
+            instruction_anchor_on_canvas(instruction, Some(context.canvas)),
+            context.canvas,
+        );
+        let clip_id = format!(
+            "oil-fill-clip-{}-{}",
+            context.instruction_index, context.mark_index
+        );
+        let mut clip = Element::new("clipPath")
+            .attr("id", &clip_id)
+            .attr("clipPathUnits", "userSpaceOnUse");
+        clip.push(Element::new("path").attr("d", polygon_path(contour)));
+        let mut defs = Element::new("defs");
+        defs.push(clip);
+        group.push(defs);
+        let matrix = [
+            a,
+            b,
+            b,
+            d,
+            center.x * (1.0 - a) - b * center.y,
+            center.y * (1.0 - d) - b * center.x,
+        ]
+        .map(format_number)
+        .join(" ");
+        let mut field = Element::new("g")
+            .attr("class", "oil-intensity-width-field-v1")
+            .attr("transform", format!("matrix({matrix})"));
+        for pass in passes {
+            field.push(pass);
+        }
+        let mut clipped = Element::new("g")
+            .attr("class", "oil-intensity-width-clip-v1")
+            .attr("clip-path", format!("url(#{clip_id})"));
+        clipped.push(field);
+        group.push(clipped);
+    } else {
+        for pass in passes {
+            group.push(pass);
+        }
     }
     group
 }
@@ -363,6 +471,9 @@ pub(crate) fn render_interior_fill(
             context,
             opacity,
         ));
+    }
+    if let Some(fill) = crate::accepted_fills::interior(instruction, contour, style, context) {
+        return Some(fill);
     }
     if is_noncomputer_solid_fill(instruction) {
         let mut group = Element::new("g").attr("class", "solid-fill-v1");

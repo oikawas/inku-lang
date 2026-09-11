@@ -258,7 +258,9 @@
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
 # 23: oil paint is a separate touch. Japanese and English DDL material markers
 # lower deterministically to `weight=oil_paint`; thick brush remains independent.
-DDL_ENGINE_VERSION = "23"
+# 24: surface_intensity is inserted before surface in Instruction declaration
+# order. This is independent of activating the typed compiler.
+DDL_ENGINE_VERSION = "24"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

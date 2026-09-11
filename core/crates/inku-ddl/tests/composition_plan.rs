@@ -687,6 +687,41 @@ fn declared_macro_explicit_integer_count_reaches_plan() {
 }
 
 #[test]
+fn macro_group_delivery_keeps_symbolic_count_and_exact_generated_origin() {
+    let flat = definition(false, Some(json!({"expr":"integer","value":u32::MAX})));
+    let mut grouped = serde_json::to_value(&flat).unwrap();
+    grouped["body"] = json!([{"op":"group","body":[{"op":"group","body":grouped["body"]}]}]);
+    let grouped = MacroDefinition::from_json(&grouped.to_string()).unwrap();
+    let flat_stage = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[flat]);
+    let group_stage = stage("Draw.Plan", ResolvedInstructionLanguage::En, &[grouped]);
+    let flat_plan = plan_verified_stage15(flat_stage.verified_effective_view(), context("square"));
+    let group_plan =
+        plan_verified_stage15(group_stage.verified_effective_view(), context("square"));
+    let objects = group_plan
+        .objects()
+        .unwrap_or_else(|| panic!("{:?}", group_plan.diagnostics()));
+    assert_eq!(objects.len(), 1);
+    let object = &objects[0];
+    let expected = &flat_plan.objects().unwrap()[0];
+    assert_eq!(object.count(), u32::MAX);
+    assert_eq!(object.dimensions(), expected.dimensions());
+    assert_eq!(object.appearance(), expected.appearance());
+    assert_eq!(object.recipe(), expected.recipe());
+    let ScoreInstructionOrigin::MacroEmit { provenance, .. } = object.origin() else {
+        panic!("Macro origin")
+    };
+    assert_eq!(provenance.generated_ordinal, 2);
+    assert_eq!(
+        provenance
+            .expansion_path
+            .iter()
+            .filter(|segment| matches!(segment, ExpansionPathSegment::Group { .. }))
+            .count(),
+        2
+    );
+}
+
+#[test]
 fn bilingual_direct_and_declared_flat_macro_share_values_and_preserve_origins() {
     for (language, source, caller) in [
         (

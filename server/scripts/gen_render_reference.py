@@ -28,14 +28,15 @@ from inku_server.schema import GroundMaterial, Score
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
 CORPUS_FORMAT_VERSION = "2"
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
 FROZEN_AT = "2026-09-11"
 REASON = (
-    "Engine 47 adds oil_paint: loaded paint strokes and solid fills carry seeded "
-    "bristle ridges with pigment-derived light and shade in every SVG profile. "
-    "A-oil_paint-line and C-surface-solid-oil_paint are the two new Score 0.2 cases; "
-    "the eleven-tool matrices and all earlier literal inputs remain unchanged."
+    "Engine 48 gives solid fills the accepted tool-specific deposition, engraving "
+    "and CRT surfaces, and widens oil-paint passes with milder interior relief. "
+    "Normal, dense and faint preserve the geometry seed; Compat keeps explicit "
+    "intensity with a filter-free approximation. Earlier literal inputs and "
+    "frozen Engine 47 artifacts remain unchanged."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -205,13 +206,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Engine 47 adds only the two material witnesses, not another tool matrix.
     _case(cases, "A-oil_paint-line",
           _instruction("line", weight="oil_paint", color="blue"),
-          score_version=SCHEMA_VERSION)
+          score_version="0.2.0")
     oil_solid = copy.deepcopy(BASE_SURFACE)
     oil_solid["texture"] = "solid"
     _case(cases, "C-surface-solid-oil_paint",
           _instruction("square", weight="oil_paint", color="blue", filled=True,
                        surface=oil_solid),
-          score_version=SCHEMA_VERSION)
+          score_version="0.2.0")
 
     dimensions = {"line": ["position_x", "position_y"], "circle": ["radius"], "arc": ["radius"]}
     for quality in ("white", "perlin", "pink", "wave"):

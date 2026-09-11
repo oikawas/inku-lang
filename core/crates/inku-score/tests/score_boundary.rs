@@ -21,7 +21,7 @@ fn explicit_score_round_trips_without_renderer() {
 fn default_bearing_score_keeps_its_declared_defaults() {
     let parsed = score(r#"{"instructions":[{"primitive":"line"}]}"#);
 
-    assert_eq!(parsed.version, "0.2.0");
+    assert_eq!(parsed.version, "0.3.0");
     assert_eq!(parsed.canvas, Canvas::Id("square".to_owned()));
     assert_eq!(parsed.background, Color::White);
     assert_eq!(parsed.instructions[0].weight, Weight::Pen);
@@ -30,7 +30,7 @@ fn default_bearing_score_keeps_its_declared_defaults() {
     assert_eq!(
         serde_json::to_value(parsed).unwrap(),
         json!({
-            "version": "0.2.0",
+            "version": "0.3.0",
             "canvas": "square",
             "background": "white",
             "presence": null,
@@ -69,6 +69,39 @@ fn default_bearing_score_keeps_its_declared_defaults() {
 fn surface_intensity_keeps_normal_bytes_and_rejects_unaccepted_texture_meanings() {
     let old = score(r#"{"instructions":[{"primitive":"circle","filled":true}]}"#);
     let old_bytes = serde_json::to_vec(&old).unwrap();
+    for edition in ["0.1.0", "0.2.0", "0.3.0"] {
+        let mut wire = serde_json::to_value(&old).unwrap();
+        wire["version"] = json!(edition);
+        let saved = inku_score::read_saved_score_json(&serde_json::to_vec(&wire).unwrap()).unwrap();
+        assert_eq!(saved.version, edition);
+        let canonical = inku_score::canonical_json_bytes(&saved).unwrap();
+        let reread = inku_score::read_saved_score_json(&canonical).unwrap();
+        assert_eq!(
+            inku_score::canonical_json_bytes(&reread).unwrap(),
+            canonical
+        );
+        wire["instructions"][0]["surface_intensity"] = json!("normal");
+        let normal =
+            inku_score::read_saved_score_json(&serde_json::to_vec(&wire).unwrap()).unwrap();
+        assert_eq!(
+            inku_score::canonical_json_bytes(&normal).unwrap(),
+            canonical
+        );
+        for level in ["dense", "faint"] {
+            wire["instructions"][0]["surface_intensity"] = json!(level);
+            let result = inku_score::read_saved_score_json(&serde_json::to_vec(&wire).unwrap());
+            assert_eq!(result.is_ok(), edition == "0.3.0");
+        }
+    }
+    let legacy = inku_score::read_saved_score_json(br#"{"instructions":[]}"#).unwrap();
+    assert_eq!(legacy.version, "0.1.0");
+    for edition in ["0.2.0", "0.3.0"] {
+        let wire = json!({"version":edition,"instructions":[{
+            "primitive":"arc","arc_form":"crescent","center":[0.5,0.5],
+            "size":[0.2,0.2572564393705176],"filled":true
+        }]});
+        assert!(inku_score::read_saved_score_json(&serde_json::to_vec(&wire).unwrap()).is_ok());
+    }
     assert!(
         !String::from_utf8(old_bytes.clone())
             .unwrap()

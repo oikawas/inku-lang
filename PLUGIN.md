@@ -80,9 +80,11 @@ This small definition reaches the current runtime-disconnected Score lowerer:
 }
 ```
 
-Each complete flat Emit becomes one ordinary Score instruction. A sequence of
-complete Emits keeps its order, including Emits already flattened through
-`use`, bounded `repeat`, or `vary`. The current consumer accepts `shape`
+Each complete Emit becomes one ordinary Score instruction. A sequence of
+complete Emits keeps its order, including Emits already expanded through
+`use`, bounded `repeat`, or `vary`, and Emits nested inside placement-free
+`group` containers. Group traversal preserves generated owners and reference IDs
+resolved in lexical scope; it adds no placement, transform, or drawing instruction. The current consumer accepts `shape`
 (`line`, `circle`, `ellipse`, `cloudform`, `square`, `triangle`, `polygon`, `arc`, or `point`), explicit
 `movement:place`, either explicit `place` (center, top, bottom, the four edges, or corner) or the exact `position_x` / `position_y` pair, and optional same-category `color`,
 `touch`, `continuity`, `surface`, `angle`, `thinness`, and `relative_scale`. Thinness is a closed
@@ -102,7 +104,7 @@ document Ground. A verified document-owned Ground reaches the same lowerer as a
 `CanvasGroundSpec` with the host-resolved aspect. Omitted drawing attributes and
 normal count-one geometry use the same defaults as ordinary DDL.
 
-An explicit `connected` or `touching` relation may join only two adjacent bound flat Emits in
+An explicit `connected` or `touching` relation may join only two adjacent bound Emits in
 the same expansion, with exact center placement on both Emits. It preserves Emit order and generated ownership and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
 omitted `from` omits the complete `to` Emit under OmitAndContinue; it never
@@ -112,16 +114,17 @@ fixed; omitted normal may adjust. Macro relations check actual typed Emits witho
 a literal noun condition. `not_touching` also uses adjacent bound Emits and the ordinary
 Medium-gap Score representation, requiring exact center on the current Emit. Adjacency
 includes every original Emit, including unbound Emits. An omitted from never retargets to
-a survivor. Other relation kinds and structural relation placement remain unsupported.
+a survivor. Relations inside placement-free Groups use the same rules. Unsupported
+subtrees are not traversed and cannot be crossed to create adjacency. Other relation kinds remain unsupported.
 
 Stop is the default. Under Stop, incomplete Emits, unknown keys, mismatched
 value types or categories, unbound caller facts, repeated outer counts, and
-expanded `group`, `transform`, `anchor`, or unsupported `relation` nodes stop the entire
+expanded `transform`, `anchor`, or unsupported `relation` nodes stop the entire
 Score. Under explicit OmitAndContinue, a supported appearance problem omits
-only that field and uses the ordinary default; an invalid flat Emit omits that
+only that field and uses the ordinary default; an invalid Emit omits that
 Emit; and an unsupported structural node omits its whole subtree without
 extracting child Emits. Invalid outer placement, size, count, relation, or other
-caller meaning omits the invocation. Unrelated flat siblings retain source and
+caller meaning omits the invocation. Unrelated siblings, including those inside Groups, retain source and
 generated-provenance order. Diagnostics identify source or generated ownership,
 spans, invocation, expansion path, generated ordinal, field key, and the actual
 omission unit. If no drawing target remains, the result is stopped.
@@ -203,7 +206,7 @@ O(count) allocation or materialization.
 ## Current Implementation Status
 
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
-and deterministically expand MacroDefinition v1 values. Its finite flat Emit
+and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including placement-free Groups,
 subset also reaches an actual Score through the same lowerer used by ordinary
 DDL, with shared Stop / OmitAndContinue outcomes and typed omission diagnostics.
 The compile-once facade retains the original document, compiler state, lock, and

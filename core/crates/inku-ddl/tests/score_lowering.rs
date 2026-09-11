@@ -3616,7 +3616,7 @@ fn flat_use_repeat_and_vary_emits_are_consumed_without_origin_rejection() {
 }
 
 #[test]
-fn unsupported_emit_and_caller_meaning_never_returns_a_partial_score() {
+fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
     let cases = [
         (
             missing_movement_definition(),
@@ -3658,8 +3658,224 @@ fn unsupported_emit_and_caller_meaning_never_returns_a_partial_score() {
     }
 }
 
+fn macro_group_emit(binding: &str, color: &str) -> serde_json::Value {
+    serde_json::json!({"op":"emit", "binding":binding, "fields":{
+        "shape":{"expr":"semantic_ref","category":"shape","id":"line"},
+        "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
+        "place":{"expr":"semantic_ref","category":"place","id":"center"},
+        "color":{"expr":"semantic_ref","category":"color","id":color}
+    }})
+}
+
+fn macro_group_definition(body: serde_json::Value) -> MacroDefinition {
+    let mut value = serde_json::to_value(complete_flat_emit_definition()).unwrap();
+    value["body"] = body;
+    MacroDefinition::from_json(&value.to_string()).unwrap()
+}
+
 #[test]
-fn continue_omits_macro_emit_and_structural_subtree_but_keeps_flat_siblings() {
+fn macro_group_delivery_keeps_nested_order_scope_ids_and_relation_targets() {
+    use inku_ddl::ExpandedMacroNode;
+    use serde_json::json;
+    let definition = macro_group_definition(json!([
+        macro_group_emit("outer", "black"),
+        {"op":"group","body":[
+            macro_group_emit("local", "red"),
+            {"op":"relation","kind":"connected","from":"outer","to":"local"},
+            {"op":"group","body":[
+                macro_group_emit("nested", "blue"),
+                {"op":"relation","kind":"touching","from":"local","to":"nested"}
+            ]}
+        ]},
+        {"op":"group","body":[
+            macro_group_emit("local", "green"),
+            macro_group_emit("next", "red"),
+            {"op":"relation","kind":"not_touching","from":"local","to":"next"}
+        ]}
+    ]));
+    assert!(definition.validate().is_valid());
+    let transformed = stage15_locked(
+        "place one yellow circle at center; Draw.Pair; place one blue circle at center.",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let view = transformed.verified_effective_view();
+    let nodes = &view.original_expanded_invocations()[0].nodes;
+    let ExpandedMacroNode::Group { body: left, .. } = &nodes[1] else {
+        panic!("left group")
+    };
+    let ExpandedMacroNode::Group { body: nested, .. } = &left[2] else {
+        panic!("nested group")
+    };
+    let ExpandedMacroNode::Group { body: right, .. } = &nodes[2] else {
+        panic!("right group")
+    };
+    let originals = [&nodes[0], &left[0], &nested[0], &right[0], &right[1]];
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let result = lower_verified_stage15_score_with_policy(view, context, policy);
+        assert!(
+            result.diagnostics().is_empty(),
+            "{:?}",
+            result.diagnostics()
+        );
+        let instructions = &result.score().unwrap().instructions;
+        assert_eq!(instructions.len(), 7);
+        assert_eq!(
+            instructions
+                .iter()
+                .map(|instruction| instruction.color)
+                .collect::<Vec<_>>(),
+            [
+                Color::Yellow,
+                Color::Black,
+                Color::Red,
+                Color::Blue,
+                Color::Green,
+                Color::Red,
+                Color::Blue
+            ]
+        );
+        assert_eq!(
+            instructions[2]
+                .relation
+                .as_ref()
+                .unwrap()
+                .target_instruction_index,
+            Some(1)
+        );
+        assert_eq!(
+            instructions[3]
+                .relation
+                .as_ref()
+                .unwrap()
+                .target_instruction_index,
+            Some(2)
+        );
+        assert!(instructions[4].relation.is_none());
+        assert_eq!(
+            instructions[5].relation.as_ref().unwrap().kind,
+            RelationType::NotTouching
+        );
+        let mut locals = Vec::new();
+        for (origin, original) in result.instruction_origins()[1..6].iter().zip(originals) {
+            let ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index,
+                binding,
+                provenance,
+            } = origin
+            else {
+                panic!("Macro origin")
+            };
+            let ExpandedMacroNode::Emit {
+                binding: expected_binding,
+                provenance: expected_provenance,
+                ..
+            } = original
+            else {
+                panic!("Emit")
+            };
+            assert_eq!(*source_instruction_index, 1);
+            assert_eq!(binding, expected_binding);
+            assert_eq!(provenance, expected_provenance);
+            if binding.as_ref().unwrap().local_name == "local" {
+                locals.push(binding.as_ref().unwrap());
+            }
+        }
+        assert_eq!(locals.len(), 2);
+        assert_ne!(locals[0], locals[1]);
+    }
+    // A child declaration does not become visible to the caller's lexical scope.
+    let mut invalid = serde_json::to_value(definition).unwrap();
+    invalid["body"].as_array_mut().unwrap().push(json!({
+        "op":"relation","kind":"connected","from":"local","to":"outer"
+    }));
+    assert!(
+        MacroDefinition::from_json(&invalid.to_string())
+            .unwrap()
+            .validate()
+            .has_code("undefined_anchor")
+    );
+}
+
+#[test]
+fn macro_group_delivery_never_rebinds_across_failed_emit_or_structural_subtree() {
+    use serde_json::json;
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    for obstruction in ["failed_between", "failed_source", "transform", "anchor"] {
+        let mut first = macro_group_emit("first", "red");
+        let mut failed = macro_group_emit("failed", "black");
+        failed["fields"].as_object_mut().unwrap().remove("movement");
+        let mut body = Vec::new();
+        if obstruction == "failed_source" {
+            first["fields"].as_object_mut().unwrap().remove("movement");
+        }
+        body.push(first);
+        match obstruction {
+            "failed_between" => body.push(json!({"op":"group","body":[failed]})),
+            "transform" => body.push(json!({"op":"group","body":[{
+                "op":"transform","transform":{"translate_x":{"expr":"number","value":0.1}},
+                "body":[macro_group_emit("hidden", "black")]
+            }]})),
+            "anchor" => body.push(json!({"op":"group","body":[{"op":"anchor","name":"pivot"}]})),
+            _ => {}
+        }
+        body.extend([
+            macro_group_emit("second", "blue"),
+            json!({"op":"relation","kind":"connected","from":"first","to":"second"}),
+            macro_group_emit("tail", "green"),
+        ]);
+        let definition = macro_group_definition(json!([{"op":"group","body":body}]));
+        let transformed =
+            stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+        for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+            let result = lower_verified_stage15_score_with_policy(
+                transformed.verified_effective_view(),
+                context,
+                policy,
+            );
+            let expected = if obstruction == "failed_source" {
+                ScoreFieldGap::UnavailableMacroRelationReference
+            } else {
+                ScoreFieldGap::UnsupportedMacroRelation
+            };
+            assert!(
+                result.gaps().contains(&expected),
+                "{obstruction}: {:?}",
+                result.gaps()
+            );
+            assert!(result.diagnostics().iter().any(|diagnostic| diagnostic.reason == expected && matches!(
+                &diagnostic.owner, ScoreDiagnosticOwner::GeneratedNode { expansion_path, .. }
+                    if expansion_path.iter().any(|segment| matches!(segment, inku_ddl::ExpansionPathSegment::Group { .. }))
+            )));
+            if policy == ScoreErrorPolicy::Stop {
+                assert!(result.score().is_none());
+                continue;
+            }
+            let instructions = &result.score().unwrap().instructions;
+            let expected_colors = if obstruction == "failed_source" {
+                vec![Color::Green]
+            } else {
+                vec![Color::Red, Color::Green]
+            };
+            assert_eq!(
+                instructions
+                    .iter()
+                    .map(|instruction| instruction.color)
+                    .collect::<Vec<_>>(),
+                expected_colors
+            );
+            assert!(
+                instructions
+                    .iter()
+                    .all(|instruction| instruction.relation.is_none())
+            );
+        }
+    }
+}
+
+#[test]
+fn macro_group_delivery_keeps_transform_subtree_and_emit_omission_units() {
     let definition = mixed_omission_definition();
     let result = stage15_locked(
         "Mixed.Omissions",
@@ -4251,14 +4467,14 @@ fn angle_emit_definition(shape: &str, angle: &str) -> MacroDefinition {
 
 fn structural_definition() -> MacroDefinition {
     MacroDefinition::from_json(
-        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Structure","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"group","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}]}"#,
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Bad","heading":"Structure","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"transform","transform":{"translate_x":{"expr":"number","value":0.1}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]}]}"#,
     )
     .unwrap()
 }
 
 fn mixed_omission_definition() -> MacroDefinition {
     MacroDefinition::from_json(
-        r#"{"schema":"inku.macro-definition.v1","namespace":"Mixed","heading":"Omissions","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"group","body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"cloudform"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
+        r#"{"schema":"inku.macro-definition.v1","namespace":"Mixed","heading":"Omissions","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"transform","transform":{"translate_x":{"expr":"number","value":0.1}},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"cloudform"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}}]},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"ellipse"},"place":{"expr":"semantic_ref","category":"place","id":"center"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
     )
     .unwrap()
 }

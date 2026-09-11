@@ -106,15 +106,20 @@ class ServerScoreVocabularyTest {
     }
 
     @Test
-    fun testTheSchemaOffersScore0_2AndTheCrescentDescriptor() {
+    fun testTheSchemaOffersScore0_3AndKeepsOldEditions() {
         val root = JSONObject(ServerScoreSchemaJson.parameters)
         val properties = root.getJSONObject("properties")
-        assertEquals("0.2.0", properties.getJSONObject("version").getString("default"))
+        assertEquals("0.3.0", properties.getJSONObject("version").getString("default"))
+        assertEquals("[\"0.3.0\",\"0.2.0\",\"0.1.0\"]",
+            properties.getJSONObject("version").getJSONArray("enum").toString())
 
         val instruction = properties
             .getJSONObject("instructions")
             .getJSONObject("items")
             .getJSONObject("properties")
+        assertEquals("normal", instruction.getJSONObject("surface_intensity").getString("default"))
+        assertEquals("[\"normal\",\"dense\",\"faint\"]",
+            instruction.getJSONObject("surface_intensity").getJSONArray("enum").toString())
         assertEquals("crescent", instruction.getJSONObject("arc_form").getJSONArray("anyOf")
             .getJSONObject(0).getString("const"))
     }

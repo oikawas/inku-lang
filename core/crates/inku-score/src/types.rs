@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.2.0".to_owned()
+    "0.3.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -843,6 +843,9 @@ impl Score {
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         for instruction in &self.instructions {
             if instruction.surface_intensity != SurfaceIntensity::Normal {
+                if self.version != "0.3.0" {
+                    return Err("surface_intensity requires Score version 0.3.0");
+                }
                 let closed = matches!(
                     instruction.primitive,
                     Primitive::Circle
@@ -871,7 +874,7 @@ impl Score {
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
-            if self.version != "0.2.0" {
+            if self.version != "0.2.0" && self.version != "0.3.0" {
                 return Err("arc_form requires Score version 0.2.0");
             }
             if instruction.primitive != Primitive::Arc {

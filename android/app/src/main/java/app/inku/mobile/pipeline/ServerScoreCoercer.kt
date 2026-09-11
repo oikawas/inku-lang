@@ -82,6 +82,9 @@ internal object ServerScoreCoercer {
             val thinness = data.optString("thinness").takeIf { it in setOf("fine", "extra_fine") }
             if (thinness != null) data.put("thinness", thinness) else data.remove("thinness")
         }
+        if (data.optString("surface_intensity") !in setOf("dense", "faint")) {
+            data.remove("surface_intensity")
+        }
         data.put("style", data.optString("style", "solid").ifBlank { "solid" })
         if (!data.has("filled")) data.put("filled", false)
         if (data.has("mode")) {
@@ -112,7 +115,7 @@ internal object ServerScoreCoercer {
             "primitive", "note", "from", "to", "center", "radius", "sides", "position", "size",
             "angle_start", "angle_end", "rotation", "filled", "style", "weight", "thinness",
             "mode", "carve_depth", "color", "color_hint", "variation", "arrangement",
-            "at", "relation", "surface",
+            "at", "relation", "surface_intensity", "surface",
         )
         val keysToRemove = data.keys().asSequence().filter { it !in allowedKeys }.toList()
         keysToRemove.forEach { data.remove(it) }

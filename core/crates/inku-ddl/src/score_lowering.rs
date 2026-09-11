@@ -309,6 +309,20 @@ fn project_source_instruction<'a>(
     })
 }
 
+/// Visit pure containers without changing the already resolved lexical identities.
+/// Transforms remain atomic unsupported subtrees; their children are not delivered.
+fn collect_macro_delivery_nodes<'a>(
+    nodes: &'a [ExpandedMacroNode],
+    output: &mut Vec<&'a ExpandedMacroNode>,
+) {
+    for node in nodes {
+        match node {
+            ExpandedMacroNode::Group { body, .. } => collect_macro_delivery_nodes(body, output),
+            _ => output.push(node),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn lower_macro_instruction(
     view: VerifiedStage15EffectiveView<'_>,
@@ -349,21 +363,23 @@ fn lower_macro_instruction(
         }
     };
 
-    let emit_nodes = expansion
-        .nodes
+    let mut delivery_nodes = Vec::new();
+    collect_macro_delivery_nodes(&expansion.nodes, &mut delivery_nodes);
+    let emit_nodes = delivery_nodes
         .iter()
-        .filter_map(|node| match node {
+        .enumerate()
+        .filter_map(|(index, node)| match node {
             ExpandedMacroNode::Emit {
                 binding,
                 provenance,
                 ..
-            } => Some((binding.as_ref(), provenance)),
+            } => Some((binding.as_ref(), provenance, index)),
             _ => None,
         })
         .collect::<Vec<_>>();
     let mut relation_by_to = BTreeMap::new();
     let mut invalid_relation_targets = BTreeSet::new();
-    for node in &expansion.nodes {
+    for &node in &delivery_nodes {
         let ExpandedMacroNode::Relation {
             kind,
             from,
@@ -378,16 +394,23 @@ fn lower_macro_instruction(
         }
         let from_position = emit_nodes
             .iter()
-            .position(|(binding, _)| binding.is_some_and(|binding| binding == from));
+            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == from));
         let to_position = emit_nodes
             .iter()
-            .position(|(binding, _)| binding.is_some_and(|binding| binding == to));
-        if from_position
-            .zip(to_position)
-            .is_some_and(|(from, to)| to == from + 1)
-            && relation_by_to
-                .insert(to.clone(), (from.clone(), kind.as_str()))
-                .is_none()
+            .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
+        if from_position.zip(to_position).is_some_and(|(from, to)| {
+            to == from + 1
+                && delivery_nodes[emit_nodes[from].2 + 1..emit_nodes[to].2]
+                    .iter()
+                    .all(|node| {
+                        !matches!(
+                            node,
+                            ExpandedMacroNode::Transform { .. } | ExpandedMacroNode::Anchor { .. }
+                        )
+                    })
+        }) && relation_by_to
+            .insert(to.clone(), (from.clone(), kind.as_str()))
+            .is_none()
         {
             continue;
         }
@@ -420,7 +443,7 @@ fn lower_macro_instruction(
     let mut successful_bindings: BTreeMap<GeneratedTargetId, usize> = BTreeMap::new();
     let mut center_bindings = BTreeSet::new();
 
-    for node in &expansion.nodes {
+    for &node in &delivery_nodes {
         let ExpandedMacroNode::Emit {
             binding,
             fields,

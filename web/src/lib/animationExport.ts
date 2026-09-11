@@ -71,7 +71,8 @@ function filenameFromResponse(response: Response, format: AnimationExportFormat)
 export async function downloadAnimation(
 	apiFetch: ApiFetch,
 	ids: string[],
-	settings: AnimationExportSettings
+	settings: AnimationExportSettings,
+	directory?: FileSystemDirectoryHandle
 ): Promise<void> {
 	const heightPx = settings.resolution === 'custom'
 		? settings.customHeight
@@ -96,5 +97,6 @@ export async function downloadAnimation(
 	// Same single path as every other download -- see features/export/save-target.
 	await saveBlob(blob, filenameFromResponse(response, settings.format), {
 		enabled: downloadFolderSettings.enabled,
+		directory,
 	});
 }

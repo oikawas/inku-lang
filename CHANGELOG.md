@@ -15,6 +15,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-11 — History animation export modal
+
+The history Animation button now opens a modal to adjust format, transitions,
+hold time, and resolution, choose a destination folder, and save. It shares
+controls with the settings tab and applies edits only to the current export.
+The selected works remain ordered from oldest to newest, and failures to write
+to the chosen folder appear in the modal. Defaults and other download
+destinations remain unchanged.
+
+---
+
 ### 2026-09-11 — Add oil paint to touches
 
 Added Japanese `油彩` / English `oil paint` with Score weight `oil_paint` to vocabulary, typed DDL, current interpretation/composition prompts, Score preservation, and Web/Android selection and display. The shared renderer suggests impasto with loaded paint strokes and bristle ridges shaded from the selected color across lines, arcs, closed contours, and filled surfaces. The ridges remain geometry in every SVG profile, including Compat.

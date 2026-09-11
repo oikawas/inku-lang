@@ -119,6 +119,27 @@ async function ensureWritable(handle: FileSystemDirectoryHandle): Promise<boolea
 	}
 }
 
+async function writeBlobToDirectory(
+	handle: FileSystemDirectoryHandle,
+	blob: Blob,
+	filename: string
+): Promise<SaveOutcome> {
+	const file = await handle.getFileHandle(filename, { create: true });
+	const writable = await file.createWritable();
+	try {
+		await writable.write(blob);
+		await writable.close();
+	} catch (error) {
+		try {
+			await writable.abort();
+		} catch {
+			// Preserve the original write or close failure.
+		}
+		throw error;
+	}
+	return { kind: 'folder', folderName: handle.name };
+}
+
 export type DownloadAnchor = {
 	href: string;
 	download: string;
@@ -167,16 +188,26 @@ export function triggerBrowserDownload(
 /**
  * Save one file. Every download in the app goes through here.
  *
- * `enabled` and `folderName` come from the user's settings; the handle comes
- * from IndexedDB. When anything is missing or permission is refused, the file
- * still lands in the browser's download folder and the outcome says so, so the
- * caller can tell the user it went somewhere other than the folder they picked.
+ * An explicit directory is used directly, regardless of the persistent folder
+ * setting or browser feature detection. Its permission and write failures reject
+ * the save so a one-off export can report the failure instead of changing target.
+ *
+ * Otherwise, `enabled` comes from the user's settings and the handle comes from
+ * IndexedDB. When anything is missing or permission is refused, the file still
+ * lands in the browser's download folder and the outcome says so, so the caller
+ * can tell the user it went somewhere other than the folder they picked.
  */
 export async function saveBlob(
 	blob: Blob,
 	filename: string,
-	options: { enabled?: boolean } = {},
+	options: { enabled?: boolean; directory?: FileSystemDirectoryHandle } = {},
 ): Promise<SaveOutcome> {
+	if (options.directory) {
+		if (!(await ensureWritable(options.directory))) {
+			throw new Error('Write permission was denied for the selected export folder.');
+		}
+		return writeBlobToDirectory(options.directory, blob, filename);
+	}
 	if (!supportsDirectoryPicker()) {
 		triggerBrowserDownload(blob, filename);
 		return { kind: 'browser', reason: 'unsupported' };
@@ -195,11 +226,7 @@ export async function saveBlob(
 		return { kind: 'browser', reason: 'denied' };
 	}
 	try {
-		const file = await handle.getFileHandle(filename, { create: true });
-		const writable = await file.createWritable();
-		await writable.write(blob);
-		await writable.close();
-		return { kind: 'folder', folderName: handle.name };
+		return await writeBlobToDirectory(handle, blob, filename);
 	} catch {
 		triggerBrowserDownload(blob, filename);
 		return { kind: 'browser', reason: 'failed' };

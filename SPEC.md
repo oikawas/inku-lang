@@ -982,6 +982,17 @@ templates the user edited are kept).  The status bar PNG menu is generated from
 these templates, and export width is computed from the current canvas aspect
 ratio.
 
+In history management, Animation opens an export modal when at least two works
+are selected. It starts with the settings export tab's Animation of multiple
+works values and allows the format (APNG/GIF), transition pattern, hold time,
+resolution, and custom height to be changed for this export. Supported browsers
+offer a save-location button to choose a folder; Save exports the selected works
+from oldest to newest. Changes in the modal do not update the default settings
+or folder. Without a destination override, the existing save settings apply;
+browsers without folder selection use their own download settings. Failure to
+write to a folder chosen for this export stays visible in the modal and does
+not redirect the file to another destination.
+
 ---
 
 ## 8. The Cost of Choosing and the Balance of Making

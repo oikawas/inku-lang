@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import AnimationExportFields from '$lib/features/export/AnimationExportFields.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { CardExportSettings } from '$lib/cardExport';
@@ -98,53 +99,7 @@
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsAnimationExportTitle}</div>
 				<div class="db-test-result">{t().settingsAnimationExportDescription}</div>
-				<div class="animation-settings-grid">
-					<label>
-						<span>{t().settingsAnimationFormat}</span>
-						<select value={animationExportSettings.format} onchange={(event) => (animationExportSettings = { ...animationExportSettings, format: event.currentTarget.value as AnimationExportSettings["format"] })}>
-							<option value="apng">{t().animationFormatApng}</option>
-							<option value="gif">{t().animationFormatGif}</option>
-						</select>
-					</label>
-					<label>
-						<span>{t().settingsAnimationPattern}</span>
-						<select value={animationExportSettings.pattern} onchange={(event) => (animationExportSettings = { ...animationExportSettings, pattern: event.currentTarget.value as AnimationExportSettings["pattern"] })}>
-							<option value="cut">{t().animationPatternCut}</option>
-							<option value="crossfade">{t().animationPatternCrossfade}</option>
-							<option value="fade_white">{t().animationPatternFadeWhite}</option>
-							<option value="slide">{t().animationPatternSlide}</option>
-						</select>
-					</label>
-					<label>
-						<span>{t().settingsAnimationHold}</span>
-						<input type="number" min="0.1" max="30" step="0.1" value={animationExportSettings.holdSeconds} onchange={(event) => (animationExportSettings = { ...animationExportSettings, holdSeconds: Math.max(0.1, Math.min(30, Number(event.currentTarget.value) || 1)) })} />
-						<small>{t().settingsAnimationHoldHint}</small>
-					</label>
-					<label>
-						<span>{t().settingsAnimationResolution}</span>
-						<select value={animationExportSettings.resolution} onchange={(event) => (animationExportSettings = { ...animationExportSettings, resolution: event.currentTarget.value as AnimationExportSettings["resolution"] })}>
-							<option value="150">{t().animationResolution150}</option>
-							<option value="300">{t().animationResolution300}</option>
-							<option value="500">{t().animationResolution500}</option>
-							<option value="1k">{t().animationResolution1k}</option>
-							<option value="4k">{t().animationResolution4k}</option>
-							<option value="8k">{t().animationResolution8k}</option>
-							<option value="custom">{t().animationResolutionCustom}</option>
-						</select>
-						{#if animationExportSettings.resolution === "custom"}
-							<input
-								type="number"
-								min="64"
-								max="12000"
-								step="1"
-								value={animationExportSettings.customHeight}
-								aria-label={t().animationCustomHeight}
-								onchange={(event) => (animationExportSettings = { ...animationExportSettings, customHeight: Math.max(64, Math.min(12000, Math.round(Number(event.currentTarget.value) || 720))) })}
-							/>
-							<small>{t().animationCustomHeight}</small>
-						{/if}
-					</label>
-				</div>
+				<AnimationExportFields bind:settings={animationExportSettings} />
 			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsCardExportTitle}</div>

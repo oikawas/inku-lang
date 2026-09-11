@@ -682,6 +682,13 @@ export interface LangPack {
 	animationCustomHeight: string;
 	historyAnimationExport: string;
 	historyAnimationExportHint: string;
+	animationExportTitle: string;
+	animationExportSelection: (count: number) => string;
+	animationExportChoosePath: string;
+	animationExportSave: string;
+	animationExportFolderUnsupported: string;
+	animationExportFolderFailed: string;
+	animationExportWorkUnavailable: string;
 	lineageAnimationExport: string;
 	lineageAnimationExportHint: string;
 	animationExportBusy: string;

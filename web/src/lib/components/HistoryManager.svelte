@@ -5,6 +5,7 @@
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { saveBlob } from '$lib/features/export/save-target';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import AnimationExportModal from '$lib/components/AnimationExportModal.svelte';
 	import { type SheetVariant } from '$lib/contactSheet';
 	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
@@ -340,8 +341,7 @@
 
 	let contactSheetBusy = $state<SheetVariant | null>(null);
 	let contactSheetError = $state<string | null>(null);
-	let animationExportBusy = $state(false);
-	let animationExportError = $state<string | null>(null);
+	let animationExportIds = $state<string[] | null>(null);
 	let cardExportBusy = $state(false);
 	let cardExportError = $state<string | null>(null);
 
@@ -384,25 +384,18 @@
 		}
 	}
 
-	async function downloadSelectedAnimation(): Promise<void> {
-		if (animationExportBusy || selectedHistoryIds.length < 2) return;
-		animationExportBusy = true;
-		animationExportError = null;
-		try {
-			const items: HistoryItem[] = [];
-			for (const id of selectedHistoryIds) {
-				const item = await resolveWorkWithSvg(id);
-				if (item?.id) items.push(item);
-			}
-			if (items.length < 2) throw new Error("At least two saved works are required.");
-			items.sort((left, right) => left.at - right.at || String(left.id).localeCompare(String(right.id)));
-			await downloadAnimation(apiFetch, items.map((item) => item.id as string), animationExportSettings);
-		} catch (cause) {
-			const reason = cause instanceof Error ? cause.message : String(cause);
-			animationExportError = t().animationExportFailed(reason);
-		} finally {
-			animationExportBusy = false;
+	async function downloadSelectedAnimation(
+		ids: string[], settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle
+	): Promise<void> {
+		const items: HistoryItem[] = [];
+		for (const id of ids) {
+			const item = await resolveWorkWithSvg(id);
+			if (!item?.id) throw new Error(t().animationExportWorkUnavailable);
+			items.push(item);
 		}
+		if (items.length < 2) throw new Error(t().animationExportWorkUnavailable);
+		items.sort((left, right) => left.at - right.at || String(left.id).localeCompare(String(right.id)));
+		await downloadAnimation(apiFetch, items.map((item) => item.id as string), settings, directory);
 	}
 
 	async function downloadSelectedCard(): Promise<void> {
@@ -724,11 +717,11 @@
 				<button
 					class="ghost-btn"
 					type="button"
-					onclick={downloadSelectedAnimation}
-					disabled={selectedHistoryIds.length < 2 || animationExportBusy}
+					onclick={() => { animationExportIds = [...selectedHistoryIds]; }}
+					disabled={selectedHistoryIds.length < 2}
 				>
-					{animationExportBusy ? t().animationExportBusy : t().historyAnimationExport}
-					{#if !animationExportBusy && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+					{t().historyAnimationExport}
+					{#if selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
 				</button>
 			</Tooltip>
 			<Tooltip placement="bottom-left" wide text={t().historyCardExportHint}>
@@ -741,7 +734,6 @@
 					{cardExportBusy ? t().cardExportBusy : t().historyCardExport}
 				</button>
 			</Tooltip>
-			{#if animationExportError}<span class="tool-error">{animationExportError}</span>{/if}
 			{#if cardExportError}<span class="tool-error">{cardExportError}</span>{/if}
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 			{/if}
@@ -939,6 +931,15 @@
 		</div>
 	{/if}
 </div>
+
+{#if animationExportIds}
+	<AnimationExportModal
+		initialSettings={animationExportSettings}
+		count={animationExportIds.length}
+		onSave={(settings, directory) => downloadSelectedAnimation(animationExportIds ?? [], settings, directory)}
+		onClose={() => { animationExportIds = null; }}
+	/>
+{/if}
 
 <style>
 	/* Not a decoration: this listing is what people select and delete from, so a

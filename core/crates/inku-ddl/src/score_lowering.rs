@@ -389,7 +389,10 @@ fn lower_macro_instruction(
         else {
             continue;
         };
-        if kind != "connected" && kind != "touching" && kind != "not_touching" {
+        if !matches!(
+            kind.as_str(),
+            "along" | "cutting" | "connected" | "touching" | "not_touching"
+        ) {
             continue;
         }
         let from_position = emit_nodes
@@ -450,7 +453,7 @@ fn lower_macro_instruction(
             provenance,
         } = node
         else {
-            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if kind == "connected" || kind == "touching" || kind == "not_touching")
+            if matches!(node, ExpandedMacroNode::Relation { kind, .. } if matches!(kind.as_str(), "along" | "cutting" | "connected" | "touching" | "not_touching"))
             {
                 continue;
             }
@@ -698,24 +701,34 @@ fn lower_macro_instruction(
                     });
                 } else {
                     let touching = *kind == "touching";
+                    let line_relation = matches!(*kind, "along" | "cutting");
                     let target_instruction_index = successful_bindings[dependency];
                     let prior_supported =
                         instructions
                             .get(target_instruction_index)
                             .is_some_and(|prior| {
-                                (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-                                    && prior.arc_form.is_none())
-                                    || (!touching && prior.primitive == Primitive::Point)
+                                if line_relation {
+                                    prior.primitive == Primitive::Line
+                                } else {
+                                    (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+                                        && prior.arc_form.is_none())
+                                        || (!touching && prior.primitive == Primitive::Point)
+                                }
                             });
-                    let current_supported = matches!(
-                        score_instruction.primitive,
-                        Primitive::Line | Primitive::Arc
-                    ) && score_instruction.arc_form.is_none()
-                        || (!touching && score_instruction.primitive == Primitive::Point);
+                    let current_supported = if line_relation {
+                        score_instruction.primitive == Primitive::Line
+                    } else {
+                        matches!(
+                            score_instruction.primitive,
+                            Primitive::Line | Primitive::Arc
+                        ) && score_instruction.arc_form.is_none()
+                            || (!touching && score_instruction.primitive == Primitive::Point)
+                    };
                     if !prior_supported
                         || !current_supported
-                        || input.effective_focus.is_none()
-                        || !center_bindings.contains(dependency)
+                        || (!line_relation
+                            && (input.effective_focus.is_none()
+                                || !center_bindings.contains(dependency)))
                     {
                         let reason = ScoreFieldGap::UnsupportedMacroRelation;
                         diagnostics.push(ScoreLoweringDiagnostic {
@@ -731,10 +744,12 @@ fn lower_macro_instruction(
                         continue;
                     }
                     score_instruction.relation = Some(Relation {
-                        kind: if touching {
-                            RelationType::Touching
-                        } else {
-                            RelationType::Connected
+                        kind: match *kind {
+                            "along" => RelationType::Along,
+                            "cutting" => RelationType::Cutting,
+                            "touching" => RelationType::Touching,
+                            "connected" => RelationType::Connected,
+                            _ => unreachable!("checked macro relation kind"),
                         },
                         gap: RelationGap::Medium,
                         target_instruction_index: Some(target_instruction_index),
@@ -1830,17 +1845,33 @@ fn direct_score_relation(
     );
     let touching = relation.kind == SemanticRelationKind::Touching
         && relation.reference == SemanticPreviousReference::PreviousOne;
-    let checked = connected || touching;
+    let along = relation.kind == SemanticRelationKind::Along
+        && relation.reference == SemanticPreviousReference::PreviousOne;
+    let cutting = relation.kind == SemanticRelationKind::Cutting
+        && relation.reference == SemanticPreviousReference::PreviousOne;
+    let checked = connected || touching || along || cutting;
+    let line_relation = along || cutting;
     let has_exact_center = instruction.position.as_ref().is_some_and(|position| {
         position.identity.category == "place" && position.identity.id == "center"
     });
-    let connected_position_supported = instruction.entity.numeric_position.is_some()
-        || (instruction.position.is_some() && effective_focus.is_some());
-    let connected_primitive_supported = matches!(
+    let checked_position_supported = if line_relation {
+        instruction.entity.numeric_position.is_some()
+            || instruction.position.is_none()
+            || effective_focus.is_some()
+    } else {
+        instruction.entity.numeric_position.is_some()
+            || (instruction.position.is_some() && effective_focus.is_some())
+    };
+    let checked_primitive_supported = matches!(
         &instruction.entity.head,
         SemanticHead::Primitive(term)
             if term.identity.category == "shape"
-                && (matches!(term.identity.id.as_str(), "line" | "arc") || (!touching && term.identity.id == "point"))
+                && (if line_relation {
+                    term.identity.id == "line"
+                } else {
+                    matches!(term.identity.id.as_str(), "line" | "arc")
+                        || (!touching && term.identity.id == "point")
+                })
                 && instruction.entity.proportion.arc_form.as_ref().is_none_or(|form| form.identity.id != "crescent")
     );
     if (!legacy_supported && !checked)
@@ -1848,7 +1879,7 @@ fn direct_score_relation(
             && (instruction.entity.numeric_position.is_some()
                 || !has_exact_center
                 || effective_focus.is_none()))
-        || (checked && (!connected_position_supported || !connected_primitive_supported))
+        || (checked && (!checked_position_supported || !checked_primitive_supported))
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
     }
@@ -1889,9 +1920,13 @@ fn direct_score_relation(
     }
     if checked
         && !score_instructions.last().is_some_and(|prior| {
-            (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-                && prior.arc_form.is_none())
-                || (!touching && prior.primitive == Primitive::Point)
+            if line_relation {
+                prior.primitive == Primitive::Line
+            } else {
+                (matches!(prior.primitive, Primitive::Line | Primitive::Arc)
+                    && prior.arc_form.is_none())
+                    || (!touching && prior.primitive == Primitive::Point)
+            }
         })
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
@@ -1903,9 +1938,8 @@ fn direct_score_relation(
             SemanticRelationKind::Between => RelationType::Between,
             SemanticRelationKind::Connected => RelationType::Connected,
             SemanticRelationKind::Touching => RelationType::Touching,
-            SemanticRelationKind::Along | SemanticRelationKind::Cutting => {
-                unreachable!("supported relation checked")
-            }
+            SemanticRelationKind::Along => RelationType::Along,
+            SemanticRelationKind::Cutting => RelationType::Cutting,
         },
         gap: RelationGap::Medium,
         target_instruction_index: checked.then(|| score_instructions.len() - 1),

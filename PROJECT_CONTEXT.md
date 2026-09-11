@@ -104,12 +104,12 @@ Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. T
 material numeric defaults or seeds. Line owns exact length, arc owns exact chord and sagitta, and point owns exact
 radius or diameter. For ordinary source-owned direct primitives, the checked lowerer carries NotTouching and Between,
 and the Line / Arc / Point endpoint family carries Connected, into the existing Score
-relation with its Medium gap. References survive only when the direct instructions named by typed previous-one/two
-each produce one instruction and remain the current instruction's actual immediate source origins in original order;
+relation with its Medium gap. NotTouching retains the existing gap, and Between retains the existing recipe based on the bounding-box centers of the two immediately preceding elements; named or noncenter placement is movable while numeric placement remains fixed authority. References survive only when the direct instructions named by typed previous-one/two
+each produce one instruction and remain the current instruction's actual immediate source origins in original order. For Between, the immediately preceding instruction is the first reference and the one before it is the second, with both owners retained.
 A missing referent records an error and removes only its dependent relation; it does not retarget or omit the dependent current.
 Macro exact_decimal literals and declared parameters join the ordinary DDL dimension and numeric-position resolver.
 Explicit dimensions bind uniquely, retaining legacy Number(f64), exact values, and source / generated ownership.
-NotTouching also reaches the same Score from adjacent bound flat Emits without skipping unbound Emits or lost references.
+NotTouching and Between also reach the same Score from adjacent bound flat Emits without skipping unbound Emits or lost references. External relations attempt only a whole-group translation that preserves transformed geometry and explicit values; an unsatisfied relation records an error, is removed alone, and leaves the group at its original placement.
 
 Touching also reaches the shared checked performer from direct Line / Arc instructions and adjacent bound flat Macro Emits.
 The four bilingual full literals verify their named prior Line / Arc type in original source order. Both-endpoint matching

@@ -104,8 +104,8 @@ Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"pla
 隅はStage 2がattested meaning / composition seed / 元occurrenceから選び、隅内anchorはRendererが選ぶ。
 生成した座標を原文出典として挿入せず、未宣言callerの暗黙overlayや位置省略のdefaultを追加しない。
 隣接bound Emitのconnected / touchingは両者がexact centerの場合に限り、noncenter relationを黙って捨てない。
-not_touchingはcurrentがexact centerの場合に、通常DDLと同じMedium gapのScoreへ届く。
-隣接性はunbound Emitを含む元順序で判定し、省略されたfromを他のsurvivorへ付け替えない。
+not_touchingとbetweenはnamed／noncenter位置も通常DDLと同じchecked performerへ届け、数値位置はfixedのauthorityを保つ。NotTouchingは既存Medium gapを使い、Betweenはcurrent直前のEmitとさらに一つ前のEmitのbbox中心を使う既存recipeを保つ。Betweenのfromは直前Emitであり、その一つ前を第二参照として両方のownerを保持する。
+隣接性はunbound Emitを含む元順序で判定し、省略されたfromまたはBetweenの二参照を他のsurvivorへ付け替えない。
 旧Stop入力も受けるが、recoverableなrelation失敗で新Score全体を止めない。relationだけをerrorとして外し、元ownerと変形後配置を保って描く。OmitAndContinueは既存の最小省略単位を保ち、integrity不良は両mode停止とする。
 
 共有Rust compiler基盤は、MacroDefinition v1の値をparse、validate、identify、lock、bindし、

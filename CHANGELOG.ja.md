@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-12 — NotTouching／Betweenのchecked relation配送
+
+通常DDLとMacroのNotTouching／Betweenを同じchecked lowerer、symbolic plan、rendererへ届ける。NotTouchingは既存のgapを、Betweenはcurrent直前の要素とさらに一つ前の要素のbbox中心を使う既存recipeを保つ。named／noncenter位置は可動、数値位置はfixedのauthorityを保つ。MacroのBetweenは`from`を直前Emitとし、その一つ前を第二参照として両方のownerを保つ。参照が省略・消失した場合や制約が両立しない場合はerrorを記録してrelationだけを外し、図形・まとまり・元配置・順序・seedを残す。
+
+Score 0.6.0に新しい項目は加えず、render engine 54、DDL engine 29の意味変更として扱う。direct coordinated groupの内部配置は作者裁定待ちのままであり、個体materialization、typed runtime／UI／save全面接続は未完了である。共有DDLのpaired selector 4件、版ファイルのRuff、Linuxの新2 selectorは各一回成功した。Linuxは1 targetを一回buildし、network noneで2/2 passed、0 failedだった。
+
+---
+
 ### 2026-09-11 — まとまりを保ち、成立しない関係だけを省略
 
 変形したまとまりと外の図形とのTouching／Along／Cuttingを、群全体の平行移動で調整する。変形後の形・向き・明示値を保ち、不成立の関係はエラーを返してその関係だけを外す。複数の移動要求が競合する場合は元配置を保ち、そこで成立する関係を残す。図形・群・後続の描画を消さず、元の参照先、描画順、seedを維持する。欠落参照や循環も関係だけの省略として報告する。

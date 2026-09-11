@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-12 — Checked relation delivery for NotTouching and Between
+
+Ordinary DDL and Macros deliver NotTouching and Between through the same checked lowerer, symbolic plan, and renderer. NotTouching retains the existing gap. Between retains the existing recipe using the bounding-box centers of the current element's immediately preceding element and the one before it. Named or noncenter placement is movable, while numeric placement retains fixed authority. Macro Between uses the immediately preceding Emit as `from` and retains the one before it as its second reference, preserving both owners. If a reference is omitted or missing, or constraints cannot coexist, an error removes only the relation and retains shapes, groups, original placement, order, and seeds.
+
+Score remains 0.6.0 with no new field. This is a render engine 54 and DDL engine 29 meaning change. Direct coordinated-group internal placement remains subject to a separate author decision; instance materialization and full typed runtime, UI, and save integration remain unfinished. Four paired shared-DDL selectors, version-file Ruff, and the two new Linux selectors each passed once. Linux built one target once and ran both selectors with networking disabled: 2/2 passed, 0 failed.
+
+---
+
 ### 2026-09-11 — Preserve groups and omit only unsatisfied relations
 
 External Touching, Along, and Cutting translate the whole transformed group while retaining its geometry, orientation, and explicit values. Unsatisfied relations produce errors and are omitted individually. Conflicting translations preserve the original placement and retain relations satisfied there. Shapes, groups, and subsequent drawing remain, with original targets, drawing order, and seeds. Missing references and cycles also omit relations alone.

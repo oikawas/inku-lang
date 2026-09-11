@@ -90,12 +90,12 @@ circle / ellipse / cloudform / square / triangle / polygon / line / arc / point�
 7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
 数値defaultやseedを作らない。Lineは長さ、Arcは弦長と矢高、Pointは半径または直径をexact decimalとして所有する。
 通常sourceのdirect primitiveでは既存checked lowererがNotTouchingとBetweenを、Line / Arc / Pointの
-endpoint familyがConnectedを既存Medium gapのScore relationへ届ける。typedな
+endpoint familyがConnectedを既存Medium gapのScore relationへ届ける。NotTouchingは既存gap、Betweenは直前二要素のbbox中心を使う既存recipeを保ち、named／noncenter位置はmovable、数値位置はfixedのauthorityを保つ。typedな
 previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
-一致する場合だけ参照を保つ。参照消失時はerrorを記録してdependent relationだけを外し、currentを連鎖省略も付け替えもしない。
+一致する場合だけ参照を保つ。Betweenでは直前が第一参照、その一つ前が第二参照であり、両ownerを保持する。参照消失時はerrorを記録してdependent relationだけを外し、currentを連鎖省略も付け替えもしない。
 Macroのexact_decimal literal / 宣言parameterは通常DDLの寸法・数値位置resolverへ合流する。
 Radius等の明示dimensionで一意にbindし、旧Number(f64)、exact値、source / generated ownerを保つ。
-NotTouchingも隣接bound flat Emitから同じScoreへ届き、unbound Emitや失った参照を飛び越さない。
+NotTouchingとBetweenも隣接bound flat Emitから同じScoreへ届き、unbound Emitや失った参照を飛び越さない。外部relationは変形後の形と明示値を保ったgroup全体translationだけを試み、成立しなければrelationだけをerrorとして外して元配置を描く。
 
 TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから同じchecked performerへ届く。
 日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、

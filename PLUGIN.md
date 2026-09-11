@@ -111,10 +111,13 @@ omitted `from` records an error and removes only the relation; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
 and shares the ordinary Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain
 fixed; omitted normal may adjust. Macro relations check actual typed Emits without creating
-a literal noun condition. `not_touching` also uses adjacent bound Emits and the ordinary
-Medium-gap Score representation, requiring exact center on the current Emit. Adjacency
-includes every original Emit, including unbound Emits. An omitted from never retargets to
-a survivor. Relations inside placement-free Groups use the same rules. Unsupported
+a literal noun condition. `not_touching` and `between` also use adjacent bound Emits and the ordinary checked
+performer. They accept named or noncenter placement while retaining numeric placement as
+fixed authority. NotTouching keeps the existing Medium gap. Between keeps the existing
+recipe based on the bounding-box centers of the immediately preceding Emit and the Emit
+before it; its `from` is that preceding Emit, and both reference owners remain intact.
+Adjacency includes every original Emit, including unbound Emits. An omitted from or either
+Between reference never retargets to a survivor. Relations inside placement-free Groups use the same rules. Unsupported
 subtrees are not traversed and cannot be crossed to create adjacency. `along` / `cutting`
 also accept adjacent bound Line Emits through the shared checked performer. Along
 aligns an unspecified direction parallel to the preceding line; Cutting retains

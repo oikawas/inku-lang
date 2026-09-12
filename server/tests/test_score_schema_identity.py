@@ -96,4 +96,4 @@ def test_score08_gates_scatter_and_tile_placement_groups() -> None:
     scatter["placement_groups"] = [{**base["placement_groups"][0], "layout": "scatter"}]
     with pytest.raises(ValueError, match="require Score version 0.8.0"):
         Score.model_validate(scatter)
-    assert Score.model_validate({"version": "0.8.0", **scatter}).placement_groups
+    assert Score.model_validate({**scatter, "version": "0.8.0"}).placement_groups

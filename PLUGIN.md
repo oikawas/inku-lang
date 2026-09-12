@@ -248,6 +248,12 @@ system/user plugin directories, and plugin status or enable controls are
 compatibility surfaces while retirement remains unfinished. They are not an
 authoring or loading API for vocabulary macros.
 
+Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate, and standalone repeated-Macro count delivery remains incomplete.
+
+Member `transform_group_indices` retains source-owned internal transforms before placement; unlisted equal-range transforms remain outer and run afterward.
+
+`CompositionPlanResult.standalone_macro_repetitions` retains the existing body positions, range, Anchors, internal transforms, and source-head repeat count symbolically; it creates no outer placement or actual Score instances.
+
 A compatibility importer reports `legacy_plugin_format` and returns a
 per-macro `Imported` or `Omitted` outcome. Existing works prefer their stored
 Score or expanded artifact. An omitted macro without such an artifact must not

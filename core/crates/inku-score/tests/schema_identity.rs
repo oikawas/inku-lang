@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "4c7a21fcf30346fdec73c674be03ef665ff90274aff73f3fd836330284a45889";
+    "8463c17d2d26e8b6eeac020b5c6581ad3afbdee4e139f19dd48830c0266b2198";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -34,7 +34,7 @@ fn canonical_score_schema_identity_is_stable() {
     let placement_group = schema["$defs"]["PlacementGroup"]["properties"]
         .as_object()
         .expect("PlacementGroup properties must be an object");
-    for required in ["start", "end", "layout", "at"] {
+    for required in ["start", "end", "layout", "at", "members"] {
         assert!(
             placement_group.contains_key(required),
             "missing PlacementGroup property {required}"
@@ -44,6 +44,15 @@ fn canonical_score_schema_identity_is_stable() {
         placement_group["layout"]["enum"],
         serde_json::json!(["overlap", "horizontal_source_order", "scatter", "tile"])
     );
+    let placement_member = schema["$defs"]["PlacementMember"]["properties"]
+        .as_object()
+        .expect("PlacementMember properties must be an object");
+    for required in ["start", "end", "anchor_indices", "transform_group_indices"] {
+        assert!(
+            placement_member.contains_key(required),
+            "missing PlacementMember property {required}"
+        );
+    }
 
     let instruction = schema["$defs"]["Instruction"]["properties"]
         .as_object()

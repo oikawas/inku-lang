@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.8.0".to_owned()
+    "0.9.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -912,6 +912,17 @@ pub enum GroupLayout {
     Tile,
 }
 
+/// One source head's complete body, placed without changing its internal geometry.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PlacementMember {
+    pub start: usize,
+    pub end: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchor_indices: Vec<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transform_group_indices: Vec<usize>,
+}
+
 /// One coordinated arrangement and named placement, distinct from affine transforms.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PlacementGroup {
@@ -919,6 +930,8 @@ pub struct PlacementGroup {
     pub end: usize,
     pub layout: GroupLayout,
     pub at: AtRegion,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<PlacementMember>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -946,17 +959,20 @@ impl Score {
         for group in &self.placement_groups {
             match group.layout {
                 GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
-                    if !matches!(self.version.as_str(), "0.7.0" | "0.8.0") =>
+                    if !matches!(self.version.as_str(), "0.7.0" | "0.8.0" | "0.9.0") =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
                 }
-                GroupLayout::Scatter | GroupLayout::Tile if self.version != "0.8.0" => {
+                GroupLayout::Scatter | GroupLayout::Tile
+                    if !matches!(self.version.as_str(), "0.8.0" | "0.9.0") =>
+                {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
                 }
                 _ => {}
             }
             if group.start < previous_end
-                || group.start >= group.end
+                || group.start > group.end
+                || (group.start == group.end && group.members.is_empty())
                 || group.end > self.instructions.len()
             {
                 return Err(
@@ -964,6 +980,68 @@ impl Score {
                 );
             }
             previous_end = group.end;
+            if !group.members.is_empty() && self.version != "0.9.0" {
+                return Err("placement members require Score version 0.9.0");
+            }
+            let mut member_end = group.start;
+            let mut anchors = HashSet::new();
+            let mut owned_transforms = HashSet::new();
+            for member in &group.members {
+                if member.start != member_end
+                    || member.start > member.end
+                    || member.end > group.end
+                    || (member.start == member.end && member.anchor_indices.is_empty())
+                {
+                    return Err("placement members must partition the group in source order");
+                }
+                member_end = member.end;
+                for &anchor in &member.anchor_indices {
+                    if anchor >= self.anchors.len() || !anchors.insert(anchor) {
+                        return Err("placement member anchors must be valid and unique");
+                    }
+                }
+                for &index in &member.transform_group_indices {
+                    let Some(affine) = self.transform_groups.get(index) else {
+                        return Err("placement member transform index exceeds transform groups");
+                    };
+                    if !owned_transforms.insert(index)
+                        || affine.start < member.start
+                        || affine.end > member.end
+                        || !affine
+                            .anchor_indices
+                            .iter()
+                            .all(|anchor| member.anchor_indices.contains(anchor))
+                    {
+                        return Err(
+                            "placement member transforms must be unique and contained by their owner",
+                        );
+                    }
+                }
+            }
+            if !group.members.is_empty() && member_end != group.end {
+                return Err("placement members must cover the group");
+            }
+            for prior in &self.placement_groups {
+                if std::ptr::eq(prior, group) {
+                    break;
+                }
+                if prior
+                    .members
+                    .iter()
+                    .flat_map(|member| &member.anchor_indices)
+                    .any(|anchor| anchors.contains(anchor))
+                {
+                    return Err("placement groups cannot share anchors");
+                }
+                if prior
+                    .members
+                    .iter()
+                    .flat_map(|member| &member.transform_group_indices)
+                    .any(|index| owned_transforms.contains(index))
+                {
+                    return Err("placement groups cannot share owned transforms");
+                }
+            }
             let [x0, y0, x1, y1] = group.at.region;
             if ![x0, y0, x1, y1].into_iter().all(f64::is_finite) || x0 > x1 || y0 > y1 {
                 return Err("placement group at region must be finite and ordered");
@@ -974,13 +1052,21 @@ impl Score {
             {
                 return Err("placement group members cannot carry arrangements");
             }
-            for affine in &self.transform_groups {
-                if group.start < affine.end
-                    && affine.start < group.end
-                    && !(affine.start <= group.start && group.end <= affine.end)
-                {
+            for (affine_index, affine) in self.transform_groups.iter().enumerate() {
+                let drawable_overlap = group.start < affine.end && affine.start < group.end;
+                let anchor_overlap = affine
+                    .anchor_indices
+                    .iter()
+                    .any(|anchor| anchors.contains(anchor));
+                let outer = affine.start <= group.start
+                    && group.end <= affine.end
+                    && anchors
+                        .iter()
+                        .all(|anchor| affine.anchor_indices.contains(anchor));
+                let inner = owned_transforms.contains(&affine_index);
+                if (drawable_overlap || anchor_overlap) && !outer && !inner {
                     return Err(
-                        "an overlapping affine group must contain the entire placement group",
+                        "an overlapping affine group must contain the placement group or fit one member",
                     );
                 }
             }
@@ -992,7 +1078,7 @@ impl Score {
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         if !self.anchors.is_empty()
-            && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0")
+            && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0")
         {
             return Err("anchors requires Score version 0.6.0");
         }
@@ -1024,7 +1110,7 @@ impl Score {
                     return Err("relation target instruction and anchor are exclusive");
                 }
                 if let Some(anchor_index) = relation.target_anchor_index {
-                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0") {
+                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0") {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
                     if anchor_index >= self.anchors.len() {
@@ -1039,6 +1125,7 @@ impl Score {
                     && self.version != "0.6.0"
                     && self.version != "0.7.0"
                     && self.version != "0.8.0"
+                    && self.version != "0.9.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -1077,6 +1164,7 @@ impl Score {
                 && self.version != "0.6.0"
                 && self.version != "0.7.0"
                 && self.version != "0.8.0"
+                && self.version != "0.9.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -1116,7 +1204,7 @@ impl Score {
         }
         if !matches!(
             self.version.as_str(),
-            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0"
+            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0"
         ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
@@ -1143,6 +1231,7 @@ impl Score {
                 && self.version != "0.6.0"
                 && self.version != "0.7.0"
                 && self.version != "0.8.0"
+                && self.version != "0.9.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -1177,7 +1266,7 @@ impl Score {
                 }
             }
             if !group.anchor_indices.is_empty()
-                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0")
+                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0")
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }

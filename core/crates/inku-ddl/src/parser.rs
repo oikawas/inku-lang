@@ -430,6 +430,20 @@ fn candidates_at_with_locked_macro_boundary(
 ) -> Vec<Candidate> {
     let source = document.source();
     let mut candidates = candidates_at(source, start_byte, language, true);
+    // A sidecar-locked Macro is also a recognized left boundary for Japanese
+    // particles. The ordinary asset-only boundary scan cannot see that head.
+    let left_end = source[..start_byte].trim_end_matches(is_separator).len();
+    let preceded_by_locked_macro = language == ResolvedInstructionLanguage::Ja
+        && document.macro_locks().iter().any(|macro_lock| {
+            left_end
+                .checked_sub(macro_lock.qualified_name().len())
+                .filter(|left_start| source.is_char_boundary(*left_start))
+                .and_then(|left_start| qualified_macro_match(document, left_start))
+                .is_some_and(|matched| {
+                    matches!(matched, QualifiedMacroMatch::ExactLock { end_byte, .. }
+                        if end_byte == left_end)
+                })
+        });
     for candidate in candidates_at(source, start_byte, language, false) {
         let followed_by_locked_macro = matches!(
             qualified_macro_match(document, candidate.end_byte),
@@ -437,7 +451,7 @@ fn candidates_at_with_locked_macro_boundary(
                 | Some(QualifiedMacroMatch::AmbiguousLocks { .. })
         );
         let already_present = candidates.iter().any(|existing| existing == &candidate);
-        if followed_by_locked_macro && !already_present {
+        if (followed_by_locked_macro || preceded_by_locked_macro) && !already_present {
             candidates.push(candidate);
         }
     }

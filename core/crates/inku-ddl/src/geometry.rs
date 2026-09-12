@@ -278,6 +278,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"omitted_members_exceed_total\":\"each_one_higher_total\",",
                     "\"target\":\"resolve_once_first_original_member_occurrence\",\"pivot\":\"combined_geometry_bbox_center\",",
                     "\"repetition\":\"symbolic_plan_materialization_deferred\"},",
+                    "\"placement_members\":{\"source_head\":\"atomic_logical_slot\",\"primitive\":{\"logical_count\":\"object_count\",\"body_repeat_count\":1,\"recipe\":\"local_place_only\"},\"macro\":{\"logical_count\":\"outer_count\",\"body_repeat_count\":\"outer_count\",\"internal\":\"emit_counts_positions_recipes_preserved\"},\"bbox\":\"drawables_else_anchor_points\",\"owned_internal_transforms\":\"before_member_placement\",\"unowned_outer_transforms\":\"after_placement_including_equal_range\",\"standalone_repeats\":\"body_scopes_preserved_no_group_layout_target\"},",
                     "\"size_basis\":\"canvas_short_edge_independent_of_count\",",
                     "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
                     "\"geometry_gap\":[\"triangle\",\"polygon\"],",
@@ -947,8 +948,16 @@ mod tests {
             );
         }
         assert_eq!(
+            payload["object_placement"]["placement_members"]["source_head"],
+            "atomic_logical_slot"
+        );
+        assert_eq!(
+            payload["object_placement"]["placement_members"]["macro"]["body_repeat_count"],
+            "outer_count"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "83aa353249cd273cafc3ca029fec610ecd441128fada1c2d8083a80f45d36b73"
+            "2a68a8e4f990c8809d509178e8d7feafb18cc741474f41579d264f7a5964215a"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

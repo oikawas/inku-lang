@@ -15,6 +15,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-12 — Atomic Macro placement members
+
+Score 0.9 adds optional `placement_groups.members` to retain Macro body boundaries as ordered contiguous drawable spans and Anchor ownership. Empty members require Anchors; explicit members partition their group and cannot share drawables or Anchors. Legacy member-less Score 0.7/0.8 placement groups remain readable. Group-head count remains separate from internal Emit count, and repeated results remain symbolic plans. This does not complete standalone repeated-Macro counts, instance materialization, or runtime / UI / save cutover.
+
+Each member can also own ordered `transform_group_indices`: listed transforms run before member placement, while an unlisted equal-range transform remains outer and runs afterward.
+
+Standalone Macro repeat planning retains the existing body positions, range, Anchors, internal-transform ownership, and source-head repeat count in `CompositionPlanResult.standalone_macro_repetitions`; it creates neither an outer placement recipe nor actual Score instances.
+
+---
+
 ### 2026-09-12 — Combine explicit and omitted group counts
 
 Scatter and tile preserve explicit counts and divide the remainder up to eight among omitted members, assigning any remainder in source order. Each omitted member receives at least one, allowing the total to exceed eight. Fully omitted counts use the same minimum; fully explicit counts are not topped up. For example, three red objects and an omitted blue count become three and five; ten red objects and an omitted blue count become ten and one.

@@ -1926,6 +1926,59 @@ fn bound_action_and_position_are_not_redelivered_to_outer_instruction_fields() {
     assert_eq!(head.parameters.len(), 2);
 }
 
+#[test]
+fn macro_first_coordinated_heads_claim_the_shared_predicate_in_source_order() {
+    let definition = instruction_macro_definition("Draw", "Pair", serde_json::json!({}));
+    for (language, source) in [
+        (
+            ResolvedInstructionLanguage::En,
+            "arrange Draw.Pair and one blue square at center.",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "Draw.Pairと青い四角を中央に並べる",
+        ),
+    ] {
+        let document = instruction_macro_document_in_language(
+            source,
+            language,
+            std::slice::from_ref(&definition),
+        );
+        let binding = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+        let result = associate_semantic_instructions_with_macro_binding(&document, binding);
+
+        assert!(result.coordination_issues.is_empty(), "{source}");
+        assert_eq!(result.ast.coordinated_head_groups.len(), 1, "{source}");
+        assert_eq!(
+            result.ast.coordinated_head_groups[0].member_instruction_indices,
+            [0, 1],
+            "{source}"
+        );
+        assert!(result.issues.is_empty(), "{source}: {:?}", result.issues);
+        assert!(result.ast.complete, "{source}");
+        assert!(matches!(
+            result.ast.instructions[0].entity.head,
+            SemanticHead::MacroInvocation(_)
+        ));
+        assert!(matches!(
+            result.ast.instructions[1].entity.head,
+            SemanticHead::Primitive(_)
+        ));
+        let [predicate] = result.ast.group_predicates.as_slice() else {
+            panic!("{source}: one group predicate is required");
+        };
+        assert!(predicate.action.is_some(), "{source}");
+        assert_eq!(
+            predicate
+                .position
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("center"),
+            "{source}"
+        );
+    }
+}
+
 fn instruction_macro_definition(
     namespace: &str,
     heading: &str,
@@ -1950,6 +2003,14 @@ fn instruction_macro_document(
     source: &str,
     definitions: &[MacroDefinition],
 ) -> NormalizedDdlDocument {
+    instruction_macro_document_in_language(source, ResolvedInstructionLanguage::En, definitions)
+}
+
+fn instruction_macro_document_in_language(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> NormalizedDdlDocument {
     let locks = definitions
         .iter()
         .map(|definition| {
@@ -1964,7 +2025,7 @@ fn instruction_macro_document(
             .expect("synthetic lock is valid")
         })
         .collect();
-    NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, locks)
+    NormalizedDdlDocument::new(source, language, locks)
         .expect("synthetic instruction macro document is valid")
 }
 

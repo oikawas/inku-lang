@@ -123,6 +123,12 @@ official registryのentryでもない。v1.70のhard-coded Nature展開とlegacy
 directory、plugin statusまたはenable controlは、退役作業が未完了の間のcompatibility surfaceである。
 語彙macroのauthoring APIまたはloading APIではない。
 
+Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分け、standalone repeated Macro count配送は未完了である。
+
+memberの`transform_group_indices`はsource-owned内部transformを配置前に保ち、unlistedの同範囲transformはouterとして後に実行する。
+
+`CompositionPlanResult.standalone_macro_repetitions`は既存body位置、range、Anchor、内部transform、source head repeat countをsymbolicに保持し、outer placementやactual Score instanceを作らない。
+
 Compatibility importerは`legacy_plugin_format`を報告し、macroごとに`Imported`または
 `Omitted` outcomeを返す。既存作品は、保存済みScoreまたは展開済みartifactを優先する。
 そのようなartifactを持たないomitted macroを、黙って部分描画したり、旧expanderへ永続的に

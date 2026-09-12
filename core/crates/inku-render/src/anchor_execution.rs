@@ -23,6 +23,30 @@ struct Execution<'a> {
     warnings: Vec<PlanningWarning>,
     omitted_relations: Vec<bool>,
     diagnostics: Vec<ScoreExecutionDiagnostic>,
+    placement_indices: Vec<Option<usize>>,
+}
+
+fn relation_inside_member(
+    group: &inku_score::PlacementGroup,
+    source: usize,
+    relation: &inku_score::Relation,
+) -> bool {
+    group.members.iter().any(|member| {
+        if !(member.start <= source && source < member.end) {
+            return false;
+        }
+        if let Some(anchor) = relation.target_anchor_index {
+            return member.anchor_indices.contains(&anchor);
+        }
+        let target = relation
+            .target_instruction_index
+            .or_else(|| source.checked_sub(1));
+        target.is_some_and(|target| member.start <= target && target < member.end)
+            && (relation.kind != RelationType::Between
+                || source
+                    .checked_sub(2)
+                    .is_some_and(|target| member.start <= target && target < member.end))
+    })
 }
 
 enum TranslationPredicate {
@@ -328,6 +352,7 @@ impl Execution<'_> {
             group.start <= index
                 && index < group.end
                 && self.schedule.external_groups[index].is_none()
+                && !relation_inside_member(group, index, relation)
         }) {
             // Internal arrangement has priority. Check this relation against
             // the completed local layout instead of moving a child beforehand.
@@ -876,8 +901,8 @@ impl Execution<'_> {
     }
 
     fn perform_group(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
-        if index < self.request.score.placement_groups.len() {
-            return self.perform_placement(index);
+        if let Some(placement_index) = self.placement_indices[index] {
+            return self.perform_placement(index, placement_index);
         }
         let group = &self.request.score.transform_groups[index];
         if (group.start..group.end)
@@ -984,12 +1009,29 @@ impl Execution<'_> {
         Ok(())
     }
 
-    fn perform_placement(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
+    fn perform_placement(
+        &mut self,
+        scope_index: usize,
+        index: usize,
+    ) -> Result<(), ScoreExecutionReason> {
         let group = &self.request.score.placement_groups[index];
-        let mut placed = None;
+        let members = if group.members.is_empty() {
+            (group.start..group.end)
+                .map(|start| inku_score::PlacementMember {
+                    start,
+                    end: start + 1,
+                    anchor_indices: vec![],
+                    transform_group_indices: vec![],
+                })
+                .collect::<Vec<_>>()
+        } else {
+            group.members.clone()
+        };
+        let mut placed_drawables = None;
+        let mut placed_anchors = None;
         let mut domain =
             crate::geometry::point_to_short_side_units(Point::new(1.0, 1.0), self.request.canvas);
-        let count = group.end - group.start;
+        let count = members.len();
         let seed = self.request.performance_seed.unwrap_or_default();
         if group.layout == inku_score::GroupLayout::Tile {
             domain.x *= group.at.region[2] - group.at.region[0];
@@ -1016,21 +1058,40 @@ impl Execution<'_> {
             1
         };
         let rows = count.div_ceil(columns);
-        for member in group.start..group.end {
-            let value = self.performed[member]
-                .last()
+        for (ordinal, member) in members.iter().enumerate() {
+            let mut drawable_bounds = None;
+            for instruction in member.start..member.end {
+                for value in &self.performed[instruction] {
+                    merge_bounds(
+                        &mut drawable_bounds,
+                        crate::affine_geometry::bounds(
+                            &value.instruction,
+                            self.request.performance_seed,
+                            value.ordinal,
+                            self.request.canvas,
+                            value.seed_override,
+                            self.transforms[instruction],
+                        )
+                        .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
+                    );
+                }
+            }
+            let mut anchor_bounds = None;
+            for &anchor in &member.anchor_indices {
+                let point =
+                    self.anchors[anchor].ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+                merge_bounds(
+                    &mut anchor_bounds,
+                    Bounds {
+                        min: point,
+                        max: point,
+                    },
+                );
+            }
+            let bounds = drawable_bounds
+                .or(anchor_bounds)
                 .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
-            let bounds = crate::affine_geometry::bounds(
-                &value.instruction,
-                self.request.performance_seed,
-                value.ordinal,
-                self.request.canvas,
-                value.seed_override,
-                self.transforms[member],
-            )
-            .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
             let center = bounds.center();
-            let ordinal = member - group.start;
             let target = match group.layout {
                 inku_score::GroupLayout::Overlap => Point::new(0.0, 0.0),
                 inku_score::GroupLayout::HorizontalSourceOrder => {
@@ -1046,15 +1107,28 @@ impl Execution<'_> {
                 ),
             };
             let delta = Point::new(target.x - center.x, target.y - center.y);
-            self.transforms[member] =
-                AffineTransform::translation(delta).compose(self.transforms[member]);
-            merge_bounds(
-                &mut placed,
-                Bounds {
-                    min: Point::new(bounds.min.x + delta.x, bounds.min.y + delta.y),
-                    max: Point::new(bounds.max.x + delta.x, bounds.max.y + delta.y),
-                },
-            );
+            for instruction in member.start..member.end {
+                self.transforms[instruction] =
+                    AffineTransform::translation(delta).compose(self.transforms[instruction]);
+            }
+            for &anchor in &member.anchor_indices {
+                self.anchors[anchor] = self.anchors[anchor]
+                    .map(|point| Point::new(point.x + delta.x, point.y + delta.y));
+            }
+            for (placed, bounds) in [
+                (&mut placed_drawables, drawable_bounds),
+                (&mut placed_anchors, anchor_bounds),
+            ] {
+                if let Some(bounds) = bounds {
+                    merge_bounds(
+                        placed,
+                        Bounds {
+                            min: Point::new(bounds.min.x + delta.x, bounds.min.y + delta.y),
+                            max: Point::new(bounds.max.x + delta.x, bounds.max.y + delta.y),
+                        },
+                    );
+                }
+            }
         }
         let [x0, y0, x1, y1] = group.at.region;
         let target = crate::geometry::point_to_short_side_units(
@@ -1066,11 +1140,19 @@ impl Execution<'_> {
             ),
             self.request.canvas,
         );
-        let center = placed.expect("validated nonempty placement").center();
+        let center = placed_drawables
+            .or(placed_anchors)
+            .expect("validated nonempty placement")
+            .center();
         let translation =
             AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
         for member in group.start..group.end {
             self.transforms[member] = translation.compose(self.transforms[member]);
+        }
+        for member in &members {
+            for &anchor in &member.anchor_indices {
+                self.anchors[anchor] = self.anchors[anchor].map(|point| translation.apply(point));
+            }
         }
         for member in group.start..group.end {
             if self.schedule.external_groups[member].is_none()
@@ -1091,7 +1173,7 @@ impl Execution<'_> {
                 }
             }
         }
-        self.correct_external_relations(index)
+        self.correct_external_relations(scope_index)
     }
 }
 
@@ -1113,26 +1195,58 @@ pub(super) fn resolve(
     // Placement and affine transforms have separate wire contracts, while their
     // dependency scopes share the existing scheduler and relation recovery.
     let original_score = request.score;
+    let mut placement_indices = Vec::new();
     let scoped_score = if original_score.placement_groups.is_empty() {
+        placement_indices.resize(original_score.transform_groups.len(), None);
         std::borrow::Cow::Borrowed(original_score)
     } else {
         let mut scoped_score = original_score.clone();
-        let mut scopes = original_score
+        let insertion_points = original_score
             .placement_groups
             .iter()
-            .map(|group| TransformGroup {
-                start: group.start,
-                end: group.end,
-                rotation_degrees: 0.0,
-                scale_x: 1.0,
-                scale_y: 1.0,
-                translate_x: 0.0,
-                translate_y: 0.0,
-                fixed_position_indices: Vec::new(),
-                anchor_indices: Vec::new(),
+            .map(|group| {
+                original_score
+                    .transform_groups
+                    .iter()
+                    .enumerate()
+                    .position(|(affine_index, affine)| {
+                        affine.start <= group.start
+                            && group.end <= affine.end
+                            && !group.members.iter().any(|member| {
+                                member.transform_group_indices.contains(&affine_index)
+                            })
+                    })
+                    .unwrap_or(original_score.transform_groups.len())
             })
             .collect::<Vec<_>>();
-        scopes.extend(scoped_score.transform_groups.iter().cloned());
+        let mut scopes = Vec::new();
+        for slot in 0..=original_score.transform_groups.len() {
+            for (index, group) in original_score.placement_groups.iter().enumerate() {
+                if insertion_points[index] != slot {
+                    continue;
+                }
+                scopes.push(TransformGroup {
+                    start: group.start,
+                    end: group.end,
+                    rotation_degrees: 0.0,
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                    translate_x: 0.0,
+                    translate_y: 0.0,
+                    fixed_position_indices: Vec::new(),
+                    anchor_indices: group
+                        .members
+                        .iter()
+                        .flat_map(|member| member.anchor_indices.iter().copied())
+                        .collect(),
+                });
+                placement_indices.push(Some(index));
+            }
+            if let Some(affine) = original_score.transform_groups.get(slot) {
+                scopes.push(affine.clone());
+                placement_indices.push(None);
+            }
+        }
         scoped_score.transform_groups = scopes;
         std::borrow::Cow::Owned(scoped_score)
     };
@@ -1200,6 +1314,7 @@ pub(super) fn resolve(
         warnings: Vec::new(),
         omitted_relations,
         diagnostics,
+        placement_indices,
     };
     for node in execution.schedule.order.clone() {
         let failure = match node {

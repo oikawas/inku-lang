@@ -17,6 +17,18 @@ and read only the specification sections relevant to the task. Chronological
 release history is maintained separately in [CHANGELOG.md](CHANGELOG.md), with
 more detailed canonical notes in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
+## Score 0.9 Macro placement members
+
+`transform_group_indices` names source-owned internal affine transforms. Listed transforms run before their member is placed; an unlisted equal-range transform remains outer and runs afterward.
+
+`CompositionPlanResult.standalone_macro_repetitions` now retains the existing body positions, range, Anchors, internal-transform ownership, and source-head repeat count. It adds no outer placement recipe or actual Score expansion; materialization remains Step11.
+
+Score 0.9 `placement_groups.members` records each Macro body atomically as an ordered contiguous drawable span plus its non-drawing Anchor indices. An empty member range is valid only when it owns Anchors. Explicit members partition the group exactly and cannot share drawables or Anchors with another placement group. The legacy absent `members` form remains readable for Score 0.7/0.8. Group-head counts remain distinct from a Macro body's internal Emit counts; repeated results remain symbolic plans. This adds no Macro authoring operator, individual materialization, or runtime / UI / save cutover. Ordinary standalone repeated-Macro count delivery remains outside this contract.
+
+## Score 0.9 Macro placement members
+
+Score 0.9 `placement_groups.members` records each Macro body atomically as an ordered contiguous drawable span plus its non-drawing Anchor indices. An empty member range is valid only when it owns Anchors. Explicit members partition the group exactly and cannot share drawables or Anchors with another placement group. The legacy absent `members` form remains readable for Score 0.7/0.8. Group-head counts remain distinct from a Macro body's internal Emit counts; repeated results remain symbolic plans. This adds no Macro authoring operator, individual materialization, or runtime / UI / save cutover. Ordinary standalone repeated-Macro count delivery remains outside this contract.
+
 ---
 
 ## About This Document

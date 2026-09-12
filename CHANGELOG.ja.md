@@ -15,6 +15,16 @@
 
 ---
 
+### 2026-09-12 — Macro配置memberの原子的保持
+
+Score 0.9はoptionalな`placement_groups.members`でMacro body境界を順序付き連続drawable範囲とAnchor所有として保持する。空memberはAnchorを必要とし、明示memberはgroupを分割してdrawable／Anchorを共有しない。member無しの旧Score 0.7／0.8 placement groupは読む。group head countと内部Emit countを分け、反復結果はsymbolic planに残る。standalone repeated Macro count、個体materialization、runtime／UI／save cutoverは完了していない。
+
+各memberは`transform_group_indices`も所有でき、listed transformはmember配置前に、unlistedの同範囲transformはouterとして後に実行する。
+
+standalone Macro repeat planningは`CompositionPlanResult.standalone_macro_repetitions`へ既存body位置、range、Anchor、内部transform所有、source head repeat countを保持し、outer placement recipeやactual Score instanceを作らない。
+
+---
+
 ### 2026-09-12 — 群の明示個数と省略個数を両立
 
 散らす／敷き詰めるでは明示した数を保ち、合計8までの残りを省略した対象へ均等に配り、余りは原文順に割り当てる。省略対象は最低1個とし、必要なら合計8個を超える。全省略でも同じ最低数を保ち、全明示なら補充しない。たとえば赤3個と青の省略は3・5、赤10個と青の省略は10・1となる。

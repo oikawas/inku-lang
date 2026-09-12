@@ -2,8 +2,8 @@
 
 use crate::composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
-    PlacementAction, PlacementGroupPlan, PlacementRecipe, PlanRelation, ResolvedObjectAppearance,
-    TransformGroupPlan,
+    PlacementAction, PlacementGroupPlan, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
+    PlanRelation, ResolvedObjectAppearance, TransformGroupPlan,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -578,6 +578,7 @@ fn lower_macro_instruction(
     source_instruction_index: usize,
     instruction: &SemanticInstruction,
     head: &SemanticMacroInvocationHead,
+    group_count: Option<u64>,
     context: ScoreLoweringContext,
     error_policy: ScoreErrorPolicy,
     instructions: &mut Vec<Instruction>,
@@ -593,6 +594,8 @@ fn lower_macro_instruction(
         source_instruction_index,
         instruction,
         head,
+        group_count,
+        objects.is_some(),
         error_policy,
         diagnostics,
     );
@@ -1256,17 +1259,21 @@ fn append_macro_caller_diagnostics(
     source_instruction_index: usize,
     instruction: &SemanticInstruction,
     head: &SemanticMacroInvocationHead,
+    group_count: Option<u64>,
+    planning: bool,
     error_policy: ScoreErrorPolicy,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
 ) -> bool {
     let mut invalid = false;
-    match instruction
-        .entity
-        .quantity
-        .as_ref()
-        .map(|value| value.value)
-    {
+    match group_count.or_else(|| {
+        instruction
+            .entity
+            .quantity
+            .as_ref()
+            .map(|value| value.value)
+    }) {
         None | Some(1) => {}
+        Some(value) if planning && (1..=u64::from(u32::MAX)).contains(&value) => {}
         Some(0) => {
             invalid = true;
             append_macro_invocation_diagnostic(
@@ -1814,6 +1821,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     gaps: Vec<ScoreFieldGap>,
     diagnostics: Vec<ScoreLoweringDiagnostic>,
     placement_groups: Vec<PlacementGroupPlan>,
+    standalone_macro_repetitions: Vec<PlacementMemberPlan>,
 }
 
 impl<'a> ExplicitScoreLoweringResult<'a> {
@@ -2023,6 +2031,7 @@ pub(crate) fn resolve_composition_plan<'a>(
         anchor_origins: result.anchor_origins,
         transform_groups,
         placement_groups: result.placement_groups,
+        standalone_macro_repetitions: result.standalone_macro_repetitions,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
     }
@@ -2044,6 +2053,8 @@ fn lower_verified_stage15_shared<'a>(
     let mut omitted_group_members = BTreeSet::new();
     let mut group_members = BTreeMap::new();
     let mut supported_groups = Vec::new();
+    let mut lowered_members = BTreeMap::new();
+    let mut standalone_macro_repetitions = Vec::new();
 
     let ground =
         document.ground.as_ref().and_then(|ground| {
@@ -2137,13 +2148,7 @@ fn lower_verified_stage15_shared<'a>(
                     },
                 )
             });
-            if group.member_instruction_indices.iter().all(|&member| {
-                matches!(
-                    document.instructions[member].entity.head,
-                    SemanticHead::Primitive(_)
-                )
-            }) && let (Some(counts), Some(bounds)) = (counts, bounds)
-            {
+            if let (Some(counts), Some(bounds)) = (counts, bounds) {
                 let region = bounds.map(|(n, d)| n as f64 / d as f64);
                 let layout = match action.expect("allocated known action") {
                     "line_up" => inku_score::GroupLayout::HorizontalSourceOrder,
@@ -2209,6 +2214,13 @@ fn lower_verified_stage15_shared<'a>(
             .verified_effective_view()
             .source_instruction_index(projected_index)
             .expect("verified Stage 1.5 view maps every projected instruction");
+        let body_start = objects
+            .as_ref()
+            .map_or(instructions.len(), |objects| objects.len());
+        let anchor_start = anchors.len();
+        let transform_start = transform_groups
+            .as_ref()
+            .map_or(score_transform_groups.len(), |groups| groups.len());
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
                 let effective_focus = direct_instruction_focus(
@@ -2292,6 +2304,23 @@ fn lower_verified_stage15_shared<'a>(
                     if let Some(index) = object_index {
                         objects[index].relation = relation;
                         objects[index].count_was_omitted = instruction.entity.quantity.is_none();
+                        if group_members.contains_key(&projected_index) {
+                            lowered_members.insert(
+                                instruction_index,
+                                PlacementMemberPlan {
+                                    source_instruction_index: instruction_index,
+                                    member: inku_score::PlacementMember {
+                                        start: index,
+                                        end: index + 1,
+                                        anchor_indices: vec![],
+                                        transform_group_indices: vec![],
+                                    },
+                                    kind: PlacementMemberKind::Primitive,
+                                    source_count: objects[index].count,
+                                    count_was_omitted: instruction.entity.quantity.is_none(),
+                                },
+                            );
+                        }
                     }
                     continue;
                 }
@@ -2372,6 +2401,7 @@ fn lower_verified_stage15_shared<'a>(
                     instruction_index,
                     instruction,
                     head,
+                    group_members.get(&projected_index).map(|(_, count)| *count),
                     context,
                     error_policy,
                     &mut instructions,
@@ -2385,27 +2415,71 @@ fn lower_verified_stage15_shared<'a>(
                 );
             }
         }
+        let body_end = objects
+            .as_ref()
+            .map_or(instructions.len(), |objects| objects.len());
+        let transform_end = transform_groups
+            .as_ref()
+            .map_or(score_transform_groups.len(), |groups| groups.len());
+        if let Some((_, count)) = group_members.get(&projected_index)
+            && (body_start < body_end || anchor_start < anchors.len())
+        {
+            lowered_members.insert(
+                instruction_index,
+                PlacementMemberPlan {
+                    source_instruction_index: instruction_index,
+                    member: inku_score::PlacementMember {
+                        start: body_start,
+                        end: body_end,
+                        anchor_indices: (anchor_start..anchors.len()).collect(),
+                        transform_group_indices: (transform_start..transform_end).collect(),
+                    },
+                    kind: match instruction.entity.head {
+                        SemanticHead::Primitive(_) => PlacementMemberKind::Primitive,
+                        SemanticHead::MacroInvocation(_) => PlacementMemberKind::Macro,
+                    },
+                    source_count: u32::try_from(*count)
+                        .expect("successful source count was validated"),
+                    count_was_omitted: instruction.entity.quantity.is_none(),
+                },
+            );
+        } else if objects.is_some()
+            && matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            && let Some(quantity) = instruction.entity.quantity.as_ref()
+            && quantity.value > 1
+            && (body_start < body_end || anchor_start < anchors.len())
+        {
+            standalone_macro_repetitions.push(PlacementMemberPlan {
+                source_instruction_index: instruction_index,
+                member: inku_score::PlacementMember {
+                    start: body_start,
+                    end: body_end,
+                    anchor_indices: (anchor_start..anchors.len()).collect(),
+                    transform_group_indices: (transform_start..transform_end).collect(),
+                },
+                kind: PlacementMemberKind::Macro,
+                source_count: u32::try_from(quantity.value)
+                    .expect("successful source count was validated"),
+                count_was_omitted: false,
+            });
+        }
     }
 
     let mut placement_groups = Vec::new();
     for (group_index, members, layout, region, bounds) in supported_groups {
-        let origins = objects.as_ref().map_or_else(
-            || instruction_origins.iter().collect::<Vec<_>>(),
-            |objects| objects.iter().map(|object| &object.origin).collect(),
-        );
-        let indices = origins.iter().enumerate().filter_map(|(index, origin)| {
-            matches!(origin, ScoreInstructionOrigin::SourceInstruction { instruction_index } if members.contains(instruction_index)).then_some(index)
-        }).collect::<Vec<_>>();
-        let (Some(&start), Some(&last)) = (indices.first(), indices.last()) else {
+        let members = members
+            .iter()
+            .filter_map(|source| lowered_members.remove(source))
+            .collect::<Vec<_>>();
+        let (Some(first), Some(last)) = (members.first(), members.last()) else {
             continue;
         };
-        let end = last + 1;
-        let logical_count = objects.as_ref().map_or((end - start) as u64, |objects| {
-            objects[start..end]
-                .iter()
-                .map(|object| u64::from(object.count))
-                .sum()
-        });
+        let start = first.member.start;
+        let end = last.member.end;
+        let logical_count = members
+            .iter()
+            .map(|member| u64::from(member.logical_count()))
+            .sum();
         let (width, height) = context.canvas_format.integer_ratio();
         let short = width.min(height);
         let mut domain = [
@@ -2437,25 +2511,35 @@ fn lower_verified_stage15_shared<'a>(
         )
         .expect("bounded validated group recipe");
         // These are local coordinates; only the group carries the semantic focus.
-        if let Some(objects) = objects.as_deref_mut() {
-            for object in &mut objects[start..end] {
-                object.anchor = ObjectAnchor::Named([0.5; 4]);
-            }
-        } else {
-            for instruction in &mut instructions[start..end] {
-                instruction.at = Some(AtRegion { region: [0.5; 4] });
+        for member in &members {
+            if member.kind == PlacementMemberKind::Primitive {
+                if let Some(objects) = objects.as_deref_mut() {
+                    objects[member.member.start].anchor = ObjectAnchor::Named([0.5; 4]);
+                } else {
+                    instructions[member.member.start].at = Some(AtRegion { region: [0.5; 4] });
+                }
             }
         }
+        let score_members = if members
+            .iter()
+            .any(|member| member.kind == PlacementMemberKind::Macro)
+        {
+            members.iter().map(|member| member.member.clone()).collect()
+        } else {
+            Vec::new()
+        };
         placement_groups.push(PlacementGroupPlan {
             group_index,
             logical_count,
             domain,
             recipe,
+            members,
             placement: inku_score::PlacementGroup {
                 start,
                 end,
                 layout,
                 at: AtRegion { region },
+                members: score_members,
             },
         });
     }
@@ -2522,6 +2606,7 @@ fn lower_verified_stage15_shared<'a>(
         gaps,
         diagnostics,
         placement_groups,
+        standalone_macro_repetitions,
     }
 }
 

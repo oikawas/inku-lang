@@ -8,6 +8,18 @@
 **日本語版と英語版は節ごとに対応させる。**
 仕様変更は本書を先に更新し、同じ内容を `SPEC.md` へ反映する。
 
+## Score 0.9 の Macro 配置 member
+
+`transform_group_indices`はsource-ownedな内部affine transformを指す。listed transformはmember配置前に実行し、同じ範囲でもunlisted transformはouterとして後に実行する。
+
+`CompositionPlanResult.standalone_macro_repetitions`は既存bodyの位置、range、Anchor、内部transform所有とsource head repeat countを保持する。outer placement recipeやactual Score展開を追加せず、materializationはStep11のままである。
+
+Score 0.9 の `placement_groups.members` は、Macro bodyを順序どおり連続するdrawable範囲と非描画Anchor indexの組として原子的に保持する。空のmember範囲はAnchorを所有するときだけ有効である。明示memberはgroupを完全に分割し、他のplacement groupとdrawable／Anchorを共有しない。`members`が無い旧形式はScore 0.7／0.8として読める。group headのcountとMacro body内部のEmit countは別であり、反復結果はsymbolic planに残る。Macro authoring operator、個体materialization、runtime／UI／save cutoverは追加しない。通常のstandalone repeated Macro count配送はこの契約の範囲外である。
+
+## Score 0.9 の Macro 配置 member
+
+Score 0.9 の `placement_groups.members` は、Macro bodyを順序どおり連続するdrawable範囲と非描画Anchor indexの組として原子的に保持する。空のmember範囲はAnchorを所有するときだけ有効である。明示memberはgroupを完全に分割し、他のplacement groupとdrawable／Anchorを共有しない。`members`が無い旧形式はScore 0.7／0.8として読める。group headのcountとMacro body内部のEmit countは別であり、反復結果はsymbolic planに残る。Macro authoring operator、個体materialization、runtime／UI／save cutoverは追加しない。通常のstandalone repeated Macro count配送はこの契約の範囲外である。
+
 ---
 
 ## このドキュメントの位置づけ

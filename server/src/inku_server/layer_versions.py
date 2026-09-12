@@ -268,7 +268,8 @@
 # 30: Coordinated groups preserve overlap or source-order row layout and one placement.
 # 31: Coordinated actions preserve per-member counts or one shared default total.
 # 32: Explicit group counts are preserved; omitted counts fill to eight with a minimum of one.
-DDL_ENGINE_VERSION = "32"
+# 33: Coordinated placement preserves each Macro body as one source member.
+DDL_ENGINE_VERSION = "33"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

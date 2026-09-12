@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -867,6 +867,23 @@ class TransformGroup(BaseModel):
         return value
 
 
+class PlacementMember(BaseModel):
+    """One atomic source member of a Score 0.9 coordinated placement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    anchor_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+    )
+    transform_group_indices: list[Annotated[int, Field(ge=0)]] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+    )
+
+
 class PlacementGroup(BaseModel):
     """One direct coordinated-group placement over a contiguous Score span."""
 
@@ -876,6 +893,11 @@ class PlacementGroup(BaseModel):
     end: int = Field(ge=0, description="配置する Score instruction 範囲の終端 exclusive index")
     layout: Literal["overlap", "horizontal_source_order", "scatter", "tile"]
     at: AtRegion = Field(description="群全体の中心を一度だけ解決する named 配置領域")
+    members: list[PlacementMember] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="Score 0.9 Macro body boundaries; absent retains the legacy drawable span",
+    )
 
     @model_validator(mode="after")
     def _require_finite_ordered_region(self) -> "PlacementGroup":
@@ -888,7 +910,7 @@ class PlacementGroup(BaseModel):
 class Score(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: ScoreVersion = "0.8.0"
+    version: ScoreVersion = "0.9.0"
     canvas: Canvas = Field(
         default="square",
         description=(
@@ -988,9 +1010,9 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0"}:
+        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
             raise ValueError("anchors requires Score version 0.6.0")
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"}:
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start > group.end or (
@@ -999,7 +1021,7 @@ class Score(BaseModel):
                 raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0"} and (
+            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
@@ -1018,7 +1040,7 @@ class Score(BaseModel):
                 raise ValueError("transform group anchor_indices must be unique")
             if any(index >= len(self.anchors) for index in anchor_indices):
                 raise ValueError("transform group anchor_indices exceeds anchors")
-            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0"}:
+            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
                 raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
                 current_contains_prior = (
@@ -1044,13 +1066,17 @@ class Score(BaseModel):
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
                 if not set(prior.anchor_indices) <= anchor_indices:
                     raise ValueError("outer transform groups must include descendant anchor_indices")
-        if self.placement_groups and self.version not in {"0.7.0", "0.8.0"}:
+        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0"}:
             raise ValueError("placement_groups requires Score version 0.7.0")
         placement_end = 0
+        placement_anchor_indices: set[int] = set()
+        placement_transform_indices: set[int] = set()
         for group in self.placement_groups:
             if group.layout in {"scatter", "tile"} and self.version != "0.8.0":
                 raise ValueError("scatter and tile placement_groups require Score version 0.8.0")
-            if group.start >= group.end:
+            if group.members and self.version != "0.9.0":
+                raise ValueError("placement group members require Score version 0.9.0")
+            if not group.members and group.start >= group.end:
                 raise ValueError("placement group range must be nonempty")
             if group.end > len(self.instructions):
                 raise ValueError("placement group range exceeds the instruction list")
@@ -1058,15 +1084,58 @@ class Score(BaseModel):
                 raise ValueError("placement groups must be disjoint and source ordered")
             if any(instruction.arrangement is not None for instruction in self.instructions[group.start:group.end]):
                 raise ValueError("placement group members cannot carry arrangements")
-            for affine in self.transform_groups:
+            if group.members:
+                member_end = group.start
+                member_anchors: set[int] = set()
+                member_transforms: set[int] = set()
+                for member in group.members:
+                    if member.start != member_end or member.start > member.end:
+                        raise ValueError("placement members must partition the group in source order")
+                    if member.end > group.end:
+                        raise ValueError("placement member range exceeds its group")
+                    if member.start == member.end and not member.anchor_indices:
+                        raise ValueError("empty placement member requires anchors")
+                    for anchor_index in member.anchor_indices:
+                        if anchor_index >= len(self.anchors):
+                            raise ValueError("placement member anchor_indices exceeds anchors")
+                        if anchor_index in member_anchors or anchor_index in placement_anchor_indices:
+                            raise ValueError("placement member anchors must be unique")
+                        member_anchors.add(anchor_index)
+                    for transform_index in member.transform_group_indices:
+                        if transform_index >= len(self.transform_groups):
+                            raise ValueError("placement member transform_group_indices exceeds transform groups")
+                        if transform_index in member_transforms or transform_index in placement_transform_indices:
+                            raise ValueError("placement member transform_group_indices must be unique")
+                        transform = self.transform_groups[transform_index]
+                        if not (
+                            member.start <= transform.start
+                            and transform.end <= member.end
+                            and set(transform.anchor_indices) <= set(member.anchor_indices)
+                        ):
+                            raise ValueError("placement member transform must be wholly within its member")
+                        member_transforms.add(transform_index)
+                    member_end = member.end
+                if member_end != group.end:
+                    raise ValueError("placement members must end at the group end")
+                placement_anchor_indices.update(member_anchors)
+                placement_transform_indices.update(member_transforms)
+            for affine_index, affine in enumerate(self.transform_groups):
                 overlaps = group.start < affine.end and affine.start < group.end
-                if overlaps and not (affine.start <= group.start and group.end <= affine.end):
+                outer = affine.start <= group.start and group.end <= affine.end
+                owned_member = any(
+                    affine_index in member.transform_group_indices
+                    and member.start <= affine.start
+                    and affine.end <= member.end
+                    and set(affine.anchor_indices) <= set(member.anchor_indices)
+                    for member in group.members
+                )
+                if overlaps and not (outer or owned_member):
                     raise ValueError("transform group must contain an overlapping placement group")
             placement_end = group.end
         for instruction in self.instructions:
             relation = instruction.relation
             if relation is not None and relation.target_anchor_index is not None:
-                if self.version not in {"0.6.0", "0.7.0", "0.8.0"}:
+                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
                     raise ValueError("relation target_anchor_index requires Score version 0.6.0")
                 if relation.target_anchor_index >= len(self.anchors):
                     raise ValueError("relation target_anchor_index exceeds anchors")

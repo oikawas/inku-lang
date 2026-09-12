@@ -28,11 +28,57 @@ pub struct PlacementGroupPlan {
     pub(crate) logical_count: u64,
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
+    pub(crate) members: Vec<PlacementMemberPlan>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PlacementMemberKind {
+    Primitive,
+    Macro,
+}
+
+/// Source-head occurrence count is distinct from the body's internal Emit counts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacementMemberPlan {
+    pub(crate) source_instruction_index: usize,
+    pub(crate) member: inku_score::PlacementMember,
+    pub(crate) kind: PlacementMemberKind,
+    pub(crate) source_count: u32,
+    pub(crate) count_was_omitted: bool,
+}
+
+impl PlacementMemberPlan {
+    pub const fn source_instruction_index(&self) -> usize {
+        self.source_instruction_index
+    }
+    pub const fn member(&self) -> &inku_score::PlacementMember {
+        &self.member
+    }
+    pub const fn kind(&self) -> PlacementMemberKind {
+        self.kind
+    }
+    pub const fn logical_count(&self) -> u32 {
+        self.source_count
+    }
+    /// Primitive object.count already supplies its independent slots. A Macro body
+    /// supplies one slot per whole-body repetition, retaining every internal count.
+    pub const fn body_repeat_count(&self) -> u32 {
+        match self.kind {
+            PlacementMemberKind::Primitive => 1,
+            PlacementMemberKind::Macro => self.source_count,
+        }
+    }
+    pub const fn count_was_omitted(&self) -> bool {
+        self.count_was_omitted
+    }
 }
 
 impl PlacementGroupPlan {
     pub const fn group_index(&self) -> usize {
         self.group_index
+    }
+    pub fn members(&self) -> &[PlacementMemberPlan] {
+        &self.members
     }
     pub const fn placement(&self) -> &inku_score::PlacementGroup {
         &self.placement
@@ -43,7 +89,8 @@ impl PlacementGroupPlan {
     pub const fn domain(&self) -> [Rational; 2] {
         self.domain
     }
-    /// Apply once over source-ordered logical members. Member recipes are local Place.
+    /// Apply once over source-ordered logical members. Primitive recipes are local Place;
+    /// Macro bodies retain their own recipes and finish before outer member placement.
     /// After layout, translate the group's bounds center to `placement.at`, including
     /// Scatter: the ordinary object's sampled-centroid pivot does not apply here.
     pub const fn recipe(&self) -> &PlacementRecipe {
@@ -331,6 +378,7 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) anchor_origins: Vec<ScoreAnchorOrigin>,
     pub(crate) transform_groups: Vec<TransformGroupPlan>,
     pub(crate) placement_groups: Vec<PlacementGroupPlan>,
+    pub(crate) standalone_macro_repetitions: Vec<PlacementMemberPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
 }
@@ -362,6 +410,11 @@ impl<'a> CompositionPlanResult<'a> {
     }
     pub fn placement_groups(&self) -> &[PlacementGroupPlan] {
         &self.placement_groups
+    }
+    /// Repeat each complete body symbolically with its existing positions. These
+    /// ranges are outside coordinated placement, and add no layout or anchor.
+    pub fn standalone_macro_repetitions(&self) -> &[PlacementMemberPlan] {
+        &self.standalone_macro_repetitions
     }
     pub fn anchors(&self) -> &[AnchorPoint] {
         &self.anchors

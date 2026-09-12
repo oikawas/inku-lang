@@ -594,6 +594,14 @@ When the application generation changes, also update the Web `APP_VERSION`.
 - **Do not stack per-version paragraphs in "Current Product State".**
 The changelog holds what each version did, so this document keeps present-tense statements and
 rewrites the parts that changed.
+Score 0.9 retains a Macro body atomically in `placement_groups.members`: ordered contiguous drawable ranges with their Anchor indices. It preserves the distinction between group-head count and internal Emit count; repetitions stay symbolic, and no standalone repeated-Macro count delivery, instance materialization, or runtime cutover is claimed.
+
+Score 0.9 retains a Macro body atomically in `placement_groups.members`: ordered contiguous drawable ranges with their Anchor indices. It preserves the distinction between group-head count and internal Emit count; repetitions stay symbolic, and no standalone repeated-Macro count delivery, instance materialization, or runtime cutover is claimed.
+
+Member `transform_group_indices` preserves source-owned internal transforms before placement; unlisted equal-range transforms remain outer and run afterward.
+
+`CompositionPlanResult.standalone_macro_repetitions` keeps the existing body positions, range, Anchors, internal transforms, and source-head repeat count as a symbolic plan. It adds neither outer placement nor actual Score instances.
+
 Appending a paragraph at every release turns this file into a second changelog and it stops working
 as an entry point.
 - **Do not record unresolved issues or undecided questions here.**

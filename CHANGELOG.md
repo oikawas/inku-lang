@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-12 — Combine explicit and omitted group counts
+
+Scatter and tile preserve explicit counts and divide the remainder up to eight among omitted members, assigning any remainder in source order. Each omitted member receives at least one, allowing the total to exceed eight. Fully omitted counts use the same minimum; fully explicit counts are not topped up. For example, three red objects and an omitted blue count become three and five; ten red objects and an omitted blue count become ten and one.
+
+Advance DDL engine to 32. Keep Score 0.8.0 and render engine 56. This adds no instance materialization, full reference update, deployment, application version finalization, or release.
+
+---
+
 ### 2026-09-12 — Scatter and tile wire for direct coordinated groups
 
 Primitive-only direct coordinated groups at existing named places add `scatter` and `tile` to Score 0.8.0 `placement_groups`, beside the existing `overlap` and `horizontal_source_order`. Line-up keeps `horizontal_source_order`. An omitted line-up count is one for every member and reaches an actual Score. Scatter and tile reach an actual Score only when every member explicitly has count one; all omitted counts allocate a total of eight evenly in source order and remain a symbolic plan. Other explicit counts remain symbolic. Mixed explicit and omitted counts, or more than eight all-omitted heads, are unsupported only for scatter and tile; line-up and place mixed counts remain valid.

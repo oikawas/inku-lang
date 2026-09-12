@@ -317,14 +317,35 @@ fn coordinated_actions_plan_preserves_quantities_and_one_named_target() {
     }
     let transformed =
         stage("scatter three red circle and blue square at center. place green triangle at top.");
-    let recovered = plan_verified_stage15(transformed.verified_effective_view(), context());
-    assert_eq!(recovered.objects().unwrap().len(), 1);
-    assert!(
-        recovered
-            .diagnostics()
-            .iter()
-            .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnsupportedCoordinatedGroup)
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+    assert!(plan.diagnostics().is_empty(), "{:?}", plan.diagnostics());
+    let objects = plan.objects().unwrap();
+    assert_eq!(
+        objects.iter().map(|object| object.count()).collect::<Vec<_>>(),
+        [3, 5, 1]
     );
+    assert_eq!(
+        objects.iter().map(|object| object.appearance().color).collect::<Vec<_>>(),
+        [Color::Red, Color::Blue, Color::Green]
+    );
+    assert_eq!(
+        objects.iter().map(|object| object.origin()).collect::<Vec<_>>(),
+        [
+            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 0 },
+            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 1 },
+            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 2 },
+        ]
+    );
+    assert_eq!(
+        objects
+            .iter()
+            .map(|object| object.count_was_omitted())
+            .collect::<Vec<_>>(),
+        [false, true, true]
+    );
+    assert_eq!(plan.placement_groups().len(), 1);
+    assert_eq!(plan.placement_groups()[0].logical_count(), 8);
+    assert_eq!(plan.placement_groups()[0].placement().end, 2);
 }
 
 #[test]

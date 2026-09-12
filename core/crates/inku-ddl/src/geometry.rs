@@ -273,9 +273,9 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 concat!(
                     "\"object_placement\":{\"repeated_default_count\":8,",
                     "\"coordinated_group\":{\"place_line_up_omitted_per_member\":1,",
-                    "\"scatter_tile_all_omitted_total\":8,\"allocation\":\"balanced_source_order_remainder_first\",",
-                    "\"explicit_counts\":\"preserved\",\"scatter_tile_mixed_counts\":\"unsupported_pending_author_decision\",",
-                    "\"all_omitted_members_above_total\":\"unsupported_no_zero_count\",",
+                    "\"scatter_tile_omitted_fill_total\":8,\"omitted_member_minimum\":1,\"allocation\":\"balanced_source_order_remainder_first\",",
+                    "\"explicit_counts\":\"preserved\",\"scatter_tile_mixed_counts\":\"explicit_preserved_omissions_fill_total\",",
+                    "\"omitted_members_exceed_total\":\"each_one_higher_total\",",
                     "\"target\":\"resolve_once_first_original_member_occurrence\",\"pivot\":\"combined_geometry_bbox_center\",",
                     "\"repetition\":\"symbolic_plan_materialization_deferred\"},",
                     "\"size_basis\":\"canvas_short_edge_independent_of_count\",",
@@ -948,7 +948,7 @@ mod tests {
         }
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "9dc4ebfccdef7170c7c364812303ce8dbde55310f1c1abd41c48362b36cab995"
+            "83aa353249cd273cafc3ca029fec610ecd441128fada1c2d8083a80f45d36b73"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

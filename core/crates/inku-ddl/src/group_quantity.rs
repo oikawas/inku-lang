@@ -5,8 +5,9 @@ const GROUP_TOTAL_DEFAULT: u64 = 8;
 /// Resolves the symbolic count for every source-ordered member of one coordinated group.
 ///
 /// `place` and `line_up` give each omitted member one object. `scatter` and `tile`
-/// share their omitted total evenly in source order. Mixed explicit and omitted
-/// `scatter`/`tile` groups deliberately remain unresolved until their policy is chosen.
+/// preserve explicit counts, then use their total of eight for omitted members when
+/// possible. Every omitted member receives at least one object; any remainder is
+/// allocated in source order. This works for all-omitted and mixed groups alike.
 pub(crate) fn coordinated_counts(action: &str, counts: &[Option<u64>]) -> Option<Vec<u64>> {
     if counts.is_empty() {
         return None;
@@ -14,18 +15,28 @@ pub(crate) fn coordinated_counts(action: &str, counts: &[Option<u64>]) -> Option
     match action {
         "place" | "line_up" => Some(counts.iter().map(|count| count.unwrap_or(1)).collect()),
         "scatter" | "tile" => {
-            if counts.iter().all(Option::is_some) {
+            let omitted_count = counts.iter().filter(|count| count.is_none()).count() as u64;
+            if omitted_count == 0 {
                 return Some(counts.iter().map(|count| count.unwrap()).collect());
             }
-            if counts.iter().any(Option::is_some) || counts.len() > GROUP_TOTAL_DEFAULT as usize {
-                return None;
-            }
-            let member_count = counts.len() as u64;
-            let base = GROUP_TOTAL_DEFAULT / member_count;
-            let remainder = GROUP_TOTAL_DEFAULT % member_count;
+            let remaining_after_explicit = counts.iter().fold(GROUP_TOTAL_DEFAULT, |remaining, count| {
+                count.map_or(remaining, |explicit| remaining.saturating_sub(explicit))
+            });
+            let distributable = remaining_after_explicit.saturating_sub(omitted_count);
+            let base = distributable / omitted_count;
+            let remainder = distributable % omitted_count;
+            let mut omitted_index = 0;
             Some(
-                (0..member_count)
-                    .map(|index| base + u64::from(index < remainder))
+                counts
+                    .iter()
+                    .map(|count| match count {
+                        Some(explicit) => *explicit,
+                        None => {
+                            let resolved = 1 + base + u64::from(omitted_index < remainder);
+                            omitted_index += 1;
+                            resolved
+                        }
+                    })
                     .collect(),
             )
         }
@@ -62,9 +73,16 @@ mod tests {
     }
 
     #[test]
-    fn coordinated_counts_reject_unresolved_groups_but_preserve_explicit_values() {
-        assert_eq!(coordinated_counts("scatter", &[Some(2), None]), None);
-        assert_eq!(coordinated_counts("tile", &[None; 9]), None);
+    fn coordinated_counts_preserve_explicit_values_and_allocate_omissions() {
+        assert_eq!(
+            coordinated_counts("scatter", &[Some(3), None]),
+            Some(vec![3, 5])
+        );
+        assert_eq!(coordinated_counts("tile", &[None; 9]), Some(vec![1; 9]));
+        assert_eq!(
+            coordinated_counts("scatter", &[Some(u64::MAX), None]),
+            Some(vec![u64::MAX, 1])
+        );
         assert_eq!(
             coordinated_counts("scatter", &[Some(0), Some(u64::from(u32::MAX) + 1)]),
             Some(vec![0, u64::from(u32::MAX) + 1])

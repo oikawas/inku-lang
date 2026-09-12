@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-12 — 群の明示個数と省略個数を両立
+
+散らす／敷き詰めるでは明示した数を保ち、合計8までの残りを省略した対象へ均等に配り、余りは原文順に割り当てる。省略対象は最低1個とし、必要なら合計8個を超える。全省略でも同じ最低数を保ち、全明示なら補充しない。たとえば赤3個と青の省略は3・5、赤10個と青の省略は10・1となる。
+
+DDL engine 32へ更新する。Score 0.8.0とrender engine 56を保持し、反復の個体化、全件参照更新、配備・APP版確定・releaseは追加しない。
+
+---
+
 ### 2026-09-12 — Direct coordinated groupのscatter／tile wire
 
 既存named位置のprimitiveだけからなるdirect coordinated groupはScore 0.8.0 `placement_groups`で、既存の`overlap`と`horizontal_source_order`に`scatter`と`tile`を加える。Line-upは既存の`horizontal_source_order`を保つ。line-upの省略countは各member 1 としてactual Scoreへ届く。scatter／tileは全memberのcountが明示1のときだけactual Scoreへ届き、全省略countは合計8をsource順で均等配分するsymbolic planに残る。その他の明示countはsymbolic planに残る。countの一部だけを明示したscatter／tileと、全省略でheadが8を超えるscatter／tileは未対応であり、line-up／placeのmixed countは有効である。

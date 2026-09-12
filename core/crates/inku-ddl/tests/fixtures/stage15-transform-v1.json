@@ -19,9 +19,9 @@
       "language": "ja",
       "composition_seed": null,
       "variation": null,
-      "expected_baseline_focus": "upper_edge",
-      "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "c8a711c3da9648e3d63743d05977164db9a23de9c62637ca8a1babcc6b41ae5b"
+      "expected_baseline_focus": "right_half",
+      "expected_effective_focus": "right_half",
+      "expected_effective_sha256": "247dd38e820759fdd8941ccecb78229196ff0f50f193d6fae00209de9eed3a5d"
     },
     {
       "id": "en-center-baseline",
@@ -29,9 +29,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": null,
-      "expected_baseline_focus": "upper_edge",
-      "expected_effective_focus": "upper_edge",
-      "expected_effective_sha256": "c8a711c3da9648e3d63743d05977164db9a23de9c62637ca8a1babcc6b41ae5b"
+      "expected_baseline_focus": "right_half",
+      "expected_effective_focus": "right_half",
+      "expected_effective_sha256": "247dd38e820759fdd8941ccecb78229196ff0f50f193d6fae00209de9eed3a5d"
     },
     {
       "id": "en-center-small-variation",
@@ -39,9 +39,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "small", "seed": 7},
-      "expected_baseline_focus": "upper_edge",
+      "expected_baseline_focus": "right_half",
       "expected_effective_focus": "lower_left",
-      "expected_effective_sha256": "bdd8c15d3de1983b4eb578935cd2cc723aae3d4400eeefb8022510188f9dd4af"
+      "expected_effective_sha256": "49d7a33ba1a3ce37b0f819c232498f988506c871b7e4799bfb15b22baa8026a0"
     },
     {
       "id": "en-center-medium-variation",
@@ -49,9 +49,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "medium", "seed": 7},
-      "expected_baseline_focus": "upper_edge",
+      "expected_baseline_focus": "right_half",
       "expected_effective_focus": "upper_right",
-      "expected_effective_sha256": "c418b66e073a7e665efc3ce392e80eef0a86dba165542ecc82c1a3f416b57929"
+      "expected_effective_sha256": "03425ee4d1672f655911a7db476b3ae8e9889c32ff4c8aa5654a8c7aa7441752"
     },
     {
       "id": "en-center-large-variation",
@@ -59,9 +59,9 @@
       "language": "en",
       "composition_seed": null,
       "variation": {"amplitude": "large", "seed": 7},
-      "expected_baseline_focus": "upper_edge",
+      "expected_baseline_focus": "right_half",
       "expected_effective_focus": "lower_right",
-      "expected_effective_sha256": "d8cd27432b6da34d860f2a64b608a6660d7b50aaccbc72415b4a2aa523d3c188"
+      "expected_effective_sha256": "ffe05f88a4fe9ae75fa9571cfcb4e2df492661db1f781b3073c8a3625e970a16"
     }
   ]
 }

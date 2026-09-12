@@ -266,7 +266,8 @@
 # 28: recoverable failures keep drawable units; invalid relations alone are omitted.
 # 29: NotTouching and Between share direct, Macro, and symbolic-plan delivery.
 # 30: Coordinated groups preserve overlap or source-order row layout and one placement.
-DDL_ENGINE_VERSION = "30"
+# 31: Coordinated actions preserve per-member counts or one shared default total.
+DDL_ENGINE_VERSION = "31"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

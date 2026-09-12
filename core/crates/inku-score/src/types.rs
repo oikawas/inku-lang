@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.7.0".to_owned()
+    "0.8.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -908,6 +908,8 @@ fn is_zero_translation(value: &f64) -> bool {
 pub enum GroupLayout {
     Overlap,
     HorizontalSourceOrder,
+    Scatter,
+    Tile,
 }
 
 /// One coordinated arrangement and named placement, distinct from affine transforms.
@@ -940,11 +942,19 @@ pub struct Score {
 
 impl Score {
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
-        if !self.placement_groups.is_empty() && self.version != "0.7.0" {
-            return Err("placement_groups requires Score version 0.7.0");
-        }
         let mut previous_end = 0;
         for group in &self.placement_groups {
+            match group.layout {
+                GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
+                    if !matches!(self.version.as_str(), "0.7.0" | "0.8.0") =>
+                {
+                    return Err("placement_groups requires Score version 0.7.0");
+                }
+                GroupLayout::Scatter | GroupLayout::Tile if self.version != "0.8.0" => {
+                    return Err("scatter and tile placement_groups require Score version 0.8.0");
+                }
+                _ => {}
+            }
             if group.start < previous_end
                 || group.start >= group.end
                 || group.end > self.instructions.len()
@@ -981,7 +991,9 @@ impl Score {
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
-        if !self.anchors.is_empty() && !matches!(self.version.as_str(), "0.6.0" | "0.7.0") {
+        if !self.anchors.is_empty()
+            && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0")
+        {
             return Err("anchors requires Score version 0.6.0");
         }
         for anchor in &self.anchors {
@@ -1012,7 +1024,7 @@ impl Score {
                     return Err("relation target instruction and anchor are exclusive");
                 }
                 if let Some(anchor_index) = relation.target_anchor_index {
-                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0") {
+                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0") {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
                     if anchor_index >= self.anchors.len() {
@@ -1026,6 +1038,7 @@ impl Score {
                     && self.version != "0.5.0"
                     && self.version != "0.6.0"
                     && self.version != "0.7.0"
+                    && self.version != "0.8.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -1063,6 +1076,7 @@ impl Score {
                 && self.version != "0.5.0"
                 && self.version != "0.6.0"
                 && self.version != "0.7.0"
+                && self.version != "0.8.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -1100,7 +1114,10 @@ impl Score {
         if self.transform_groups.is_empty() {
             return Ok(());
         }
-        if !matches!(self.version.as_str(), "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0") {
+        if !matches!(
+            self.version.as_str(),
+            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0"
+        ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
@@ -1125,6 +1142,7 @@ impl Score {
             if self.version != "0.5.0"
                 && self.version != "0.6.0"
                 && self.version != "0.7.0"
+                && self.version != "0.8.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -1159,7 +1177,7 @@ impl Score {
                 }
             }
             if !group.anchor_indices.is_empty()
-                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0")
+                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0")
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }

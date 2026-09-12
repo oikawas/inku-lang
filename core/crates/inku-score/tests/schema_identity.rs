@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "17d4e41f096880c97a0c8b51d9684e265b745eaf7ce39c13c5ee55d512f6d51b";
+    "4c7a21fcf30346fdec73c674be03ef665ff90274aff73f3fd836330284a45889";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -40,6 +40,10 @@ fn canonical_score_schema_identity_is_stable() {
             "missing PlacementGroup property {required}"
         );
     }
+    assert_eq!(
+        placement_group["layout"]["enum"],
+        serde_json::json!(["overlap", "horizontal_source_order", "scatter", "tile"])
+    );
 
     let instruction = schema["$defs"]["Instruction"]["properties"]
         .as_object()

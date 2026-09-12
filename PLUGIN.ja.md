@@ -95,7 +95,7 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 `transform`は透明な`group`のEmit連続範囲を内側から外側へ保ち、Count1ではScore 0.5.0の`transform_groups`へ、反復では個体を作らないsymbolic planへ届く。有限の`scale_x` / `scale_y`と`translate_x` / `translate_y`は、bbox中心でのscale、同中心でのrotate、normalized canvas軸のtranslateをgeneral affineとして合成する。geometryと間隔だけを変え、stroke幅とgrain pitchは保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部のTouching / Along / Cuttingは変形後の形・向き・明示指定を保ち、group全体の平行移動で成立を試みる。失敗時はrelationだけをerrorとして外し、groupは元の変形後配置で描く。Step11 materializationとStep13 runtime / UI / 保存cutoverは未完了である。
 
-通常DDLのprimitiveだけからなる「中央に置く」direct coordinated groupはScore 0.7.0の`placement_groups`へ届く。内部配置を省略すると`overlap`でmemberのbbox中心を揃え、「並べて置く」はsource順の`horizontal_source_order`、「重ねて置く」は`overlap`となる。一つのnamed regionをperformance seedで一度だけ解決し、group全体を移す。memberのowner、count、seed、geometryは保ち、反復はsymbolic planのままである。このdirect carrierはMacro authoring operatorや個体materializationを追加しない。
+通常DDLのprimitiveだけからなる既存named位置のdirect coordinated groupはScore 0.8.0の`placement_groups`へ届く。内部配置を省略すると`overlap`でmemberのbbox中心を揃え、「並べて置く」は既存wire値の`horizontal_source_order`、「重ねて置く」は`overlap`、`散らす`と`敷き詰める`は新しいwire値の`scatter`と`tile`となる。一つのnamed regionをperformance seedで一度だけ解決し、group全体を移す。memberのowner、count、seed、geometryは保つ。line-upの省略countは各member 1 でactual Scoreへ届く。scatter / tileは全memberのcountが明示1のときだけactual Scoreへ届き、全省略countは合計8をsource順で均等配分するsymbolic planに残る。明示countが1以外のgroupはsymbolic planに残る。countの一部だけを明示したscatter / tileと、全省略でheadが8を超えるscatter / tileは未対応であり、line-up / placeのmixed countは有効である。このdirect carrierはMacro authoring operatorや個体materializationを追加しない。
 
 AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央で、Emitのfocus依存配置を借用しない。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
 

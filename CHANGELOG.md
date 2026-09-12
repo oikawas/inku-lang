@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-12 — Scatter and tile wire for direct coordinated groups
+
+Primitive-only direct coordinated groups at existing named places add `scatter` and `tile` to Score 0.8.0 `placement_groups`, beside the existing `overlap` and `horizontal_source_order`. Line-up keeps `horizontal_source_order`. An omitted line-up count is one for every member and reaches an actual Score. Scatter and tile reach an actual Score only when every member explicitly has count one; all omitted counts allocate a total of eight evenly in source order and remain a symbolic plan. Other explicit counts remain symbolic. Mixed explicit and omitted counts, or more than eight all-omitted heads, are unsupported only for scatter and tile; line-up and place mixed counts remain valid.
+
+This moves to render engine 56, DDL engine 31, and Score 0.8.0. APP_VERSION remains 2.14.2 and BUILD_NUMBER remains 1073. Step11 instance materialization, typed runtime / UI / persistence cutover, a full reference-corpus update, deployment, and a public release are outside this change.
+
+---
+
 ### 2026-09-12 — Internal placement for direct coordinated groups
 
 Primitive-only direct coordinated groups with `place:center` reach Score 0.7.0 `placement_groups`. Omitted internal placement is `overlap`, aligning member bounding-box centers; “place in a row” is source-order `horizontal_source_order`; “overlap” is `overlap`. The group bounding-box center moves to one named region resolved once from the performance seed while retaining member owners, counts, seeds, and geometry. Repetition stays symbolic, without mixing member arrangements or instance materialization into the carrier. When an affine group overlaps, only an outer transform that contains the full placement range is allowed.

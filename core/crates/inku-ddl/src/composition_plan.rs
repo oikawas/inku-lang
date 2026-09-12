@@ -25,6 +25,9 @@ pub enum PlacementAction {
 pub struct PlacementGroupPlan {
     pub(crate) group_index: usize,
     pub(crate) placement: inku_score::PlacementGroup,
+    pub(crate) logical_count: u64,
+    pub(crate) domain: [Rational; 2],
+    pub(crate) recipe: PlacementRecipe,
 }
 
 impl PlacementGroupPlan {
@@ -33,6 +36,18 @@ impl PlacementGroupPlan {
     }
     pub const fn placement(&self) -> &inku_score::PlacementGroup {
         &self.placement
+    }
+    pub const fn logical_count(&self) -> u64 {
+        self.logical_count
+    }
+    pub const fn domain(&self) -> [Rational; 2] {
+        self.domain
+    }
+    /// Apply once over source-ordered logical members. Member recipes are local Place.
+    /// After layout, translate the group's bounds center to `placement.at`, including
+    /// Scatter: the ordinary object's sampled-centroid pivot does not apply here.
+    pub const fn recipe(&self) -> &PlacementRecipe {
+        &self.recipe
     }
 }
 
@@ -173,9 +188,9 @@ pub enum PlacementRecipe {
     },
     /// Row-major filled prefix. No instances or trailing empty cells are allocated.
     Grid {
-        columns: u32,
-        rows: u32,
-        filled_count: u32,
+        columns: u64,
+        rows: u64,
+        filled_count: u64,
         cell_width: Rational,
         cell_height: Rational,
         /// Exact filled-prefix centroid in domain coordinates; numeric anchors translate it.

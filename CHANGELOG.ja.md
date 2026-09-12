@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-12 — Direct coordinated groupのscatter／tile wire
+
+既存named位置のprimitiveだけからなるdirect coordinated groupはScore 0.8.0 `placement_groups`で、既存の`overlap`と`horizontal_source_order`に`scatter`と`tile`を加える。Line-upは既存の`horizontal_source_order`を保つ。line-upの省略countは各member 1 としてactual Scoreへ届く。scatter／tileは全memberのcountが明示1のときだけactual Scoreへ届き、全省略countは合計8をsource順で均等配分するsymbolic planに残る。その他の明示countはsymbolic planに残る。countの一部だけを明示したscatter／tileと、全省略でheadが8を超えるscatter／tileは未対応であり、line-up／placeのmixed countは有効である。
+
+render engine 56、DDL engine 31、Score 0.8.0へ進める。APP_VERSION 2.14.2とBUILD_NUMBER 1073は変えない。Step11の個体materialization、typed runtime／UI／save全面接続、全参照コーパス更新、配備・公開releaseは含めない。
+
+---
+
 ### 2026-09-12 — Direct coordinated groupの内部配置
 
 通常DDLのprimitiveだけからなる「中央に置く」direct coordinated groupをScore 0.7.0 `placement_groups`へ届ける。内部配置省略はmemberのbbox中心を揃える`overlap`、「並べて置く」はsource順の`horizontal_source_order`、「重ねて置く」は`overlap`である。group bbox中心をperformance seedで一度だけ解決したnamed regionへ移し、memberのowner、count、seed、geometryを保つ。反復はsymbolic planのままとし、member arrangementや個体materializationをcarrierへ混ぜない。affine groupと重なる場合は配置範囲を包含する外側変換だけを許す。

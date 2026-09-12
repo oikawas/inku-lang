@@ -987,9 +987,35 @@ impl Execution<'_> {
     fn perform_placement(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
         let group = &self.request.score.placement_groups[index];
         let mut placed = None;
-        let width =
-            crate::geometry::point_to_short_side_units(Point::new(1.0, 1.0), self.request.canvas).x;
-        let step = width / (group.end - group.start) as f64;
+        let mut domain =
+            crate::geometry::point_to_short_side_units(Point::new(1.0, 1.0), self.request.canvas);
+        let count = group.end - group.start;
+        let seed = self.request.performance_seed.unwrap_or_default();
+        if group.layout == inku_score::GroupLayout::Tile {
+            domain.x *= group.at.region[2] - group.at.region[0];
+            domain.y *= group.at.region[3] - group.at.region[1];
+        }
+        let columns = if group.layout == inku_score::GroupLayout::Tile {
+            let landscape = domain.x >= domain.y;
+            let long_count = if domain.x == 0.0 || domain.y == 0.0 {
+                count
+            } else {
+                let aspect = if landscape {
+                    domain.x / domain.y
+                } else {
+                    domain.y / domain.x
+                };
+                ((count as f64 * aspect).sqrt().ceil() as usize).min(count)
+            };
+            if landscape {
+                long_count
+            } else {
+                count.div_ceil(long_count)
+            }
+        } else {
+            1
+        };
+        let rows = count.div_ceil(columns);
         for member in group.start..group.end {
             let value = self.performed[member]
                 .last()
@@ -1004,15 +1030,21 @@ impl Execution<'_> {
             )
             .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
             let center = bounds.center();
-            let target = Point::new(
-                match group.layout {
-                    inku_score::GroupLayout::Overlap => 0.0,
-                    inku_score::GroupLayout::HorizontalSourceOrder => {
-                        (member - group.start) as f64 * step
-                    }
-                },
-                0.0,
-            );
+            let ordinal = member - group.start;
+            let target = match group.layout {
+                inku_score::GroupLayout::Overlap => Point::new(0.0, 0.0),
+                inku_score::GroupLayout::HorizontalSourceOrder => {
+                    Point::new(ordinal as f64 * domain.x / count as f64, 0.0)
+                }
+                inku_score::GroupLayout::Scatter => {
+                    let sampled = crate::placement::scatter_position(ordinal, seed, 0.0);
+                    Point::new(sampled.x * domain.x, sampled.y * domain.y)
+                }
+                inku_score::GroupLayout::Tile => Point::new(
+                    (ordinal % columns) as f64 * domain.x / columns as f64,
+                    (ordinal / columns) as f64 * domain.y / rows as f64,
+                ),
+            };
             let delta = Point::new(target.x - center.x, target.y - center.y);
             self.transforms[member] =
                 AffineTransform::translation(delta).compose(self.transforms[member]);
@@ -1024,12 +1056,15 @@ impl Execution<'_> {
                 },
             );
         }
-        let [x0, y0, x1, y1] =
-            crate::placement::region_in_short_side_units(group.at.region, self.request.canvas);
-        let seed = self.request.performance_seed.unwrap_or_default();
-        let target = Point::new(
-            x0 + (x1 - x0) * crate::determinism::hash01(index as i64, seed, "placement-group-x"),
-            y0 + (y1 - y0) * crate::determinism::hash01(index as i64, seed, "placement-group-y"),
+        let [x0, y0, x1, y1] = group.at.region;
+        let target = crate::geometry::point_to_short_side_units(
+            Point::new(
+                x0 + (x1 - x0)
+                    * crate::determinism::hash01(index as i64, seed, "placement-group-x"),
+                y0 + (y1 - y0)
+                    * crate::determinism::hash01(index as i64, seed, "placement-group-y"),
+            ),
+            self.request.canvas,
         );
         let center = placed.expect("validated nonempty placement").center();
         let translation =

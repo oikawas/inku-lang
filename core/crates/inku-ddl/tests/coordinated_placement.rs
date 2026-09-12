@@ -209,3 +209,243 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
         inku_score::ScoreExecutionDisposition::RelationOmitted
     );
 }
+
+#[test]
+fn coordinated_actions_plan_preserves_quantities_and_one_named_target() {
+    for (source, counts, layout) in [
+        (
+            "赤い円と青い四角を中央に並べる",
+            vec![1, 1],
+            ScoreGroupLayout::HorizontalSourceOrder,
+        ),
+        (
+            "scatter red circle and blue square at center.",
+            vec![4, 4],
+            ScoreGroupLayout::Scatter,
+        ),
+        (
+            "tile red circle and blue square and green triangle at left-edge.",
+            vec![3, 3, 2],
+            ScoreGroupLayout::Tile,
+        ),
+        (
+            "arrange two red circle and one blue square at corner.",
+            vec![2, 1],
+            ScoreGroupLayout::HorizontalSourceOrder,
+        ),
+        (
+            "tile 4294967295 red circle and 4294967295 blue square at top.",
+            vec![u32::MAX, u32::MAX],
+            ScoreGroupLayout::Tile,
+        ),
+    ] {
+        let transformed = stage(source);
+        let original = transformed
+            .verified_effective_view()
+            .original_semantic_document()
+            .clone();
+        let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+        assert!(
+            plan.diagnostics().is_empty(),
+            "{source}: {:?}",
+            plan.diagnostics()
+        );
+        let objects = plan.objects().unwrap();
+        assert_eq!(
+            objects
+                .iter()
+                .map(|object| object.count())
+                .collect::<Vec<_>>(),
+            counts
+        );
+        assert_eq!(objects[0].appearance().color, Color::Red);
+        assert_eq!(objects[1].appearance().color, Color::Blue);
+        for (index, object) in objects.iter().enumerate() {
+            assert_eq!(
+                object.origin(),
+                &ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: index
+                }
+            );
+            assert_eq!(
+                object.count_was_omitted(),
+                original.instructions[index].entity.quantity.is_none()
+            );
+            assert_eq!(object.recipe(), &PlacementRecipe::Place);
+            assert_eq!(object.anchor(), &ObjectAnchor::Named([0.5; 4]));
+        }
+        let group = &plan.placement_groups()[0];
+        assert_eq!(
+            group.logical_count(),
+            counts.iter().map(|&count| u64::from(count)).sum::<u64>()
+        );
+        assert_eq!(group.placement().layout, layout);
+        match layout {
+            ScoreGroupLayout::HorizontalSourceOrder => assert!(matches!(
+                group.recipe(),
+                PlacementRecipe::HorizontalLine { .. }
+            )),
+            ScoreGroupLayout::Scatter => assert_eq!(
+                group.recipe(),
+                &PlacementRecipe::ScatterUniformWithCentroidTranslation
+            ),
+            ScoreGroupLayout::Tile => assert!(
+                matches!(group.recipe(), PlacementRecipe::Grid { filled_count, .. } if *filled_count == group.logical_count())
+            ),
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            *transformed
+                .verified_effective_view()
+                .original_semantic_document(),
+            original
+        );
+    }
+    for position in ["left-edge", "top", "corner"] {
+        let transformed = stage(&format!("place red circle and blue square at {position}."));
+        let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+        let lower = lower_verified_stage15_score(transformed.verified_effective_view(), context());
+        assert!(
+            lower.diagnostics().is_empty(),
+            "{position}: {:?}",
+            lower.diagnostics()
+        );
+        assert_eq!(
+            plan.placement_groups()[0].placement(),
+            &lower.score().unwrap().placement_groups[0]
+        );
+    }
+    let transformed =
+        stage("scatter three red circle and blue square at center. place green triangle at top.");
+    let recovered = plan_verified_stage15(transformed.verified_effective_view(), context());
+    assert_eq!(recovered.objects().unwrap().len(), 1);
+    assert!(
+        recovered
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnsupportedCoordinatedGroup)
+    );
+}
+
+#[test]
+fn coordinated_actions_geometry_uses_shared_layout_and_target() {
+    use inku_render::{
+        checked_performance::resolve_checked_performance, performance::PerformanceRequest,
+    };
+    use inku_score::{Point, ScoreErrorPolicy};
+    for (source, layout) in [
+        (
+            "arrange one red circle and one blue circle at left-edge.",
+            ScoreGroupLayout::HorizontalSourceOrder,
+        ),
+        (
+            "scatter one red circle and one blue circle at top.",
+            ScoreGroupLayout::Scatter,
+        ),
+        (
+            "tile one red circle and one blue circle and one green circle at top.",
+            ScoreGroupLayout::Tile,
+        ),
+    ] {
+        let transformed = stage(source);
+        let wide = layout == ScoreGroupLayout::HorizontalSourceOrder;
+        let lower = lower_verified_stage15_score(
+            transformed.verified_effective_view(),
+            ScoreLoweringContext::resolve(if wide { "hd_monitor" } else { "square" }, Color::White)
+                .unwrap(),
+        );
+        assert!(
+            lower.diagnostics().is_empty(),
+            "{source}: {:?}",
+            lower.diagnostics()
+        );
+        let score = lower.score().unwrap();
+        assert_eq!(score.placement_groups[0].layout, layout);
+        let performed = resolve_checked_performance(
+            PerformanceRequest {
+                score,
+                performance_seed: Some(71),
+                composition_seed: Some(19),
+                canvas: wide.then_some(inku_render::types::CanvasSize {
+                    width: 160.0,
+                    height: 90.0,
+                }),
+            },
+            ScoreErrorPolicy::Stop,
+        )
+        .unwrap();
+        assert!(performed.execution.is_none(), "{:?}", performed.execution);
+        let centers = performed
+            .score
+            .instructions
+            .iter()
+            .enumerate()
+            .map(|(index, instruction)| {
+                let center = inku_render::geometry::point_to_short_side_units(
+                    instruction.center.unwrap(),
+                    wide.then_some(inku_render::types::CanvasSize {
+                        width: 160.0,
+                        height: 90.0,
+                    }),
+                );
+                performed.instruction_transforms[index].apply(center)
+            })
+            .collect::<Vec<_>>();
+        let bounds_center = Point::new(
+            (centers.iter().map(|p| p.x).fold(f64::INFINITY, f64::min)
+                + centers
+                    .iter()
+                    .map(|p| p.x)
+                    .fold(f64::NEG_INFINITY, f64::max))
+                / 2.0,
+            (centers.iter().map(|p| p.y).fold(f64::INFINITY, f64::min)
+                + centers
+                    .iter()
+                    .map(|p| p.y)
+                    .fold(f64::NEG_INFINITY, f64::max))
+                / 2.0,
+        );
+        let [x0, y0, x1, y1] = score.placement_groups[0].at.region;
+        let expected = Point::new(
+            (if wide { 16.0 / 9.0 } else { 1.0 })
+                * (x0 + (x1 - x0) * inku_render::determinism::hash01(0, 71, "placement-group-x")),
+            y0 + (y1 - y0) * inku_render::determinism::hash01(0, 71, "placement-group-y"),
+        );
+        assert!(
+            (bounds_center.x - expected.x).abs() < 1e-9
+                && (bounds_center.y - expected.y).abs() < 1e-9
+        );
+        if layout == ScoreGroupLayout::Scatter {
+            let a = inku_render::placement::scatter_position(0, 71, 0.0);
+            let b = inku_render::placement::scatter_position(1, 71, 0.0);
+            assert!((centers[1].x - centers[0].x - (b.x - a.x)).abs() < 1e-9);
+            assert!((centers[1].y - centers[0].y - (b.y - a.y)).abs() < 1e-9);
+        } else {
+            assert!(
+                centers
+                    .windows(2)
+                    .all(|pair| pair[0].x < pair[1].x && (pair[0].y - pair[1].y).abs() < 1e-9)
+            );
+        }
+        if layout == ScoreGroupLayout::Tile {
+            let mut point = score.clone();
+            point.placement_groups[0].at.region = [0.5; 4];
+            let collapsed = resolve_checked_performance(
+                PerformanceRequest {
+                    score: &point,
+                    performance_seed: Some(71),
+                    composition_seed: Some(19),
+                    canvas: None,
+                },
+                ScoreErrorPolicy::Stop,
+            )
+            .unwrap();
+            assert!(collapsed.execution.is_none());
+            for (index, instruction) in collapsed.score.instructions.iter().enumerate() {
+                let center =
+                    collapsed.instruction_transforms[index].apply(instruction.center.unwrap());
+                assert!((center.x - 0.5).abs() < 1e-9 && (center.y - 0.5).abs() < 1e-9);
+            }
+        }
+    }
+}

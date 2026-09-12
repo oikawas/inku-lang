@@ -70,17 +70,20 @@ class ServerScoreCompatTest {
     }
 
     @Test
-    fun placementGroupsSurviveScoreMigrationForSaveAndReplay() {
+    fun score08PlacementGroupLayoutsSurviveScoreMigrationForSaveAndReplay() {
         val score = JSONObject(
-            """{"version":"0.7.0","instructions":[{"primitive":"circle"},{"primitive":"square"}],
-                "placement_groups":[{"start":0,"end":2,"layout":"horizontal_source_order",
-                "at":{"region":[0.4,0.4,0.6,0.6]}}]}""",
+            """{"version":"0.8.0","instructions":[{"primitive":"circle"},{"primitive":"square"},
+                {"primitive":"triangle"},{"primitive":"ellipse"}],"placement_groups":[
+                {"start":0,"end":2,"layout":"scatter","at":{"region":[0.4,0.4,0.6,0.6]}},
+                {"start":2,"end":4,"layout":"tile","at":{"region":[0.2,0.2,0.8,0.8]}}]}""",
         )
 
         val migrated = ServerScoreCompat.migrateScore(score)
 
-        val group = migrated.getJSONArray("placement_groups").getJSONObject(0)
-        assertEquals("horizontal_source_order", group.getString("layout"))
-        assertEquals(0.4, group.getJSONObject("at").getJSONArray("region").getDouble(0), 0.0)
+        val groups = migrated.getJSONArray("placement_groups")
+        assertEquals("scatter", groups.getJSONObject(0).getString("layout"))
+        assertEquals(0.4, groups.getJSONObject(0).getJSONObject("at").getJSONArray("region").getDouble(0), 0.0)
+        assertEquals("tile", groups.getJSONObject(1).getString("layout"))
+        assertEquals(0.8, groups.getJSONObject(1).getJSONObject("at").getJSONArray("region").getDouble(2), 0.0)
     }
 }

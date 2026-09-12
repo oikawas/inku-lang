@@ -186,6 +186,7 @@ fn project_source_instruction<'a>(
         return None;
     };
     Some(ScoreLoweringInput {
+        group_region: None,
         proportion_width_extent: instruction
             .entity
             .proportion
@@ -1634,6 +1635,7 @@ fn project_macro_emit<'a>(
     }
 
     Ok(ScoreLoweringInput {
+        group_region: None,
         generated_position,
         generated_geometries,
         proportion_width_extent,
@@ -2101,30 +2103,68 @@ fn lower_verified_stage15_shared<'a>(
                     } if target_group == group_index => Some(target.effective_focus),
                     _ => None,
                 });
-            if predicate
+            let action = predicate
                 .action
                 .as_ref()
-                .is_some_and(|action| action.identity.id == "place")
-                && predicate
-                    .position
-                    .as_ref()
-                    .is_some_and(|position| position.identity.id == "center")
-                && group.member_instruction_indices.iter().all(|&member| {
-                    matches!(
-                        document.instructions[member].entity.head,
-                        SemanticHead::Primitive(_)
-                    )
-                })
-                && let Some(focus) = focus
+                .map(|action| action.identity.id.as_str());
+            let counts = action.and_then(|action| {
+                crate::group_quantity::coordinated_counts(
+                    action,
+                    &group
+                        .member_instruction_indices
+                        .iter()
+                        .map(|&member| {
+                            document.instructions[member]
+                                .entity
+                                .quantity
+                                .as_ref()
+                                .map(|quantity| quantity.value)
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            });
+            let bounds = predicate.position.as_ref().and_then(|position| {
+                crate::geometry::named_region_rational_bounds(
+                    &position.identity.id,
+                    focus,
+                    ScoreAngleContext {
+                        composition_seed: view.composition_seed(),
+                        original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                        original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                        occurrence: ScoreAngleOccurrence::Direct {
+                            logical_ordinal: source_member_instruction_indices[0] as u64,
+                        },
+                    },
+                )
+            });
+            if group.member_instruction_indices.iter().all(|&member| {
+                matches!(
+                    document.instructions[member].entity.head,
+                    SemanticHead::Primitive(_)
+                )
+            }) && let (Some(counts), Some(bounds)) = (counts, bounds)
             {
-                for &member in &group.member_instruction_indices {
-                    group_members.insert(member, (predicate, focus));
+                let region = bounds.map(|(n, d)| n as f64 / d as f64);
+                let layout = match action.expect("allocated known action") {
+                    "line_up" => inku_score::GroupLayout::HorizontalSourceOrder,
+                    "scatter" => inku_score::GroupLayout::Scatter,
+                    "tile" => inku_score::GroupLayout::Tile,
+                    _ => match predicate.layout {
+                        crate::GroupLayout::Overlap => inku_score::GroupLayout::Overlap,
+                        crate::GroupLayout::HorizontalSourceOrder => {
+                            inku_score::GroupLayout::HorizontalSourceOrder
+                        }
+                    },
+                };
+                for (&member, count) in group.member_instruction_indices.iter().zip(counts) {
+                    group_members.insert(member, (region, count));
                 }
                 supported_groups.push((
                     group_index,
                     source_member_instruction_indices,
-                    predicate.layout,
-                    focus,
+                    layout,
+                    region,
+                    bounds,
                 ));
                 continue;
             }
@@ -2182,17 +2222,16 @@ fn lower_verified_stage15_shared<'a>(
                     effective_focus,
                 )
                 .expect("source projection is called only for primitive heads");
-                if let Some((predicate, focus)) = group_members.get(&projected_index) {
-                    input.action = predicate
-                        .action
-                        .as_ref()
-                        .map(|term| (&term.identity).into());
-                    input.named_position = predicate
-                        .position
-                        .as_ref()
-                        .map(|term| (&term.identity).into());
+                if let Some((region, count)) = group_members.get(&projected_index) {
+                    // The group alone owns action and target; members retain appearance
+                    // and quantities while resolving geometry in a local Place recipe.
+                    input.action = Some(SemanticInputIdentity {
+                        category: "movement",
+                        id: "place",
+                    });
+                    input.count = Some(*count);
                     input.has_named_position = true;
-                    input.effective_focus = Some(*focus);
+                    input.group_region = Some(*region);
                 }
                 if let Some(objects) = objects.as_deref_mut() {
                     let relation = instruction.relation.as_ref().and_then(|relation| {
@@ -2252,6 +2291,7 @@ fn lower_verified_stage15_shared<'a>(
                     );
                     if let Some(index) = object_index {
                         objects[index].relation = relation;
+                        objects[index].count_was_omitted = instruction.entity.quantity.is_none();
                     }
                     continue;
                 }
@@ -2348,7 +2388,7 @@ fn lower_verified_stage15_shared<'a>(
     }
 
     let mut placement_groups = Vec::new();
-    for (group_index, members, layout, focus) in supported_groups {
+    for (group_index, members, layout, region, bounds) in supported_groups {
         let origins = objects.as_ref().map_or_else(
             || instruction_origins.iter().collect::<Vec<_>>(),
             |objects| objects.iter().map(|object| &object.origin).collect(),
@@ -2360,6 +2400,42 @@ fn lower_verified_stage15_shared<'a>(
             continue;
         };
         let end = last + 1;
+        let logical_count = objects.as_ref().map_or((end - start) as u64, |objects| {
+            objects[start..end]
+                .iter()
+                .map(|object| u64::from(object.count))
+                .sum()
+        });
+        let (width, height) = context.canvas_format.integer_ratio();
+        let short = width.min(height);
+        let mut domain = [
+            Rational::from_ratio(width.into(), short.into()).expect("valid canvas ratio"),
+            Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
+        ];
+        if layout == inku_score::GroupLayout::Tile {
+            for axis in 0..2 {
+                let (end_n, end_d) = bounds[axis + 2];
+                let (start_n, start_d) = bounds[axis];
+                let extent = Rational::from_ratio(end_n.into(), end_d.into())
+                    .unwrap()
+                    .sub(Rational::from_ratio(start_n.into(), start_d.into()).unwrap())
+                    .unwrap();
+                domain[axis] = domain[axis].mul(extent).unwrap();
+            }
+        }
+        let recipe = placement_recipe(
+            match layout {
+                inku_score::GroupLayout::Overlap => PlacementAction::Place,
+                inku_score::GroupLayout::HorizontalSourceOrder => PlacementAction::LineUp,
+                inku_score::GroupLayout::Scatter => PlacementAction::Scatter,
+                inku_score::GroupLayout::Tile => PlacementAction::Tile,
+            },
+            logical_count,
+            domain,
+            None,
+            false,
+        )
+        .expect("bounded validated group recipe");
         // These are local coordinates; only the group carries the semantic focus.
         if let Some(objects) = objects.as_deref_mut() {
             for object in &mut objects[start..end] {
@@ -2372,18 +2448,14 @@ fn lower_verified_stage15_shared<'a>(
         }
         placement_groups.push(PlacementGroupPlan {
             group_index,
+            logical_count,
+            domain,
+            recipe,
             placement: inku_score::PlacementGroup {
                 start,
                 end,
-                layout: match layout {
-                    crate::GroupLayout::Overlap => inku_score::GroupLayout::Overlap,
-                    crate::GroupLayout::HorizontalSourceOrder => {
-                        inku_score::GroupLayout::HorizontalSourceOrder
-                    }
-                },
-                at: AtRegion {
-                    region: crate::geometry::focus_region_bounds(focus),
-                },
+                layout,
+                at: AtRegion { region },
             },
         });
     }
@@ -3146,6 +3218,7 @@ impl<'a> From<&'a SemanticIdentity> for SemanticInputIdentity<'a> {
 
 #[derive(Clone, Copy, Debug)]
 struct ScoreLoweringInput<'a> {
+    group_region: Option<[f64; 4]>,
     generated_position: Option<crate::geometry::ExactPosition>,
     generated_geometries: [Option<crate::geometry::ExactGeometry>; 6],
     proportion_width_extent: Option<SemanticInputIdentity<'a>>,
@@ -3294,87 +3367,16 @@ fn resolve_object_plan(
         };
         let n = resolved.count;
         let layout_direction = resolved.layout_direction;
-        let recipe = match resolved.action {
-            PlacementAction::Place => PlacementRecipe::Place,
-            PlacementAction::LineUp => match layout_direction
-                .as_ref()
-                .map(|direction| direction.axis)
-                .unwrap_or([1, 0])
-            {
-                [1, 0] => PlacementRecipe::HorizontalLine {
-                    cell_width: domain[0].div_i128(n.into())?,
-                },
-                [0, 1] => PlacementRecipe::VerticalLine {
-                    cell_height: domain[1].div_i128(n.into())?,
-                },
-                [1, y] => {
-                    let short = if domain[0].le(domain[1])? {
-                        domain[0]
-                    } else {
-                        domain[1]
-                    };
-                    let step = short.div_i128(n.into())?;
-                    PlacementRecipe::DiagonalLine {
-                        step: [step, step.mul_i128(y.into())?],
-                    }
-                }
-                _ => unreachable!("closed layout axes"),
-            },
-            PlacementAction::Scatter => PlacementRecipe::ScatterUniformWithCentroidTranslation,
-            PlacementAction::Tile => {
-                let landscape = domain[1].le(domain[0])?;
-                let aspect = if landscape {
-                    domain[0].div(domain[1])?
-                } else {
-                    domain[1].div(domain[0])?
-                };
-                // Integer binary search of k² >= n * long/short. This is bounded
-                // by 32 iterations and has no floating ceil boundary or count loop.
-                let target = aspect.mul_i128(n.into())?;
-                let mut low = 1_u32;
-                let mut high = n;
-                while low < high {
-                    let middle = low + (high - low) / 2;
-                    if target.le(Rational::from_ratio(
-                        i128::from(middle) * i128::from(middle),
-                        1,
-                    )?)? {
-                        high = middle;
-                    } else {
-                        low = middle + 1;
-                    }
-                }
-                let long_count = low;
-                let short_count = n.div_ceil(long_count);
-                let (columns, rows) = if landscape {
-                    (long_count, short_count)
-                } else {
-                    (short_count, long_count)
-                };
-                let cell_width = domain[0].div_i128(columns.into())?;
-                let cell_height = domain[1].div_i128(rows.into())?;
-                let c = i128::from(columns);
-                let q = i128::from(n / columns);
-                let remainder = i128::from(n % columns);
-                let centroid = [
-                    cell_width.mul_ratio(q * c * c + remainder * remainder, 2 * i128::from(n))?,
-                    cell_height
-                        .mul_ratio(c * q * q + remainder * (2 * q + 1), 2 * i128::from(n))?,
-                ];
-                PlacementRecipe::Grid {
-                    columns,
-                    rows,
-                    filled_count: n,
-                    cell_width,
-                    cell_height,
-                    centroid,
-                    translate_to_numeric_anchor: matches!(
-                        anchor,
-                        ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
-                    ),
-                }
-            }
-        };
+        let recipe = placement_recipe(
+            resolved.action,
+            u64::from(n),
+            domain,
+            layout_direction.as_ref(),
+            matches!(
+                anchor,
+                ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
+            ),
+        )?;
         Ok(ObjectPlacementPlan {
             arc_form: resolved.arc_form,
             proportion_width_extent: input.proportion_width_extent.map(|identity| {
@@ -3411,6 +3413,95 @@ fn resolve_object_plan(
         })
     };
     build().map_err(|gap| vec![gap])
+}
+
+fn placement_recipe(
+    action: PlacementAction,
+    n: u64,
+    domain: [Rational; 2],
+    layout_direction: Option<&crate::composition_plan::ResolvedLayoutDirection>,
+    translate_to_numeric_anchor: bool,
+) -> Result<PlacementRecipe, ScoreFieldGap> {
+    Ok(match action {
+        PlacementAction::Place => PlacementRecipe::Place,
+        PlacementAction::LineUp => match layout_direction
+            .map(|direction| direction.axis)
+            .unwrap_or([1, 0])
+        {
+            [1, 0] => PlacementRecipe::HorizontalLine {
+                cell_width: domain[0].div_i128(n.into())?,
+            },
+            [0, 1] => PlacementRecipe::VerticalLine {
+                cell_height: domain[1].div_i128(n.into())?,
+            },
+            [1, y] => {
+                let short = if domain[0].le(domain[1])? {
+                    domain[0]
+                } else {
+                    domain[1]
+                };
+                let step = short.div_i128(n.into())?;
+                PlacementRecipe::DiagonalLine {
+                    step: [step, step.mul_i128(y.into())?],
+                }
+            }
+            _ => unreachable!("closed layout axes"),
+        },
+        PlacementAction::Scatter => PlacementRecipe::ScatterUniformWithCentroidTranslation,
+        PlacementAction::Tile => {
+            let landscape = domain[1].le(domain[0])?;
+            // Integer binary search of k² >= n * long/short. This is bounded
+            // by 64 iterations and has no floating ceil boundary or count loop.
+            // A flat domain is one row/column; a point domain collapses every cell.
+            let degenerate = domain.iter().any(|axis| axis.numerator() == 0);
+            let aspect = if degenerate {
+                Rational::from_ratio(1, 1)?
+            } else if landscape {
+                domain[0].div(domain[1])?
+            } else {
+                domain[1].div(domain[0])?
+            };
+            let target = aspect.mul_i128(n.into())?;
+            let mut low = if degenerate { n } else { 1_u64 };
+            let mut high = n;
+            while low < high {
+                let middle = low + (high - low) / 2;
+                if target.le(Rational::from_ratio(
+                    i128::from(middle) * i128::from(middle),
+                    1,
+                )?)? {
+                    high = middle;
+                } else {
+                    low = middle + 1;
+                }
+            }
+            let long_count = low;
+            let short_count = n.div_ceil(long_count);
+            let (columns, rows) = if landscape {
+                (long_count, short_count)
+            } else {
+                (short_count, long_count)
+            };
+            let cell_width = domain[0].div_i128(columns.into())?;
+            let cell_height = domain[1].div_i128(rows.into())?;
+            let c = i128::from(columns);
+            let q = i128::from(n / columns);
+            let remainder = i128::from(n % columns);
+            let centroid = [
+                cell_width.mul_ratio(q * c * c + remainder * remainder, 2 * i128::from(n))?,
+                cell_height.mul_ratio(c * q * q + remainder * (2 * q + 1), 2 * i128::from(n))?,
+            ];
+            PlacementRecipe::Grid {
+                columns,
+                rows,
+                filled_count: n,
+                cell_width,
+                cell_height,
+                centroid,
+                translate_to_numeric_anchor,
+            }
+        }
+    })
 }
 
 fn append_plan_attempt(
@@ -3699,6 +3790,8 @@ fn resolve_complete_object<'a>(
     let named_focus = if input.has_named_position && input.exact_position().is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
+    } else if let Some(region) = input.group_region {
+        Some(region)
     } else if input.has_named_position {
         if let Some(region) = input
             .named_position

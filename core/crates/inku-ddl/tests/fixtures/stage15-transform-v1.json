@@ -1,7 +1,7 @@
 {
   "schema": "inku.stage15-transform-cross-platform-fixture.v1",
   "version": 1,
-  "transformation_schema": "inku.typed-stage15-transformation.v5",
+  "transformation_schema": "inku.typed-stage15-transformation.v6",
   "geometry_policy_id": "inku.geometry-resolution-policy.v1",
   "geometry_policy_digest": "cff343a5d5ab7ec1c775d0c90bf7987a462b37896317cb3a37be86d5b534ff52",
   "focus_order": [

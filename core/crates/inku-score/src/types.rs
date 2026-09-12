@@ -523,7 +523,7 @@ const fn default_relation_gap() -> RelationGap {
 }
 
 fn default_score_version() -> String {
-    "0.6.0".to_owned()
+    "0.7.0".to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -903,6 +903,22 @@ fn is_zero_translation(value: &f64) -> bool {
     *value == 0.0
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupLayout {
+    Overlap,
+    HorizontalSourceOrder,
+}
+
+/// One coordinated arrangement and named placement, distinct from affine transforms.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PlacementGroup {
+    pub start: usize,
+    pub end: usize,
+    pub layout: GroupLayout,
+    pub at: AtRegion,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
     #[serde(default = "default_score_version")]
@@ -918,13 +934,54 @@ pub struct Score {
     pub anchors: Vec<AnchorPoint>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transform_groups: Vec<TransformGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub placement_groups: Vec<PlacementGroup>,
 }
 
 impl Score {
+    pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
+        if !self.placement_groups.is_empty() && self.version != "0.7.0" {
+            return Err("placement_groups requires Score version 0.7.0");
+        }
+        let mut previous_end = 0;
+        for group in &self.placement_groups {
+            if group.start < previous_end
+                || group.start >= group.end
+                || group.end > self.instructions.len()
+            {
+                return Err(
+                    "placement group ranges must be nonempty, disjoint and in source order",
+                );
+            }
+            previous_end = group.end;
+            let [x0, y0, x1, y1] = group.at.region;
+            if ![x0, y0, x1, y1].into_iter().all(f64::is_finite) || x0 > x1 || y0 > y1 {
+                return Err("placement group at region must be finite and ordered");
+            }
+            if self.instructions[group.start..group.end]
+                .iter()
+                .any(|instruction| instruction.arrangement.is_some())
+            {
+                return Err("placement group members cannot carry arrangements");
+            }
+            for affine in &self.transform_groups {
+                if group.start < affine.end
+                    && affine.start < group.end
+                    && !(affine.start <= group.start && group.end <= affine.end)
+                {
+                    return Err(
+                        "an overlapping affine group must contain the entire placement group",
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
-        if !self.anchors.is_empty() && self.version != "0.6.0" {
+        if !self.anchors.is_empty() && !matches!(self.version.as_str(), "0.6.0" | "0.7.0") {
             return Err("anchors requires Score version 0.6.0");
         }
         for anchor in &self.anchors {
@@ -955,7 +1012,7 @@ impl Score {
                     return Err("relation target instruction and anchor are exclusive");
                 }
                 if let Some(anchor_index) = relation.target_anchor_index {
-                    if self.version != "0.6.0" {
+                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0") {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
                     if anchor_index >= self.anchors.len() {
@@ -968,6 +1025,7 @@ impl Score {
                     && self.version != "0.4.0"
                     && self.version != "0.5.0"
                     && self.version != "0.6.0"
+                    && self.version != "0.7.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -1004,6 +1062,7 @@ impl Score {
                 && self.version != "0.4.0"
                 && self.version != "0.5.0"
                 && self.version != "0.6.0"
+                && self.version != "0.7.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -1037,10 +1096,11 @@ impl Score {
     /// Validates the structural contract shared by Score-producing hosts and
     /// the renderer before it performs any transform.
     pub fn validate_transform_groups(&self) -> Result<(), &'static str> {
+        self.validate_placement_groups()?;
         if self.transform_groups.is_empty() {
             return Ok(());
         }
-        if self.version != "0.4.0" && self.version != "0.5.0" && self.version != "0.6.0" {
+        if !matches!(self.version.as_str(), "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0") {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
@@ -1064,6 +1124,7 @@ impl Score {
             }
             if self.version != "0.5.0"
                 && self.version != "0.6.0"
+                && self.version != "0.7.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -1097,7 +1158,9 @@ impl Score {
                     return Err("transform group anchor_indices must be unique");
                 }
             }
-            if !group.anchor_indices.is_empty() && self.version != "0.6.0" {
+            if !group.anchor_indices.is_empty()
+                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0")
+            {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }
 

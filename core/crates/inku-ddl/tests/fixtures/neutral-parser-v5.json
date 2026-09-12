@@ -1,6 +1,6 @@
 {
-  "schema": "inku.neutral-lexeme-parser-fixture.v6",
-  "version": 6,
+  "schema": "inku.neutral-lexeme-parser-fixture.v7",
+  "version": 7,
   "cases": [
     {
       "id": "ja-longest-source-and-hole",

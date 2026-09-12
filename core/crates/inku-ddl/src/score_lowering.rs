@@ -2,7 +2,8 @@
 
 use crate::composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
-    PlacementAction, PlacementRecipe, PlanRelation, ResolvedObjectAppearance, TransformGroupPlan,
+    PlacementAction, PlacementGroupPlan, PlacementRecipe, PlanRelation, ResolvedObjectAppearance,
+    TransformGroupPlan,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -1810,6 +1811,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     instruction_origins: Vec<ScoreInstructionOrigin>,
     gaps: Vec<ScoreFieldGap>,
     diagnostics: Vec<ScoreLoweringDiagnostic>,
+    placement_groups: Vec<PlacementGroupPlan>,
 }
 
 impl<'a> ExplicitScoreLoweringResult<'a> {
@@ -2018,6 +2020,7 @@ pub(crate) fn resolve_composition_plan<'a>(
         anchors: result.anchors,
         anchor_origins: result.anchor_origins,
         transform_groups,
+        placement_groups: result.placement_groups,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
     }
@@ -2037,6 +2040,8 @@ fn lower_verified_stage15_shared<'a>(
     let mut diagnostics = Vec::new();
     let mut score_transform_groups = Vec::new();
     let mut omitted_group_members = BTreeSet::new();
+    let mut group_members = BTreeMap::new();
+    let mut supported_groups = Vec::new();
 
     let ground =
         document.ground.as_ref().and_then(|ground| {
@@ -2060,7 +2065,6 @@ fn lower_verified_stage15_shared<'a>(
             }
         });
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
-        omitted_group_members.extend(group.member_instruction_indices.iter().copied());
         let group_index = candidate
             .verified_effective_view()
             .source_group_index(projected_group_index)
@@ -2087,6 +2091,43 @@ fn lower_verified_stage15_shared<'a>(
             .iter()
             .find(|predicate| predicate.group_index == projected_group_index)
         {
+            let focus = view
+                .pending_focus_targets()
+                .iter()
+                .find_map(|target| match target.path {
+                    Stage15TargetPath::GroupPredicate {
+                        group_index: target_group,
+                        ..
+                    } if target_group == group_index => Some(target.effective_focus),
+                    _ => None,
+                });
+            if predicate
+                .action
+                .as_ref()
+                .is_some_and(|action| action.identity.id == "place")
+                && predicate
+                    .position
+                    .as_ref()
+                    .is_some_and(|position| position.identity.id == "center")
+                && group.member_instruction_indices.iter().all(|&member| {
+                    matches!(
+                        document.instructions[member].entity.head,
+                        SemanticHead::Primitive(_)
+                    )
+                })
+                && let Some(focus) = focus
+            {
+                for &member in &group.member_instruction_indices {
+                    group_members.insert(member, (predicate, focus));
+                }
+                supported_groups.push((
+                    group_index,
+                    source_member_instruction_indices,
+                    predicate.layout,
+                    focus,
+                ));
+                continue;
+            }
             spans.extend(
                 predicate
                     .action
@@ -2095,6 +2136,7 @@ fn lower_verified_stage15_shared<'a>(
                     .map(|term| term.provenance.source.span),
             );
         }
+        omitted_group_members.extend(group.member_instruction_indices.iter().copied());
         let reason = ScoreFieldGap::UnsupportedCoordinatedGroup;
         diagnostics.push(ScoreLoweringDiagnostic {
             owner: ScoreDiagnosticOwner::CoordinatedGroup {
@@ -2133,13 +2175,25 @@ fn lower_verified_stage15_shared<'a>(
                     candidate.verified_effective_view(),
                     instruction_index,
                 );
-                let input = project_source_instruction(
+                let mut input = project_source_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
                     instruction,
                     effective_focus,
                 )
                 .expect("source projection is called only for primitive heads");
+                if let Some((predicate, focus)) = group_members.get(&projected_index) {
+                    input.action = predicate
+                        .action
+                        .as_ref()
+                        .map(|term| (&term.identity).into());
+                    input.named_position = predicate
+                        .position
+                        .as_ref()
+                        .map(|term| (&term.identity).into());
+                    input.has_named_position = true;
+                    input.effective_focus = Some(*focus);
+                }
                 if let Some(objects) = objects.as_deref_mut() {
                     let relation = instruction.relation.as_ref().and_then(|relation| {
                         let resolved = if matches!(
@@ -2293,6 +2347,46 @@ fn lower_verified_stage15_shared<'a>(
         }
     }
 
+    let mut placement_groups = Vec::new();
+    for (group_index, members, layout, focus) in supported_groups {
+        let origins = objects.as_ref().map_or_else(
+            || instruction_origins.iter().collect::<Vec<_>>(),
+            |objects| objects.iter().map(|object| &object.origin).collect(),
+        );
+        let indices = origins.iter().enumerate().filter_map(|(index, origin)| {
+            matches!(origin, ScoreInstructionOrigin::SourceInstruction { instruction_index } if members.contains(instruction_index)).then_some(index)
+        }).collect::<Vec<_>>();
+        let (Some(&start), Some(&last)) = (indices.first(), indices.last()) else {
+            continue;
+        };
+        let end = last + 1;
+        // These are local coordinates; only the group carries the semantic focus.
+        if let Some(objects) = objects.as_deref_mut() {
+            for object in &mut objects[start..end] {
+                object.anchor = ObjectAnchor::Named([0.5; 4]);
+            }
+        } else {
+            for instruction in &mut instructions[start..end] {
+                instruction.at = Some(AtRegion { region: [0.5; 4] });
+            }
+        }
+        placement_groups.push(PlacementGroupPlan {
+            group_index,
+            placement: inku_score::PlacementGroup {
+                start,
+                end,
+                layout: match layout {
+                    crate::GroupLayout::Overlap => inku_score::GroupLayout::Overlap,
+                    crate::GroupLayout::HorizontalSourceOrder => {
+                        inku_score::GroupLayout::HorizontalSourceOrder
+                    }
+                },
+                at: AtRegion {
+                    region: crate::geometry::focus_region_bounds(focus),
+                },
+            },
+        });
+    }
     let stopped = diagnostics
         .iter()
         .any(|diagnostic| matches!(diagnostic.disposition, ScoreDiagnosticDisposition::Stopped));
@@ -2330,6 +2424,10 @@ fn lower_verified_stage15_shared<'a>(
         instructions,
         anchors: anchors.clone(),
         transform_groups: score_transform_groups,
+        placement_groups: placement_groups
+            .iter()
+            .map(|group| group.placement.clone())
+            .collect(),
     });
     if score.is_none() {
         instruction_origins.clear();
@@ -2351,6 +2449,7 @@ fn lower_verified_stage15_shared<'a>(
         instruction_origins,
         gaps,
         diagnostics,
+        placement_groups,
     }
 }
 

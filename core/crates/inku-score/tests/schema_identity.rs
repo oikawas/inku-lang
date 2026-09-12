@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "606a375126bb9051a486e5f79fc51e4355bb80ed4bd82a77dd012d8e0c54b5a8";
+    "17d4e41f096880c97a0c8b51d9684e265b745eaf7ce39c13c5ee55d512f6d51b";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -23,10 +23,21 @@ fn canonical_score_schema_identity_is_stable() {
         "presence",
         "instructions",
         "transform_groups",
+        "placement_groups",
     ] {
         assert!(
             properties.contains_key(required),
             "missing {required} property"
+        );
+    }
+
+    let placement_group = schema["$defs"]["PlacementGroup"]["properties"]
+        .as_object()
+        .expect("PlacementGroup properties must be an object");
+    for required in ["start", "end", "layout", "at"] {
+        assert!(
+            placement_group.contains_key(required),
+            "missing PlacementGroup property {required}"
         );
     }
 

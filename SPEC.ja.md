@@ -213,7 +213,7 @@ Anchorだけを含むTransformは、解決済みのAnchor全体の外接矩形�
 
 現行consumerの`transform`は回転、`scale_x` / `scale_y`、`translate_x` / `translate_y`を受け入れる。有限値だけを受け、負のscaleは反転、0は退化を表す。子図形のgeometryだけを、回転前の子図形全体の正確な外接矩形中心でscaleし、同じ中心で回転し、最後に平行移動する。translateはnormalized canvas軸の差分である。形状と間隔は変わるがstroke幅とgrain pitchは保つ。内側から外側へgeneral affineを合成し、配置が演奏時に決まる場合はその配置を確定してからbboxを求める。`group`は範囲・参照・ownerを運ぶ透明な構造であり、それ自体の配置・描画命令にはならない。
 
-transformはCount1のactual Scoreと反復symbolic planの両方へ配送する。Score 0.5.0の`transform_groups`は範囲、回転、scale、translate、数値固定memberの元instruction indexを保持する。旧Score 0.4.0の回転だけのgroup、保存済み0.1.0／0.2.0／0.3.0、versionなしartifactは従来互換を保つ。空のgroup listはwireへ出ず、`surface_intensity`はScore 0.3.0以後で有効である。反復planはsymbolicのままで個体を作らない。外部Connected、Touching / Along / Cutting、NotTouching / Betweenは、変形後の形・向き・namedまたは数値の配置authorityを保ったgroup全体の平行移動で成立を試みる。NotTouchingは既存gap、Betweenは先行二要素のbbox中心を使う既存recipeを保つ。不成立ならerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。数値固定member、旧Stop入力、owner・元index・seed・失われた参照の規則は保持する。Step11の個体materializationとStep13のruntime / UI / 保存全面接続は未完了である。
+transformはCount1のactual Scoreと反復symbolic planの両方へ配送する。Score 0.5.0の`transform_groups`は範囲、回転、scale、translate、数値固定memberの元instruction indexを保持する。旧Score 0.4.0の回転だけのgroup、保存済み0.1.0／0.2.0／0.3.0、versionなしartifactは従来互換を保つ。空のgroup listはwireへ出ず、`surface_intensity`はScore 0.3.0以後で有効である。反復planはsymbolicのままで個体を作らない。Score 0.7.0のdirect `placement_groups`は連続したsource順member範囲を一度だけ配置する。現行lowererの対応はprimitiveだけからなる「中央に置く」groupで、Macroを含む群・他のnamed位置・group単位の反復actionは未配送である。内部配置省略はbbox中心を揃える`overlap`、明示した「並べて置く」は`horizontal_source_order`、明示した「重ねて置く」は`overlap`である。group bbox中心をperformance seedで解決する一つのnamed regionへ移し、各memberのowner、count、seedと形を保つ。反復は個体化せずsymbolic planに残す。外部Connected、Touching / Along / Cutting、NotTouching / Betweenは、変形後の形・向き・namedまたは数値の配置authorityを保ったgroup全体の平行移動で成立を試みる。NotTouchingは既存gap、Betweenは先行二要素のbbox中心を使う既存recipeを保つ。不成立ならerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。数値固定member、旧Stop入力、owner・元index・seed・失われた参照の規則は保持する。Step11の個体materializationとStep13のruntime / UI / 保存全面接続は未完了である。
 
 Anchorは線の接続先に使う非描画の基準点であり、`place`または`position_x` / `position_y`の組で位置を明示する。Anchorの`place:center`は画面中央（0.5, 0.5）で、Emitのfocus依存配置から推測しない。その他のnamed位置は既存の位置領域を使う。Score 0.6.0の`anchors`は描画instructionと別に保持し、`target_anchor_index`でConnectedの接続先になる。元の参照・owner・描画順・seedを保ち、包含Transformの移動・拡縮・回転へ一緒に従う。数値位置の固定と旧Stop入力の互換を維持するが、recoverableなrelation失敗はerrorを記録してrelationだけを外し、描画を止めない。位置のないAnchorを前後の図形や呼出し位置から補完しない。保存済みScore 0.1.0〜0.5.0とversionなしartifactは従来互換を保つ。
 
@@ -739,7 +739,7 @@ coerce は記述と typed meaning に明示された内容を Score へ届ける
 
 無効値や解決不能な関係は、意味を推測して補わず、警告付きの drop、明示的な failure、または読み取り互換の経路として区別する。補修を品質の底上げや発火率の floor に使わず、同じ定型部品が現れる経路を作らない。
 
-Lock検証済みStage 1.5からactual Scoreへ下ろす共有境界は、作者が選ぶStopとOmitAndContinueの二modeだけを持つ。Stopは既定で、描画不能な意味が一つでもあればScoreを返さない。OmitAndContinueは元meaningを削らずexecution projectionだけを縮め、appearance field、source instruction、Macro Emit / subtree / invocation、Ground、coordinated group、relation instructionの実際の省略単位をsource / generated ownerとspan付き診断へ残す。全単位が省略された場合と、owner / focus joinまたはhost contextの整合性が壊れた場合は停止する。どちらのmodeもLLM、推測、clamp、index再圧縮によるrelation再解決を使わない。
+Lock検証済みStage 1.5からactual Scoreへ下ろす共有境界は、旧StopとOmitAndContinueの入力を受けるが、recoverableな意味エラーでは同じ局所回復を使う。元meaningを削らずexecution projectionだけを縮め、appearance field、source instruction、Macro Emit / subtree / invocation、Ground、coordinated group、relation instructionの実際の省略単位をsource / generated ownerとspan付き診断へ残す。recoverableなrelation失敗はerrorを記録してrelationだけを外し、描画可能なmemberとgroupを残す。全単位が省略された場合と、owner / focus joinまたはhost contextの整合性が壊れた場合は停止する。どの入力もLLM、推測、clamp、index再圧縮によるrelation再解決を使わない。
 
 
 ---
@@ -931,7 +931,7 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 原文、正規化 DDL、元の typed meaning、effective meaning、source / generated provenance を別々に保ち、元の意味や明示属性を上書きしない
 - 新しい sentence、entity、relation、technique、color、touch、primitive、content を発明しない
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
-- verified viewをactual Scoreへ下ろすときは、元のtyped instructionと同じindexを持つdirect `Instruction { instruction_index }` targetだけがそのinstructionを所有する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
+- verified viewをactual Scoreへ下ろすときは、direct `Instruction { instruction_index }`は元のtyped instructionと同じindexのinstructionだけを所有する。direct coordinated groupはその規則を変えず、別の`placement_groups`範囲としてmemberを配送する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
 - baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
 - 明示noncenter placeはfocus targetへ加えず、Stage 2が§18の領域へ解決する。隅の四候補選択も構図側の責務で、元meaningとattested optional seedおよび元logical occurrenceを使う。
 - 明示angleは元のtyped meaningのまま通し、center-only target集合や変奏軸へ追加しない。具体角度はStage 2が同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ

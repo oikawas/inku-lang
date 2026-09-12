@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v15";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v16";
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]

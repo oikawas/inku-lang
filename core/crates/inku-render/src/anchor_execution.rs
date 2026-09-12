@@ -324,6 +324,15 @@ impl Execution<'_> {
         if relation.target_anchor_index.is_some() && relation.kind != RelationType::Connected {
             return Err(ScoreExecutionReason::UnsupportedAnchorRelation);
         }
+        if self.request.score.placement_groups.iter().any(|group| {
+            group.start <= index
+                && index < group.end
+                && self.schedule.external_groups[index].is_none()
+        }) {
+            // Internal arrangement has priority. Check this relation against
+            // the completed local layout instead of moving a child beforehand.
+            return Ok(instruction);
+        }
         if relation.kind == RelationType::Connected {
             return self.prepare_connected(index, instruction);
         }
@@ -867,6 +876,9 @@ impl Execution<'_> {
     }
 
     fn perform_group(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
+        if index < self.request.score.placement_groups.len() {
+            return self.perform_placement(index);
+        }
         let group = &self.request.score.transform_groups[index];
         if (group.start..group.end)
             .any(|member| self.omitted[member] || self.performed[member].is_empty())
@@ -971,6 +983,81 @@ impl Execution<'_> {
         }
         Ok(())
     }
+
+    fn perform_placement(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
+        let group = &self.request.score.placement_groups[index];
+        let mut placed = None;
+        let width =
+            crate::geometry::point_to_short_side_units(Point::new(1.0, 1.0), self.request.canvas).x;
+        let step = width / (group.end - group.start) as f64;
+        for member in group.start..group.end {
+            let value = self.performed[member]
+                .last()
+                .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
+            let bounds = crate::affine_geometry::bounds(
+                &value.instruction,
+                self.request.performance_seed,
+                value.ordinal,
+                self.request.canvas,
+                value.seed_override,
+                self.transforms[member],
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
+            let center = bounds.center();
+            let target = Point::new(
+                match group.layout {
+                    inku_score::GroupLayout::Overlap => 0.0,
+                    inku_score::GroupLayout::HorizontalSourceOrder => {
+                        (member - group.start) as f64 * step
+                    }
+                },
+                0.0,
+            );
+            let delta = Point::new(target.x - center.x, target.y - center.y);
+            self.transforms[member] =
+                AffineTransform::translation(delta).compose(self.transforms[member]);
+            merge_bounds(
+                &mut placed,
+                Bounds {
+                    min: Point::new(bounds.min.x + delta.x, bounds.min.y + delta.y),
+                    max: Point::new(bounds.max.x + delta.x, bounds.max.y + delta.y),
+                },
+            );
+        }
+        let [x0, y0, x1, y1] =
+            crate::placement::region_in_short_side_units(group.at.region, self.request.canvas);
+        let seed = self.request.performance_seed.unwrap_or_default();
+        let target = Point::new(
+            x0 + (x1 - x0) * crate::determinism::hash01(index as i64, seed, "placement-group-x"),
+            y0 + (y1 - y0) * crate::determinism::hash01(index as i64, seed, "placement-group-y"),
+        );
+        let center = placed.expect("validated nonempty placement").center();
+        let translation =
+            AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
+        for member in group.start..group.end {
+            self.transforms[member] = translation.compose(self.transforms[member]);
+        }
+        for member in group.start..group.end {
+            if self.schedule.external_groups[member].is_none()
+                && self
+                    .prior(member)
+                    .is_some_and(|instruction| instruction.relation.is_some())
+            {
+                match self.external_constraint(member) {
+                    Ok(constraint) if constraint.accepts(Point::new(0.0, 0.0)) => {}
+                    Ok(_) => self.drop_relation(
+                        member,
+                        ScoreExecutionReason::ConflictingRelationConstraints,
+                    ),
+                    Err(reason) => self.drop_relation(member, reason),
+                }
+                for value in &mut self.performed[member] {
+                    value.instruction.relation = None;
+                }
+            }
+        }
+        self.correct_external_relations(index)
+    }
 }
 
 pub(super) fn resolve(
@@ -988,6 +1075,36 @@ pub(super) fn resolve(
             )],
         });
     }
+    // Placement and affine transforms have separate wire contracts, while their
+    // dependency scopes share the existing scheduler and relation recovery.
+    let original_score = request.score;
+    let scoped_score = if original_score.placement_groups.is_empty() {
+        std::borrow::Cow::Borrowed(original_score)
+    } else {
+        let mut scoped_score = original_score.clone();
+        let mut scopes = original_score
+            .placement_groups
+            .iter()
+            .map(|group| TransformGroup {
+                start: group.start,
+                end: group.end,
+                rotation_degrees: 0.0,
+                scale_x: 1.0,
+                scale_y: 1.0,
+                translate_x: 0.0,
+                translate_y: 0.0,
+                fixed_position_indices: Vec::new(),
+                anchor_indices: Vec::new(),
+            })
+            .collect::<Vec<_>>();
+        scopes.extend(scoped_score.transform_groups.iter().cloned());
+        scoped_score.transform_groups = scopes;
+        std::borrow::Cow::Owned(scoped_score)
+    };
+    let request = PerformanceRequest {
+        score: &scoped_score,
+        ..request
+    };
     let (expanded, owners) = expand_composite_groups_with_indices(
         request.score,
         request.composition_seed.or(request.performance_seed),
@@ -1144,8 +1261,9 @@ pub(super) fn resolve(
         .map(|(_, value)| value.instruction)
         .collect();
     score.transform_groups.clear();
+    score.placement_groups.clear();
     let summary = (!execution.diagnostics.is_empty()).then(|| ScoreExecutionSummary {
-        input_score_digest: canonical_score_digest(request.score)
+        input_score_digest: canonical_score_digest(original_score)
             .expect("typed Score canonicalization"),
         diagnostics: execution.diagnostics,
         rendered_instruction_indices: original_instruction_indices.clone(),

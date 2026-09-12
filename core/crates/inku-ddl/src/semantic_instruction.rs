@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v17";
+    "inku.semantic-instruction-association.v18";
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,6 +56,23 @@ pub struct SemanticGroupPredicateEdge {
     pub group_index: usize,
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
+    pub layout: GroupLayout,
+}
+
+/// Closed coordinated-placement layout, separate from member actions and positions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GroupLayout {
+    Overlap,
+    HorizontalSourceOrder,
+}
+
+impl GroupLayout {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Overlap => "overlap",
+            Self::HorizontalSourceOrder => "horizontal_source_order",
+        }
+    }
 }
 
 /// Stable fail-closed coordination ownership issue classes.
@@ -1175,12 +1192,84 @@ fn extract_group_predicates(
         if action.is_some() || position.is_some() {
             edges.push(SemanticGroupPredicateEdge {
                 group_index,
+                layout: group_layout(
+                    group_index,
+                    groups,
+                    association,
+                    action.as_ref(),
+                    position.as_ref(),
+                ),
                 action,
                 position,
             });
         }
     }
     (edges, issues)
+}
+
+fn group_layout(
+    group_index: usize,
+    groups: &[SemanticCoordinatedHeadGroup],
+    association: &SemanticAssociationResult,
+    action: Option<&SemanticTerm>,
+    position: Option<&SemanticTerm>,
+) -> GroupLayout {
+    let Some(action) = action else {
+        return GroupLayout::Overlap;
+    };
+    if action.identity.id != "place" {
+        return GroupLayout::Overlap;
+    }
+    let group = &groups[group_index];
+    let first = &association.ast.entities[group.member_instruction_indices[0]];
+    let last = &association.ast.entities[*group
+        .member_instruction_indices
+        .last()
+        .expect("coordinated group has members")];
+    let clause_index = first.head.source().clause_index;
+    if action.provenance.source.clause_index != clause_index
+        || position.is_some_and(|term| term.provenance.source.clause_index != clause_index)
+    {
+        return GroupLayout::Overlap;
+    }
+    let start_byte = first
+        .head
+        .source()
+        .span
+        .start_byte
+        .min(action.provenance.source.span.start_byte);
+    let end_byte = last
+        .head
+        .source()
+        .span
+        .end_byte
+        .max(action.provenance.source.span.end_byte)
+        .max(position.map_or(0, |term| term.provenance.source.span.end_byte));
+    association.clause_stream.clauses[clause_index]
+        .atoms
+        .iter()
+        .filter_map(|atom| match atom {
+            ClauseAtom::FunctionWord { surface, span, .. }
+                if start_byte <= span.start_byte
+                    && span.end_byte <= end_byte
+                    && crate::parser::is_group_layout_function_word(surface) =>
+            {
+                match surface.as_str() {
+                    "並べて" => Some(GroupLayout::HorizontalSourceOrder),
+                    "重ねて" => Some(GroupLayout::Overlap),
+                    value if value.eq_ignore_ascii_case("side by side") => {
+                        Some(GroupLayout::HorizontalSourceOrder)
+                    }
+                    value if value.eq_ignore_ascii_case("overlapping") => {
+                        Some(GroupLayout::Overlap)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        })
+        .next()
+        .unwrap_or(GroupLayout::Overlap)
 }
 
 fn extract_group_role(
@@ -1924,14 +2013,17 @@ fn japanese_predicate_segment_is_clear(
                     RemainingRoleKind::Motion | RemainingRoleKind::Place | RemainingRoleKind::Angle
                 )
             }
-            ClauseAtom::FunctionWord { span, .. } => matches!(
-                attachment_marker_at(association, clause_index, span.start_byte),
-                Some(AttachmentMarkerKind::Japanese(
-                    JapaneseAttachmentMarkerKind::Ni
-                        | JapaneseAttachmentMarkerKind::De
-                        | JapaneseAttachmentMarkerKind::He
-                ))
-            ),
+            ClauseAtom::FunctionWord { surface, span, .. } => {
+                crate::parser::is_group_layout_function_word(surface)
+                    || matches!(
+                        attachment_marker_at(association, clause_index, span.start_byte),
+                        Some(AttachmentMarkerKind::Japanese(
+                            JapaneseAttachmentMarkerKind::Ni
+                                | JapaneseAttachmentMarkerKind::De
+                                | JapaneseAttachmentMarkerKind::He
+                        ))
+                    )
+            }
             ClauseAtom::CoreRole(_)
             | ClauseAtom::SaijikiRelation { .. }
             | ClauseAtom::UnresolvedDiagnostic(_) => false,
@@ -2006,11 +2098,12 @@ fn english_entity_to_marker_gap_is_clear(
                 exact_decimal: Some(_),
                 ..
             } => true,
-            ClauseAtom::FunctionWord { span, .. } => {
-                association
-                    .clause_topology
-                    .determiner_starts
-                    .contains(&span.start_byte)
+            ClauseAtom::FunctionWord { surface, span, .. } => {
+                crate::parser::is_group_layout_function_word(surface)
+                    || association
+                        .clause_topology
+                        .determiner_starts
+                        .contains(&span.start_byte)
                     || (attachment_marker_at(association, clause_index, span.start_byte)
                         == Some(AttachmentMarkerKind::English(
                             EnglishAttachmentMarkerKind::With,
@@ -2286,6 +2379,10 @@ pub(crate) fn semantic_group_predicate_value(edge: &SemanticGroupPredicateEdge) 
             .unwrap_or(Value::Null),
     );
     record.insert("group".to_owned(), Value::from(edge.group_index as u64));
+    record.insert(
+        "layout".to_owned(),
+        Value::String(edge.layout.as_str().to_owned()),
+    );
     record.insert(
         "position".to_owned(),
         edge.position

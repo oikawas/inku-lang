@@ -141,7 +141,7 @@ fn cross_platform_fixture_fixes_closed_focus_order_and_known_answers() {
     let fixture = fixture();
     assert_eq!(
         STAGE15_TRANSFORMATION_SCHEMA_ID,
-        "inku.typed-stage15-transformation.v5"
+        "inku.typed-stage15-transformation.v6"
     );
     assert_eq!(
         STAGE15_FOCUS_SELECTION_DOMAIN,

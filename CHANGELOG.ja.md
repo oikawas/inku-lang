@@ -15,6 +15,14 @@
 
 ---
 
+### 2026-09-12 — Direct coordinated groupの内部配置
+
+通常DDLのprimitiveだけからなる「中央に置く」direct coordinated groupをScore 0.7.0 `placement_groups`へ届ける。内部配置省略はmemberのbbox中心を揃える`overlap`、「並べて置く」はsource順の`horizontal_source_order`、「重ねて置く」は`overlap`である。group bbox中心をperformance seedで一度だけ解決したnamed regionへ移し、memberのowner、count、seed、geometryを保つ。反復はsymbolic planのままとし、member arrangementや個体materializationをcarrierへ混ぜない。affine groupと重なる場合は配置範囲を包含する外側変換だけを許す。
+
+render engine 55、DDL engine 30、Score 0.7.0へ進める。APP_VERSION 2.14.2とBUILD_NUMBER 1073は変えない。typed runtime／UI／save全面接続とStep11 materializationは未完了である。
+
+---
+
 ### 2026-09-12 — NotTouching／Betweenのchecked relation配送
 
 通常DDLとMacroのNotTouching／Betweenを同じchecked lowerer、symbolic plan、rendererへ届ける。NotTouchingは既存のgapを、Betweenはcurrent直前の要素とさらに一つ前の要素のbbox中心を使う既存recipeを保つ。named／noncenter位置は可動、数値位置はfixedのauthorityを保つ。MacroのBetweenは`from`を直前Emitとし、その一つ前を第二参照として両方のownerを保つ。参照が省略・消失した場合や制約が両立しない場合はerrorを記録してrelationだけを外し、図形・まとまり・元配置・順序・seedを残す。

@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
-pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v5";
+pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v6";
 /// Framed hash domain for source-independent baseline focus selection.
 pub const STAGE15_FOCUS_SELECTION_DOMAIN: &[u8] = b"inku.typed-stage15-focus-selection.v1";
 

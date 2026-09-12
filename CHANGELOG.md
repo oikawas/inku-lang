@@ -15,6 +15,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ---
 
+### 2026-09-12 — Internal placement for direct coordinated groups
+
+Primitive-only direct coordinated groups with `place:center` reach Score 0.7.0 `placement_groups`. Omitted internal placement is `overlap`, aligning member bounding-box centers; “place in a row” is source-order `horizontal_source_order`; “overlap” is `overlap`. The group bounding-box center moves to one named region resolved once from the performance seed while retaining member owners, counts, seeds, and geometry. Repetition stays symbolic, without mixing member arrangements or instance materialization into the carrier. When an affine group overlaps, only an outer transform that contains the full placement range is allowed.
+
+Render engine advances to 55, DDL engine to 30, and Score to 0.7.0. APP_VERSION 2.14.2 and BUILD_NUMBER 1073 do not change. Full typed runtime, UI, and save integration and Step11 materialization remain unfinished.
+
+---
+
 ### 2026-09-12 — Checked relation delivery for NotTouching and Between
 
 Ordinary DDL and Macros deliver NotTouching and Between through the same checked lowerer, symbolic plan, and renderer. NotTouching retains the existing gap. Between retains the existing recipe using the bounding-box centers of the current element's immediately preceding element and the one before it. Named or noncenter placement is movable, while numeric placement retains fixed authority. Macro Between uses the immediately preceding Emit as `from` and retains the one before it as its second reference, preserving both owners. If a reference is omitted or missing, or constraints cannot coexist, an error removes only the relation and retains shapes, groups, original placement, order, and seeds.

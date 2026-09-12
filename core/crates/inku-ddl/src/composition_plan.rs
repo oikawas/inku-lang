@@ -21,6 +21,21 @@ pub enum PlacementAction {
     Scatter,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacementGroupPlan {
+    pub(crate) group_index: usize,
+    pub(crate) placement: inku_score::PlacementGroup,
+}
+
+impl PlacementGroupPlan {
+    pub const fn group_index(&self) -> usize {
+        self.group_index
+    }
+    pub const fn placement(&self) -> &inku_score::PlacementGroup {
+        &self.placement
+    }
+}
+
 /// A deferred Macro rotation over the half-open object range it owns.
 ///
 /// The renderer materializes members and resolves named placement before it computes this
@@ -300,6 +315,7 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) anchors: Vec<AnchorPoint>,
     pub(crate) anchor_origins: Vec<ScoreAnchorOrigin>,
     pub(crate) transform_groups: Vec<TransformGroupPlan>,
+    pub(crate) placement_groups: Vec<PlacementGroupPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
 }
@@ -328,6 +344,9 @@ impl<'a> CompositionPlanResult<'a> {
     }
     pub fn transform_groups(&self) -> &[TransformGroupPlan] {
         &self.transform_groups
+    }
+    pub fn placement_groups(&self) -> &[PlacementGroupPlan] {
+        &self.placement_groups
     }
     pub fn anchors(&self) -> &[AnchorPoint] {
         &self.anchors

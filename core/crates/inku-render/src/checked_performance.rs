@@ -550,6 +550,7 @@ pub fn resolve_checked_performance(
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     let needs_checked_execution = !request.score.anchors.is_empty()
+        || !request.score.placement_groups.is_empty()
         || !request.score.transform_groups.is_empty()
         || request.score.instructions.iter().any(|instruction| {
             instruction.relation.as_ref().is_some_and(|relation| {

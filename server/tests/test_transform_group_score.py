@@ -34,6 +34,49 @@ def test_old_and_transform_group_scores_roundtrip_without_dropping_metadata() ->
     ]
 
 
+def test_placement_groups_roundtrip_and_require_disjoint_source_order() -> None:
+    score = Score.model_validate(
+        {
+            "version": "0.7.0",
+            "instructions": [{"primitive": "circle"}, {"primitive": "square"}],
+            "placement_groups": [
+                {
+                    "start": 0,
+                    "end": 2,
+                    "layout": "overlap",
+                    "at": {"region": [0.4, 0.4, 0.6, 0.6]},
+                }
+            ],
+        }
+    )
+    assert score.model_dump(mode="json", exclude_none=True)["placement_groups"][0]["layout"] == "overlap"
+    with pytest.raises(ValidationError, match="requires Score version 0.7.0"):
+        Score.model_validate(
+            {
+                "version": "0.6.0",
+                "instructions": [{"primitive": "circle"}],
+                "placement_groups": [{"start": 0, "end": 1, "layout": "overlap", "at": {"region": [0, 0, 1, 1]}}],
+            }
+        )
+    with pytest.raises(ValidationError, match="members cannot carry arrangements"):
+        Score.model_validate(
+            {
+                "version": "0.7.0",
+                "instructions": [{"primitive": "circle", "arrangement": {"count": 2}}],
+                "placement_groups": [{"start": 0, "end": 1, "layout": "overlap", "at": {"region": [0, 0, 1, 1]}}],
+            }
+        )
+    with pytest.raises(ValidationError, match="must contain an overlapping placement group"):
+        Score.model_validate(
+            {
+                "version": "0.7.0",
+                "instructions": [{"primitive": "circle"}, {"primitive": "square"}],
+                "transform_groups": [{"start": 0, "end": 1, "rotation_degrees": 0}],
+                "placement_groups": [{"start": 0, "end": 2, "layout": "overlap", "at": {"region": [0, 0, 1, 1]}}],
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "groups",
     [

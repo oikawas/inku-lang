@@ -671,10 +671,10 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v6"
+        "inku.neutral-lexeme-parser.v7"
     );
-    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v6");
-    assert_eq!(fixture.version, 6);
+    assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v7");
+    assert_eq!(fixture.version, 7);
     assert_eq!(fixture.cases.len(), 32);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 

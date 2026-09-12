@@ -68,4 +68,19 @@ class ServerScoreCompatTest {
         assertEquals(0, migrated.getJSONArray("transform_groups").getJSONObject(0)
             .getJSONArray("anchor_indices").getInt(0))
     }
+
+    @Test
+    fun placementGroupsSurviveScoreMigrationForSaveAndReplay() {
+        val score = JSONObject(
+            """{"version":"0.7.0","instructions":[{"primitive":"circle"},{"primitive":"square"}],
+                "placement_groups":[{"start":0,"end":2,"layout":"horizontal_source_order",
+                "at":{"region":[0.4,0.4,0.6,0.6]}}]}""",
+        )
+
+        val migrated = ServerScoreCompat.migrateScore(score)
+
+        val group = migrated.getJSONArray("placement_groups").getJSONObject(0)
+        assertEquals("horizontal_source_order", group.getString("layout"))
+        assertEquals(0.4, group.getJSONObject("at").getJSONArray("region").getDouble(0), 0.0)
+    }
 }

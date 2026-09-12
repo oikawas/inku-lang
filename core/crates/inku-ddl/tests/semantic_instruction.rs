@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use inku_ddl::{
-    ClauseAtom, ClauseSeparatorKind, ClauseStream, MacroDefinition, MacroLock,
+    ClauseAtom, ClauseSeparatorKind, ClauseStream, GroupLayout, MacroDefinition, MacroLock,
     NormalizedDdlDocument, RemainingRoleKind, ResolvedInstructionLanguage,
     SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
     SemanticHead, SemanticInstructionAssociationResult, SemanticIssueCausalProvenance,
@@ -676,13 +676,13 @@ fn fixture_schema_and_required_instruction_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v17"
+        "inku.semantic-instruction-association.v18"
     );
     assert_eq!(
         fixture.schema,
-        "inku.semantic-instruction-association-fixture.v17"
+        "inku.semantic-instruction-association-fixture.v18"
     );
-    assert_eq!(fixture.version, 17);
+    assert_eq!(fixture.version, 18);
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
 
     let ids = fixture
@@ -1386,6 +1386,7 @@ fn coordinated_heads_have_one_shared_predicate_owner() {
             Some("center"),
             "{source}"
         );
+        assert_eq!(edge.layout, GroupLayout::Overlap, "{source}");
         assert_eq!(result.owned_instruction_occurrence_count, 2, "{source}");
         assert_eq!(result.delivered_instruction_occurrence_count, 2, "{source}");
         assert_eq!(result.owned_coordination_marker_count, 1, "{source}");
@@ -1393,6 +1394,96 @@ fn coordinated_heads_have_one_shared_predicate_owner() {
         canonical.push(result.canonical_bytes.expect("group result is complete"));
     }
     assert_eq!(canonical[0], canonical[1]);
+}
+
+#[test]
+fn coordinated_place_layout_is_explicit_and_source_ordered() {
+    let cases = [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "赤い円と青い四角を中央に置く。",
+            GroupLayout::Overlap,
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "赤い円と青い四角を中央に重ねて置く。",
+            GroupLayout::Overlap,
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "赤い円と青い四角を中央に並べて置く。",
+            GroupLayout::HorizontalSourceOrder,
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a red circle and a blue square at the center.",
+            GroupLayout::Overlap,
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a red circle and a blue square overlapping at the center.",
+            GroupLayout::Overlap,
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "place a red circle and a blue square side by side at the center.",
+            GroupLayout::HorizontalSourceOrder,
+        ),
+    ];
+    let mut canonical = Vec::new();
+    for (language, source, layout) in cases {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = associate_semantic_instructions(&document).unwrap();
+        assert!(result.ast.complete, "{source}: {:?}", result.issues);
+        assert!(result.coordination_issues.is_empty(), "{source}");
+        let [edge] = result.ast.group_predicates.as_slice() else {
+            panic!("{source}: one coordinated placement edge is required");
+        };
+        assert_eq!(edge.layout, layout, "{source}");
+        assert_eq!(
+            edge.action.as_ref().map(|term| term.identity.id.as_str()),
+            Some("place"),
+            "{source}"
+        );
+        assert_eq!(
+            edge.position.as_ref().map(|term| term.identity.id.as_str()),
+            Some("center"),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.coordinated_head_groups[0].member_instruction_indices,
+            [0, 1],
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[0]
+                .entity
+                .color
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("red"),
+            "{source}"
+        );
+        assert_eq!(
+            result.ast.instructions[1]
+                .entity
+                .color
+                .as_ref()
+                .map(|term| term.identity.id.as_str()),
+            Some("blue"),
+            "{source}"
+        );
+        canonical.push(
+            result
+                .canonical_bytes
+                .expect("complete coordinated placement"),
+        );
+    }
+    assert_eq!(canonical[0], canonical[1]);
+    assert_eq!(canonical[0], canonical[3]);
+    assert_eq!(canonical[1], canonical[4]);
+    assert_eq!(canonical[2], canonical[5]);
+    assert_ne!(canonical[0], canonical[2]);
 }
 
 #[test]
@@ -1763,7 +1854,7 @@ fn macro_head_retains_unbound_action_position_and_mixed_relation_order() {
     .unwrap();
     assert_eq!(
         canonical["schema"],
-        "inku.semantic-instruction-association.v17"
+        "inku.semantic-instruction-association.v18"
     );
     assert_eq!(
         canonical["instructions"][1]["entity"]["head"]["kind"],

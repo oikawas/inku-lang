@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v6";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v7";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -182,6 +182,8 @@ pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
 const FUNCTION_WORDS_EN: &[&str] = &[
     "a", "an", "the", "with", "in", "at", "on", "to", "of", "and",
 ];
+const GROUP_LAYOUT_FUNCTION_WORDS_JA: &[&str] = &["重ねて", "並べて"];
+const GROUP_LAYOUT_FUNCTION_WORDS_EN: &[&str] = &["overlapping", "side by side"];
 const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
     ("ひとつ", 1),
     ("ふたつ", 2),
@@ -532,6 +534,36 @@ fn candidates_at(
     let mut candidates = Vec::new();
     let asset = saijiki_asset();
 
+    match language {
+        ResolvedInstructionLanguage::Ja => {
+            for surface in GROUP_LAYOUT_FUNCTION_WORDS_JA {
+                push_japanese_function_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    require_boundary,
+                    surface,
+                    format!("function:group_layout:{surface}"),
+                );
+            }
+        }
+        ResolvedInstructionLanguage::En => {
+            for surface in GROUP_LAYOUT_FUNCTION_WORDS_EN {
+                push_surface_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    language,
+                    require_boundary,
+                    surface,
+                    PRIORITY_FUNCTION,
+                    format!("function:group_layout:{surface}"),
+                    CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+                );
+            }
+        }
+    }
+
     let shape_heads = match language {
         ResolvedInstructionLanguage::Ja => crate::shape_constraint::SHAPE_HEADS_JA,
         ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
@@ -867,6 +899,13 @@ fn candidates_at(
     }
 
     candidates
+}
+
+pub(crate) fn is_group_layout_function_word(surface: &str) -> bool {
+    GROUP_LAYOUT_FUNCTION_WORDS_JA.contains(&surface)
+        || GROUP_LAYOUT_FUNCTION_WORDS_EN
+            .iter()
+            .any(|candidate| surface.eq_ignore_ascii_case(candidate))
 }
 
 fn geometry_keyword_at(

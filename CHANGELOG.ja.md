@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 30 版である。それより前は書庫にある。
 
+### 2026-09-13 — symbolic planでchecked relationを保持
+
+反復Direct planはchecked済みのConnected、Touching、Along、Cuttingを元targetと位置authorityのまま保持する。Macro relationもDirectと同じnumeric-fixed／named-movable authorityを使うため、明示数値座標は固定のままであり、旧center-onlyの受入制限は適用しない。Macro配置memberも、先行drawableの後にAnchor-only Transform memberが続くとき、そのAnchorを含むvalidな範囲を保つ。
+
+決定的なDDL解釈が変わるためDDL engineを33→34へ進める。Score wireとrendererの挙動は変わらないため、Score 0.9.0とrender engine 57を維持する。Step11の個体materializationとStep13のruntime / UI / 保存cutoverは未完了である。APP_VERSION 2.14.2とBUILD_NUMBER 1073は変更しない。
+
 | 書庫 | 範囲 | 版数 | 中身 |
 |---|---|---|---|
 | [v0.1 〜 v1.71](docs/history/changelog-v0.1-v1.71.ja.md) | 2026-04-02 〜 2026-05 | 73 | 着想から Stage 1.5 の整備まで。**「起源」もここ** |

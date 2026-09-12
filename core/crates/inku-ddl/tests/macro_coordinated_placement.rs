@@ -57,6 +57,310 @@ fn context() -> ScoreLoweringContext {
     ScoreLoweringContext::resolve("square", Color::White).unwrap()
 }
 
+fn relation_body(kind: &str, numeric: bool, constrained: bool, count: u32) -> MacroDefinition {
+    let mut first = emit("line", "red", "0.2", 1);
+    let mut second = emit("line", "blue", "0.7", count);
+    first["binding"] = json!("first");
+    second["binding"] = json!("second");
+    first["fields"]["position_y"]["value"] = json!("0.3");
+    second["fields"]["position_y"]["value"] = json!("0.7");
+    if !numeric {
+        for node in [&mut first, &mut second] {
+            let fields = node["fields"].as_object_mut().unwrap();
+            fields.remove("position_x");
+            fields.remove("position_y");
+            fields.insert(
+                "place".to_owned(),
+                json!({"expr":"semantic_ref","category":"place","id":"top"}),
+            );
+        }
+    }
+    if constrained {
+        second["fields"]["length"] = json!({"expr":"exact_decimal","value":"0.2"});
+        second["fields"]["angle"] =
+            json!({"expr":"semantic_ref","category":"angle","id":"vertical"});
+    }
+    definition(json!([first, second, {"op":"relation","kind":kind,"from":"first","to":"second"}]))
+}
+
+#[test]
+fn checked_relation_delivery_preserves_direct_macro_score_and_symbolic_meaning() {
+    use inku_score::{ConnectedPositionAuthority, RelationType, TouchingConstraints};
+    // Each case exercises a distinct consumer rule, without a position/count matrix.
+    for (kind, phrase, numeric, constrained, expected) in [
+        (
+            "connected",
+            "connected to the previous shape",
+            false,
+            false,
+            RelationType::Connected,
+        ),
+        (
+            "touching",
+            "touching the previous line",
+            true,
+            true,
+            RelationType::Touching,
+        ),
+        (
+            "along",
+            "along the previous line",
+            true,
+            true,
+            RelationType::Along,
+        ),
+        (
+            "cutting",
+            "cutting the previous line",
+            false,
+            false,
+            RelationType::Cutting,
+        ),
+    ] {
+        let shape = if constrained {
+            "vertical line of length 0.2"
+        } else {
+            "line"
+        };
+        let (first_position, second_position) = if numeric {
+            (
+                "horizontal 0.2, vertical 0.3",
+                "horizontal 0.7, vertical 0.7",
+            )
+        } else {
+            ("top", "top")
+        };
+        let source = |count| {
+            format!(
+                "place one red line at {first_position}. place {count} blue {shape} at {second_position} {phrase}."
+            )
+        };
+        let single_body = relation_body(kind, numeric, constrained, 1);
+        let direct_stage = stage(&source(1), &single_body);
+        let macro_stage = stage("Draw.Pair", &single_body);
+        let direct =
+            lower_verified_stage15_score(direct_stage.verified_effective_view(), context());
+        let generated =
+            lower_verified_stage15_score(macro_stage.verified_effective_view(), context());
+        assert!(
+            direct.diagnostics().is_empty(),
+            "{kind}: {:?}",
+            direct.diagnostics()
+        );
+        assert!(
+            generated.diagnostics().is_empty(),
+            "{kind}: {:?}",
+            generated.diagnostics()
+        );
+        let a = &direct.score().unwrap().instructions[1];
+        let b = &generated.score().unwrap().instructions[1];
+        assert_eq!(a.relation, b.relation, "{kind}");
+        assert_eq!(a.rotation, b.rotation);
+        if numeric {
+            assert_eq!((a.from_, a.to), (b.from_, b.to));
+        }
+        let relation = a.relation.as_ref().unwrap();
+        assert_eq!(relation.kind, expected);
+        assert_eq!(relation.target_instruction_index, Some(0));
+        assert_eq!(
+            relation.position_authority,
+            Some(if numeric {
+                ConnectedPositionAuthority::NumericFixed
+            } else {
+                ConnectedPositionAuthority::NamedMovable
+            })
+        );
+        if kind == "touching" {
+            assert_eq!(
+                relation.touching_constraints,
+                Some(TouchingConstraints {
+                    dimensions_fixed: true,
+                    direction_fixed: true
+                })
+            );
+        }
+        let repeated_body = relation_body(kind, numeric, constrained, 2);
+        let repeated_direct = stage(&source(2), &repeated_body);
+        let repeated_macro = stage("Draw.Pair", &repeated_body);
+        let mut plans = Vec::new();
+        for transformed in [
+            &direct_stage,
+            &macro_stage,
+            &repeated_direct,
+            &repeated_macro,
+        ] {
+            let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+            assert!(
+                plan.diagnostics().is_empty(),
+                "{kind}: {:?}",
+                plan.diagnostics()
+            );
+            let objects = plan.objects().unwrap();
+            assert_eq!(objects.len(), 2);
+            let intent = objects[1].relation().unwrap();
+            assert_eq!(intent.kind(), relation.kind);
+            assert_eq!(
+                intent.target_object_index(),
+                relation.target_instruction_index
+            );
+            assert_eq!(intent.position_authority(), relation.position_authority);
+            assert_eq!(intent.touching_constraints(), relation.touching_constraints);
+            assert_eq!(objects[1].angle(), a.rotation);
+            plans.push(plan);
+        }
+        assert_eq!(plans[0].objects().unwrap()[1].count(), 1);
+        assert_eq!(plans[2].objects().unwrap()[1].count(), 2);
+        assert_eq!(plans[3].objects().unwrap()[1].count(), 2);
+        assert_eq!(
+            plans[2].objects().unwrap()[1].dimensions(),
+            plans[3].objects().unwrap()[1].dimensions()
+        );
+        assert_eq!(
+            plans[0].objects().unwrap()[1].dimensions(),
+            plans[2].objects().unwrap()[1].dimensions()
+        );
+    }
+    let mut omitted = emit("line", "blue", "0.5", 0);
+    omitted["binding"] = json!("missing");
+    let mut survivor = emit("line", "green", "0.7", 2);
+    survivor["binding"] = json!("survivor");
+    let body = definition(json!([emit("line", "red", "0.2", 1), omitted, survivor,
+        {"op":"relation","kind":"connected","from":"missing","to":"survivor"}]));
+    for source in [
+        "Draw.Pair",
+        "place one red line at center. place 0 blue line at center. place 2 green line at center connected to the previous shape.",
+    ] {
+        let transformed = stage(source, &body);
+        let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+        let objects = plan.objects().unwrap();
+        assert_eq!(objects.len(), 2);
+        assert_eq!(objects[1].count(), 2);
+        assert!(objects[1].relation().is_none());
+        assert!(plan.diagnostics().iter().any(|diagnostic| matches!(
+            diagnostic.disposition,
+            ScoreDiagnosticDisposition::RelationOmitted
+        )));
+        if source == "Draw.Pair" {
+            assert!(matches!(
+                objects[1].origin(),
+                ScoreInstructionOrigin::MacroEmit {
+                    source_instruction_index: 0,
+                    binding: Some(_),
+                    ..
+                }
+            ));
+        } else {
+            assert!(matches!(
+                objects[1].origin(),
+                ScoreInstructionOrigin::SourceInstruction {
+                    instruction_index: 2
+                }
+            ));
+        }
+    }
+}
+
+fn anchor_only_transform_body() -> MacroDefinition {
+    definition(
+        json!([{"op":"transform","transform":{"rotate_degrees":{"expr":"number","value":90.0}},"body":[
+            {"op":"anchor","name":"pivot","fields":{"position_x":{"expr":"exact_decimal","value":"0.2"},"position_y":{"expr":"exact_decimal","value":"0.5"}}}
+        ]}]),
+    )
+}
+
+#[test]
+fn checked_relation_delivery_anchor_member_uses_source_body_cursor() {
+    let body = anchor_only_transform_body();
+    let transformed = stage("arrange one green circle and Draw.Pair at center.", &body);
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context());
+    assert!(lowered.diagnostics().is_empty());
+    assert!(plan.diagnostics().is_empty());
+    let score = lowered.score().unwrap();
+    assert!(score.validate_transform_groups().is_ok());
+    let member = &score.placement_groups[0].members[1];
+    assert_eq!((member.start, member.end), (1, 1));
+    assert_eq!(member.anchor_indices, [0]);
+    assert_eq!(member.transform_group_indices, [0]);
+    assert_eq!(
+        (
+            score.transform_groups[0].start,
+            score.transform_groups[0].end
+        ),
+        (1, 1)
+    );
+    assert_eq!(plan.placement_groups()[0].members()[1].member(), member);
+    let transform = &plan.transform_groups()[0];
+    assert_eq!((transform.start(), transform.end()), (1, 1));
+    assert_eq!(transform.anchor_indices(), [0]);
+    // The unchanged validator still rejects the original malformed containment.
+    let mut invalid = score.clone();
+    invalid.transform_groups[0].start = 0;
+    invalid.transform_groups[0].end = 0;
+    assert!(invalid.validate_transform_groups().is_err());
+}
+
+#[test]
+fn checked_relation_numeric_recovery_and_anchor_member_reach_native_performer() {
+    use inku_render::{
+        checked_performance::resolve_checked_performance, performance::PerformanceRequest,
+    };
+    use inku_score::{ScoreExecutionDisposition, ScoreExecutionReason};
+    let resolve = |score: &Score| {
+        resolve_checked_performance(
+            PerformanceRequest {
+                score,
+                performance_seed: Some(71),
+                composition_seed: Some(19),
+                canvas: None,
+            },
+            inku_score::ScoreErrorPolicy::Stop,
+        )
+        .unwrap()
+    };
+    let body = relation_body("along", true, false, 1);
+    let transformed = stage("Draw.Pair", &body);
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
+    assert!(lowered.diagnostics().is_empty());
+    let score = lowered.score().unwrap();
+    let mut baseline = score.clone();
+    baseline.instructions[1].relation = None;
+    let before = resolve(&baseline);
+    let after = resolve(score);
+    assert_eq!(after.score.instructions.len(), 2);
+    assert_eq!(after.score.instructions, before.score.instructions);
+    assert_eq!(after.instruction_transforms, before.instruction_transforms);
+    assert_eq!(
+        after.original_instruction_indices,
+        before.original_instruction_indices
+    );
+    assert_eq!(
+        after.instruction_seed_overrides,
+        before.instruction_seed_overrides
+    );
+    let diagnostics = &after.execution.as_ref().unwrap().diagnostics;
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].instruction_index, 1);
+    assert_eq!(
+        diagnostics[0].reason,
+        ScoreExecutionReason::NumericAlongPositionConflict
+    );
+    assert_eq!(
+        diagnostics[0].disposition,
+        ScoreExecutionDisposition::RelationOmitted
+    );
+
+    let body = anchor_only_transform_body();
+    let transformed = stage("arrange one green circle and Draw.Pair at center.", &body);
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context());
+    let score = lowered.score().unwrap();
+    assert!(score.validate_transform_groups().is_ok());
+    let performed = resolve(score);
+    assert!(performed.execution.is_none(), "{:?}", performed.execution);
+    assert_eq!(performed.score.instructions.len(), 1);
+    assert_eq!(performed.score.anchors.len(), 1);
+}
+
 #[test]
 fn macro_members_preserve_complete_bodies_and_source_quantity_authority() {
     let single = definition(json!([emit("circle", "red", "0.5", 1)]));

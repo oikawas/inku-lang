@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 30 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-13 — Preserve checked relations in symbolic plans
+
+Repeated Direct plans now keep checked Connected, Touching, Along, and Cutting with their original target and position authority. Macro relations use the same numeric-fixed versus named-movable authority as Direct, so explicit numeric coordinates remain fixed; the former center-only admission does not apply. Macro placement members also keep a valid range containing an Anchor-only Transform after an earlier drawable member.
+
+DDL engine advances 33→34 because deterministic DDL interpretation changes. Score remains 0.9.0 and render engine remains 57: no Score wire or renderer behavior changes. Step11 instance materialization and Step13 runtime / UI / persistence cutover remain incomplete. APP_VERSION 2.14.2 and BUILD_NUMBER 1073 are unchanged.
+
 | Archive | Range | Entries | Contents |
 |---|---|---|---|
 | [v1.72 through v2.4](docs/history/changelog-v1.72-v2.4.md) | 2026-07 | 44 | from the refine-and-compare UI to freezing the reference corpora |

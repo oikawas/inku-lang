@@ -104,8 +104,8 @@ document Ground. A verified document-owned Ground reaches the same lowerer as a
 `CanvasGroundSpec` with the host-resolved aspect. Omitted drawing attributes and
 normal count-one geometry use the same defaults as ordinary DDL.
 
-An explicit `connected` or `touching` relation may join only two adjacent bound Emits in
-the same expansion, with exact center placement on both Emits. It preserves Emit order and generated ownership and uses
+An explicit `connected` or `touching` relation may join two adjacent bound Emits in
+the same expansion. It preserves Emit order, generated ownership, and the same named-movable or numeric-fixed position authority as ordinary DDL, and uses
 the same checked Score performer as ordinary DDL. A missing, nonadjacent, or
 omitted `from` records an error and removes only the relation; it never
 retargets to the last surviving Emit. Touching accepts Line / Arc, matches both endpoints,
@@ -119,7 +119,7 @@ before it; its `from` is that preceding Emit, and both reference owners remain i
 Adjacency includes every original Emit, including unbound Emits. An omitted from or either
 Between reference never retargets to a survivor. Relations inside placement-free Groups use the same rules. Unsupported
 subtrees are not traversed and cannot be crossed to create adjacency. `along` / `cutting`
-also accept adjacent bound Line Emits through the shared checked performer. Along
+also accept adjacent bound Line Emits through the shared checked performer with that same position authority. Along
 aligns an unspecified direction parallel to the preceding line; Cutting retains
 the resolved length. Explicit direction, dimensions, and numeric position remain
 authoritative. Unsupported pairs or incompatible constraints record an error and
@@ -248,9 +248,9 @@ system/user plugin directories, and plugin status or enable controls are
 compatibility surfaces while retirement remains unfinished. They are not an
 authoring or loading API for vocabulary macros.
 
-Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate, and standalone repeated-Macro count delivery remains incomplete.
+Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate. A standalone Macro also retains its outer repetitions symbolically; instance materialization belongs to Step11.
 
-Member `transform_group_indices` retains source-owned internal transforms before placement; unlisted equal-range transforms remain outer and run afterward.
+Member `transform_group_indices` retains source-owned internal transforms before placement. Their valid member range contains their Anchors even when an Anchor-only transformed member follows an earlier drawable member; unlisted equal-range transforms remain outer and run afterward.
 
 `CompositionPlanResult.standalone_macro_repetitions` retains the existing body positions, range, Anchors, internal transforms, and source-head repeat count symbolically; it creates no outer placement or actual Score instances.
 

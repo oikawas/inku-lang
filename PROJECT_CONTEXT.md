@@ -104,8 +104,8 @@ background-contrast color, into an actual Score. Existing fill behavior for `non
 remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
 Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
 material numeric defaults or seeds. Line owns exact length, arc owns exact chord and sagitta, and point owns exact
-radius or diameter. For ordinary source-owned direct primitives, the checked lowerer carries NotTouching and Between,
-and the Line / Arc / Point endpoint family carries Connected, into the existing Score
+radius or diameter. For ordinary source-owned direct primitives, the checked lowerer carries NotTouching, Between,
+Connected, Touching, Along, and Cutting into the existing Score and symbolic plans without changing the verified target or position authority.
 relation with its Medium gap. NotTouching retains the existing gap, and Between retains the existing recipe based on the bounding-box centers of the two immediately preceding elements; named or noncenter placement is movable while numeric placement remains fixed authority. References survive only when the direct instructions named by typed previous-one/two
 each produce one instruction and remain the current instruction's actual immediate source origins in original order. For Between, the immediately preceding instruction is the first reference and the one before it is the second, with both owners retained.
 A missing referent records an error and removes only its dependent relation; it does not retarget or omit the dependent current.
@@ -119,7 +119,7 @@ shares existing Arc reconstruction. Explicit dimensions, relative scale (includi
 omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure records an error and removes only the relation while
 preserving original transformed placement, dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
 Engine49 also delivers typed Along / Cutting between adjacent count-one Lines through the shared checked performer.
-Repeated plans retain checked relation intent as `PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`.
+Repeated Direct and Macro plans retain checked relation intent as `PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`, including Connected / Touching / Along / Cutting with their original target and authority.
 Along aligns only an unspecified direction; Cutting keeps the resolved length. Explicit direction, dimensions,
 and numeric position remain authoritative. Incompatible constraints or missing references record an error and remove only the
 relation, while metadata-free legacy Scores remain compatible. Whole Step 10 and typed
@@ -201,6 +201,10 @@ public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover 
 compilation. Reaching Step10P does not complete Step10 as a whole. Product UI, API, and persistence
 do not yet select this mode, and legacy coerce / LLM fallback
 has not been replaced by it.
+
+Score 0.9 retains a Macro body atomically in `placement_groups.members`, using ordered contiguous drawable ranges and Anchor indices. Group-head count and internal Emit count remain distinct, and repetitions stay symbolic. Internal transforms listed by `transform_group_indices` run before placement; unlisted equal-range transforms are outer and run afterward. Internal transforms of an Anchor-only member record its empty drawable range, including when an earlier drawable precedes it.
+
+`CompositionPlanResult.standalone_macro_repetitions` preserves existing body positions, ranges, Anchors, internal transforms, and source-head repetition counts. Instance materialization and runtime / UI / save integration remain later work.
 
 ## Contracts That Must Remain Intact
 
@@ -594,14 +598,6 @@ When the application generation changes, also update the Web `APP_VERSION`.
 - **Do not stack per-version paragraphs in "Current Product State".**
 The changelog holds what each version did, so this document keeps present-tense statements and
 rewrites the parts that changed.
-Score 0.9 retains a Macro body atomically in `placement_groups.members`: ordered contiguous drawable ranges with their Anchor indices. It preserves the distinction between group-head count and internal Emit count; repetitions stay symbolic, and no standalone repeated-Macro count delivery, instance materialization, or runtime cutover is claimed.
-
-Score 0.9 retains a Macro body atomically in `placement_groups.members`: ordered contiguous drawable ranges with their Anchor indices. It preserves the distinction between group-head count and internal Emit count; repetitions stay symbolic, and no standalone repeated-Macro count delivery, instance materialization, or runtime cutover is claimed.
-
-Member `transform_group_indices` preserves source-owned internal transforms before placement; unlisted equal-range transforms remain outer and run afterward.
-
-`CompositionPlanResult.standalone_macro_repetitions` keeps the existing body positions, range, Anchors, internal transforms, and source-head repeat count as a symbolic plan. It adds neither outer placement nor actual Score instances.
-
 Appending a paragraph at every release turns this file into a second changelog and it stops working
 as an entry point.
 - **Do not record unresolved issues or undecided questions here.**

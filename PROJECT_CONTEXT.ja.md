@@ -167,6 +167,10 @@ Unspecified placement、finite subset外のMacro delivery、action省略、repea
 Step10全体の完了を意味しない。製品UI / API / 保存経路は
 まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
 
+Score 0.9はMacro bodyを`placement_groups.members`の順序付き連続drawable範囲とAnchor indexとして原子的に保持する。group head countと内部Emit countを区別し、反復はsymbolic planに残る。memberの`transform_group_indices`で指定した内部Transformは配置前、未指定の同範囲Transformは外側として配置後に実行する。Anchor-only memberの内部Transformは、先行drawableがある場合もmemberと同じ空のdrawable範囲を記録する。
+
+`CompositionPlanResult.standalone_macro_repetitions`は既存bodyの位置・range・Anchor・内部Transformとsource headの反復数を保持する。個体materializationとruntime／UI／save接続は後続の責務である。
+
 ## 守るべき設計契約
 
 - DDLテキストは母語で書ける。
@@ -471,14 +475,6 @@ host CIでは代替しない）、
 - Webの挙動またはUI変更では `web/BUILD_NUMBER` を更新する。
 アプリ世代変更時はWebの `APP_VERSION` も揃える。
 - **本書の「現在の製品状態」には版ごとの段落を積まない。**
-Score 0.9はMacro bodyを`placement_groups.members`の順序付き連続drawable範囲とAnchor indexとして原子的に保持する。group head countと内部Emit countを区別し、反復はsymbolic planに残る。standalone repeated Macro count配送、個体化、runtime cutoverは完了としない。
-
-Score 0.9はMacro bodyを`placement_groups.members`の順序付き連続drawable範囲とAnchor indexとして原子的に保持する。group head countと内部Emit countを区別し、反復はsymbolic planに残る。standalone repeated Macro count配送、個体化、runtime cutoverは完了としない。
-
-memberの`transform_group_indices`はsource-ownedな内部transformを配置前に保ち、同範囲でもunlisted transformはouterとして後に実行する。
-
-`CompositionPlanResult.standalone_macro_repetitions`は既存bodyの位置、range、Anchor、内部transform、source head repeat countをsymbolic planとして保持する。outer placementやactual Score instanceは追加しない。
-
 版で何をしたかは `CHANGELOG.ja.md` が持つので、本書は現在形の記述だけを保ち、変わった箇所を書き換える。
 採番のたびに段落を足すと、本書は変更履歴の二枚目になり、入口として読めなくなる。
 - **未解決の課題・未裁定の事項を本書に書かない。**

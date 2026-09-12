@@ -105,7 +105,7 @@ top / bottom / left_edge / right_edge / top_edge / bottom_edge / cornerを受け
 Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"place"}` parameterは同じ経路を通る。
 隅はStage 2がattested meaning / composition seed / 元occurrenceから選び、隅内anchorはRendererが選ぶ。
 生成した座標を原文出典として挿入せず、未宣言callerの暗黙overlayや位置省略のdefaultを追加しない。
-隣接bound Emitのconnected / touchingは両者がexact centerの場合に限り、noncenter relationを黙って捨てない。
+隣接bound Emitのconnected / touchingは、通常DDLと同じnamed-movableまたはnumeric-fixedの位置authorityを保って共有checked performerへ届ける。
 not_touchingとbetweenはnamed／noncenter位置も通常DDLと同じchecked performerへ届け、数値位置はfixedのauthorityを保つ。NotTouchingは既存Medium gapを使い、Betweenはcurrent直前のEmitとさらに一つ前のEmitのbbox中心を使う既存recipeを保つ。Betweenのfromは直前Emitであり、その一つ前を第二参照として両方のownerを保持する。
 隣接性はunbound Emitを含む元順序で判定し、省略されたfromまたはBetweenの二参照を他のsurvivorへ付け替えない。
 旧Stop入力も受けるが、recoverableなrelation失敗で新Score全体を止めない。relationだけをerrorとして外し、元ownerと変形後配置を保って描く。OmitAndContinueは既存の最小省略単位を保ち、integrity不良は両mode停止とする。
@@ -123,9 +123,9 @@ official registryのentryでもない。v1.70のhard-coded Nature展開とlegacy
 directory、plugin statusまたはenable controlは、退役作業が未完了の間のcompatibility surfaceである。
 語彙macroのauthoring APIまたはloading APIではない。
 
-Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分け、standalone repeated Macro count配送は未完了である。
+Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分ける。standalone Macroの外側反復もsymbolic planへ保持し、個体化はStep11で行う。
 
-memberの`transform_group_indices`はsource-owned内部transformを配置前に保ち、unlistedの同範囲transformはouterとして後に実行する。
+memberの`transform_group_indices`はsource-owned内部transformを配置前に保つ。先行drawableの後にAnchor-only Transform memberが続く場合も、validなmember範囲はそのAnchorを含む。unlistedの同範囲transformはouterとして後に実行する。
 
 `CompositionPlanResult.standalone_macro_repetitions`は既存body位置、range、Anchor、内部transform、source head repeat countをsymbolicに保持し、outer placementやactual Score instanceを作らない。
 

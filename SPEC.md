@@ -1439,7 +1439,7 @@ A typed Stage 1 request carries bounded projections of the finite vocabulary der
 
 Transcript replay reconstructs the same snapshots and outputs from command envelopes and final effect-result envelopes alone; output-only progress events and host effects are never replay inputs. The two-owned-buffer entry point accepts UTF-8 JSON bytes for an empty or previous snapshot and for one input envelope, then returns JSON bytes for either output or a stable error. The UniFFI candidate exports only this `Vec<u8>, Vec<u8> -> Vec<u8>` operation and a binding/protocol version report, with no semantic branch. A panic is contained as a stable `internal_invariant` error envelope rather than platform exception text.
 
-Focused checks of commit/approval/reparse/replay, authority and prompt boundaries, and one representative binding call passed. Independent completion review remains pending. The current server and Android authoring runtimes continue to use their legacy paths. This state machine, two-buffer ABI, and generated bindings are not considered connected or shipped until the Step 13/14 candidate host integrations and Step 16/17 acceptance and cutover are complete.
+Focused checks of commit/approval/reparse/replay, authority and prompt boundaries, and one representative binding call passed. Independent completion review and owner assessment passed for the shared control layer. The current server and Android authoring runtimes continue to use their legacy paths. This state machine, two-buffer ABI, and generated bindings are not considered connected or shipped until the Step 13/14 candidate host integrations and Step 16/17 acceptance and cutover are complete.
 
 ### 12.8 Error Recovery
 

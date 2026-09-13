@@ -922,7 +922,7 @@ Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みc
 
 Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。UniFFI候補はこの`Vec<u8>, Vec<u8> -> Vec<u8>`とbinding/protocol version reportだけを公開し、意味分岐を持たない。Panicもplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。
 
-この候補の保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しの限定確認は成功した。独立完了reviewは未実施である。現行ServerとAndroidのauthoring runtimeは引き続きlegacy経路を使い、Step 13/14のcandidate host統合とStep 16/17のacceptance／cutoverが完了するまで、このstate machine、二buffer ABI、または生成bindingが製品へ接続・出荷済みとは扱わない。
+この候補の保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しの限定確認は成功した。共通制御の独立完了reviewと親判定はPASSである。現行ServerとAndroidのauthoring runtimeは引き続きlegacy経路を使い、Step 13/14のcandidate host統合とStep 16/17のacceptance／cutoverが完了するまで、このstate machine、二buffer ABI、または生成bindingが製品へ接続・出荷済みとは扱わない。
 
 ### 12.8 エラー回復戦略
 

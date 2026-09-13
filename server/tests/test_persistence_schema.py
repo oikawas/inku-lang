@@ -16,6 +16,9 @@ OWNER_PATH = SERVER_ROOT / "src" / "inku_server" / "persistence" / "schema.py"
 SCHEMA_MODEL_NAMES = (
     "Base",
     "HistoryRow",
+    "VariationAuthorityRow",
+    "VariationAuthorityActionRow",
+    "PipelineCandidateExecutionRow",
     "CoerceTraceCatalogRow",
     "LineageNodeRow",
     "LineageEdgeRow",
@@ -30,7 +33,24 @@ SCHEMA_MODEL_NAMES = (
     "ExternalIdentityRow",
     "AppSettingRow",
 )
-DB_COMPAT_MODEL_NAMES = tuple(name for name in SCHEMA_MODEL_NAMES if name != "AppSettingRow")
+DB_COMPAT_MODEL_NAMES = tuple(
+    name
+    for name in SCHEMA_MODEL_NAMES
+    if name
+    not in {
+        "AppSettingRow",
+        "VariationAuthorityRow",
+        "VariationAuthorityActionRow",
+        "PipelineCandidateExecutionRow",
+        "PipelineHistoryLinkRow",
+    }
+)
+AUTHORING_TABLE_NAMES = {
+    "variation_authority",
+    "variation_authority_actions",
+    "pipeline_candidate_executions",
+    "pipeline_history_links",
+}
 EXPECTED_TABLE_NAMES = {
     "history",
     "coerce_trace_catalogs",
@@ -46,13 +66,16 @@ EXPECTED_TABLE_NAMES = {
     "user_sessions",
     "external_identities",
     "app_settings",
+    *AUTHORING_TABLE_NAMES,
 }
 PRE_EXTRACTION_SCHEMA_SHA256 = "6f95e2f40a2352bfbcdfad721259e2a480b93c27a876809c6c4f2f0681bf7186"
 
 
-def _compiled_schema_payload(base) -> bytes:
+def _compiled_schema_payload(base, *, excluded_tables: set[str] | None = None) -> bytes:
     payload = []
     for table in base.metadata.tables.values():
+        if table.name in (excluded_tables or set()):
+            continue
         indexes = [
             str(CreateIndex(index).compile(dialect=sqlite.dialect()))
             for index in sorted(table.indexes, key=lambda item: item.name or "")
@@ -83,7 +106,12 @@ def test_orm_schema_has_one_persistence_owner_and_creates_the_same_tables():
     assert not hasattr(db, "AppSettingRow")
     assert db.Base.metadata is schema.Base.metadata
     assert (
-        hashlib.sha256(_compiled_schema_payload(schema.Base)).hexdigest()
+        hashlib.sha256(
+            _compiled_schema_payload(
+                schema.Base,
+                excluded_tables=AUTHORING_TABLE_NAMES,
+            )
+        ).hexdigest()
         == PRE_EXTRACTION_SCHEMA_SHA256
     )
 

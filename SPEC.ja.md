@@ -25,7 +25,7 @@
 
 派生プロジェクトは `inku-` プレフィックスで統一する：
 
-- `inku-core` — Rustで実装された共通core。Rendererはserverの現行runtimeで使用し、Typed Compilerは受入済み・runtime未接続の基盤として保持する
+- `inku-core` — Rustで実装された共通core。Serverの現行runtimeはRendererとTyped Compilerの両方を共有authoring pipelineから使用する
 - `inku-saijiki` — 語彙辞書、最小限かつ必要十分を目指す
 - `inku-plugin` — 描画拡張 plugin、語彙自体は拡張されない、一種のマクロセット
 - `inku-web` — コンテナベースのWeb UI 実装
@@ -70,7 +70,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 3. **感情語彙を排除する** — 「美しく」ではなく、数値と物理素材の語彙で記述
 4. **固定した大きさを持たない** — 大きさ、位置は基準辺に対する相対位置で示される。Pixelの絶対値は持たない。サイズはスケール可能で、壁にも画面にも適用可能。**縦横比も固定しない** — 画面の縦横比は作品世界を規定する制約であって、記述が持つ寸法ではない
 5. **出力は静止画** — 動かさない。見る人が動く。**⚠ 「面がどう在るか」は静止画の状態であって時間の経過ではない**（2026-08-12 作者裁定）。塗り・質感を語彙に持つときは**状態の名詞**で持つ（動詞の「塗る」ではなく名詞の「塗り」）。**動詞で持つと本原則と §3.1 の「配置する動作を中心とする」の両方に衝突する** —— `描く` が v1.92 で剪定されたのと同じ理由による
-6. **文章を正規化されたDDLへ変換し、Typed Compilerで検証する設計を採る** — 入力は自由にすることが可能だが、DDLには明確な形式とルールがある。完全な自由形式はユーザーを圧倒する。適度な構造が創造を助ける。Typed Compiler基盤は受入済みだが現行runtimeには未接続であり、現在の生成経路は §12 に記す
+6. **文章を正規化されたDDLへ変換し、Typed Compilerで検証する設計を採る** — 入力は自由にすることが可能だが、DDLには明確な形式とルールがある。完全な自由形式はユーザーを圧倒する。適度な構造が創造を助ける。通常Server／Webは共有Typed Compilerへ接続し、現在の生成経路は §12 に記す
 7. **エンジンは後戻りしない** — 版木を彫り進めるように、描画エンジンは一方向にしか進まない。過去の版をシステムとして保持せず、選び直せるようにもしない。**残るのは刷り上がった作品（保存済み SVG）であって、彫る前の版木ではない**（§2.1）
 
 ### 2.1 演奏の版・同一性・保存
@@ -914,15 +914,15 @@ Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既
 
 ### 12.7.1 共有authoring state machine候補
 
-製品runtime未接続の共有Rust候補は、authoringをversion付きsnapshotへの決定的なcommandとして扱う。Coreは次のsnapshot、進行event、最大1個の`EffectAction`を返し、hostはLLM呼出またはvisible normalized DDLの保存だけを実行して、action identityをechoするtyped `EffectResult`を返す。再試行では同じaction idとrequest digestを保ってattemptだけを進め、古いsequence、異なるdigest、遅れて届いたresultを状態へ適用しない。Hostの成功をcoreが先取りして主張することはない。
+共有Rust候補は、authoringをversion付きsnapshotへの決定的なcommandとして扱う。通常Server／Web経路はこのsnapshotとhostへ接続済みである。Coreは次のsnapshot、進行event、最大1個の`EffectAction`を返し、hostはLLM呼出またはvisible normalized DDLの保存だけを実行して、action identityをechoするtyped `EffectResult`を返す。Provider transportは一つのactionにつき一回だけ呼び、再試行の要否と次actionはcoreが決める。古いsequence、異なるdigest、遅れて届いたresultを状態へ適用せず、hostの成功をcoreが先取りして主張しない。
 
-Variationの作成元は`stage1_generated`または`user_authored_ddl`として不変に保存し、authoring authorityは`description_authoritative`、`ddl_authoritative`、`legacy_unknown`のいずれかを単調に進める。記述から生成したvariationで、ユーザーがexact source bytesの変わるDDLを初めて確定するとDDL authorityへlockされる。同一bytesの確定はlockせず、確定後に以前のbytesへ戻しても記述authorityへ戻らない。Direct DDLは最初からDDL authorityである。`legacy_unknown`は由来を推測して移行せず、記述再生成とDDL mutationを明示的なcompatibility-required結果で拒む。すべての変更はdecimal-string revisionのcompare-and-set proposalであり、hostの一致するatomic save acknowledgmentを受け取るまでactive authorityとsourceを変えない。
+Variationの作成元は`stage1_generated`または`user_authored_ddl`として不変に保存し、authoring authorityは`description_authoritative`、`ddl_authoritative`、`legacy_unknown`のいずれかを単調に進める。記述から生成したvariationで、ユーザーがexact source bytesの変わるDDLを初めて確定するとDDL authorityへlockされる。同一bytesの確定はlockせず、確定後に以前のbytesへ戻しても記述authorityへ戻らない。Direct DDLは最初からDDL authorityである。すべての変更はdecimal-string revisionのcompare-and-set proposalであり、hostの一致するatomic save acknowledgmentを受け取るまでactive authorityとsourceを変えない。既存historyは`legacy_unknown`の由来を本文から推測せず、表示と保存済みSVGによる再演を維持する。旧DDLの変更は`user_authored_ddl`／`ddl_authoritative`、旧記述からの再生成は`stage1_generated`／`description_authoritative`の新variationへforkし、元historyと新旧関係を保存して元行を変更しない。共有pipelineで保存した過去の演奏を選んだ場合も、そのhistoryのsource、revision、seed、catalog、資源上限、definition lockを正とし、同じvariationの最新状態へ置き換えない。新しい演奏はraw compact Scoreとauthority revisionをhistory linkで結び、その時点のconfigとhost contextをfork用sidecarとして保存する。Sidecarのrevision／source digestがhistory linkと一致しなければforkを停止し、最新snapshotから推測しない。Core snapshot configは一つのvariation内で不変に保ち、既存variationから記述を生成し直す通常UI操作は、現在選択中のoptionsを渡した新variation／new editionとして保存する。
 
 Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaはvisible normalized DDLだけを許す。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。Unknown／conflict／integrityエラーを補完対象にしない。Hole補完はtyped compilerが明示したholeだけを対象とし、選択したhole id、許可span、range digest、base source digest、compiler-lock digestでpatchを閉じる。Providerのpatchは候補にすぎない。作者の明示承認時にbaseへ再検証し、sourceと次authorityを1個のCAS save actionとしてhostへ渡す。一致するsave acknowledgmentの後だけ、保存されたvisible bytesを再parseして共有compilerへ渡す。
 
 Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。UniFFI候補はこの`Vec<u8>, Vec<u8> -> Vec<u8>`とbinding/protocol version reportだけを公開し、意味分岐を持たない。Panicもplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。
 
-この候補の保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しの限定確認は成功した。共通制御の独立完了reviewと親判定はPASSである。現行ServerとAndroidのauthoring runtimeは引き続きlegacy経路を使い、Step 13/14のcandidate host統合とStep 16/17のacceptance／cutoverが完了するまで、このstate machine、二buffer ABI、または生成bindingが製品へ接続・出荷済みとは扱わない。
+保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しに加え、通常Server hostでの一つのLinux flowは成功した。このflowは固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3 pointのcircle fillと後続lineをprimitive mark 4としてSVGへ演奏し、raw Score、history、authority linkを保存した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じserviceを使い、11形式のcanvasは共有registryを正本とする。保存済みraw compact Scoreの再演もLinuxで成功し、raw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を保存済みpolicyで拒否してprimitive mark 4を保った。Step 13全体の完了review、Android接続、acceptance、配備、releaseは未実施であり、source上のServer接続と出荷済みであることを混同しない。
 
 ### 12.8 エラー回復戦略
 
@@ -930,7 +930,7 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
 
-Runtime未接続のshared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合だけfield単位で省略し、成立しないinstruction / Emit / call / structural subtree、Ground、group、relationをそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
+Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合だけfield単位で省略し、成立しないinstruction / Emit / call / structural subtree、Ground、group、relationをそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
 
 ### 12.9 実装史の所在
 
@@ -955,11 +955,11 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
-sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通の局所回復error policyはactual Scoreまで実装済みだがruntimeには未接続である。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。旧StopとContinueの入力は、同じcompilationのtyped owner / dependencyに従うsealed projectionを使う。回復可能な上流hole / conflictは確立済みの局所単位を省略して独立命令を届け、描画単位の全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenanceは保ち、寸法規則の追加はgeometry policy digestへ記録し、Score 0.2.0で新しい月形を表す。現行Python経路のcoerceやLLM fallbackが置換済みとはみなさない。Runtime / UI / API / 保存接続は後続の責務である。
+sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通の局所回復error policyはactual Scoreまで実装され、通常Server／Webの共有pipelineから使用される。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。旧StopとContinueの入力は、同じcompilationのtyped owner / dependencyに従うsealed projectionを使う。回復可能な上流hole / conflictは確立済みの局所単位を省略して独立命令を届け、描画単位の全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenanceは保ち、寸法規則の追加はgeometry policy digestへ記録し、Score 0.2.0で新しい月形を表す。通常APIは旧URLを保ちながらこの共有経路へ接続し、保存済みcompact Scoreの再演もLinuxで確認済みである。Android接続は未完了である。
 
-このruntime未接続subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / square / triangle / polygonのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
+このshared compiler subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / square / triangle / polygonのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
 
-同じruntime未接続subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
+同じshared compiler subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
 `Instruction.thinness`へ届け、明示宣言した細さ・大小parameterも§4.6の経路へbindingする。
 この到達だけでwhole Step 10を完了とはしない。
 
@@ -1094,7 +1094,7 @@ Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない
 
 Line-upだけが方向を配置へ届ける。省略は従来の横一列、明示horizontalは同じ式でも元の明示identityを保持する。t=(i+1/2)/n-1/2としてanchorからのoffsetはhorizontal=(tW,0)、vertical=(0,tH)、rising=(ts,-ts)、falling=(ts,ts)、s=min(W,H)である。Y下向きの物理座標で斜めは45度とし、長方形の対角線へ引き伸ばさない。Bare diagonalはattestされたoptional composition seed（NoneとSome(0)を区別）、元pre / expanded meaning、元logical occurrenceを専用layout-direction roleでframeして二軸から選ぶ。Shape angleの選択scheme・size・countは変えず、focus / variation / render seedやsource spellingを方向選択へ使わない。Pointにも方向は届くがPoint自身のangleは拒否する。Place / Scatter / Tile、group / relationの新方向、rotated等の未対応方向は元instruction / Emit単位で停止・省略し、全省略は両mode停止する。既存Score入口も新fieldを捨てて成功しない。
 
-Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10の再演可能なrecipeへ写し、個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64であり、countをclampしない。`logical_objects`、`template_nodes`、`anchor_instances`、`transform_instances`、`placement_instances`、`fill_instances`の追加6次元は明示accountingを持つが、新しい出荷既定値を導入しない。超過した一sourceまたはcoordinated placement全体を個体化前に省略して診断し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。短いDDLから保存Scoreと非矩形fillのDisplay／Compat、clip後の局所省略・後続描画までの限定Linux確認は成功した。製品runtime / UI / API / 保存cutoverは未完了である。
+Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10の再演可能なrecipeへ写し、個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64に加え、`logical_objects` 4096、`template_nodes` 128、`anchor_instances` 4096、`transform_instances` 4096、`placement_instances` 64、`fill_instances` 64であり、countをclampしない。既存4上限の管理者設定と作品に保存された旧予算は維持する。超過した一sourceまたはcoordinated placement全体だけを個体化前に省略して診断し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。短いDDLから保存Scoreと非矩形fillのDisplay／Compat、clip後の局所省略・後続描画までの限定Linux確認は成功した。通常Server接続と保存compact Scoreの再演確認は完了し、Step 13全体の完了判定は未実施である。
 
 ## 13. 揺らぎの設計
 
@@ -1174,7 +1174,7 @@ DDLの揺らぎは、この意味での揺らぎである。
 **三層に例外を作るのではなく、太さを三層の外に置く**という整理である。
 
 Visible DDLの有限表記は、Fineが日本語`細い` / 英語`thin`、ExtraFineが日本語`ごく細い` /
-英語`extra-fine`である。Runtime未接続のshared compilerはこの二段階をsource表記から独立した
+英語`extra-fine`である。Shared compilerはこの二段階をsource表記から独立した
 typed identityとして保持し、対応範囲のdirect instructionとflat Macro Emitから共通lowererを通して
 既存`Instruction.thinness`へ届ける。未指定は`None`のままで、太い段階や自由なdegree同義語を補わない。
 
@@ -1271,7 +1271,7 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 
 配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
-Runtime未接続のshared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying` / `trembling`はPerlin、`undulating`はWave、`blurring`はPinkへ写す。三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足する振幅／周波数／質だけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`trembling`からFineやHighを推測しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
+Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying` / `trembling`はPerlin、`undulating`はWave、`blurring`はPinkへ写す。三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足する振幅／周波数／質だけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`trembling`からFineやHighを推測しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
@@ -1737,7 +1737,7 @@ ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmo
 隅内のanchorは既存Rendererのrender seedが選ぶ。別の演奏・明示変奏は隅を変えない。
 Tableはpolicyの有理数定義から最後にだけScore f64へ変換する。Policy IDは同じでも内容digestは変わり、
 semantic schemaの新versionを意味しない。未指定位置は補わず、named/numeric conflict、numeric must-fitを保つ。
-Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryはruntime / UI / 保存へ未接続で、whole Step10の完了ではない。
+Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryは通常の共有runtime / UI / 保存経路から使用されるが、whole Step10の完了を意味しない。
 
 JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。
 
@@ -1839,7 +1839,7 @@ Renderer の共有`format_number`境界は数値を小数第6位で丸め、`-0.
 
 ## 20. モード
 
-Runtime未接続のtyped compilerで揺らぎが不成立なら、旧Stop / Continue入力にかかわらず元instruction／malformed Emit／未宣言caller invocationを既存単位で診断付きに省略し、残るScoreを返す。元owner、理由、実処置を保ち、揺らぎを新しいfield-level回復単位へ広げない。Integrity不良または描画対象ゼロは停止である。製品runtime、UI、保存経路への接続は未完了である。
+Shared typed compilerで揺らぎが不成立なら、旧Stop / Continue入力にかかわらず元instruction／malformed Emit／未宣言caller invocationを既存単位で診断付きに省略し、残るScoreを返す。元owner、理由、実処置を保ち、揺らぎを新しいfield-level回復単位へ広げない。Integrity不良または描画対象ゼロは停止である。通常Server／Webはこのcompilerと保存経路を使用する。
 
 ### 単一描画
 

@@ -29,6 +29,7 @@
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import PipelineStatus from '$lib/components/PipelineStatus.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
@@ -89,9 +90,13 @@
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
+		canvasAspectOptions as readCanvasAspectOptions,
 		getCanvasAspectOption,
+		installCanvasFormatRegistry,
 		normalizeCanvasAspectId,
 		type CanvasAspectId,
+		type CanvasAspectOption,
+		type CanvasFormatRegistryResponse,
 	} from '$lib/plugins/system/canvas-aspect';
 	import {
 		type HistoryItem,
@@ -186,8 +191,8 @@
 	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
-	let canvasAspectEnabled = $state(true);
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
+	let canvasAspectOptions = $state<CanvasAspectOption[]>(readCanvasAspectOptions());
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
@@ -716,21 +721,30 @@
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { storage?: Record<string, unknown> };
 			const canvasValue = data.storage?.[CANVAS_ASPECT_PLUGIN_ID] as { selected?: unknown; enabled?: unknown } | undefined;
-			canvasAspectEnabled = canvasValue?.enabled !== false;
-			canvasAspectId = normalizeCanvasAspectId(canvasValue?.selected);
+			canvasAspectId = canvasValue?.enabled === false
+				? DEFAULT_CANVAS_ASPECT_ID
+				: normalizeCanvasAspectId(canvasValue?.selected);
 		} catch (e) {
-			canvasAspectEnabled = true;
 			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 			console.warn('failed to load plugin storage', e);
 		}
 	}
 
-	function canvasAspectPluginValue() {
-		return { enabled: canvasAspectEnabled, selected: canvasAspectId };
+	async function loadCanvasFormats(): Promise<void> {
+		try {
+			const response = await apiFetch('/api/pipeline/canvas-formats', { cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			canvasAspectOptions = installCanvasFormatRegistry(await response.json() as CanvasFormatRegistryResponse);
+			canvasAspectId = normalizeCanvasAspectId(canvasAspectId);
+		} catch (error) {
+			canvasAspectOptions = readCanvasAspectOptions();
+			canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
+			console.warn('failed to load canvas formats', error);
+		}
 	}
 
 	function effectiveCanvasAspectId(): CanvasAspectId {
-		return canvasAspectEnabled ? canvasAspectId : DEFAULT_CANVAS_ASPECT_ID;
+		return canvasAspectId;
 	}
 
 	async function saveCanvasAspectPluginValue() {
@@ -739,27 +753,12 @@
 			const r = await apiFetch(`/api/auth/me/plugin-storage/${CANVAS_ASPECT_PLUGIN_ID}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: canvasAspectPluginValue() })
+				body: JSON.stringify({ value: { enabled: true, selected: canvasAspectId } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 		} catch (e) {
 			console.warn('failed to save canvas aspect plugin storage', e);
 		}
-	}
-
-	async function setCanvasAspectEnabled(value: boolean) {
-		if (!session.isAdmin) return;
-		canvasAspectEnabled = value;
-		canvasAspectMenuOpen = false;
-		if (!value) {
-			work.result = null;
-			work.displayedHistoryItem = null;
-			history.clearSelection();
-			outputTab = 'canvas';
-			exportMenuOpen = false;
-			canvasViewport.fit();
-		}
-		await saveCanvasAspectPluginValue();
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
@@ -1105,6 +1104,7 @@
 
 	async function completeAuthentication(source: 'resume' | 'login'): Promise<void> {
 		if (source === 'login') history.clear();
+		await loadCanvasFormats();
 		await Promise.all([
 			loadAvailableModels(),
 			settings.userAdministration.load(),
@@ -1128,7 +1128,6 @@
 		demo.resetForSignedOut();
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
-		canvasAspectEnabled = true;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		settings.resetForLoggedOut();
 		history.clear();
@@ -1502,24 +1501,23 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 
 async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
-	if (!sourceText || !node.history) return;
+	if (!sourceText || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
-	const rendered = await work.paintOne(sourceText, {
+	work.selectLegacyHistory(node.history.id);
+	const view = await work.authorDescription(sourceText, {
 		sourceText,
-		historyInput: sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
 		derivationKind: 'description_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
-		signal,
 		// null override = inherit the parent work's setting.
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
 			...wildOverride(wild ?? node.history.render_wild === true)
 		},
-	});
-	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
+	}, signal);
+	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
 }
 
 /** Sketching (Stage 0.5): redraw a saved work at a different grain, as its child.
@@ -1554,116 +1552,34 @@ async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse
 
 async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
-	if (!nextDdl || !node.history) return;
+	if (!nextDdl || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
-	const composed = await work.composeOne(nextDdl, sourceText, signal, undefined, undefined, {
+	work.selectLegacyHistory(node.history.id);
+	const view = await work.authorDdl(nextDdl, {
+		sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
+		derivationKind: 'ddl_edit',
+		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
 			...wildOverride(ddlDialogWildOverride ?? node.history.render_wild === true)
 		},
-	});
-	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
-	const resolvedEditStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
-	const saved = await pushHistory({
-		input: sourceText,
-		source_text: sourceText,
-		ddl: nextDdl,
-		expanded_ddl: composed.ddl,
-		sketch_text: composed.sketch_text ?? null,
-		sketch_grain: composed.sketch_grain ?? null,
-		sketch_state: composed.sketch_state ?? null,
-		score: composed.score,
-		svg: composed.svg,
-		at: Date.now(),
-		elapsed_ms: composed.elapsed_ms,
-		stage1_model: resolvedEditStage1Model,
-		stage2_model: resolvedEditStage2Model,
-		tokens_in: composed.tokens_in,
-		tokens_out: composed.tokens_out,
-		catalog_id: lineageCatalogId(node),
-		render_build_number: composed.render_build_number,
-		render_color_profile: composed.render_color_profile,
-		render_engine_id: composed.render_engine_id,
-		render_engine_version: composed.render_engine_version,
-		render_color_catalog_id: composed.render_color_catalog_id,
-		render_color_catalog_name: composed.render_color_catalog_name,
-		render_color_catalog_sub: composed.render_color_catalog_sub,
-		render_color_map: composed.render_color_map,
-		render_canvas_aspect: composed.render_canvas_aspect,
-		render_canvas_aspect_id: composed.render_canvas_aspect_id,
-		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
-		render_seed: composed.render_seed,
-		composition_seed: composed.composition_seed,
-		instruction_lang_requested: composed.instruction_lang_requested,
-		instruction_lang_resolved: composed.instruction_lang_resolved,
-		ui_lang: composed.ui_lang,
-		render_hash: composed.render_hash,
-		render_hash_short: composed.render_hash_short,
-	}, {
-		selectSaved: true,
-		countGeneration: true,
-		sourceText,
-		lineageParentNodeId: node.id,
-		derivationKind: 'ddl_edit',
-		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
-	});
-	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
+	}, signal);
+	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
 async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
-	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
-	const composed = await work.composeOne(nextDdl, '', signal, undefined, undefined, {
+	work.beginNewAuthoring();
+	await work.authorDdl(nextDdl, {
 		canvasAspectId: effectiveCanvasAspectId(),
-	});
-	const saved = await pushHistory({
-		input: '',
-		source_text: firstLine,
-		ddl: nextDdl,
-		expanded_ddl: composed.ddl,
-		sketch_text: composed.sketch_text ?? null,
-		sketch_grain: composed.sketch_grain ?? null,
-		sketch_state: composed.sketch_state ?? null,
-		score: composed.score,
-		svg: composed.svg,
-		at: Date.now(),
-		elapsed_ms: composed.elapsed_ms,
-		stage1_model: null,
-		stage2_model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-		tokens_in: composed.tokens_in,
-		tokens_out: composed.tokens_out,
-		catalog_id: colorCatalogSettings.effectiveId,
-		render_build_number: composed.render_build_number,
-		render_color_profile: composed.render_color_profile,
-		render_engine_id: composed.render_engine_id,
-		render_engine_version: composed.render_engine_version,
-		render_color_catalog_id: composed.render_color_catalog_id,
-		render_color_catalog_name: composed.render_color_catalog_name,
-		render_color_catalog_sub: composed.render_color_catalog_sub,
-		render_color_map: composed.render_color_map,
-		render_canvas_aspect: composed.render_canvas_aspect,
-		render_canvas_aspect_id: composed.render_canvas_aspect_id,
-		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
-		render_seed: composed.render_seed,
-		composition_seed: composed.composition_seed,
-		instruction_lang_requested: composed.instruction_lang_requested,
-		instruction_lang_resolved: composed.instruction_lang_resolved,
-		ui_lang: composed.ui_lang,
-		render_hash: composed.render_hash,
-		render_hash_short: composed.render_hash_short,
-	}, {
-		selectSaved: true,
-		countGeneration: true,
-		sourceText: firstLine,
 		displayLabel: 'DDL',
-	});
-	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
+	}, signal);
 }
 
 function openNewDdlDialog(): void {
@@ -1804,6 +1720,7 @@ $effect(() => {
 		work.pendingCanvasAspectDerivation = null;
 		work.inputMode = 'single';
 		work.displayedHistoryItem = it;
+		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
 		void history.syncToItem(it);
 		work.lineageDetached = false;
 		work.expandedDdl = projection.expandedDdl;
@@ -2595,6 +2512,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchNonEmpty={batch.nonEmpty}
 						{batchRunning}
 						singleRunning={work.singleRunning}
+						descriptionLocked={work.pipelineLocked}
 						hideRunStatus={work.reloading}
 						singleDdlReady={work.ddl !== null}
 						batchActiveLine={batch.activeLine}
@@ -2639,8 +2557,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={refinementSession.gridBusy || work.reloading}
 						error={work.error}
 						stageLabel={work.stageLabel}
-						{canvasAspectEnabled}
 						{canvasAspectId}
+						{canvasAspectOptions}
 						{canvasAspectMenuOpen}
 						stage1ModelLabel={work.stage1ModelLabel}
 						stage2ModelLabel={work.stage2ModelLabel}
@@ -2661,6 +2579,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onStartDemo={work.startDemo}
 						onStopDemo={work.stopDemo}
 						onSubmit={work.requestSubmit}
+						onForkDescription={work.forkPipelineDescription}
 						onStop={work.stopBatch}
 					/>
 
@@ -2673,6 +2592,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							</details>
 						</section>
 					{/if}
+
+					<PipelineStatus
+						patch={work.pipelinePatch}
+						committedDdl={work.pipelineView?.document?.source ?? ''}
+						diagnostics={work.pipelineDiagnostics}
+						busy={work.pipelineBusy}
+						reason={work.pipelineView?.phase.reason ?? null}
+						onApprove={work.approvePipelinePatch}
+						onDecline={work.declinePipelinePatch}
+					/>
 
 					<!-- DDL tools -->
 					{#if work.inputMode === 'single'}
@@ -3087,8 +3016,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			bind:cardExportSettings={exportSettings.card}
 			{exportTemplates}
 			{exportTemplateStatus}
-			{canvasAspectEnabled}
-			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 			onChooseDownloadFolder={() => session.chooseDownloadFolder()}
 			onClearDownloadFolder={() => session.clearDownloadFolder()}
 			onSetStage1Provider={setStage1Provider}

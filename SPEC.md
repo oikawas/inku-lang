@@ -43,7 +43,7 @@ design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 
 Derived projects share the `inku-` prefix:
 
-- `inku-core` -- the shared Rust core. The server uses its Renderer in the current runtime; the Typed Compiler is an accepted foundation that is not yet connected to the runtime
+- `inku-core` -- the shared Rust core. The current Server runtime uses both its Renderer and Typed Compiler through the shared authoring pipeline
 - `inku-saijiki` -- the vocabulary dictionary, aiming to be minimal yet sufficient
 - `inku-plugin` -- drawing-extension plugins; they do not extend the vocabulary and act as macro sets
 - `inku-web` -- the container-based web UI implementation
@@ -100,7 +100,7 @@ It rests on three pillars of constraint:
 3. **Emotional vocabulary is excluded** — use numbers and the vocabulary of physical materials rather than words such as "beautifully."
 4. **There is no fixed size** — size and position are expressed relative to a reference edge, not as absolute pixel values. The work scales to a wall as readily as to a screen. **The aspect ratio is not fixed either** — it is a constraint that shapes the world of the work, not a dimension the description carries.
 5. **Output is a still image** — the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
-6. **The design converts prose into normalized DDL for validation by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation. The Typed Compiler foundation is accepted but is not yet connected to the current runtime; §12 describes the active generation path.
+6. **The design converts prose into normalized DDL for validation by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation. The normal Server and Web are connected to the shared Typed Compiler; §12 describes the active generation path.
 7. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (§2.1).
 
 ### 2.1 Performance Versions, Identity, and Preservation
@@ -1388,7 +1388,7 @@ For example, `赤い円を中心に置く。` and `円を中心に置く。円�
 - when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
 - writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. This Rust path is not yet connected to the product runtime
+- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. The normal product runtime uses this Rust path
 
 ### 12.5 Splitting the Model by Stage
 
@@ -1431,15 +1431,15 @@ An explicitly authored angle reaches `Score.rotation` exactly once through one s
 
 ### 12.7.1 Shared Authoring State-Machine Candidate
 
-The shared Rust candidate, still disconnected from the product runtime, treats authoring as deterministic commands over a versioned snapshot. Core returns the next snapshot, progress events, and at most one `EffectAction`; the host performs only the LLM call or visible-normalized-DDL save and returns a typed `EffectResult` that echoes the action identity. A retry keeps the same action ID and request digest while advancing only its attempt. A stale sequence, changed digest, or late result cannot change state. Core never claims host success before the host reports it.
+The shared Rust candidate treats authoring as deterministic commands over a versioned snapshot, and the normal Server and Web paths are now connected to that snapshot and host. Core returns the next snapshot, progress events, and at most one `EffectAction`; the host performs only the LLM call or visible-normalized-DDL save and returns a typed `EffectResult` that echoes the action identity. Provider transport is attempted once per action; core decides whether another action is required. A stale sequence, changed digest, or late result cannot change state. Core never claims host success before the host reports it.
 
-A variation preserves its origin as either `stage1_generated` or `user_authored_ddl`, while authoring authority advances monotonically through `description_authoritative`, `ddl_authoritative`, or `legacy_unknown`. On a description-generated variation, the first user-confirmed DDL commit whose exact source bytes changed locks authority to DDL. Committing identical bytes does not lock it, and restoring earlier bytes after a committed edit does not restore description authority. Direct DDL starts under DDL authority. `legacy_unknown` is never migrated by inference: description regeneration and DDL mutation return an explicit compatibility-required result. Every mutation is a compare-and-set proposal with a decimal-string revision; active authority and source change only after the host acknowledges the matching atomic save.
+A variation preserves its origin as either `stage1_generated` or `user_authored_ddl`, while authoring authority advances monotonically through `description_authoritative`, `ddl_authoritative`, or `legacy_unknown`. On a description-generated variation, the first user-confirmed DDL commit whose exact source bytes changed locks authority to DDL. Committing identical bytes does not lock it, and restoring earlier bytes after a committed edit does not restore description authority. Direct DDL starts under DDL authority. Every mutation is a compare-and-set proposal with a decimal-string revision; active authority and source change only after the host acknowledges the matching atomic save. Existing history remains `legacy_unknown` without inferring origin from its text, and retains its display and saved-SVG replay. Editing legacy DDL forks a new `user_authored_ddl` / `ddl_authoritative` variation; regenerating from a legacy description forks a new `stage1_generated` / `description_authoritative` variation. The parent relation is saved and the original history row is unchanged. Selecting an older performance saved by the shared pipeline also keeps that history's source, revision, seed, catalog, resource limits, and definition locks; it is never replaced by the latest state of the same variation. A new performance links its raw compact Score and authority revision to history and stores the config and host context from that point in a fork sidecar. A fork stops if the sidecar revision or source digest does not match the history link and never infers these values from the latest snapshot. Core snapshot config remains immutable within one variation. The normal UI therefore regenerates a description from an existing variation as a new variation and edition, passing the currently selected options.
 
 A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits visible normalized DDL alone. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM; unknowns, conflicts, and integrity errors are not completion targets. Hole completion is limited to holes explicitly reported by the typed compiler and binds each selected hole ID, allowed span, range digest, base-source digest, and compiler-lock digest. A provider patch remains a candidate. Explicit author approval revalidates it against the base and sends source plus next authority to the host as one CAS save action. Only the matching save acknowledgment allows the saved visible bytes to be parsed again and passed to the shared compiler.
 
 Transcript replay reconstructs the same snapshots and outputs from command envelopes and final effect-result envelopes alone; output-only progress events and host effects are never replay inputs. The two-owned-buffer entry point accepts UTF-8 JSON bytes for an empty or previous snapshot and for one input envelope, then returns JSON bytes for either output or a stable error. The UniFFI candidate exports only this `Vec<u8>, Vec<u8> -> Vec<u8>` operation and a binding/protocol version report, with no semantic branch. A panic is contained as a stable `internal_invariant` error envelope rather than platform exception text.
 
-Focused checks of commit/approval/reparse/replay, authority and prompt boundaries, and one representative binding call passed. Independent completion review and owner assessment passed for the shared control layer. The current server and Android authoring runtimes continue to use their legacy paths. This state machine, two-buffer ABI, and generated bindings are not considered connected or shipped until the Step 13/14 candidate host integrations and Step 16/17 acceptance and cutover are complete.
+Focused checks of commit/approval/reparse/replay, authority and prompt boundaries, and one representative binding call passed, as did one normal Server host flow on Linux. In that flow an ordinary point fill requested 6,945 logical objects against a fixed fixture budget of 400 logical objects, 512 template nodes, and 400 for the other structural resources; only that fill was omitted, while a three-point circle fill and a later line continued as four primitive marks, produced SVG, and saved the raw Score, history, and authority link. This checked the native connection; it did not measure the six new shipping limits. The normal Web and `/api/interpret`, `/api/compose`, `/api/paint`, and `/api/paint/stream` paths use the same service, and the shared registry is authoritative for all 11 canvas formats. Saved raw compact Score replay also passed on Linux: it left the raw Score, saved source, and authority unchanged, delivered a changed seed as a changed SVG, and rejected a request-side hard-budget alteration using independently saved policy while retaining four primitive marks. Completion review for Step 13 as a whole, Android integration, acceptance, deployment, and release have not been performed; source-level Server integration does not mean the change has shipped.
 
 ### 12.8 Error Recovery
 
@@ -1455,7 +1455,7 @@ layer. `interpret_fallback` and `compose_fallback` distinguish a reason,
 `"none"`, and absence from records created before the field. Refining from a
 marked parent asks once before execution, and existing works are not backfilled.
 
-In the runtime-disconnected shared compiler consumer, Stop and OmitAndContinue are deterministic execution policies over the same verified input rather than LLM fallbacks. Continue omits an appearance field only when the existing default can resolve it; otherwise it omits the invalid instruction, Emit, invocation, or structural subtree, or the unsupported Ground, group, or relation as its typed unit. Integrity failures stop both modes, and omitting every unit is not reported as a successful empty work.
+In the shared compiler consumer, Stop and OmitAndContinue are deterministic execution policies over the same verified input rather than LLM fallbacks. Continue omits an appearance field only when the existing default can resolve it; otherwise it omits the invalid instruction, Emit, invocation, or structural subtree, or the unsupported Ground, group, or relation as its typed unit. Integrity failures stop both modes, and omitting every unit is not reported as a successful empty work.
 
 ### 12.9 Where Implementation History Lives
 
@@ -1518,8 +1518,8 @@ is the effective DDL / typed meaning consumed by Stage 2.
 
 The sealed Rust Stage 1.5 v5 typed foundation, R1 / R2 / D1, direct normal and
 explicit geometry, finite flat Macro Emits, and the shared local recoverable-error
-policy are implemented through an actual Score but are not
-connected to runtime. The `compile_ddl_to_score` facade compiles the original
+policy are implemented through an actual Score and used by the normal Server and
+Web pipeline. The `compile_ddl_to_score` facade compiles the original
 `NormalizedDdlDocument` exactly once and retains its source, state, lock, and issues.
 Legacy Stop and Continue inputs use the same compilation's typed owners and dependencies
 to build a sealed projection. Recoverable upstream holes or conflicts omit their established
@@ -1533,17 +1533,17 @@ integrity failures stop both modes. The public Stage 1.5 API remains
 `CanonicalReady`-only and cannot recover an arbitrary mutable compilation. D1
 meaning, seed, focus, source-ordinal gaps, and generated provenance are preserved.
 The added sizing rules update the geometry policy digest, and Score 0.2.0 carries
-the new moon descriptor. The current Python coerce and LLM fallback
-have not been replaced by this facade; runtime / UI / API / persistence connection
-remains later work.
+the new moon descriptor. The normal APIs keep their existing URLs while using
+this shared path, and saved compact Score replay has passed on Linux. Android
+integration remains unfinished.
 
-This runtime-disconnected subset now delivers direct and flat-Macro angles for
+This shared-compiler subset delivers direct and flat-Macro angles for
 circle, ellipse, cloudform, and square through the shared lowerer to actual
 `Score.rotation`. Square uses the same angle resolver for direct and flat Macro
 Emit input. Only numeric placement must fit the rotated declared rectangle;
 named focus adds no must-fit check. This does not complete Step 10 as a whole.
 
-The same runtime-disconnected subset delivers finite two-step thinness from direct and flat
+The same shared-compiler subset delivers finite two-step thinness from direct and flat
 Macro Emit input to actual `Instruction.thinness`, and binds explicitly declared thinness and size
 parameters through §4.6. This delivery does not complete Step 10 as a whole.
 
@@ -1702,7 +1702,7 @@ Optional instruction / Emit `layout_direction` owns arrangement direction indepe
 
 Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. New direction on Place / Scatter / Tile, groups / relations, and unsupported identities such as rotated stop or omit the original instruction / Emit; an entirely omitted result stops in both modes. The existing Score entrance also cannot discard this field and report success.
 
-One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable Score 0.10 recipes and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits remain 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates; counts are never clamped. Six additional structural dimensions (`logical_objects`, `template_nodes`, `anchor_instances`, `transform_instances`, `placement_instances`, and `fill_instances`) are explicitly accounted without introducing new shipping defaults. An excessive source or coordinated placement is omitted as one complete atomic unit before materialization, with a diagnostic, while independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. A focused Linux check passed from short DDL through saved Score and nonrectangular Display / Compat fill to local omission after clip failure and continued later drawing. Product runtime / UI / API / persistence cutover remains incomplete.
+One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable Score 0.10 recipes and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`; counts are never clamped. Administrator control of the existing four limits and budgets saved by older works remain intact. An excessive source or coordinated placement alone is omitted as one complete atomic unit before materialization, with a diagnostic, while independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. A focused Linux check passed from short DDL through saved Score and nonrectangular Display / Compat fill to local omission after clip failure and continued later drawing. Normal Server integration and saved compact Score replay validation are complete; the full Step 13 completion decision has not been made.
 
 ## 13. The Design of Sway
 
@@ -1802,7 +1802,7 @@ The three layers match the way bonsai is thought about:
 **Thinness is a dimension, not a sway** (engine 16, v2.9.3). It does not belong to the layer where `weight` carries the sway inherent to a material. A tool has a thinness as its default, but thinness itself is a dimension the writer states independently, and it falls **outside the three layers** (material, motion word, Nature plugin). It has steps on the thin side only; there is no vocabulary for the thick side. `Instruction.thinness` (`fine` / `extra_fine`) carries it. **The principle gains no exception; thinness is placed outside the three layers instead.**
 
 The finite visible DDL forms are Japanese `細い` / English `thin` for Fine and
-Japanese `ごく細い` / English `extra-fine` for ExtraFine. The runtime-disconnected shared compiler
+Japanese `ごく細い` / English `extra-fine` for ExtraFine. The shared compiler
 keeps both as typed identities independent of source spelling and carries them from supported direct
 instructions and flat Macro Emits through the common lowerer into the existing
 `Instruction.thinness`. Omission remains `None`; no thick step or open-ended degree synonym is inferred.
@@ -1898,7 +1898,7 @@ and noun.**
 Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
 and by `arrangement` (layout / path / jitter).
 
-In the runtime-disconnected shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` / `trembling` to Perlin; `undulating` to Wave; and `blurring` to Pink. With all three slots absent, `Instruction.variation=None`. With at least one present, only missing amplitude, frequency, and quality receive Medium, Medium, and Perlin respectively. Explicit values win and the dimensions are independent: `trembling` does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
+In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` / `trembling` to Perlin; `undulating` to Wave; and `blurring` to Pink. With all three slots absent, `Instruction.variation=None`. With at least one present, only missing amplitude, frequency, and quality receive Medium, Medium, and Perlin respectively. Explicit values win and the dimensions are independent: `trembling` does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
@@ -2729,8 +2729,8 @@ selected corner; the existing Renderer render seed chooses its anchor within tha
 explicit variation preserve the corner. One rational policy table converts to Score f64 only at the final boundary.
 The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
 Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
-Unsupported noncenter relations remain unsupported and are never silently discarded. This delivery remains disconnected
-from runtime, UI, and persistence and does not complete whole Step10.
+Unsupported noncenter relations remain unsupported and are never silently discarded. The normal shared runtime,
+UI, and persistence path uses this delivery, which does not complete whole Step10.
 
 JSON Score is the machine-readable score produced by Stage 2.  It is not the
 final work; it is the structure that the renderer performs.
@@ -2947,8 +2947,8 @@ is drawable content, and Continue retaining Ground preserves its original omissi
 diagnostics. The default Stop mode rejects the entire Score when the document contains
 unsupported meaning. Explicit OmitAndContinue records the original owner and spans plus
 the actual omitted field or execution unit, and reports a remaining Score only when a
-drawing target survives. Integrity failure or omission of every target is stopped. This
-Rust path is not yet connected to the product runtime.
+drawing target survives. Integrity failure or omission of every target is stopped. The
+normal product runtime uses this Rust path.
 
 Isotropic mark size, circle and arc radii, `radial` rings, `at.region` extent,
 cluster bands, and a path's cross-axis spread become pixels from their allocation
@@ -2984,11 +2984,11 @@ recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## 20. Modes
 
-For invalid sway in the runtime-disconnected typed compiler, Stop returns no new Score.
+For invalid sway in the shared typed compiler, Stop returns no new Score.
 Continue omits the original instruction, malformed Emit, or undeclared caller invocation
 at its existing unit, preserving owner, reason, and actual disposition. Sway does not add
-a new field-level recovery unit. Integrity failures stop both modes. Product runtime,
-UI, and save integration remain incomplete.
+a new field-level recovery unit. Integrity failures stop both modes. The normal Server and
+Web use this compiler and persistence path.
 
 ### Single Drawing
 

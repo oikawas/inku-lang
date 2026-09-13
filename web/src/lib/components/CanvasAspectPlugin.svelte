@@ -1,18 +1,19 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import {
-		CANVAS_ASPECT_OPTIONS,
+		type CanvasAspectOption,
 		type CanvasAspectId,
 	} from '$lib/plugins/system/canvas-aspect';
 
 	type Props = {
 		selected: CanvasAspectId;
+		options: CanvasAspectOption[];
 		open: boolean;
 		onToggle: () => void;
 		onSelect: (id: CanvasAspectId) => void | Promise<void>;
 	};
 
-	let { selected, open = false, onToggle, onSelect }: Props = $props();
+	let { selected, options, open = false, onToggle, onSelect }: Props = $props();
 
 	const isJa = $derived(getLang() === 'ja');
 </script>
@@ -33,7 +34,7 @@
 	{#if open}
 		<div class="aspect-menu" role="menu">
 			<div class="aspect-menu-head">{t().canvasAspectTitle}</div>
-			{#each CANVAS_ASPECT_OPTIONS as option (option.id)}
+			{#each options as option (option.id)}
 				<button
 					type="button"
 					class:selected={option.id === selected}

@@ -1,6 +1,36 @@
 import type { ComposeFallbackState } from '$lib/composeFallback';
 
 export interface LangPack {
+	pipelineDescriptionLabel: string;
+	pipelineLegacyForkHint: string;
+	pipelineDescriptionLocked: string;
+	pipelineFromDescription: string;
+	pipelineForkDescription: string;
+	pipelineSaveDdl: string;
+	pipelineCancel: string;
+	pipelineReload: string;
+	pipelinePerform: string;
+	pipelineWorking: string;
+	pipelineRequestFailed: string;
+	pipelinePatchTitle: string;
+	pipelinePatchHint: string;
+	pipelineCommittedDdl: string;
+	pipelineProposedDdl: string;
+	pipelineApprove: string;
+	pipelineDecline: string;
+	pipelineDiagnostics: string;
+	pipelineNeedsAttention: string;
+	pipelineAttentionReason: (reason: string) => string;
+	pipelineDiagnosticSourceRange: (start: number, end: number) => string;
+	pipelineDiagnosticPart: (kind: string) => string;
+	pipelineDiagnosticOwner: (kind: string, index: number) => string;
+	pipelineDiagnosticReason: (reason: string) => string;
+	pipelineDiagnosticBudgetExceeded: (dimension: string, required: number, maximum: number) => string;
+	pipelineDiagnosticOmitted: (kind: string, index: number | null) => string;
+	pipelineDiagnosticContinued: string;
+	pipelineDiagnosticDetails: string;
+	pipelineDiagnosticUnknown: string;
+	pipelineDrawing: string;
 	code: string;
 	label: string;
 

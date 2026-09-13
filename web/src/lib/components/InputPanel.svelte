@@ -13,7 +13,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import type { DemoSettings } from '$lib/demo';
 	import type { ProviderGroup } from '$lib/models';
-	import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
+	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 
 	type BatchFailure = {
 		line: number;
@@ -33,6 +33,7 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
+		descriptionLocked: boolean;
 		/** The run shows its status elsewhere (the instruction sheet draws its own). */
 		hideRunStatus?: boolean;
 		runTokensIn: number | null;
@@ -80,8 +81,8 @@
 		demoError: string | null;
 		lockNonDemo: boolean;
 		stageLabel: string;
-		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
+		canvasAspectOptions: CanvasAspectOption[];
 		canvasAspectMenuOpen: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
@@ -103,6 +104,7 @@
 		onStartDemo: () => void | Promise<void>;
 		onStopDemo: () => void;
 		onSubmit: () => void | Promise<void>;
+		onForkDescription: () => void | Promise<void>;
 		onStop: () => void;
 	};
 
@@ -114,6 +116,7 @@
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
+		descriptionLocked,
 		hideRunStatus = false,
 		runTokensIn,
 		runTokensOut,
@@ -160,8 +163,8 @@
 		demoError,
 		lockNonDemo,
 		stageLabel,
-		canvasAspectEnabled,
 		canvasAspectId,
+		canvasAspectOptions,
 		canvasAspectMenuOpen,
 		stage1ModelLabel,
 		stage2ModelLabel,
@@ -182,6 +185,7 @@
 		onStartDemo,
 		onStopDemo,
 		onSubmit,
+		onForkDescription,
 		onStop,
 	}: Props = $props();
 
@@ -277,16 +281,15 @@
 					onclick={() => wildSettings.set(!wildSettings.enabled)}
 				>{t().wildButton}</button>
 			</Tooltip>
-			{#if canvasAspectEnabled}
-				<Tooltip text={t().tooltipInputCanvas}>
-					<CanvasAspectPlugin
-						selected={canvasAspectId}
-						open={canvasAspectMenuOpen}
-						onToggle={onToggleCanvasAspectMenu}
-						onSelect={onSelectCanvasAspect}
-					/>
-				</Tooltip>
-			{/if}
+			<Tooltip text={t().tooltipInputCanvas}>
+				<CanvasAspectPlugin
+					selected={canvasAspectId}
+					options={canvasAspectOptions}
+					open={canvasAspectMenuOpen}
+					onToggle={onToggleCanvasAspectMenu}
+					onSelect={onSelectCanvasAspect}
+				/>
+			</Tooltip>
 			<!-- On the description tab this button lives at the right end of the label row
 			     instead, next to the text it clears. -->
 			{#if inputMode === 'batch'}
@@ -349,12 +352,19 @@
 			<LabelHighlight text={input} />
 			<textarea
 				bind:value={input}
+				readonly={descriptionLocked}
 				rows="5"
 				spellcheck="false"
 				placeholder={t().inputPlaceholder}
 				class="input-ta"
 			></textarea>
 		</div>
+		{#if descriptionLocked}
+			<div class="description-lock">
+				<span>{t().pipelineDescriptionLocked}</span>
+				<button type="button" class="ghost-btn" disabled={singleRunning} onclick={onForkDescription}>{t().pipelineForkDescription}</button>
+			</div>
+		{/if}
 		<div class="input-meta-row">
 			<span class="input-comment-hint">{t().inputCommentHint}</span>
 			<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
@@ -597,6 +607,8 @@
 		resize: vertical; outline: none;
 	}
 	.input-ta:focus { border-color: var(--accent); }
+	.input-ta[readonly] { background: var(--bg2); color: var(--fg2); }
+	.description-lock { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--fg2); }
 	.input-meta-row {
 		display: flex;
 		align-items: flex-start;

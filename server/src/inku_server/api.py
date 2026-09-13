@@ -25,6 +25,9 @@ from .api_core.common import _APP_VERSION, _build_number, _env_flag
 from .api_core.deps import _logger
 from .api_core.state import _render_slots
 from .api_core.thumbnails import shutdown_bake_pool
+from .pipeline_api import pipeline_router, register_pipeline_errors
+from .pipeline_runtime import get_binding as _pipeline_binding, get_service as _pipeline_service, shutdown as _shutdown_pipeline
+from .api_core.deps import _current_user
 from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback
 
 
@@ -67,9 +70,11 @@ async def _lifespan(_app: FastAPI):
         # else closes them: they are held in a pool that outlives every request,
         # unlike the rebuild's, which is made and dropped inside one run.
         shutdown_bake_pool()
+        _shutdown_pipeline()
 
 
 app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)
+register_pipeline_errors(app)
 
 
 _db.init_db()
@@ -257,6 +262,7 @@ app.include_router(users.router)
 app.include_router(history.router)
 app.include_router(lineage.router)
 app.include_router(render.router)
+app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding))
 app.include_router(feedback.router)
 
 

@@ -11,6 +11,8 @@ export type HistoryItem = {
 	// listing of works the caller made.
 	shared?: boolean;
 	id?: string;
+	pipeline_variation_id?: string | null;
+	pipeline_revision?: string | null;
 	input: string;
 	source_text?: string | null;
 	display_label?: string | null;

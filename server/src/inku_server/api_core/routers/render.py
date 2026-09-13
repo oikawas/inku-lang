@@ -44,6 +44,7 @@ from ...sketch import (
     sketch_state_of,
 )
 from ... import db as _db
+from ... import pipeline_compat as _pipeline_compat
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
 from ..rendering import COLOR_CATALOG_ID_HEADER, COLOR_SOURCE_HEADER, LIMITS_SOURCE_HEADER, compose_fallback_value, _color_render_metadata, _effective_limits, _limits_for_render, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude, _work_for_color_snapshot
@@ -228,6 +229,9 @@ class ComposeRequest(BaseModel):
     # here and it stands in for the description everywhere the description went.
     sketch_text: str | None = Field(default=None, max_length=100_000, description="写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)")
+    lineage_parent_node_id: str | None = None
+    derivation_kind: str | None = None
+    derivation_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class ComposeResponse(BaseModel):
@@ -237,7 +241,9 @@ class ComposeResponse(BaseModel):
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
-    score: Score
+    # Score 0.10 is the shared core's opaque delivery document. Compatibility
+    # routes must not expand or coerce it through the retired Python model.
+    score: dict
     svg: str
     stage2_model: str | None = None
     stage2_prompt_digest: str | None = None
@@ -298,6 +304,9 @@ class ComposeResponse(BaseModel):
     # the row it writes has no record of the layer at all.
     sketch_state: str | None = None
     trace: dict | None = None
+    pipeline_variation_id: str | None = None
+    pipeline_execution_id: str | None = None
+    pipeline_revision: str | None = None
 
 
 class InterpretRequest(BaseModel):
@@ -382,7 +391,7 @@ class PaintResponse(BaseModel):
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
     thinking: str | None = None
-    score: Score
+    score: dict
     svg: str
     stage1_model: str | None = None
     stage2_model: str | None = None
@@ -459,6 +468,9 @@ class PaintResponse(BaseModel):
     # different readers, and the flag says nothing about the other four states.
     sketch_state: str | None = None
     trace: dict | None = None
+    pipeline_variation_id: str | None = None
+    pipeline_execution_id: str | None = None
+    pipeline_revision: str | None = None
 
 
 class RenderSvgRequest(BaseModel):
@@ -495,7 +507,9 @@ class RenderScoreRequest(BaseModel):
 
 
 class RenderScoreResponse(BaseModel):
-    score: Score
+    score: Score | dict
+    render_diagnostics: dict | None = None
+    resource_execution: dict | None = None
     svg: str
     catalog_id: str
     ddl_version: str
@@ -1425,8 +1439,7 @@ def api_variation_seeds(
     return VariationSeedsResponse(amplitude=amplitude, seeds=seeds)
 
 
-@router.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
-def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
+def _legacy_api_compose(req: ComposeRequest, actor: dict) -> ComposeResponse:
     # The author's leading numbers and bracketed comments are their document,
     # not their description: they are cut once, here, so that no layer -- Stage
     # 0.5 included -- and no client can read them.  req.description stays whole
@@ -1609,8 +1622,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     )
 
 
-@router.post("/api/interpret")
-def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
+def _legacy_api_interpret(req: InterpretRequest, actor: dict) -> dict:
     # The author's leading numbers and bracketed comments are their document,
     # not their description: they are cut once, here, so that no layer -- Stage
     # 0.5 included -- and no client can read them.  req.description stays whole
@@ -1781,6 +1793,10 @@ def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
 
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    if req.score.get("version") == "0.10.0":
+        from ...pipeline_runtime import get_service
+        work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
+        return RenderScoreResponse(**get_service().replay_for(actor["id"], req.model_dump(), work))
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     # Outside the try: a 404 for an unknown work is the answer, not a render
     # failure to be relabelled 422 by the handler below.
@@ -1851,6 +1867,15 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
 
 @router.post("/api/render-svg")
 def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) -> Response:
+    if req.score.get("version") == "0.10.0":
+        from ...pipeline_runtime import get_service
+        work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
+        result = get_service().replay_for(actor["id"], req.model_dump(), work)
+        return Response(content=result["svg"], media_type="image/svg+xml; charset=utf-8", headers={
+            COLOR_SOURCE_HEADER: result["render_color_source"],
+            COLOR_CATALOG_ID_HEADER: result["render_color_catalog_id"],
+            LIMITS_SOURCE_HEADER: result["render_limits_source"],
+        })
     render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
     work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
@@ -2303,8 +2328,7 @@ def _paint_events(
     yield {"event": "done", "response": response}
 
 
-@router.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
-def api_paint(
+def _legacy_api_paint(
     req: PaintRequest,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
@@ -2315,8 +2339,7 @@ def api_paint(
     raise _unexpected_http_error("paint", 500)
 
 
-@router.post("/api/paint/stream")
-def api_paint_stream(
+def _legacy_api_paint_stream(
     req: PaintRequest,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
@@ -2366,6 +2389,52 @@ def api_paint_stream(
                 {"event": "error", "status": 500, "detail": "unexpected error"},
                 ensure_ascii=False,
             ) + "\n"
+
+    return StreamingResponse(
+        lines(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
+def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> dict:
+    """Run the old Stage-2 URL through the shared authority pipeline."""
+    return _pipeline_compat.compose(actor["id"], req.model_dump(mode="json"))
+
+
+@router.post("/api/interpret")
+def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
+    """Project the shared pipeline's committed document for old callers."""
+    return _pipeline_compat.interpret(actor["id"], req.model_dump(mode="json"))
+
+
+@router.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
+def api_paint(
+    req: PaintRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> dict:
+    return _pipeline_compat.paint(
+        actor["id"], req.model_dump(mode="json"), idempotency_key
+    )
+
+
+@router.post("/api/paint/stream")
+def api_paint_stream(
+    req: PaintRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> StreamingResponse:
+    # The shared core owns progress and durable resumption. The compatibility
+    # stream therefore sends its final projection as one NDJSON record; a patch
+    # approval remains an HTTP 409 before streaming starts.
+    result = _pipeline_compat.paint(
+        actor["id"], req.model_dump(mode="json"), idempotency_key
+    )
+
+    def lines() -> Iterator[str]:
+        yield json.dumps({"event": "done", **result}, ensure_ascii=False) + "\n"
 
     return StreamingResponse(
         lines(),

@@ -403,7 +403,12 @@ dependencies = [
 name = "inku-pipeline-uniffi"
 version = "0.1.0"
 dependencies = [
+ "inku-ddl",
  "inku-pipeline",
+ "inku-render",
+ "inku-score",
+ "serde",
+ "serde_json",
  "uniffi",
 ]
 

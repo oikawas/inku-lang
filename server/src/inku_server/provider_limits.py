@@ -39,7 +39,7 @@ def _semaphore_for(provider_id: str, limit: int) -> threading.BoundedSemaphore:
 
 
 @contextmanager
-def provider_slot(provider_id: str | None) -> Iterator[None]:
+def provider_slot(provider_id: str | None, *, timeout: float | None = None) -> Iterator[None]:
     """Wait for a free slot on this provider, or pass straight through."""
     limit = provider_concurrency_limit(str(provider_id or ""))
     if limit <= 0:
@@ -48,7 +48,9 @@ def provider_slot(provider_id: str | None) -> Iterator[None]:
     # Released on the same object it was taken from, so a definition changing
     # mid-flight cannot push a BoundedSemaphore past its ceiling.
     semaphore = _semaphore_for(str(provider_id), limit)
-    semaphore.acquire()
+    acquired = semaphore.acquire() if timeout is None else semaphore.acquire(timeout=timeout)
+    if not acquired:
+        raise TimeoutError("provider slot deadline expired")
     try:
         yield
     finally:

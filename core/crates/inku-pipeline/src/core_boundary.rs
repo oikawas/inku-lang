@@ -513,6 +513,17 @@ impl ClipPolicy {
     }
 }
 
+/// Replay without changing the saved Score, under independent host policies.
+pub fn render_saved_score(
+    request: RenderRequest,
+    hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+    clip: ClipPolicy,
+) -> Result<RenderOutput, BoundaryError> {
+    render_with_resources(request, hard_policy, operational_budget, clip.resolved()?)
+        .map_err(BoundaryError::Render)
+}
+
 /// Render only the Score and identities produced by the matching compiler options.
 pub fn render_delivery(
     delivery: &CompiledDelivery,

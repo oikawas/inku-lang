@@ -19,6 +19,7 @@ type RefinementWork = Pick<WorkState,
 	'ddlGeneratedBaseline' | 'displayedHistoryItem' | 'elapsedStage1Ms' | 'elapsedStage2Ms' |
 	'elapsedTotalMs' | 'error' | 'expandedDdl' | 'input' | 'instructionLang' | 'loading' |
 	'paintOne' | 'paintTokensIn' | 'paintTokensOut' | 'reloadError' | 'reloading' | 'result' |
+	'pipelineCompatibilityError' |
 	'sketchPayloadFor' | 'sketchTextFor' | 'stopTimer' | 'thinking' | 'tokensInStage1' |
 	'tokensInStage2' | 'tokensOutStage1' | 'tokensOutStage2'
 >;
@@ -98,7 +99,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		work.reloading = true;
 		work.reloadError = null;
 		try {
-			const redrawn = await runTouchRedraw({
+		const redrawn = await runTouchRedraw({
 				current: work.result,
 				canvasAspectId: refinementCanvasAspectId(),
 				parentNodeId,
@@ -331,7 +332,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
 			})
 		});
-		if (!r.ok) throw await apiError(r);
+		if (!r.ok) throw await work.pipelineCompatibilityError(r);
 		const data = await r.json();
 		return { id: `comp-${compositionSeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? 'layout_change' : null, derivation_metadata: { composition_seed: compositionSeed } } };
 	}
@@ -417,7 +418,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
 			})
 		});
-		if (!r.ok) throw await apiError(r);
+		if (!r.ok) throw await work.pipelineCompatibilityError(r);
 		const data = await r.json();
 		return {
 			id: `variation-${amplitude}-${seed}`,

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -130,6 +131,102 @@ class HistoryRow(Base):
     coerce_trace_version = Column(Integer, nullable=True)
     coerce_catalog_digest = Column(String, nullable=True)
     coerce_trace = Column(Text, nullable=True)
+
+
+class VariationAuthorityRow(Base):
+    """Candidate authoring state, separate from immutable legacy history."""
+
+    __tablename__ = "variation_authority"
+    __table_args__ = (
+        CheckConstraint(
+            "origin IN ('stage1_generated', 'user_authored_ddl')",
+            name="ck_variation_authority_origin",
+        ),
+        CheckConstraint(
+            "authority IN "
+            "('description_authoritative', 'ddl_authoritative', 'legacy_unknown')",
+            name="ck_variation_authority_value",
+        ),
+        CheckConstraint(
+            "(derivation_kind = 'new' "
+            "AND parent_legacy_history_id IS NULL "
+            "AND parent_variation_id IS NULL) "
+            "OR (derivation_kind IN "
+            "('legacy_ddl_fork', 'legacy_description_fork') "
+            "AND parent_legacy_history_id IS NOT NULL "
+            "AND parent_variation_id IS NULL) "
+            "OR (derivation_kind IN ('description_fork', 'variation_ddl_fork') "
+            "AND parent_legacy_history_id IS NULL "
+            "AND parent_variation_id IS NOT NULL)",
+            name="ck_variation_authority_parent",
+        ),
+    )
+
+    owner_id = Column(String, primary_key=True)
+    variation_id = Column(String, primary_key=True)
+    protocol_version = Column(String, nullable=False)
+    # Canonical decimal string: bindings and SQLite integers must not truncate u64.
+    revision = Column(String, nullable=False)
+    origin = Column(String, nullable=False)
+    authority = Column(String, nullable=False)
+    source = Column(Text, nullable=False)
+    document_json = Column(Text, nullable=False)
+    ddl_digest = Column(String, nullable=False)
+    authority_digest = Column(String, nullable=False)
+    description = Column(Text, nullable=False, default="")
+    derivation_kind = Column(String, nullable=False, default="new")
+    parent_legacy_history_id = Column(String, nullable=True)
+    parent_variation_id = Column(String, nullable=True)
+    updated_at = Column(BigInteger, nullable=False)
+
+
+class VariationAuthorityActionRow(Base):
+    """Durable acknowledgment for one logical shared-core commit action."""
+
+    __tablename__ = "variation_authority_actions"
+
+    owner_id = Column(String, primary_key=True)
+    action_id = Column(String, primary_key=True)
+    variation_id = Column(String, nullable=False)
+    request_digest = Column(String, nullable=False)
+    action_fingerprint = Column(String, nullable=False)
+    context_fingerprint = Column(String, nullable=False)
+    ddl_digest = Column(String, nullable=False)
+    revision = Column(String, nullable=False)
+    authority_digest = Column(String, nullable=False)
+    committed_at = Column(BigInteger, nullable=False)
+
+
+class PipelineCandidateExecutionRow(Base):
+    """Opaque host wrapper bytes for exact candidate execution resumption."""
+
+    __tablename__ = "pipeline_candidate_executions"
+
+    owner_id = Column(String, primary_key=True)
+    execution_id = Column(String, primary_key=True)
+    variation_id = Column(String, nullable=False, index=True)
+    sequence = Column(String, nullable=False)
+    state_bytes = Column(LargeBinary, nullable=False)
+    # Adapter-local byte integrity only; this is not a core snapshot digest.
+    state_digest = Column(String, nullable=False)
+    created_at = Column(BigInteger, nullable=False)
+    updated_at = Column(BigInteger, nullable=False, index=True)
+
+
+class PipelineHistoryLinkRow(Base):
+    """Server-owned link from an immutable performance to its authoring revision."""
+
+    __tablename__ = "pipeline_history_links"
+    owner_id = Column(String, primary_key=True)
+    history_id = Column(String, primary_key=True)
+    variation_id = Column(String, nullable=False, index=True)
+    revision = Column(String, nullable=False)
+    ddl_digest = Column(String, nullable=False)
+    # Exact trusted inputs required to fork this immutable performance. The
+    # execution table is a mutable latest-snapshot CAS and cannot recover an
+    # older revision without this per-history copy.
+    fork_context_bytes = Column(LargeBinary, nullable=False)
+    fork_context_digest = Column(String, nullable=False)
 
 
 class CoerceTraceCatalogRow(Base):
@@ -317,4 +414,3 @@ class AppSettingRow(Base):
     key   = Column(String, primary_key=True)
     value = Column(Text, nullable=False)
     at    = Column(BigInteger, nullable=False, index=True)
-

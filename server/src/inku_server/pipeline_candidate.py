@@ -1,7 +1,7 @@
-"""Short-lived acceptance host for the shared Rust authoring pipeline.
+"""Serialized host execution for the shared Rust authoring pipeline.
 
-Never imported by the ordinary API/router. Configuration, bundle location and
-owner identity come from a trusted harness. Clients cannot submit snapshots,
+Configuration, bundle location and owner identity come from the trusted server.
+Clients cannot submit snapshots,
 authority sidecars, effect results or resource policies through this module.
 """
 
@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from .persistence.variation_authority import VariationAuthorityStore
+from .persistence.variation_authority import VariationAuthoringContext, VariationAuthorityStore
 
 
 class CandidateHostError(ValueError):
@@ -56,6 +56,11 @@ class PipelineBinding:
         if self.versions != {"binding_version": "1.0.0", "protocol_version": "1.0.0"}:
             raise CandidateHostError("binding_protocol_mismatch")
         self.step = module.step
+        # Older Step12 bundles remain useful for their existing byte fixtures.
+        self.canvas_registry = json.loads(module.canvas_registry()) if hasattr(module, "canvas_registry") else None
+        self.resolve_palette = getattr(module, "resolve_palette", None)
+        self.render_saved = getattr(module, "render_saved", None)
+        self.resolve_macro_catalog = getattr(module, "resolve_macro_catalog", None)
 
 
 class CandidateExecution:
@@ -63,19 +68,23 @@ class CandidateExecution:
 
     The provider callback performs exactly one transport attempt and returns an
     EffectResult. Only Rust selects retries, completion and fallback. The caller
-    owns saving the returned bytes/transcript for a comparison run; this class is
-    not a persistent product session service.
+    owns saving the returned bytes through save_snapshot.
     """
 
     def __init__(
         self, binding: PipelineBinding, store: VariationAuthorityStore, *,
         owner_id: str, config: dict, provider: Callable[[dict], dict],
         allow_render: bool = False,
+        context: dict | None = None,
+        save_snapshot: Callable[[dict | None, dict, dict, dict | None], None] | None = None,
     ):
         self.binding, self.store, self.owner_id = binding, store, owner_id
         self.config = json.loads(_bytes(config))
         self.provider = provider
         self.allow_render = allow_render
+        self.context = json.loads(_bytes(context or {}))
+        self.save_snapshot = save_snapshot
+        self._rendered: dict | None = None
         self._snapshot: dict | None = None
         self._lock = threading.RLock()
         self._fresh = False
@@ -112,7 +121,23 @@ class CandidateExecution:
         with self._lock:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
-            return self._advance(payload)
+            previous_context = self.context
+            if payload["tag"] == "generate_from_description":
+                self.context = {**self.context, "description": payload.get("description", "")}
+            try:
+                return self._advance(payload)
+            except Exception:
+                self.context = previous_context
+                raise
+
+    def restore(self, snapshot: dict, *, rendered: dict | None = None) -> None:
+        """Restore only trusted host persistence; never accept client snapshots."""
+        with self._lock:
+            if self._snapshot is not None:
+                raise CandidateHostError("execution_already_started")
+            self._snapshot = json.loads(_bytes(snapshot))
+            self._rendered = rendered
+            self._fresh = snapshot["authority"]["revision"] == "0"
 
     def run_effect(self) -> dict | None:
         """Execute the current effect once. No effect means author input is next."""
@@ -123,11 +148,26 @@ class CandidateExecution:
                 raise CandidateHostError("provider_effect_in_flight")
             action = json.loads(_bytes(self._snapshot["action"]))
             if action["tag"] == "commit_visible_normalized_ddl":
+                context = None
+                if self.context:
+                    generated = action["payload"]["reason"] == "stage1_generated"
+                    description = self.context.get("description", "") if generated else self.context.get("committed_description", self.context.get("description", ""))
+                    context = VariationAuthoringContext(
+                        description=description,
+                        derivation_kind=self.context.get("derivation_kind", "new"),
+                        parent_legacy_history_id=self.context.get("parent_legacy_history_id"),
+                        parent_variation_id=self.context.get("parent_variation_id"),
+                    )
                 result = self.store.commit_effect(
-                    self.owner_id, action, create_if_missing=self._fresh
+                    self.owner_id, action, create_if_missing=self._fresh,
+                    authoring_context=context,
                 )
                 if result["tag"] == "visible_normalized_ddl_committed":
                     self._fresh = False
+                    if context is not None:
+                        self.context["committed_description"] = context.description
+                        if action["payload"]["authority"]["next_state"]["authority"] == "ddl_authoritative":
+                            self.context["description"] = context.description
                 return self._advance({"tag": "effect_result", "result": result})
             self._provider_in_flight = True
         try:
@@ -151,9 +191,23 @@ class CandidateExecution:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
             state = self._snapshot
-            return json.loads(_bytes({key: state[key] for key in (
+            result = {key: state[key] for key in (
                 "execution_id", "variation_id", "sequence", "authority", "document", "phase", "delivery"
-            )}))
+            )}
+            result.update({"description": self.context.get("description", ""),
+                           "parent": self.context.get("parent"),
+                           "busy": state["action"] is not None,
+                           "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
+                           "rendered": self._rendered,
+                           "result": self.context.get("result")})
+            return json.loads(_bytes(result))
+
+    def snapshot(self) -> dict:
+        """Internal harness/export API, not exposed on the HTTP author surface."""
+        with self._lock:
+            if self._snapshot is None:
+                raise CandidateHostError("execution_not_started")
+            return json.loads(_bytes(self._snapshot))
 
     def _advance(self, payload: dict) -> dict:
         limits = self.config["envelope_limits"]
@@ -174,6 +228,16 @@ class CandidateExecution:
         self.transcript.append({"input": envelope, "output": output})
         if output["kind"] == "error":
             raise CandidateHostError(output["payload"]["code"])
-        self._snapshot = output["payload"]["result"]["snapshot"]
+        result = output["payload"]["result"]
+        next_snapshot = result["snapshot"]
+        rendered = result["rendered"]
+        # A committed edit invalidates the previous performance. Keep it only
+        # when the same acknowledged source and Score remain active.
+        if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
+            rendered = self._rendered
+        if self.save_snapshot is not None:
+            self.save_snapshot(state, next_snapshot, self.context, rendered)
+        self._snapshot = next_snapshot
+        self._rendered = rendered
         self.last_output = output
         return output

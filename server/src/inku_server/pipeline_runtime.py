@@ -1,0 +1,63 @@
+"""Normal Server composition of the shared core and host effects.
+
+The configuration file contains explicit deployment policies and definitions,
+never credentials. There is no old/new runtime selector or Python fallback.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+from pathlib import Path
+
+from .pipeline_candidate import PipelineBinding
+
+_binding: PipelineBinding | None = None
+_service = None
+_lock = threading.RLock()
+
+
+def get_binding() -> PipelineBinding:
+    global _binding
+    with _lock:
+        if _binding is None:
+            bundle = Path(os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE", str(Path(__file__).parent / "native" / "pipeline")))
+            _binding = PipelineBinding(bundle)
+        return _binding
+
+
+def get_service():
+    global _service
+    with _lock:
+        if _service is not None:
+            return _service
+        path = os.environ.get("INKU_PIPELINE_CONFIG")
+        from . import db
+        from .pipeline_api import PipelineService
+        from .pipeline_product import ProductPipelineEffects
+        from .pipeline_defaults import default_manifest
+        from .persistence.variation_authority import VariationAuthorityStore
+
+        binding = get_binding()
+        manifest = json.loads(Path(path).read_bytes()) if path else default_manifest(binding)
+        effects = ProductPipelineEffects(binding, manifest)
+        limits = manifest["host_limits"]
+        _service = PipelineService(
+            binding, VariationAuthorityStore(db.engine), config_for=effects.settings.config_for,
+            provider_for=lambda owner: effects.provider_for(owner, {}), render_for=None,
+            prepare_for=effects.prepare, provider_with_context=effects.provider_for,
+            render_with_context=effects.render_options, project_result=effects.save_result,
+            replay_for=effects.replay,
+            max_workers=limits["max_workers"], max_effect_steps=limits["max_effect_steps"],
+            max_retained_runs=limits["max_retained_runs"],
+        )
+        return _service
+
+
+def shutdown() -> None:
+    global _service
+    with _lock:
+        if _service is not None:
+            _service.close()
+            _service = None

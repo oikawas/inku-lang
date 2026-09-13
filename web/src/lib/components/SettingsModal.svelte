@@ -53,7 +53,6 @@
 		exportTemplateStatus: string | null;
 		animationExportSettings: AnimationExportSettings;
 		cardExportSettings: CardExportSettings;
-		canvasAspectEnabled: boolean;
 		onChooseDownloadFolder: () => void | Promise<void>;
 		onClearDownloadFolder: () => void | Promise<void>;
 		onSetStage1Provider: (provider: Provider) => void;
@@ -64,7 +63,6 @@
 		onSetVisionModel: (model: string) => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
-		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
 		onAddExportTemplate: () => void | Promise<void>;
 		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => void | Promise<void>;
 		onRemoveExportTemplate: (id: string) => void | Promise<void>;
@@ -104,7 +102,6 @@
 		exportTemplateStatus,
 		animationExportSettings = $bindable(),
 		cardExportSettings = $bindable(),
-		canvasAspectEnabled,
 		onChooseDownloadFolder,
 		onClearDownloadFolder,
 		onSetStage1Provider,
@@ -115,7 +112,6 @@
 		onSetVisionModel,
 		onLogin,
 		onLogout,
-		onSetCanvasAspectEnabled,
 		onAddExportTemplate,
 		onUpdateExportTemplate,
 		onRemoveExportTemplate,
@@ -315,10 +311,10 @@
 				<PluginAdministrationSettings
 					pluginsStatus={settingsStatus?.plugins ?? null}
 					{settingsStatusError} {settingsStatusLoading} pluginActionStatus={settings.pluginActionStatus}
-					{isAdmin} {canvasAspectEnabled} onLoadSettingsStatus={settings.loadStatus}
+					{isAdmin} onLoadSettingsStatus={settings.loadStatus}
 					onLoadPluginContent={settings.loadPluginContent} onSavePlugin={settings.savePlugin}
 					onCreatePlugin={settings.createPlugin} onDeletePlugin={settings.deletePlugin}
-					onSetPluginEnabled={settings.setPluginEnabled} {onSetCanvasAspectEnabled}
+					onSetPluginEnabled={settings.setPluginEnabled}
 				/>
 		{:else if settingsTab === 'users'}
 			<UserAdministrationSettings

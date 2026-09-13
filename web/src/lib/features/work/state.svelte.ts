@@ -25,6 +25,8 @@ import { HistoryBrowsingState } from '$lib/features/history/browsing-state.svelt
 import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
+import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView } from '$lib/features/pipeline/api';
+import { PipelineController } from '$lib/features/pipeline/controller';
 
 type Iteration = HistoryItem;
 type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null; };
@@ -213,6 +215,143 @@ export function createWorkState(deps: WorkStateDeps) {
 	// ── History ─────────────────────────────────────────────
 	let displayedHistoryItem = $state<Iteration | null>(null);
 
+	// The persisted pipeline is the authority for every newly authored single
+	// work. A selected history row remains the immutable performance on screen;
+	// its id records the exact parent that a subsequent author action must fork.
+	let pipelineView = $state<PipelineView | null>(null);
+	let pipelineBusy = $state(false);
+
+	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
+		const render = renderSettingsPayload('paint', options.renderOverrides);
+		return {
+			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
+			stage2_model: options.stage2Model ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
+			instruction_lang: instructionLang,
+			ui_lang: getLang(),
+			catalog_id: typeof render.catalog_id === 'string' ? render.catalog_id : colorCatalogSettings.effectiveId,
+			catalog_mode: typeof render.catalog_mode === 'string' ? render.catalog_mode : undefined,
+			canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
+			render_seed: options.renderSeed,
+			composition_seed: options.compositionSeed,
+			wild: typeof render.wild === 'boolean' ? render.wild : undefined,
+			variation_amplitude: options.variationAmplitude,
+			variation_seed: options.variationSeed,
+			interpretation_seed: options.interpretationSeed,
+			seed_text: options.seedText,
+			history_display_label: options.displayLabel,
+			batch_line_number: options.batchLineNumber,
+			batch_run_id: options.batchRunId,
+			history_visibility: options.historyVisibility,
+			lineage_parent_node_id: options.lineageParentNodeId ?? undefined,
+			derivation_kind: options.derivationKind ?? undefined,
+			derivation_metadata: options.derivationMetadata,
+			count_generation: options.countGeneration ?? true,
+		};
+	}
+
+	function adoptPipelineView(view: PipelineView | null): void {
+		pipelineView = view;
+		if (!view) return;
+		input = view.description;
+		stage1UserPrompt = view.description;
+		if (view.document?.source) {
+			ddl = view.document.source;
+			ddlGeneratedBaseline = view.document.source;
+		}
+		if (!view.result) return;
+		const painted = view.result;
+		result = painted;
+		expandedDdl = painted.ddl ?? view.document?.source ?? null;
+		thinking = painted.thinking ?? null;
+		elapsedStage1Ms = painted.elapsed_stage1_ms;
+		elapsedStage2Ms = painted.elapsed_stage2_ms;
+		elapsedTotalMs = painted.elapsed_total_ms;
+		tokensInStage1 = painted.tokens_in_stage1;
+		tokensOutStage1 = painted.tokens_out_stage1;
+		tokensInStage2 = painted.tokens_in_stage2;
+		tokensOutStage2 = painted.tokens_out_stage2;
+		deps.showCanvas();
+		canvasViewport.fit();
+	}
+
+	const pipelineController = new PipelineController(
+		new PipelineApi(apiFetch),
+		() => pipelineOptions(),
+		adoptPipelineView,
+	);
+
+	async function pipelineCompatibilityError(response: Response): Promise<Error> {
+		const payload = await response.json().catch(() => ({})) as { detail?: unknown };
+		const current = pipelineViewFromErrorDetail(payload.detail);
+		if (current) pipelineController.adopt(current);
+		const message = payload.detail && typeof payload.detail === 'object' && 'message' in payload.detail
+			? String((payload.detail as { message: unknown }).message)
+			: describeApiError(payload.detail, response.status);
+		return new Error(message);
+	}
+
+	async function finishPipeline(run: () => Promise<PipelineView>): Promise<PipelineView> {
+		pipelineBusy = true;
+		error = null;
+		reloadError = null;
+		try {
+			const view = await run();
+			if (view.result?.history_id) {
+				await deps.history().fetchOffset(0, { anchorId: view.result.history_id });
+				displayedHistoryItem = deps.history().items.find((item) => item.id === view.result?.history_id) ?? null;
+				await lineageState.loadNearby(view.result.history_id);
+			}
+			return view;
+		} catch (cause) {
+			if (cause instanceof PipelineApiError && cause.detail.current_view) {
+				adoptPipelineView(cause.detail.current_view);
+			}
+			throw cause;
+		} finally {
+			pipelineBusy = false;
+		}
+	}
+
+	function selectLegacyHistory(historyId: string): void {
+		if (pipelineView?.result?.history_id === historyId) return;
+		pipelineController.markLegacy(historyId);
+	}
+
+	async function selectHistoryAuthority(historyId: string, variationId?: string | null): Promise<void> {
+		if (!variationId) {
+			selectLegacyHistory(historyId);
+			return;
+		}
+		pipelineController.markLinkedHistory(historyId);
+	}
+
+	function beginNewAuthoring(): void {
+		pipelineController.clear();
+	}
+
+	async function authorDescription(text: string, options: PaintOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
+		return finishPipeline(() => pipelineController.fromDescription(text, pipelineOptions(options), signal));
+	}
+
+	async function authorDdl(source: string, options: PaintOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
+		return finishPipeline(() => pipelineController.fromDdl(source, pipelineOptions(options), signal));
+	}
+
+	async function forkPipelineDescription(): Promise<void> {
+		if (pipelineBusy || !pipelineView) return;
+		await finishPipeline(() => pipelineController.forkDescription());
+	}
+
+	async function approvePipelinePatch(): Promise<void> {
+		if (pipelineBusy) return;
+		await finishPipeline(() => pipelineController.approvePatch());
+	}
+
+	async function declinePipelinePatch(): Promise<void> {
+		if (pipelineBusy) return;
+		await finishPipeline(() => pipelineController.declinePatch());
+	}
+
 	// Which works this screen has already asked about. Kept here and not on the
 	// server: the question is about this sitting, not about the work (contract
 	// §5-7). See $lib/fallbackRefineGate.
@@ -348,7 +487,8 @@ export function createWorkState(deps: WorkStateDeps) {
 				},
 				loadNearbyHistory: lineageState.loadNearby,
 				attachSavedLineage: () => { lineageDetached = false; },
-				updateGenerationCount: (count) => session.updateGenerationCount(count)
+				updateGenerationCount: (count) => session.updateGenerationCount(count),
+				adoptPipelineView: (view) => pipelineController.adopt(view)
 			}
 		);
 	}
@@ -379,8 +519,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown; };
-			throw new Error(describeApiError(d.detail, r.status));
+			throw await pipelineCompatibilityError(r);
 		}
 		const data = await r.json() as {
 			ddl: string;
@@ -449,8 +588,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			})
 		});
 		if (!r.ok) {
-			const d = await r.json().catch(() => ({})) as { detail?: unknown; };
-			throw new Error(describeApiError(d.detail, r.status));
+			throw await pipelineCompatibilityError(r);
 		}
 		const data = await r.json() as {
 			score: Score;
@@ -581,23 +719,12 @@ export function createWorkState(deps: WorkStateDeps) {
 		// Sketching (Stage 0.5). The grain edge fires only when the grain differs from
 		// the parent's, exactly as description_edit fires only when the text does;
 		// one edge, one cause, so a changed description stays a description edit.
-		const submitParentGrain = normalizeSketchGrain(displayedHistoryItem?.sketch_grain);
-		const submitGrain = sketchGrainOf(sketchMode);
-		const submitGrainChanged = submitGrain !== submitParentGrain;
 		const submitDerivationKind: DerivationKind | null = submitDerivationKindOf({
 			hasParent: submitParentNodeId !== null,
 			canvasAspectChanged: canvasAspectDerivation !== null,
 			textChanged: submitTextChanged,
-			grainChanged: submitGrainChanged
+			grainChanged: false,
 		});
-		// A redraw at the same grain replays the prose it was painted from; the
-		// layer is not deterministic, so calling it again would not be a replay.
-		// An edited prose wins over the stored one, and a changed grain has to be
-		// written anew.
-		const sketchEdited = sketchDraft.trim() !== '' && sketchDraft.trim() !== (sketchText ?? '').trim();
-		const submitSketchText = sketchEdited
-			? sketchDraft.trim()
-			: (!submitTextChanged && !submitGrainChanged ? sketchText : null);
 		const submitDerivationMetadata = canvasAspectDerivation
 			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
 			: {};
@@ -613,47 +740,17 @@ export function createWorkState(deps: WorkStateDeps) {
 
 		try {
 			stageLabel = t().stageDdlGenerating;
-			const r = await paintOne(input, {
+			const view = await authorDescription(input, {
 				sourceText: input,
 				canvasAspectId: effectiveCanvasAspectId(),
 				lineageParentNodeId: submitParentNodeId,
-				sketchText: submitSketchText,
 				derivationKind: submitDerivationKind,
 				derivationMetadata: submitDerivationMetadata,
-				signal: abortController.signal,
-				onStage1: (stage1) => {
-					elapsedStage1Ms = stage1.elapsed_ms;
-					tokensInStage1 = stage1.tokens_in;
-					tokensOutStage1 = stage1.tokens_out;
-					ddl = stage1.ddl;
-					expandedDdl = null;
-					ddlGeneratedBaseline = stage1.ddl;
-					thinking = stage1.thinking;
-					stageLabel = t().stageImageGenerating;
-					reloading = true;
-				}
-			});
+			}, abortController.signal);
 			if (submitStopRequested) return;
-			reloading = false;
-			elapsedStage1Ms = r.elapsed_stage1_ms;
-			elapsedStage2Ms = r.elapsed_stage2_ms;
-			elapsedTotalMs = r.elapsed_total_ms;
-			tokensInStage1 = r.tokens_in_stage1;
-			tokensOutStage1 = r.tokens_out_stage1;
-			tokensInStage2 = r.tokens_in_stage2;
-			tokensOutStage2 = r.tokens_out_stage2;
-			ddl = r.source_ddl ?? r.ddl;
-			expandedDdl = r.ddl;
-			ddlGeneratedBaseline = ddl;
-			thinking = r.thinking;
-			result = r; deps.showCanvas();
-			adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
-			canvasViewport.fit();
-			if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
+			if (view.result?.history_id && submitAbortController === abortController && !submitStopRequested) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 				lineageDetached = false;
-				await deps.history().fetchOffset(0, { anchorId: r.history_id });
-				displayedHistoryItem = deps.history().items.find((item) => item.id === r.history_id) ?? null;
 			}
 		} catch (cause) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
@@ -713,12 +810,14 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (activeRunMode !== 'single') return;
 		submitStopRequested = true;
 		submitAbortController?.abort();
+		void pipelineController.cancel();
 	}
 
 	function stopReplay() {
 		if (!reloading) return;
 		replayStopRequested = true;
 		replayAbortController?.abort();
+		void pipelineController.cancel();
 	}
 
 	function stopDdlRender() {
@@ -754,119 +853,23 @@ export function createWorkState(deps: WorkStateDeps) {
 		reloading = true; reloadError = null;
 		displayedHistoryItem = null;
 		deps.history().clearSelection();
-		const uiLang = getLang();
 		const replayInput = input;
-		const startedAt = Date.now();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		stageLabel = t().stageStructuring('');
 		startTimer();
 		try {
-			const resolvedStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
-			const r = await apiFetch('/api/compose', {
-				method: 'POST',
-				signal: abortController.signal,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					ddl,
-					model: resolvedStage2Model,
-					description: replayInput,
-					...sketchPayloadFor(replayInput),
-					instruction_lang: instructionLang,
-					ui_lang: uiLang,
-					canvas_aspect: effectiveCanvasAspectId(),
-					auto_repair: ddlAutoRepairEnabled,
-					...renderSettingsPayload('compose')
-				})
-			});
-			if (!r.ok) {
-				const d = await r.json().catch(() => ({})) as { detail?: unknown; };
-				throw new Error(describeApiError(d.detail, r.status));
-			}
-			const d = await r.json() as {
-				score: Score;
-				svg: string;
-				stage2_model?: string | null;
-				render_build_number?: string | null;
-				render_color_profile?: Record<string, string> | null;
-				render_engine_id?: string | null;
-				render_engine_version?: string | null;
-				render_color_catalog_id?: string | null;
-				render_color_catalog_name?: string | null;
-				render_color_catalog_sub?: string | null;
-				render_color_map?: Record<string, string> | null;
-				render_canvas_aspect?: string | null;
-				render_canvas_aspect_id?: string | null;
-				render_canvas_aspect_ratio?: number | null;
-				render_seed?: number | null;
-				render_wild?: boolean | null;
-				composition_seed?: number | null;
-				instruction_lang_requested?: string | null;
-				instruction_lang_resolved?: string | null;
-				ui_lang?: string | null;
-				render_hash?: string | null;
-				render_hash_short?: string | null;
-				tokens_in: number | null;
-				tokens_out: number | null;
-			};
-			const elapsedMs = Date.now() - startedAt;
-			const resolvedStage1Model = result?.stage1_model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
-			const savedStage2Model = d.stage2_model ?? resolvedStage2Model;
-			const replayMetadata = {
-				render_build_number: d.render_build_number,
-				render_color_profile: d.render_color_profile,
-				render_engine_id: d.render_engine_id,
-				render_engine_version: d.render_engine_version,
-				render_color_catalog_id: d.render_color_catalog_id,
-				render_color_catalog_name: d.render_color_catalog_name,
-				render_color_catalog_sub: d.render_color_catalog_sub,
-				render_color_map: d.render_color_map,
-				render_canvas_aspect: d.render_canvas_aspect,
-				render_canvas_aspect_id: d.render_canvas_aspect_id,
-				render_canvas_aspect_ratio: d.render_canvas_aspect_ratio,
-				render_seed: d.render_seed,
-				composition_seed: d.composition_seed,
-				instruction_lang_requested: d.instruction_lang_requested,
-				instruction_lang_resolved: d.instruction_lang_resolved,
-				ui_lang: d.ui_lang,
-				render_hash: d.render_hash,
-				render_hash_short: d.render_hash_short
-			};
-			result = result
-				? { ...result, score: d.score, svg: d.svg, stage2_model: savedStage2Model, ...replayMetadata }
-				: { score: d.score, svg: d.svg, stage1_model: resolvedStage1Model, stage2_model: savedStage2Model, ...replayMetadata, elapsed_stage1_ms: 0, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage1: null, tokens_out_stage1: null, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
-			if (result) {
-				result = { ...result, elapsed_stage2_ms: elapsedMs, elapsed_total_ms: elapsedMs, tokens_in_stage2: d.tokens_in, tokens_out_stage2: d.tokens_out };
-			}
-			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
-			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
-			const savedHistory = await pushHistory({
-				input: replayInput,
-				ddl,
-				score: d.score,
-				svg: d.svg,
-				at: Date.now(),
-				elapsed_ms: elapsedMs,
-				stage1_model: resolvedStage1Model,
-				stage2_model: savedStage2Model,
-				tokens_in: d.tokens_in,
-				tokens_out: d.tokens_out,
-				catalog_id: colorCatalogSettings.effectiveId !== 'default' ? colorCatalogSettings.effectiveId : null
-			}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
-			if (savedHistory && result) {
+			const view = await authorDdl(ddl, {
+				sourceText: replayInput,
+				canvasAspectId: effectiveCanvasAspectId(),
+				lineageParentNodeId: replayParentNodeId,
+				derivationKind: replayKind,
+				derivationMetadata: replayDerivationMetadata,
+			}, abortController.signal);
+			if (view.result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
 				lineageDetached = false;
-				displayedHistoryItem = savedHistory;
-				result = {
-					...result,
-					history_id: savedHistory.id,
-					history_at: savedHistory.at,
-					render_hash: savedHistory.render_hash,
-					render_hash_short: savedHistory.render_hash_short,
-				};
 			}
-			deps.showCanvas();
-			canvasViewport.fit();
 		} catch (e) {
 			if (!replayStopRequested && !abortController.signal.aborted) {
 				reloadError = e instanceof Error ? e.message : String(e);
@@ -882,6 +885,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	function clearInput() {
 		resetTargetScopedState();
+		pipelineController.clear();
 		pendingCanvasAspectDerivation = null;
 		if (inputMode === 'single') input = '';
 		if (inputMode === 'batch') batch.clearInput();
@@ -912,6 +916,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		get limitNotesShown() { return limitNotesToShow(result); },
 		get singleRunning() { return (activeRunMode === 'single' && loading) || reloading; },
 		get ddlEditedAfterGeneration() { return ddlEditedAfterGeneration; },
+		get pipelineView() { return pipelineView; },
+		get pipelineBusy() { return pipelineBusy; },
+		get pipelineLocked() { return pipelineView?.authority.authority === 'ddl_authoritative'; },
+		get pipelinePatch() { return pipelinePatch(pipelineView); },
+		get pipelineDiagnostics() { return pipelineDiagnostics(pipelineView); },
 		get canSubmit() { return canSubmit; },
 		get currentInstructionText() {
 			if (displayedHistoryItem?.input) return displayedHistoryItem.input;
@@ -1012,6 +1021,15 @@ export function createWorkState(deps: WorkStateDeps) {
 		stopTimer,
 		requestVisionRefineAdvice,
 		paintOne,
+		pipelineCompatibilityError,
+		authorDescription,
+		authorDdl,
+		selectLegacyHistory,
+		selectHistoryAuthority,
+		beginNewAuthoring,
+		forkPipelineDescription,
+		approvePipelinePatch,
+		declinePipelinePatch,
 		interpretOne,
 		composeOne,
 		startDemo,

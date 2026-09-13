@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError
 
 import inku_server.persistence.migrations as migrations
 from inku_server.persistence import backup
+from inku_server.persistence import schema as persistence_schema
 from inku_server.persistence.backup import SQLiteSnapshotError, create_sqlite_snapshot
 from inku_server.persistence.migrations import (
     ACCEPTED_LEGACY_STATES,
@@ -122,6 +123,97 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
     assert first.mode == "fresh"
     assert second.mode == "current"
     assert calls == {"create": 1, "seed": 1, "legacy": 0}
+    assert _registry_row(engine) == (
+        MIGRATION_VERSION,
+        MIGRATION_NAME,
+        MIGRATION_CHECKSUM,
+    )
+    engine.dispose()
+
+
+def test_registered_v1_adds_candidate_tables_without_touching_history(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "registered-v1.db"
+    engine = _engine(path)
+    candidate_tables = {
+        "variation_authority",
+        "variation_authority_actions",
+        "pipeline_candidate_executions",
+        "pipeline_history_links",
+    }
+    legacy_tables = [
+        table
+        for table in persistence_schema.Base.metadata.sorted_tables
+        if table.name not in candidate_tables
+    ]
+    with engine.begin() as connection:
+        persistence_schema.Base.metadata.create_all(
+            connection, tables=legacy_tables
+        )
+        connection.exec_driver_sql(migrations._REGISTRY_DDL)
+        connection.execute(
+            text(
+                "INSERT INTO schema_migrations"
+                "(version, name, checksum, applied_at) "
+                "VALUES (:version, :name, :checksum, 1)"
+            ),
+            {
+                "version": migrations._PREVIOUS_MIGRATION_VERSION,
+                "name": migrations._PREVIOUS_MIGRATION_NAME,
+                "checksum": migrations._PREVIOUS_MIGRATION_CHECKSUM,
+            },
+        )
+        connection.execute(
+            persistence_schema.HistoryRow.__table__.insert().values(
+                id="legacy-work",
+                at=1,
+                input="original description",
+                ddl="円を描く。",
+                score='{"instructions":[]}',
+                svg="<svg/>",
+                elapsed_ms=0,
+            )
+        )
+
+    outcome = ensure_current_schema(
+        engine=engine,
+        database_path=path,
+        create_schema=lambda connection: (
+            persistence_schema.Base.metadata.create_all(connection)
+        ),
+        seed_fresh=_no_op,
+        apply_legacy=lambda _connection: pytest.fail(
+            "registered v1 replayed pre-registry transforms"
+        ),
+    )
+
+    assert outcome.mode == "registered_upgrade"
+    assert outcome.snapshot is not None
+    with engine.connect() as connection:
+        tables = {
+            str(row[0])
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        history = connection.exec_driver_sql(
+            "SELECT input, ddl, score, svg FROM history WHERE id='legacy-work'"
+        ).one()
+        history_link_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(pipeline_history_links)"
+            )
+        }
+    assert candidate_tables <= tables
+    assert {"fork_context_bytes", "fork_context_digest"} <= history_link_columns
+    assert history == (
+        "original description",
+        "円を描く。",
+        '{"instructions":[]}',
+        "<svg/>",
+    )
     assert _registry_row(engine) == (
         MIGRATION_VERSION,
         MIGRATION_NAME,

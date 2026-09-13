@@ -11,6 +11,7 @@ import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts
 import { sketchGrainOf, type SketchMode } from '../../sketch.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { RenderOverrides } from '../render-payload.ts';
+import { pipelineViewFromErrorDetail, type PipelineView } from '../pipeline/api.ts';
 
 export type InstructionLang = 'auto' | 'ja' | 'en';
 
@@ -145,6 +146,7 @@ export type CurrentWorkCapabilities = {
 	loadNearbyHistory: (historyId: string | null | undefined) => Promise<void>;
 	attachSavedLineage: () => void;
 	updateGenerationCount: (count: number) => void;
+	adoptPipelineView?: (view: PipelineView) => void;
 };
 
 export type CurrentWorkResult = { ddl: string; thinking: string | null } & PaintResult;
@@ -216,6 +218,8 @@ export async function runCurrentWork(
 	});
 	if (!response.ok) {
 		const data = await response.json().catch(() => ({})) as { detail?: unknown };
+		const pipelineView = pipelineViewFromErrorDetail(data.detail);
+		if (pipelineView) capabilities.adoptPipelineView?.(pipelineView);
 		throw new Error(capabilities.describeApiError(data.detail, response.status));
 	}
 

@@ -27,21 +27,20 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
 - 短さと制約によって作者の主張を削ぎ、提示を中心にする。
 - 既定の処理は再現可能にし、揺らぎはRendererの演奏とユーザーの明示操作に限定する。
 
-短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。共通coreにはcompact Score 0.10のresource-awareなcompile／演奏入口がある。現行の製品hostは下のlegacy経路を使い、UI／API／保存の切替は未完了である。実装範囲と未接続境界はSPECの該当節を正とする。
+短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。通常のServer／Webは、compact Score 0.10のresource-awareなcompile／演奏入口を持つ共有authoring pipelineへ接続済みである。旧作品の閲覧と保存済みSVGの再演は維持し、旧作品からの変更は元を保った新しいvariationとして保存する。保存済みcompact Scoreを最新engineで再演する橋も通常hostのLinux確認を通したが、接続全体はまだ配備していない。詳細な実装範囲と未完了境界はSPECを正とする。
 
 ## 現行アーキテクチャ
 
 ```text
-指示文
-  -> Stage 0.5: 写生（任意・記述を物の言葉へ写した自然文にする）
-  -> Stage 1: 解釈
-  -> 正規化DDL（名前空間付きプラグイン語を含みうる）
-  -> legacy plugin展開（互換経路）: コアDDLへ決定的にwriting-down
-  -> Stage 1.5（互換runtime）: 決定的な焦点書換え・明示変奏
-  -> Stage 2: JSON Score化
-  -> coerce / validation: drop-onlyを優先する境界処理
-  -> Render Engine: SVG演奏
-  -> 履歴・作品系譜
+記述またはdirect DDL
+  -> 共有Rust authoring state machine
+  -> Stage 1: 記述から正規化DDLを生成（記述起点だけ）
+  -> visible DDLをauthority・revisionと原子的にCAS保存
+  -> typed compiler（known holeは自動検出して補完案を要求）
+  -> 作者が補完案を承認した場合だけCAS保存
+  -> compact Score 0.10
+  -> resource-aware Render Engine: SVG演奏
+  -> raw Score・SVG・history authority linkを保存
 ```
 
 - `server/`: FastAPIバックエンド。
@@ -58,9 +57,11 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 共有Rust compilerは、日英の正規化DDLをtyped semantic documentとして解釈し、source provenance、canonical meaning、Macroの有限展開を保持する。compiler lockはsourceとprovenanceを照合し、lock検証済みmeaningだけが共通lowererへ進む。lowererは一度だけactual Scoreまたは反復のsymbolic Planへ解決し、recoverableな不成立はtyped diagnosticと局所省略で扱い、独立した描画を続ける。詳細な型、lock、recovery、geometry、relation、Macroの契約は[SPEC.ja.md](SPEC.ja.md)を正とする。
 
-現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。既定／legacy wireはScore 0.9を維持する。明示的なresource-aware入口は、source owner、namespaceごとのordinal、placement／repetition／fill group、fill targetと境界、Macroの内外の反復をcompact Score 0.10のrecipeへ保存する。演奏時にrecipeからsamplingし、個体座標を保存しない。解決済みの個数・図形を正確に保ち、資源超過は個体生成前に当該sourceまたはcoordinated placement全体を診断付きで省略して、独立した後続を続ける。
+現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。新作品の通常wireはcompact Score 0.10であり、source owner、namespaceごとのordinal、placement／repetition／fill group、fill targetと境界、Macroの内外の反復をrecipeとして保存する。演奏時にrecipeからsamplingし、個体座標を保存しない。解決済みの個数・図形を正確に保ち、資源超過は個体生成前に当該sourceまたはcoordinated placement全体を診断付きで省略して、独立した後続を続ける。旧Score 0.9は旧作品の互換読取用に維持する。
 
-`compile_ddl_to_score_with_resources`と`render_with_resources`が新しい共通coreの入口である。短いDDLから保存Score、非矩形fillのDisplay／Compat、clip失敗後の局所省略と後続描画までの限定Linux確認は成功した。製品runtime／UI／API／保存経路への接続は未完了であり、現行hostは上のlegacy経路を使う。legacy coerce／LLM fallbackもまだ置換されていない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
+`compile_ddl_to_score_with_resources`と`render_with_resources`が共通coreの入口であり、通常Webと既存のinterpret／compose／paint APIも同じpipeline serviceを使う。Provider transportはcoreが要求したactionごとに一度だけ呼び、再試行判断をcoreに残す。CanvasのIDと整数比は共有coreの11形式を正本とする。新しい6資源上限はlogical objects 4096、template nodes 128、anchor instances 4096、transform instances 4096、placement instances 64、fill instances 64である。既存4上限、管理者のauthority、旧作品に保存済みのbudgetを維持し、超過した配置だけを省略して後続を続ける。
+
+通常Linux hostの代表確認では、固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3点のcircle fillと後続lineを含むprimitive mark 4個を描画した。SVG、raw Score、historyとauthority linkの保存まで成功した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。保存済みcompact Scoreの再演でもraw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を保存済みpolicyで拒否してprimitive mark 4個を保つことをLinuxで確認した。Step 13全体のfresh independent completion review、Android接続、acceptance、配備、releaseは未完了であり、source接続済みという状態は出荷済みを意味しない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
 
 ## 守るべき設計契約
 
@@ -174,8 +175,8 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
 **強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
 切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
-- **共有authoring pipeline候補（runtime未接続）** — version付きsnapshotへcommandを与える純粋なstate machineで、LLMとvisible DDL保存はtyped action/resultとしてhostへ外出しする。Stage 1 promptはSaijiki由来の有限語彙、解決済みcanvas/catalog、検証済みMacroのidentity・parameter・localized summaryだけをbounded projectionとして持つ。保存済みDDLのknown hole検出から補完要求へ自動で進み、補完開始の追加操作を要求しない。HoleなしではStage2 LLMを呼ばず、unknown／conflict／integrityは対象にしない。Typed holeの補完は明示holeのspanとdigestに閉じ、provider patchをそのまま採用せず、作者の承認、CAS save、host acknowledgment、保存bytesの再parseの順を守る。
-Variationのoriginは不変で、description authorityはexact bytesの変わる最初のユーザーDDL確定後にDDL authorityへ単調にlockする。同一bytesの確定はlockせず、undoや再生成でunlockしない。由来不明の旧recordは推測移行しない。Commandと最終effect resultだけのtranscriptは決定的にreplayでき、薄いUniFFI候補はsnapshot bytesとinput-envelope bytesを受けてstable JSON bytesを返すだけである。保存・承認・replay、authority／prompt境界と代表bindingの限定確認は成功し、共通制御の独立完了reviewと親判定はPASSである。Server／Androidの現行authoring runtimeはStep 13/14のcandidate統合とStep 16/17のacceptance／cutoverまでlegacyのままである。
+- **共有authoring pipeline（通常Server／Web接続済み）** — version付きsnapshotへcommandを与える純粋なstate machineで、LLMとvisible DDL保存はtyped action/resultとしてhostへ外出しする。Stage 1 promptはSaijiki由来の有限語彙、解決済みcanvas/catalog、検証済みMacroのidentity・parameter・localized summaryだけをbounded projectionとして持つ。保存済みDDLのknown hole検出から補完要求へ自動で進み、補完開始の追加操作を要求しない。HoleなしではStage2 LLMを呼ばず、unknown／conflict／integrityは対象にしない。Typed holeの補完は明示holeのspanとdigestに閉じ、provider patchをそのまま採用せず、作者の承認、CAS save、host acknowledgment、保存bytesの再parseの順を守る。
+Variationのoriginは不変で、description authorityはexact bytesの変わる最初のユーザーDDL確定後にDDL authorityへ単調にlockする。同一bytesの確定はlockせず、undoや再生成でunlockしない。由来不明の旧recordは推測移行せず、旧DDLの編集は`user_authored_ddl`／`ddl_authoritative`、旧記述からの再生成は`stage1_generated`／`description_authoritative`の新variationへforkする。共有pipelineの過去historyを選んだ場合もそのrevisionの演奏を表示し続け、同じvariationの最新状態で置換しない。Forkはhistory linkと一致するsource digest、保存済みconfig、seed、catalog、資源上限、definition lockを使い、latest snapshotから推測しない。Core configはvariation内で不変なので、既存variationからの記述再生成も現在のoptionsを持つ新variation／new editionにする。親関係を保存し、元のhistory行は変更しない。Commandと最終effect resultだけのtranscriptは決定的にreplayでき、薄いUniFFI bindingはsnapshot bytesとinput-envelope bytesを受けてstable JSON bytesを返すだけである。通常Server／Web、authority store、history link、保存済みcompact Score replay、共有11 canvas形式まで接続済みで、Android、Step 13全体の完了確認と配備は未完了である。
 - **Render Engine 41** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
 Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
 `inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。

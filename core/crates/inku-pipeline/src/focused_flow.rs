@@ -156,6 +156,98 @@ fn ack(state: &PipelineSnapshot) -> PipelineInput {
 }
 
 #[test]
+fn canonical_macro_crosses_owned_start_and_commit() {
+    let definition = inku_ddl::MacroDefinition::from_json(
+        &json!({
+            "schema": "inku.macro-definition.v1", "namespace": "Example", "heading": "Circle",
+            "version": "1.0.0", "parameters": {}, "components": {}, "body": [{
+                "op": "emit", "binding": null, "fields": {
+                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                    "color": {"expr": "semantic_ref", "category": "color", "id": "black"},
+                    "position_x": {"expr": "exact_decimal", "value": "0.5"},
+                    "position_y": {"expr": "exact_decimal", "value": "0.5"},
+                    "count": {"expr": "integer", "value": 1}
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let mut selected = config();
+    selected.definitions = vec![definition];
+    selected.macro_summaries = vec!["A black circle at the center".into()];
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "canonical-macro".into(),
+            authoring_nonce: "macro-1".into(),
+            config: Box::new(selected),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "Example.Circle.".into(),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let committed = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}; {:?}",
+        committed.phase,
+        committed.delivery
+    );
+    assert!(committed.delivery.unwrap().score.is_some());
+}
+
+#[test]
+fn unresolved_qualified_macro_blocks_without_stage2_completion() {
+    let mut pipeline_config = config();
+    pipeline_config.language = inku_ddl::ResolvedInstructionLanguage::Ja;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "missing-macro".into(),
+            authoring_nonce: "missing-macro-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "Nature.若葉 を置く".into(),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let committed = envelope(Some(&pending), ack(&pending));
+    let state = run(Some(&pending), &committed).snapshot;
+
+    assert!(
+        matches!(
+            state.phase,
+            PipelinePhase::NeedsUserEdit { ref reason }
+                if reason == "compiler_diagnostics"
+        ),
+        "{:?}",
+        state.phase
+    );
+    assert!(
+        state.action.is_none(),
+        "unknown Macro must not start Stage 2"
+    );
+    let lock = state
+        .delivery
+        .as_ref()
+        .and_then(|delivery| delivery.compiler_lock.as_ref())
+        .expect("blocked compilation retains its compiler lock");
+    assert_eq!(lock["state"], "blocked_diagnostic");
+    assert!(
+        lock["blocking_diagnostic_identities"]
+            .as_array()
+            .is_some_and(|identities| !identities.is_empty()),
+        "MissingLock must be represented as a blocking diagnostic"
+    );
+}
+
+#[test]
 fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
     let source = "place one black circle at center.";
     let direct_start = envelope(

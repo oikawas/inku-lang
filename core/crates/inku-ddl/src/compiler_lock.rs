@@ -969,16 +969,8 @@ fn project_deliveries(
                     add_blocking(&mut projection, kind, None);
                 }
             }
-            SemanticAssociationIssueKind::MacroResolution(
-                MacroInvocationResolutionDiagnosticKind::MissingLock
-                | MacroInvocationResolutionDiagnosticKind::MissingDefinition
-                | MacroInvocationResolutionDiagnosticKind::InvalidDefinition,
-            )
-            | SemanticAssociationIssueKind::MacroParameterBinding(
-                MacroParameterBindingDiagnosticKind::MissingCompatibleFact
-                | MacroParameterBindingDiagnosticKind::UnsupportedSchema
-                | MacroParameterBindingDiagnosticKind::NumericRange
-                | MacroParameterBindingDiagnosticKind::NumericPrecision,
+            SemanticAssociationIssueKind::MacroParameterBinding(
+                MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
             ) => {
                 if let Some(span) = span {
                     add_hole(

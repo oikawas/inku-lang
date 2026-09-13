@@ -81,6 +81,8 @@ class HistoryPostBody(BaseModel):
 
 class HistoryItem(HistoryPostBody):
     id: str
+    pipeline_variation_id: str | None = None
+    pipeline_revision: str | None = None
     # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
     # The listing that draws the strip asks for `include_svg=false`, so a client
     # cannot count this for itself: what arrives in `svg` is then an empty

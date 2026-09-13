@@ -30,15 +30,29 @@ class MigrationExecutionError(MigrationStateError):
         self.snapshot = snapshot
 
 
-MIGRATION_VERSION = 1
-MIGRATION_NAME = "legacy_baseline"
-_MIGRATION_MANIFEST = (
+_PREVIOUS_MIGRATION_VERSION = 1
+_PREVIOUS_MIGRATION_NAME = "legacy_baseline"
+_PREVIOUS_MIGRATION_MANIFEST = (
     "create-current-metadata-v1",
     "history-column-and-index-transforms-v1",
     "permission-and-owner-transforms-v1",
     "history-identity-and-lineage-transform-v1",
     "history-fts5-trigram-v1",
     "pk-and-canonical-history-invariants-v1",
+)
+_PREVIOUS_MIGRATION_CHECKSUM = hashlib.sha256(
+    json.dumps(
+        _PREVIOUS_MIGRATION_MANIFEST, separators=(",", ":")
+    ).encode("utf-8")
+).hexdigest()
+
+MIGRATION_VERSION = 2
+MIGRATION_NAME = "candidate_authoring_sidecars"
+_MIGRATION_MANIFEST = (
+    *_PREVIOUS_MIGRATION_MANIFEST,
+    "variation-authority-and-action-sidecars-v1",
+    "pipeline-candidate-execution-snapshots-v1",
+    "pipeline-performance-history-links-v2",
 )
 MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
@@ -306,13 +320,78 @@ def _record_baseline(connection: Connection) -> None:
     )
 
 
-def _verify_registry(connection: Connection) -> None:
+def _verify_registry(connection: Connection) -> str:
     rows = connection.exec_driver_sql(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
     ).fetchall()
-    expected = [(MIGRATION_VERSION, MIGRATION_NAME, MIGRATION_CHECKSUM)]
-    if rows != expected:
-        raise MigrationStateError("schema_migrations does not match the reviewed baseline")
+    current = [(MIGRATION_VERSION, MIGRATION_NAME, MIGRATION_CHECKSUM)]
+    previous = [
+        (
+            _PREVIOUS_MIGRATION_VERSION,
+            _PREVIOUS_MIGRATION_NAME,
+            _PREVIOUS_MIGRATION_CHECKSUM,
+        )
+    ]
+    if rows == current:
+        return "current"
+    if rows == previous:
+        return "previous"
+    raise MigrationStateError(
+        "schema_migrations does not match a reviewed baseline"
+    )
+
+
+def _upgrade_registered_schema(
+    *,
+    engine: Engine,
+    database_path: Path | None,
+    create_schema: Callable[[Connection], None],
+    fts_enabled: bool,
+) -> MigrationOutcome:
+    if database_path is None:
+        raise MigrationStateError(
+            "an existing in-memory database cannot be snapshotted"
+        )
+    snapshot_path = database_path.parent / "migration-backups" / (
+        f"{database_path.stem}-pre-v{MIGRATION_VERSION}-{time.time_ns()}.db"
+    )
+    snapshot = create_sqlite_snapshot(database_path, snapshot_path)
+    with engine.connect() as connection:
+        _begin_immediate(connection)
+        try:
+            if _verify_registry(connection) != "previous":
+                raise MigrationStateError(
+                    "registered schema changed before writer lock"
+                )
+            before = capture_invariants(connection)
+            create_schema(connection)
+            verify_invariants(connection, before)
+            require_integrity(connection)
+            connection.execute(
+                text(
+                    "UPDATE schema_migrations "
+                    "SET version=:version, name=:name, checksum=:checksum, "
+                    "applied_at=:applied_at "
+                    "WHERE version=:previous_version"
+                ),
+                {
+                    "version": MIGRATION_VERSION,
+                    "name": MIGRATION_NAME,
+                    "checksum": MIGRATION_CHECKSUM,
+                    "applied_at": int(time.time() * 1000),
+                    "previous_version": _PREVIOUS_MIGRATION_VERSION,
+                },
+            )
+            connection.commit()
+        except Exception as exc:
+            connection.rollback()
+            raise MigrationExecutionError(snapshot) from exc
+    return MigrationOutcome(
+        mode="registered_upgrade",
+        fts_enabled=fts_enabled,
+        fingerprint_name=_PREVIOUS_MIGRATION_NAME,
+        snapshot=snapshot,
+    )
 
 
 def install_history_fts(connection: Connection, *, rebuild: bool) -> bool:
@@ -386,6 +465,7 @@ def ensure_current_schema(
     apply_legacy: Callable[[Connection], None],
 ) -> MigrationOutcome:
     """Create, verify, or migrate the canonical database exactly once."""
+    registered_upgrade_fts: bool | None = None
     with engine.connect() as connection:
         tables = _user_tables(connection)
         if not tables:
@@ -404,22 +484,39 @@ def ensure_current_schema(
             return MigrationOutcome(mode="fresh", fts_enabled=fts_enabled)
 
         if "schema_migrations" in tables:
-            _verify_registry(connection)
+            registry_state = _verify_registry(connection)
             state = history_fts_state(connection)
             if state == "partial":
                 raise MigrationStateError("history FTS objects are internally inconsistent")
-            return MigrationOutcome(mode="current", fts_enabled=state == "complete")
-
-        fingerprint = schema_fingerprint(connection)
-        fts_state = history_fts_state(connection)
-        if fts_state == "partial":
-            raise MigrationStateError("history FTS objects are internally inconsistent")
-        fingerprint_name = ACCEPTED_LEGACY_STATES.get((fingerprint, fts_state))
-        if fingerprint_name is None:
-            raise MigrationStateError(
-                f"unrecognized pre-registry SQLite schema: fingerprint={fingerprint} fts={fts_state}"
+            if registry_state == "current":
+                return MigrationOutcome(
+                    mode="current", fts_enabled=state == "complete"
+                )
+            registered_upgrade_fts = state == "complete"
+        else:
+            fingerprint = schema_fingerprint(connection)
+            fts_state = history_fts_state(connection)
+            if fts_state == "partial":
+                raise MigrationStateError(
+                    "history FTS objects are internally inconsistent"
+                )
+            fingerprint_name = ACCEPTED_LEGACY_STATES.get(
+                (fingerprint, fts_state)
             )
-        require_integrity(connection)
+            if fingerprint_name is None:
+                raise MigrationStateError(
+                    "unrecognized pre-registry SQLite schema: "
+                    f"fingerprint={fingerprint} fts={fts_state}"
+                )
+            require_integrity(connection)
+
+    if registered_upgrade_fts is not None:
+        return _upgrade_registered_schema(
+            engine=engine,
+            database_path=database_path,
+            create_schema=create_schema,
+            fts_enabled=registered_upgrade_fts,
+        )
 
     if database_path is None:
         raise MigrationStateError("an existing in-memory database cannot be snapshotted")

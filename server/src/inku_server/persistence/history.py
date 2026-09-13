@@ -19,6 +19,7 @@ from .schema import (
     LineageEdgeRow,
     LineageNodeRow,
     OkugakiRow,
+    PipelineHistoryLinkRow,
     UserGroupRow,
 )
 
@@ -832,6 +833,16 @@ class HistoryListProjector:
         for the ordinary case of a person looking at their own works.
         """
         items = [self.row_to_dict_fn(row) for row in rows]
+        if rows:
+            links = session.query(PipelineHistoryLinkRow).filter(
+                PipelineHistoryLinkRow.history_id.in_([row.id for row in rows]),
+            ).all()
+            links_by_work = {(link.owner_id, link.history_id): link for link in links}
+            for item, row in zip(items, rows, strict=True):
+                link = links_by_work.get((row.user_id, row.id))
+                if link is not None:
+                    item["pipeline_variation_id"] = link.variation_id
+                    item["pipeline_revision"] = link.revision
         if actor is not None:
             for item, row in zip(items, rows):
                 if row.user_id != actor["id"]:

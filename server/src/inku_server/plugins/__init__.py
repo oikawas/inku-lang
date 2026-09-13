@@ -71,17 +71,7 @@ def plugin_item_with_fires_on(item: dict[str, object]) -> dict[str, object]:
 
 
 def plugin_status_items() -> list[dict[str, object]]:
-    system: list[dict[str, object]] = [
-        {
-            "name": CANVAS_ASPECT_PLUGIN_ID,
-            "namespace": "system",
-            "version": "0.1.0",
-            "status": "enabled",
-            "entries": [],
-            "reasons": [],
-        }
-    ]
-    return system + [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]
+    return [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]
 
 
 __all__ = [

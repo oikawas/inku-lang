@@ -9,21 +9,18 @@
 		settingsStatusLoading: boolean;
 		pluginActionStatus: string | null;
 		isAdmin: boolean;
-		canvasAspectEnabled: boolean;
 		onLoadSettingsStatus: () => void;
 		onLoadPluginContent: (id: string) => Promise<string | null>;
 		onSavePlugin: (id: string, content: string) => Promise<string[] | null>;
 		onCreatePlugin: (content: string, filename: string) => Promise<string[] | null>;
 		onDeletePlugin: (id: string) => Promise<boolean>;
 		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
-		onSetCanvasAspectEnabled: (enabled: boolean) => void | Promise<void>;
 	};
 
 	let {
 		pluginsStatus, settingsStatusError, settingsStatusLoading, pluginActionStatus,
-		isAdmin, canvasAspectEnabled, onLoadSettingsStatus, onLoadPluginContent,
+		isAdmin, onLoadSettingsStatus, onLoadPluginContent,
 		onSavePlugin, onCreatePlugin, onDeletePlugin, onSetPluginEnabled,
-		onSetCanvasAspectEnabled
 	}: Props = $props();
 
 	let pluginFileInput = $state<HTMLInputElement | null>(null);
@@ -128,39 +125,6 @@
 </script>
 
 			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsSystemPlugins}</div>
-				<div class="system-plugin-panel">
-					<div class="system-plugin-main">
-						<div class="system-plugin-title-row">
-							<div class="system-plugin-title">{t().settingsCanvasPluginTitle}</div>
-							<span class="plugin-version-pill">v0.1.0</span>
-						</div>
-						<div class="system-plugin-desc">{t().settingsCanvasPluginDescription}</div>
-					</div>
-					<button
-						type="button"
-						class="plugin-switch"
-						class:plugin-enabled={canvasAspectEnabled}
-						role="switch"
-						aria-checked={canvasAspectEnabled}
-						disabled={!isAdmin}
-						title={isAdmin ? '' : t().settingsPluginAdminOnly}
-						onclick={() => { if (isAdmin) void onSetCanvasAspectEnabled(!canvasAspectEnabled); }}
-					>
-						<span class="switch-track"><span class="switch-knob"></span></span>
-						<span class="switch-label">{canvasAspectEnabled ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
-					</button>
-				</div>
-				{#if !isAdmin}
-					<div class="db-test-result">{t().settingsPluginAdminOnly}</div>
-				{/if}
-				{#if isAdmin && settingsStatusLoading}
-					<div class="inline-message">{t().settingsLoading}</div>
-				{:else if isAdmin && settingsStatusError}
-					<div class="inline-message">{settingsStatusError}</div>
-				{/if}
-			</div>
-			<div class="popover-group">
 				<div class="popover-group-label user-plugin-head">
 					<span>{t().settingsUserPlugins}</span>
 					<button class="ghost-btn" onclick={triggerPluginFile} disabled={!isAdmin || pluginBusy}>{t().settingsPluginLoadFile}</button>
@@ -212,6 +176,7 @@
 			<div class="settings-inline-actions">
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReload}</button>
 			</div>
+			{#if settingsStatusError}<div class="inline-message">{settingsStatusError}</div>{/if}
 {#if pluginEditorOpen}
 	<div class="modal-backdrop" onclick={closePluginEditor} aria-hidden="true"></div>
 	<div class="plugin-editor-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') closePluginEditor(); }}>

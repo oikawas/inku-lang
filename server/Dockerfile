@@ -1,15 +1,28 @@
 # This immutable builder contains Rust 1.95.0, maturin 1.13.3, and CPython 3.12.
-# Only its audited wheel crosses into the runtime image; Rust and Cargo do not.
+# Only native bundles cross into the runtime image; Rust and Cargo do not.
 FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b0774376e3de103f9bed2578 AS native-builder
 
 WORKDIR /build
 COPY core/ /build/core/
+COPY scripts/rust-toolchain.sh scripts/generate-pipeline-python.py /build/scripts/
 RUN maturin build \
     --manifest-path /build/core/crates/inku-render-python/Cargo.toml \
     --release \
     --locked \
     --compatibility manylinux2014 \
     --out /wheelhouse
+RUN /build/scripts/rust-toolchain.sh build \
+    -p inku-pipeline-uniffi \
+    --release \
+    --locked \
+    --features cli \
+    --lib \
+    --bin uniffi-bindgen
+RUN python /build/scripts/generate-pipeline-python.py \
+    --root /build \
+    --library /build/core/target/release/libinku_pipeline_uniffi.so \
+    --bindgen /build/core/target/release/uniffi-bindgen \
+    --out /pipeline-bundle
 
 FROM python:3.12-slim AS runtime
 
@@ -31,6 +44,7 @@ WORKDIR /app
 COPY shared/ /app/shared/
 COPY server/ /app/server/
 COPY --from=native-builder /wheelhouse/ /tmp/wheelhouse/
+COPY --from=native-builder /pipeline-bundle/ /app/server/src/inku_server/native/pipeline/
 RUN cd /app/server \
     && uv sync --frozen --no-dev \
     && uv pip install --python /app/server/.venv/bin/python --no-deps /tmp/wheelhouse/*.whl \

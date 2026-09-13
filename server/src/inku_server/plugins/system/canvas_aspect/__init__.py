@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+
+from ....canvas_formats import canvas_format, canvas_format_ids, canvas_format_registry
 
 
 @dataclass(frozen=True)
@@ -29,38 +32,72 @@ CANVAS_ASPECT_PLUGIN_ID = "canvas-aspect"
 DEFAULT_CANVAS_ASPECT_ID = "square"
 CANVAS_BASE_PX = 1000
 
-CANVAS_ASPECTS: tuple[CanvasAspect, ...] = (
-    CanvasAspect("square", "Basic", "Square", 1.0, 1.0, "Standard square canvas"),
-    CanvasAspect("golden", "Standard", "Golden Ratio", 1.618, 1.0, "Classical Western proportion"),
-    CanvasAspect("a4", "Modern", "A4 Root Rectangle", 1.0, 1.414, "Modern print-oriented root rectangle"),
-    CanvasAspect("b4", "Modern", "B4 Root Rectangle", 1.0, 1.414, "Modern print-oriented root rectangle"),
-    CanvasAspect("pillar", "Classic JP", "Pillar", 1.0, 5.0, "Tall Japanese pillar-picture format"),
-    CanvasAspect("oban", "Ukiyoe", "Oban", 2.0, 3.0, "Ukiyo-e oban woodblock proportion"),
-    CanvasAspect("wide", "Cinema", "CinemaScope", 2.35, 1.0, "Wide cinematic panorama"),
-    CanvasAspect("byobu", "Classic JP", "Byobu", 2.2, 1.0, "Japanese folding screen panel based on one half of a six-panel pair"),
-    CanvasAspect("vertical", "Mobile", "Mobile Vertical", 9.0, 16.0, "Contemporary phone-screen format"),
-)
+_DISPLAY = {
+    "square": ("Basic", "Square", "Standard square canvas"),
+    "golden": ("Standard", "Golden Ratio", "Classical Western proportion"),
+    "a4": ("Modern", "A4 Root Rectangle", "Modern print-oriented root rectangle"),
+    "b4": ("Modern", "B4 Root Rectangle", "Modern print-oriented root rectangle"),
+    "pillar": ("Classic JP", "Pillar", "Tall Japanese pillar-picture format"),
+    "oban": ("Ukiyoe", "Oban", "Ukiyo-e oban woodblock proportion"),
+    "wide": ("Cinema", "CinemaScope", "Wide cinematic panorama"),
+    "byobu": ("Classic JP", "Byobu", "Japanese folding screen panel"),
+    "vertical": ("Mobile", "Mobile Vertical", "Contemporary phone-screen format"),
+    "sd_monitor": ("Display", "SD Monitor", "Traditional 4:3 display format"),
+    "hd_monitor": ("Display", "HD Monitor", "Widescreen 16:9 display format"),
+}
 
-_CANVAS_ASPECT_BY_ID = {item.id: item for item in CANVAS_ASPECTS}
+
+def _canvas_aspects() -> tuple[CanvasAspect, ...]:
+    result: list[CanvasAspect] = []
+    for item in canvas_format_registry().formats:
+        category, label, intent = _DISPLAY.get(item.id, ("Other", item.id, item.id))
+        result.append(
+            CanvasAspect(
+                item.id,
+                category,
+                label,
+                float(item.width_units),
+                float(item.height_units),
+                intent,
+            )
+        )
+    return tuple(result)
+
+
+class _CanvasAspects(Sequence[CanvasAspect]):
+    """Lazy compatibility view; registry identity stays in the Rust binding."""
+
+    def __getitem__(self, index):
+        return _canvas_aspects()[index]
+
+    def __len__(self) -> int:
+        return len(_canvas_aspects())
+
+    def __iter__(self) -> Iterator[CanvasAspect]:
+        return iter(_canvas_aspects())
+
+
+CANVAS_ASPECTS: Sequence[CanvasAspect] = _CanvasAspects()
 
 
 def canvas_aspect_ids() -> set[str]:
-    return set(_CANVAS_ASPECT_BY_ID)
+    return canvas_format_ids()
 
 
 def normalize_canvas_aspect_id(value: str | None) -> str:
-    if value in _CANVAS_ASPECT_BY_ID:
+    if value in canvas_format_ids():
         return value
     return DEFAULT_CANVAS_ASPECT_ID
 
 
 def canvas_aspect_ratio_for_aspect(value: str | None) -> float:
-    aspect = _CANVAS_ASPECT_BY_ID[normalize_canvas_aspect_id(value)]
-    return aspect.ratio_w / aspect.ratio_h
+    item = canvas_format(normalize_canvas_aspect_id(value))
+    return item.width_units / item.height_units
 
 
 def canvas_size_for_aspect(value: str | None) -> CanvasSize:
-    ratio = canvas_aspect_ratio_for_aspect(value)
-    if ratio >= 1:
-        return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)
-    return CanvasSize(width=round(CANVAS_BASE_PX * ratio), height=CANVAS_BASE_PX)
+    item = canvas_format(normalize_canvas_aspect_id(value))
+    return CanvasSize(
+        width=round(CANVAS_BASE_PX * item.width_units / item.height_units),
+        height=CANVAS_BASE_PX,
+    )

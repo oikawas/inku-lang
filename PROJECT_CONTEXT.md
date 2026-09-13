@@ -41,25 +41,26 @@ Variation belongs to renderer performance and explicit user operations.
 
 A short description becomes a typed semantic document retaining shared meaning;
 the lock-verified lowerer resolves it once to a Score, and SVG is one
-performance of that same Score. The shared core now has resource-aware entry
-points for compact Score 0.10 compilation and performance. The current product
-host still uses the legacy path below; its UI, API, and persistence cutover
-remain later work. SPEC defines the implemented core subset
-and that delivery boundary.
+performance of that same Score. The normal Server and Web are connected to the
+shared authoring pipeline and its resource-aware compact Score 0.10 compilation
+and performance entry points. Viewing old works and replaying their saved SVGs
+remain available; changes from an old work are stored as a new variation while
+the original is preserved. The bridge that replays a saved compact Score on the
+latest engine has also passed a normal-host Linux check, but this integrated
+source has not been deployed. SPEC defines the completed and unfinished boundaries.
 
 ## Current Architecture
 
 ```text
-instruction
-  -> Stage 0.5: sketch from life (optional; rewrites the description as prose naming things)
-  -> Stage 1: interpretation
-  -> normalized DDL (which may contain namespaced plugin words)
-  -> legacy plugin expansion (compatibility path): deterministic writing-down to core DDL
-  -> Stage 1.5 (compatibility runtime): deterministic focus reframing and explicit variation
-  -> Stage 2: JSON Score
-  -> coerce / validation: boundary handling with a drop-only preference
-  -> Render Engine: SVG performance
-  -> history and work lineage
+description or direct DDL
+  -> shared Rust authoring state machine
+  -> Stage 1: generate normalized DDL (description start only)
+  -> atomically CAS-save visible DDL with authority and revision
+  -> typed compiler (known holes automatically request a completion proposal)
+  -> CAS-save a completion patch only after author approval
+  -> compact Score 0.10
+  -> resource-aware Render Engine: SVG performance
+  -> save raw Score, SVG, and the history-authority link
 ```
 
 - `server/`: FastAPI backend for APIs, authentication, DB access, interpretation, composition, coercion, rendering, and lineage.
@@ -74,9 +75,11 @@ instruction
 
 The shared Rust compiler interprets normalized Japanese and English DDL as a typed semantic document, retaining source provenance, canonical meaning, and finite Macro expansion. The compiler lock attests source and provenance; only lock-verified meaning reaches the shared lowerer. The lowerer resolves once to an actual Score or a symbolic plan for repetition. A recoverable failure receives a typed diagnostic and local omission while independent drawing continues. [SPEC.ja.md](SPEC.ja.md) is authoritative for the types, lock, recovery, geometry, relations, and Macro contracts.
 
-The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. The legacy/default wire remains Score 0.9. The explicit resource-aware path emits compact Score 0.10 recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work.
+The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. The normal wire for new works is compact Score 0.10. It stores recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work. Legacy Score 0.9 remains readable for old-work compatibility.
 
-`compile_ddl_to_score_with_resources` and `render_with_resources` form the new shared-core boundary. A focused Linux check passed from short DDL through saved Score to nonrectangular fill in Display / Compat, local omission after clip failure, and continued later drawing. Connecting these entry points to product runtime / UI / API / persistence paths remains unfinished. The Current Architecture above remains the active product-host runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
+`compile_ddl_to_score_with_resources` and `render_with_resources` form the shared-core boundary. The normal Web and existing interpret, compose, and paint APIs use the same pipeline service. Provider transport is attempted once for each action requested by core; core retains the retry decision. The shared core is the source of truth for all 11 canvas IDs and integer ratios. The six new resource limits are 4,096 logical objects, 128 template nodes, 4,096 anchor instances, 4,096 transform instances, 64 placement instances, and 64 fill instances. The existing four limits, administrator authority, and budgets saved with old works remain intact. An over-budget placement is omitted locally and later work continues.
+
+In a representative normal Linux-host check, an ordinary point fill requested 6,945 logical objects against a fixed fixture budget of 400 logical objects, 512 template nodes, and 400 for the other structural resources. Only that fill was omitted; a three-point circle fill and a later line continued, producing four primitive marks. Saving the SVG, raw Score, history, and authority link passed. This checked the native connection; it did not measure the six new shipping limits. Saved compact Score replay also preserved the raw Score, saved source, and authority; a changed seed changed the SVG; and saved policy rejected a request that tried to alter the hard budget, retaining four primitive marks. Fresh independent completion review for all of Step 13, Android integration, acceptance, deployment, and release remain unfinished. Source integration does not mean the change has shipped. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
 
 ## Contracts That Must Remain Intact
 
@@ -212,8 +215,8 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Shared authoring-pipeline candidate (runtime disconnected)** — a pure state machine applies commands to a versioned snapshot and sends LLM work and visible-DDL persistence to the host as typed actions and results. Its Stage 1 prompt contains bounded projections of the finite Saijiki-derived vocabulary, resolved canvas and catalog, and only validated Macro identities, parameters, and localized summaries. Committed known-hole detection automatically starts the completion request without another user operation. No hole means no Stage 2 LLM call; unknowns, conflicts, and integrity errors are excluded. Typed-hole completion is closed over explicit hole spans and digests. A provider patch is never adopted directly: author approval, CAS save, host acknowledgment, and reparse of the saved bytes occur in that order.
-Variation origin is immutable. Description authority locks monotonically to DDL authority after the first user DDL commit that changes exact bytes; identical bytes do not lock, and undo or regeneration cannot unlock it. An old record of unknown origin is not migrated by inference. A transcript of commands and final effect results replays deterministically, and the thin UniFFI candidate only accepts snapshot bytes plus input-envelope bytes and returns stable JSON bytes. Focused commit/approval/replay, authority/prompt boundary, and representative binding checks passed; independent completion review and owner assessment passed for the shared control layer. Current server and Android authoring runtimes remain legacy through the Step 13/14 candidate integrations and Step 16/17 acceptance and cutover.
+- **Shared authoring pipeline (connected to the normal Server and Web)** — a pure state machine applies commands to a versioned snapshot and sends LLM work and visible-DDL persistence to the host as typed actions and results. Its Stage 1 prompt contains bounded projections of the finite Saijiki-derived vocabulary, resolved canvas and catalog, and only validated Macro identities, parameters, and localized summaries. Committed known-hole detection automatically starts the completion request without another user operation. No hole means no Stage 2 LLM call; unknowns, conflicts, and integrity errors are excluded. Typed-hole completion is closed over explicit hole spans and digests. A provider patch is never adopted directly: author approval, CAS save, host acknowledgment, and reparse of the saved bytes occur in that order.
+Variation origin is immutable. Description authority locks monotonically to DDL authority after the first user DDL commit that changes exact bytes; identical bytes do not lock, and undo or regeneration cannot unlock it. An old record of unknown origin is never migrated by inference. Editing old DDL forks a `user_authored_ddl` / `ddl_authoritative` variation, while regenerating from an old description forks a `stage1_generated` / `description_authoritative` variation. Selecting an older shared-pipeline history keeps that revision's performance on screen instead of replacing it with the latest state of the same variation. Its fork uses a matching source digest plus saved config, seed, catalog, resource limits, and definition locks; it never infers them from the latest snapshot. Core config is immutable within a variation, so regenerating from an existing variation creates a new variation and edition with the current options. The parent relation is saved and the original history row remains unchanged. A transcript of commands and final effect results replays deterministically, and the thin UniFFI binding accepts snapshot bytes plus input-envelope bytes and returns stable JSON bytes. The normal Server and Web, authority store, history link, saved compact Score replay, and shared 11-format canvas registry are connected. Android, full Step 13 completion review, and deployment remain unfinished.
 - **Render Engine 41** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
 Android main preview, thumbnails, and PNG export rasterize canonical saved/current SVG through the
 separate `inku-svg-raster` (`resvg`) crate. Pixels are derived presentation; SVG remains canonical storage.

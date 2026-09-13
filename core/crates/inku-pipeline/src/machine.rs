@@ -399,7 +399,7 @@ impl PipelineSnapshot {
             locks.push(LockedDefinition {
                 qualified_name: identity.qualified_name().to_owned(),
                 version: identity.version().to_owned(),
-                digest: identity.full_digest_hex().to_owned(),
+                digest: format!("sha256:{}", identity.full_digest_hex()),
             });
         }
         let wire = VisibleDocument {

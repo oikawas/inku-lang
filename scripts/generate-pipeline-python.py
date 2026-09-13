@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--library", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--bindgen", type=Path, help="Use the already-built UniFFI generator for this library")
     args = parser.parse_args()
     root, library, out = (p.resolve() for p in (args.root, args.library, args.out))
     expected = {
@@ -30,11 +31,17 @@ def main() -> None:
     if out.exists() and any(out.iterdir()):
         parser.error("--out must be an empty directory")
     out.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [str(root / "scripts/rust-toolchain.sh"), "run", "-p", "inku-pipeline-uniffi",
+    if args.bindgen:
+        bindgen = args.bindgen.resolve()
+        if not bindgen.is_file():
+            parser.error("--bindgen must name the already-built generator")
+        command = [str(bindgen)]
+    else:
+        command = [str(root / "scripts/rust-toolchain.sh"), "run", "-p", "inku-pipeline-uniffi",
          "--features", "cli", "--bin", "uniffi-bindgen", "--locked", "--offline", "--",
-         "generate", str(library), "--language", "python", "--out-dir", str(out),
-         "--no-format"],
+        ]
+    subprocess.run(
+        [*command, "generate", str(library), "--language", "python", "--out-dir", str(out), "--no-format"],
         check=True,
     )
     shutil.copy2(library, out / library.name)

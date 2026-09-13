@@ -27,6 +27,8 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
 - 短さと制約によって作者の主張を削ぎ、提示を中心にする。
 - 既定の処理は再現可能にし、揺らぎはRendererの演奏とユーザーの明示操作に限定する。
 
+短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。現行の製品runtimeは下のlegacy経路を使う一方、typed compiler foundationは受入済みでも未接続である。実装範囲と未接続境界はSPECの該当節を正とする。
+
 ## 現行アーキテクチャ
 
 ```text
@@ -54,122 +56,11 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 
 ### 受入済みのTyped DDL基盤（runtime未接続）
 
-全幅・半幅は通常サイズの短辺基準と異なり、キャンバス横幅の100%・50%を回転前の基準寸法へ適用する。通常DDLと宣言Macroで同じ寸法解決を使い、線長・開弧の弦長・閉形の輪郭幅を区別する。半円は上、上弦は右、下弦は左へ膨らむ開弧で、三日月は歳時記の細い塗り面としてScore 0.2.0の`arc_form: crescent`、center/sizeへ届ける。保存済みScore 0.1.0はそのまま読む。重複サイズだけは全候補と原文を保持し、`ConflictingSizeSpecifications`と採用寸法を示しながら小さい方で描く。`Recovered`はStop/Continueとも描画を続ける処置であり、他の整合性・未対応エラーの停止規則は変えない。詳細はSPEC §12.11。
+共有Rust compilerは、日英の正規化DDLをtyped semantic documentとして解釈し、source provenance、canonical meaning、Macroの有限展開を保持する。compiler lockはsourceとprovenanceを照合し、lock検証済みmeaningだけが共通lowererへ進む。lowererは一度だけactual Scoreまたは反復のsymbolic Planへ解決し、recoverableな不成立はtyped diagnosticと局所省略で扱い、独立した描画を続ける。詳細な型、lock、recovery、geometry、relation、Macroの契約は[SPEC.ja.md](SPEC.ja.md)を正とする。
 
-共有Rustは12道具の通常／濃い／薄いを道具別の塗りとして描く。`surface_intensity`はScore 0.3.0以後で通常DDLとMacroの共通lowererから届き、既存0.1.0／0.2.0／0.3.0とversionなしartifactの読み書きは保持する。Macro TransformはCount1 Score 0.5.0の`transform_groups`と反復symbolic planへ届く。有限の`scale_x` / `scale_y` / `translate_x` / `translate_y`はbbox中心のscale、同中心のrotate、normalized canvas軸のtranslateを内側から外側へ合成し、geometryと間隔だけを変えてstroke幅とgrain pitchを保つ。Score 0.4.0の回転だけのgroupは互換として残る。外部Touching / Along / Cuttingは変形後の形・向き・明示指定を保ち、group全体の平行移動で成立を試みる。失敗時はerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。Step11の個体materialization、Step13のruntime / UI / 保存全面接続は未完了である。
+現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。Score 0.9はMacro body境界とAnchor所有を保持し、反復を個体化せずsymbolic Planに残す。fillはtarget、count、Macro footprintをsymbolic FillGroupPlanへ解決するが、sampling、clip、actual Scoreへのregion materializationはStep11の未接続責務である。
 
-AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央で、Emitのfocus依存配置を借用しない。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
-
-通常DDLのprimitiveだけからなる既存named位置のdirect coordinated groupはScore 0.8.0の`placement_groups`を使う。内部配置省略はbbox中心を揃える`overlap`、明示した「並べて置く」は既存wire値のsource順横並び`horizontal_source_order`、明示した「重ねて置く」は`overlap`、`散らす`と`敷き詰める`は新しいwire値の`scatter`と`tile`である。group bbox中心をperformance seedで一度解決したnamed regionへ移し、memberのowner、count、seed、geometryを保つ。line-upの省略countは各member 1 でactual Scoreへ届く。scatter / tileは明示countを保ち、合計8までの残りを省略したmemberへ均等配分し、余りはsource順で先の省略memberへ割り当てる。省略memberは最低1個とし、明示数と最低数だけで8を超える場合も減らさない。全省略も同じ規則で、9種類なら各1個になる。全明示なら合計8へ補わない。line-up / placeは省略memberだけ1とする。配分後の全countが1のときだけactual Scoreへ届き、それ以外は個体化せずsymbolic planに残る。個体materializationやruntime／UI／save全面接続は完了していない。
-
-Verified Stage 1.5からの共有object placement plan APIは、通常DDLと宣言済みflat Macroのline-up / scatter / tileを、一instruction / 一Emitにつき一件の解決済みplanへ届ける。数量省略は8（placeは1）、sizeはcount非依存のcanvas短辺基準で既存normal / 大小倍率を共有する。Line-upはshape angleと独立したaction-side layout_directionから横 / 縦 / 物理45度の列を解決し、省略は従来の横一列とする。方向のidentityとexact軸を保ち、bare diagonalだけが元meaning・attestされたoptional composition seed・元occurrenceの専用roleで二軸から選ぶ。日英source、single-head continuation、宣言済みMacro Emitへ接続し、未対応action / group方向や未宣言caller方向を黙って捨てない。物理aspectに沿うtile行列、performance seedを後続へ要求するscatter重心移動recipeも持ち、個体配列・乱数・Score化は実行しない。9primitiveは同じresolverへ届き、triangle / squareの縦長・横長、正三角 / 正方形、五〜八角形の制約もbase headと別に保持する。通常三角はnormal幅=高さ6/25、aspectは長辺6/25×size係数と短辺半分、正三角はexact sideと高さs√3/2の固定規則、polygonは外接円半径と省略5辺を使う。元のexact geometry・外観・angle・位置・originとStop / Continueを保ち、place / count1のactual Scoreと反復のReady planを区別する。Whole Step10、Step11の個体materializationとruntime / UI / 保存cutoverは未完了である。詳細はSPEC §12末尾。
-
-通常DDLと宣言済みflat Macroの明示揺らぎは、三次元の共通resolverから既存Scoreへ届く。8語写像と一slot以上の不足値Medium / Medium / Perlin、全省略None、PositionX + PositionYはSPEC §13.6に従う。Line / Arc / circle / ellipse / square / cloudformが対象でPointは拒否する。Macroはvariation categoryにoptional dimension制約を持ち、三つのfluctuation Emit keysへ届ける。旧None schemaのidentityは保ち、宣言必須parameterの不足をdefaultで埋めない。Source / generated ownerと既存Stop / Continue単位を保つ。Whole Step10とruntime / UI / 保存cutoverは未完了である。
-
-`core/crates/inku-ddl` には、利用者に見える正規化DDLをsource span付きで保持し、
-日本語／英語の句・entity・修飾・数量・action・position・relation・coordination・
-continuationをtyped semantic documentへ組み立てるshared Rust compiler基盤がある。
-名前空間付きmacro呼出しは、汎用の`MacroDefinition`へlock解決し、typed parameterを
-bindingしてから、attestされた`composition_seed`と呼出側の有限上限のもとで決定的に
-semantic nodeへ展開する。full compiler-lock digestはsource/provenanceを検証し、
-canonical identityとfocus選択はmeaning digestに基づくため、sourceの違いは意味選択に入れない。
-曖昧な所有先や未解決の意味は、先頭・最近傍・末尾を推測せずtyped issueとして
-fail closedする。
-
-受入済みのsealed Rust Stage 1.5 v5は、lock検証済みtyped meaningを入力に、meaning digestと
-attestされた任意の`composition_seed`からfocusを決める。明示変奏が動かせるのはfocusだけである。
-inline/continuationの等価meaningと対応するmacro executionはsource provenanceから分離し、
-full compiler-lock digest自体をfocusの材料にしない。
-Stage 1.5の入場では、実際のvisible source bytes、存在する言語証跡、未使用分を含む全sidecar、
-実行macroのdefinition identityをlockと照合してからsource-independent入力を切り離す。
-言語証跡のない入力へ条件を足さず、未使用sidecarの解決や実行を要求しない。
-同じlockは`inku.geometry-resolution-policy.v1`もattestし、verified viewからのlowererは、明示host
-canvas / backgroundと、色省略時の実palette観測をcontextとして受け取る。数値位置、またはverified
-direct `Instruction { instruction_index }` ownerを持つ元`place:center`、明示した上・下・四辺・隅と、place actionが解決済みの
-circle / ellipse / cloudform / square / triangle / polygon / line / arc / pointでは、明示numeric geometryに加え、count1のnormal geometryと
-日英7classの大小、省略count=1 / pen / solid / fill / 背景contrast色をactual Scoreへ解決する。`none` /
-`solid` / surface省略のfillを保ち、7つのpositive surface qualityは既存`SurfaceSpec`へ、検証済みの
-7つのGroundはhost解決済みaspectを持つ既存`CanvasGroundSpec`へ解決する。compilerはtexture / materialの
-数値defaultやseedを作らない。Lineは長さ、Arcは弦長と矢高、Pointは半径または直径をexact decimalとして所有する。
-通常sourceのdirect primitiveでは既存checked lowererがNotTouchingとBetweenを、Line / Arc / Pointの
-endpoint familyがConnectedを既存Medium gapのScore relationへ届ける。NotTouchingは既存gap、Betweenは直前二要素のbbox中心を使う既存recipeを保ち、named／noncenter位置はmovable、数値位置はfixedのauthorityを保つ。typedな
-previous-one/twoが指す元direct instructionが各1命令として生存し、current直前のactual source originと元順序で
-一致する場合だけ参照を保つ。Betweenでは直前が第一参照、その一つ前が第二参照であり、両ownerを保持する。参照消失時はerrorを記録してdependent relationだけを外し、currentを連鎖省略も付け替えもしない。
-Macroのexact_decimal literal / 宣言parameterは通常DDLの寸法・数値位置resolverへ合流する。
-Radius等の明示dimensionで一意にbindし、旧Number(f64)、exact値、source / generated ownerを保つ。
-NotTouchingとBetweenも隣接bound flat Emitから同じScoreへ届き、unbound Emitや失った参照を飛び越さない。外部relationは変形後の形と明示値を保ったgroup全体translationだけを試み、成立しなければrelationだけをerrorとして外して元配置を描く。
-
-TouchingはLine / Arcの通常directと同flat Macro内の隣接bound Emitから同じchecked performerへ届く。
-日英four full literalは明記された先行Line / Arc型を元source順で確認する。両端一致と既存Arc再構成を共用し、
-明示寸法・relative scale（normal含む）・弦方向は固定、省略normalは可変、numeric anchorと最終must-fitは固定する。
-失敗時はerrorを記録してrelationだけを外し、元の変形後配置、dependency、owner、drawing ordinal、seedを保つ。旧metadataなしの
-Touchingは従来互換を維持する。Engine49のtyped Along / CuttingもCount1の隣接するLine間を共通配送する。反復planは`PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`としてchecked relation intentを保持する。
-Alongは未指定方向だけを平行に揃え、Cuttingは解決済みの長さを保持する。明示方向・寸法・数値位置を保ち、
-両立しない指定や参照消失はerrorを記録してrelationだけを外す。旧metadata-free Scoreの挙動は保持する。
-whole Step10とtyped本番 / UI / 保存cutoverは残る。
-Connectedは同じflat Macro内の隣接bound Emitも受け、named-movable / numeric-fixedの位置authorityをshared
-checked performerまで運ぶ。先行のcanonical終端（Pointはcenter）へcurrent始端を平行移動で合わせ、先行、寸法、
-曲率、rotationを変えない。numericの非zero衝突はerrorを記録してrelationだけを外し、失われた参照をsurvivorへ
-付け替えない。他relation、一般構造、allocation、whole parity、runtime/UI保存cutoverは残る。
-Effective focusは単一policyの六値から`at.region`へ写し、named経路では寸法を縮めずshape全体の
-must-fitを課さない。既存Rendererがperformance seedでregion内のanchorを選び、基準点をclampする。
-Defaultはsemantic meaningへ注入せず、exact rationalを最後にだけf64へ変換する。Shared lowererは
-旧Stop入力を受け、OmitAndContinueを明示選択とする。recoverableなrelation失敗はScoreを止めず、
-Continueは元meaningを変えず、独立appearance fieldまたは成立しないtyped実行単位だけを省略する。
-結果はcomplete / omissions / stopped、元gap、実際の処置、source / generated ownerとspanを区別する。
-
-同じpolicyは明示top / bottom / 四辺 / cornerを§18のanchor領域へ解決する。四辺は狭い帯、
-上・下は各1/3、隅は各1/5の四候補であり、寸法や見切れ方針を変えない。隅はStage 2が元meaning、
-tag付きcomposition seedと元occurrenceを専用domainで選び、隅内anchorだけをRendererへ委ねる。
-Centerのexact owner / focusと未対応relation境界を保ち、未宣言caller overlayを足さない。
-
-同じpolicyのangle resolverは、lock検証済みoriginal pre / expanded meaning、tag付きoptional
-`composition_seed`、logical occurrence、angle identityをSHA-256の専用domainへframeし、作者が明示した
-かたむきをactual `Score.rotation`へ一度だけ解決する。horizontal / verticalは0 / 90、diagonalは4方向、
-rising / fallingと左右版は裁定済み整数範囲、rotatedは45度境界から5度超の有限集合を使う。
-Circle / ellipse / cloudform / square / line / arc / pointの数値配置は物理短辺単位の回転後宣言extentをmust-fitし、named focusは
-従来の寸法と`at.region`を保つ。Squareもdirectとflat Macro Emitで同じresolverを通る。Engine 42は
-square / triangleのanchor、pivot、bounds、relation、composite、arrangementを同じ物理短辺座標族で解決する。
-Engine 43はLineの端点中点、Arcの弦中点、Pointの中心をsemantic anchorとして使う。Typed Arcは既存optional
-`position`に弦中点を運び、field不在の旧Arcは従来どおり円中心をanchorとする。
-
-Finiteなflat Macro Emitも、exact execution ownerと、centerの場合だけexact generated focusへjoinした後、通常DDLと同じ
-semantic inputとlowererを通ってactual Scoreへ届く。一Emitは一命令で、複数Emitと既にflatな
-`use` / bounded `repeat` / `vary`由来の順序を保つ。現行subsetは6つのclosed shapeとline / arc / point、明示`place`、
-`center`または明示top / bottom / 四辺 / corner、任意の同名category属性、count省略またはInteger 1である。旧Stop / Continue入力にかかわらず、未結合caller fact、
-構造node、不完全・未知・型不一致のEmitは共通局所回復で扱う。未結合caller appearanceはfield単位でdefinition内の値を保ち、不成立EmitはEmit、structural nodeはsubtree、成立しない
-外側meaningはinvocation単位で診断付きに省略する。無関係なflat siblingと元ordinal欠番は保持する。
-
-Flat Emitの`angle: semantic_ref`も同じresolverを通る。Caller angleはEmitへfan-out / overrideせず、
-Macroのsemantic ordinalと既存expansion path / generated ordinalを選択keyにする。
-
-Visible DDLの`細い` / `thin`と`ごく細い` / `extra-fine`は、Fine / ExtraFineの同じ二段階identityとして
-通常instructionとflat Macro Emitの共通lowererから既存`Instruction.thinness`へ届く。Macro definitionは
-Saijiki外のclosed core ref `thinness:fine` / `thinness:extra_fine`と7classの`relative_scale`を受け入れる。
-Visible sourceは同dimensionのSemanticRef parameterを明示宣言した場合だけ一意にbindingし、
-元span / clause / atom / definitionを保持して通常entityで二重消費しない。Core由来のasset metadataはNoneである。
-Literalとparameterは同じEmit fieldから通常geometry / factorへ一度だけ合流し、明示normalも固定寸法とする。
-Missing / ambiguousは既存上流error、未宣言callerは従来lowering診断とmode別処置を保つ。
-
-Runtime未接続の`compile_ddl_to_score` facadeは、元の`NormalizedDdlDocument`を一度だけcompileし、
-そのcompilationとsource / state / lock / issuesを結果に保持する。旧Stop / Continue入力は、ともに同じcompilationのtyped ownershipとdependencyからsealedな
-execution projectionを作る。recoverableな上流hole / conflictは確立済みの局所単位を省略し、独立した命令をactual Scoreへ届ける。Canonicalなpre-meaningでは成功済み
-macro outputと元seed / source ordinal / generated provenanceをexact subsetとして再利用し、再展開しない。
-NonCanonicalなprojectionでは省略単位を先に確定してから一度だけseed導出・展開し、local failure後に
-drawをやり直さない。Global budgetとsource / lock / owner / definition / provenance整合性不良は両modeを止める。
-
-この基盤は受入済みだが、server・Web・Androidの製品pipelineからはまだ呼ばれない。
-したがって上の「現行アーキテクチャ」が現在のruntimeである。そこにあるlegacy plugin
-展開とStage 1.5は互換経路であり、新しいsemantic specificationの正本ではない。
-Unspecified placement、finite subset外のMacro delivery、action省略、repeated allocation、
-残るprimitive等のdelivery拡張、runtime cutoverは未接続の境界として残る。Public Stage 1.5 APIは
-`CanonicalReady`専用のままで、facade外の任意のmutable compilationを回復しない。Step10Pの到達は
-Step10全体の完了を意味しない。製品UI / API / 保存経路は
-まだこのmodeを選ばず、legacy coerce / LLM fallbackが置換済みという意味ではない。
-
-Score 0.9はMacro bodyを`placement_groups.members`の順序付き連続drawable範囲とAnchor indexとして原子的に保持する。group head countと内部Emit countを区別し、反復はsymbolic planに残る。memberの`transform_group_indices`で指定した内部Transformは配置前、未指定の同範囲Transformは外側として配置後に実行する。Anchor-only memberの内部Transformは、先行drawableがある場合もmemberと同じ空のdrawable範囲を記録する。
-
-`CompositionPlanResult.standalone_macro_repetitions`は既存bodyの位置・range・Anchor・内部Transformとsource headの反復数を保持する。個体materializationとruntime／UI／save接続は後続の責務である。
+Step11の個体materialization、typed compilerの製品runtime / UI / API / 保存経路への接続、及び未接続のdelivery拡張は残る。現行runtimeは上のlegacy経路を使用し、legacy coerce / LLM fallbackはまだ置換されていない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
 
 ## 守るべき設計契約
 
@@ -219,8 +110,8 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 42 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 21 | `server/src/inku_server/layer_versions.py` |
+| Render Engine | 58 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 35 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 

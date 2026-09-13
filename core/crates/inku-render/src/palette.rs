@@ -291,7 +291,7 @@ pub enum PaletteObservationError {
     InvalidResolvedColor { abstract_color: Color },
 }
 
-/// Observe the actual background, black, and white selected for one render request.
+/// Observe all abstract colors from the actual assignment for one render request.
 ///
 /// The returned DTO contains no selection policy. It only exposes the concrete
 /// RGB and the same OKLCH lightness already used by palette assignment.
@@ -302,11 +302,26 @@ pub fn work_palette_context(
     background: Color,
 ) -> Result<ResolvedPaletteContext, PaletteObservationError> {
     let assignment = work_color_assignment(color_map, render_seed, catalog_id);
+    let observations = [
+        Color::White,
+        Color::Black,
+        Color::Blue,
+        Color::Red,
+        Color::Green,
+        Color::Gray,
+        Color::Yellow,
+        Color::Orange,
+        Color::Purple,
+    ]
+    .map(|color| observe_resolved_color(color, color_map, &assignment))
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
     Ok(ResolvedPaletteContext::new(
         observe_resolved_color(background, color_map, &assignment)?,
         observe_resolved_color(Color::Black, color_map, &assignment)?,
         observe_resolved_color(Color::White, color_map, &assignment)?,
-    ))
+    )
+    .with_observations(observations.try_into().expect("nine abstract colors")))
 }
 
 fn observe_resolved_color(

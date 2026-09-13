@@ -21,7 +21,30 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v18";
+    "inku.semantic-instruction-association.v19";
+
+/// An explicit fill domain. Inline operands retain their original instruction owner
+/// and are consumed as geometry by the fill, rather than drawn independently.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SemanticFillTarget {
+    Canvas {
+        source: SourceOccurrence,
+        markers: Vec<SourceOccurrence>,
+    },
+    InlineShape {
+        target_instruction_index: usize,
+        markers: Vec<SourceOccurrence>,
+    },
+}
+
+impl SemanticFillTarget {
+    pub(crate) fn sources(&self) -> Vec<&SourceOccurrence> {
+        match self {
+            Self::Canvas { source, markers } => std::iter::once(source).chain(markers).collect(),
+            Self::InlineShape { markers, .. } => markers.iter().collect(),
+        }
+    }
+}
 
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,6 +64,7 @@ pub struct SemanticInstruction {
     pub position: Option<SemanticTerm>,
     pub layout_direction: Option<SemanticTerm>,
     pub relation: Option<SemanticRelation>,
+    pub fill_target: Option<SemanticFillTarget>,
 }
 
 /// A source-ordered reference to existing instructions joined by explicit coordination.
@@ -57,6 +81,7 @@ pub struct SemanticGroupPredicateEdge {
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
     pub layout: GroupLayout,
+    pub fill_target: Option<SemanticFillTarget>,
 }
 
 /// Closed coordinated-placement layout, separate from member actions and positions.
@@ -303,6 +328,266 @@ pub fn associate_semantic_instructions_with_macro_binding(
     build_semantic_instructions(document, association)
 }
 
+pub(crate) fn fill_phrase_ranges(
+    language: crate::ResolvedInstructionLanguage,
+    clause: &crate::ClauseSegment,
+    action_span: SourceSpan,
+) -> Option<(SourceSpan, SourceSpan, Vec<usize>)> {
+    let marker = |word: &str| {
+        clause
+            .atoms
+            .iter()
+            .enumerate()
+            .filter_map(|(index, atom)| {
+                matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface == word)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>()
+    };
+    let ranges = match language {
+        crate::ResolvedInstructionLanguage::Ja => {
+            let object = marker("を");
+            let material = marker("で");
+            let [material] = material.as_slice() else {
+                return None;
+            };
+            let object = match object.as_slice() {
+                [] => None,
+                [object] => Some(*object),
+                _ => return None,
+            };
+            if object.is_some_and(|object| object >= *material)
+                || clause.atoms[*material].span().end_byte > action_span.start_byte
+                || clause.atoms.last().map(ClauseAtom::span) != Some(action_span)
+            {
+                return None;
+            }
+            (
+                SourceSpan {
+                    start_byte: clause.span.start_byte,
+                    end_byte: object.map_or(clause.span.start_byte, |index| {
+                        clause.atoms[index].span().start_byte
+                    }),
+                },
+                SourceSpan {
+                    start_byte: object.map_or(clause.span.start_byte, |index| {
+                        clause.atoms[index].span().end_byte
+                    }),
+                    end_byte: clause.atoms[*material].span().start_byte,
+                },
+                object
+                    .into_iter()
+                    .chain(std::iter::once(*material))
+                    .collect(),
+            )
+        }
+        crate::ResolvedInstructionLanguage::En => {
+            let with = marker("with");
+            let [with] = with.as_slice() else {
+                return None;
+            };
+            if clause.atoms.first().map(ClauseAtom::span) != Some(action_span)
+                || action_span.end_byte > clause.atoms[*with].span().start_byte
+            {
+                return None;
+            }
+            (
+                SourceSpan {
+                    start_byte: action_span.end_byte,
+                    end_byte: clause.atoms[*with].span().start_byte,
+                },
+                SourceSpan {
+                    start_byte: clause.atoms[*with].span().end_byte,
+                    end_byte: clause.span.end_byte,
+                },
+                vec![*with],
+            )
+        }
+    };
+    Some(ranges)
+}
+
+fn associate_fill_targets(
+    document: &NormalizedDdlDocument,
+    association: &SemanticAssociationResult,
+    actions: &[SemanticTerm],
+    positions: &[SemanticTerm],
+    groups: &[SemanticCoordinatedHeadGroup],
+    ownership: &mut InstructionOwnership,
+    group_targets: &mut BTreeMap<usize, SemanticFillTarget>,
+) -> BTreeMap<usize, SemanticFillTarget> {
+    let mut targets = BTreeMap::new();
+    for (clause_index, clause) in association.clause_stream.clauses.iter().enumerate() {
+        let clause_actions = actions
+            .iter()
+            .filter(|term| term.provenance.source.clause_index == clause_index)
+            .collect::<Vec<_>>();
+        let [action] = clause_actions.as_slice() else {
+            continue;
+        };
+        if action.identity.category != "movement"
+            || action.identity.id != "fill"
+            || clause.atoms.iter().any(|atom| {
+                matches!(atom, ClauseAtom::UnresolvedDiagnostic(diagnostic)
+                    if !association.ast.entities.iter().any(|entity|
+                        matches!(entity.head, crate::SemanticHead::MacroInvocation(_))
+                            && entity.head.source().span == diagnostic.span))
+            })
+        {
+            continue;
+        }
+        let Some((target_range, motif_range, marker_indices)) =
+            fill_phrase_ranges(document.language(), clause, action.provenance.source.span)
+        else {
+            continue;
+        };
+        let heads = |range: SourceSpan| {
+            association
+                .ast
+                .entities
+                .iter()
+                .enumerate()
+                .filter_map(|(index, entity)| {
+                    let span = entity.head.source().span;
+                    (range.start_byte <= span.start_byte && span.end_byte <= range.end_byte)
+                        .then_some(index)
+                })
+                .collect::<Vec<_>>()
+        };
+        let motif_heads = heads(motif_range);
+        let Some(motif_index) = motif_heads.first() else {
+            continue;
+        };
+        let motif_group = if motif_heads.len() > 1 {
+            let Some(group_index) = groups
+                .iter()
+                .position(|group| group.member_instruction_indices == motif_heads)
+            else {
+                continue;
+            };
+            Some(group_index)
+        } else {
+            None
+        };
+        let source = |atom_index: usize| {
+            let span = clause.atoms[atom_index].span();
+            SourceOccurrence {
+                span,
+                surface: document.source()[span.start_byte..span.end_byte].to_owned(),
+                language: document.language(),
+                region_index: sentence_region_index(&association.clause_stream, span),
+                clause_index,
+                atom_index,
+            }
+        };
+        let markers = marker_indices.into_iter().map(source).collect::<Vec<_>>();
+        let target_heads = heads(target_range);
+        let target = if let [target_index] = target_heads.as_slice() {
+            if !matches!(
+                &association.ast.entities[*target_index].head,
+                crate::SemanticHead::Primitive(_)
+            ) {
+                continue;
+            }
+            Some(SemanticFillTarget::InlineShape {
+                target_instruction_index: *target_index,
+                markers,
+            })
+        } else if target_heads.is_empty() {
+            let background = clause.atoms.iter().enumerate().filter_map(|(index, atom)| {
+                (target_range.start_byte <= atom.span().start_byte && atom.span().end_byte <= target_range.end_byte
+                    && matches!(atom, ClauseAtom::FunctionWord {surface, ..} if matches!(surface.as_str(), "背景" | "background"))).then_some(index)
+            }).collect::<Vec<_>>();
+            let named = positions
+                .iter()
+                .filter(|position| {
+                    let span = position.provenance.source.span;
+                    target_range.start_byte <= span.start_byte
+                        && span.end_byte <= target_range.end_byte
+                })
+                .count();
+            if document.source()[target_range.start_byte..target_range.end_byte]
+                .trim()
+                .is_empty()
+                || (background.is_empty() && named == 1)
+            {
+                None
+            } else {
+                let [background] = background.as_slice() else {
+                    continue;
+                };
+                Some(SemanticFillTarget::Canvas {
+                    source: source(*background),
+                    markers,
+                })
+            }
+        } else {
+            continue;
+        };
+        if groups.iter().any(|group| {
+            (motif_group.is_none() && group.member_instruction_indices.contains(motif_index))
+                || target_heads
+                    .iter()
+                    .any(|index| group.member_instruction_indices.contains(index))
+        }) {
+            continue;
+        }
+        let action_start = action.provenance.source.span.start_byte;
+        for starts in ownership.action_starts_by_head.values_mut() {
+            starts.remove(&action_start);
+        }
+        for starts in ownership.action_starts_by_group.values_mut() {
+            starts.remove(&action_start);
+        }
+        let motif_start = association.ast.entities[*motif_index]
+            .head
+            .source()
+            .span
+            .start_byte;
+        if let Some(group_index) = motif_group {
+            ownership.insert_group_action(group_index, action_start);
+        } else {
+            ownership.insert_action(motif_start, action_start);
+        }
+        // Positions written inside the target phrase retain the target's owner.
+        // A Canvas target uses the motif's position as its named fill domain.
+        for position in positions {
+            let span = position.provenance.source.span;
+            if target_range.start_byte <= span.start_byte && span.end_byte <= target_range.end_byte
+            {
+                for starts in ownership.position_starts_by_head.values_mut() {
+                    starts.remove(&span.start_byte);
+                }
+                for starts in ownership.position_starts_by_group.values_mut() {
+                    starts.remove(&span.start_byte);
+                }
+                if let Some(target_index) = target_heads.first() {
+                    ownership.insert_position(
+                        association.ast.entities[*target_index]
+                            .head
+                            .source()
+                            .span
+                            .start_byte,
+                        span.start_byte,
+                    );
+                } else if let Some(group_index) = motif_group {
+                    ownership.insert_group_position(group_index, span.start_byte);
+                } else {
+                    ownership.insert_position(motif_start, span.start_byte);
+                }
+            }
+        }
+        if let Some(target) = target {
+            if let Some(group_index) = motif_group {
+                group_targets.insert(group_index, target);
+            } else {
+                targets.insert(motif_start, target);
+            }
+        }
+    }
+    targets
+}
+
 fn build_semantic_instructions(
     document: &NormalizedDdlDocument,
     association: SemanticAssociationResult,
@@ -383,9 +668,19 @@ fn build_semantic_instructions(
     let (coordinated_head_groups, mut coordination_issues) =
         collect_coordinated_head_groups(document, &association, &coordination_evidence);
     assign_ambiguous_boundary_predicates(&mut actions, &mut positions, &mut coordination_issues);
-    let ownership =
+    let mut ownership =
         collect_instruction_ownership(&association, &actions, &positions, &coordinated_head_groups);
-    let (group_predicates, mut predicate_coordination_issues) = extract_group_predicates(
+    let mut group_fill_targets = BTreeMap::new();
+    let fill_targets = associate_fill_targets(
+        document,
+        &association,
+        &actions,
+        &positions,
+        &coordinated_head_groups,
+        &mut ownership,
+        &mut group_fill_targets,
+    );
+    let (mut group_predicates, mut predicate_coordination_issues) = extract_group_predicates(
         &mut actions,
         &mut positions,
         &ownership,
@@ -393,6 +688,9 @@ fn build_semantic_instructions(
         &association,
     );
     coordination_issues.append(&mut predicate_coordination_issues);
+    for edge in &mut group_predicates {
+        edge.fill_target = group_fill_targets.remove(&edge.group_index);
+    }
 
     let mut instructions = Vec::new();
     let mut issues = Vec::new();
@@ -455,6 +753,7 @@ fn build_semantic_instructions(
             position,
             layout_direction: None,
             relation,
+            fill_target: fill_targets.get(&head_start).cloned(),
         });
     }
     for direction in directions {
@@ -1048,6 +1347,14 @@ fn coordination_gap_is_clear(
         .all(|atom| {
             atom.span() == marker_span
                 || right_owned.contains(&(atom.span().start_byte, atom.span().end_byte))
+                // The accepted right quantity keeps its genitive bridge, e.g.
+                // `circle と four の blue point`; it is part of that noun phrase,
+                // not a boundary between coordinated heads.
+                || right.quantity.as_ref().is_some_and(|quantity|
+                    association.clause_topology.attachment_markers.iter().any(|marker|
+                        marker.span == atom.span()
+                            && marker.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No)
+                            && marker.left_atom_spans.last() == Some(&quantity.provenance.span)))
                 || matches!(atom, ClauseAtom::FunctionWord { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
         })
@@ -1192,6 +1499,7 @@ fn extract_group_predicates(
         if action.is_some() || position.is_some() {
             edges.push(SemanticGroupPredicateEdge {
                 group_index,
+                fill_target: None,
                 layout: group_layout(
                     group_index,
                     groups,
@@ -2371,6 +2679,9 @@ pub(crate) fn semantic_coordinated_head_group_value(group: &SemanticCoordinatedH
 
 pub(crate) fn semantic_group_predicate_value(edge: &SemanticGroupPredicateEdge) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(target) = &edge.fill_target {
+        record.insert("fill_target".to_owned(), semantic_fill_target_value(target));
+    }
     record.insert(
         "action".to_owned(),
         edge.action
@@ -2395,6 +2706,9 @@ pub(crate) fn semantic_group_predicate_value(edge: &SemanticGroupPredicateEdge) 
 
 pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(target) = &instruction.fill_target {
+        record.insert("fill_target".to_owned(), semantic_fill_target_value(target));
+    }
     if let Some(direction) = &instruction.layout_direction {
         record.insert(
             "layout_direction".to_owned(),
@@ -2430,6 +2744,18 @@ pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> V
             .unwrap_or(Value::Null),
     );
     Value::Object(record.into_iter().collect())
+}
+
+pub(crate) fn semantic_fill_target_value(target: &SemanticFillTarget) -> Value {
+    match target {
+        SemanticFillTarget::Canvas { .. } => serde_json::json!({"kind":"canvas"}),
+        SemanticFillTarget::InlineShape {
+            target_instruction_index,
+            ..
+        } => {
+            serde_json::json!({"kind":"inline_shape","target_instruction_index":target_instruction_index})
+        }
+    }
 }
 
 fn semantic_relation_value(relation: &SemanticRelation) -> Value {

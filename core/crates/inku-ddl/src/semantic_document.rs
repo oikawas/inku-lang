@@ -26,7 +26,28 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v16";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v17";
+
+/// A document background declaration, distinct from a drawable surface or Ground.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SemanticBackground {
+    pub color: SemanticTerm,
+    pub action: SemanticTerm,
+    pub head: SourceOccurrence,
+    pub markers: Vec<SourceOccurrence>,
+}
+
+impl SemanticBackground {
+    pub(crate) fn sources(&self) -> impl Iterator<Item = &SourceOccurrence> {
+        [
+            &self.head,
+            &self.color.provenance.source,
+            &self.action.provenance.source,
+        ]
+        .into_iter()
+        .chain(&self.markers)
+    }
+}
 
 /// Source-independent identity of one continuation target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,6 +74,7 @@ pub struct SemanticContinuationEdge {
 /// Document-global semantic AST with accepted drawable instructions and optional support material.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticDocumentAst {
+    pub background: Option<SemanticBackground>,
     pub ground: Option<SemanticTerm>,
     pub instructions: Vec<SemanticInstruction>,
     pub coordinated_head_groups: Vec<crate::SemanticCoordinatedHeadGroup>,
@@ -65,12 +87,14 @@ pub struct SemanticDocumentAst {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SemanticDocumentIssueKind {
     ConflictingGrounds,
+    ConflictingBackgrounds,
 }
 
 impl SemanticDocumentIssueKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ConflictingGrounds => "conflicting_grounds",
+            Self::ConflictingBackgrounds => "conflicting_backgrounds",
         }
     }
 }
@@ -122,6 +146,8 @@ pub struct SemanticDocumentResult {
     pub schema_id: &'static str,
     pub instruction_association: SemanticInstructionAssociationResult,
     pub ast: SemanticDocumentAst,
+    /// All declarations, including conflicting candidates, retain their source ownership.
+    pub background_candidates: Vec<SemanticBackground>,
     pub issues: Vec<SemanticDocumentIssue>,
     pub continuation_issues: Vec<SemanticContinuationIssue>,
     pub canonical_bytes: Option<Vec<u8>>,
@@ -153,6 +179,12 @@ fn build_semantic_document(
     document: &NormalizedDdlDocument,
     mut instruction_association: SemanticInstructionAssociationResult,
 ) -> SemanticDocumentResult {
+    let background_candidates = associate_backgrounds(document, &instruction_association);
+    let background_spans = background_candidates
+        .iter()
+        .flat_map(SemanticBackground::sources)
+        .map(|source| source.span)
+        .collect::<Vec<_>>();
     let mut grounds = Vec::new();
 
     for (clause_index, clause) in instruction_association
@@ -193,7 +225,7 @@ fn build_semantic_document(
     }
 
     let owned_ground_occurrence_count = grounds.len();
-    let (ground, issues) = match grounds.len() {
+    let (ground, mut issues) = match grounds.len() {
         0 => (None, Vec::new()),
         1 => (grounds.pop(), Vec::new()),
         _ => (
@@ -214,15 +246,31 @@ fn build_semantic_document(
         "semantic document must deliver every Ground occurrence exactly once"
     );
 
+    let background = match background_candidates.as_slice() {
+        [background] => Some(background.clone()),
+        [] => None,
+        candidates => {
+            issues.push(SemanticDocumentIssue {
+                kind: SemanticDocumentIssueKind::ConflictingBackgrounds,
+                occurrences: candidates
+                    .iter()
+                    .map(|candidate| candidate.color.clone())
+                    .collect(),
+            });
+            None
+        }
+    };
+
     let coordination_continuation_occurrence_count =
         arbitrate_coordination_continuation_claims(document, &mut instruction_association);
     let (
-        instructions,
+        mut instructions,
         continuations,
         continuation_issues,
         mut owned_continuation_occurrence_count,
         instruction_index_map,
     ) = associate_continuations(document, &instruction_association);
+    remap_fill_targets(&mut instructions, &instruction_index_map);
     owned_continuation_occurrence_count += coordination_continuation_occurrence_count;
     let coordinated_head_groups = instruction_association
         .ast
@@ -289,28 +337,45 @@ fn build_semantic_document(
         .issues
         .iter()
         .all(|issue| {
-            issue.kind == SemanticAssociationIssueKind::AmbiguousEntityOwnership
+            (issue.kind == SemanticAssociationIssueKind::AmbiguousEntityOwnership
                 && issue.upstream_diagnostic.is_none()
                 && !issue.occurrences.is_empty()
                 && issue
                     .occurrences
                     .iter()
-                    .all(|occurrence| consumed_upstream_spans.contains(&occurrence.source().span))
+                    .all(|occurrence| consumed_upstream_spans.contains(&occurrence.source().span)))
+                || (issue.kind == SemanticAssociationIssueKind::MissingEntityHead
+                    && issue.upstream_diagnostic.is_none()
+                    && !issue.occurrences.is_empty()
+                    && issue
+                        .occurrences
+                        .iter()
+                        .all(|occurrence| background_spans.contains(&occurrence.source().span)))
         })
         && instruction_association.issues.iter().all(|issue| {
-            issue.kind == SemanticInstructionIssueKind::AmbiguousActionOwnership
+            (issue.kind == SemanticInstructionIssueKind::AmbiguousActionOwnership
                 && !issue.occurrences.is_empty()
                 && issue.occurrences.iter().all(|occurrence| {
                     consumed_upstream_spans.contains(&occurrence.term.provenance.source.span)
-                })
+                }))
+                || (issue.kind == SemanticInstructionIssueKind::MissingActionEntity
+                    && !issue.occurrences.is_empty()
+                    && issue.occurrences.iter().all(|occurrence| {
+                        background_spans.contains(&occurrence.term.provenance.source.span)
+                    }))
         })
         && instruction_association.coordination_issues.is_empty()
         && instruction_association.relation_issues.is_empty();
+    let mut group_predicates = instruction_association.ast.group_predicates.clone();
+    for edge in &mut group_predicates {
+        remap_fill_target(&mut edge.fill_target, &instruction_index_map);
+    }
     let ast = SemanticDocumentAst {
+        background,
         ground,
         instructions,
         coordinated_head_groups,
-        group_predicates: instruction_association.ast.group_predicates.clone(),
+        group_predicates,
         continuations,
         complete: (instruction_association.ast.complete || upstream_complete)
             && issues.is_empty()
@@ -322,6 +387,7 @@ fn build_semantic_document(
         schema_id: SEMANTIC_DOCUMENT_SCHEMA_ID,
         instruction_association,
         ast,
+        background_candidates,
         issues,
         continuation_issues,
         canonical_bytes,
@@ -330,6 +396,129 @@ fn build_semantic_document(
         owned_continuation_occurrence_count,
         delivered_continuation_occurrence_count,
     }
+}
+
+pub(crate) fn remap_fill_targets(
+    instructions: &mut [SemanticInstruction],
+    index_map: &[Option<usize>],
+) {
+    for instruction in instructions {
+        remap_fill_target(&mut instruction.fill_target, index_map);
+    }
+}
+
+pub(crate) fn remap_fill_target(
+    target: &mut Option<crate::SemanticFillTarget>,
+    index_map: &[Option<usize>],
+) {
+    if let Some(crate::SemanticFillTarget::InlineShape {
+        target_instruction_index,
+        ..
+    }) = target
+    {
+        *target_instruction_index = index_map[*target_instruction_index]
+            .expect("a retained fill keeps its original target operand");
+    }
+}
+
+fn associate_backgrounds(
+    document: &NormalizedDdlDocument,
+    association: &SemanticInstructionAssociationResult,
+) -> Vec<SemanticBackground> {
+    let stream = &association.association.clause_stream;
+    stream
+        .clauses
+        .iter()
+        .enumerate()
+        .filter_map(|(clause_index, clause)| {
+            // This finite grammar consumes typed atoms, never rewrites the source or
+            // treats a Ground, drawable head, or surface texture as a background.
+            let mut tokens = Vec::new();
+            let mut color = None;
+            let mut action = None;
+            let mut head = None;
+            let mut markers = Vec::new();
+            for (atom_index, atom) in clause.atoms.iter().enumerate() {
+                if association
+                    .association
+                    .macro_parameter_owns_span(atom.span())
+                {
+                    return None;
+                }
+                let region_index = sentence_region_index(stream, atom.span());
+                let source = || SourceOccurrence {
+                    span: atom.span(),
+                    surface: document.source()[atom.span().start_byte..atom.span().end_byte]
+                        .to_owned(),
+                    language: document.language(),
+                    region_index,
+                    clause_index,
+                    atom_index,
+                };
+                match atom {
+                    ClauseAtom::CoreRole(term)
+                        if term.role == CoreRoleKind::Color && color.is_none() =>
+                    {
+                        color = Some(project_semantic_term(
+                            document,
+                            &term.asset_id,
+                            &term.category_key,
+                            &term.canonical_surface_ja,
+                            term.span,
+                            region_index,
+                            clause_index,
+                            atom_index,
+                        ));
+                        tokens.push("color");
+                    }
+                    ClauseAtom::RemainingRole(term)
+                        if term.role == crate::RemainingRoleKind::Motion && action.is_none() =>
+                    {
+                        let term = project_semantic_term(
+                            document,
+                            &term.asset_id,
+                            &term.category_key,
+                            &term.canonical_surface_ja,
+                            term.span,
+                            region_index,
+                            clause_index,
+                            atom_index,
+                        );
+                        if term.identity.category != "movement" || term.identity.id != "fill" {
+                            return None;
+                        }
+                        action = Some(term);
+                        tokens.push("fill");
+                    }
+                    ClauseAtom::FunctionWord { surface, .. } => {
+                        if matches!(surface.as_str(), "背景" | "background") && head.is_none() {
+                            head = Some(source());
+                            tokens.push("background");
+                        } else {
+                            markers.push(source());
+                            tokens.push(surface.as_str());
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            let accepted = match document.language() {
+                ResolvedInstructionLanguage::Ja => {
+                    tokens == ["background", "を", "color", "で", "fill"]
+                }
+                ResolvedInstructionLanguage::En => {
+                    tokens == ["fill", "the", "background", "with", "color"]
+                        || tokens == ["fill", "background", "with", "color"]
+                }
+            };
+            accepted.then(|| SemanticBackground {
+                color: color.unwrap(),
+                action: action.unwrap(),
+                head: head.unwrap(),
+                markers,
+            })
+        })
+        .collect()
 }
 
 fn arbitrate_coordination_continuation_claims(
@@ -875,6 +1064,20 @@ fn continuation_marker(
     allow_shared_determiner_candidate: bool,
 ) -> Option<ContinuationAdmission> {
     let head = instruction.entity.head.source();
+    // Explicit imperative fill grammar owns both its motif and inline operand.
+    // Its article must not be reused as a marked-subject continuation claim.
+    if instruction.fill_target.is_some() || result.ast.group_predicates.iter().any(|edge| {
+        (edge.action.as_ref().is_some_and(|action| action.identity.id == "fill")
+            && result.ast.coordinated_head_groups[edge.group_index].member_instruction_indices.iter()
+                .any(|index| result.ast.instructions[*index].entity.head.source().span == head.span))
+        || matches!(&edge.fill_target, Some(crate::SemanticFillTarget::InlineShape {target_instruction_index, ..})
+            if result.ast.instructions[*target_instruction_index].entity.head.source().span == head.span)
+    }) || result.ast.instructions.iter().any(|candidate| {
+        matches!(&candidate.fill_target, Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
+            if result.ast.instructions[*target_instruction_index].entity.head.source().span == head.span)
+    }) {
+        return None;
+    }
     let clause = result
         .association
         .clause_stream
@@ -1126,6 +1329,18 @@ fn merge_option<T: Clone>(target: &mut Option<T>, continuation: &Option<T>) {
 
 pub(crate) fn canonical_ast_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     let mut root = BTreeMap::new();
+    root.insert(
+        "background".to_owned(),
+        ast.background
+            .as_ref()
+            .map(|background| {
+                serde_json::json!({
+                    "color": semantic_identity_value(&background.color.identity),
+                    "action": semantic_identity_value(&background.action.identity)
+                })
+            })
+            .unwrap_or(Value::Null),
+    );
     root.insert(
         "coordinated_head_groups".to_owned(),
         Value::Array(

@@ -271,7 +271,10 @@
 # 33: Coordinated placement preserves each Macro body as one source member.
 # 34: Repeated Direct and Macro plans preserve checked relation targets and position
 # authority; Anchor-only transformed Macro members retain valid contained ranges.
-DDL_ENGINE_VERSION = "34"
+# 35: Typed documents retain source-owned background, deliver draw through the shared
+# geometry/count/place resolver, preserve omitted position for central performance-time resolution,
+# and resolve fill target/count/Macro footprint into symbolic plans.
+DDL_ENGINE_VERSION = "35"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

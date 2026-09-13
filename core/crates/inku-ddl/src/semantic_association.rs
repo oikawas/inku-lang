@@ -1090,7 +1090,7 @@ fn build_semantic_entities(
     document: &NormalizedDdlDocument,
     clause_stream: ClauseStream,
     macro_parameter_binding: Option<MacroParameterBindingResult>,
-    pre_head_ownership: PreHeadPhraseOwnership,
+    mut pre_head_ownership: PreHeadPhraseOwnership,
     clause_topology: ClauseTopologyEvidence,
 ) -> SemanticAssociationResult {
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
@@ -1407,6 +1407,7 @@ fn build_semantic_entities(
         );
     }
 
+    associate_fill_geometry_ownership(document, &clause_stream, &regions, &mut pre_head_ownership);
     let mut entities = Vec::new();
     for (region_index, region) in regions {
         associate_region(
@@ -1497,6 +1498,86 @@ fn build_semantic_entities(
         delivered_compound_reference_count,
         macro_parameter_binding,
         clause_topology,
+    }
+}
+
+fn associate_fill_geometry_ownership(
+    document: &NormalizedDdlDocument,
+    stream: &ClauseStream,
+    regions: &BTreeMap<usize, AssociationRegion>,
+    ownership: &mut PreHeadPhraseOwnership,
+) {
+    for clause in &stream.clauses {
+        let actions = clause
+            .atoms
+            .iter()
+            .filter_map(|atom| match atom {
+                ClauseAtom::RemainingRole(term)
+                    if term.role == crate::RemainingRoleKind::Motion =>
+                {
+                    Some(term)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let [action] = actions.as_slice() else {
+            continue;
+        };
+        if !crate::project_macro_semantic_ref(&action.category_key, &action.canonical_surface_ja)
+            .is_some_and(|identity| {
+                identity.category == "movement" && identity.canonical_id == "fill"
+            })
+        {
+            continue;
+        }
+        let Some((target, motif, _)) = crate::semantic_instruction::fill_phrase_ranges(
+            document.language(),
+            clause,
+            action.span,
+        ) else {
+            continue;
+        };
+        let Some(region) = regions.get(&sentence_region_index(stream, action.span)) else {
+            continue;
+        };
+        for range in [target, motif] {
+            let within = |span: SourceSpan| {
+                range.start_byte <= span.start_byte && span.end_byte <= range.end_byte
+            };
+            let heads = region
+                .heads
+                .iter()
+                .filter(|head| within(head.source().span))
+                .collect::<Vec<_>>();
+            let [head] = heads.as_slice() else {
+                continue;
+            };
+            let value_within = |value: &crate::SemanticGeometryValue| {
+                within(value.keyword_provenance.span) && within(value.decimal.provenance.span)
+            };
+            for geometry in &region.explicit_geometries {
+                let contained = match geometry {
+                    SemanticExplicitGeometry::Radius(value)
+                    | SemanticExplicitGeometry::Diameter(value)
+                    | SemanticExplicitGeometry::Length(value)
+                    | SemanticExplicitGeometry::Side(value) => value_within(value),
+                    SemanticExplicitGeometry::WidthHeight { width, height } => {
+                        value_within(width) && value_within(height)
+                    }
+                    SemanticExplicitGeometry::ChordSagitta { chord, sagitta } => {
+                        value_within(chord) && value_within(sagitta)
+                    }
+                };
+                if contained {
+                    ownership.insert(head.source().span, geometry.source().span);
+                }
+            }
+            for position in &region.numeric_positions {
+                if value_within(&position.x) && value_within(&position.y) {
+                    ownership.insert(head.source().span, position.source().span);
+                }
+            }
+        }
     }
 }
 
@@ -2339,8 +2420,20 @@ fn take_pre_head_region(
         quantities: take_owned_quantities(&mut region.quantities, &head, ownership),
         thinnesses: take_owned_thinnesses(&mut region.thinnesses, &head, ownership),
         relative_scales: take_owned_relative_scales(&mut region.relative_scales, &head, ownership),
-        explicit_geometries: Vec::new(),
-        numeric_positions: Vec::new(),
+        explicit_geometries: {
+            let (owned, remaining) = std::mem::take(&mut region.explicit_geometries)
+                .into_iter()
+                .partition(|geometry| ownership.owns(&head, geometry.source().span));
+            region.explicit_geometries = remaining;
+            owned
+        },
+        numeric_positions: {
+            let (owned, remaining) = std::mem::take(&mut region.numeric_positions)
+                .into_iter()
+                .partition(|position| ownership.owns(&head, position.source().span));
+            region.numeric_positions = remaining;
+            owned
+        },
         touches: take_owned_terms(&mut region.touches, &head, ownership),
         continuities: take_owned_terms(&mut region.continuities, &head, ownership),
         angles: take_owned_terms(&mut region.angles, &head, ownership),

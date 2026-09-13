@@ -33,15 +33,15 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v14";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v15";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v15";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v16";
 /// ASCII domain prefix for the fully framed compiler lock digest.
 pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v15";
 /// Stable identity for source-bearing semantic provenance bytes.
-pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v3";
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v4";
 /// Stable identity for generated macro provenance bytes.
 pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
 /// Stable identity for source-independent expanded macro meaning bytes.
@@ -121,6 +121,8 @@ pub enum SemanticDeliveryOwner {
     Position,
     Relation,
     Ground,
+    Background,
+    FillTarget,
     ExpandedNode,
     TypedIssue,
     SyntaxOnly,
@@ -154,6 +156,8 @@ impl SemanticDeliveryOwner {
             Self::Position => "position",
             Self::Relation => "relation",
             Self::Ground => "ground",
+            Self::Background => "background",
+            Self::FillTarget => "fill_target",
             Self::ExpandedNode => "expanded_node",
             Self::TypedIssue => "typed_issue",
             Self::SyntaxOnly => "syntax_only",
@@ -751,10 +755,49 @@ fn project_deliveries(
     if let Some(ground) = &semantic_document.ast.ground {
         add_term_explicit(&mut projection, SemanticDeliveryOwner::Ground, ground);
     }
+    let background_spans = semantic_document
+        .background_candidates
+        .iter()
+        .flat_map(crate::SemanticBackground::sources)
+        .map(|source| source.span)
+        .collect::<Vec<_>>();
+    for background in &semantic_document.background_candidates {
+        add_explicit(
+            &mut projection,
+            background.head.span,
+            SemanticDeliveryOwner::Background,
+            "document:background".to_owned(),
+        );
+        add_term_explicit(
+            &mut projection,
+            SemanticDeliveryOwner::Background,
+            &background.color,
+        );
+        add_term_explicit(
+            &mut projection,
+            SemanticDeliveryOwner::Background,
+            &background.action,
+        );
+        for marker in &background.markers {
+            add_syntax(&mut projection, marker.span, "background_grammar");
+        }
+    }
     for instruction in &semantic_document.ast.instructions {
         project_instruction(instruction, &mut projection);
     }
     for edge in &semantic_document.ast.group_predicates {
+        if let Some(target) = &edge.fill_target {
+            let meaning =
+                crate::semantic_instruction::semantic_fill_target_value(target).to_string();
+            for source in target.sources() {
+                add_explicit(
+                    &mut projection,
+                    source.span,
+                    SemanticDeliveryOwner::FillTarget,
+                    meaning.clone(),
+                );
+            }
+        }
         if let Some(action) = &edge.action {
             add_term_explicit(&mut projection, SemanticDeliveryOwner::Action, action);
         }
@@ -888,6 +931,16 @@ fn project_deliveries(
 
     let association = &semantic_document.instruction_association.association;
     for issue in &association.issues {
+        if issue.kind == SemanticAssociationIssueKind::MissingEntityHead
+            && issue.upstream_diagnostic.is_none()
+            && !issue.occurrences.is_empty()
+            && issue
+                .occurrences
+                .iter()
+                .all(|occurrence| background_spans.contains(&occurrence.source().span))
+        {
+            continue;
+        }
         let span = issue
             .upstream_diagnostic
             .as_ref()
@@ -999,6 +1052,14 @@ fn project_deliveries(
     }
 
     for issue in &semantic_document.instruction_association.issues {
+        if issue.kind == SemanticInstructionIssueKind::MissingActionEntity
+            && !issue.occurrences.is_empty()
+            && issue.occurrences.iter().all(|occurrence| {
+                background_spans.contains(&occurrence.term.provenance.source.span)
+            })
+        {
+            continue;
+        }
         let span = issue
             .occurrences
             .first()
@@ -1198,7 +1259,8 @@ fn project_deliveries(
 
     for issue in &semantic_document.issues {
         match issue.kind {
-            SemanticDocumentIssueKind::ConflictingGrounds => add_conflict(
+            SemanticDocumentIssueKind::ConflictingGrounds
+            | SemanticDocumentIssueKind::ConflictingBackgrounds => add_conflict(
                 &mut projection,
                 issue.kind.as_str(),
                 issue
@@ -1505,6 +1567,17 @@ fn project_instruction_excluding_claims(
 }
 
 fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mut Projection) {
+    if let Some(target) = &instruction.fill_target {
+        let meaning = crate::semantic_instruction::semantic_fill_target_value(target).to_string();
+        for source in target.sources() {
+            add_explicit(
+                projection,
+                source.span,
+                SemanticDeliveryOwner::FillTarget,
+                meaning.clone(),
+            );
+        }
+    }
     if let Some(constraint) = &instruction.entity.shape_constraint {
         for source in
             std::iter::once(&constraint.provenance).chain(&constraint.additional_provenance)
@@ -2509,10 +2582,16 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
     }
 
     let mut occurrences = Vec::new();
+    if let Some(background) = &ast.background {
+        occurrences.extend(background.sources());
+    }
     if let Some(ground) = &ast.ground {
         push_term(&mut occurrences, ground);
     }
     for instruction in &ast.instructions {
+        if let Some(target) = &instruction.fill_target {
+            occurrences.extend(target.sources());
+        }
         push_entity(&mut occurrences, &instruction.entity);
         if let Some(direction) = &instruction.layout_direction {
             push_term(&mut occurrences, direction);
@@ -2533,6 +2612,9 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             .flat_map(|group| group.markers.iter()),
     );
     for edge in &ast.group_predicates {
+        if let Some(target) = &edge.fill_target {
+            occurrences.extend(target.sources());
+        }
         if let Some(action) = &edge.action {
             push_term(&mut occurrences, action);
         }
@@ -2550,6 +2632,14 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
 /// Canonical source-bearing provenance for the complete returned semantic graph.
 pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> Vec<u8> {
     let mut root = BTreeMap::new();
+    root.insert("background".to_owned(), ast.background.as_ref().map(|background| {
+        serde_json::json!({
+            "head": source_occurrence_value(&background.head),
+            "color": term_provenance_value(&background.color),
+            "action": term_provenance_value(&background.action),
+            "markers": background.markers.iter().map(source_occurrence_value).collect::<Vec<_>>()
+        })
+    }).unwrap_or(Value::Null));
     root.insert(
         "schema".to_owned(),
         Value::String(SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID.to_owned()),
@@ -2603,6 +2693,12 @@ pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> 
                 .iter()
                 .map(|edge| {
                     let mut record = BTreeMap::new();
+                    if let Some(target) = &edge.fill_target {
+                        record.insert("fill_target".to_owned(), serde_json::json!({
+                            "meaning": crate::semantic_instruction::semantic_fill_target_value(target),
+                            "sources": target.sources().into_iter().map(source_occurrence_value).collect::<Vec<_>>()
+                        }));
+                    }
                     record.insert(
                         "group_index".to_owned(),
                         Value::Number(Number::from(edge.group_index as u64)),
@@ -2666,6 +2762,12 @@ pub fn semantic_source_provenance_canonical_bytes(ast: &SemanticDocumentAst) -> 
 
 fn instruction_provenance_value(instruction: &SemanticInstruction) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(target) = &instruction.fill_target {
+        record.insert("fill_target".to_owned(), serde_json::json!({
+            "meaning": crate::semantic_instruction::semantic_fill_target_value(target),
+            "sources": target.sources().into_iter().map(source_occurrence_value).collect::<Vec<_>>()
+        }));
+    }
     if let Some(direction) = &instruction.layout_direction {
         record.insert(
             "layout_direction".to_owned(),

@@ -39,6 +39,12 @@ command language.
 - The default path is reproducible.
 Variation belongs to renderer performance and explicit user operations.
 
+A short description becomes a typed semantic document retaining shared meaning;
+the lock-verified lowerer resolves it once to a Score, and SVG is one
+performance of that same Score. The current product runtime still uses the
+legacy path below; the accepted typed compiler foundation is not connected to
+it. SPEC defines the implemented subset and the remaining boundary.
+
 ## Current Architecture
 
 ```text
@@ -64,147 +70,11 @@ instruction
 
 ### Accepted typed DDL foundation (not connected to runtime)
 
-Full/half width use 100%/50% of canvas width before rotation, unlike normal sizing's short-edge basis. Ordinary DDL and declared Macros share one resolver, distinguishing line length, open-arc chord, and closed-outline width. Semicircle bulges upward, waxing right, and waning left; crescent is the saijiki's thin filled shape represented by Score 0.2.0 `arc_form: crescent` with center/size. Saved 0.1.0 remains readable unchanged. Only overlapping sizes recover: all original candidates are retained, `ConflictingSizeSpecifications` reports the effective extent, and `Recovered` draws the smaller size under both Stop and Continue. Other integrity and unsupported-meaning failures keep their existing policy. See SPEC §12.11.
+The shared Rust compiler interprets normalized Japanese and English DDL as a typed semantic document, retaining source provenance, canonical meaning, and finite Macro expansion. The compiler lock attests source and provenance; only lock-verified meaning reaches the shared lowerer. The lowerer resolves once to an actual Score or a symbolic plan for repetition. A recoverable failure receives a typed diagnostic and local omission while independent drawing continues. [SPEC.ja.md](SPEC.ja.md) is authoritative for the types, lock, recovery, geometry, relations, and Macro contracts.
 
-Shared Rust renders normal, dense, and faint fills for all twelve tools. `surface_intensity` is valid from Score 0.3.0 onward and reaches one lowerer from direct DDL and Macros; saved 0.1.0 / 0.2.0 / 0.3.0 Scores and versionless artifacts retain their existing reads and writes. Macro Transform reaches count-one Score 0.5.0 `transform_groups` and repeated symbolic plans. Finite `scale_x` / `scale_y` / `translate_x` / `translate_y` compose inner to outer as scale at the bounding-box center, rotation at that center, then normalized-canvas-axis translation. They change geometry and spacing while retaining stroke width and grain pitch. Rotation-only Score 0.4.0 groups remain compatible. External Touching / Along / Cutting preserve transformed geometry, direction, and explicit values while attempting one whole-group translation; a failure records an error, removes only the relation, and leaves the group at its original transformed placement. Step11 instance materialization and Step13 runtime / UI / persistence cutover remain incomplete.
+The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. Score 0.9 retains Macro-body boundaries and Anchor ownership, leaving repetition in a symbolic plan rather than materializing instances. Fill resolves target, count, and Macro footprint into a symbolic FillGroupPlan; sampling, clipping, and actual-Score region materialization remain disconnected Step11 work.
 
-Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the canvas center and does not borrow an Emit's focus-dependent placement. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
-
-Primitive-only direct coordinated groups at existing named places use Score 0.8.0 `placement_groups`. Omitted internal placement is `overlap`, which aligns bounding-box centers; explicit “place in a row” retains the source-order `horizontal_source_order` wire value; explicit “overlap” is `overlap`; `scatter` and `tile` use the new `scatter` and `tile` wire values. The group bounding-box center moves to one named region resolved once from the performance seed while retaining each member's owner, count, seed, and geometry. An omitted line-up count is one for every member and reaches an actual Score. Scatter and tile preserve explicit counts and divide the remainder up to a total of eight evenly among omitted members, assigning any remainder to earlier omitted members in source order. Each omitted member receives at least one, even when explicit counts plus those minima exceed eight. The same rule applies when all counts are omitted: nine listed kinds receive one each. Fully explicit counts are not topped up to eight. Line-up and place assign one only to omitted members. The group reaches an actual Score only when all resolved counts are one; otherwise it remains a symbolic plan without instance materialization. Instance materialization and full runtime, UI, and save integration remain incomplete.
-
-The shared object placement plan API takes verified Stage 1.5 and delivers ordinary DDL and declared flat Macro line-up / scatter / tile as one resolved plan per instruction / Emit. Omitted count is eight (one for place); size uses the canvas short edge independently of count, sharing existing normal sizes and factors. Line-up resolves horizontal, vertical, or physical 45-degree rows from action-side layout_direction independently of shape angle; omission retains the horizontal row. It preserves direction identity and exact axes. Only bare diagonal selects between two axes using original meaning, attested optional composition seed, and original occurrence under a dedicated role. Japanese / English source, single-head continuation, and declared Macro Emits share this delivery; unsupported actions / group directions and undeclared caller direction are never silently discarded. Recipes also retain tile rows and columns from physical aspect, or scatter centroid translation requiring a later performance seed. No instance array, RNG, or Score conversion runs. All nine primitives share the resolver, with tall / wide triangles and rectangles, equilateral triangles, regular squares, and five- through eight-sided polygons retaining constraints separately from the base head. Normal triangle width and height are 6/25; aspect uses that long extent times the size factor and half for the short extent. Equilateral triangles retain exact side and the fixed s√3/2 height rule; polygons use circumradius and default to five sides. Exact geometry, appearance, angle, position, origin, and Stop / Continue are preserved. Actual place / count-one Score and repeated Ready plans remain distinct. Whole Step10, Step11 instance materialization, and runtime / UI / persistence cutover remain incomplete. See the end of SPEC §12.
-
-Explicit sway in ordinary DDL and declared flat Macros reaches the existing Score through one three-dimensional resolver. SPEC §13.6 defines the eight-word mapping, missing-slot Medium / Medium / Perlin defaults when any slot is present, all-absent None, and PositionX + PositionY. Supported shapes are Line / Arc / circle / ellipse / square / cloudform; Point rejects explicit sway. Macros keep category variation with an optional dimension constraint and use three fluctuation Emit keys. Legacy None schemas preserve identity, and missing required parameters remain binding errors. Source / generated owners and existing Stop / Continue units remain intact. Whole Step 10 and runtime / UI / save cutover remain incomplete.
-
-`core/crates/inku-ddl` contains the accepted shared-Rust compiler foundation. It preserves the
-visible normalized DDL with source spans and composes Japanese and English phrases, entities,
-modifiers, quantities, actions, positions, relations, coordination, and continuation into a
-typed semantic document. A qualified macro invocation is lock-resolved to the generic
-`MacroDefinition`, its typed parameters are bound, and expansion to semantic nodes is deterministic
-under an attested `composition_seed` and caller-owned finite limits. The compiler lock attests source
-and provenance through its full digest, while canonical identity and focus selection use the meaning
-digest, so source differences do not enter meaning selection. Ambiguous ownership and unresolved
-meaning fail closed as typed issues; the compiler does not guess by first, nearest, or last.
-
-The accepted sealed Rust Stage 1.5 v5 takes lock-verified typed meaning and chooses focus from its
-meaning digest and an optional attested `composition_seed`. Explicit variation may move focus only.
-Equivalent meaning in inline and continuation forms, and their corresponding macro execution, are
-separated from source provenance; the full compiler-lock digest itself is not an input to focus.
-Stage 1.5 admission checks the actual visible source bytes, available language evidence, every
-sidecar including unused entries, and executed-macro definition identities against the lock before
-detaching source-independent input. It adds no condition when language evidence is absent and does
-not require an unused sidecar to resolve or execute.
-The same lock attests `inku.geometry-resolution-policy.v1`. From the verified view, the lowerer
-takes host-supplied canvas and background plus actual color-catalog observations when color is omitted.
-For circle, ellipse, cloudform, square, triangle, polygon, line, arc, and point instructions with a resolved numeric position or an
-original `place:center` owned by a verified direct `Instruction { instruction_index }` target, or an explicit top / bottom / edge / corner, plus
-a place action, it lowers explicit numeric geometry or count-one normal geometry and the finite
-bilingual seven-class size scale, together with omitted count-one, pen, solid, fill, and
-background-contrast color, into an actual Score. Existing fill behavior for `none`, `solid`, and omitted surface
-remains; the seven positive surface qualities reach the existing `SurfaceSpec`, and a verified one of the seven
-Grounds reaches the existing `CanvasGroundSpec` with the host-resolved aspect. The compiler creates no texture or
-material numeric defaults or seeds. Line owns exact length, arc owns exact chord and sagitta, and point owns exact
-radius or diameter. For ordinary source-owned direct primitives, the checked lowerer carries NotTouching, Between,
-Connected, Touching, Along, and Cutting into the existing Score and symbolic plans without changing the verified target or position authority.
-relation with its Medium gap. NotTouching retains the existing gap, and Between retains the existing recipe based on the bounding-box centers of the two immediately preceding elements; named or noncenter placement is movable while numeric placement remains fixed authority. References survive only when the direct instructions named by typed previous-one/two
-each produce one instruction and remain the current instruction's actual immediate source origins in original order. For Between, the immediately preceding instruction is the first reference and the one before it is the second, with both owners retained.
-A missing referent records an error and removes only its dependent relation; it does not retarget or omit the dependent current.
-Macro exact_decimal literals and declared parameters join the ordinary DDL dimension and numeric-position resolver.
-Explicit dimensions bind uniquely, retaining legacy Number(f64), exact values, and source / generated ownership.
-NotTouching and Between also reach the same Score from adjacent bound flat Emits without skipping unbound Emits or lost references. External relations attempt only a whole-group translation that preserves transformed geometry and explicit values; an unsatisfied relation records an error, is removed alone, and leaves the group at its original placement.
-
-Touching also reaches the shared checked performer from direct Line / Arc instructions and adjacent bound flat Macro Emits.
-The four bilingual full literals verify their named prior Line / Arc type in original source order. Both-endpoint matching
-shares existing Arc reconstruction. Explicit dimensions, relative scale (including normal), and chord direction remain fixed;
-omitted normal can adjust. Numeric anchors and final must-fit remain fixed. Failure records an error and removes only the relation while
-preserving original transformed placement, dependencies, owners, drawing ordinals, and seeds. Legacy Touching without metadata stays compatible.
-Engine49 also delivers typed Along / Cutting between adjacent count-one Lines through the shared checked performer.
-Repeated Direct and Macro plans retain checked relation intent as `PlanRelation { kind, gap, target_object_index, position_authority, touching_constraints }`, including Connected / Touching / Along / Cutting with their original target and authority.
-Along aligns only an unspecified direction; Cutting keeps the resolved length. Explicit direction, dimensions,
-and numeric position remain authoritative. Incompatible constraints or missing references record an error and remove only the
-relation, while metadata-free legacy Scores remain compatible. Whole Step 10 and typed
-production / UI / persistence cutover remain incomplete. Connected also reaches
-adjacent bound flat Macro Emits and carries named-movable versus numeric-fixed position authority into the shared
-checked performer. It translates the current start to the prior canonical endpoint (or Point center) without changing
-the prior, dimensions, curvature, or rotation. A nonzero numeric conflict records an error and removes only the relation;
-dependencies never retarget to a survivor. Other relations, general structures,
-allocation, whole-parity, and runtime/UI persistence cutover remain. Effective focus maps through the single policy's
-six values to `at.region`; the named path preserves dimensions without a shape-extent must-fit check,
-while the existing Renderer selects a region anchor from the performance seed and clamps base points.
-Defaults never enter semantic meaning, and exact rationals cross to `f64` only at the final
-boundary. The shared lowerer accepts legacy Stop input and exposes OmitAndContinue explicitly. Recoverable
-relation failure never prevents a Score. Continue leaves original meaning intact
-and omits only an independent appearance field or invalid typed execution unit. The result
-distinguishes complete, complete with omissions, and stopped, retaining original gaps, actual
-treatment, source or generated owners, and spans.
-
-The same policy's angle resolver frames the lock-verified original pre- and expanded-meaning
-digests, tagged optional `composition_seed`, logical occurrence, and angle identity in an
-angle-specific SHA-256 domain and resolves an explicitly authored angle exactly once into actual
-`Score.rotation`. Horizontal and vertical are 0 and 90; diagonal uses four directions; rising,
-falling, and their left-facing forms use the author-approved integer ranges; rotated uses the
-finite set more than five degrees from every 45-degree boundary. Numeric circle, ellipse,
-cloudform, square, line, arc, and point placement checks the rotated declared extent in physical short-edge units,
-while named focus keeps its dimensions and `at.region`. Square uses the same resolver for direct
-and flat Macro Emit input. Engine 42 resolves square and triangle anchors, pivots, bounds,
-relations, composites, and arrangements through the same physical short-edge coordinate family.
-Engine 43 uses the endpoint midpoint for line, the chord midpoint for arc, and the center for point as
-semantic anchors. A typed arc carries its chord midpoint in the existing optional `position`; an old
-arc with that field absent keeps the circle-center anchor.
-
-The same policy resolves explicit top / bottom / four edges / corner to the anchor regions in SPEC §18.
-Top and bottom use thirds, edges narrow tenths, and each corner extends one fifth along each axis without changing dimensions
-or the clipping policy. Stage 2 selects a corner using original meaning, tagged composition seed, and original
-occurrence in a dedicated domain; the Renderer chooses only its anchor within the selected region.
-Exact center owners and focus joins, unsupported relation boundaries, and declared-only caller binding remain.
-
-Finite flat Macro Emits also reach an actual Score through the same semantic input and lowerer as
-ordinary DDL after an exact join to the execution owner and, for center only, generated focus. One Emit is one
-instruction; multiple Emits and already-flat output from `use`, bounded `repeat`, or `vary` retain
-their order. The current subset covers six closed shapes plus line, arc, and point,
-explicit `place`, `center` or explicit top / bottom / four edges / corner,
-optional attributes from their same-named categories, and omitted count or Integer one. Regardless of
-legacy Stop or Continue input, an unbound caller fact, structural node, incomplete or unknown Emit,
-or type mismatch uses shared local recovery. An unbound caller appearance field is omitted while
-definition values remain; an invalid Emit, structural subtree, or invalid outer invocation is omitted
-as its typed unit. Unrelated flat siblings and original ordinal gaps remain.
-
-Flat Emit `angle: semantic_ref` uses the same resolver. A caller angle does not fan out to or
-override Emits; the selection key uses the Macro semantic ordinal and existing expansion path /
-generated ordinal.
-
-Visible DDL `細い` / `thin` and `ごく細い` / `extra-fine` share the same Fine / ExtraFine identities
-and reach the existing `Instruction.thinness` from ordinary instructions and flat Macro Emits through
-one lowerer. Macro definitions accept only the Saijiki-independent closed core refs
-`thinness:fine` / `thinness:extra_fine` and seven-class `relative_scale`.
-Visible source binds uniquely only when a parameter explicitly declares the matching SemanticRef dimension,
-preserving its span, clause, atom, and definition without a second consumption as an ordinary entity modifier.
-Core values carry no asset metadata. Literals and parameters join ordinary geometry and factors exactly once
-through the same Emit fields; explicit normal also fixes dimensions. Missing or ambiguous binding retains
-the upstream error policy, and undeclared caller facts retain existing lowering diagnostics and mode handling.
-
-The runtime-disconnected `compile_ddl_to_score` facade compiles the original
-`NormalizedDdlDocument` exactly once and retains that compilation, including its source, state,
-lock, and issues, in the result. Legacy Stop and Continue input both build a sealed execution projection
-from the same compilation's typed ownership and dependencies. A recoverable upstream hole or conflict
-omits its established local unit and delivers independent instructions to an actual Score. For canonical
-pre-meaning it reuses the exact subset of successful macro output with the original seed, source
-ordinal, and generated provenance, without re-expansion. For a noncanonical projection it finalizes
-omissions before one seed derivation and expansion and never retries a draw after a local failure.
-Global budgets and source, lock, owner, definition, or provenance integrity failures stop both modes.
-
-No Server, Web, or Android product pipeline calls this foundation yet. The Current Architecture
-above therefore remains the active runtime. Its legacy plugin expansion and Stage 1.5 are
-compatibility paths, not the canonical semantic specification. Unspecified placement, macro delivery outside the finite subset, omitted action, repeated allocation, remaining
-delivery for remaining primitives, and runtime cutover remain at the unconnected boundary. The
-public Stage 1.5 API remains `CanonicalReady`-only; the facade does not recover an arbitrary mutable
-compilation. Reaching Step10P does not complete Step10 as a whole. Product UI, API, and persistence
-do not yet select this mode, and legacy coerce / LLM fallback
-has not been replaced by it.
-
-Score 0.9 retains a Macro body atomically in `placement_groups.members`, using ordered contiguous drawable ranges and Anchor indices. Group-head count and internal Emit count remain distinct, and repetitions stay symbolic. Internal transforms listed by `transform_group_indices` run before placement; unlisted equal-range transforms are outer and run afterward. Internal transforms of an Anchor-only member record its empty drawable range, including when an earlier drawable precedes it.
-
-`CompositionPlanResult.standalone_macro_repetitions` preserves existing body positions, ranges, Anchors, internal transforms, and source-head repetition counts. Instance materialization and runtime / UI / save integration remain later work.
+Step11 instance materialization, connecting the typed compiler to product runtime / UI / API / persistence paths, and remaining delivery extensions are unfinished. The Current Architecture above remains the active runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
 
 ## Contracts That Must Remain Intact
 
@@ -257,8 +127,8 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 42 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 21 | `server/src/inku_server/layer_versions.py` |
+| Render Engine | 58 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 35 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 

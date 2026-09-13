@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v7";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v8";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -180,7 +180,17 @@ pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
     JAPANESE_COUNTERS_V1.contains(&surface)
 }
 const FUNCTION_WORDS_EN: &[&str] = &[
-    "a", "an", "the", "with", "in", "at", "on", "to", "of", "and",
+    "background",
+    "a",
+    "an",
+    "the",
+    "with",
+    "in",
+    "at",
+    "on",
+    "to",
+    "of",
+    "and",
 ];
 const GROUP_LAYOUT_FUNCTION_WORDS_JA: &[&str] = &["重ねて", "並べて"];
 const GROUP_LAYOUT_FUNCTION_WORDS_EN: &[&str] = &["overlapping", "side by side"];
@@ -734,6 +744,25 @@ fn candidates_at(
             let Some(surface) = surfaces.first().map(|surface| surface.as_ref()) else {
                 continue;
             };
+            if language == ResolvedInstructionLanguage::En && category.key == "katachi" {
+                // Registered primitive heads use regular English noun plurals.
+                // Number agreement changes spelling, never quantity or identity.
+                push_surface_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    language,
+                    require_boundary,
+                    &format!("{surface}s"),
+                    PRIORITY_ASSET,
+                    format!("word:{}:{}", category.key, word.surface_ja),
+                    CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
+                        asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                        category_key: category.key.clone(),
+                        canonical_surface_ja: word.surface_ja.clone(),
+                    }),
+                );
+            }
             if language == ResolvedInstructionLanguage::Ja && category.key == "iro" {
                 if JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1.contains(&word.surface_ja.as_str()) {
                     push_japanese_derived_surface_candidate(
@@ -809,6 +838,20 @@ fn candidates_at(
         }
     }
 
+    if language == ResolvedInstructionLanguage::Ja {
+        // A document head is eligible at a clause start, unlike a particle.
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            "背景",
+            PRIORITY_FUNCTION,
+            "document:background".to_owned(),
+            CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+        );
+    }
     let function_words = match language {
         ResolvedInstructionLanguage::Ja => FUNCTION_WORDS_JA,
         ResolvedInstructionLanguage::En => FUNCTION_WORDS_EN,
@@ -1676,6 +1719,11 @@ fn qualified_macro_end(source: &str, start_byte: usize) -> Option<usize> {
     }
     if end_byte == start_byte {
         return None;
+    }
+    // A single sentence-final period is a clause boundary, not an empty
+    // qualified-name segment. Keep the Macro's exact spelling for lock lookup.
+    if source.as_bytes()[end_byte - 1] == b'.' {
+        end_byte -= 1;
     }
     let candidate = &source[start_byte..end_byte];
     is_visible_qualified_name(candidate).then_some(end_byte)

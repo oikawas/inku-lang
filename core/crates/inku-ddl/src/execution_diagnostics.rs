@@ -32,6 +32,7 @@ pub enum CompilerExecutionOmissionUnit {
         dependency_instruction_indices: Vec<usize>,
     },
     GroundCandidates,
+    BackgroundCandidates,
     MacroInvocation {
         source_instruction_index: usize,
         invocation_ordinal: u64,

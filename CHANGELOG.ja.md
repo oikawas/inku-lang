@@ -6,6 +6,24 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 30 版である。それより前は書庫にある。
 
+### 2026-09-13 — typed fill planを解決
+
+通常fill、coordinated group、declared Emit、単独Macro呼出は、全画面・既存named area・inline閉primitiveのtarget、明示／省略／混在count、source ownerとMacro footprintを共通のsymbolic FillGroupPlanへ解決する。省略countは面積とreference diameterから決め、混在群は残りareaを省略種へ配り、all-explicitは数をそのまま保つ。Macroはbody・内部count・内側Transformを一つのmotifとして保ち、個体化しない。無面積/open target、numeric motif area、overflowは局所diagnosticである。sampling、clip、actual Scoreへのregion materializationはCount1を含めStep11のままである。
+
+semantic instruction associationを19、explicit score loweringをv5へ進め、geometry policy v1 digestを`5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56`へ更新する。neutral parser 8、semantic document 17、compilation 15、compiler lock 16、source provenance 4、DDL engine 35、Score 0.9.0、render engine 58、APP_VERSION 2.14.2、BUILD_NUMBER 1073はこの契約に従う。direct / group / Macroとpolicy goldenの限定selectorは成功した。全件参照更新、配備、releaseは含めない。
+
+### 2026-09-13 — Compat SVGからclip-pathを除去
+
+Compat profileのComputer solid fillは、全canvas rectをclipする代わりに同じcontour pathへbase field、grille、黒いscanlineを重ねる。Oilのaccepted fillはclipした幅拡張を使わず、既存のfilter-free paint passとbaseで形とintensityを保つ。Display / Editableの経路は変えず、Compatはpixel一致を約束しない既存の近似である。
+
+Compat SVGの出力意味が変わるためrender engineを57→58へ進める。DDL engine 35、Score 0.9.0、APP_VERSION 2.14.2、BUILD_NUMBER 1073は変更しない。参照コーパスの全件更新、配備、releaseは含めない。
+
+### 2026-09-13 — typed documentから背景、draw、位置省略を配送
+
+有限構文`背景を<抽象色>で埋める。`をtyped documentの背景として保持し、source背景をhost contextより優先してScoreへ届ける。背景省略と複数背景conflictはcontext fallbackを使い、conflictだけを局所diagnosticにする。`埋める`は面または領域を密に満たし、領域省略は画面全体、scatterより明確に密集しつつ隙間を残し、境界でclipする。明示した個数・寸法を保ち、同じ寸法なら塗り・輪郭・道具で個数を変えない。`散らす`は不規則に散布し、`敷き詰める`は要素を隙間なく反復して領域を覆う。このfillの領域・密度・recipe配送は次chunkの未接続境界である。`引く`はlineとarcを共通geometry・count・place resolverへ配送する。位置省略はsource factとしてNoneのまま保ち、共通resolverが既存揺らぎ幅の中央領域`[0.39, 0.39, 0.61, 0.61]`から演奏時位置を選ぶ。明示位置と明示centerのStage 1.5 focusは保つ。
+
+neutral parser 8、semantic document 17、typed compilation 15、compiler lock 16、source provenance 4へ進め、geometry policy v1の省略位置payloadを更新し、DDL engineを34→35へ進める。Score 0.9.0、render engine 57、APP_VERSION 2.14.2、BUILD_NUMBER 1073は変更しない。typed runtime / UI / 保存cutoverとStep11の個体materializationは未接続のままである。
+
 ### 2026-09-13 — symbolic planでchecked relationを保持
 
 反復Direct planはchecked済みのConnected、Touching、Along、Cuttingを元targetと位置authorityのまま保持する。Macro relationもDirectと同じnumeric-fixed／named-movable authorityを使うため、明示数値座標は固定のままであり、旧center-onlyの受入制限は適用しない。Macro配置memberも、先行drawableの後にAnchor-only Transform memberが続くとき、そのAnchorを含むvalidな範囲を保つ。

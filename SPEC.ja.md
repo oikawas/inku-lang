@@ -8,16 +8,6 @@
 **日本語版と英語版は節ごとに対応させる。**
 仕様変更は本書を先に更新し、同じ内容を `SPEC.md` へ反映する。
 
-## Score 0.9 の Macro 配置 member
-
-`transform_group_indices`はsource-ownedな内部affine transformを指す。listed transformはmember配置前に実行し、同じ範囲でもunlisted transformはouterとして後に実行する。
-
-`CompositionPlanResult.standalone_macro_repetitions`は既存bodyの位置、range、Anchor、内部transform所有とsource head repeat countを保持する。outer placement recipeやactual Score展開を追加せず、materializationはStep11のままである。
-
-Score 0.9 の `placement_groups.members` は、Macro bodyを順序どおり連続するdrawable範囲と非描画Anchor indexの組として原子的に保持する。空のmember範囲はAnchorを所有するときだけ有効であり、Anchor-only memberの内部Transformも同じ空のdrawable範囲を記録する。明示memberはgroupを完全に分割し、他のplacement groupとdrawable／Anchorを共有しない。`members`が無い旧形式はScore 0.7／0.8として読める。group headのcountとMacro body内部のEmit countは別であり、反復結果はsymbolic planに残る。Macro authoring operator、個体materialization、runtime／UI／save cutoverは追加しない。standalone Macroの外側反復も、内部Emitの個数と区別してsymbolic planへ保持する。
-
----
-
 ## このドキュメントの位置づけ
 
 **inku** は、DDL（Drawing Description Language）のリファレンス実装プロジェクトである。DDLは言語仕様、inkuはその実装全般の呼称である。
@@ -50,7 +40,7 @@ Score 0.9 の `placement_groups.members` は、Macro bodyを順序どおり連�
 
 DDLは単にグラフィックを記述する言語ではなく、**視覚的な短歌を書く言語**として位置づける。
 
-`inku` はその参照実装であり、通常の意味での描画プログラムではない。**書かれた記述こそが持続する作品であり、描画された SVG はその作品の一度の演奏である**と扱う。同じ記述は後から何度でも、制御された揺らぎのもとで、楽譜（JSONデータ）を保ったまま演奏し直せる。
+`inku` はその参照実装であり、通常の意味での描画プログラムではない。**書かれた短い記述こそが持続する作品であり、typed document が共有の意味を保ち、そこから得た Score を SVG として一度演奏する**。同じ Score は同じ演奏契約を各hostが共有し、揺らぎは記述や意味を変えず演奏時にだけ現れる。
 
 三つの規制の柱：
 
@@ -146,6 +136,8 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 **色カタログの命名と調整**: カタログ id は素材・光・技法に基づく名称を使用する。 — `ink_season`・`fresco_study`・`open_air_light`・`ink_porcelain`・`cool_material`・`dye_earth`・`vivid_material`・`weathered_heritage`・`sea_stone`・`moss_bark`・`neon_plate`・`lantern_dew`。カタログの `map` 値は 9 抽象色の意味を保たねばならず、より強い同一性の色は構造色を置き換えるのではなく `palette` に置く。Build 265 の見直しは `open_air_light`・`dye_earth`・`desert_mineral`（v2.9.14 で退役）を調整対象として残した — 暗い背景・高彩度のアクセント・紙や砂の色調が静かな記述を支配しうるため、記述ごとの例外へ分岐せず中核の明度と彩度で調整する。Build 266 でその 3 つの中核色を明るくした。カタログの `sub` は英語 UI の説明文、`sub_ja` が日本語 UI の説明文である。パレット色名は `name` を英語の正規ラベルとし `name_ja` を持ちうる。日本語 UI は `English（日本語）` の形で表示し、英語 UI は `name` だけを表示する。
 
 **render JSON が記録する描画文脈**: 描画・構成・JSON タブ・保存済み作品 JSON は、実際に使われた `stage1_model` / `stage2_model` に加えて `render_build_number`・`render_color_profile`・`render_engine_id`・`render_engine_version`・`ddl_version`・`ddl_engine_version`・`render_canvas_aspect`・`render_hash`・`render_hash_short`・`render_color_catalog_id`・`render_color_catalog_name`・`render_color_catalog_sub`・`render_color_map`・`instruction_lang_requested`・`instruction_lang_resolved`・`ui_lang`・`render_seed` を含む。`ddl_version` と `ddl_engine_version` は、その絵を決めた DDL 層の版である。描画応答は必ず両方を積み、保存済み作品では版を記録する前に保存した古い行にだけ欠ける。抽象色と `palette:<name>` は SVG 描画に使った `#RRGGBB` へ展開して記録する。カタログの `map` / `swatches` / `palette` の全体は render JSON へ複製しない — 再演奏と監査に要る具体の記録は `render_color_map` だからである。`score.canvas` は楽譜レベルのキャンバス指示のままで、`render_canvas_aspect` はこの描画作品が実際に使ったキャンバス比を記録する。v2.13.14 から両者は食い違いうる — Stage 2 はどの紙のために組むのかを告げられ、そこで宣言した比は「構図が何のために組まれたか」の記録として残り、実際に演奏した紙は `render_canvas_aspect*` が持つ。それ以前に保存した作品は両方に要求比が入っている。描き直しは演奏した紙を作品の行から読むので、古い作品は以前とまったく同じに描き直る。新しいメタデータでは `render_canvas_aspect_id` が明示のキャンバス比識別子、`render_canvas_aspect_ratio` が実際に描画した幅／高さの比を数値で持つ。`render_canvas_aspect` は互換のために残り、古い記録は応答の中でそこから新しい id と比を導いて補える。
+
+`背景を<抽象色>で埋める。` は面の指定ではなく、typed documentが所有する`background`を指定する有限構文である。sourceで明示した背景はhost contextより優先してScoreへ届ける。背景を省略した場合と複数背景が衝突した場合はcontext backgroundを使い、後者だけをtyped diagnosticとして残す。`埋める`は面または領域を密に満たし、`散らす`は要素を不規則に散布し、`敷き詰める`は図形を規則的・反復的に配置する。これらの意味を互いに読み替えない。typed fill planは全画面、既存named area、またはinlineの単一閉primitiveをtargetとして、同じ領域内の密な不規則配置とclip recipe、targetのsource owner、geometry、count provenanceを保持する。省略countは`ceil(A / d²)`で決め、明示countは保つ。群の混在countは明示分を引いた残りareaを省略種の平均`d²`で割り、ほぼ均等に配って余りをsource順に置き、各省略種を最低1とする。all-explicitは密度計算をしない。Macroは一つのmotifとしてbody、内部count、内側Transformを保ったreference footprintを使い、outer count、seed、material、instruction angle、performed relation移動からは影響を受けない。無面積/open target、numeric motif area、overflowは局所diagnosticで他描画を続ける。これはactual Scoreを作らないsymbolic FillGroupPlanであり、Count1を含むsampling、clip、region materializationはStep11の未接続責務である。`引く`はlineとarcを共通のgeometry、count、place resolverへ一度だけ配送する。source positionが未指定ならNoneのまま保ち、共通resolverは既存の揺らぎ幅を保つ中央領域`[0.39, 0.39, 0.61, 0.61]`から演奏時位置を選ぶ。明示位置と明示centerのStage 1.5 focusは優先する。`inku.geometry-resolution-policy.v1`はfill planを含むpayloadを保持し、現行digestは`5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56`である。
 
 ### 3.2 エクステンションとして分離するもの
 
@@ -1007,7 +999,7 @@ SVG の書き出しは 3 つのプロファイルを持つ。
 
 - `display`: 既定のサーバー描画 SVG。Web 表示・履歴・PNG 生成・作品の再構築に使う
 - `editable`: JSON Score とサーバー所有の色カタログメタデータから要求に応じて生成する。SVG-native editor での編集に向け、安定した ASCII の ID とレイヤー相当のグループを持つ。non-computer の solid fill は実体の base fill と standard SVG filter のむらを保つ
-- `compat`: 同じく要求に応じて生成し、定義済みportable subsetに制限する。filter と clip-path を使わない filter-free flat vector fallback で、広い互換性のため一部表現を単純化することがある
+- `compat`: 同じく要求に応じて生成し、定義済みportable subsetに制限する。filter と clip-path を使わない filter-free flat vector fallback で、広い互換性のため一部表現を単純化することがある。Computerはcontour path内のbase field、grille、黒いscanlineを保ち、Oilはclipした幅拡張を使わず既存のfilter-freeなpaint passで形とintensityを保つ。Display / Editableとのpixel一致は約束しない
 
 DB が保存するのは `history.svg` の `display` SVG だけである。編集可能 SVG と互換 SVG は、DB の追加ペイロードとして保存するのではなく**ダウンロード時に生成し直す**。
 

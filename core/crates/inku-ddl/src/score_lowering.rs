@@ -1,9 +1,10 @@
 //! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
 
 use crate::composition_plan::{
-    CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
+    CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,
+    FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor, ObjectPlacementPlan,
     PlacementAction, PlacementGroupPlan, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
-    PlanRelation, ResolvedObjectAppearance, TransformGroupPlan,
+    PlanRelation, ResolvedFillRegion, ResolvedObjectAppearance, TransformGroupPlan,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -34,7 +35,7 @@ use crate::{
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
 pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v4";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v5";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -139,6 +140,13 @@ impl ScoreLoweringContext {
             resolved_palette.white().oklch_lightness(),
         ]
         .into_iter()
+        .chain(
+            resolved_palette
+                .observations()
+                .into_iter()
+                .flatten()
+                .map(|color| color.oklch_lightness()),
+        )
         .any(|lightness| !lightness.is_finite() || !(0.0..=1.0).contains(&lightness))
         {
             return Err(ScoreLoweringContextError::InvalidResolvedPaletteLightness);
@@ -186,6 +194,7 @@ fn project_source_instruction<'a>(
         return None;
     };
     Some(ScoreLoweringInput {
+        fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
         group_region: None,
         proportion_width_extent: instruction
             .entity
@@ -1480,13 +1489,7 @@ fn project_macro_emit<'a>(
         sides,
     });
     let action = macro_semantic_field(fields, "movement", "movement", true, &mut gaps);
-    let place = macro_semantic_field(
-        fields,
-        "place",
-        "place",
-        !fields.contains_key("position_x") && !fields.contains_key("position_y"),
-        &mut gaps,
-    );
+    let place = macro_semantic_field(fields, "place", "place", false, &mut gaps);
     use crate::geometry::{ExactGeometry as G, ExactPosition};
     let radius = macro_exact_field(fields, "radius", &mut gaps);
     let diameter = macro_exact_field(fields, "diameter", &mut gaps);
@@ -1587,7 +1590,9 @@ fn project_macro_emit<'a>(
     }
     if let Some(identity) = action
         && identity.id != "place"
-        && !(planning && matches!(identity.id, "line_up" | "scatter" | "tile"))
+        && identity.id != "draw"
+        && identity.id != "fill"
+        && !(planning && matches!(identity.id, "line_up" | "scatter" | "tile" | "fill"))
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
             key: "movement".to_owned(),
@@ -1627,6 +1632,7 @@ fn project_macro_emit<'a>(
     }
 
     Ok(ScoreLoweringInput {
+        fill_target: None,
         group_region: None,
         generated_position,
         generated_geometries,
@@ -1806,6 +1812,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     gaps: Vec<ScoreFieldGap>,
     diagnostics: Vec<ScoreLoweringDiagnostic>,
     placement_groups: Vec<PlacementGroupPlan>,
+    fill_groups: Vec<FillGroupPlan>,
     standalone_macro_repetitions: Vec<PlacementMemberPlan>,
 }
 
@@ -1997,7 +2004,12 @@ pub(crate) fn resolve_composition_plan<'a>(
     );
     let outcome = match result.outcome {
         ScoreLoweringOutcome::Stopped => CompositionPlanOutcome::Stopped,
-        _ if objects.is_empty() && result.anchors.is_empty() => CompositionPlanOutcome::Stopped,
+        _ if objects.is_empty()
+            && result.anchors.is_empty()
+            && view.original_semantic_document().background.is_none() =>
+        {
+            CompositionPlanOutcome::Stopped
+        }
         ScoreLoweringOutcome::Complete => CompositionPlanOutcome::Ready,
         ScoreLoweringOutcome::CompleteWithOmissions => CompositionPlanOutcome::ReadyWithOmissions,
     };
@@ -2007,7 +2019,7 @@ pub(crate) fn resolve_composition_plan<'a>(
     }
     CompositionPlanResult {
         view,
-        context,
+        context: result.context,
         error_policy,
         policy_digest: result.policy_digest,
         outcome,
@@ -2016,6 +2028,7 @@ pub(crate) fn resolve_composition_plan<'a>(
         anchor_origins: result.anchor_origins,
         transform_groups,
         placement_groups: result.placement_groups,
+        fill_groups: result.fill_groups,
         standalone_macro_repetitions: result.standalone_macro_repetitions,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
@@ -2033,11 +2046,30 @@ fn lower_verified_stage15_shared<'a>(
     let document = candidate
         .verified_effective_view()
         .original_semantic_document();
+    let context = if let Some(background) = &document.background {
+        let color: Color = serde_json::from_value(serde_json::Value::String(
+            background.color.identity.id.clone(),
+        ))
+        .expect("typed background contains an accepted abstract color");
+        ScoreLoweringContext {
+            background: color,
+            resolved_palette: context
+                .resolved_palette
+                .and_then(|palette| palette.select_background(color)),
+            ..context
+        }
+    } else {
+        context
+    };
     let mut diagnostics = Vec::new();
     let mut score_transform_groups = Vec::new();
     let mut omitted_group_members = BTreeSet::new();
     let mut group_members = BTreeMap::new();
     let mut supported_groups = Vec::new();
+    let mut supported_fill_groups = Vec::new();
+    let mut standalone_fill_members = BTreeSet::new();
+    let mut fill_groups = Vec::new();
+    let mut fill_checkpoints = BTreeMap::new();
     let mut lowered_members = BTreeMap::new();
     let mut standalone_macro_repetitions = Vec::new();
 
@@ -2103,6 +2135,47 @@ fn lower_verified_stage15_shared<'a>(
                 .action
                 .as_ref()
                 .map(|action| action.identity.id.as_str());
+            if action == Some("fill") {
+                let allocation = resolve_fill_group(view, group, predicate, focus, context);
+                let reason = match allocation {
+                    Ok(allocation) if objects.is_some() => {
+                        for (&member, &count) in group
+                            .member_instruction_indices
+                            .iter()
+                            .zip(&allocation.counts)
+                        {
+                            group_members.insert(member, ([0.5; 4], u64::from(count)));
+                        }
+                        supported_fill_groups.push((
+                            FillPlanOwner::CoordinatedGroup { group_index },
+                            source_member_instruction_indices,
+                            allocation,
+                        ));
+                        continue;
+                    }
+                    Ok(_) => ScoreFieldGap::FillRequiresRegionMaterialization,
+                    Err(reason) => reason,
+                };
+                omitted_group_members.extend(group.member_instruction_indices.iter().copied());
+                diagnostics.push(ScoreLoweringDiagnostic {
+                    owner: ScoreDiagnosticOwner::CoordinatedGroup {
+                        group_index,
+                        member_instruction_indices: source_member_instruction_indices.clone(),
+                        spans,
+                    },
+                    disposition: diagnostic_disposition(
+                        error_policy,
+                        &reason,
+                        ScoreOmissionUnit::CoordinatedGroup {
+                            group_index,
+                            member_instruction_indices: source_member_instruction_indices,
+                        },
+                        None,
+                    ),
+                    reason,
+                });
+                continue;
+            }
             let counts = action.and_then(|action| {
                 crate::group_quantity::coordinated_counts(
                     action,
@@ -2187,11 +2260,88 @@ fn lower_verified_stage15_shared<'a>(
         });
     }
 
+    // Consume the standalone Macro caller's placement once, outside its intact
+    // body. The body keeps its own actions, quantities, anchors and transforms.
+    for (projected_index, instruction) in document.instructions.iter().enumerate() {
+        if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
+            || instruction
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str())
+                != Some("fill")
+            || group_members.contains_key(&projected_index)
+            || omitted_group_members.contains(&projected_index)
+        {
+            continue;
+        }
+        let source_index = view
+            .source_instruction_index(projected_index)
+            .expect("verified source");
+        let prepared = prepare_single_macro_fill(view, source_index, instruction, context);
+        let reason = match prepared {
+            Ok(prepared) if objects.is_some() => {
+                group_members.insert(projected_index, ([0.5; 4], u64::from(prepared.counts[0])));
+                standalone_fill_members.insert(projected_index);
+                supported_fill_groups.push((
+                    FillPlanOwner::Instruction {
+                        source_instruction_index: source_index,
+                    },
+                    vec![source_index],
+                    prepared,
+                ));
+                continue;
+            }
+            Ok(_) => ScoreFieldGap::FillRequiresRegionMaterialization,
+            Err(reason) => reason,
+        };
+        omitted_group_members.insert(projected_index);
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(source_index, instruction, &reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                ScoreOmissionUnit::SourceInstruction {
+                    instruction_index: source_index,
+                },
+                None,
+            ),
+            reason,
+        });
+    }
+
     let mut instructions = Vec::new();
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
     let mut instruction_origins = Vec::new();
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
+        // An inline region operand supplies geometry; it is not an extra drawing.
+        if document.instructions.iter().any(|owner| {
+            matches!(owner.fill_target,
+            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
+                if target_instruction_index == projected_index)
+        }) || document.group_predicates.iter().any(|owner| {
+            matches!(owner.fill_target,
+            Some(crate::SemanticFillTarget::InlineShape { target_instruction_index, .. })
+                if target_instruction_index == projected_index)
+        }) {
+            let source_index = view
+                .source_instruction_index(projected_index)
+                .expect("verified view maps each region operand");
+            if let Some(target_input) = project_source_instruction(
+                view,
+                source_index,
+                instruction,
+                direct_instruction_focus(view, source_index),
+            ) && let Some(reason) = size_recovery_diagnostic(target_input, context)
+            {
+                diagnostics.push(ScoreLoweringDiagnostic {
+                    owner: source_owner_for_gap(source_index, instruction, &reason),
+                    disposition: ScoreDiagnosticDisposition::Recovered,
+                    reason,
+                });
+            }
+            continue;
+        }
         if omitted_group_members.contains(&projected_index) {
             continue;
         }
@@ -2206,6 +2356,12 @@ fn lower_verified_stage15_shared<'a>(
         let transform_start = transform_groups
             .as_ref()
             .map_or(score_transform_groups.len(), |groups| groups.len());
+        if let Some((group_index, _, _)) = supported_fill_groups
+            .iter()
+            .find(|(_, sources, _)| sources.first() == Some(&instruction_index))
+        {
+            fill_checkpoints.insert(*group_index, (body_start, anchor_start, transform_start));
+        }
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
                 let effective_focus = direct_instruction_focus(
@@ -2281,27 +2437,8 @@ fn lower_verified_stage15_shared<'a>(
                     if let Some(index) = object_index {
                         objects[index].relation = relation;
                         objects[index].count_was_omitted = instruction.entity.quantity.is_none();
-                        if group_members.contains_key(&projected_index) {
-                            lowered_members.insert(
-                                instruction_index,
-                                PlacementMemberPlan {
-                                    source_instruction_index: instruction_index,
-                                    member: inku_score::PlacementMember {
-                                        start: index,
-                                        end: index + 1,
-                                        anchor_indices: vec![],
-                                        transform_group_indices: vec![],
-                                    },
-                                    kind: PlacementMemberKind::Primitive,
-                                    source_count: objects[index].count,
-                                    count_was_omitted: instruction.entity.quantity.is_none(),
-                                },
-                            );
-                        }
                     }
-                    continue;
-                }
-                if let Some(relation) = &instruction.relation {
+                } else if let Some(relation) = &instruction.relation {
                     match direct_score_relation(
                         instruction_index,
                         input,
@@ -2372,10 +2509,20 @@ fn lower_verified_stage15_shared<'a>(
                         reason,
                     });
                 }
+                let mut body_caller;
+                let body_instruction = if standalone_fill_members.contains(&projected_index) {
+                    body_caller = instruction.clone();
+                    body_caller.action = None;
+                    body_caller.position = None;
+                    body_caller.fill_target = None;
+                    &body_caller
+                } else {
+                    instruction
+                };
                 lower_macro_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
-                    instruction,
+                    body_instruction,
                     head,
                     group_members.get(&projected_index).map(|(_, count)| *count),
                     context,
@@ -2438,6 +2585,83 @@ fn lower_verified_stage15_shared<'a>(
                     .expect("successful source count was validated"),
                 count_was_omitted: false,
             });
+        }
+        if let Some(group_slot) = supported_fill_groups
+            .iter()
+            .position(|(_, sources, _)| sources.last() == Some(&instruction_index))
+        {
+            let (group_index, sources, prepared) = supported_fill_groups.remove(group_slot);
+            let checkpoint = fill_checkpoints
+                .remove(&group_index)
+                .expect("source-ordered fill group has a start checkpoint");
+            let members = sources
+                .iter()
+                .filter_map(|source| lowered_members.remove(source))
+                .collect();
+            let planned = finalize_fill_group(
+                group_index,
+                prepared,
+                members,
+                objects.as_deref_mut().expect("fill groups are symbolic"),
+                transform_groups
+                    .as_ref()
+                    .map_or(&[][..], |groups| groups.as_slice()),
+                &anchors,
+                context.canvas_format,
+            );
+            match planned {
+                Ok(group) => fill_groups.push(group),
+                Err(reason) => {
+                    // This group is still the tail: recover before the next source
+                    // instruction, so previous owners/indices never need rewriting.
+                    objects.as_deref_mut().unwrap().truncate(checkpoint.0);
+                    anchors.truncate(checkpoint.1);
+                    anchor_origins.truncate(checkpoint.1);
+                    if let Some(transforms) = transform_groups.as_deref_mut() {
+                        transforms.truncate(checkpoint.2);
+                    }
+                    let spans = document
+                        .instructions
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, instruction)| {
+                            sources
+                                .contains(&view.source_instruction_index(index)?)
+                                .then_some(instruction.entity.head.source().span)
+                        })
+                        .collect();
+                    let (owner, unit) = match group_index {
+                        FillPlanOwner::CoordinatedGroup { group_index } => (
+                            ScoreDiagnosticOwner::CoordinatedGroup {
+                                group_index,
+                                member_instruction_indices: sources.clone(),
+                                spans,
+                            },
+                            ScoreOmissionUnit::CoordinatedGroup {
+                                group_index,
+                                member_instruction_indices: sources,
+                            },
+                        ),
+                        FillPlanOwner::Instruction {
+                            source_instruction_index,
+                        } => (
+                            ScoreDiagnosticOwner::SourceInstruction {
+                                instruction_index: source_instruction_index,
+                                field: None,
+                                spans,
+                            },
+                            ScoreOmissionUnit::SourceInstruction {
+                                instruction_index: source_instruction_index,
+                            },
+                        ),
+                    };
+                    diagnostics.push(ScoreLoweringDiagnostic {
+                        owner,
+                        disposition: diagnostic_disposition(error_policy, &reason, unit, None),
+                        reason,
+                    });
+                }
+            }
         }
     }
 
@@ -2530,8 +2754,8 @@ fn lower_verified_stage15_shared<'a>(
         )
     });
     let has_drawable_content = objects.as_ref().map_or_else(
-        || !instructions.is_empty() || ground.is_some(),
-        |objects| !objects.is_empty(),
+        || !instructions.is_empty() || ground.is_some() || document.background.is_some(),
+        |objects| !objects.is_empty() || document.background.is_some(),
     );
     let outcome = if stopped || (omitted && !has_drawable_content) {
         ScoreLoweringOutcome::Stopped
@@ -2582,6 +2806,7 @@ fn lower_verified_stage15_shared<'a>(
         gaps,
         diagnostics,
         placement_groups,
+        fill_groups,
         standalone_macro_repetitions,
     }
 }
@@ -3196,7 +3421,7 @@ fn appearance_field_for_macro_projection_gap(gap: &ScoreFieldGap) -> Option<Scor
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct SemanticInputIdentity<'a> {
     category: &'a str,
     id: &'a str,
@@ -3212,7 +3437,19 @@ impl<'a> From<&'a SemanticIdentity> for SemanticInputIdentity<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum FillTargetInput<'a> {
+    Canvas(&'a crate::SourceOccurrence),
+    Shape {
+        instruction: &'a SemanticInstruction,
+        source_instruction_index: usize,
+        effective_focus: Option<FocusRegion>,
+    },
+    Invalid,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 struct ScoreLoweringInput<'a> {
+    fill_target: Option<FillTargetInput<'a>>,
     group_region: Option<[f64; 4]>,
     generated_position: Option<crate::geometry::ExactPosition>,
     generated_geometries: [Option<crate::geometry::ExactGeometry>; 6],
@@ -3270,6 +3507,15 @@ fn lower_complete_instruction(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
 ) -> Result<Instruction, Vec<ScoreFieldGap>> {
+    if input
+        .action
+        .is_some_and(|action| action.category == "movement" && action.id == "fill")
+    {
+        // Even count one needs the region clip contract. Validate the same plan
+        // without pretending that the current un-clipped Score can carry it.
+        resolve_fill_plan(input, context)?;
+        return Err(vec![ScoreFieldGap::FillRequiresRegionMaterialization]);
+    }
     let resolved = resolve_complete_object(input, context, false)?;
     let geometric = match resolved.placement {
         ScorePlacement::Numeric(position) => lower_numeric_geometry(
@@ -3368,18 +3614,27 @@ fn resolve_object_plan(
                 ObjectAnchor::Named(region)
             }
         };
-        let n = resolved.count;
+        let (n, fill_recipe) = if resolved.action == PlacementAction::Fill {
+            let (count, recipe) = resolve_fill_plan_with_object(input, context, &resolved)?;
+            (count, Some(recipe))
+        } else {
+            (resolved.count, None)
+        };
         let layout_direction = resolved.layout_direction;
-        let recipe = placement_recipe(
-            resolved.action,
-            u64::from(n),
-            domain,
-            layout_direction.as_ref(),
-            matches!(
-                anchor,
-                ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
-            ),
-        )?;
+        let recipe = if let Some(recipe) = fill_recipe {
+            recipe
+        } else {
+            placement_recipe(
+                resolved.action,
+                u64::from(n),
+                domain,
+                layout_direction.as_ref(),
+                matches!(
+                    anchor,
+                    ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
+                ),
+            )?
+        };
         Ok(ObjectPlacementPlan {
             arc_form: resolved.arc_form,
             proportion_width_extent: input.proportion_width_extent.map(|identity| {
@@ -3418,6 +3673,607 @@ fn resolve_object_plan(
     build().map_err(|gap| vec![gap])
 }
 
+struct PreparedFillGroup {
+    region: ResolvedFillRegion,
+    /// Provisional source-head counts; omitted counts are resolved after each
+    /// member body has produced its symbolic geometry, without repeating it.
+    counts: Vec<u32>,
+}
+
+fn project_fill_target<'a>(
+    view: VerifiedStage15EffectiveView<'a>,
+    target: Option<&'a crate::SemanticFillTarget>,
+) -> Option<FillTargetInput<'a>> {
+    match target {
+        Some(crate::SemanticFillTarget::Canvas { source, .. }) => {
+            Some(FillTargetInput::Canvas(source))
+        }
+        Some(crate::SemanticFillTarget::InlineShape {
+            target_instruction_index,
+            ..
+        }) => Some(
+            match view
+                .original_semantic_document()
+                .instructions
+                .get(*target_instruction_index)
+            {
+                Some(instruction) => {
+                    let source_instruction_index = view
+                        .source_instruction_index(*target_instruction_index)
+                        .expect("verified view maps every inline target");
+                    FillTargetInput::Shape {
+                        instruction,
+                        source_instruction_index,
+                        effective_focus: direct_instruction_focus(view, source_instruction_index),
+                    }
+                }
+                None => FillTargetInput::Invalid,
+            },
+        ),
+        None => None,
+    }
+}
+
+fn resolve_fill_group(
+    view: VerifiedStage15EffectiveView<'_>,
+    group: &crate::SemanticCoordinatedHeadGroup,
+    predicate: &crate::SemanticGroupPredicateEdge,
+    focus: Option<FocusRegion>,
+    context: ScoreLoweringContext,
+) -> Result<PreparedFillGroup, ScoreFieldGap> {
+    let mut counts = Vec::new();
+    for &index in &group.member_instruction_indices {
+        let instruction = &view.original_semantic_document().instructions[index];
+        if instruction.entity.numeric_position.is_some() || instruction.position.is_some() {
+            return Err(ScoreFieldGap::InvalidFillTarget);
+        }
+        let count = instruction
+            .entity
+            .quantity
+            .as_ref()
+            .map_or(1, |quantity| quantity.value);
+        if count == 0 {
+            return Err(ScoreFieldGap::ExactCountZero { value: count });
+        }
+        counts.push(
+            u32::try_from(count)
+                .map_err(|_| ScoreFieldGap::ExactCountExceedsScoreRange { value: count })?,
+        );
+    }
+    let first = *group
+        .member_instruction_indices
+        .first()
+        .ok_or(ScoreFieldGap::InvalidFillTarget)?;
+    // This empty structural input supplies only region authority. It does not
+    // insert drawing defaults or use any member's size/appearance as the target.
+    let input = ScoreLoweringInput {
+        fill_target: project_fill_target(view, predicate.fill_target.as_ref()),
+        has_named_position: predicate.position.is_some(),
+        named_position: predicate
+            .position
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        effective_focus: focus,
+        angle_context: Some(ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::Direct {
+                logical_ordinal: view
+                    .source_instruction_index(first)
+                    .expect("verified group source member") as u64,
+            },
+        }),
+        ..ScoreLoweringInput::default()
+    };
+    Ok(PreparedFillGroup {
+        region: resolve_fill_region(input, context)?,
+        counts,
+    })
+}
+
+fn prepare_single_macro_fill(
+    view: VerifiedStage15EffectiveView<'_>,
+    source_index: usize,
+    instruction: &SemanticInstruction,
+    context: ScoreLoweringContext,
+) -> Result<PreparedFillGroup, ScoreFieldGap> {
+    if instruction.entity.numeric_position.is_some() {
+        return Err(ScoreFieldGap::InvalidFillTarget);
+    }
+    let count = instruction
+        .entity
+        .quantity
+        .as_ref()
+        .map_or(1, |quantity| quantity.value);
+    if count == 0 {
+        return Err(ScoreFieldGap::ExactCountZero { value: count });
+    }
+    let count = u32::try_from(count)
+        .map_err(|_| ScoreFieldGap::ExactCountExceedsScoreRange { value: count })?;
+    let input = ScoreLoweringInput {
+        fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
+        has_named_position: instruction.position.is_some(),
+        named_position: instruction
+            .position
+            .as_ref()
+            .map(|term| (&term.identity).into()),
+        effective_focus: direct_instruction_focus(view, source_index),
+        angle_context: Some(ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::Direct {
+                logical_ordinal: source_index as u64,
+            },
+        }),
+        ..ScoreLoweringInput::default()
+    };
+    Ok(PreparedFillGroup {
+        region: resolve_fill_region(input, context)?,
+        counts: vec![count],
+    })
+}
+
+fn balanced_fill_counts(
+    area: Rational,
+    extents: &[Rational],
+    explicit_counts: &[Option<u32>],
+) -> Result<Vec<u32>, ScoreFieldGap> {
+    // Explicit quantities need no density arithmetic, even for large extents.
+    if let Some(counts) = explicit_counts.iter().copied().collect::<Option<Vec<_>>>() {
+        return Ok(counts);
+    }
+    let mut explicit_area = Rational::from_ratio(0, 1)?;
+    let mut omitted_footprints = Rational::from_ratio(0, 1)?;
+    let mut omitted = 0_i128;
+    for (&extent, count) in extents.iter().zip(explicit_counts) {
+        let footprint = fill_product(extent, extent)?;
+        if footprint.numerator <= 0 {
+            return Err(ScoreFieldGap::FillRegionHasNoArea);
+        }
+        if let Some(count) = count {
+            explicit_area = fill_sum(
+                explicit_area,
+                fill_product(footprint, Rational::from_ratio((*count).into(), 1)?)?,
+            )?;
+        } else {
+            omitted += 1;
+            omitted_footprints = fill_sum(omitted_footprints, footprint)?;
+        }
+    }
+    let difference = fill_sum(
+        area,
+        Rational::from_ratio(-explicit_area.numerator, explicit_area.denominator)?,
+    )?;
+    let remaining = if difference.numerator <= 0 {
+        Rational::from_ratio(0, 1)?
+    } else {
+        difference
+    };
+    let budget = fill_quotient(
+        fill_product(remaining, Rational::from_ratio(omitted, 1)?)?,
+        omitted_footprints,
+    )?;
+    let total = (budget.numerator / budget.denominator
+        + i128::from(budget.numerator % budget.denominator != 0))
+    .max(omitted);
+    let base = total / omitted;
+    let remainder = total % omitted;
+    let mut ordinal = 0;
+    explicit_counts
+        .iter()
+        .map(|count| match count {
+            Some(count) => Ok(*count),
+            None => {
+                let count = base + i128::from(ordinal < remainder);
+                ordinal += 1;
+                u32::try_from(count).map_err(|_| ScoreFieldGap::FillCountExceedsScoreRange)
+            }
+        })
+        .collect()
+}
+
+fn finalize_fill_group(
+    owner: FillPlanOwner,
+    prepared: PreparedFillGroup,
+    mut members: Vec<PlacementMemberPlan>,
+    objects: &mut [ObjectPlacementPlan],
+    transforms: &[TransformGroupPlan],
+    anchors: &[AnchorPoint],
+    canvas: CanvasFormat,
+) -> Result<FillGroupPlan, ScoreFieldGap> {
+    if members.is_empty() {
+        return Err(ScoreFieldGap::InvalidFillTarget);
+    }
+    let extents = members
+        .iter()
+        .map(|member| match member.kind {
+            PlacementMemberKind::Primitive => {
+                reference_extent(objects[member.member.start].dimensions)
+            }
+            PlacementMemberKind::Macro => crate::plan_reference_extent::reference_member_extent(
+                objects, transforms, anchors, member, canvas,
+            ),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let explicit_counts = members
+        .iter()
+        .map(|member| (!member.count_was_omitted).then_some(member.source_count))
+        .collect::<Vec<_>>();
+    let counts = balanced_fill_counts(prepared.region.reference_area, &extents, &explicit_counts)?;
+    let mut logical_count = 0_u64;
+    for (member, count) in members.iter_mut().zip(counts) {
+        logical_count = logical_count
+            .checked_add(u64::from(count))
+            .ok_or(ScoreFieldGap::FillCountExceedsScoreRange)?;
+        member.source_count = count;
+        if member.kind == PlacementMemberKind::Primitive {
+            let object = &mut objects[member.member.start];
+            object.count = count;
+            object.anchor = ObjectAnchor::Named([0.5; 4]);
+        }
+    }
+    Ok(FillGroupPlan {
+        owner,
+        logical_count,
+        members,
+        recipe: PlacementRecipe::FillUniformInRegionAndClip {
+            region: Box::new(prepared.region),
+            count_resolution: FillCountResolution::BalancedGroup {
+                reference_extents: extents,
+                explicit_counts,
+            },
+        },
+    })
+}
+
+// Cross-cancel before checked arithmetic. Geometry's finite decimal reference
+// extents may have large denominators, even for ordinary mixed polygons.
+fn fill_gcd(mut a: i128, mut b: i128) -> i128 {
+    while b != 0 {
+        let next = a % b;
+        a = b;
+        b = next;
+    }
+    a.max(1)
+}
+
+fn fill_product(a: Rational, b: Rational) -> Result<Rational, ScoreFieldGap> {
+    let a = reduced_ratio(a);
+    let b = reduced_ratio(b);
+    let g1 = fill_gcd(a.numerator.abs(), b.denominator);
+    let g2 = fill_gcd(b.numerator.abs(), a.denominator);
+    Ok(reduced_ratio(Rational::from_ratio(
+        (a.numerator / g1)
+            .checked_mul(b.numerator / g2)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+        (a.denominator / g2)
+            .checked_mul(b.denominator / g1)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+    )?))
+}
+
+fn fill_sum(a: Rational, b: Rational) -> Result<Rational, ScoreFieldGap> {
+    let a = reduced_ratio(a);
+    let b = reduced_ratio(b);
+    let common = fill_gcd(a.denominator, b.denominator);
+    let left = a
+        .numerator
+        .checked_mul(b.denominator / common)
+        .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?;
+    let right = b
+        .numerator
+        .checked_mul(a.denominator / common)
+        .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?;
+    Ok(reduced_ratio(Rational::from_ratio(
+        left.checked_add(right)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+        a.denominator
+            .checked_mul(b.denominator / common)
+            .ok_or(ScoreFieldGap::GeometryRepresentationLimit)?,
+    )?))
+}
+
+fn fill_quotient(a: Rational, b: Rational) -> Result<Rational, ScoreFieldGap> {
+    if b.numerator <= 0 {
+        return Err(ScoreFieldGap::GeometryRepresentationLimit);
+    }
+    fill_product(a, Rational::from_ratio(b.denominator, b.numerator)?)
+}
+
+fn resolve_fill_plan(
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+) -> Result<(u32, PlacementRecipe), Vec<ScoreFieldGap>> {
+    let object = resolve_complete_object(input, context, true)?;
+    resolve_fill_plan_with_object(input, context, &object).map_err(|gap| vec![gap])
+}
+
+fn resolve_fill_plan_with_object(
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+    object: &ResolvedObject,
+) -> Result<(u32, PlacementRecipe), ScoreFieldGap> {
+    // A fixed center is not an area. The position of an inline target is a
+    // separate authority and is preserved below.
+    if input.exact_position().is_some() {
+        return Err(ScoreFieldGap::InvalidFillTarget);
+    }
+    let region = resolve_fill_region(input, context)?;
+    let extent = reduced_ratio(reference_extent(object.dimensions)?);
+    if extent.numerator <= 0 || region.reference_area.numerator <= 0 {
+        return Err(ScoreFieldGap::FillRegionHasNoArea);
+    }
+    let (count, count_resolution) = if input.count.is_some() {
+        (object.count, FillCountResolution::Explicit)
+    } else {
+        let footprint = fill_product(extent, extent)?;
+        let ratio = fill_quotient(region.reference_area, footprint)?;
+        let count = ratio.numerator / ratio.denominator
+            + i128::from(ratio.numerator % ratio.denominator != 0);
+        let count =
+            u32::try_from(count.max(1)).map_err(|_| ScoreFieldGap::FillCountExceedsScoreRange)?;
+        (
+            count,
+            FillCountResolution::FromRegionAndExtent {
+                reference_extent: extent,
+            },
+        )
+    };
+    Ok((
+        count,
+        PlacementRecipe::FillUniformInRegionAndClip {
+            region: Box::new(region),
+            count_resolution,
+        },
+    ))
+}
+
+fn resolve_fill_region(
+    input: ScoreLoweringInput<'_>,
+    context: ScoreLoweringContext,
+) -> Result<ResolvedFillRegion, ScoreFieldGap> {
+    let (cw, ch) = context.canvas_format.integer_ratio();
+    let short = cw.min(ch);
+    let canvas_area =
+        Rational::from_ratio(i128::from(cw) * i128::from(ch), i128::from(short).pow(2))?;
+    match input.fill_target {
+        Some(FillTargetInput::Invalid) => Err(ScoreFieldGap::InvalidFillTarget),
+        Some(FillTargetInput::Shape {
+            instruction,
+            source_instruction_index,
+            effective_focus,
+        }) => {
+            if input.has_named_position
+                || instruction
+                    .entity
+                    .quantity
+                    .as_ref()
+                    .is_some_and(|q| q.value != 1)
+            {
+                return Err(ScoreFieldGap::InvalidFillTarget);
+            }
+            let entity = &instruction.entity;
+            let SemanticHead::Primitive(term) = &entity.head else {
+                return Err(ScoreFieldGap::InvalidFillTarget);
+            };
+            let primitive = score_primitive_from_semantic_identity(&term.identity)
+                .map_err(|_| ScoreFieldGap::InvalidFillTarget)?;
+            let arc_form = entity
+                .proportion
+                .arc_form
+                .as_ref()
+                .filter(|form| form.identity.id == "crescent")
+                .map(|_| inku_score::ArcForm::Crescent);
+            if primitive == Primitive::Line || (primitive == Primitive::Arc && arc_form.is_none()) {
+                return Err(ScoreFieldGap::FillRegionHasNoArea);
+            }
+            let target_input = ScoreLoweringInput {
+                fill_target: None,
+                primitive: (&term.identity).into(),
+                explicit_geometry: entity.explicit_geometry.as_ref(),
+                generated_geometries: [None; 6],
+                relative_scale: entity.relative_scale.as_ref().map(|scale| scale.value),
+                additional_relative_scales: &entity.additional_relative_scales,
+                additional_explicit_geometries: &entity.additional_explicit_geometries,
+                additional_width_extents: &entity.additional_width_extents,
+                shape_constraint: entity.shape_constraint.as_ref().map(|shape| shape.value),
+                proportion_aspect: entity
+                    .proportion
+                    .aspect
+                    .as_ref()
+                    .map(|term| (&term.identity).into()),
+                proportion_arc_form: entity
+                    .proportion
+                    .arc_form
+                    .as_ref()
+                    .map(|term| (&term.identity).into()),
+                proportion_width_extent: entity
+                    .proportion
+                    .width_extent
+                    .as_ref()
+                    .map(|term| (&term.identity).into()),
+                ..input
+            };
+            let (dimensions, _) = resolve_size_candidates(target_input, context, primitive)?;
+            let mut angle_context = input
+                .angle_context
+                .ok_or(ScoreFieldGap::InvalidFillTarget)?;
+            angle_context.occurrence = ScoreAngleOccurrence::Direct {
+                logical_ordinal: source_instruction_index as u64,
+            };
+            let anchor = match (
+                entity.numeric_position.as_ref(),
+                instruction.position.as_ref(),
+            ) {
+                (Some(_), Some(_)) => return Err(ScoreFieldGap::NamedAndNumericPositionConflict),
+                (Some(position), None) => {
+                    let exact: crate::geometry::ExactPosition = position.into();
+                    if !Rational::from_decimal(exact.x)?.in_unit_interval()
+                        || !Rational::from_decimal(exact.y)?.in_unit_interval()
+                    {
+                        return Err(ScoreFieldGap::PositionOutOfRange);
+                    }
+                    ObjectAnchor::Numeric(position.clone())
+                }
+                (None, Some(position)) => ObjectAnchor::Named(
+                    named_region_bounds(&position.identity.id, effective_focus, angle_context)
+                        .ok_or(ScoreFieldGap::UnsupportedNamedPosition)?,
+                ),
+                (None, None) => ObjectAnchor::Named(crate::geometry::omitted_position_bounds()),
+            };
+            let rotation_degrees = instruction
+                .entity
+                .angle
+                .as_ref()
+                .map(|angle| {
+                    if primitive == Primitive::Point {
+                        return Err(ScoreFieldGap::UnsupportedAngleForPrimitive { primitive });
+                    }
+                    resolve_score_angle(&angle.identity.id, angle_context).ok_or(
+                        ScoreFieldGap::UnsupportedAngleIdentity {
+                            category: angle.identity.category.clone(),
+                            id: angle.identity.id.clone(),
+                        },
+                    )
+                })
+                .transpose()?;
+            let reference_area = fill_shape_reference_area(primitive, dimensions, arc_form)?;
+            let contour_variation = crate::fluctuation::resolve_fluctuation(
+                entity
+                    .fluctuation
+                    .amplitude
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()),
+                entity
+                    .fluctuation
+                    .frequency
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()),
+                entity
+                    .fluctuation
+                    .quality
+                    .as_ref()
+                    .map(|term| term.identity.id.as_str()),
+            )
+            .map_err(|_| ScoreFieldGap::UnsupportedInstructionMeaning)?;
+            Ok(ResolvedFillRegion {
+                owner: FillRegionOwner::InlineShape {
+                    source_instruction_index,
+                    source: entity.head.source().clone(),
+                },
+                geometry: FillRegionGeometry::Shape {
+                    primitive,
+                    dimensions,
+                    arc_form,
+                    anchor,
+                    rotation_degrees,
+                    contour_variation,
+                },
+                reference_area,
+            })
+        }
+        canvas_target => {
+            let (owner, bounds) = if let Some(position) = input.named_position {
+                if canvas_target.is_some() {
+                    return Err(ScoreFieldGap::InvalidFillTarget);
+                }
+                let rational = crate::geometry::named_region_rational_bounds(
+                    position.id,
+                    input.effective_focus,
+                    input
+                        .angle_context
+                        .ok_or(ScoreFieldGap::InvalidFillTarget)?,
+                )
+                .ok_or(ScoreFieldGap::UnsupportedNamedPosition)?;
+                let mut bounds = [Rational::from_ratio(0, 1)?; 4];
+                for (output, (n, d)) in bounds.iter_mut().zip(rational) {
+                    *output = Rational::from_ratio(n.into(), d.into())?;
+                }
+                (
+                    FillRegionOwner::Named(SemanticIdentity {
+                        category: position.category.to_owned(),
+                        id: position.id.to_owned(),
+                    }),
+                    bounds,
+                )
+            } else {
+                let owner = match canvas_target {
+                    Some(FillTargetInput::Canvas(source)) => {
+                        FillRegionOwner::ExplicitCanvas(source.clone())
+                    }
+                    None => FillRegionOwner::OmittedCanvas,
+                    _ => unreachable!("shape and invalid handled above"),
+                };
+                (
+                    owner,
+                    [
+                        Rational::from_ratio(0, 1)?,
+                        Rational::from_ratio(0, 1)?,
+                        Rational::from_ratio(1, 1)?,
+                        Rational::from_ratio(1, 1)?,
+                    ],
+                )
+            };
+            let area = canvas_area
+                .mul(reduced_ratio(bounds[2].sub(bounds[0])?))?
+                .mul(reduced_ratio(bounds[3].sub(bounds[1])?))?;
+            if area.numerator <= 0 {
+                return Err(ScoreFieldGap::FillRegionHasNoArea);
+            }
+            Ok(ResolvedFillRegion {
+                owner,
+                geometry: FillRegionGeometry::Rectangle { bounds },
+                reference_area: reduced_ratio(area),
+            })
+        }
+    }
+}
+
+fn fill_shape_reference_area(
+    primitive: Primitive,
+    dimensions: ResolvedGeometryDimensions,
+    arc_form: Option<inku_score::ArcForm>,
+) -> Result<Rational, ScoreFieldGap> {
+    let area = match dimensions {
+        ResolvedGeometryDimensions::Circle { radius }
+        | ResolvedGeometryDimensions::Point { radius } => radius
+            .mul(radius)?
+            .mul(finite_geometry_ratio(std::f64::consts::PI)?)?,
+        ResolvedGeometryDimensions::Square { side } => side.mul(side)?,
+        ResolvedGeometryDimensions::RegularTriangle { side } => side
+            .mul(side)?
+            .mul(finite_geometry_ratio(3.0_f64.sqrt() / 4.0)?)?,
+        ResolvedGeometryDimensions::Polygon { radius, sides } => {
+            radius.mul(radius)?.mul(finite_geometry_ratio(
+                f64::from(sides) * (std::f64::consts::TAU / f64::from(sides)).sin() / 2.0,
+            )?)?
+        }
+        ResolvedGeometryDimensions::Bbox { width, height }
+        | ResolvedGeometryDimensions::CenteredSize { width, height } => {
+            let fraction = match primitive {
+                Primitive::Ellipse => std::f64::consts::PI / 4.0,
+                Primitive::Triangle => 0.5,
+                // Declared envelope area keeps count independent of performance contours.
+                Primitive::Cloudform | Primitive::Square => 1.0,
+                Primitive::Arc if arc_form == Some(inku_score::ArcForm::Crescent) => {
+                    inku_score::crescent_reference_area_ratio()
+                }
+                _ => return Err(ScoreFieldGap::FillRegionHasNoArea),
+            };
+            width.mul(height)?.mul(finite_geometry_ratio(fraction)?)?
+        }
+        ResolvedGeometryDimensions::Line { .. } | ResolvedGeometryDimensions::Arc { .. } => {
+            return Err(ScoreFieldGap::FillRegionHasNoArea);
+        }
+    };
+    if area.numerator <= 0 {
+        return Err(ScoreFieldGap::FillRegionHasNoArea);
+    }
+    Ok(reduced_ratio(area))
+}
+
 fn placement_recipe(
     action: PlacementAction,
     n: u64,
@@ -3451,6 +4307,7 @@ fn placement_recipe(
             _ => unreachable!("closed layout axes"),
         },
         PlacementAction::Scatter => PlacementRecipe::ScatterUniformWithCentroidTranslation,
+        PlacementAction::Fill => return Err(ScoreFieldGap::InvalidFillTarget),
         PlacementAction::Tile => {
             let landscape = domain[1].le(domain[0])?;
             // Integer binary search of k² >= n * long/short. This is bounded
@@ -3762,6 +4619,13 @@ fn resolve_complete_object<'a>(
         }
     };
     let action = match input.action {
+        Some(identity)
+            if identity.category == "movement"
+                && identity.id == "draw"
+                && matches!(primitive, Primitive::Line | Primitive::Arc) =>
+        {
+            PlacementAction::Place
+        }
         Some(identity) if identity.category == "movement" && identity.id == "place" => {
             PlacementAction::Place
         }
@@ -3777,6 +4641,9 @@ fn resolve_complete_object<'a>(
             if planning && identity.category == "movement" && identity.id == "scatter" =>
         {
             PlacementAction::Scatter
+        }
+        Some(identity) if planning && identity.category == "movement" && identity.id == "fill" => {
+            PlacementAction::Fill
         }
         Some(identity) => {
             gaps.push(ScoreFieldGap::UnsupportedActionIdentity {
@@ -3812,9 +4679,10 @@ fn resolve_complete_object<'a>(
             gaps.push(ScoreFieldGap::UnsupportedNamedPosition);
             None
         }
+    } else if input.exact_position().is_none() && action == PlacementAction::Fill {
+        Some([0.0, 0.0, 1.0, 1.0])
     } else if input.exact_position().is_none() {
-        gaps.push(ScoreFieldGap::MissingNumericPosition);
-        None
+        Some(crate::geometry::omitted_position_bounds())
     } else {
         None
     };
@@ -4049,7 +4917,9 @@ pub enum ResolvedGeometryDimensions {
 }
 
 /// The reference extent is measured before any instruction rotation or ink variation.
-fn reference_extent(dimensions: ResolvedGeometryDimensions) -> Result<Rational, ScoreFieldGap> {
+pub(crate) fn reference_extent(
+    dimensions: ResolvedGeometryDimensions,
+) -> Result<Rational, ScoreFieldGap> {
     match dimensions {
         ResolvedGeometryDimensions::Bbox { width, .. }
         | ResolvedGeometryDimensions::CenteredSize { width, .. } => Ok(width),
@@ -5009,7 +5879,7 @@ impl Rational {
         self.denominator
     }
 
-    fn from_ratio(numerator: i128, denominator: i128) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn from_ratio(numerator: i128, denominator: i128) -> Result<Self, ScoreFieldGap> {
         if denominator <= 0 {
             return Err(ScoreFieldGap::GeometryRepresentationLimit);
         }
@@ -5019,7 +5889,7 @@ impl Rational {
         })
     }
 
-    fn from_decimal(value: ExactDecimal) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn from_decimal(value: ExactDecimal) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: value.coefficient(),
             denominator: value.denominator().map_err(map_decimal_error)?,
@@ -5030,7 +5900,11 @@ impl Rational {
         0 <= self.numerator && self.numerator <= self.denominator
     }
 
-    fn mul_ratio(self, numerator: i128, denominator: i128) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn mul_ratio(
+        self,
+        numerator: i128,
+        denominator: i128,
+    ) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: self
                 .numerator
@@ -5043,11 +5917,11 @@ impl Rational {
         })
     }
 
-    fn mul_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn mul_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
         self.mul_ratio(value, 1)
     }
 
-    fn mul(self, other: Self) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn mul(self, other: Self) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: self
                 .numerator
@@ -5060,14 +5934,14 @@ impl Rational {
         })
     }
 
-    fn div(self, other: Self) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn div(self, other: Self) -> Result<Self, ScoreFieldGap> {
         if other.numerator <= 0 {
             return Err(ScoreFieldGap::GeometryRepresentationLimit);
         }
         self.mul_ratio(other.denominator, other.numerator)
     }
 
-    fn le(self, other: Self) -> Result<bool, ScoreFieldGap> {
+    pub(crate) fn le(self, other: Self) -> Result<bool, ScoreFieldGap> {
         let left = self
             .numerator
             .checked_mul(other.denominator)
@@ -5079,11 +5953,11 @@ impl Rational {
         Ok(left <= right)
     }
 
-    fn div_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn div_i128(self, value: i128) -> Result<Self, ScoreFieldGap> {
         self.mul_ratio(1, value)
     }
 
-    fn add(self, other: Self) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn add(self, other: Self) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: self
                 .numerator
@@ -5102,7 +5976,7 @@ impl Rational {
         })
     }
 
-    fn sub(self, other: Self) -> Result<Self, ScoreFieldGap> {
+    pub(crate) fn sub(self, other: Self) -> Result<Self, ScoreFieldGap> {
         Ok(Self {
             numerator: self
                 .numerator
@@ -5121,7 +5995,7 @@ impl Rational {
         })
     }
 
-    fn to_f64(self) -> Result<f64, ScoreFieldGap> {
+    pub(crate) fn to_f64(self) -> Result<f64, ScoreFieldGap> {
         let value = self.numerator as f64 / self.denominator as f64;
         value
             .is_finite()

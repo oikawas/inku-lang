@@ -2871,11 +2871,11 @@ fn fixture_schema_and_closed_ids_are_stable() {
     assert_eq!(fixture.version, 12);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v16"
+        "inku.semantic-document.v17"
     );
     assert_eq!(
         SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID,
-        "inku.semantic-source-provenance.v3"
+        "inku.semantic-source-provenance.v4"
     );
     assert_eq!(
         EXPANDED_MACRO_MEANING_SCHEMA_ID,
@@ -2883,11 +2883,11 @@ fn fixture_schema_and_closed_ids_are_stable() {
     );
     assert_eq!(
         TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
-        "inku.typed-ddl-compiler-lock.v15"
+        "inku.typed-ddl-compiler-lock.v16"
     );
     assert_eq!(
         TYPED_DDL_COMPILATION_SCHEMA_ID,
-        "inku.typed-ddl-compilation.v14"
+        "inku.typed-ddl-compilation.v15"
     );
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     assert_eq!(

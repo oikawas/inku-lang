@@ -85,6 +85,8 @@ pub(crate) fn project_compilation_for_execution(
         let unit =
             if reason == "conflicting_grounds" {
                 CompilerExecutionOmissionUnit::GroundCandidates
+            } else if reason == "conflicting_backgrounds" {
+                CompilerExecutionOmissionUnit::BackgroundCandidates
             } else if let Some(span) = span {
                 let exact_macro = semantic.ast.instructions.iter().enumerate().find_map(
                     |(index, instruction)| match &instruction.entity.head {
@@ -142,7 +144,11 @@ pub(crate) fn project_compilation_for_execution(
     omit_typed_dependencies(semantic, &omitted_clauses, &mut keep, &mut diagnostics);
     let (mut projected_ast, mut source_instruction_indices, mut source_group_indices) =
         retain_ast(&semantic.ast, &keep);
-    projected_ast.ground = if semantic.issues.is_empty() {
+    projected_ast.ground = if !semantic
+        .issues
+        .iter()
+        .any(|issue| issue.kind == crate::SemanticDocumentIssueKind::ConflictingGrounds)
+    {
         semantic.ast.ground.clone()
     } else {
         None
@@ -714,10 +720,13 @@ fn omit_typed_dependencies(
     loop {
         let before = keep.to_vec();
         for (group_index, group) in semantic.ast.coordinated_head_groups.iter().enumerate() {
+            let target_missing = semantic.ast.group_predicates.iter().any(|edge| edge.group_index == group_index
+                && matches!(&edge.fill_target, Some(crate::SemanticFillTarget::InlineShape {target_instruction_index, ..}) if !keep[*target_instruction_index]));
             if group
                 .member_instruction_indices
                 .iter()
                 .any(|index| !keep[*index])
+                || target_missing
             {
                 for index in &group.member_instruction_indices {
                     keep[*index] = false;
@@ -752,6 +761,27 @@ fn omit_typed_dependencies(
         }
         for (index, instruction) in semantic.ast.instructions.iter().enumerate() {
             if !keep[index] {
+                continue;
+            }
+            // Losing an inline operand cannot rebind a fill after compaction.
+            if let Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index,
+                ..
+            }) = &instruction.fill_target
+                && !keep[*target_instruction_index]
+            {
+                keep[index] = false;
+                diagnostics.push(CompilerExecutionDiagnostic {
+                    issue_kind: CompilerExecutionIssueKind::Dependency,
+                    issue_id: format!("fill-target:{index}:{target_instruction_index}"),
+                    reason: "fill_target_dependency".to_owned(),
+                    span: Some(instruction.entity.head.source().span),
+                    disposition: CompilerExecutionDisposition::Omitted {
+                        unit: CompilerExecutionOmissionUnit::SourceInstructions {
+                            instruction_indices: vec![index],
+                        },
+                    },
+                });
                 continue;
             }
             let Some(relation) = &instruction.relation else {
@@ -811,7 +841,7 @@ fn retain_ast(
 ) -> (SemanticDocumentAst, Vec<usize>, Vec<usize>) {
     let mut index_map = vec![None; ast.instructions.len()];
     let mut source_instruction_indices = Vec::new();
-    let instructions = ast
+    let mut instructions = ast
         .instructions
         .iter()
         .enumerate()
@@ -823,6 +853,7 @@ fn retain_ast(
             })
         })
         .collect::<Vec<_>>();
+    crate::semantic_document::remap_fill_targets(&mut instructions, &index_map);
     let mut group_map = vec![None; ast.coordinated_head_groups.len()];
     let mut source_group_indices = Vec::new();
     let coordinated_head_groups = ast
@@ -849,11 +880,16 @@ fn retain_ast(
         .group_predicates
         .iter()
         .filter_map(|edge| {
-            group_map[edge.group_index].map(|group_index| crate::SemanticGroupPredicateEdge {
-                group_index,
-                action: edge.action.clone(),
-                position: edge.position.clone(),
-                layout: edge.layout,
+            group_map[edge.group_index].map(|group_index| {
+                let mut fill_target = edge.fill_target.clone();
+                crate::semantic_document::remap_fill_target(&mut fill_target, &index_map);
+                crate::SemanticGroupPredicateEdge {
+                    group_index,
+                    action: edge.action.clone(),
+                    position: edge.position.clone(),
+                    layout: edge.layout,
+                    fill_target,
+                }
             })
         })
         .collect();
@@ -870,6 +906,7 @@ fn retain_ast(
         .collect();
     (
         SemanticDocumentAst {
+            background: ast.background.clone(),
             ground: ast.ground.clone(),
             instructions,
             coordinated_head_groups,

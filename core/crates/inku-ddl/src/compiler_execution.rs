@@ -187,6 +187,11 @@ fn execute_compilation(
             let upstream_omitted = !ready.diagnostics.is_empty();
             let score_has_drawable_content = lowered.score().is_some_and(|score| {
                 !score.instructions.is_empty()
+                    || transformed
+                        .verified_effective_view()
+                        .original_semantic_document()
+                        .background
+                        .is_some()
                     || matches!(
                         &score.canvas,
                         Canvas::Spec(spec) if spec.ground.is_some()

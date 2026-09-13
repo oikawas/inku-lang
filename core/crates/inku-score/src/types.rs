@@ -106,6 +106,31 @@ pub const fn crescent_reference_aspect_ratio() -> f64 {
     CRESCENT_REFERENCE_ASPECT_RATIO
 }
 
+/// Area of the shared closed cubic contour divided by its reference bbox area.
+/// Integrate x dy - y dx analytically, without another sampled approximation.
+#[must_use]
+pub fn crescent_reference_area_ratio() -> f64 {
+    let coefficients = |p: [f64; 4]| {
+        [
+            p[0],
+            3.0 * (p[1] - p[0]),
+            3.0 * (p[2] - 2.0 * p[1] + p[0]),
+            p[3] - 3.0 * p[2] + 3.0 * p[1] - p[0],
+        ]
+    };
+    let mut twice_area = 0.0;
+    for cubic in CRESCENT_REFERENCE_CUBICS {
+        let x = coefficients(cubic.map(|p| p.x));
+        let y = coefficients(cubic.map(|p| p.y));
+        for i in 0..4 {
+            for j in 1..4 {
+                twice_area += (x[i] * y[j] - y[i] * x[j]) * j as f64 / (i + j) as f64;
+            }
+        }
+    }
+    twice_area.abs() / (2.0 * CRESCENT_REFERENCE_WIDTH * CRESCENT_REFERENCE_HEIGHT)
+}
+
 /// Physical bounds of the reference crescent after fitting it into `size` about `center`.
 ///
 /// `size` is the unrotated physical bounding box. The returned bounds include
@@ -281,12 +306,13 @@ impl ResolvedPaletteColor {
     }
 }
 
-/// The resolved background, black, and white observations for one work palette.
+/// Observations from one work palette, including the legacy three-color view.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ResolvedPaletteContext {
     background: ResolvedPaletteColor,
     black: ResolvedPaletteColor,
     white: ResolvedPaletteColor,
+    observations: Option<[ResolvedPaletteColor; 9]>,
 }
 
 impl ResolvedPaletteContext {
@@ -300,7 +326,30 @@ impl ResolvedPaletteContext {
             background,
             black,
             white,
+            observations: None,
         }
+    }
+
+    /// Retain the nine abstract-color observations from the same work assignment.
+    #[must_use]
+    pub const fn with_observations(mut self, observations: [ResolvedPaletteColor; 9]) -> Self {
+        self.observations = Some(observations);
+        self
+    }
+
+    #[must_use]
+    pub const fn observations(&self) -> Option<&[ResolvedPaletteColor; 9]> {
+        self.observations.as_ref()
+    }
+
+    /// Change only the selected role; never synthesize an unobserved color.
+    #[must_use]
+    pub fn select_background(mut self, color: Color) -> Option<Self> {
+        self.background = [self.background, self.black, self.white]
+            .into_iter()
+            .chain(self.observations.into_iter().flatten())
+            .find(|observation| observation.abstract_color() == color)?;
+        Some(self)
     }
 
     #[must_use]

@@ -57,6 +57,14 @@ const FOCUS_REGION_BOUNDS_HUNDREDTHS: [(FocusRegion, [u8; 4]); 6] = [
     (FocusRegion::RightHalf, [61, 39, 83, 61]),
 ];
 
+// The existing 22%-wide focus region translated to the canvas center. This is
+// an execution default; it does not create a source position or a focus target.
+const OMITTED_POSITION_BOUNDS_HUNDREDTHS: [u8; 4] = [39, 39, 61, 61];
+
+pub(crate) fn omitted_position_bounds() -> [f64; 4] {
+    OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| f64::from(value) / 100.0)
+}
+
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
 pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
 
@@ -263,7 +271,8 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
             canonical = canonical.replacen(
                 "\"author_resolved_omission\":{",
                 &format!(
-                    "\"author_resolved_omission\":{{\"fluctuation\":{},",
+                    "\"author_resolved_omission\":{{\"position\":{{\"region\":{},\"anchor\":\"performance_seed_in_region\",\"source_position\":\"absent\"}},\"fluctuation\":{},",
+                    serde_json::to_string(&omitted_position_bounds()).expect("finite default bounds"),
                     crate::fluctuation::policy()
                 ),
                 1,
@@ -293,6 +302,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"tile_named_anchor\":\"stay_in_named_domain_no_centroid_translation\",",
                     "\"scatter\":\"uniform_xy_then_translate_sample_centroid_at_materialization\",",
                     "\"scatter_seed\":\"existing_performance_seed_owner_instance_ordinal\",",
+                    "\"fill\":{\"omitted_target\":\"canvas\",\"target\":\"area_not_anchor\",\"distribution\":\"independent_uniform_in_target\",\"boundary\":\"clip_to_same_target_contour\",\"target_transform\":\"with_contents\",\"centroid_translation\":false,\"omitted_count\":\"max_1_ceil_reference_area_over_reference_extent_squared\",\"explicit_count_size\":\"preserved\",\"count_appearance_dependency\":false,\"cloudform_count_area\":\"declared_envelope\",\"crescent_count_area\":\"shared_cubic_analytic_integral\",\"numeric_motif_position\":\"invalid_not_area\",\"all_counts\":\"same_region_clip\",\"mixed_omission\":\"max_k_ceil_k_times_nonnegative_remaining_area_over_sum_omitted_extent_squared\",\"mixed_explicit_area\":\"sum_count_times_extent_squared\",\"mixed_allocation\":\"equal_omitted_counts_source_order_remainder_minimum_one\",\"macro_reference_extent\":\"max_declared_center_envelope_axis_span_plus_twice_max_primitive_reference_radius\",\"macro_reference_transform\":\"rotate_centers_scale_radius_by_max_absolute_axis\",\"macro_reference_positions\":\"declared_numeric_or_named_center_and_internal_recipe_envelope\",\"macro_reference_exclusions\":[\"outer_count\",\"ink_bounds\",\"instruction_angle\",\"performance_seed\",\"performed_relation_movement\"]},",
                     "\"non_grid_domain\":\"canvas_axes_group_centroid_at_semantic_anchor\",",
                     "\"overlap\":\"allowed_no_resize_no_fit_no_count_change\",",
                     "\"materialization\":\"deferred\",\"score_success\":false},",
@@ -957,7 +967,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "2a68a8e4f990c8809d509178e8d7feafb18cc741474f41579d264f7a5964215a"
+            "5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

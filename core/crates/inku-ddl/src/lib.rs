@@ -29,6 +29,7 @@ pub mod opaque_head;
 pub mod parser;
 pub mod phrase;
 pub mod phrase_topology;
+mod plan_reference_extent;
 pub mod prompt;
 pub mod relation_reference;
 pub mod render_execution;
@@ -37,10 +38,11 @@ mod score_angle;
 pub mod score_diagnostics;
 pub mod score_lowering;
 pub use composition_plan::{
-    CompositionPlanOutcome, CompositionPlanResult, ObjectAnchor, ObjectPlacementPlan,
+    CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,
+    FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor, ObjectPlacementPlan,
     PlacementAction, PlacementGroupPlan, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
-    PlanRelation, Rational, ResolvedGeometryDimensions, ResolvedLayoutDirection,
-    ResolvedObjectAppearance, TransformGroupPlan, plan_verified_stage15,
+    PlanRelation, Rational, ResolvedFillRegion, ResolvedGeometryDimensions,
+    ResolvedLayoutDirection, ResolvedObjectAppearance, TransformGroupPlan, plan_verified_stage15,
     plan_verified_stage15_with_policy,
 };
 pub mod semantic_association;
@@ -210,19 +212,19 @@ pub use semantic_association::{
     associate_semantic_entities, associate_semantic_entities_with_macro_binding,
 };
 pub use semantic_document::{
-    SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticContinuationEdge, SemanticContinuationIssue,
-    SemanticContinuationIssueKind, SemanticContinuationTarget, SemanticDocumentAst,
-    SemanticDocumentIssue, SemanticDocumentIssueKind, SemanticDocumentResult,
+    SEMANTIC_DOCUMENT_SCHEMA_ID, SemanticBackground, SemanticContinuationEdge,
+    SemanticContinuationIssue, SemanticContinuationIssueKind, SemanticContinuationTarget,
+    SemanticDocumentAst, SemanticDocumentIssue, SemanticDocumentIssueKind, SemanticDocumentResult,
     associate_semantic_document, associate_semantic_document_with_macro_binding,
 };
 // Coordination issues expose source-owned marker, candidate, cause, and claim evidence.
 pub use semantic_instruction::{
     GroupLayout, SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID, SemanticCoordinatedHeadGroup,
-    SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticGroupPredicateEdge,
-    SemanticInstruction, SemanticInstructionAssociationAst, SemanticInstructionAssociationResult,
-    SemanticInstructionIssue, SemanticInstructionIssueKind, SemanticInstructionOccurrence,
-    SemanticInstructionOccurrenceRole, SemanticRelation, SemanticRelationIssue,
-    SemanticRelationIssueKind, associate_semantic_instructions,
+    SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticFillTarget,
+    SemanticGroupPredicateEdge, SemanticInstruction, SemanticInstructionAssociationAst,
+    SemanticInstructionAssociationResult, SemanticInstructionIssue, SemanticInstructionIssueKind,
+    SemanticInstructionOccurrence, SemanticInstructionOccurrenceRole, SemanticRelation,
+    SemanticRelationIssue, SemanticRelationIssueKind, associate_semantic_instructions,
     associate_semantic_instructions_with_macro_binding,
 };
 pub use stage15_transform::{

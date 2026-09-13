@@ -17,16 +17,6 @@ and read only the specification sections relevant to the task. Chronological
 release history is maintained separately in [CHANGELOG.md](CHANGELOG.md), with
 more detailed canonical notes in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-## Score 0.9 Macro placement members
-
-`transform_group_indices` names source-owned internal affine transforms. Listed transforms run before their member is placed; an unlisted equal-range transform remains outer and runs afterward.
-
-`CompositionPlanResult.standalone_macro_repetitions` now retains the existing body positions, range, Anchors, internal-transform ownership, and source-head repeat count. It adds no outer placement recipe or actual Score expansion; materialization remains Step11.
-
-Score 0.9 `placement_groups.members` records each Macro body atomically as an ordered contiguous drawable span plus its non-drawing Anchor indices. An empty member range is valid only when it owns Anchors; internal transforms of an Anchor-only member record the same empty drawable range. Explicit members partition the group exactly and cannot share drawables or Anchors with another placement group. The legacy absent `members` form remains readable for Score 0.7/0.8. Group-head counts remain distinct from a Macro body's internal Emit counts; repeated results remain symbolic plans. This adds no Macro authoring operator, individual materialization, or runtime / UI / save cutover. A standalone Macro also retains its outer repetition count in a symbolic plan, separately from its internal Emit counts.
-
----
-
 ## About This Document
 
 **inku** is the reference implementation project for DDL (Drawing Description
@@ -69,11 +59,11 @@ Derived projects share the `inku-` prefix:
 DDL is not merely a language for describing graphics. It is positioned as a language
 for **writing visual tanka**.
 
-`inku` is the reference implementation of DDL.  It is not a drawing program in
-the usual sense: it treats the written description as the durable work, and the
-rendered SVG as one performance of that work. The same description may be
-rendered again later, with controlled sway, while preserving the score (the
-JSON data).
+`inku` is the reference implementation of DDL. It is not a drawing program in
+the usual sense: a short written description is the durable work, its typed
+document retains shared meaning, and the resulting Score is performed once as
+SVG. Hosts share that Score contract; sway appears only while performing and
+does not rewrite the description or its meaning.
 
 It rests on three pillars of constraint:
 
@@ -209,7 +199,35 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   the width at 0.35 of the opacity). **The other six are moved to the closed
   shape before them as before, and dropped where there is none.** **An
   instruction to fill the background is not about a surface** either; it goes to
-  the `background` field.
+  the document-owned `background` field. The finite form is `fill [the]
+  background with <abstract color>.` `fill` densely fills a surface or region;
+  `scatter` distributes elements irregularly; and `tile` covers a region by
+  arranging shapes regularly and repeatedly. These movement meanings are
+  distinct and are never substituted for one another. A typed fill plan targets
+  the whole canvas, an existing named area, or one inline closed primitive and
+  retains dense irregular placement and its clipping recipe within that region,
+  plus the target's source owner, geometry, and count provenance. Omitted
+  count is `ceil(A / d²)` and explicit count is retained. A mixed-count group
+  distributes the remaining area using the omitted kinds' mean `d²`, nearly
+  evenly with source-order remainder and a minimum of one for each omitted
+  kind; an all-explicit group performs no density calculation. A Macro is one
+  motif whose reference footprint retains its body, internal counts, and inner
+  Transform while excluding outer count, seed, material, instruction angle, and
+  performed-relation translation. Invalid targets receive local diagnostics
+  while independent drawing continues. This is a symbolic FillGroupPlan: even
+  Count1 sampling, clipping, and region materialization remain disconnected
+  Step11 work.
+An explicit source background takes precedence over host context while lowering
+to Score. An omitted background or a conflict between multiple backgrounds uses
+the context background; only the conflict records a local diagnostic. `draw`
+delivers line and arc through the shared geometry, count, and place resolvers
+exactly once. An omitted source position remains None; the shared resolver
+chooses a performance-time position from the existing-sway central region
+`[0.39, 0.39, 0.61, 0.61]`. Explicit positions and explicit-center Stage 1.5
+focus take priority. `inku.geometry-resolution-policy.v1` records this omitted-
+position payload; its current digest is
+`0cdcd857f546084c64b64a44b68068dfbfcfb879d50d385db4c4adecbe3fb62b`.
+
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
@@ -1813,7 +1831,7 @@ Closed fills carry the selected tool's texture. From Score 0.3.0 onward, `surfac
 | Oil paint | Broad paint tracks and pigment-derived bristle relief. Dense strengthens and simplifies the ridges; faint makes deposited paint translucent |
 | Computer | Vertical RGB bands, black interlaced scanlines, and a soft glow evoke a CRT. Dense lowers brightness; faint raises it |
 
-Compact shared patterns, masks, and filters carry grain and line textures; oil paint uses filter-free paths. Oil fill width and spacing are three times the baseline. Interior ridge contrast is 0.6 / 1.05 / 0.6 for normal / dense / faint. Dense simplifies paired ridge banks within 0.25 per 1000 short-edge units before widening; faint applies opacity 0.54 to each paint stroke. The base and outline are not widened. Compat preserves its filter-free approximation and does not promise pixel equality with Display.
+Compact shared patterns, masks, and filters carry grain and line textures; oil paint uses filter-free paths. Oil fill width and spacing are three times the baseline. Interior ridge contrast is 0.6 / 1.05 / 0.6 for normal / dense / faint. Dense simplifies paired ridge banks within 0.25 per 1000 short-edge units before widening; faint applies opacity 0.54 to each paint stroke. The base and outline are not widened. Compat preserves its filter-free, clip-free approximation: Computer retains the contour-path base field, grille, and black scanlines, while Oil retains shape and intensity through its existing paint passes without clipped width expansion. Compat does not promise pixel equality with Display.
 
 Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
 

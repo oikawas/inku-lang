@@ -19,6 +19,7 @@ pub enum PlacementAction {
     LineUp,
     Tile,
     Scatter,
+    Fill,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -218,6 +219,79 @@ pub enum ObjectAnchor {
     Named([f64; 4]),
 }
 
+/// Region authority is distinct from the placement anchor of a repeated object.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FillRegionOwner {
+    OmittedCanvas,
+    ExplicitCanvas(crate::SourceOccurrence),
+    Named(crate::SemanticIdentity),
+    InlineShape {
+        source_instruction_index: usize,
+        source: crate::SourceOccurrence,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FillRegionGeometry {
+    /// Exact normalized canvas axes, not an anchor sampling box.
+    Rectangle { bounds: [Rational; 4] },
+    /// The target's own geometry and placement. Performance resolves its contour
+    /// once, then uses that same contour for sampling and clipping all members.
+    Shape {
+        primitive: Primitive,
+        dimensions: ResolvedGeometryDimensions,
+        arc_form: Option<inku_score::ArcForm>,
+        anchor: ObjectAnchor,
+        rotation_degrees: Option<f64>,
+        /// Declared contour variation never changes reference_area. The target
+        /// is geometry, so it requires no color, surface or drawing tool.
+        contour_variation: Option<Variation>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedFillRegion {
+    pub owner: FillRegionOwner,
+    pub geometry: FillRegionGeometry,
+    /// Canvas-short-edge units squared. Cloudform uses its declared reference
+    /// envelope, never the performance-dependent ink/contour area.
+    pub reference_area: Rational,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FillCountResolution {
+    Explicit,
+    /// ceil(reference_area / reference_extent²), with a minimum of one.
+    /// Extent is resolved geometry, independent of ink, tool and opacity.
+    FromRegionAndExtent {
+        reference_extent: Rational,
+    },
+    /// One density budget across source-ordered kinds. Explicit counts survive;
+    /// omitted kinds share the remaining footprint budget equally, at least one
+    /// each, with source-order remainders.
+    BalancedGroup {
+        reference_extents: Vec<Rational>,
+        explicit_counts: Vec<Option<u32>>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FillGroupPlan {
+    pub owner: FillPlanOwner,
+    pub logical_count: u64,
+    pub members: Vec<PlacementMemberPlan>,
+    /// One region/clip for all members; local Place anchors are not sampled a
+    /// second time. External relations preserve the region or only the relation
+    /// is omitted. The region and contents share every outer Transform.
+    pub recipe: PlacementRecipe,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum FillPlanOwner {
+    CoordinatedGroup { group_index: usize },
+    Instruction { source_instruction_index: usize },
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlacementRecipe {
     Place,
@@ -248,6 +322,16 @@ pub enum PlacementRecipe {
     /// renderer sampler and existing performance seed with this owner's instance ordinal,
     /// then translates the sampled centroid to the semantic anchor. No RNG runs here.
     ScatterUniformWithCentroidTranslation,
+    /// Exactly object.count independent uniform centers in the target region;
+    /// clip each complete drawable at the target contour. No centroid translation,
+    /// fit, resizing, grid or materialization occurs in Step 10. The enclosing
+    /// Transform applies to the region and its contents together in Step 11.
+    /// This region is authoritative; the object's ordinary placement domain and
+    /// anchor must not translate the sampled centers out of it.
+    FillUniformInRegionAndClip {
+        region: Box<ResolvedFillRegion>,
+        count_resolution: FillCountResolution,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -378,6 +462,7 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) anchor_origins: Vec<ScoreAnchorOrigin>,
     pub(crate) transform_groups: Vec<TransformGroupPlan>,
     pub(crate) placement_groups: Vec<PlacementGroupPlan>,
+    pub(crate) fill_groups: Vec<FillGroupPlan>,
     pub(crate) standalone_macro_repetitions: Vec<PlacementMemberPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
@@ -410,6 +495,9 @@ impl<'a> CompositionPlanResult<'a> {
     }
     pub fn placement_groups(&self) -> &[PlacementGroupPlan] {
         &self.placement_groups
+    }
+    pub fn fill_groups(&self) -> &[FillGroupPlan] {
+        &self.fill_groups
     }
     /// Repeat each complete body symbolically with its existing positions. These
     /// ranges are outside coordinated placement, and add no layout or anchor.

@@ -5,6 +5,11 @@ use crate::{ExpansionPathSegment, SemanticPreviousReference, SemanticRelationKin
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreFieldGap {
+    FillRegionHasNoArea,
+    InvalidFillTarget,
+    FillCountExceedsScoreRange,
+    /// The resolved fill is symbolic until Step 11 supplies Score clip delivery.
+    FillRequiresRegionMaterialization,
     ConflictingSizeSpecifications {
         candidate_extents: Vec<crate::score_lowering::Rational>,
         effective_extent: crate::score_lowering::Rational,

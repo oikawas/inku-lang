@@ -6,6 +6,24 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 30 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-13 — Resolve typed fill plans
+
+Ordinary fill, coordinated groups, declared Emits, and standalone Macro invocations now resolve whole-canvas, existing named-area, or inline closed-primitive targets, explicit / omitted / mixed counts, source ownership, and Macro footprints through one symbolic FillGroupPlan. Omitted count derives from area and reference diameter; mixed groups distribute remaining area across omitted kinds, while all-explicit groups retain their counts. A Macro remains one motif with its body, internal counts, and inner Transform, without instance materialization. Invalid targets receive local diagnostics. Sampling, clipping, and actual-Score region materialization, including Count1, remain Step11 work.
+
+Semantic instruction association advances to 19, explicit score lowering to v5, and geometry policy v1 digest to `5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56`. Neutral parser 8, semantic document 17, compilation 15, compiler lock 16, source provenance 4, DDL engine 35, Score 0.9.0, render engine 58, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 apply to this contract. Focused direct, group, Macro, and policy-golden selectors passed. This adds no full reference update, deployment, or release.
+
+### 2026-09-13 — Remove clip paths from Compat SVG
+
+Computer solid fill in the Compat profile now layers its base field, grille, and black scanlines on the same contour path instead of clipping canvas-sized rectangles. Accepted Oil fill no longer uses clipped width expansion in Compat; its existing filter-free paint passes and base retain shape and intensity. Display and Editable paths are unchanged, and Compat remains an approximation that does not promise pixel equality.
+
+Compat SVG output changes, so render engine advances 57→58. DDL engine 35, Score 0.9.0, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 are unchanged. This adds no full reference-corpus update, deployment, or release.
+
+### 2026-09-13 — Deliver background, draw, and omitted position from the typed document
+
+The finite form `fill [the] background with <abstract color>.` now remains as document-owned background and source background takes priority over host context when lowering to Score. Omitted background and a multiple-background conflict use context fallback, with a local diagnostic only for the conflict. `fill` densely fills a surface or region: its omitted region is the whole canvas; it is visibly denser than scatter while retaining gaps, clips at its boundary, preserves explicit count and size, and does not change count for surface, outline, or tool at the same size. `scatter` distributes elements irregularly, and `tile` covers a region by repeating elements without gaps. This fill region, density, and recipe delivery remains a disconnected next-chunk boundary. `draw` delivers line and arc through the shared geometry, count, and place resolvers. An omitted position remains None; the shared resolver chooses its performance-time position from the existing-sway central region `[0.39, 0.39, 0.61, 0.61]`, while explicit positions and explicit-center Stage 1.5 focus remain authoritative.
+
+Neutral parser advances to 8, semantic document to 17, typed compilation to 15, compiler lock to 16, and source provenance to 4; geometry policy v1 updates its omitted-position payload; DDL engine advances 34→35. Score 0.9.0, render engine 57, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 are unchanged. Typed runtime / UI / persistence cutover and Step11 instance materialization remain disconnected.
+
 ### 2026-09-13 — Preserve checked relations in symbolic plans
 
 Repeated Direct plans now keep checked Connected, Touching, Along, and Cutting with their original target and position authority. Macro relations use the same numeric-fixed versus named-movable authority as Direct, so explicit numeric coordinates remain fixed; the former center-only admission does not apply. Macro placement members also keep a valid range containing an Anchor-only Transform after an earlier drawable member.

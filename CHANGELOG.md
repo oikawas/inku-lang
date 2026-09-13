@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-13 — Prepare shared bundled Macro definitions for content review
+
+Six Nature leaf words now have proposed MacroDefinition v1 content. The shared catalog supplies the same definitions and digests with localized summaries to Server and Android. Server retains the installed document's enable/disable control, does not implicitly translate arbitrary legacy Markdown, and gives explicit installation definitions precedence. Saved works retain their original definitions and locks. Android native build inputs now include embedded JSON assets.
+
+Content migration and author acceptance remain pending. Aoba is unregistered because placing several arc-shaped leaves along one branch exceeds the current adjacent Line-to-Line relation contract; Server reports its omission. The current Ochiba proposal keeps strict red/gray alternation and diagonal placement with ten leaves, pending a decision on the original 8–12 count variation. No new relation rule, arithmetic expression, or renderer-specific branch is introduced. This change does not deploy the product, implement iOS, or change engine versions.
+
 ### 2026-09-13 — Connect standalone Android authoring to shared Rust
 
 Android's Kotlin host now connects directly to the provider and shared Rust JNI without an inku server. Normal description and direct-DDL input, batch, demo, refinement, and camera output use the same authoring state machine. Shared core requests completion for a known hole without another start operation; the normal drawing screen shows the current DDL and visible patch, and persistence proceeds only after author approval. Camera image preparation and the on-device local LLM remain in the host, while non-image provenance survives completion approval and resumption.

@@ -44,11 +44,18 @@ def _canonical_candidates(
     return candidates
 
 
-def _legacy_candidates() -> list[dict[str, str]]:
+def _installed_candidates() -> tuple[list[dict[str, str]], list[str]]:
     candidates = []
+    bundled_packages = []
+    bundled_document = Path(__file__).resolve().parents[2] / "plugins/nature-leaves.inku-plugin.md"
     for document in DOCUMENT_PLUGIN_MANAGER.documents():
+        # The installed document remains the enable/disable handle. Arbitrary
+        # user Markdown with the same namespace is not translated implicitly.
+        is_bundled = document.source_path and Path(document.source_path).resolve() == bundled_document
+        if is_bundled:
+            bundled_packages.append("Nature.leaves")
         source_id = (
-            Path(document.source_path).name
+            "bundled:Nature.leaves" if is_bundled else Path(document.source_path).name
             if document.source_path
             else document.manifest.name
         )
@@ -59,7 +66,7 @@ def _legacy_candidates() -> list[dict[str, str]]:
                     "qualified_name": entry.qualified_name(document.manifest.namespace),
                 }
             )
-    return candidates
+    return candidates, bundled_packages
 
 
 def resolve_new_work_macro_catalog(binding: object, pipeline_config: Mapping[str, Any]) -> dict[str, Any]:
@@ -85,13 +92,16 @@ def resolve_new_work_macro_catalog(binding: object, pipeline_config: Mapping[str
         raise CandidateHostError("invalid_macro_catalog_source")
     if not isinstance(summaries, Sequence) or isinstance(summaries, (str, bytes)):
         raise CandidateHostError("invalid_macro_catalog_source")
+    legacy, bundled_packages = _installed_candidates()
     output = json.loads(
         resolver(
             _bytes(
                 {
                     "maximum_entries": maximum_entries,
                     "canonical": _canonical_candidates(definitions, summaries),
-                    "legacy": _legacy_candidates(),
+                    "legacy": legacy,
+                    "bundled_packages": bundled_packages,
+                    "language": pipeline_config.get("language", "en"),
                 }
             )
         )

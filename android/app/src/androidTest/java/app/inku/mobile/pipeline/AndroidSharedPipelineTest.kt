@@ -34,6 +34,49 @@ class AndroidSharedPipelineTest {
     }
 
     @Test
+    fun bundledMacroReachesScoreThroughNormalAuthoring() = runBlocking {
+        val provider = ScriptedProvider()
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
+            .build().also { database = it }
+        val repo = InkuRepository(context, db, modelProviderOverride = provider)
+            .also { repository = it }
+        val memoryBefore = android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
+        val started = android.os.SystemClock.elapsedRealtime()
+        val work = repo.paint(
+            description = "Young leaves",
+            catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+            seeds = PaintSeeds(renderSeed = 77L, compositionSeed = 17L),
+            instructionLang = "en", uiLang = "en",
+        )
+        val elapsed = android.os.SystemClock.elapsedRealtime() - started
+        val memoryAfter = android.os.Debug.MemoryInfo().also { android.os.Debug.getMemoryInfo(it) }
+        assertEquals(1, provider.requests.size)
+        assertEquals("Nature.若葉.", work.normalizedDdl)
+        assertTrue(work.displaySvg.startsWith("<svg"))
+        assertTrue(JSONObject(work.scoreJson).getJSONArray("instructions").length() > 0)
+        val managed = repo.readManagedHistory(AndroidWorkPipeline.OWNER_ID, work.id)!!
+        val config = JSONObject(managed.forkContextJson!!).getJSONObject("config")
+        assertEquals(6, config.getJSONArray("definitions").length())
+        assertEquals("description_authoritative", managed.authority)
+        File(context.cacheDir, "step16-shared-pipeline.json").writeText(
+            JSONObject()
+                .put("schema", "inku.android-shared-pipeline-evidence.v1")
+                .put("binding", JSONObject(NativePipelineBridge.versionReport()))
+                .put("description", work.originalInput)
+                .put("normalized_ddl", work.normalizedDdl)
+                .put("config", config)
+                .put("score", JSONObject(work.scoreJson))
+                .put("render_seed", "77").put("composition_seed", "17")
+                .put("authoring_elapsed_ms", elapsed)
+                .put("pss_before_kib", memoryBefore.totalPss)
+                .put("pss_after_kib", memoryAfter.totalPss)
+                .put("svg_bytes", work.displaySvg.toByteArray(Charsets.UTF_8).size)
+                .toString(),
+        )
+    }
+
+    @Test
     fun nativeSharedPipelineSavesEditsForksAndReplaysExactScore() = runBlocking {
         val provider = ScriptedProvider()
         val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
@@ -155,7 +198,9 @@ class AndroidSharedPipelineTest {
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             requests += request
-            val ddl = if (request.prompt.contains("One quiet blue circle")) {
+            val ddl = if (request.prompt.contains("Young leaves")) {
+                "Nature.若葉."
+            } else if (request.prompt.contains("One quiet blue circle")) {
                 "place one blue circle at center."
             } else {
                 "place one black circle at center."

@@ -19,6 +19,43 @@ from inku_server.pipeline_defaults import ADDITIONAL_RESOURCE_LIMITS, default_ma
 from inku_server.pipeline_product import ProductPipelineEffects
 
 
+def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp_path, monkeypatch):
+    bundle = os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE")
+    if not bundle:
+        pytest.skip("explicit generated pipeline binding bundle required")
+    binding = PipelineBinding(Path(bundle))
+    engine = create_engine(f"sqlite:///{tmp_path / 'bundled-macro.db'}")
+    Base.metadata.create_all(engine)
+    from inku_server import db
+
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    source = "Nature.若葉。"
+    config, context = effects.prepare("author", "direct_ddl", source,
+        {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77}, None)
+    assert len(config["definitions"]) == 6
+    assert config["language"] == "ja"
+    assert "若葉" in config["macro_summaries"][0]
+    omissions = context["macro_catalog"]["diagnostics"]
+    assert [(item["qualified_name"], item["reason"]) for item in omissions] == [
+        ("Nature.青葉", "legacy_semantics_require_authored_canonical_definition"),
+    ]
+    context.update(description="", committed_description="", derivation_kind="new")
+    store = VariationAuthorityStore(engine)
+    run = CandidateExecution(binding, store, owner_id="author", config=config,
+        context=context, provider=lambda _action: pytest.fail("complete Macro called a provider"))
+    run.start_new({"tag": "direct_ddl", "source": source})
+    run.run_effect()
+    snapshot = run.snapshot()
+    assert snapshot["phase"]["tag"] == "score_ready"
+    assert snapshot["document"]["source"] == source
+    assert snapshot["delivery"]["score"]["instructions"]
+    stored = store.read("author", snapshot["variation_id"])
+    assert stored["document"]["macro_locks"]
+    engine.dispose()
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch):
     bundle = os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE")
     if not bundle:

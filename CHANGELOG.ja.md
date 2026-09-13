@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
 
+### 2026-09-13 — 同梱Macroの共通定義と内容比較を準備
+
+Nature葉のうち6語を通常のMacroDefinition v1で記述した内容候補を追加し、共有catalogが同じ定義・digestと日英の要約をServer／Androidへ配る。Serverの同梱documentは既存の有効・無効設定の入口として保持し、任意の旧Markdownを暗黙変換しない。明示された設置定義を優先し、保存済み作品は保存時の定義とlockを使う。Android nativeのbuild入力には埋込みJSON assetも含める。
+
+内容移行は未完了で、作者採用前の候補である。青葉は「同じ枝に複数の弧形の葉を沿わせる」関係が現行のLine同士・隣接参照の範囲外のため未登録とし、Serverは明示的な省略診断を返す。落葉の現候補は赤・灰の厳密交互と斜め列を保つ10枚固定であり、元の8〜12枚の個数変奏は作者裁定待ちである。新しい関係規則・算術式・renderer専用分岐は追加していない。出荷・一般配備・iOS対応・engine版変更は含まない。
+
 ### 2026-09-13 — Androidのstandalone authoringを共有Rustへ接続
 
 AndroidのKotlin hostをinku serverを介さずproviderと共有Rust JNIへ接続し、通常の記述・直接DDL、batch／demo、推敲、カメラ出力を同じauthoring state machineへ通した。共有coreがknown holeの補完を追加操作なしで要求し、通常描画画面は現在のDDLと可視patchを示して作者の承認後だけ保存へ進む。カメラ画像の前処理と端末内local LLMはhostに残し、非画像provenanceは補完承認と再開をまたいで保持する。

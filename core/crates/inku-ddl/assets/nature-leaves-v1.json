@@ -1,0 +1,432 @@
+{
+  "schema": "inku.bundled-macro-package.v1",
+  "package_id": "Nature.leaves",
+  "version": "1.0.0",
+  "entries": [
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "若葉",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {
+          "leaf_form": {
+            "parameters": {
+              "lean": {"type": "semantic_ref", "category": "angle"},
+              "x": {"type": "exact_decimal", "dimension": "position_x"},
+              "y": {"type": "exact_decimal", "dimension": "position_y"}
+            },
+            "body": [
+              {"op": "emit", "binding": "edge_a", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "exact_decimal", "value": "0.120"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
+                "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "position_x": {"expr": "parameter", "name": "x"},
+                "position_y": {"expr": "parameter", "name": "y"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.025"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
+              }},
+              {"op": "emit", "binding": "edge_b", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "exact_decimal", "value": "0.120"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
+                "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "position_x": {"expr": "parameter", "name": "x"},
+                "position_y": {"expr": "parameter", "name": "y"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.025"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
+              }},
+              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+            ]
+          }
+        },
+        "body": [
+          {"op": "vary", "binding": "leaf_count", "domain": "wakaba_leaf_count", "choices": [
+            {"expr": "integer", "value": 4},
+            {"expr": "integer", "value": 5},
+            {"expr": "integer", "value": 6}
+          ], "range": null, "body": [
+            {"op": "repeat", "count": {"expr": "local", "name": "leaf_count"}, "maximum": 6, "index": "leaf_index", "body": [
+              {"op": "vary", "binding": "leaf_x", "domain": "wakaba_upper_x", "choices": [
+                {"expr": "exact_decimal", "value": "0.20"},
+                {"expr": "exact_decimal", "value": "0.35"},
+                {"expr": "exact_decimal", "value": "0.50"},
+                {"expr": "exact_decimal", "value": "0.65"},
+                {"expr": "exact_decimal", "value": "0.80"}
+              ], "range": null, "body": [
+                {"op": "vary", "binding": "leaf_y", "domain": "wakaba_upper_y", "choices": [
+                  {"expr": "exact_decimal", "value": "0.14"},
+                  {"expr": "exact_decimal", "value": "0.24"},
+                  {"expr": "exact_decimal", "value": "0.34"},
+                  {"expr": "exact_decimal", "value": "0.44"}
+                ], "range": null, "body": [
+                  {"op": "vary", "binding": "leaf_lean", "domain": "wakaba_upward_lean", "choices": [
+                    {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
+                    {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
+                    {"expr": "semantic_ref", "category": "angle", "id": "rising"}
+                  ], "range": null, "body": [
+                    {"op": "use", "component": "leaf_form", "arguments": {
+                      "lean": {"expr": "local", "name": "leaf_lean"},
+                      "x": {"expr": "local", "name": "leaf_x"},
+                      "y": {"expr": "local", "name": "leaf_y"}
+                    }}
+                  ]}
+                ]}
+              ]}
+            ]}
+          ]}
+        ]
+      },
+      "summaries": {
+        "ja": "若葉を4〜6枚、上半分へ散らす。各葉は両端で触れる二つの弧で、鉛筆の緑、細かな震え、上向きの異なる傾きを持つ。",
+        "en": "Scatter 4–6 young leaves across the upper half. Each leaf is two arcs touching at both ends, in trembling fine green pencil with a separately chosen upward lean."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "下草",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {
+          "rooted_blade": {
+            "parameters": {
+              "chord": {"type": "exact_decimal", "dimension": "chord"},
+              "lean": {"type": "semantic_ref", "category": "angle"},
+              "x": {"type": "exact_decimal", "dimension": "position_x"},
+              "y": {"type": "exact_decimal", "dimension": "position_y"}
+            },
+            "body": [
+              {"op": "anchor", "name": "root", "fields": {
+                "position_x": {"expr": "parameter", "name": "x"},
+                "position_y": {"expr": "parameter", "name": "y"}
+              }},
+              {"op": "emit", "binding": "edge_a", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "parameter", "name": "chord"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "brush_thin"}
+              }},
+              {"op": "emit", "binding": "edge_b", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "parameter", "name": "chord"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "brush_thin"}
+              }},
+              {"op": "relation", "kind": "connected", "from": "root", "to": "edge_a"},
+              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+            ]
+          }
+        },
+        "body": [
+          {"op": "vary", "binding": "root_count", "domain": "shitakusa_root_count", "choices": [
+            {"expr": "integer", "value": 1},
+            {"expr": "integer", "value": 2}
+          ], "range": null, "body": [
+            {"op": "repeat", "count": {"expr": "local", "name": "root_count"}, "maximum": 2, "index": "root_index", "body": [
+              {"op": "vary", "binding": "root_x", "domain": "shitakusa_bottom_spot", "choices": [
+                {"expr": "exact_decimal", "value": "0.28"},
+                {"expr": "exact_decimal", "value": "0.72"}
+              ], "range": null, "body": [
+                {"op": "vary", "binding": "blade_count", "domain": "shitakusa_blade_count", "choices": [
+                  {"expr": "integer", "value": 3},
+                  {"expr": "integer", "value": 4},
+                  {"expr": "integer", "value": 5}
+                ], "range": null, "body": [
+                  {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 5, "index": "blade_index", "body": [
+                    {"op": "vary", "binding": "blade_chord", "domain": "shitakusa_blade_height", "choices": [
+                      {"expr": "exact_decimal", "value": "0.18"},
+                      {"expr": "exact_decimal", "value": "0.24"},
+                      {"expr": "exact_decimal", "value": "0.30"}
+                    ], "range": null, "body": [
+                      {"op": "vary", "binding": "blade_lean", "domain": "shitakusa_blade_lean", "choices": [
+                        {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
+                        {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
+                        {"expr": "semantic_ref", "category": "angle", "id": "rising"}
+                      ], "range": null, "body": [
+                        {"op": "use", "component": "rooted_blade", "arguments": {
+                          "chord": {"expr": "local", "name": "blade_chord"},
+                          "lean": {"expr": "local", "name": "blade_lean"},
+                          "x": {"expr": "local", "name": "root_x"},
+                          "y": {"expr": "exact_decimal", "value": "0.90"}
+                        }}
+                      ]}
+                    ]}
+                  ]}
+                ]}
+              ]}
+            ]}
+          ]}
+        ]
+      },
+      "summaries": {
+        "ja": "下端の1〜2箇所の同じ根元から、細い縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを葉ごとに変え、細筆の緑で描き、地面は描かない。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 slim tall blades per root. Their heights and upward leans vary; they use a fine green brush and draw no ground."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "紅葉",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {"op": "anchor", "name": "palm_center", "fields": {
+            "position_x": {"expr": "exact_decimal", "value": "0.50"},
+            "position_y": {"expr": "exact_decimal", "value": "0.50"}
+          }},
+          {"op": "vary", "binding": "blade_count", "domain": "momiji_blade_count", "choices": [
+            {"expr": "integer", "value": 5},
+            {"expr": "integer", "value": 6},
+            {"expr": "integer", "value": 7}
+          ], "range": null, "body": [
+            {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 7, "index": "blade_index", "body": [
+              {"op": "vary", "binding": "blade_lean", "domain": "momiji_radial_lean", "choices": [
+                {"expr": "semantic_ref", "category": "angle", "id": "horizontal"},
+                {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
+                {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
+                {"expr": "semantic_ref", "category": "angle", "id": "rising"},
+                {"expr": "semantic_ref", "category": "angle", "id": "diagonal"},
+                {"expr": "semantic_ref", "category": "angle", "id": "falling"},
+                {"expr": "semantic_ref", "category": "angle", "id": "left_falling"}
+              ], "range": null, "body": [
+                {"op": "emit", "binding": "edge_a", "fields": {
+                  "angle": {"expr": "local", "name": "blade_lean"},
+                  "chord": {"expr": "exact_decimal", "value": "0.220"},
+                  "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+                  "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                  "sagitta": {"expr": "exact_decimal", "value": "0.018"},
+                  "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                  "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
+                }},
+                {"op": "emit", "binding": "edge_b", "fields": {
+                  "angle": {"expr": "local", "name": "blade_lean"},
+                  "chord": {"expr": "exact_decimal", "value": "0.220"},
+                  "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+                  "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                  "sagitta": {"expr": "exact_decimal", "value": "0.018"},
+                  "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                  "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
+                }},
+                {"op": "relation", "kind": "connected", "from": "palm_center", "to": "edge_a"},
+                {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+              ]}
+            ]}
+          ]},
+          {"op": "emit", "binding": "stem", "fields": {
+            "angle": {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
+            "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
+            "length": {"expr": "exact_decimal", "value": "0.24"},
+            "movement": {"expr": "semantic_ref", "category": "movement", "id": "draw"},
+            "shape": {"expr": "semantic_ref", "category": "shape", "id": "line"},
+            "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
+          }},
+          {"op": "relation", "kind": "connected", "from": "palm_center", "to": "stem"}
+        ]
+      },
+      "summaries": {
+        "ja": "中域の掌の中心から、細い縦長の紅葉5〜7枚を放射に並べる。各葉は両端で触れる二弧を赤のロットリングで描き、中心から下へ茎を引く。",
+        "en": "Arrange 5–7 slim tall red leaves radially from a palm center in the middle. Each is a rotring two-arc form touching at both ends, with a stem drawn downward from the center."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "落葉",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {
+          "fallen_leaf": {
+            "parameters": {
+              "color": {"type": "semantic_ref", "category": "color"},
+              "lean": {"type": "semantic_ref", "category": "angle"},
+              "x": {"type": "exact_decimal", "dimension": "position_x"},
+              "y": {"type": "exact_decimal", "dimension": "position_y"}
+            },
+            "body": [
+              {"op": "emit", "binding": "edge_a", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "exact_decimal", "value": "0.110"},
+                "color": {"expr": "parameter", "name": "color"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "position_x": {"expr": "parameter", "name": "x"},
+                "position_y": {"expr": "parameter", "name": "y"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.022"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
+              }},
+              {"op": "emit", "binding": "edge_b", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "exact_decimal", "value": "0.110"},
+                "color": {"expr": "parameter", "name": "color"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "position_x": {"expr": "parameter", "name": "x"},
+                "position_y": {"expr": "parameter", "name": "y"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.022"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
+              }},
+              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+            ]
+          }
+        },
+        "body": [
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rising"}, "x": {"expr": "exact_decimal", "value": "0.18"}, "y": {"expr": "exact_decimal", "value": "0.16"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rotated"}, "x": {"expr": "exact_decimal", "value": "0.25"}, "y": {"expr": "exact_decimal", "value": "0.24"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "falling"}, "x": {"expr": "exact_decimal", "value": "0.32"}, "y": {"expr": "exact_decimal", "value": "0.32"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "diagonal"}, "x": {"expr": "exact_decimal", "value": "0.39"}, "y": {"expr": "exact_decimal", "value": "0.40"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "left_falling"}, "x": {"expr": "exact_decimal", "value": "0.46"}, "y": {"expr": "exact_decimal", "value": "0.48"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "horizontal"}, "x": {"expr": "exact_decimal", "value": "0.53"}, "y": {"expr": "exact_decimal", "value": "0.56"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "left_rising"}, "x": {"expr": "exact_decimal", "value": "0.60"}, "y": {"expr": "exact_decimal", "value": "0.64"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rotated"}, "x": {"expr": "exact_decimal", "value": "0.67"}, "y": {"expr": "exact_decimal", "value": "0.72"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "falling"}, "x": {"expr": "exact_decimal", "value": "0.74"}, "y": {"expr": "exact_decimal", "value": "0.80"}}},
+          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "diagonal"}, "x": {"expr": "exact_decimal", "value": "0.81"}, "y": {"expr": "exact_decimal", "value": "0.88"}}}
+        ]
+      },
+      "summaries": {
+        "ja": "落葉10枚を左上から右下への斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を葉ごとに交互にし、傾きをばらし、端を滲ませる。",
+        "en": "Place ten fallen leaves along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with red and gray alternating leaf by leaf and varied rotations."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "枯草",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {
+          "rooted_blade": {
+            "parameters": {
+              "chord": {"type": "exact_decimal", "dimension": "chord"},
+              "lean": {"type": "semantic_ref", "category": "angle"},
+              "x": {"type": "exact_decimal", "dimension": "position_x"},
+              "y": {"type": "exact_decimal", "dimension": "position_y"}
+            },
+            "body": [
+              {"op": "anchor", "name": "root", "fields": {"position_x": {"expr": "parameter", "name": "x"}, "position_y": {"expr": "parameter", "name": "y"}}},
+              {"op": "emit", "binding": "edge_a", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "parameter", "name": "chord"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
+                "fluctuation_frequency": {"expr": "semantic_ref", "category": "variation", "id": "quickly"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
+              }},
+              {"op": "emit", "binding": "edge_b", "fields": {
+                "angle": {"expr": "parameter", "name": "lean"},
+                "chord": {"expr": "parameter", "name": "chord"},
+                "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
+                "fluctuation_frequency": {"expr": "semantic_ref", "category": "variation", "id": "quickly"},
+                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
+                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
+                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
+                "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
+              }},
+              {"op": "relation", "kind": "connected", "from": "root", "to": "edge_a"},
+              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+            ]
+          }
+        },
+        "body": [
+          {"op": "vary", "binding": "root_count", "domain": "karekusa_root_count", "choices": [{"expr": "integer", "value": 1}, {"expr": "integer", "value": 2}], "range": null, "body": [
+            {"op": "repeat", "count": {"expr": "local", "name": "root_count"}, "maximum": 2, "index": "root_index", "body": [
+              {"op": "vary", "binding": "root_x", "domain": "karekusa_bottom_spot", "choices": [{"expr": "exact_decimal", "value": "0.28"}, {"expr": "exact_decimal", "value": "0.72"}], "range": null, "body": [
+                {"op": "vary", "binding": "blade_count", "domain": "karekusa_blade_count", "choices": [{"expr": "integer", "value": 3}, {"expr": "integer", "value": 4}, {"expr": "integer", "value": 5}], "range": null, "body": [
+                  {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 5, "index": "blade_index", "body": [
+                    {"op": "vary", "binding": "blade_chord", "domain": "karekusa_blade_height", "choices": [{"expr": "exact_decimal", "value": "0.18"}, {"expr": "exact_decimal", "value": "0.24"}, {"expr": "exact_decimal", "value": "0.30"}], "range": null, "body": [
+                      {"op": "vary", "binding": "blade_lean", "domain": "karekusa_blade_lean", "choices": [
+                        {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
+                        {"expr": "semantic_ref", "category": "angle", "id": "diagonal"},
+                        {"expr": "semantic_ref", "category": "angle", "id": "falling"}
+                      ], "range": null, "body": [
+                        {"op": "use", "component": "rooted_blade", "arguments": {
+                          "chord": {"expr": "local", "name": "blade_chord"},
+                          "lean": {"expr": "local", "name": "blade_lean"},
+                          "x": {"expr": "local", "name": "root_x"},
+                          "y": {"expr": "exact_decimal", "value": "0.90"}
+                        }}
+                      ]}
+                    ]}
+                  ]}
+                ]}
+              ]}
+            ]}
+          ]}
+        ]
+      },
+      "summaries": {
+        "ja": "下端の1〜2箇所の同じ根元から、枯れた縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを垂直から右下がりまで大きく変え、チョークの灰で速く滲ませ、地面は描かない。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 tall withered blades per root. Heights and leans vary strongly from vertical to falling; gray chalk moves quickly with blurred edges, and no ground is drawn."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
+        "heading": "枯葉",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {"op": "vary", "binding": "leaf_count", "domain": "kareha_leaf_count", "choices": [{"expr": "integer", "value": 2}, {"expr": "integer", "value": 3}, {"expr": "integer", "value": 4}], "range": null, "body": [
+            {"op": "repeat", "count": {"expr": "local", "name": "leaf_count"}, "maximum": 4, "index": "leaf_index", "body": [
+              {"op": "vary", "binding": "leaf_x", "domain": "kareha_lower_corner_x", "choices": [
+                {"expr": "exact_decimal", "value": "0.16"},
+                {"expr": "exact_decimal", "value": "0.26"},
+                {"expr": "exact_decimal", "value": "0.74"},
+                {"expr": "exact_decimal", "value": "0.84"}
+              ], "range": null, "body": [
+                {"op": "vary", "binding": "leaf_y", "domain": "kareha_lower_y", "choices": [
+                  {"expr": "exact_decimal", "value": "0.72"},
+                  {"expr": "exact_decimal", "value": "0.82"},
+                  {"expr": "exact_decimal", "value": "0.88"}
+                ], "range": null, "body": [
+                  {"op": "emit", "binding": null, "fields": {
+                    "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
+                    "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
+                    "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
+                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                    "position_x": {"expr": "local", "name": "leaf_x"},
+                    "position_y": {"expr": "local", "name": "leaf_y"},
+                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "cloudform"},
+                    "surface": {"expr": "semantic_ref", "category": "surface", "id": "none"},
+                    "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
+                  }}
+                ]}
+              ]}
+            ]}
+          ]}
+        ]
+      },
+      "summaries": {
+        "ja": "輪郭主体の雲形2〜4個を下の左右の隅に置く。面は空のまま、チョークの灰で輪郭を細かく震わせる。",
+        "en": "Place 2–4 outline-first cloudforms in the lower left or right corners. Their surfaces stay explicitly empty while fine trembling gray chalk carries the outlines."
+      }
+    }
+  ]
+}

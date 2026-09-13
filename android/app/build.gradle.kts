@@ -147,7 +147,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**")
             exclude("target/**")
         },
     )

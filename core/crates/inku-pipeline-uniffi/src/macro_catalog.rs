@@ -5,7 +5,9 @@ use std::{
     panic::{AssertUnwindSafe, catch_unwind},
 };
 
-use inku_ddl::{LegacyImportOutcome, MacroDefinition};
+use inku_ddl::{
+    LegacyImportOutcome, MacroDefinition, NATURE_LEAVES_V1_JSON, ResolvedInstructionLanguage,
+};
 use serde::{Deserialize, Serialize};
 
 const CATALOG_RESOLUTION_SCHEMA: &str = "inku.macro-catalog-resolution.v1";
@@ -19,6 +21,32 @@ struct CatalogInput {
     canonical: Vec<CanonicalCandidate>,
     #[serde(default)]
     legacy: Vec<LegacyCandidate>,
+    #[serde(default)]
+    bundled_packages: Vec<String>,
+    #[serde(default = "default_language")]
+    language: ResolvedInstructionLanguage,
+}
+
+fn default_language() -> ResolvedInstructionLanguage {
+    ResolvedInstructionLanguage::En
+}
+
+#[derive(Deserialize)]
+struct BundledPackage {
+    package_id: String,
+    entries: Vec<BundledEntry>,
+}
+
+#[derive(Deserialize)]
+struct BundledEntry {
+    definition: serde_json::Value,
+    summaries: BundledSummaries,
+}
+
+#[derive(Deserialize)]
+struct BundledSummaries {
+    ja: String,
+    en: String,
 }
 
 #[derive(Deserialize)]
@@ -98,7 +126,7 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     if input_bytes.len() > MAX_INPUT_BYTES {
         return Err(());
     }
-    let input: CatalogInput = serde_json::from_slice(input_bytes).map_err(|_| ())?;
+    let mut input: CatalogInput = serde_json::from_slice(input_bytes).map_err(|_| ())?;
     if input.maximum_entries == 0 {
         return Err(());
     }
@@ -106,6 +134,34 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     let mut locks = Vec::new();
     let mut diagnostics = Vec::new();
     let mut names = BTreeSet::new();
+
+    // Explicit installation definitions precede bundled editions. Both travel
+    // through the same parser, validation, identity and resource boundary.
+    for package_id in input.bundled_packages {
+        let package: BundledPackage = match package_id.as_str() {
+            "Nature.leaves" => serde_json::from_str(NATURE_LEAVES_V1_JSON).map_err(|_| ())?,
+            _ => {
+                diagnostics.push(omitted(
+                    package_id,
+                    None,
+                    "unknown_bundled_package",
+                    vec![],
+                    vec![],
+                ));
+                continue;
+            }
+        };
+        for entry in package.entries {
+            input.canonical.push(CanonicalCandidate {
+                source_id: format!("bundled:{}", package.package_id),
+                definition_json: entry.definition.to_string(),
+                summary: match input.language {
+                    ResolvedInstructionLanguage::Ja => entry.summaries.ja,
+                    ResolvedInstructionLanguage::En => entry.summaries.en,
+                },
+            });
+        }
+    }
 
     for candidate in input.canonical {
         let definition = match MacroDefinition::from_json(&candidate.definition_json) {
@@ -184,6 +240,14 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
     }
 
     for candidate in input.legacy {
+        // A successfully loaded edition from the same package needs no legacy
+        // warning. Unmigrated entries still receive their explicit omission.
+        if entries.iter().any(|entry| {
+            entry.qualified_name == candidate.qualified_name
+                && entry.source_id == candidate.source_id
+        }) {
+            continue;
+        }
         let reason = if locks
             .iter()
             .any(|lock| lock.qualified_name == candidate.qualified_name)
@@ -240,6 +304,50 @@ pub fn resolve_macro_catalog(input_bytes: Vec<u8>) -> Vec<u8> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn bundled_content_has_language_independent_locks_and_respects_explicit_precedence() {
+        let ja = resolve(
+            &serde_json::to_vec(&json!({
+                "maximum_entries": 64, "bundled_packages": ["Nature.leaves"], "language": "ja"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let en = resolve(
+            &serde_json::to_vec(&json!({
+                "maximum_entries": 64, "bundled_packages": ["Nature.leaves"], "language": "en"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(ja.entries.len(), 6);
+        assert!(ja.diagnostics.is_empty());
+        assert!(en.diagnostics.is_empty());
+        assert_eq!(
+            serde_json::to_value(&ja.locks).unwrap(),
+            serde_json::to_value(&en.locks).unwrap()
+        );
+        assert_ne!(ja.entries[0].summary, en.entries[0].summary);
+        let mut explicit = ja.entries[0].definition.clone();
+        explicit["version"] = json!("2.0.0");
+        let overridden = resolve(&serde_json::to_vec(&json!({
+            "maximum_entries": 1, "bundled_packages": ["Nature.leaves"],
+            "canonical": [{"source_id": "installation", "definition_json": explicit.to_string(), "summary": "Custom edition"}]
+        })).unwrap()).unwrap();
+        assert_eq!(overridden.entries.len(), 1);
+        assert_eq!(overridden.entries[0].source_id, "installation");
+        assert_eq!(overridden.locks[0].version, "2.0.0");
+        assert_eq!(overridden.diagnostics[0].reason, "duplicate_qualified_name");
+        assert_eq!(
+            overridden
+                .diagnostics
+                .iter()
+                .filter(|d| d.reason == "catalog_entry_limit")
+                .count(),
+            5
+        );
+    }
 
     #[test]
     fn canonical_definition_is_identified_and_legacy_entry_is_typed_omission() {

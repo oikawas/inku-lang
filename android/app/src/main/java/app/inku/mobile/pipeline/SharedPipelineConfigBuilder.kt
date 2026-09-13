@@ -309,6 +309,8 @@ class SharedPipelineConfigBuilder(
     private fun resolveMacros(request: SharedPipelineConfigRequest): JSONObject {
         val input = JSONObject()
             .put("maximum_entries", 64)
+            .put("bundled_packages", JSONArray().put("Nature.leaves"))
+            .put("language", request.resolvedLanguage)
             .put(
                 "canonical",
                 JSONArray().also { output ->

@@ -86,6 +86,8 @@ class ProductPipelineEffects:
         if "lineage_parent_node_id" not in options and (work or {}).get("result", {}).get("lineage_node_id"):
             selected["lineage_parent_node_id"] = work["result"]["lineage_node_id"]
         config = self.settings.config_for(owner, work)
+        language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
+        config["language"] = language
         if work and "saved_config" in work:
             catalog_context = deepcopy(work.get("macro_catalog", {}))
         else:
@@ -96,8 +98,6 @@ class ProductPipelineEffects:
                                "diagnostics": catalog["diagnostics"]}
         if selected.get("canvas_aspect") is not None:
             config = select_canvas(config, self.binding.canvas_registry, selected["canvas_aspect"])
-        language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
-        config["language"] = language
         seed, seed_text = _render_seed_from_text(selected.get("seed_text"), selected.get("render_seed"))
         seed = secrets.randbits(63) if seed is None else int(seed)
         composition_seed = selected.get("composition_seed")

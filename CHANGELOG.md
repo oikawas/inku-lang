@@ -12,7 +12,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Resource admission runs before instance allocation and preserves the current shipping limits of 400 total primitive marks, 240 marks per expanded Score template, resolved count 2000, and 64 drawable templates, without clamping. Budget excess or clip failure omits the complete affected source or coordinated placement, records diagnostics, and continues independent later work. Six additional structural dimensions introduce no new shipping defaults. A saved Score retains caller-authorized policy authorities; replay recomputes demand from its recipes. Render metadata `resource_execution` records recomputed demand, resource omissions, and relation omissions.
 
-This delivery advances DDL engine 36→37 and render engine 58→59 and adds Score 0.10 as a core candidate. Default / legacy Score 0.9, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 remain unchanged. Product-host runtime / UI / API / persistence cutover, native acceptance, deployment, and release are not included.
+Nested-fill Macro transforms, resolved named coordinates, and later clip diagnostics are retained. One focused Linux check follows short DDL through ordinary-fill budget excess, an admitted nonrectangular fill, and whole-placement omission with later-line relation recovery after clip-budget excess. No full suite or reference-corpus regeneration was run.
+
+This delivery advances DDL engine 36→37 and render engine 58→59 and adds Score 0.10 as a core candidate. Default / legacy Score 0.9, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 remain unchanged. Product-host runtime / UI / API / persistence cutover, deployment, and release are not included.
 
 ### 2026-09-13 — Share omitted placement and ground-only readiness
 

@@ -43,8 +43,8 @@ A short description becomes a typed semantic document retaining shared meaning;
 the lock-verified lowerer resolves it once to a Score, and SVG is one
 performance of that same Score. The shared core now has resource-aware entry
 points for compact Score 0.10 compilation and performance. The current product
-host still uses the legacy path below; its UI, API, and persistence cutover and
-native acceptance remain later work. SPEC defines the implemented core subset
+host still uses the legacy path below; its UI, API, and persistence cutover
+remain later work. SPEC defines the implemented core subset
 and that delivery boundary.
 
 ## Current Architecture
@@ -76,7 +76,7 @@ The shared Rust compiler interprets normalized Japanese and English DDL as a typ
 
 The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. The legacy/default wire remains Score 0.9. The explicit resource-aware path emits compact Score 0.10 recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work.
 
-`compile_ddl_to_score_with_resources` and `render_with_resources` form the new shared-core boundary. Connecting them to product runtime / UI / API / persistence paths remains unfinished, and focused native acceptance is still pending. The Current Architecture above remains the active product-host runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
+`compile_ddl_to_score_with_resources` and `render_with_resources` form the new shared-core boundary. A focused Linux check passed from short DDL through saved Score to nonrectangular fill in Display / Compat, local omission after clip failure, and continued later drawing. Connecting these entry points to product runtime / UI / API / persistence paths remains unfinished. The Current Architecture above remains the active product-host runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
 
 ## Contracts That Must Remain Intact
 

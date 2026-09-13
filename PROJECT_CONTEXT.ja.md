@@ -27,7 +27,7 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
 - 短さと制約によって作者の主張を削ぎ、提示を中心にする。
 - 既定の処理は再現可能にし、揺らぎはRendererの演奏とユーザーの明示操作に限定する。
 
-短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。現行の製品runtimeは下のlegacy経路を使う一方、typed compiler foundationは受入済みでも未接続である。実装範囲と未接続境界はSPECの該当節を正とする。
+短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。共通coreにはcompact Score 0.10のresource-awareなcompile／演奏入口がある。現行の製品hostは下のlegacy経路を使い、UI／API／保存の切替は未完了である。実装範囲と未接続境界はSPECの該当節を正とする。
 
 ## 現行アーキテクチャ
 
@@ -54,13 +54,13 @@ API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 - `SPEC.md`: 英語公開仕様。
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: 実装・設計変更の履歴。
 
-### 受入済みのTyped DDL基盤（runtime未接続）
+### 受入済みのTyped DDL基盤とcompact演奏core
 
 共有Rust compilerは、日英の正規化DDLをtyped semantic documentとして解釈し、source provenance、canonical meaning、Macroの有限展開を保持する。compiler lockはsourceとprovenanceを照合し、lock検証済みmeaningだけが共通lowererへ進む。lowererは一度だけactual Scoreまたは反復のsymbolic Planへ解決し、recoverableな不成立はtyped diagnosticと局所省略で扱い、独立した描画を続ける。詳細な型、lock、recovery、geometry、relation、Macroの契約は[SPEC.ja.md](SPEC.ja.md)を正とする。
 
-現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。Score 0.9はMacro body境界とAnchor所有を保持し、反復を個体化せずsymbolic Planに残す。fillはtarget、count、Macro footprintをsymbolic FillGroupPlanへ解決するが、sampling、clip、actual Scoreへのregion materializationはStep11の未接続責務である。
+現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。既定／legacy wireはScore 0.9を維持する。明示的なresource-aware入口は、source owner、namespaceごとのordinal、placement／repetition／fill group、fill targetと境界、Macroの内外の反復をcompact Score 0.10のrecipeへ保存する。演奏時にrecipeからsamplingし、個体座標を保存しない。解決済みの個数・図形を正確に保ち、資源超過は個体生成前に当該sourceまたはcoordinated placement全体を診断付きで省略して、独立した後続を続ける。
 
-Step11の個体materialization、typed compilerの製品runtime / UI / API / 保存経路への接続、及び未接続のdelivery拡張は残る。現行runtimeは上のlegacy経路を使用し、legacy coerce / LLM fallbackはまだ置換されていない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
+`compile_ddl_to_score_with_resources`と`render_with_resources`が新しい共通coreの入口である。短いDDLから保存Score、非矩形fillのDisplay／Compat、clip失敗後の局所省略と後続描画までの限定Linux確認は成功した。製品runtime／UI／API／保存経路への接続は未完了であり、現行hostは上のlegacy経路を使う。legacy coerce／LLM fallbackもまだ置換されていない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
 
 ## 守るべき設計契約
 

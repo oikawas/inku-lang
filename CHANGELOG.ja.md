@@ -12,7 +12,9 @@
 
 resource検査は個体化前に行い、現行出荷値400 total primitive marks／240 per expanded Score template／2000 resolved count／64 drawable templatesをclampなしで維持する。超過やclip不能は当該sourceまたはcoordinated placement全体を省略して診断し、独立した後続を続ける。追加6構造次元に新しい出荷既定値は設けない。保存Scoreはcallerが許可したpolicyを保持し、需要は再演時にrecipeから再計算する。描画metadataの`resource_execution`は再計算需要、resource省略、relation省略を記録する。
 
-この新deliveryによりDDL engineを36→37、render engineを58→59へ進め、Score 0.10をcore候補として追加する。既定／legacy Score 0.9、APP_VERSION 2.14.2、BUILD_NUMBER 1073は維持する。製品host runtime／UI／API／保存への切替、native受入、配備、releaseは含めない。
+入れ子fillを含むMacroのTransform、named配置の実座標、後段clip診断の記録を保持する。限定Linux確認では、通常fillの超過、上限内の非矩形fill、clip予算超過時の配置省略と後続線の関係回復を、一つの短いDDLから確認した。全suiteや全件参照更新は行わない。
+
+この新deliveryによりDDL engineを36→37、render engineを58→59へ進め、Score 0.10をcore候補として追加する。既定／legacy Score 0.9、APP_VERSION 2.14.2、BUILD_NUMBER 1073は維持する。製品host runtime／UI／API／保存への切替、配備、releaseは含めない。
 
 ### 2026-09-13 — 位置省略と地だけの作品の共通配送を修正
 

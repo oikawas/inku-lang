@@ -926,6 +926,8 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しに加え、通常Server hostでの一つのLinux flowは成功した。このflowは固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3 pointのcircle fillと後続lineをprimitive mark 4としてSVGへ演奏し、raw Score、history、authority linkを保存した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じserviceを使い、11形式のcanvasは共有registryを正本とする。保存済みraw compact Scoreの再演もLinuxで成功し、raw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を保存済みpolicyで拒否してprimitive mark 4を保った。managed historyの系譜編集、active DDLの現在options、revisionごとの診断復元は上記の契約で通常経路へ接続する。Step 14のAndroid接続、Step 16の作品受入、Step 17の配備は開始しておらず、source上のServer接続と出荷済みであることを混同しない。
 
+通常履歴を選んだ後の記述生成・DDL描画は、同じhistoryの判別が完了してから対応するforkへ進む。判別中・失敗・選択の失効を新規作品と扱わず、元記述・保存時設定・親関係の継承を保つ。待機中に取り消した操作や別の作品へ切り替える前の操作を、後から開始しない。
+
 ### 12.8 エラー回復戦略
 
 各 LLM 段は、空・短すぎる・schema 不適合の応答に対して理由を明示した再試行を一度だけ行う。再試行後も使えない場合は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。

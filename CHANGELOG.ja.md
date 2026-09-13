@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 33 版である。それより前は書庫にある。
 
+### 2026-09-13 — 履歴の判別完了を待って描画する
+
+通常履歴を選んですぐ記述生成・DDL描画を始めても、選択した同じhistoryの判別が完了してから対応するforkへ進むよう修正した。判別中を新規作品と扱わず、元記述・保存時設定・親関係を継承する。判別が失敗した場合はその失敗を操作へ返し、取り消した操作や選択変更で失効した操作は後から開始しない。保存済み作品の表示は判別を待たず継続する。
+
+独立reviewはStep 13の通常Server／Web接続を完了と判定した。既存の代表flowで判別の保留・失敗・取り消し・選択の失効を確認し、Web checkも成功した。既存の保存・診断・native再演奏の証拠を継承し、全suite・native再描画・Web buildを繰り返していない。Step 14、16、17は未開始であり、この判定は出荷または配備を意味しない。版番号と配備状態は変更しない。
+
 ### 2026-09-13 — 通常Server／Webを共有authoring pipelineへ接続
 
 通常Webと既存のinterpret／compose／paint APIを同じ共有pipeline serviceへ接続した。Coreが要求したprovider actionはhostが一度だけ実行し、再試行判断はcoreが持つ。Visible DDLは不変のorigin、単調なauthority、revisionと一つのtransactionでCAS保存し、古いtabの上書きを拒む。Known holeは追加の開始操作なしで補完案を作るが、作者の承認前には採用しない。旧作品のauthorityを本文から推測せず、旧DDLの編集と旧記述からの再生成は親関係を持つ新variationへforkして元のhistoryを保つ。共有pipelineの過去historyも選択したrevisionの演奏を表示正本とし、同じvariationの最新結果へ置換しない。History linkにはsource digestと、その時点のconfig／host contextをfork用sidecarとして結び、revision／digest不一致やsidecar欠落では停止してlatestを推測しない。既存variationからの記述再生成はcore configを変えず、現在のoptionsを持つnew editionへforkする。新作品はraw Scoreとauthority revisionをhistoryへ結び付けて保存する。Canvas IDと整数比の正本も共有coreの11形式へ揃えた。新規documentのMacroLock digestに正本の`sha256:` prefixを付け、actual Macro invocationのowned StartからACK、Score readyまでを確認し、unknown Macroはknown holeへ偽装せずblockingにした。

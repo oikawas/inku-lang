@@ -19,6 +19,7 @@ export const en: LangPack = {
 	pipelineApprove: 'Accept this proposal',
 	pipelineDecline: 'Keep the saved DDL',
 	pipelineDiagnostics: 'Drawing diagnostics and omitted parts',
+	pipelineDiagnosticsUnavailable: 'The drawing diagnostics for this saved work could not be read. The work is still shown.',
 	pipelineNeedsAttention: 'Review the result of this operation.',
 	pipelineAttentionReason: (reason) => `Reason: ${({
 		stage1_failed: 'the description could not be interpreted',
@@ -44,6 +45,8 @@ export const en: LangPack = {
 		invalid_canonical_definition: 'The definition could not be loaded because it is invalid.',
 		duplicate_qualified_name: 'Another definition already uses this name; the duplicate was not loaded.',
 		catalog_entry_limit: 'The limit on loaded definitions was exceeded.',
+		fill_clip_limit_exceeded: 'The clipping limit was exceeded.',
+		fill_clip_unsupported: 'This fill area could not be clipped.',
 	}[reason] ?? `Reason: ${reason}.`),
 	pipelineDiagnosticBudgetExceeded: (dimension, required, maximum) => `${dimension} required ${required}; the limit was ${maximum}.`,
 	pipelineDiagnosticOmitted: (kind, index) => `Omitted ${kind}${index === null ? '' : ` ${index}`}.`,

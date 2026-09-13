@@ -1,7 +1,7 @@
 import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { PaintResult } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
-import type { PipelineDiagnostic } from './diagnostics';
+import type { PipelineDiagnostic, PipelineHistoryDiagnostics } from './diagnostics';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -19,6 +19,8 @@ export type PipelinePhase = {
 export type PipelineResult = PaintResult & {
 	ddl?: string | null;
 	thinking?: string | null;
+	render_diagnostics?: Record<string, unknown> | null;
+	resource_execution?: Record<string, unknown> | null;
 };
 
 export type PipelineView = {
@@ -134,6 +136,14 @@ export class PipelineApi {
 		return this.request<PipelineView>(`/variations/${encodeURIComponent(variationId)}`, undefined, signal);
 	}
 
+	historyLink(historyId: string, signal?: AbortSignal) {
+		return this.request<{ variation_id: string; revision: string }>(
+			`/history/${encodeURIComponent(historyId)}`,
+			undefined,
+			signal,
+		);
+	}
+
 	forkLegacy(historyId: string, kind: VariationKind, text: string, options: PipelineOptions, signal?: AbortSignal) {
 		return this.request<PipelineView>(`/legacy/${encodeURIComponent(historyId)}/fork`, {
 			kind,
@@ -159,21 +169,40 @@ export class PipelineApi {
 		}, signal);
 	}
 
+	authorDdl(view: PipelineView, source: string, options: PipelineOptions, signal?: AbortSignal) {
+		return this.request<PipelineView>(`/executions/${encodeURIComponent(view.execution_id)}/author-ddl`, {
+			source,
+			expected_revision: view.authority.revision,
+			options,
+		}, signal);
+	}
+
 	command(view: PipelineView, command: Record<string, unknown>, signal?: AbortSignal) {
 		return this.request<PipelineView>(`/executions/${encodeURIComponent(view.execution_id)}/commands`, command, signal);
 	}
 }
 
-export function pipelineDiagnostics(view: PipelineView | null): PipelineDiagnostic[] {
-	if (!view) return [];
-	const catalog = (view.catalog_diagnostics ?? []).map((value) => ({ channel: 'catalog' as const, value }));
-	if (!view.delivery) return catalog;
+export function pipelineDiagnostics(
+	view: PipelineView | null,
+	saved: PipelineHistoryDiagnostics | null | undefined = null,
+): PipelineDiagnostic[] {
+	const catalog = (view?.catalog_diagnostics ?? []).map((value) => ({ channel: 'catalog' as const, value }));
+	const delivery = view ? view.delivery : saved;
+	const renderDiagnostics = view ? view.result?.render_diagnostics : saved?.render_diagnostics;
+	const resourceExecution = view ? view.result?.resource_execution : saved?.resource_execution;
+	const recordArray = (record: Record<string, unknown> | null | undefined, field: string): unknown[] => {
+		const value = record?.[field];
+		return Array.isArray(value) ? value : [];
+	};
 	return [
 		...catalog,
-		...view.delivery.upstream_diagnostics.map((value) => ({ channel: 'upstream' as const, value })),
-		...view.delivery.downstream_diagnostics.map((value) => ({ channel: 'downstream' as const, value })),
-		...view.delivery.resource_omissions.map((value) => ({ channel: 'resource' as const, value })),
-		...view.delivery.relation_omissions.map((value) => ({ channel: 'relation' as const, value })),
+		...(delivery?.upstream_diagnostics ?? []).map((value) => ({ channel: 'upstream' as const, value })),
+		...(delivery?.downstream_diagnostics ?? []).map((value) => ({ channel: 'downstream' as const, value })),
+		...(delivery?.resource_omissions ?? []).map((value) => ({ channel: 'resource' as const, value })),
+		...(delivery?.relation_omissions ?? []).map((value) => ({ channel: 'relation' as const, value })),
+		...recordArray(renderDiagnostics, 'diagnostics').map((value) => ({ channel: 'render' as const, value })),
+		...recordArray(resourceExecution, 'omissions').map((value) => ({ channel: 'resource' as const, value })),
+		...recordArray(resourceExecution, 'relation_omissions').map((value) => ({ channel: 'relation' as const, value })),
 	];
 }
 

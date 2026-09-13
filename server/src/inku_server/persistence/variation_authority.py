@@ -37,7 +37,18 @@ from .schema import (
 
 AUTHORITY_PROTOCOL = "inku.variation-authority.v1"
 COMMIT_ACTION_TAG = "commit_visible_normalized_ddl"
-HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v1"
+_LEGACY_HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v1"
+HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v2"
+_PIPELINE_DIAGNOSTIC_KEYS = frozenset(
+    {
+        "upstream_diagnostics",
+        "downstream_diagnostics",
+        "resource_omissions",
+        "relation_omissions",
+        "render_diagnostics",
+        "resource_execution",
+    }
+)
 _U64_MAX = (1 << 64) - 1
 _ORIGINS = frozenset({"stage1_generated", "user_authored_ddl"})
 _AUTHORITIES = frozenset(
@@ -157,6 +168,7 @@ class LinkedHistoryForkRecord:
     saved_config: dict[str, object]
     host_options: dict[str, object]
     macro_catalog: dict[str, object]
+    pipeline_diagnostics: dict[str, object] | None
 
 
 @dataclass(frozen=True)
@@ -590,8 +602,9 @@ def _history_fork_context_bytes(
     variation_id: str,
     revision: str,
     ddl_digest: str,
+    pipeline_diagnostics: Mapping[str, Any],
 ) -> tuple[bytes, str]:
-    """Freeze only the trusted state that an exact history fork needs."""
+    """Freeze trusted fork inputs and the raw diagnostics of this performance."""
     authority = snapshot.get("authority")
     document = snapshot.get("document")
     delivery = snapshot.get("delivery")
@@ -631,14 +644,40 @@ def _history_fork_context_bytes(
         "config": config,
         "host_options": host_options,
         "macro_catalog": macro_catalog,
+        "pipeline_diagnostics": _validate_pipeline_diagnostics(
+            pipeline_diagnostics
+        ),
     }
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
     return encoded, hashlib.sha256(encoded).hexdigest()
 
 
-def _decode_history_fork_context(
-    row: Mapping[str, Any], history: LegacyHistoryRecord
-) -> LinkedHistoryForkRecord:
+def _validate_pipeline_diagnostics(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping) or set(value) != _PIPELINE_DIAGNOSTIC_KEYS:
+        raise VariationAuthorityAdapterError(
+            "pipeline diagnostics have an unexpected shape"
+        )
+    for key in (
+        "upstream_diagnostics",
+        "downstream_diagnostics",
+        "resource_omissions",
+        "relation_omissions",
+    ):
+        if not isinstance(value[key], list):
+            raise VariationAuthorityAdapterError(
+                "pipeline diagnostic channels must be arrays"
+            )
+    for key in ("render_diagnostics", "resource_execution"):
+        if value[key] is not None and not isinstance(value[key], Mapping):
+            raise VariationAuthorityAdapterError(
+                "render diagnostic records must be objects or null"
+            )
+    return dict(value)
+
+
+def _decode_history_fork_context_payload(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, object] | None]:
     encoded = bytes(row["fork_context_bytes"])
     digest = hashlib.sha256(encoded).hexdigest()
     if digest != row["fork_context_digest"]:
@@ -651,7 +690,7 @@ def _decode_history_fork_context(
         raise VariationAuthorityAdapterError(
             "stored history fork context is not UTF-8 JSON"
         ) from exc
-    expected_keys = {
+    legacy_keys = {
         "protocol_version",
         "variation_id",
         "revision",
@@ -660,13 +699,29 @@ def _decode_history_fork_context(
         "host_options",
         "macro_catalog",
     }
-    if not isinstance(payload, dict) or set(payload) != expected_keys:
+    if not isinstance(payload, dict):
+        raise VariationAuthorityAdapterError(
+            "stored history fork context has an unexpected shape"
+        )
+    protocol = payload.get("protocol_version")
+    if protocol == _LEGACY_HISTORY_FORK_CONTEXT_PROTOCOL:
+        expected_keys = legacy_keys
+        pipeline_diagnostics = None
+    elif protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
+        expected_keys = legacy_keys | {"pipeline_diagnostics"}
+        pipeline_diagnostics = _validate_pipeline_diagnostics(
+            payload.get("pipeline_diagnostics")
+        )
+    else:
+        raise VariationAuthorityAdapterError(
+            "stored history fork context does not match its history link"
+        )
+    if set(payload) != expected_keys:
         raise VariationAuthorityAdapterError(
             "stored history fork context has an unexpected shape"
         )
     if (
-        payload["protocol_version"] != HISTORY_FORK_CONTEXT_PROTOCOL
-        or payload["variation_id"] != row["variation_id"]
+        payload["variation_id"] != row["variation_id"]
         or payload["revision"] != row["revision"]
         or payload["ddl_digest"] != row["ddl_digest"]
         or not isinstance(payload["config"], dict)
@@ -676,6 +731,21 @@ def _decode_history_fork_context(
         raise VariationAuthorityAdapterError(
             "stored history fork context does not match its history link"
         )
+    return payload, pipeline_diagnostics
+
+
+def history_pipeline_diagnostics(
+    row: Mapping[str, Any],
+) -> dict[str, object] | None:
+    """Read only diagnostics frozen on this exact immutable history link."""
+    _, pipeline_diagnostics = _decode_history_fork_context_payload(row)
+    return pipeline_diagnostics
+
+
+def _decode_history_fork_context(
+    row: Mapping[str, Any], history: LegacyHistoryRecord
+) -> LinkedHistoryForkRecord:
+    payload, pipeline_diagnostics = _decode_history_fork_context_payload(row)
     if (
         history.source is None
         or hashlib.sha256(history.source.encode("utf-8")).hexdigest()
@@ -692,6 +762,7 @@ def _decode_history_fork_context(
         saved_config=payload["config"],
         host_options=payload["host_options"],
         macro_catalog=payload["macro_catalog"],
+        pipeline_diagnostics=pipeline_diagnostics,
     )
 
 
@@ -920,6 +991,7 @@ class VariationAuthorityStore:
         *,
         snapshot: Mapping[str, Any],
         context: Mapping[str, Any],
+        pipeline_diagnostics: Mapping[str, Any],
     ) -> None:
         revision, _ = _decimal_u64(revision, "history revision")
         context_bytes, context_digest = _history_fork_context_bytes(
@@ -928,6 +1000,7 @@ class VariationAuthorityStore:
             variation_id=variation_id,
             revision=revision,
             ddl_digest=ddl_digest,
+            pipeline_diagnostics=pipeline_diagnostics,
         )
         values = dict(owner_id=owner_id, history_id=history_id, variation_id=variation_id,
                       revision=revision, ddl_digest=ddl_digest,

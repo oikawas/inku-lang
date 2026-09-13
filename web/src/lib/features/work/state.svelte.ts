@@ -317,12 +317,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineController.markLegacy(historyId);
 	}
 
-	async function selectHistoryAuthority(historyId: string, variationId?: string | null): Promise<void> {
-		if (!variationId) {
-			selectLegacyHistory(historyId);
-			return;
-		}
-		pipelineController.markLinkedHistory(historyId);
+	async function selectHistoryAuthority(historyId: string, variationId?: string | null, signal?: AbortSignal): Promise<boolean> {
+		return pipelineController.selectHistory(historyId, variationId, signal);
 	}
 
 	function beginNewAuthoring(): void {
@@ -920,7 +916,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		get pipelineBusy() { return pipelineBusy; },
 		get pipelineLocked() { return pipelineView?.authority.authority === 'ddl_authoritative'; },
 		get pipelinePatch() { return pipelinePatch(pipelineView); },
-		get pipelineDiagnostics() { return pipelineDiagnostics(pipelineView); },
+		get pipelineDiagnostics() { return pipelineDiagnostics(pipelineView, displayedHistoryItem?.pipeline_diagnostics); },
+		get pipelineDiagnosticsUnavailable() {
+			return pipelineView === null
+				&& displayedHistoryItem?.data_warnings?.includes('pipeline_diagnostics_invalid') === true;
+		},
 		get canSubmit() { return canSubmit; },
 		get currentInstructionText() {
 			if (displayedHistoryItem?.input) return displayedHistoryItem.input;

@@ -19,6 +19,7 @@ export interface LangPack {
 	pipelineApprove: string;
 	pipelineDecline: string;
 	pipelineDiagnostics: string;
+	pipelineDiagnosticsUnavailable: string;
 	pipelineNeedsAttention: string;
 	pipelineAttentionReason: (reason: string) => string;
 	pipelineDiagnosticSourceRange: (start: number, end: number) => string;

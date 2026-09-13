@@ -22,6 +22,10 @@ from .schema import (
     PipelineHistoryLinkRow,
     UserGroupRow,
 )
+from .variation_authority import (
+    VariationAuthorityAdapterError,
+    history_pipeline_diagnostics,
+)
 
 
 LINEAGE_DERIVATION_KINDS = {
@@ -843,6 +847,26 @@ class HistoryListProjector:
                 if link is not None:
                     item["pipeline_variation_id"] = link.variation_id
                     item["pipeline_revision"] = link.revision
+                    try:
+                        stored_diagnostics = history_pipeline_diagnostics(
+                            {
+                                "variation_id": link.variation_id,
+                                "revision": link.revision,
+                                "ddl_digest": link.ddl_digest,
+                                "fork_context_bytes": link.fork_context_bytes,
+                                "fork_context_digest": link.fork_context_digest,
+                            }
+                        )
+                    except VariationAuthorityAdapterError:
+                        # A broken optional sidecar must not hide the immutable
+                        # work itself. Report only that its saved diagnostics
+                        # cannot be trusted; never reconstruct them from latest.
+                        item.setdefault("data_warnings", []).append(
+                            "pipeline_diagnostics_invalid"
+                        )
+                        stored_diagnostics = None
+                    if stored_diagnostics is not None:
+                        item["pipeline_diagnostics"] = stored_diagnostics
         if actor is not None:
             for item, row in zip(items, rows):
                 if row.user_id != actor["id"]:

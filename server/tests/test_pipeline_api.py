@@ -6,6 +6,7 @@ import json
 import os
 import runpy
 import time
+from copy import deepcopy
 from pathlib import Path
 
 from fastapi import Header
@@ -16,6 +17,8 @@ from inku_server.persistence.schema import Base, HistoryRow
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_api import PipelineService, create_acceptance_app
 from inku_server.pipeline_candidate import PipelineBinding
+from inku_server.pipeline_product import RunOptions
+from inku_server.pipeline_settings import select_canvas
 
 
 _fixture_config = runpy.run_path(
@@ -107,6 +110,16 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         }
 
     def service() -> PipelineService:
+        def prepare(_owner, _kind, _text, options, source):
+            selected = {
+                "canvas_aspect": "square", "wild": False,
+                **(source or {}).get("host_options", {}),
+                **RunOptions.model_validate(options).model_dump(exclude_unset=True),
+            }
+            config = deepcopy((source or {}).get("saved_config") or _fixture_config())
+            config = select_canvas(config, binding.canvas_registry, selected["canvas_aspect"])
+            return config, {"host_options": selected}
+
         return PipelineService(
             binding,
             store,
@@ -118,6 +131,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             max_workers=1,
             max_effect_steps=16,
             max_retained_runs=4,
+            prepare_for=prepare,
         )
 
     def app(candidate_service: PipelineService):
@@ -149,12 +163,12 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         assert ready["authority"]["revision"] == "1"
 
         edit_response = client.post(
-            f"/api/pipeline/executions/{execution_id}/commands",
+            f"/api/pipeline/executions/{execution_id}/author-ddl",
             headers=owner,
             json={
-                "tag": "commit_user_ddl",
                 "expected_revision": "1",
                 "source": "place one red circle at center. many square.",
+                "options": {"derivation_kind": "ddl_edit"},
             },
         )
         assert edit_response.status_code == 200, edit_response.text
@@ -165,6 +179,9 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             phase="awaiting_patch_approval",
         )
         assert proposal["authority"]["revision"] == "2"
+        assert proposal["variation_id"] == variation_id
+        assert proposal["authority"]["origin"] == "stage1_generated"
+        assert proposal["authority"]["authority"] == "ddl_authoritative"
         assert proposal["delivery"] is None
         assert [call["tag"] for call in provider_calls] == [
             "generate_normalized_ddl",
@@ -202,7 +219,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             },
         )
         assert stale_response.status_code == 409
-        assert stale_response.json() == {"detail": "authority_conflict"}
+        assert stale_response.json()["detail"]["code"] == "authority_conflict"
         assert store.read("author-1", variation_id)["authority"]["revision"] == "3"
         assert (
             client.get(
@@ -211,6 +228,38 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             ).status_code
             == 404
         )
+
+        before = store.read("author-1", variation_id)
+        original_state = json.loads(store.read_execution("author-1", execution_id).state_bytes)
+        new_edition_body = {
+            "expected_revision": "3", "source": approved["document"]["source"],
+            "options": {"canvas_aspect": "hd_monitor", "wild": True,
+                        "lineage_parent_node_id": "parent-node", "derivation_kind": "canvas_aspect_change"},
+        }
+        edition_response = client.post(
+            f"/api/pipeline/executions/{execution_id}/author-ddl",
+            headers=owner, json=new_edition_body,
+        )
+        assert edition_response.status_code == 200, edition_response.text
+        edition = _wait_for(client, f"/api/pipeline/variations/{edition_response.json()['variation_id']}", owner, phase="score_ready")
+        assert edition["variation_id"] != variation_id
+        assert edition["authority"]["authority"] == "ddl_authoritative"
+        assert edition["authority"]["origin"] == "user_authored_ddl"
+        assert edition["document"]["source"] == approved["document"]["source"]
+        assert edition["parent"] == {"kind": "variation", "id": variation_id}
+        assert edition["delivery"]["compiler_options"]["host"]["canvas_format_id"] == "hd_monitor"
+        edition_state = json.loads(store.read_execution("author-1", edition["execution_id"]).state_bytes)
+        assert edition_state["context"]["host_options"]["wild"] is True
+        assert edition_state["context"]["host_options"]["lineage_parent_node_id"] == "parent-node"
+        assert store.read("author-1", variation_id) == before
+        assert json.loads(store.read_execution("author-1", execution_id).state_bytes) == original_state
+        assert len(provider_calls) == 2
+        stale_fork = client.post(
+            f"/api/pipeline/executions/{execution_id}/author-ddl", headers=owner,
+            json={**new_edition_body, "expected_revision": "2"},
+        )
+        assert stale_fork.status_code == 409
+        assert client.post(f"/api/pipeline/executions/{execution_id}/author-ddl", headers=another_owner, json=new_edition_body).status_code == 404
 
     with TestClient(app(service())) as reloaded_client:
         reloaded = reloaded_client.get(

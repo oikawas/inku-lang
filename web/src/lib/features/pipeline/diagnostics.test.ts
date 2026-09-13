@@ -24,3 +24,19 @@ test('resource omission names its owner, limit, omitted part, and continued draw
 		'原文の指示 1 の箇所。 描画対象の数は 6945 必要でしたが、上限は 400 でした。 原文の指示 1 を省略しました。 ほかの部分の描画は続けました。',
 	);
 });
+
+test('saved render clip omission names its instruction, reason, omission, and continuation', () => {
+	const actual = formatPipelineDiagnostic({
+		channel: 'render',
+		value: {
+			instruction_index: 2,
+			reason: 'fill_clip_limit_exceeded',
+			disposition: 'omitted',
+		},
+	}, ja);
+
+	assert.equal(
+		actual,
+		'描画指示 3 の箇所。 クリップ処理の上限を超えました。 描画指示 3 を省略しました。 ほかの部分の描画は続けました。',
+	);
+});

@@ -7,6 +7,7 @@
 		patch: PipelinePhase | null;
 		committedDdl: string;
 		diagnostics: PipelineDiagnostic[];
+		diagnosticsUnavailable: boolean;
 		busy: boolean;
 		reason: string | null;
 		onApprove: () => void | Promise<void>;
@@ -17,6 +18,7 @@
 		patch,
 		committedDdl,
 		diagnostics,
+		diagnosticsUnavailable,
 		busy,
 		reason,
 		onApprove,
@@ -54,6 +56,10 @@
 			{/each}
 		</ul>
 	</details>
+{/if}
+
+{#if diagnosticsUnavailable}
+	<p class="pipeline-attention" role="status">{t().pipelineDiagnosticsUnavailable}</p>
 {/if}
 
 {#if reason}

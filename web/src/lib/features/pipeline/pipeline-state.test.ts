@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { PipelineApiError, type PipelineView } from './api.ts';
+import { PipelineApi, PipelineApiError, pipelineDiagnostics, type PipelineView } from './api.ts';
 import { PipelineController } from './controller.ts';
 
 function view(overrides: Partial<PipelineView> = {}): PipelineView {
@@ -49,6 +49,9 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 	});
 	let loadCount = 0;
 	let rejectNextCommand = false;
+	let historyLinked = true;
+	let holdHistoryLink = false;
+	let releaseHistoryLink: (() => void) | null = null;
 	const api = {
 		start: async () => { calls.push({ method: 'start' }); return view({ busy: true }); },
 		load: async () => { calls.push({ method: 'load' }); return loadCount++ === 0 ? patch : ready; },
@@ -56,6 +59,17 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 			calls.push({ method: 'command', value: command });
 			if (rejectNextCommand) throw new PipelineApiError(409, { code: 'authority_conflict', current_revision: '7' });
 			return (command as { tag: string }).tag === 'approve_patch' ? view({ ...ready, busy: true }) : rendered;
+		},
+		authorDdl: async (_active: PipelineView, source: string, options: unknown) => {
+			calls.push({ method: 'authorDdl', value: { source, options } });
+			if (rejectNextCommand) throw new PipelineApiError(409, { code: 'authority_conflict', current_revision: '7' });
+			return rendered;
+		},
+		historyLink: async (historyId: string) => {
+			calls.push({ method: 'historyLink', value: historyId });
+			if (holdHistoryLink) await new Promise<void>((resolve) => { releaseHistoryLink = resolve; });
+			if (!historyLinked) throw new PipelineApiError(404, { code: 'pipeline_history_not_found' });
+			return { variation_id: 'variation-history', revision: '1' };
 		},
 		forkDescription: async (_active: PipelineView, _description: string, options: unknown) => {
 			calls.push({ method: 'forkDescription', value: options });
@@ -92,6 +106,10 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 	rejectNextCommand = true;
 	await assert.rejects(controller.fromDdl('edited circle'), (error: unknown) =>
 		error instanceof PipelineApiError && error.status === 409 && error.detail.current_revision === '7');
+	assert.deepEqual(calls.at(-1), {
+		method: 'authorDdl',
+		value: { source: 'edited circle', options: { canvas_aspect: 'square' } },
+	});
 	assert.equal(controller.current?.variation_id, 'variation-2');
 	assert.equal(observed.at(-1)?.variation_id, 'variation-2');
 
@@ -106,7 +124,68 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 		value: { historyId: 'history-revision-1', options: { canvas_aspect: 'square' } },
 	});
 
-	controller.markLegacy('history-old');
+	await controller.selectHistory('history-managed-without-list-hint');
+	assert.deepEqual(calls.at(-1), {
+		method: 'historyLink',
+		value: 'history-managed-without-list-hint',
+	});
+	await controller.fromDdl('managed lineage edit');
+	assert.deepEqual(calls.at(-1), {
+		method: 'forkHistory',
+		value: { historyId: 'history-managed-without-list-hint', options: { canvas_aspect: 'square' } },
+	});
+
+	historyLinked = false;
+	await controller.selectHistory('history-old');
 	await controller.fromDdl('legacy edit');
 	assert.deepEqual(calls.at(-1), { method: 'forkLegacy', value: 'history-old' });
+
+	controller.markLinkedHistory('history-reopened');
+	assert.deepEqual(pipelineDiagnostics(controller.current, {
+		upstream_diagnostics: [{ kind: 'upstream' }],
+		downstream_diagnostics: [{ kind: 'downstream' }],
+		resource_omissions: [{ kind: 'resource' }],
+		relation_omissions: [{ kind: 'relation' }],
+		render_diagnostics: {
+			rendered_instruction_indices: [0],
+			diagnostics: [{ instruction_index: 2, reason: 'fill_clip_limit_exceeded', disposition: 'omitted' }],
+		},
+		resource_execution: {
+			omissions: [{ owner: { instruction_index: 3 }, failure: 'budget_exceeded', disposition: 'omitted' }],
+			relation_omissions: [{ instruction_index: 4, reason: 'target_omitted' }],
+		},
+	}).map((diagnostic) => diagnostic.channel), [
+		'upstream',
+		'downstream',
+		'resource',
+		'relation',
+		'render',
+		'resource',
+		'relation',
+	]);
+
+	let requestPath = '';
+	let requestBody: Record<string, unknown> = {};
+	const transport = new PipelineApi(async (path, init) => {
+		requestPath = path;
+		requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+		return new Response(JSON.stringify(ready), {
+			headers: { 'Content-Type': 'application/json' },
+		});
+	});
+	await transport.authorDdl(ready, 'edited with new paper', { canvas_aspect: 'hd_monitor', wild: true });
+	assert.equal(requestPath, '/api/pipeline/executions/execution-1/author-ddl');
+	assert.deepEqual(requestBody, {
+		source: 'edited with new paper',
+		expected_revision: '1',
+		options: { canvas_aspect: 'hd_monitor', wild: true },
+	});
+
+	historyLinked = true;
+	holdHistoryLink = true;
+	const superseded = controller.selectHistory('history-superseded');
+	controller.clear();
+	releaseHistoryLink?.();
+	assert.equal(await superseded, false);
+	assert.equal(controller.current, null);
 });

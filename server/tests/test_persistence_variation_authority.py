@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 
 from inku_server.persistence.variation_authority import (
     AUTHORITY_PROTOCOL,
@@ -17,7 +17,7 @@ from inku_server.persistence.variation_authority import (
     VariationAuthorityAdapterError,
     VariationAuthorityStore,
 )
-from inku_server.persistence.schema import Base, HistoryRow
+from inku_server.persistence.schema import Base, HistoryRow, PipelineHistoryLinkRow
 
 
 def _core_digest(
@@ -415,6 +415,30 @@ def test_linked_history_fork_context_is_exact_and_owner_scoped(tmp_path) -> None
             "definition_locks": [{"qualified_name": "Example.RevisionOne"}]
         },
     }
+    pipeline_diagnostics = {
+        "upstream_diagnostics": [
+            {"owner": {"instruction_index": 0}, "reason": "revision_1_upstream"}
+        ],
+        "downstream_diagnostics": [
+            {"owner": {"instruction_index": 1}, "reason": "revision_1_downstream"}
+        ],
+        "resource_omissions": [
+            {"owner": {"instruction_index": 2}, "reason": "budget_exceeded"}
+        ],
+        "relation_omissions": [
+            {"owner": {"instruction_index": 3}, "reason": "target_omitted"}
+        ],
+        "render_diagnostics": {
+            "rendered_instruction_indices": [0],
+            "diagnostics": [
+                {"instruction_index": 2, "reason": "fill_clip_limit_exceeded"}
+            ],
+        },
+        "resource_execution": {
+            "demand": {"primitive_marks": 1},
+            "relation_omissions": [{"instruction_index": 3}],
+        },
+    }
     store.link_history(
         "author-1",
         "managed-revision-1",
@@ -423,6 +447,7 @@ def test_linked_history_fork_context_is_exact_and_owner_scoped(tmp_path) -> None
         ddl_digest,
         snapshot=snapshot,
         context=context,
+        pipeline_diagnostics=pipeline_diagnostics,
     )
 
     # The variation can advance, but this immutable performance keeps the
@@ -447,8 +472,61 @@ def test_linked_history_fork_context_is_exact_and_owner_scoped(tmp_path) -> None
     assert linked.saved_config == snapshot["config"]
     assert linked.host_options == context["host_options"]
     assert linked.macro_catalog == context["macro_catalog"]
+    assert linked.pipeline_diagnostics == pipeline_diagnostics
     assert store.read("author-1", "variation-1")["authority"]["revision"] == "2"
     assert store.read_linked_history("another-author", "managed-revision-1") is None
+
+    with pytest.raises(
+        VariationAuthorityAdapterError,
+        match="history link identity conflict",
+    ):
+        store.link_history(
+            "author-1",
+            "managed-revision-1",
+            "variation-1",
+            "1",
+            ddl_digest,
+            snapshot=snapshot,
+            context=context,
+            pipeline_diagnostics={
+                **pipeline_diagnostics,
+                "resource_omissions": [],
+            },
+        )
+
+    # Links saved by the unshipped v1 sidecar remain exact fork inputs, while
+    # their absent diagnostics stay absent instead of being inferred later.
+    with engine.begin() as connection:
+        stored_link = connection.execute(
+            select(PipelineHistoryLinkRow).where(
+                PipelineHistoryLinkRow.owner_id == "author-1",
+                PipelineHistoryLinkRow.history_id == "managed-revision-1",
+            )
+        ).mappings().one()
+        legacy_payload = json.loads(bytes(stored_link["fork_context_bytes"]))
+        legacy_payload["protocol_version"] = "inku.pipeline-history-fork-context.v1"
+        del legacy_payload["pipeline_diagnostics"]
+        legacy_bytes = json.dumps(
+            legacy_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        connection.execute(
+            PipelineHistoryLinkRow.__table__.update()
+            .where(
+                PipelineHistoryLinkRow.owner_id == "author-1",
+                PipelineHistoryLinkRow.history_id == "managed-revision-1",
+            )
+            .values(
+                fork_context_bytes=legacy_bytes,
+                fork_context_digest=hashlib.sha256(legacy_bytes).hexdigest(),
+            )
+        )
+    legacy_linked = store.read_linked_history("author-1", "managed-revision-1")
+    assert legacy_linked is not None
+    assert legacy_linked.saved_config == snapshot["config"]
+    assert legacy_linked.pipeline_diagnostics is None
 
     with engine.begin() as connection:
         connection.execute(

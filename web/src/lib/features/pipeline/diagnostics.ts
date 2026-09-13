@@ -1,10 +1,19 @@
 import type { LangPack } from '../../i18n/types.ts';
 
-export type PipelineDiagnosticChannel = 'upstream' | 'downstream' | 'resource' | 'relation' | 'catalog';
+export type PipelineDiagnosticChannel = 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog';
 
 export type PipelineDiagnostic = {
 	channel: PipelineDiagnosticChannel;
 	value: unknown;
+};
+
+export type PipelineHistoryDiagnostics = {
+	upstream_diagnostics: unknown[];
+	downstream_diagnostics: unknown[];
+	resource_omissions: unknown[];
+	relation_omissions: unknown[];
+	render_diagnostics: Record<string, unknown> | null;
+	resource_execution: Record<string, unknown> | null;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -94,7 +103,7 @@ function omittedUnit(value: JsonObject, channel: PipelineDiagnosticChannel): { k
 		|| dispositionKind === 'omitted'
 		|| dispositionKind === 'relation_omitted';
 	if (!isOmitted) return null;
-	const unit = disposition?.unit ?? value.owner;
+	const unit = disposition?.unit ?? value.owner ?? value;
 	const indexed = firstIndex(unit);
 	return {
 		kind: kind(unit) ?? indexed?.kind ?? 'part',

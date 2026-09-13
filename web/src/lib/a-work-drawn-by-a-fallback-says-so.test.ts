@@ -206,6 +206,16 @@ test('T-237 every refinement passes through the gate before it draws', () => {
 	}
 	assert.deepEqual(ungated, [], `these refinements draw without asking: ${ungated.join(', ')}`);
 	assert.equal(REFINEMENTS.length, 9, 'the census no longer counts nine refinements');
+	for (const opening of ['async function drawLineageDescriptionEdit(', 'async function drawLineageDdlEdit(']) {
+		const start = PAGE.indexOf(opening);
+		const action = PAGE.slice(start, start + 1800);
+		const authority = action.indexOf('await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal)');
+		const draw = action.indexOf(opening.includes('Description') ? 'await work.authorDescription(' : 'await work.authorDdl(');
+		const reopen = action.indexOf('await showNewLineageChild(');
+		assert.ok(authority > -1 && authority < draw, `${opening} must resolve the saved history owner before drawing`);
+		assert.ok(draw < reopen, `${opening} must reopen the saved child after drawing`);
+		assert.ok(!action.includes('selectLegacyHistory('), `${opening} must not force managed works through the legacy fork`);
+	}
 	// The gate itself has to be able to say no. A dialog whose cancel resolves
 	// nothing leaves the caller waiting for ever, and one that resolves true
 	// would run the refinement the author refused.

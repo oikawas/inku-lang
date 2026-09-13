@@ -1504,7 +1504,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	if (!sourceText || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
-	work.selectLegacyHistory(node.history.id);
+	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return;
 	const view = await work.authorDescription(sourceText, {
 		sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
@@ -1556,7 +1556,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
-	work.selectLegacyHistory(node.history.id);
+	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return;
 	const view = await work.authorDdl(nextDdl, {
 		sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
@@ -2597,6 +2597,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						patch={work.pipelinePatch}
 						committedDdl={work.pipelineView?.document?.source ?? ''}
 						diagnostics={work.pipelineDiagnostics}
+						diagnosticsUnavailable={work.pipelineDiagnosticsUnavailable}
 						busy={work.pipelineBusy}
 						reason={work.pipelineView?.phase.reason ?? null}
 						onApprove={work.approvePipelinePatch}

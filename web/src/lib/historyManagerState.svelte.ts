@@ -1,3 +1,5 @@
+import type { PipelineHistoryDiagnostics } from '$lib/features/pipeline/diagnostics';
+
 export const HISTORY_MANAGER_DEFAULT_PAGE_SIZE = 24;
 
 export type HistoryManagerView = 'active' | 'trash';
@@ -13,6 +15,8 @@ export type HistoryItem = {
 	id?: string;
 	pipeline_variation_id?: string | null;
 	pipeline_revision?: string | null;
+	pipeline_diagnostics?: PipelineHistoryDiagnostics;
+	data_warnings?: string[];
 	input: string;
 	source_text?: string | null;
 	display_label?: string | null;

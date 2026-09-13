@@ -229,6 +229,14 @@ class ProductPipelineEffects:
         result["render_hash_short"] = db.render_hash_short(result["render_hash"])
         result["render_diagnostics"] = render_metadata.get("execution")
         result["resource_execution"] = render_metadata.get("resource_execution")
+        pipeline_diagnostics = {
+            "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
+            "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
+            "resource_omissions": snapshot["delivery"]["resource_omissions"],
+            "relation_omissions": snapshot["delivery"]["relation_omissions"],
+            "render_diagnostics": result["render_diagnostics"],
+            "resource_execution": result["resource_execution"],
+        }
         if settings.get("save_history") is False:
             if settings.get("count_generation") is not False:
                 result["user_generation_count"] = db.increment_user_generation_count(owner)
@@ -263,7 +271,8 @@ class ProductPipelineEffects:
                 raise CandidateHostError("idempotency_conflict")
         store.link_history(owner, item["id"], snapshot["variation_id"],
                            snapshot["authority"]["revision"], snapshot["delivery"]["source_digest"],
-                           snapshot=snapshot, context=context)
+                           snapshot=snapshot, context=context,
+                           pipeline_diagnostics=pipeline_diagnostics)
         result.update({"history_id": item["id"], "history_at": item["at"],
                        **{key: item.get(key) for key in ("lineage_node_id", "lineage_parent_node_id", "derivation_kind", "description_hash")}})
         if not item.get("_idempotent_replay"):

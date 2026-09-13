@@ -1,5 +1,6 @@
 import {
 	PipelineApi,
+	PipelineApiError,
 	type PipelineOptions,
 	type PipelineView,
 } from './api';
@@ -61,6 +62,30 @@ export class PipelineController {
 		this.setView(null);
 	}
 
+	async selectHistory(historyId: string, linkedVariationId?: string | null, signal?: AbortSignal): Promise<boolean> {
+		const ordinal = ++this.requestOrdinal;
+		this.legacyHistoryId = null;
+		this.linkedHistoryId = null;
+		this.setView(null);
+		if (linkedVariationId) {
+			this.linkedHistoryId = historyId;
+			return true;
+		}
+		try {
+			await this.api.historyLink(historyId, signal);
+			if (ordinal !== this.requestOrdinal) return false;
+			this.linkedHistoryId = historyId;
+			return true;
+		} catch (cause) {
+			if (ordinal !== this.requestOrdinal) return false;
+			if (cause instanceof PipelineApiError && cause.status === 404) {
+				this.legacyHistoryId = historyId;
+				return true;
+			}
+			throw cause;
+		}
+	}
+
 	clear(): void {
 		this.requestOrdinal += 1;
 		this.legacyHistoryId = null;
@@ -90,11 +115,7 @@ export class PipelineController {
 			if (linked) return this.api.forkHistory(linked, 'direct_ddl', source, options, signal);
 			if (legacy) return this.api.forkLegacy(legacy, 'direct_ddl', source, options, signal);
 			if (!active) return this.api.start('direct_ddl', source, options, signal);
-			return this.api.command(active, {
-				tag: 'commit_user_ddl',
-				expected_revision: active.authority.revision,
-				source,
-			}, signal);
+			return this.api.authorDdl(active, source, options, signal);
 		});
 	}
 

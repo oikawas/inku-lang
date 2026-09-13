@@ -7,6 +7,7 @@ import json
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
 
@@ -21,6 +22,14 @@ from .persistence.variation_authority import (
     VariationAuthorityAdapterError,
 )
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
+
+
+_RECORD_OPTIONS = frozenset({
+    "history_display_label", "batch_line_number", "batch_run_id", "history_visibility",
+    "lineage_parent_node_id", "derivation_kind", "derivation_metadata", "count_generation",
+    "save_history", "save_artifacts", "history_input", "history_source_text", "history_at",
+    "request_idempotency_key",
+})
 
 
 class NewVariationBody(BaseModel):
@@ -43,6 +52,13 @@ class LinkedHistoryForkBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["description", "direct_ddl"]
     text: str
+    options: dict = {}
+
+
+class AuthorDdlBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: str
+    source: str
     options: dict = {}
 
 
@@ -124,7 +140,7 @@ class PipelineService:
 
     def start(self, owner: str, kind: str, text: str, *, parent: dict | None = None, source_work: dict | None = None,
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
-              options: dict | None = None) -> dict:
+              options: dict | None = None, prepared: tuple[dict, dict] | None = None) -> dict:
         description = text if kind == "description" else (source_work or {}).get("description", "")
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
         if parent:
@@ -141,7 +157,10 @@ class PipelineService:
                 )
         with self._lock:
             self._reserve_run()
-            if self.prepare_for:
+            if prepared is not None:
+                config, resolved_context = prepared
+                context.update(resolved_context)
+            elif self.prepare_for:
                 config, resolved_context = self.prepare_for(owner, kind, text, options or {}, source_work)
                 context.update(resolved_context)
             else:
@@ -158,6 +177,56 @@ class PipelineService:
             self._runs[key] = run
             self._schedule(key, run)
         return run.view()
+
+    def author_ddl(self, owner: str, execution_id: str, body: AuthorDdlBody) -> dict:
+        run = self.execution(owner, execution_id)
+        previous = run.view()
+        persisted = self.store.read(owner, previous["variation_id"])
+        if (
+            previous["authority"]["revision"] != body.expected_revision
+            or persisted is None
+            or persisted["authority"]["revision"] != body.expected_revision
+        ):
+            raise CandidateHostError("authority_conflict")
+        if previous["busy"]:
+            raise CandidateHostError("stale_result")
+        context = deepcopy(run.context)
+        source_work = {
+            **previous,
+            "saved_config": deepcopy(run.config),
+            "host_options": context.get("host_options", {}),
+            "macro_catalog": context.get("macro_catalog", {}),
+        }
+        if self.prepare_for is None:
+            if body.options:
+                raise CandidateHostError("unsupported_authoring_options")
+            prepared = (run.config, {"host_options": source_work["host_options"]})
+        else:
+            prepared = self.prepare_for(owner, "direct_ddl", body.source, body.options, source_work)
+        config, resolved = prepared
+        selected_options = resolved.get("host_options", {})
+        old_options = source_work["host_options"]
+        def runtime_options(options):
+            return {key: value for key, value in options.items() if key not in _RECORD_OPTIONS}
+
+        same_settings = config == run.config and runtime_options(selected_options) == runtime_options(old_options)
+        changed_source = previous["document"] is not None and previous["document"]["source"] != body.source
+        if same_settings and (changed_source or selected_options == old_options):
+            run.command({
+                "tag": "commit_user_ddl", "expected_revision": body.expected_revision,
+                "source": body.source,
+            }, context_updates={"host_options": selected_options})
+            with self._lock:
+                self._schedule((owner, execution_id), run)
+            return run.view()
+        # A changed performance configuration is a new edition, just like a
+        # DDL fork from saved history. The original source and authority stay
+        # intact; the new direct-DDL variation starts with DDL authority.
+        return self.start(
+            owner, "direct_ddl", body.source,
+            parent={"kind": "variation", "id": previous["variation_id"]},
+            source_work=source_work, prepared=prepared,
+        )
 
     def _reserve_run(self) -> None:
         if len(self._runs) < self.max_retained_runs:
@@ -327,6 +396,18 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     def command(execution_id: str, body: dict, actor: dict = Depends(actor_dependency)):
         try:
             return current_service().command(actor["id"], execution_id, body)
+        except CandidateHostError as error:
+            code = str(error)
+            detail = {"code": code, "message": code.replace("_", " ")}
+            if code in {"authority_conflict", "description_locked", "stale_result"}:
+                detail["current_view"] = current_service().execution(actor["id"], execution_id).view()
+                detail["current_revision"] = detail["current_view"]["authority"]["revision"]
+            raise HTTPException(_host_error_status(code), detail) from None
+
+    @router.post("/executions/{execution_id}/author-ddl")
+    def author_ddl(execution_id: str, body: AuthorDdlBody, actor: dict = Depends(actor_dependency)):
+        try:
+            return current_service().author_ddl(actor["id"], execution_id, body)
         except CandidateHostError as error:
             code = str(error)
             detail = {"code": code, "message": code.replace("_", " ")}

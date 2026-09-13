@@ -7,7 +7,12 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
-from inku_server.persistence.schema import Base, HistoryRow, UserAccountRow
+from inku_server.persistence.schema import (
+    Base,
+    HistoryRow,
+    PipelineHistoryLinkRow,
+    UserAccountRow,
+)
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
 from inku_server.pipeline_defaults import ADDITIONAL_RESOURCE_LIMITS, default_manifest
@@ -85,8 +90,20 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     assert render["options"]["canvas"] == {"width": 1778, "height": 1000}
     # Only history projection is exercised here. Native SVG execution belongs
     # to the Linux check, and artifact/thumbnail workers above are disconnected.
+    render_diagnostics = {
+        "rendered_instruction_indices": [0],
+        "omitted_instruction_indices": [],
+        "diagnostics": [],
+    }
+    resource_execution = {
+        "demand": {"primitive_marks": 1},
+        "omitted_units": [],
+        "relation_omissions": [],
+    }
     rendered = {"svg": "<svg xmlns='http://www.w3.org/2000/svg'/>",
-                "metadata": {"render_engine_id": "default", "render_engine_version": "59"}}
+                "metadata": {"render_engine_id": "default", "render_engine_version": "59",
+                             "execution": render_diagnostics,
+                             "resource_execution": resource_execution}}
     result = effects.save_result("author", snapshot, run.context, rendered)
     replay = effects.save_result("author", snapshot, run.context, rendered)
     assert result["history_id"] == replay["history_id"]
@@ -94,10 +111,31 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     response = HistoryItem.model_validate(item).model_dump()
     assert response["score"] == snapshot["delivery"]["score"]
     assert response["ddl"] == snapshot["document"]["source"]
+    assert response["svg"] == rendered["svg"]
     assert response["pipeline_variation_id"] == snapshot["variation_id"]
     assert response["pipeline_revision"] == "1"
     assert response["render_canvas_aspect_id"] == "hd_monitor"
     assert response["render_seed"] == 71
+    assert response["pipeline_diagnostics"] == {
+        "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
+        "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
+        "resource_omissions": snapshot["delivery"]["resource_omissions"],
+        "relation_omissions": snapshot["delivery"]["relation_omissions"],
+        "render_diagnostics": render_diagnostics,
+        "resource_execution": resource_execution,
+    }
+    with engine.begin() as connection:
+        connection.execute(
+            PipelineHistoryLinkRow.__table__.update()
+            .where(PipelineHistoryLinkRow.history_id == result["history_id"])
+            .values(fork_context_digest="invalid")
+        )
+    damaged = db.get_items("author", [result["history_id"]])[0]
+    assert damaged["data_warnings"] == ["pipeline_diagnostics_invalid"]
+    assert "pipeline_diagnostics" not in damaged
+    assert damaged["ddl"] == snapshot["document"]["source"]
+    assert damaged["score"] == snapshot["delivery"]["score"]
+    assert damaged["svg"] == rendered["svg"]
     assert store.history_link("another", result["history_id"]) is None
     assert store.read("author", snapshot["variation_id"])["authority"]["authority"] == "ddl_authoritative"
     with engine.connect() as connection:

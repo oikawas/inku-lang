@@ -83,6 +83,10 @@ class HistoryItem(HistoryPostBody):
     id: str
     pipeline_variation_id: str | None = None
     pipeline_revision: str | None = None
+    # Raw core and renderer diagnostics frozen with this exact saved performance.
+    # None means the work predates this record; empty arrays mean the recorded
+    # performance had no diagnostics in that channel.
+    pipeline_diagnostics: dict[str, object] | None = None
     # The work's own weight in UTF-8 bytes, sent whether or not the picture is.
     # The listing that draws the strip asks for `include_svg=false`, so a client
     # cannot count this for itself: what arrives in `svg` is then an empty

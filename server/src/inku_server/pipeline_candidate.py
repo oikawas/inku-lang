@@ -110,7 +110,7 @@ class CandidateExecution:
                 "authoring": authoring,
             })
 
-    def command(self, payload: dict) -> dict:
+    def command(self, payload: dict, *, context_updates: dict | None = None) -> dict:
         """Forward only author actions; expected revisions remain Rust inputs."""
         allowed = {"commit_user_ddl", "generate_from_description", "complete_holes",
                    "approve_patch", "decline_patch", "cancel"}
@@ -122,6 +122,8 @@ class CandidateExecution:
             if self._snapshot is None:
                 raise CandidateHostError("execution_not_started")
             previous_context = self.context
+            if context_updates:
+                self.context = {**self.context, **json.loads(_bytes(context_updates))}
             if payload["tag"] == "generate_from_description":
                 self.context = {**self.context, "description": payload.get("description", "")}
             try:

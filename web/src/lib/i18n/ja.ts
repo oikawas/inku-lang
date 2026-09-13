@@ -19,6 +19,7 @@ export const ja: LangPack = {
 	pipelineApprove: 'この候補を採用する',
 	pipelineDecline: '保存済みのDDLを保つ',
 	pipelineDiagnostics: '描画の診断と省略した部分',
+	pipelineDiagnosticsUnavailable: 'この保存作品の描画診断を読み込めませんでした。作品はそのまま表示しています。',
 	pipelineNeedsAttention: '処理の結果を確認してください。',
 	pipelineAttentionReason: (reason) => `理由: ${({
 		stage1_failed: '記述の解釈を完了できませんでした',
@@ -44,6 +45,8 @@ export const ja: LangPack = {
 		invalid_canonical_definition: '定義に問題があるため、読み込めませんでした。',
 		duplicate_qualified_name: '同じ名前の定義が複数あるため、重複した定義を読み込みませんでした。',
 		catalog_entry_limit: '読み込める定義数の上限を超えています。',
+		fill_clip_limit_exceeded: 'クリップ処理の上限を超えました。',
+		fill_clip_unsupported: 'この塗りの範囲をクリップできませんでした。',
 	}[reason] ?? `理由: ${reason}。`),
 	pipelineDiagnosticBudgetExceeded: (dimension, required, maximum) => `${dimension}は ${required} 必要でしたが、上限は ${maximum} でした。`,
 	pipelineDiagnosticOmitted: (kind, index) => `${kind}${index === null ? '' : ` ${index}`} を省略しました。`,

@@ -321,20 +321,20 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
        "variation":{"amplitude":"broad","frequency":"slow","quality":"wave",
                     "dimensions":["position_x","position_y"]}},
       {"primitive":"arc","center":[0.3,0.3],"radius":0.07,
-       "angle_start":0,"angle_end":180,
+       "angle_start":0,"angle_end":120,
        "relation":{"type":"connected","target_instruction_index":0,
                    "target_path_position":0.25,"position_authority":"named_movable"}},
       {"primitive":"arc","center":[0.3,0.3],"radius":0.07,
-       "angle_start":0,"angle_end":180,
+       "angle_start":0,"angle_end":120,
        "relation":{"type":"touching","target_instruction_index":1,
                    "position_authority":"named_movable",
                    "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}},
       {"primitive":"arc","center":[0.65,0.3],"radius":0.06,
-       "angle_start":0,"angle_end":180,
+       "angle_start":0,"angle_end":120,
        "relation":{"type":"connected","target_instruction_index":0,
                    "target_path_position":0.72,"position_authority":"named_movable"}},
       {"primitive":"arc","center":[0.65,0.3],"radius":0.06,
-       "angle_start":0,"angle_end":180,
+       "angle_start":0,"angle_end":120,
        "relation":{"type":"touching","target_instruction_index":3,
                    "position_authority":"named_movable",
                    "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
@@ -354,7 +354,7 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
         ScoreErrorPolicy::Stop,
     )
     .unwrap();
-    assert!(performed.execution.is_none());
+    assert!(performed.execution.is_none(), "{:?}", performed.execution);
     let centerline = performed.line_centerlines[0]
         .as_deref()
         .expect("the targeted varied branch fixes one performed centerline");

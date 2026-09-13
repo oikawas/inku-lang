@@ -12,7 +12,7 @@
 
 通常Linux hostの代表確認では、固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3点のcircle fillと後続lineを含むprimitive mark 4個を描画した。SVG、raw Score、historyとauthority linkの保存まで成功した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。新作品の追加出荷上限はlogical objects 4096、template nodes 128、anchor instances 4096、transform instances 4096、placement instances 64、fill instances 64とする。既存4上限、管理者のauthority、旧作品に保存済みのbudgetを維持し、超過した配置だけを省略して独立した後続を続ける。
 
-保存済みcompact Scoreを最新engineで再演する通常hostのLinux確認も成功した。Raw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を独立保存したpolicyで拒否してprimitive mark 4個を保った。Step 13全体のfresh independent completion review、Android、acceptance、配備、releaseは未完了である。通常sourceの接続は出荷を意味しない。DDL engine 37、Score 0.10、render engine 59、APP_VERSION 2.14.2、BUILD_NUMBER 1073は変更しない。
+保存済みcompact Scoreを最新engineで再演する通常hostのLinux確認も成功した。Raw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を独立保存したpolicyで拒否してprimitive mark 4個を保った。Step 13全体のfresh completion reviewは完了し、統合未完了と判定した。系譜から選んだmanaged historyの通常編集入口がlegacy forkへ進んで409になること、active DDLの再描画が現在のcanvas／wildなどをcommandへ渡さず保存済み設定へ戻ること、compiler／render診断をhistory／revisionへ保存・再表示せず過去作品の省略理由を失うことが残っている。Step 14のAndroid接続、Step 16の作品受入、Step 17の配備は開始していない。通常sourceの接続は出荷を意味しない。DDL engine 37、Score 0.10、render engine 59、APP_VERSION 2.14.2、BUILD_NUMBER 1073は変更しない。
 
 ### 2026-09-13 — Python候補hostと原子的なvariation保存を追加
 

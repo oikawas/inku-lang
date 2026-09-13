@@ -32,14 +32,11 @@
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
               }},
               {"op": "emit", "binding": "edge_b", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
                 "chord": {"expr": "exact_decimal", "value": "0.120"},
                 "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
                 "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
                 "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
                 "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "position_x": {"expr": "parameter", "name": "x"},
-                "position_y": {"expr": "parameter", "name": "y"},
                 "sagitta": {"expr": "exact_decimal", "value": "0.025"},
                 "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
@@ -120,7 +117,6 @@
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "brush_thin"}
               }},
               {"op": "emit", "binding": "edge_b", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
                 "chord": {"expr": "parameter", "name": "chord"},
                 "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
                 "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
@@ -217,7 +213,6 @@
                   "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
                 }},
                 {"op": "emit", "binding": "edge_b", "fields": {
-                  "angle": {"expr": "local", "name": "blade_lean"},
                   "chord": {"expr": "exact_decimal", "value": "0.220"},
                   "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
                   "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
@@ -275,13 +270,10 @@
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
               }},
               {"op": "emit", "binding": "edge_b", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
                 "chord": {"expr": "exact_decimal", "value": "0.110"},
                 "color": {"expr": "parameter", "name": "color"},
                 "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
                 "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "position_x": {"expr": "parameter", "name": "x"},
-                "position_y": {"expr": "parameter", "name": "y"},
                 "sagitta": {"expr": "exact_decimal", "value": "0.022"},
                 "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
@@ -337,7 +329,6 @@
                 "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
               }},
               {"op": "emit", "binding": "edge_b", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
                 "chord": {"expr": "parameter", "name": "chord"},
                 "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
                 "fluctuation_frequency": {"expr": "semantic_ref", "category": "variation", "id": "quickly"},

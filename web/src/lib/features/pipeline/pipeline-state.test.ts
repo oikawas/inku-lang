@@ -51,6 +51,7 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 	let rejectNextCommand = false;
 	let historyLinked = true;
 	let holdHistoryLink = false;
+	let historyLinkFailureStatus: number | null = null;
 	let releaseHistoryLink: (() => void) | null = null;
 	const api = {
 		start: async () => { calls.push({ method: 'start' }); return view({ busy: true }); },
@@ -68,6 +69,7 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 		historyLink: async (historyId: string) => {
 			calls.push({ method: 'historyLink', value: historyId });
 			if (holdHistoryLink) await new Promise<void>((resolve) => { releaseHistoryLink = resolve; });
+			if (historyLinkFailureStatus !== null) throw new PipelineApiError(historyLinkFailureStatus, { code: 'pipeline_history_lookup_failed' });
 			if (!historyLinked) throw new PipelineApiError(404, { code: 'pipeline_history_not_found' });
 			return { variation_id: 'variation-history', revision: '1' };
 		},
@@ -183,9 +185,56 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 
 	historyLinked = true;
 	holdHistoryLink = true;
+	const waitingSelection = controller.selectHistory('history-waiting');
+	const waitingAuthoring = controller.fromDdl('edit while history lookup waits');
+	await Promise.resolve();
+	assert.deepEqual(calls.at(-1), { method: 'historyLink', value: 'history-waiting' });
+	releaseHistoryLink?.();
+	assert.equal(await waitingSelection, true);
+	await waitingAuthoring;
+	assert.deepEqual(calls.at(-1), {
+		method: 'forkHistory',
+		value: { historyId: 'history-waiting', options: { canvas_aspect: 'square' } },
+	});
+
+	holdHistoryLink = false;
+	historyLinkFailureStatus = 503;
+	await assert.rejects(controller.selectHistory('history-lookup-failed'), (error: unknown) =>
+		error instanceof PipelineApiError && error.status === 503);
+	const callsBeforeFailedAuthoring = calls.length;
+	await assert.rejects(controller.fromDescription('must not become new work'), (error: unknown) =>
+		error instanceof PipelineApiError && error.status === 503);
+	assert.equal(calls.length, callsBeforeFailedAuthoring);
+
+	historyLinkFailureStatus = null;
+	holdHistoryLink = true;
+	const canceledSelection = controller.selectHistory('history-authoring-canceled');
+	const authoringAbort = new AbortController();
+	const canceledAuthoring = controller.fromDdl('must not fork after cancel', {}, authoringAbort.signal);
+	const callsBeforeCanceledRelease = calls.length;
+	authoringAbort.abort();
+	releaseHistoryLink?.();
+	assert.equal(await canceledSelection, true);
+	await assert.rejects(canceledAuthoring, (error: unknown) => error instanceof DOMException && error.name === 'AbortError');
+	assert.equal(calls.length, callsBeforeCanceledRelease);
+
+	const expiredAfterLookup = controller.selectHistory('history-expired-after-lookup');
+	const authoringAfterExpiredLookup = controller.fromDdl('must not start in the resume gap');
+	const expireBeforeAuthoringResumes = expiredAfterLookup.then(() => controller.clear());
+	const callsBeforeExpiredLookupRelease = calls.length;
+	releaseHistoryLink?.();
+	assert.equal(await expiredAfterLookup, true);
+	await expireBeforeAuthoringResumes;
+	await assert.rejects(authoringAfterExpiredLookup, /pipeline_history_selection_superseded/);
+	assert.equal(calls.length, callsBeforeExpiredLookupRelease);
+
 	const superseded = controller.selectHistory('history-superseded');
+	const supersededAuthoring = controller.fromDescription('must not start after selection expires');
+	const callsBeforeSupersededRelease = calls.length;
 	controller.clear();
 	releaseHistoryLink?.();
 	assert.equal(await superseded, false);
+	await assert.rejects(supersededAuthoring, /pipeline_history_selection_superseded/);
 	assert.equal(controller.current, null);
+	assert.equal(calls.length, callsBeforeSupersededRelease);
 });

@@ -19,6 +19,7 @@ export class PipelineController {
 	private view: PipelineView | null = null;
 	private legacyHistoryId: string | null = null;
 	private linkedHistoryId: string | null = null;
+	private historySelection: Promise<boolean> | null = null;
 	private requestOrdinal = 0;
 	private readonly api: PipelineApi;
 	private readonly options: () => PipelineOptions;
@@ -43,6 +44,7 @@ export class PipelineController {
 
 	adopt(view: PipelineView): void {
 		this.requestOrdinal += 1;
+		this.historySelection = null;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = null;
 		this.setView(view);
@@ -50,6 +52,7 @@ export class PipelineController {
 
 	markLegacy(historyId: string): void {
 		this.requestOrdinal += 1;
+		this.historySelection = null;
 		this.linkedHistoryId = null;
 		this.legacyHistoryId = historyId;
 		this.setView(null);
@@ -57,17 +60,34 @@ export class PipelineController {
 
 	markLinkedHistory(historyId: string): void {
 		this.requestOrdinal += 1;
+		this.historySelection = null;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = historyId;
 		this.setView(null);
 	}
 
-	async selectHistory(historyId: string, linkedVariationId?: string | null, signal?: AbortSignal): Promise<boolean> {
+	selectHistory(historyId: string, linkedVariationId?: string | null, signal?: AbortSignal): Promise<boolean> {
 		const ordinal = ++this.requestOrdinal;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = null;
 		this.setView(null);
+		const selection = this.resolveHistorySelection(ordinal, historyId, linkedVariationId, signal);
+		this.historySelection = selection;
+		// A normal history load intentionally does not block painting the saved
+		// work on screen. Keep its failure observed until an authoring caller
+		// awaits the same selection below.
+		void selection.catch(() => undefined);
+		return selection;
+	}
+
+	private async resolveHistorySelection(
+		ordinal: number,
+		historyId: string,
+		linkedVariationId?: string | null,
+		signal?: AbortSignal,
+	): Promise<boolean> {
 		if (linkedVariationId) {
+			if (ordinal !== this.requestOrdinal) return false;
 			this.linkedHistoryId = historyId;
 			return true;
 		}
@@ -88,16 +108,19 @@ export class PipelineController {
 
 	clear(): void {
 		this.requestOrdinal += 1;
+		this.historySelection = null;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = null;
 		this.setView(null);
 	}
 
 	async fromDescription(description: string, override: PipelineOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
+		const authoringOrdinal = await this.awaitHistorySelection(signal);
 		const active = this.view;
 		const legacy = this.legacyHistoryId;
 		const linked = this.linkedHistoryId;
 		const options = { ...this.options(), ...override };
+		this.assertAuthoringStillCurrent(authoringOrdinal, signal);
 		return this.run(() => {
 			if (linked) return this.api.forkHistory(linked, 'description', description, options, signal);
 			if (legacy) return this.api.forkLegacy(legacy, 'description', description, options, signal);
@@ -107,10 +130,12 @@ export class PipelineController {
 	}
 
 	async fromDdl(source: string, override: PipelineOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
+		const authoringOrdinal = await this.awaitHistorySelection(signal);
 		const active = this.view;
 		const legacy = this.legacyHistoryId;
 		const linked = this.linkedHistoryId;
 		const options = { ...this.options(), ...override };
+		this.assertAuthoringStillCurrent(authoringOrdinal, signal);
 		return this.run(() => {
 			if (linked) return this.api.forkHistory(linked, 'direct_ddl', source, options, signal);
 			if (legacy) return this.api.forkLegacy(legacy, 'direct_ddl', source, options, signal);
@@ -173,6 +198,24 @@ export class PipelineController {
 		return this.view;
 	}
 
+	private async awaitHistorySelection(signal?: AbortSignal): Promise<number> {
+		const ordinal = this.requestOrdinal;
+		signal?.throwIfAborted();
+		const selection = this.historySelection;
+		if (!selection) return ordinal;
+		const selected = await selection;
+		signal?.throwIfAborted();
+		if (!selected || selection !== this.historySelection || ordinal !== this.requestOrdinal) {
+			throw new Error('pipeline_history_selection_superseded');
+		}
+		return ordinal;
+	}
+
+	private assertAuthoringStillCurrent(ordinal: number, signal?: AbortSignal): void {
+		signal?.throwIfAborted();
+		if (ordinal !== this.requestOrdinal) throw new Error('pipeline_history_selection_superseded');
+	}
+
 	private setView(view: PipelineView | null): void {
 		this.view = view;
 		this.observe(view);
@@ -182,6 +225,7 @@ export class PipelineController {
 		const ordinal = ++this.requestOrdinal;
 		let next = await start();
 		if (ordinal !== this.requestOrdinal) return next;
+		this.historySelection = null;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = null;
 		this.setView(next);

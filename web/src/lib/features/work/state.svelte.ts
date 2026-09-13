@@ -317,7 +317,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineController.markLegacy(historyId);
 	}
 
-	async function selectHistoryAuthority(historyId: string, variationId?: string | null, signal?: AbortSignal): Promise<boolean> {
+	function selectHistoryAuthority(historyId: string, variationId?: string | null, signal?: AbortSignal): Promise<boolean> {
 		return pipelineController.selectHistory(historyId, variationId, signal);
 	}
 

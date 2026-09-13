@@ -13,73 +13,262 @@
         "components": {
           "leaf_form": {
             "parameters": {
-              "lean": {"type": "semantic_ref", "category": "angle"},
-              "x": {"type": "exact_decimal", "dimension": "position_x"},
-              "y": {"type": "exact_decimal", "dimension": "position_y"}
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
             },
             "body": [
-              {"op": "emit", "binding": "edge_a", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
-                "chord": {"expr": "exact_decimal", "value": "0.120"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
-                "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "position_x": {"expr": "parameter", "name": "x"},
-                "position_y": {"expr": "parameter", "name": "y"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.025"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
-              }},
-              {"op": "emit", "binding": "edge_b", "fields": {
-                "chord": {"expr": "exact_decimal", "value": "0.120"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
-                "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.025"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "pencil"}
-              }},
-              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.120"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "fine"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "trembling"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.025"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pencil"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.120"
+                  },
+                  "color": {
+                    "expr": "semantic_ref",
+                    "category": "color",
+                    "id": "green"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "fine"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "trembling"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.025"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "pencil"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
             ]
           }
         },
         "body": [
-          {"op": "vary", "binding": "leaf_count", "domain": "wakaba_leaf_count", "choices": [
-            {"expr": "integer", "value": 4},
-            {"expr": "integer", "value": 5},
-            {"expr": "integer", "value": 6}
-          ], "range": null, "body": [
-            {"op": "repeat", "count": {"expr": "local", "name": "leaf_count"}, "maximum": 6, "index": "leaf_index", "body": [
-              {"op": "vary", "binding": "leaf_x", "domain": "wakaba_upper_x", "choices": [
-                {"expr": "exact_decimal", "value": "0.20"},
-                {"expr": "exact_decimal", "value": "0.35"},
-                {"expr": "exact_decimal", "value": "0.50"},
-                {"expr": "exact_decimal", "value": "0.65"},
-                {"expr": "exact_decimal", "value": "0.80"}
-              ], "range": null, "body": [
-                {"op": "vary", "binding": "leaf_y", "domain": "wakaba_upper_y", "choices": [
-                  {"expr": "exact_decimal", "value": "0.14"},
-                  {"expr": "exact_decimal", "value": "0.24"},
-                  {"expr": "exact_decimal", "value": "0.34"},
-                  {"expr": "exact_decimal", "value": "0.44"}
-                ], "range": null, "body": [
-                  {"op": "vary", "binding": "leaf_lean", "domain": "wakaba_upward_lean", "choices": [
-                    {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
-                    {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
-                    {"expr": "semantic_ref", "category": "angle", "id": "rising"}
-                  ], "range": null, "body": [
-                    {"op": "use", "component": "leaf_form", "arguments": {
-                      "lean": {"expr": "local", "name": "leaf_lean"},
-                      "x": {"expr": "local", "name": "leaf_x"},
-                      "y": {"expr": "local", "name": "leaf_y"}
-                    }}
-                  ]}
-                ]}
-              ]}
-            ]}
-          ]}
+          {
+            "op": "vary",
+            "binding": "leaf_count",
+            "domain": "wakaba_leaf_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 4
+              },
+              {
+                "expr": "integer",
+                "value": 5
+              },
+              {
+                "expr": "integer",
+                "value": 6
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "leaf_count"
+                },
+                "maximum": 6,
+                "index": "leaf_index",
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "leaf_x",
+                    "domain": "wakaba_upper_x",
+                    "choices": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.20"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.35"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.50"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.65"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.80"
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "vary",
+                        "binding": "leaf_y",
+                        "domain": "wakaba_upper_y",
+                        "choices": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.14"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.24"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.34"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.44"
+                          }
+                        ],
+                        "range": null,
+                        "body": [
+                          {
+                            "op": "vary",
+                            "binding": "leaf_lean",
+                            "domain": "wakaba_upward_lean",
+                            "choices": [
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "left_rising"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "vertical"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "rising"
+                              }
+                            ],
+                            "range": null,
+                            "body": [
+                              {
+                                "op": "use",
+                                "component": "leaf_form",
+                                "arguments": {
+                                  "lean": {
+                                    "expr": "local",
+                                    "name": "leaf_lean"
+                                  },
+                                  "x": {
+                                    "expr": "local",
+                                    "name": "leaf_x"
+                                  },
+                                  "y": {
+                                    "expr": "local",
+                                    "name": "leaf_y"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
       "summaries": {
@@ -97,77 +286,288 @@
         "components": {
           "rooted_blade": {
             "parameters": {
-              "chord": {"type": "exact_decimal", "dimension": "chord"},
-              "lean": {"type": "semantic_ref", "category": "angle"},
-              "x": {"type": "exact_decimal", "dimension": "position_x"},
-              "y": {"type": "exact_decimal", "dimension": "position_y"}
+              "chord": {
+                "type": "exact_decimal",
+                "dimension": "chord"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
             },
             "body": [
-              {"op": "anchor", "name": "root", "fields": {
-                "position_x": {"expr": "parameter", "name": "x"},
-                "position_y": {"expr": "parameter", "name": "y"}
-              }},
-              {"op": "emit", "binding": "edge_a", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
-                "chord": {"expr": "parameter", "name": "chord"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "brush_thin"}
-              }},
-              {"op": "emit", "binding": "edge_b", "fields": {
-                "chord": {"expr": "parameter", "name": "chord"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "green"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "brush_thin"}
-              }},
-              {"op": "relation", "kind": "connected", "from": "root", "to": "edge_a"},
-              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+              {
+                "op": "anchor",
+                "name": "root",
+                "fields": {
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  }
+                }
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "parameter",
+                    "name": "rotation"
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
+                      }
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "root",
+                    "to": "edge_a"
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
+                  }
+                ]
+              }
             ]
           }
         },
         "body": [
-          {"op": "vary", "binding": "root_count", "domain": "shitakusa_root_count", "choices": [
-            {"expr": "integer", "value": 1},
-            {"expr": "integer", "value": 2}
-          ], "range": null, "body": [
-            {"op": "repeat", "count": {"expr": "local", "name": "root_count"}, "maximum": 2, "index": "root_index", "body": [
-              {"op": "vary", "binding": "root_x", "domain": "shitakusa_bottom_spot", "choices": [
-                {"expr": "exact_decimal", "value": "0.28"},
-                {"expr": "exact_decimal", "value": "0.72"}
-              ], "range": null, "body": [
-                {"op": "vary", "binding": "blade_count", "domain": "shitakusa_blade_count", "choices": [
-                  {"expr": "integer", "value": 3},
-                  {"expr": "integer", "value": 4},
-                  {"expr": "integer", "value": 5}
-                ], "range": null, "body": [
-                  {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 5, "index": "blade_index", "body": [
-                    {"op": "vary", "binding": "blade_chord", "domain": "shitakusa_blade_height", "choices": [
-                      {"expr": "exact_decimal", "value": "0.18"},
-                      {"expr": "exact_decimal", "value": "0.24"},
-                      {"expr": "exact_decimal", "value": "0.30"}
-                    ], "range": null, "body": [
-                      {"op": "vary", "binding": "blade_lean", "domain": "shitakusa_blade_lean", "choices": [
-                        {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
-                        {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
-                        {"expr": "semantic_ref", "category": "angle", "id": "rising"}
-                      ], "range": null, "body": [
-                        {"op": "use", "component": "rooted_blade", "arguments": {
-                          "chord": {"expr": "local", "name": "blade_chord"},
-                          "lean": {"expr": "local", "name": "blade_lean"},
-                          "x": {"expr": "local", "name": "root_x"},
-                          "y": {"expr": "exact_decimal", "value": "0.90"}
-                        }}
-                      ]}
-                    ]}
-                  ]}
-                ]}
-              ]}
-            ]}
-          ]}
+          {
+            "op": "vary",
+            "binding": "root_count",
+            "domain": "shitakusa_root_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 1
+              },
+              {
+                "expr": "integer",
+                "value": 2
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "root_count"
+                },
+                "maximum": 2,
+                "index": "root_index",
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "blade_count",
+                    "domain": "shitakusa_blade_count",
+                    "choices": [
+                      {
+                        "expr": "integer",
+                        "value": 3
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 4
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 5
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "repeat",
+                        "count": {
+                          "expr": "local",
+                          "name": "blade_count"
+                        },
+                        "maximum": 5,
+                        "index": "blade_index",
+                        "body": [
+                          {
+                            "op": "use",
+                            "component": "rooted_blade",
+                            "arguments": {
+                              "chord": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "blade_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.18"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.24"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.30"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.21"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.27"
+                                  }
+                                ]
+                              },
+                              "rotation": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "blade_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "number",
+                                    "value": -108.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -96.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -90.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -84.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -72.0
+                                  }
+                                ]
+                              },
+                              "x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "root_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.28"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.72"
+                                  }
+                                ]
+                              },
+                              "y": {
+                                "expr": "exact_decimal",
+                                "value": "0.90"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
       "summaries": {
@@ -179,61 +579,522 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
+        "heading": "青葉",
+        "version": "1.0.0",
+        "parameters": {},
+        "components": {},
+        "body": [
+          {
+            "op": "emit",
+            "binding": "branch",
+            "fields": {
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "horizontal"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "gray"
+              },
+              "fluctuation_frequency": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "slowly"
+              },
+              "fluctuation_quality": {
+                "expr": "semantic_ref",
+                "category": "variation",
+                "id": "undulating"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.68"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "draw"
+              },
+              "position_x": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "position_y": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "brush_thick"
+              }
+            }
+          },
+          {
+            "op": "vary",
+            "binding": "leaf_count",
+            "domain": "aoba_leaf_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 6
+              },
+              {
+                "expr": "integer",
+                "value": 7
+              },
+              {
+                "expr": "integer",
+                "value": 8
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "leaf_count"
+                },
+                "maximum": 8,
+                "index": "leaf_index",
+                "body": [
+                  {
+                    "op": "transform",
+                    "transform": {
+                      "translate_x": null,
+                      "translate_y": null,
+                      "scale_x": null,
+                      "scale_y": null,
+                      "rotate_degrees": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "number",
+                            "value": -65.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 55.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -82.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 72.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -48.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 88.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -70.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 62.0
+                          }
+                        ]
+                      }
+                    },
+                    "body": [
+                      {
+                        "op": "emit",
+                        "binding": "edge_a",
+                        "fields": {
+                          "angle": {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          "chord": {
+                            "expr": "exact_decimal",
+                            "value": "0.130"
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "green"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.026"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "wash"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thin"
+                          }
+                        }
+                      },
+                      {
+                        "op": "emit",
+                        "binding": "edge_b",
+                        "fields": {
+                          "chord": {
+                            "expr": "exact_decimal",
+                            "value": "0.130"
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "green"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.026"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "wash"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "brush_thin"
+                          }
+                        }
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "connected",
+                        "from": "branch",
+                        "to": "edge_a",
+                        "target_path_position": {
+                          "expr": "cycle",
+                          "index": {
+                            "expr": "local",
+                            "name": "leaf_index"
+                          },
+                          "items": [
+                            {
+                              "expr": "number",
+                              "value": 0.1
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.22
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.34
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.46
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.58
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.7
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.82
+                            },
+                            {
+                              "expr": "number",
+                              "value": 0.9
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "touching",
+                        "from": "edge_a",
+                        "to": "edge_b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "summaries": {
+        "ja": "中域の水平な灰の太筆枝をゆっくり波打たせ、その実線上の別々の接点へ閉じた二弧の青葉6〜8枚を結ぶ。葉は細筆の緑で、薄墨の線肌を持つ。",
+        "en": "Draw one horizontal gray thick-brush branch slowly undulating through the middle, then join 6–8 closed two-arc summer leaves to distinct points on its performed line. The leaves use a fine green brush with a wash-treated contour."
+      }
+    },
+    {
+      "definition": {
+        "schema": "inku.macro-definition.v1",
+        "namespace": "Nature",
         "heading": "紅葉",
         "version": "1.0.0",
         "parameters": {},
         "components": {},
         "body": [
-          {"op": "anchor", "name": "palm_center", "fields": {
-            "position_x": {"expr": "exact_decimal", "value": "0.50"},
-            "position_y": {"expr": "exact_decimal", "value": "0.50"}
-          }},
-          {"op": "vary", "binding": "blade_count", "domain": "momiji_blade_count", "choices": [
-            {"expr": "integer", "value": 5},
-            {"expr": "integer", "value": 6},
-            {"expr": "integer", "value": 7}
-          ], "range": null, "body": [
-            {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 7, "index": "blade_index", "body": [
-              {"op": "vary", "binding": "blade_lean", "domain": "momiji_radial_lean", "choices": [
-                {"expr": "semantic_ref", "category": "angle", "id": "horizontal"},
-                {"expr": "semantic_ref", "category": "angle", "id": "left_rising"},
-                {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
-                {"expr": "semantic_ref", "category": "angle", "id": "rising"},
-                {"expr": "semantic_ref", "category": "angle", "id": "diagonal"},
-                {"expr": "semantic_ref", "category": "angle", "id": "falling"},
-                {"expr": "semantic_ref", "category": "angle", "id": "left_falling"}
-              ], "range": null, "body": [
-                {"op": "emit", "binding": "edge_a", "fields": {
-                  "angle": {"expr": "local", "name": "blade_lean"},
-                  "chord": {"expr": "exact_decimal", "value": "0.220"},
-                  "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
-                  "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                  "sagitta": {"expr": "exact_decimal", "value": "0.018"},
-                  "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                  "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
-                }},
-                {"op": "emit", "binding": "edge_b", "fields": {
-                  "chord": {"expr": "exact_decimal", "value": "0.220"},
-                  "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
-                  "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                  "sagitta": {"expr": "exact_decimal", "value": "0.018"},
-                  "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                  "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
-                }},
-                {"op": "relation", "kind": "connected", "from": "palm_center", "to": "edge_a"},
-                {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
-              ]}
-            ]}
-          ]},
-          {"op": "emit", "binding": "stem", "fields": {
-            "angle": {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
-            "color": {"expr": "semantic_ref", "category": "color", "id": "red"},
-            "length": {"expr": "exact_decimal", "value": "0.24"},
-            "movement": {"expr": "semantic_ref", "category": "movement", "id": "draw"},
-            "shape": {"expr": "semantic_ref", "category": "shape", "id": "line"},
-            "touch": {"expr": "semantic_ref", "category": "touch", "id": "rotring"}
-          }},
-          {"op": "relation", "kind": "connected", "from": "palm_center", "to": "stem"}
+          {
+            "op": "anchor",
+            "name": "palm_center",
+            "fields": {
+              "position_x": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              },
+              "position_y": {
+                "expr": "exact_decimal",
+                "value": "0.50"
+              }
+            }
+          },
+          {
+            "op": "vary",
+            "binding": "blade_count",
+            "domain": "momiji_blade_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 5
+              },
+              {
+                "expr": "integer",
+                "value": 6
+              },
+              {
+                "expr": "integer",
+                "value": 7
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "blade_count"
+                },
+                "maximum": 7,
+                "index": "blade_index",
+                "body": [
+                  {
+                    "op": "transform",
+                    "transform": {
+                      "translate_x": null,
+                      "translate_y": null,
+                      "scale_x": null,
+                      "scale_y": null,
+                      "rotate_degrees": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "blade_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "number",
+                            "value": -90.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": -25.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 40.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 105.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 170.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 235.0
+                          },
+                          {
+                            "expr": "number",
+                            "value": 300.0
+                          }
+                        ]
+                      }
+                    },
+                    "body": [
+                      {
+                        "op": "emit",
+                        "binding": "edge_a",
+                        "fields": {
+                          "angle": {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          "chord": {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.018"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "rotring"
+                          }
+                        }
+                      },
+                      {
+                        "op": "emit",
+                        "binding": "edge_b",
+                        "fields": {
+                          "chord": {
+                            "expr": "exact_decimal",
+                            "value": "0.220"
+                          },
+                          "color": {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          "movement": {
+                            "expr": "semantic_ref",
+                            "category": "movement",
+                            "id": "place"
+                          },
+                          "sagitta": {
+                            "expr": "exact_decimal",
+                            "value": "0.018"
+                          },
+                          "shape": {
+                            "expr": "semantic_ref",
+                            "category": "shape",
+                            "id": "arc"
+                          },
+                          "touch": {
+                            "expr": "semantic_ref",
+                            "category": "touch",
+                            "id": "rotring"
+                          }
+                        }
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "connected",
+                        "from": "palm_center",
+                        "to": "edge_a"
+                      },
+                      {
+                        "op": "relation",
+                        "kind": "touching",
+                        "from": "edge_a",
+                        "to": "edge_b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "emit",
+            "binding": "stem",
+            "fields": {
+              "angle": {
+                "expr": "semantic_ref",
+                "category": "angle",
+                "id": "vertical"
+              },
+              "color": {
+                "expr": "semantic_ref",
+                "category": "color",
+                "id": "red"
+              },
+              "length": {
+                "expr": "exact_decimal",
+                "value": "0.24"
+              },
+              "movement": {
+                "expr": "semantic_ref",
+                "category": "movement",
+                "id": "draw"
+              },
+              "shape": {
+                "expr": "semantic_ref",
+                "category": "shape",
+                "id": "line"
+              },
+              "touch": {
+                "expr": "semantic_ref",
+                "category": "touch",
+                "id": "rotring"
+              }
+            }
+          },
+          {
+            "op": "relation",
+            "kind": "connected",
+            "from": "palm_center",
+            "to": "stem"
+          }
         ]
       },
       "summaries": {
@@ -251,53 +1112,351 @@
         "components": {
           "fallen_leaf": {
             "parameters": {
-              "color": {"type": "semantic_ref", "category": "color"},
-              "lean": {"type": "semantic_ref", "category": "angle"},
-              "x": {"type": "exact_decimal", "dimension": "position_x"},
-              "y": {"type": "exact_decimal", "dimension": "position_y"}
+              "color": {
+                "type": "semantic_ref",
+                "category": "color"
+              },
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
             },
             "body": [
-              {"op": "emit", "binding": "edge_a", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
-                "chord": {"expr": "exact_decimal", "value": "0.110"},
-                "color": {"expr": "parameter", "name": "color"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "position_x": {"expr": "parameter", "name": "x"},
-                "position_y": {"expr": "parameter", "name": "y"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.022"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
-              }},
-              {"op": "emit", "binding": "edge_b", "fields": {
-                "chord": {"expr": "exact_decimal", "value": "0.110"},
-                "color": {"expr": "parameter", "name": "color"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.022"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "crayon"}
-              }},
-              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.110"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "blurring"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.022"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "crayon"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.110"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "blurring"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.022"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "crayon"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
             ]
           }
         },
         "body": [
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rising"}, "x": {"expr": "exact_decimal", "value": "0.18"}, "y": {"expr": "exact_decimal", "value": "0.16"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rotated"}, "x": {"expr": "exact_decimal", "value": "0.25"}, "y": {"expr": "exact_decimal", "value": "0.24"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "falling"}, "x": {"expr": "exact_decimal", "value": "0.32"}, "y": {"expr": "exact_decimal", "value": "0.32"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "diagonal"}, "x": {"expr": "exact_decimal", "value": "0.39"}, "y": {"expr": "exact_decimal", "value": "0.40"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "left_falling"}, "x": {"expr": "exact_decimal", "value": "0.46"}, "y": {"expr": "exact_decimal", "value": "0.48"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "horizontal"}, "x": {"expr": "exact_decimal", "value": "0.53"}, "y": {"expr": "exact_decimal", "value": "0.56"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "left_rising"}, "x": {"expr": "exact_decimal", "value": "0.60"}, "y": {"expr": "exact_decimal", "value": "0.64"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "rotated"}, "x": {"expr": "exact_decimal", "value": "0.67"}, "y": {"expr": "exact_decimal", "value": "0.72"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "red"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "falling"}, "x": {"expr": "exact_decimal", "value": "0.74"}, "y": {"expr": "exact_decimal", "value": "0.80"}}},
-          {"op": "use", "component": "fallen_leaf", "arguments": {"color": {"expr": "semantic_ref", "category": "color", "id": "gray"}, "lean": {"expr": "semantic_ref", "category": "angle", "id": "diagonal"}, "x": {"expr": "exact_decimal", "value": "0.81"}, "y": {"expr": "exact_decimal", "value": "0.88"}}}
+          {
+            "op": "vary",
+            "binding": "leaf_count",
+            "domain": "ochiba_leaf_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 8
+              },
+              {
+                "expr": "integer",
+                "value": 9
+              },
+              {
+                "expr": "integer",
+                "value": 10
+              },
+              {
+                "expr": "integer",
+                "value": 11
+              },
+              {
+                "expr": "integer",
+                "value": 12
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "leaf_count"
+                },
+                "maximum": 12,
+                "index": "leaf_index",
+                "body": [
+                  {
+                    "op": "use",
+                    "component": "fallen_leaf",
+                    "arguments": {
+                      "color": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "red"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "color",
+                            "id": "gray"
+                          }
+                        ]
+                      },
+                      "lean": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rising"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rotated"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "diagonal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_rising"
+                          }
+                        ]
+                      },
+                      "x": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.14"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.205"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.27"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.335"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.40"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.465"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.53"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.595"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.66"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.725"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.79"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.855"
+                          }
+                        ]
+                      },
+                      "y": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.15"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.215"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.28"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.345"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.41"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.475"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.54"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.605"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.67"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.735"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.80"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.865"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
       "summaries": {
-        "ja": "落葉10枚を左上から右下への斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を葉ごとに交互にし、傾きをばらし、端を滲ませる。",
-        "en": "Place ten fallen leaves along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with red and gray alternating leaf by leaf and varied rotations."
+        "ja": "落葉8〜12枚を左上から右下へ順に流れる斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を厳密に交互にし、傾きをばらし、端を滲ませる。",
+        "en": "Place 8–12 fallen leaves in order along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with strictly alternating red and gray and varied rotations."
       }
     },
     {
@@ -310,64 +1469,308 @@
         "components": {
           "rooted_blade": {
             "parameters": {
-              "chord": {"type": "exact_decimal", "dimension": "chord"},
-              "lean": {"type": "semantic_ref", "category": "angle"},
-              "x": {"type": "exact_decimal", "dimension": "position_x"},
-              "y": {"type": "exact_decimal", "dimension": "position_y"}
+              "chord": {
+                "type": "exact_decimal",
+                "dimension": "chord"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
             },
             "body": [
-              {"op": "anchor", "name": "root", "fields": {"position_x": {"expr": "parameter", "name": "x"}, "position_y": {"expr": "parameter", "name": "y"}}},
-              {"op": "emit", "binding": "edge_a", "fields": {
-                "angle": {"expr": "parameter", "name": "lean"},
-                "chord": {"expr": "parameter", "name": "chord"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
-                "fluctuation_frequency": {"expr": "semantic_ref", "category": "variation", "id": "quickly"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
-              }},
-              {"op": "emit", "binding": "edge_b", "fields": {
-                "chord": {"expr": "parameter", "name": "chord"},
-                "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
-                "fluctuation_frequency": {"expr": "semantic_ref", "category": "variation", "id": "quickly"},
-                "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "blurring"},
-                "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                "sagitta": {"expr": "exact_decimal", "value": "0.014"},
-                "shape": {"expr": "semantic_ref", "category": "shape", "id": "arc"},
-                "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
-              }},
-              {"op": "relation", "kind": "connected", "from": "root", "to": "edge_a"},
-              {"op": "relation", "kind": "touching", "from": "edge_a", "to": "edge_b"}
+              {
+                "op": "anchor",
+                "name": "root",
+                "fields": {
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  }
+                }
+              },
+              {
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "parameter",
+                    "name": "rotation"
+                  }
+                },
+                "body": [
+                  {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "quickly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "blurring"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "chalk"
+                      }
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "parameter",
+                        "name": "chord"
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "gray"
+                      },
+                      "fluctuation_frequency": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "quickly"
+                      },
+                      "fluctuation_quality": {
+                        "expr": "semantic_ref",
+                        "category": "variation",
+                        "id": "blurring"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.014"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "chalk"
+                      }
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "root",
+                    "to": "edge_a"
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
+                  }
+                ]
+              }
             ]
           }
         },
         "body": [
-          {"op": "vary", "binding": "root_count", "domain": "karekusa_root_count", "choices": [{"expr": "integer", "value": 1}, {"expr": "integer", "value": 2}], "range": null, "body": [
-            {"op": "repeat", "count": {"expr": "local", "name": "root_count"}, "maximum": 2, "index": "root_index", "body": [
-              {"op": "vary", "binding": "root_x", "domain": "karekusa_bottom_spot", "choices": [{"expr": "exact_decimal", "value": "0.28"}, {"expr": "exact_decimal", "value": "0.72"}], "range": null, "body": [
-                {"op": "vary", "binding": "blade_count", "domain": "karekusa_blade_count", "choices": [{"expr": "integer", "value": 3}, {"expr": "integer", "value": 4}, {"expr": "integer", "value": 5}], "range": null, "body": [
-                  {"op": "repeat", "count": {"expr": "local", "name": "blade_count"}, "maximum": 5, "index": "blade_index", "body": [
-                    {"op": "vary", "binding": "blade_chord", "domain": "karekusa_blade_height", "choices": [{"expr": "exact_decimal", "value": "0.18"}, {"expr": "exact_decimal", "value": "0.24"}, {"expr": "exact_decimal", "value": "0.30"}], "range": null, "body": [
-                      {"op": "vary", "binding": "blade_lean", "domain": "karekusa_blade_lean", "choices": [
-                        {"expr": "semantic_ref", "category": "angle", "id": "vertical"},
-                        {"expr": "semantic_ref", "category": "angle", "id": "diagonal"},
-                        {"expr": "semantic_ref", "category": "angle", "id": "falling"}
-                      ], "range": null, "body": [
-                        {"op": "use", "component": "rooted_blade", "arguments": {
-                          "chord": {"expr": "local", "name": "blade_chord"},
-                          "lean": {"expr": "local", "name": "blade_lean"},
-                          "x": {"expr": "local", "name": "root_x"},
-                          "y": {"expr": "exact_decimal", "value": "0.90"}
-                        }}
-                      ]}
-                    ]}
-                  ]}
-                ]}
-              ]}
-            ]}
-          ]}
+          {
+            "op": "vary",
+            "binding": "root_count",
+            "domain": "karekusa_root_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 1
+              },
+              {
+                "expr": "integer",
+                "value": 2
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "root_count"
+                },
+                "maximum": 2,
+                "index": "root_index",
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "blade_count",
+                    "domain": "karekusa_blade_count",
+                    "choices": [
+                      {
+                        "expr": "integer",
+                        "value": 3
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 4
+                      },
+                      {
+                        "expr": "integer",
+                        "value": 5
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "repeat",
+                        "count": {
+                          "expr": "local",
+                          "name": "blade_count"
+                        },
+                        "maximum": 5,
+                        "index": "blade_index",
+                        "body": [
+                          {
+                            "op": "use",
+                            "component": "rooted_blade",
+                            "arguments": {
+                              "chord": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "blade_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.30"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.22"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.18"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.26"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.20"
+                                  }
+                                ]
+                              },
+                              "rotation": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "blade_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "number",
+                                    "value": -90.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -45.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": 28.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": -70.0
+                                  },
+                                  {
+                                    "expr": "number",
+                                    "value": 38.0
+                                  }
+                                ]
+                              },
+                              "x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "root_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.28"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.72"
+                                  }
+                                ]
+                              },
+                              "y": {
+                                "expr": "exact_decimal",
+                                "value": "0.90"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
       "summaries": {
@@ -384,34 +1787,136 @@
         "parameters": {},
         "components": {},
         "body": [
-          {"op": "vary", "binding": "leaf_count", "domain": "kareha_leaf_count", "choices": [{"expr": "integer", "value": 2}, {"expr": "integer", "value": 3}, {"expr": "integer", "value": 4}], "range": null, "body": [
-            {"op": "repeat", "count": {"expr": "local", "name": "leaf_count"}, "maximum": 4, "index": "leaf_index", "body": [
-              {"op": "vary", "binding": "leaf_x", "domain": "kareha_lower_corner_x", "choices": [
-                {"expr": "exact_decimal", "value": "0.16"},
-                {"expr": "exact_decimal", "value": "0.26"},
-                {"expr": "exact_decimal", "value": "0.74"},
-                {"expr": "exact_decimal", "value": "0.84"}
-              ], "range": null, "body": [
-                {"op": "vary", "binding": "leaf_y", "domain": "kareha_lower_y", "choices": [
-                  {"expr": "exact_decimal", "value": "0.72"},
-                  {"expr": "exact_decimal", "value": "0.82"},
-                  {"expr": "exact_decimal", "value": "0.88"}
-                ], "range": null, "body": [
-                  {"op": "emit", "binding": null, "fields": {
-                    "color": {"expr": "semantic_ref", "category": "color", "id": "gray"},
-                    "fluctuation_amplitude": {"expr": "semantic_ref", "category": "variation", "id": "fine"},
-                    "fluctuation_quality": {"expr": "semantic_ref", "category": "variation", "id": "trembling"},
-                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
-                    "position_x": {"expr": "local", "name": "leaf_x"},
-                    "position_y": {"expr": "local", "name": "leaf_y"},
-                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "cloudform"},
-                    "surface": {"expr": "semantic_ref", "category": "surface", "id": "none"},
-                    "touch": {"expr": "semantic_ref", "category": "touch", "id": "chalk"}
-                  }}
-                ]}
-              ]}
-            ]}
-          ]}
+          {
+            "op": "vary",
+            "binding": "leaf_count",
+            "domain": "kareha_leaf_count",
+            "choices": [
+              {
+                "expr": "integer",
+                "value": 2
+              },
+              {
+                "expr": "integer",
+                "value": 3
+              },
+              {
+                "expr": "integer",
+                "value": 4
+              }
+            ],
+            "range": null,
+            "body": [
+              {
+                "op": "repeat",
+                "count": {
+                  "expr": "local",
+                  "name": "leaf_count"
+                },
+                "maximum": 4,
+                "index": "leaf_index",
+                "body": [
+                  {
+                    "op": "vary",
+                    "binding": "leaf_x",
+                    "domain": "kareha_lower_corner_x",
+                    "choices": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.16"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.26"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.74"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.84"
+                      }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "vary",
+                        "binding": "leaf_y",
+                        "domain": "kareha_lower_y",
+                        "choices": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.72"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.82"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.88"
+                          }
+                        ],
+                        "range": null,
+                        "body": [
+                          {
+                            "op": "emit",
+                            "binding": null,
+                            "fields": {
+                              "color": {
+                                "expr": "semantic_ref",
+                                "category": "color",
+                                "id": "gray"
+                              },
+                              "fluctuation_amplitude": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "fine"
+                              },
+                              "fluctuation_quality": {
+                                "expr": "semantic_ref",
+                                "category": "variation",
+                                "id": "trembling"
+                              },
+                              "movement": {
+                                "expr": "semantic_ref",
+                                "category": "movement",
+                                "id": "place"
+                              },
+                              "position_x": {
+                                "expr": "local",
+                                "name": "leaf_x"
+                              },
+                              "position_y": {
+                                "expr": "local",
+                                "name": "leaf_y"
+                              },
+                              "shape": {
+                                "expr": "semantic_ref",
+                                "category": "shape",
+                                "id": "cloudform"
+                              },
+                              "surface": {
+                                "expr": "semantic_ref",
+                                "category": "surface",
+                                "id": "none"
+                              },
+                              "touch": {
+                                "expr": "semantic_ref",
+                                "category": "touch",
+                                "id": "chalk"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         ]
       },
       "summaries": {

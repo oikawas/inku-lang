@@ -31,16 +31,14 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     effects = ProductPipelineEffects(binding, default_manifest(binding))
-    source = "Nature.若葉。"
+    source = "Nature.青葉。"
     config, context = effects.prepare("author", "direct_ddl", source,
         {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77}, None)
-    assert len(config["definitions"]) == 6
+    assert len(config["definitions"]) == 7
     assert config["language"] == "ja"
-    assert "若葉" in config["macro_summaries"][0]
+    assert any("青葉" in summary for summary in config["macro_summaries"])
     omissions = context["macro_catalog"]["diagnostics"]
-    assert [(item["qualified_name"], item["reason"]) for item in omissions] == [
-        ("Nature.青葉", "legacy_semantics_require_authored_canonical_definition"),
-    ]
+    assert omissions == []
     context.update(description="", committed_description="", derivation_kind="new")
     store = VariationAuthorityStore(engine)
     run = CandidateExecution(binding, store, owner_id="author", config=config,
@@ -50,7 +48,13 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     snapshot = run.snapshot()
     assert snapshot["phase"]["tag"] == "score_ready"
     assert snapshot["document"]["source"] == source
-    assert snapshot["delivery"]["score"]["instructions"]
+    score = snapshot["delivery"]["score"]
+    assert score["version"] == "0.11.0"
+    assert score["resource_policy"]
+    contacts = [instruction["relation"] for instruction in score["instructions"]
+                if (instruction.get("relation") or {}).get("target_path_position") is not None]
+    assert 6 <= len(contacts) <= 8
+    assert all(relation["target_instruction_index"] == 0 for relation in contacts)
     stored = store.read("author", snapshot["variation_id"])
     assert stored["document"]["macro_locks"]
     engine.dispose()

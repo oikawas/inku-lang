@@ -321,7 +321,7 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        assert_eq!(ja.entries.len(), 6);
+        assert_eq!(ja.entries.len(), 7);
         assert!(ja.diagnostics.is_empty());
         assert!(en.diagnostics.is_empty());
         assert_eq!(

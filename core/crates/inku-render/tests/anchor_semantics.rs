@@ -27,6 +27,30 @@ fn start(plan: &PerformancePlan, index: usize) -> Point {
     plan.instruction_transforms[index].apply(point)
 }
 
+fn endpoints(plan: &PerformancePlan, index: usize, canvas: Option<CanvasSize>) -> (Point, Point) {
+    let (start, end, _, _) = endpoint_geometry(&plan.score.instructions[index], canvas).unwrap();
+    (
+        plan.instruction_transforms[index].apply(start),
+        plan.instruction_transforms[index].apply(end),
+    )
+}
+
+fn path_point(points: &[Point], position: f64) -> Point {
+    let last = points.len() - 1;
+    let scaled = position * last as f64;
+    let lower = (scaled.floor() as usize).min(last);
+    let upper = (lower + 1).min(last);
+    let fraction = scaled - lower as f64;
+    Point::new(
+        points[lower].x + (points[upper].x - points[lower].x) * fraction,
+        points[lower].y + (points[upper].y - points[lower].y) * fraction,
+    )
+}
+
+fn near_point(actual: Point, expected: Point) {
+    near(actual, expected.x, expected.y);
+}
+
 fn near(actual: Point, x: f64, y: f64) {
     assert!(
         (actual.x - x).hypot(actual.y - y) < 1.0e-9,
@@ -286,4 +310,91 @@ fn group_connections_require_one_compatible_translation() {
             .all(|value| value.instruction_index < 2
                 && value.reason == ScoreExecutionReason::ConflictingRelationConstraints)
     );
+}
+
+#[test]
+fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() {
+    let canvas = CanvasSize::new(1200.0, 800.0);
+    let input = score(
+        r#"{"version":"0.11.0","instructions":[
+      {"primitive":"line","from":[0.18,0.5],"to":[0.82,0.5],
+       "variation":{"amplitude":"broad","frequency":"slow","quality":"wave",
+                    "dimensions":["position_x","position_y"]}},
+      {"primitive":"arc","center":[0.3,0.3],"radius":0.07,
+       "angle_start":0,"angle_end":180,
+       "relation":{"type":"connected","target_instruction_index":0,
+                   "target_path_position":0.25,"position_authority":"named_movable"}},
+      {"primitive":"arc","center":[0.3,0.3],"radius":0.07,
+       "angle_start":0,"angle_end":180,
+       "relation":{"type":"touching","target_instruction_index":1,
+                   "position_authority":"named_movable",
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}},
+      {"primitive":"arc","center":[0.65,0.3],"radius":0.06,
+       "angle_start":0,"angle_end":180,
+       "relation":{"type":"connected","target_instruction_index":0,
+                   "target_path_position":0.72,"position_authority":"named_movable"}},
+      {"primitive":"arc","center":[0.65,0.3],"radius":0.06,
+       "angle_start":0,"angle_end":180,
+       "relation":{"type":"touching","target_instruction_index":3,
+                   "position_authority":"named_movable",
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
+    ],"transform_groups":[
+      {"start":1,"end":3,"rotation_degrees":35},
+      {"start":3,"end":5,"rotation_degrees":-28},
+      {"start":0,"end":5,"rotation_degrees":27,"scale_x":1.35,"scale_y":0.68}
+    ]}"#,
+    );
+    let performed = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(71),
+            composition_seed: Some(71),
+            canvas: Some(canvas),
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .unwrap();
+    assert!(performed.execution.is_none());
+    let centerline = performed.line_centerlines[0]
+        .as_deref()
+        .expect("the targeted varied branch fixes one performed centerline");
+    assert!(centerline.len() > 2);
+    let chord = Point::new(
+        centerline.last().unwrap().x - centerline[0].x,
+        centerline.last().unwrap().y - centerline[0].y,
+    );
+    assert!(centerline[1..centerline.len() - 1].iter().any(|point| {
+        let offset = Point::new(point.x - centerline[0].x, point.y - centerline[0].y);
+        (chord.x * offset.y - chord.y * offset.x).abs() > 1.0e-9
+    }));
+
+    let first = endpoints(&performed, 1, Some(canvas));
+    let first_closure = endpoints(&performed, 2, Some(canvas));
+    near_point(first.0, path_point(centerline, 0.25));
+    near_point(first.0, first_closure.0);
+    near_point(first.1, first_closure.1);
+
+    let second = endpoints(&performed, 3, Some(canvas));
+    let second_closure = endpoints(&performed, 4, Some(canvas));
+    near_point(second.0, path_point(centerline, 0.72));
+    near_point(second.0, second_closure.0);
+    near_point(second.1, second_closure.1);
+
+    let output = render(RenderRequest {
+        score: input,
+        options: RenderOptions {
+            resolved_color_map: Default::default(),
+            catalog_id: None,
+            canvas,
+            canvas_aspect_id: "landscape".to_owned(),
+            svg_profile: SvgProfile::Editable,
+            render_seed: Some(71),
+            composition_seed: Some(71),
+            wild: false,
+            error_policy: ScoreErrorPolicy::Stop,
+        },
+    })
+    .unwrap();
+    assert!(output.svg.contains("instruction_000_line"));
+    assert!(output.svg.contains("instruction_004_arc"));
 }

@@ -6,6 +6,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Connect to the performed branch and revise Nature proposals
+
+Explicit Macro Connected path positions reach Score 0.11. Connection resolution and drawing share the same varied Line centerline, retaining contact through later rotation, scaling, and translation. General Along and adjacent Connected keep their semantics; invalid relations are diagnosed and removed while other drawing continues. Works without the new field retain flat 0.9 or compact 0.10. These changes use DDL engine 38 and render engine 60.
+
+The Nature proposals add summer leaves and use shared Transform and Cycle expressions for rooted grass directions, radial red leaves with a downward stem, and 8–12 strictly alternating red/gray fallen leaves. Images and author adoption remain pending. Summer-leaf wash currently affects each Arc contour and does not fill the closed two-arc interior. Application version, deployment, and iOS remain unchanged.
+
+### 2026-09-13 — Add finite cyclic selection to Macros
+
+The shared `cycle` expression selects from a homogeneous finite list using a repeat index. It preserves counts, including odd counts, while expressing alternating colors and ordered positions. Exact values, semantic IDs, evaluation budgets, and diagnostics remain intact. A focused ordering/count case and an invalid-index rejection passed. Nature content acceptance and branch contact remain in progress; this change does not deploy the product or implement iOS.
+
 ### 2026-09-13 — Prepare shared bundled Macro definitions for content review
 
 Six Nature leaf words now have proposed MacroDefinition v1 content. The shared catalog supplies the same definitions and digests with localized summaries to Server and Android. Server retains the installed document's enable/disable control, does not implicitly translate arbitrary legacy Markdown, and gives explicit installation definitions precedence. Saved works retain their original definitions and locks. Android native build inputs now include embedded JSON assets.

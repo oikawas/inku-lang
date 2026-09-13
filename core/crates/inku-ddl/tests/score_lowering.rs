@@ -3781,6 +3781,64 @@ fn placement_free_nested_macro_group_delivers_typed_along_and_cutting() {
 }
 
 #[test]
+fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
+    use serde_json::json;
+    let mut leaf = macro_group_emit("leaf", "green");
+    leaf["fields"]["shape"]["id"] = json!("arc");
+    let mut body = json!([
+        macro_group_emit("branch", "gray"),
+        macro_group_emit("spacer", "black"),
+        leaf,
+        {"op":"relation","kind":"connected","from":"branch","to":"leaf",
+         "target_path_position":{"expr":"number","value":0.375}}
+    ]);
+    let definition = macro_group_definition(body.clone());
+    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        lowered.diagnostics()
+    );
+    let score = lowered.score().unwrap();
+    assert_eq!(score.version, "0.11.0");
+    assert_eq!(score.instructions.len(), 3);
+    let relation = score.instructions[2].relation.as_ref().unwrap();
+    assert_eq!(relation.target_instruction_index, Some(0));
+    assert_eq!(relation.target_path_position, Some(0.375));
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context);
+    let planned = plan.objects().unwrap()[2].relation().unwrap();
+    assert_eq!(planned.target_object_index(), Some(0));
+    assert_eq!(planned.target_path_position(), Some(0.375));
+
+    body[3]
+        .as_object_mut()
+        .unwrap()
+        .remove("target_path_position");
+    let ordinary = macro_group_definition(body);
+    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[ordinary]);
+    let rejected = lower_verified_stage15_score_with_policy(
+        transformed.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        rejected.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(rejected.score().unwrap().instructions.len(), 3);
+    assert!(rejected.score().unwrap().instructions[2].relation.is_none());
+    assert!(
+        rejected
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnsupportedMacroRelation)
+    );
+}
+
+#[test]
 fn macro_rotation_preserves_nested_postorder_ranges_and_fixed_member_indices() {
     use serde_json::json;
 

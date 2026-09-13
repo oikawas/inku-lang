@@ -548,6 +548,7 @@ fn render_affine_instruction(
     instruction: &Instruction,
     style: &MarkStyle,
     context: MarkContext<'_>,
+    connected_centerline: Option<&[Point]>,
 ) -> Result<Element, MarkError> {
     debug_assert!(!context.geometry_transform.is_identity());
     match instruction.primitive {
@@ -580,7 +581,14 @@ fn render_affine_instruction(
                         false,
                     ))
                 } else {
-                    Ok(hand_line(instruction, start, end, style, context))
+                    Ok(hand_line(
+                        instruction,
+                        start,
+                        end,
+                        connected_centerline,
+                        style,
+                        context,
+                    ))
                 }
             } else {
                 Ok(apply_style(
@@ -866,10 +874,18 @@ pub fn render_instruction(
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Result<Element, MarkError> {
+    render_instruction_with_line_centerline(instruction, context, None)
+}
+
+pub(crate) fn render_instruction_with_line_centerline(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    connected_centerline: Option<&[Point]>,
+) -> Result<Element, MarkError> {
     let mut style = mark_style(instruction, context);
     accepted_fills::prepare_style(instruction, &mut style);
     if !context.geometry_transform.is_identity() {
-        return render_affine_instruction(instruction, &style, context);
+        return render_affine_instruction(instruction, &style, context, connected_centerline);
     }
     match instruction.primitive {
         Primitive::Line => {
@@ -882,7 +898,14 @@ pub fn render_instruction(
                 context.canvas,
             );
             if uses_hand_stroke(instruction.weight) {
-                Ok(hand_line(instruction, start, end, &style, context))
+                Ok(hand_line(
+                    instruction,
+                    start,
+                    end,
+                    connected_centerline,
+                    &style,
+                    context,
+                ))
             } else {
                 Ok(rotate(
                     apply_style(

@@ -156,8 +156,46 @@ fn connected_fields_roundtrip_while_legacy_relations_keep_them_absent() {
     assert_eq!(legacy.target_instruction_index, None);
     assert_eq!(legacy.position_authority, None);
     let canonical = canonical_json_bytes(&score).expect("Connected Score serializes");
+    assert!(
+        !std::str::from_utf8(&canonical)
+            .unwrap()
+            .contains("target_path_position")
+    );
     let reread = read_saved_score_json(&canonical).expect("Connected Score rereads");
     assert_eq!(reread, score);
+}
+
+#[test]
+fn connected_path_position_requires_the_0_11_instruction_target_contract() {
+    let source = br#"{"version":"0.11.0","instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5]},
+        {"primitive":"arc","center":[0.4,0.4],"radius":0.08,
+         "angle_start":0.0,"angle_end":180.0,
+         "relation":{"type":"connected","target_instruction_index":0,
+         "target_path_position":0.375,"position_authority":"named_movable"}}
+    ]}"#;
+    let score = read_saved_score_json(source).expect("Score 0.11 path target must parse");
+    assert_eq!(
+        score.instructions[1]
+            .relation
+            .as_ref()
+            .unwrap()
+            .target_path_position,
+        Some(0.375)
+    );
+    let canonical = canonical_json_bytes(&score).expect("Score 0.11 path target canonicalizes");
+    assert_eq!(
+        read_saved_score_json(&canonical).expect("Score 0.11 path target rereads"),
+        score
+    );
+
+    for invalid in [
+        br#"{"version":"0.10.0","instructions":[{"primitive":"line","relation":{"type":"connected","target_instruction_index":0,"target_path_position":0.5}}]}"#.as_slice(),
+        br#"{"version":"0.11.0","instructions":[{"primitive":"line","relation":{"type":"along","target_instruction_index":0,"target_path_position":0.5}}]}"#.as_slice(),
+        br#"{"version":"0.11.0","instructions":[{"primitive":"line","relation":{"type":"connected","target_instruction_index":0,"target_path_position":1.01}}]}"#.as_slice(),
+    ] {
+        assert!(read_saved_score_json(invalid).is_err());
+    }
 }
 
 #[test]

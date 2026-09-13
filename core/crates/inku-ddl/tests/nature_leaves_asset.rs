@@ -38,8 +38,9 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
     let expected = [
         ("Nature.若葉", 12, 8..=12),
         ("Nature.下草", 20, 6..=20),
+        ("Nature.青葉", 17, 13..=17),
         ("Nature.紅葉", 15, 11..=15),
-        ("Nature.落葉", 20, 20..=20),
+        ("Nature.落葉", 24, 16..=24),
         ("Nature.枯草", 20, 6..=20),
         ("Nature.枯葉", 4, 2..=4),
     ];
@@ -157,6 +158,34 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             "Nature.下草" | "Nature.紅葉" | "Nature.枯草"
         ) {
             assert!(!execution.anchor_origins().is_empty(), "{qualified_name}");
+        }
+        if *qualified_name == "Nature.青葉" {
+            let branch = &score.instructions[0];
+            assert_eq!(branch.primitive, Primitive::Line);
+            assert_eq!(branch.color, Color::Gray);
+            assert_eq!(branch.weight, inku_score::Weight::BrushThick);
+            let variation = branch.variation.as_ref().expect("undulating branch");
+            assert_eq!(variation.frequency, inku_score::Frequency::Slow);
+            assert_eq!(variation.quality, inku_score::Quality::Wave);
+            let path_connections = score
+                .instructions
+                .iter()
+                .filter(|instruction| {
+                    instruction.relation.as_ref().is_some_and(|relation| {
+                        relation.kind == RelationType::Connected
+                            && relation.target_instruction_index == Some(0)
+                            && relation.target_path_position.is_some()
+                    })
+                })
+                .count();
+            assert!((6..=8).contains(&path_connections));
+            assert!(score.instructions[1..].iter().all(|instruction| {
+                instruction.color == Color::Green
+                    && instruction.weight == inku_score::Weight::BrushThin
+                    && instruction.surface.as_ref().is_some_and(|surface| {
+                        surface.texture == inku_score::SurfaceTexture::Wash
+                    })
+            }));
         }
         if *qualified_name == "Nature.落葉" {
             for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {

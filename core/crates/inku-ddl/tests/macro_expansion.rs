@@ -14,6 +14,78 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/macro-expansion-v1.json");
 
 #[test]
+fn cycle_keeps_odd_counts_and_exact_ordered_values() {
+    let definition = MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1","namespace":"Pattern","heading":"Marks","version":"1.0.0",
+        "parameters":{},"components":{},
+        "body":[{"op":"repeat","count":{"expr":"integer","value":5},"maximum":5,"index":"i","body":[
+            {"op":"emit","binding":null,"fields":{
+                "color":{"expr":"cycle","index":{"expr":"local","name":"i"},"items":[
+                    {"expr":"semantic_ref","category":"color","id":"red"},
+                    {"expr":"semantic_ref","category":"color","id":"gray"}]},
+                "position_x":{"expr":"cycle","index":{"expr":"local","name":"i"},"items":[
+                    {"expr":"exact_decimal","value":"0.10"},
+                    {"expr":"exact_decimal","value":"0.20"},
+                    {"expr":"exact_decimal","value":"0.30"}]}
+            }}
+        ]}]
+    }).to_string()).unwrap();
+    assert!(definition.validate().diagnostics().is_empty());
+    let source = "Pattern.Marks";
+    let binding = binding(&definition, source, "en");
+    let seeds = seeds(&binding, source, 7);
+    let result = expand_macros(binding, &[definition], &seeds, LIMITS);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let actual = flatten(&result.expanded[0].nodes)
+        .into_iter()
+        .filter_map(|node| {
+            let ExpandedMacroNode::Emit { fields, .. } = node else {
+                return None;
+            };
+            Some((fields["color"].clone(), fields["position_x"].clone()))
+        })
+        .collect::<Vec<_>>();
+    let expected = [
+        ("red", "0.1"),
+        ("gray", "0.2"),
+        ("red", "0.3"),
+        ("gray", "0.1"),
+        ("red", "0.2"),
+    ]
+    .into_iter()
+    .map(|(color, x)| {
+        (
+            ExpandedMacroValue::SemanticRef {
+                category: "color".into(),
+                id: color.into(),
+            },
+            ExpandedMacroValue::ExactDecimal(inku_ddl::ExactDecimal::parse(x).unwrap()),
+        )
+    })
+    .collect::<Vec<_>>();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn cycle_rejects_non_integer_index_at_definition_boundary() {
+    let definition = MacroDefinition::from_json(&serde_json::json!({
+        "schema":"inku.macro-definition.v1","namespace":"Pattern","heading":"Marks","version":"1.0.0",
+        "parameters":{},"components":{},
+        "body":[{"op":"emit","binding":null,"fields":{"value":{
+            "expr":"cycle","index":{"expr":"number","value":0.5},
+            "items":[{"expr":"integer","value":1}]
+        }}}]
+    }).to_string()).unwrap();
+    assert!(
+        definition
+            .validate()
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code() == "invalid_cycle_index")
+    );
+}
+
+#[test]
 fn exact_decimal_survives_source_parameter_component_and_choices() {
     let definition = MacroDefinition::from_json(&serde_json::json!({
         "schema":"inku.macro-definition.v1","namespace":"Exact","heading":"Mark","version":"1.0.0",

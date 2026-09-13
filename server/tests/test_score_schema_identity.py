@@ -16,6 +16,30 @@ _ARTIFACT_PATH = (
 )
 
 
+def test_score11_keeps_explicit_path_contact_and_rejects_older_editions() -> None:
+    from copy import deepcopy
+
+    data = {
+        "version": "0.11.0",
+        "instructions": [
+            {"primitive": "line"}, {"primitive": "point"},
+            {"primitive": "arc", "relation": {
+                "type": "connected", "target_instruction_index": 0,
+                "target_path_position": 0.375, "position_authority": "named_movable",
+            }},
+        ],
+    }
+    score = Score.model_validate(data)
+    assert score.resource_policy is None
+    assert score.model_dump()["instructions"][2]["relation"]["target_path_position"] == 0.375
+    with pytest.raises(ValueError, match="target_path_position requires Score version 0.11.0"):
+        Score.model_validate({**data, "version": "0.10.0"})
+    invalid = deepcopy(data)
+    invalid["instructions"][2]["relation"]["type"] = "along"
+    with pytest.raises(ValueError, match="requires Connected"):
+        Score.model_validate(invalid)
+
+
 def _canonical_score_schema_bytes() -> bytes:
     return json.dumps(
         Score.model_json_schema(),
@@ -36,7 +60,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]
@@ -55,6 +79,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert "target_instruction_index" in relation
     assert "target_anchor_index" in relation
     assert "position_authority" in relation
+    assert "target_path_position" in relation
     assert "touching_constraints" in relation
     assert set(schema["$defs"]["TouchingConstraints"]["required"]) == {
         "dimensions_fixed", "direction_fixed"

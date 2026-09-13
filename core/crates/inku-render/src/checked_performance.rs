@@ -562,12 +562,16 @@ fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
         .any(|group| group.start <= index && index < group.end)
 }
 
+fn uses_compact_resource_contract(score: &inku_score::Score) -> bool {
+    score.version == "0.10.0" || (score.version == "0.11.0" && score.resource_policy.is_some())
+}
+
 /// Resolve checked relations and transform scopes through one dependency executor.
 pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    if request.score.version == "0.10.0" {
+    if uses_compact_resource_contract(request.score) {
         return Err(CheckedPerformanceError {
             diagnostics: vec![ScoreExecutionDiagnostic {
                 instruction_index: 0,
@@ -598,7 +602,7 @@ pub fn resolve_checked_performance(
     }
 }
 
-/// Perform compact Score 0.10 only after caller-owned hard and operational authority.
+/// Perform compact Score only after caller-owned hard and operational authority.
 /// Legacy editions retain their established checked-performance path.
 pub fn resolve_checked_performance_with_resources(
     request: PerformanceRequest<'_>,
@@ -646,7 +650,7 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     operational_budget: inku_score::OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
-    if request.score.version != "0.10.0" {
+    if !uses_compact_resource_contract(request.score) {
         return resolve_checked_performance(request, policy).map_err(Into::into);
     }
     let finalized = inku_score::finalize_saved_score_with_omitted_instructions(

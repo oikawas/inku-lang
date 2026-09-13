@@ -979,10 +979,10 @@ pub fn finalize_saved_score_with_omitted_instructions(
     operational_budget: OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
 ) -> Result<FinalizedScore, SavedScoreResourceError> {
-    if score.version != "0.10.0" {
+    if !matches!(score.version.as_str(), "0.10.0" | "0.11.0") {
         return Err(invalid(
             SavedScoreResourceOwner::Score,
-            "saved resource finalization requires Score 0.10.0",
+            "saved resource finalization requires compact Score 0.10 or later",
         ));
     }
     if authorized_hard_policy.identity.trim().is_empty() {
@@ -1649,6 +1649,47 @@ mod tests {
             ),
             (vec![Some(0), None, None, Some(1)], 0, 1)
         );
+    }
+
+    #[test]
+    fn compact_0_11_remap_preserves_a_retained_path_position() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        score.version = "0.11.0".into();
+        let mut target = serde_json::to_value(&score.instructions[2]).unwrap();
+        let target = target.as_object_mut().unwrap();
+        target.insert("primitive".into(), json!("line"));
+        target.insert("from".into(), json!([0.1, 0.5]));
+        target.insert("to".into(), json!([0.9, 0.5]));
+        target.remove("center");
+        target.remove("radius");
+        score.instructions[2] = serde_json::from_value(serde_json::Value::Object(target.clone()))
+            .expect("compact path target line");
+        score.instructions[3].relation = serde_json::from_value(json!({
+            "type": "connected",
+            "target_instruction_index": 2,
+            "target_path_position": 0.625
+        }))
+        .unwrap();
+        assert!(score.validate_schema_edition().is_ok());
+
+        let finalized = finalize_saved_score_with_omitted_instructions(
+            &score,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+            &[0],
+        )
+        .unwrap();
+        assert_eq!(
+            finalized.index_maps.instructions,
+            vec![None, Some(0), Some(1), Some(2)]
+        );
+        let relation = finalized.score.instructions[2]
+            .relation
+            .as_ref()
+            .expect("retained relation");
+        assert_eq!(relation.target_instruction_index, Some(1));
+        assert_eq!(relation.target_path_position, Some(0.625));
     }
 
     #[test]

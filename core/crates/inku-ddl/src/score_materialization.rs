@@ -178,6 +178,7 @@ pub fn materialize_selected_composition(
                     target_anchor_index: anchor_target,
                     position_authority: relation.position_authority(),
                     touching_constraints: relation.touching_constraints(),
+                    target_path_position: relation.target_path_position(),
                 });
             }
         }
@@ -324,7 +325,17 @@ pub fn materialize_selected_composition(
         })
         .collect::<Result<Vec<_>, ScoreMaterializationError>>()?;
     let score = Score {
-        version: "0.10.0".to_owned(),
+        version: if instructions.iter().any(|instruction| {
+            instruction
+                .relation
+                .as_ref()
+                .is_some_and(|relation| relation.target_path_position.is_some())
+        }) {
+            "0.11.0"
+        } else {
+            "0.10.0"
+        }
+        .to_owned(),
         canvas: plan.ground().cloned().map_or_else(
             || Canvas::Id(plan.context().canvas_format().id.to_owned()),
             |ground| {

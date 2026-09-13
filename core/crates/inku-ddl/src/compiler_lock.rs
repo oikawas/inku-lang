@@ -3357,11 +3357,23 @@ fn node_value(
             record.insert("kind".to_owned(), Value::String("anchor".to_owned()));
             record.insert("target".to_owned(), target_value(target, owners, owner)?);
         }
-        ExpandedMacroNode::Relation { kind, from, to, .. } => {
+        ExpandedMacroNode::Relation {
+            kind,
+            from,
+            to,
+            target_path_position,
+            ..
+        } => {
             record.insert("kind".to_owned(), Value::String("relation".to_owned()));
             record.insert("relation".to_owned(), Value::String(kind.clone()));
             record.insert("from".to_owned(), target_value(from, owners, owner)?);
             record.insert("to".to_owned(), target_value(to, owners, owner)?);
+            if let Some(position) = target_path_position {
+                record.insert(
+                    "target_path_position".to_owned(),
+                    optional_f64(Some(*position)),
+                );
+            }
         }
         ExpandedMacroNode::Transform {
             transform, body, ..

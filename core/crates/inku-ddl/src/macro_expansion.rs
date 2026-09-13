@@ -139,6 +139,7 @@ pub enum ExpandedMacroNode {
         kind: String,
         from: GeneratedTargetId,
         to: GeneratedTargetId,
+        target_path_position: Option<f64>,
         provenance: GeneratedNodeProvenance,
     },
     Transform {
@@ -1178,15 +1179,42 @@ impl<'a> Evaluator<'a> {
                     Ok(Vec::new())
                 }
             }
-            Statement::Relation { kind, from, to } => {
+            Statement::Relation {
+                kind,
+                from,
+                to,
+                target_path_position,
+            } => {
                 let from = self.target(targets, from, path)?;
                 let to = self.target(targets, to, path)?;
+                let target_path_position = target_path_position
+                    .as_ref()
+                    .map(|position| {
+                        let value = match self.evaluate_expression(position, environment, path)? {
+                            ExpandedMacroValue::Number(value) => value,
+                            ExpandedMacroValue::Integer(value) => value as f64,
+                            _ => {
+                                return Err(EvalError::new(
+                                    MacroExpansionDiagnosticKind::ExpressionMismatch,
+                                )
+                                .at(path));
+                            }
+                        };
+                        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                            return Err(
+                                EvalError::new(MacroExpansionDiagnosticKind::NumericRange).at(path)
+                            );
+                        }
+                        Ok(value)
+                    })
+                    .transpose()?;
                 let ordinal = self.bump_node(path)?;
                 if self.materialize {
                     Ok(vec![ExpandedMacroNode::Relation {
                         kind: kind.clone(),
                         from,
                         to,
+                        target_path_position,
                         provenance: self.node_provenance(ordinal, path),
                     }])
                 } else {
@@ -1357,6 +1385,28 @@ impl<'a> Evaluator<'a> {
                 .map(|item| self.evaluate_expression(item, environment, path))
                 .collect::<Result<Vec<_>, _>>()
                 .map(ExpandedMacroValue::List),
+            Expression::Cycle { items, index } => {
+                let ExpandedMacroValue::Integer(index) =
+                    self.evaluate_expression(index, environment, path)?
+                else {
+                    return Err(
+                        EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch).at(path),
+                    );
+                };
+                let index = u64::try_from(index).map_err(|_| {
+                    EvalError::new(MacroExpansionDiagnosticKind::NumericRange).at(path)
+                })?;
+                if items.is_empty() {
+                    return Err(
+                        EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch).at(path),
+                    );
+                }
+                self.evaluate_expression(
+                    &items[(index % items.len() as u64) as usize],
+                    environment,
+                    path,
+                )
+            }
             Expression::Parameter { name } => {
                 environment.parameters.get(name).cloned().ok_or_else(|| {
                     EvalError::new(MacroExpansionDiagnosticKind::ExpressionMismatch).at(path)

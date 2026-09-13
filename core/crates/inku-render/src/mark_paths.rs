@@ -195,14 +195,89 @@ pub(crate) const fn amplitude_width(amplitude: Amplitude) -> f64 {
     }
 }
 
+/// Fix the visible centerline for a Line that an explicit path connection targets.
+///
+/// The result is in physical short-side units. Its variation is resolved before
+/// later affine transforms so relation execution and final rendering can share
+/// one curve and transform it together with dependents.
+pub(crate) fn connected_line_centerline(
+    instruction: &Instruction,
+    seed: crate::types::Seed,
+    canvas: CanvasSize,
+    transform: crate::affine::AffineTransform,
+) -> Option<Vec<Point>> {
+    let variation = instruction
+        .variation
+        .as_ref()
+        .filter(|variation| needs_path_variation(variation))?;
+    if instruction.primitive != Primitive::Line || !uses_hand_stroke(instruction.weight) {
+        return None;
+    }
+    let unit = canvas.unit();
+    if !unit.is_finite() || unit <= 0.0 {
+        return None;
+    }
+    let start = point_to_pixels(instruction.from_?, canvas);
+    let end = point_to_pixels(instruction.to?, canvas);
+    let mut centerline = line_with_variation(
+        start,
+        end,
+        variation,
+        seed,
+        amplitude(instruction, canvas),
+        canvas,
+    );
+    if let Some(degrees) = instruction
+        .rotation
+        .filter(|degrees| degrees.abs() >= 1.0e-9)
+    {
+        let pivot = point_to_pixels(
+            instruction_anchor_on_canvas(instruction, Some(canvas)),
+            canvas,
+        );
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        for point in &mut centerline {
+            let dx = point.x - pivot.x;
+            let dy = point.y - pivot.y;
+            *point = Point::new(pivot.x + dx * cos - dy * sin, pivot.y + dx * sin + dy * cos);
+        }
+    }
+    let transform = transform.in_pixels(unit);
+    centerline
+        .into_iter()
+        .map(|point| {
+            let point = transform.apply(point);
+            let point = Point::new(point.x / unit, point.y / unit);
+            (point.x.is_finite() && point.y.is_finite()).then_some(point)
+        })
+        .collect()
+}
+
 pub(crate) fn hand_line(
     instruction: &Instruction,
     start: Point,
     end: Point,
+    connected_centerline: Option<&[Point]>,
     style: &MarkStyle,
     context: MarkContext<'_>,
 ) -> Element {
     let seed = context.seed_for(instruction);
+    let connected_centerline = connected_centerline.map(|points| {
+        points
+            .iter()
+            .map(|point| {
+                Point::new(
+                    point.x * context.canvas.unit(),
+                    point.y * context.canvas.unit(),
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+    let has_connected_centerline = connected_centerline.is_some();
+    let (start, end) = connected_centerline
+        .as_deref()
+        .and_then(|points| points.first().copied().zip(points.last().copied()))
+        .unwrap_or((start, end));
     let sample_count =
         stroke_sample_count((end.x - start.x).hypot(end.y - start.y), context.canvas);
     let support = instruction_support(instruction, context.support);
@@ -217,20 +292,23 @@ pub(crate) fn hand_line(
         grid_step: grid_step(instruction.weight, context.canvas),
         support,
     });
-    let outline = if instruction
-        .variation
-        .as_ref()
-        .is_some_and(needs_path_variation)
-    {
-        let variation = instruction.variation.as_ref().expect("checked above");
-        let centerline = line_with_variation(
-            start,
-            end,
-            variation,
-            seed,
-            amplitude(instruction, context.canvas),
-            context.canvas,
-        );
+    let centerline = connected_centerline.or_else(|| {
+        instruction
+            .variation
+            .as_ref()
+            .filter(|variation| needs_path_variation(variation))
+            .map(|variation| {
+                line_with_variation(
+                    start,
+                    end,
+                    variation,
+                    seed,
+                    amplitude(instruction, context.canvas),
+                    context.canvas,
+                )
+            })
+    });
+    let outline = if let Some(centerline) = centerline {
         let varied = synthesize_stroke(StrokeRequest {
             start,
             end,
@@ -293,7 +371,7 @@ pub(crate) fn hand_line(
         ));
     }
     let group = with_texture_filter(group, instruction.weight, context.use_filters);
-    if context.geometry_transform.is_identity() {
+    if !has_connected_centerline && context.geometry_transform.is_identity() {
         rotate(group, instruction, context.canvas)
     } else {
         group

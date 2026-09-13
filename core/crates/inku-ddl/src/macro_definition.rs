@@ -180,14 +180,36 @@ pub enum ParameterSchema {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "expr", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Expression {
-    Number { value: f64 },
-    ExactDecimal { value: String },
-    Integer { value: i64 },
-    Boolean { value: bool },
-    List { items: Vec<Expression> },
-    Parameter { name: String },
-    Local { name: String },
-    SemanticRef { category: String, id: String },
+    Number {
+        value: f64,
+    },
+    ExactDecimal {
+        value: String,
+    },
+    Integer {
+        value: i64,
+    },
+    Boolean {
+        value: bool,
+    },
+    List {
+        items: Vec<Expression>,
+    },
+    /// Select by a non-negative integer index, repeating a finite pattern.
+    Cycle {
+        items: Vec<Expression>,
+        index: Box<Expression>,
+    },
+    Parameter {
+        name: String,
+    },
+    Local {
+        name: String,
+    },
+    SemanticRef {
+        category: String,
+        id: String,
+    },
 }
 
 /// Explicit source roles for exact numeric arguments; parameter names have no meaning.
@@ -291,6 +313,8 @@ pub enum Statement {
         kind: String,
         from: String,
         to: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target_path_position: Option<Expression>,
     },
     Repeat {
         count: Expression,
@@ -719,7 +743,14 @@ fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
                 }
                 normalize_statement_semantic_aliases(body);
             }
-            Statement::Relation { .. } => {}
+            Statement::Relation {
+                target_path_position,
+                ..
+            } => {
+                if let Some(position) = target_path_position {
+                    normalize_expression_semantic_aliases(position);
+                }
+            }
         }
     }
 }
@@ -732,6 +763,12 @@ fn normalize_expression_semantic_aliases(expression: &mut Expression) {
                 .canonical_spelling();
         }
         Expression::List { items } => {
+            for item in items {
+                normalize_expression_semantic_aliases(item);
+            }
+        }
+        Expression::Cycle { items, index } => {
+            normalize_expression_semantic_aliases(index);
             for item in items {
                 normalize_expression_semantic_aliases(item);
             }
@@ -1098,7 +1135,24 @@ fn validate_body(
                     }
                 }
             }
-            Statement::Relation { kind, from, to } => {
+            Statement::Relation {
+                kind,
+                from,
+                to,
+                target_path_position,
+            } => {
+                if let Some(position) = target_path_position {
+                    let path = format!("{statement_path}.target_path_position");
+                    if kind != "connected" {
+                        push_diagnostic(diagnostics, "path_position_requires_connected", &path);
+                    }
+                    if !matches!(
+                        validate_expression(position, &path, parameters, locals, diagnostics),
+                        Some(ValueKind::Number | ValueKind::Integer)
+                    ) {
+                        push_diagnostic(diagnostics, "path_position_requires_number", &path);
+                    }
+                }
                 if !known_relation(kind) {
                     push_diagnostic(
                         diagnostics,
@@ -1356,6 +1410,37 @@ fn validate_expression(
                 );
             }
             Some(ValueKind::List)
+        }
+        Expression::Cycle { items, index } => {
+            let index_kind = validate_expression(
+                index,
+                &format!("{path}.index"),
+                parameters,
+                locals,
+                diagnostics,
+            );
+            if index_kind != Some(ValueKind::Integer)
+                || matches!(index.as_ref(), Expression::Integer { value } if *value < 0)
+            {
+                push_diagnostic(diagnostics, "invalid_cycle_index", format!("{path}.index"));
+            }
+            if items.is_empty() {
+                push_diagnostic(diagnostics, "empty_cycle", path);
+                return None;
+            }
+            let mut selected_kind = None;
+            for (index, item) in items.iter().enumerate() {
+                let item_path = format!("{path}.items[{index}]");
+                let kind = validate_expression(item, &item_path, parameters, locals, diagnostics);
+                if let (Some(expected), Some(actual)) = (&selected_kind, &kind) {
+                    if !kinds_compatible(expected, actual) || !kinds_compatible(actual, expected) {
+                        push_diagnostic(diagnostics, "heterogeneous_cycle", item_path);
+                    }
+                } else if selected_kind.is_none() {
+                    selected_kind = kind;
+                }
+            }
+            selected_kind
         }
         Expression::Parameter { name } => {
             if !is_ascii_identifier(name) {

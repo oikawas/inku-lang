@@ -126,6 +126,7 @@ pub struct PlanRelation {
     pub(crate) gap: RelationGap,
     pub(crate) target_object_index: Option<usize>,
     pub(crate) target_anchor_index: Option<usize>,
+    pub(crate) target_path_position: Option<f64>,
     pub(crate) position_authority: Option<ConnectedPositionAuthority>,
     pub(crate) touching_constraints: Option<TouchingConstraints>,
 }
@@ -145,6 +146,10 @@ impl PlanRelation {
 
     pub const fn target_anchor_index(&self) -> Option<usize> {
         self.target_anchor_index
+    }
+
+    pub const fn target_path_position(&self) -> Option<f64> {
+        self.target_path_position
     }
 
     pub const fn position_authority(&self) -> Option<ConnectedPositionAuthority> {

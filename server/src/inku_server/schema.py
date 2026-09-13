@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -352,6 +352,11 @@ class Relation(BaseModel):
         exclude_if=lambda value: value is None,
         description="checked relation が参照する非描画 Score anchor index。instruction target と排他的",
     )
+    target_path_position: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0, strict=True,
+        exclude_if=lambda value: value is None,
+        description="Connected target Lineの演奏中心線上の位置。0が始点、1が終点。Score 0.11で明示する",
+    )
     position_authority: Optional[ConnectedPositionAuthority] = Field(
         default=None,
         exclude_if=lambda value: value is None,
@@ -377,6 +382,10 @@ class Relation(BaseModel):
     def _require_one_explicit_target(self) -> "Relation":
         if self.target_instruction_index is not None and self.target_anchor_index is not None:
             raise ValueError("relation target instruction and anchor are exclusive")
+        if self.target_path_position is not None and (
+            self.type != "connected" or self.target_instruction_index is None or self.target_anchor_index is not None
+        ):
+            raise ValueError("target_path_position requires Connected to an instruction")
         return self
 
 
@@ -1429,9 +1438,9 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
             raise ValueError("anchors requires Score version 0.6.0")
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start > group.end or (
@@ -1440,7 +1449,7 @@ class Score(BaseModel):
                 raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"} and (
+            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
@@ -1459,7 +1468,7 @@ class Score(BaseModel):
                 raise ValueError("transform group anchor_indices must be unique")
             if any(index >= len(self.anchors) for index in anchor_indices):
                 raise ValueError("transform group anchor_indices exceeds anchors")
-            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
                 raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
                 current_contains_prior = (
@@ -1485,15 +1494,15 @@ class Score(BaseModel):
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
                 if not set(prior.anchor_indices) <= anchor_indices:
                     raise ValueError("outer transform groups must include descendant anchor_indices")
-        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
             raise ValueError("placement_groups requires Score version 0.7.0")
         placement_end = 0
         placement_anchor_indices: set[int] = set()
         placement_transform_indices: set[int] = set()
         for group in self.placement_groups:
-            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0"}:
+            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
                 raise ValueError("scatter and tile placement_groups require Score version 0.8.0")
-            if group.members and self.version not in {"0.9.0", "0.10.0"}:
+            if group.members and self.version not in {"0.9.0", "0.10.0", "0.11.0"}:
                 raise ValueError("placement group members require Score version 0.9.0")
             if not group.members and group.start >= group.end:
                 raise ValueError("placement group range must be nonempty")
@@ -1553,8 +1562,10 @@ class Score(BaseModel):
             placement_end = group.end
         for instruction in self.instructions:
             relation = instruction.relation
+            if relation is not None and relation.target_path_position is not None and self.version != "0.11.0":
+                raise ValueError("target_path_position requires Score version 0.11.0")
             if relation is not None and relation.target_anchor_index is not None:
-                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
                     raise ValueError("relation target_anchor_index requires Score version 0.6.0")
                 if relation.target_anchor_index >= len(self.anchors):
                     raise ValueError("relation target_anchor_index exceeds anchors")
@@ -1570,9 +1581,9 @@ class Score(BaseModel):
                 for instruction in self.instructions
             )
         )
-        if has_compact_fields and self.version != "0.10.0":
-            raise ValueError("compact symbolic fields require Score version 0.10.0")
-        if self.version == "0.10.0":
+        if has_compact_fields and self.version not in {"0.10.0", "0.11.0"}:
+            raise ValueError("compact symbolic fields require Score version 0.10.0 or 0.11.0")
+        if self.version == "0.10.0" or (self.version == "0.11.0" and has_compact_fields):
             if self.resource_policy is None:
                 raise ValueError("Score 0.10 requires a resource_policy snapshot")
             if not self.resource_policy.hard_policy.identity:

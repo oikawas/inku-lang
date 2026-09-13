@@ -12,7 +12,7 @@ use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
-use crate::marks::{MarkContext, MarkError, render_instruction};
+use crate::marks::{MarkContext, MarkError, render_instruction_with_line_centerline};
 use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::PerformanceRequest;
@@ -400,6 +400,7 @@ fn render_impl(
         performed_index,
     ) in ordered
     {
+        let line_centerline = performance.line_centerlines[performed_index].as_deref();
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
                 instruction,
@@ -439,7 +440,8 @@ fn render_impl(
                 material_definitions.push(solid_mottle_filter(&filter_id, seed));
             }
             material_definitions.extend(accepted_fills::definitions(single, context));
-            let base_mark = render_instruction(single, context)?;
+            let base_mark =
+                render_instruction_with_line_centerline(single, context, line_centerline)?;
             let mut mark = if let Some(surface) = render_surface(single, context) {
                 let mut combined = Element::new("g");
                 combined.push(base_mark);

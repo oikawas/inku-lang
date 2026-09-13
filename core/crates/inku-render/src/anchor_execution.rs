@@ -10,6 +10,7 @@ struct Performed {
     instruction: Instruction,
     ordinal: usize,
     seed_override: Option<crate::types::Seed>,
+    line_centerline: Option<Vec<Point>>,
 }
 
 struct Execution<'a> {
@@ -17,6 +18,7 @@ struct Execution<'a> {
     schedule: AnchorSchedule,
     performed: Vec<Vec<Performed>>,
     transforms: Vec<AffineTransform>,
+    path_hosts: Vec<bool>,
     anchors: Vec<Option<Point>>,
     omitted: Vec<bool>,
     omitted_groups: Vec<bool>,
@@ -143,6 +145,24 @@ fn distance(point: Point) -> f64 {
     point.x.hypot(point.y)
 }
 
+fn centerline_point(points: &[Point], position: f64) -> Option<Point> {
+    let last = points.len().checked_sub(1)?;
+    if last == 0 {
+        return points.first().copied();
+    }
+    let scaled = position * last as f64;
+    let lower = (scaled.floor() as usize).min(last);
+    let upper = (lower + 1).min(last);
+    let fraction = scaled - lower as f64;
+    let from = points[lower];
+    let to = points[upper];
+    finite_point(Point::new(
+        from.x + (to.x - from.x) * fraction,
+        from.y + (to.y - from.y) * fraction,
+    ))
+    .ok()
+}
+
 /// The two-center segment with the existing diagonal jitter, independent of
 /// which point the performance seed happens to select for a movable source.
 fn between_contains(point: Point, first: Point, second: Point) -> bool {
@@ -209,6 +229,61 @@ fn merge_bounds(bounds: &mut Option<Bounds>, next: Bounds) {
 }
 
 impl Execution<'_> {
+    fn apply_instruction_transform(
+        &mut self,
+        index: usize,
+        transform: AffineTransform,
+    ) -> Result<(), ScoreExecutionReason> {
+        let composed = transform.compose(self.transforms[index]);
+        if !composed.is_finite() {
+            return Err(ScoreExecutionReason::InvalidTransformGroup);
+        }
+        let centerlines = self.performed[index]
+            .iter()
+            .map(|value| {
+                value
+                    .line_centerline
+                    .as_ref()
+                    .map(|centerline| {
+                        centerline
+                            .iter()
+                            .map(|point| finite_point(transform.apply(*point)))
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+                    .transpose()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.transforms[index] = composed;
+        for (value, centerline) in self.performed[index].iter_mut().zip(centerlines) {
+            value.line_centerline = centerline;
+        }
+        Ok(())
+    }
+
+    fn connected_line_centerline(
+        &self,
+        index: usize,
+        instruction: &Instruction,
+        seed_override: Option<crate::types::Seed>,
+    ) -> Option<Vec<Point>> {
+        if !self.path_hosts[index] {
+            return None;
+        }
+        let canvas = self
+            .request
+            .canvas
+            .unwrap_or_else(|| crate::types::CanvasSize::new(1.0, 1.0));
+        let seed = seed_override.unwrap_or_else(|| {
+            crate::determinism::instruction_seed(instruction, self.request.performance_seed)
+        });
+        crate::mark_paths::connected_line_centerline(
+            instruction,
+            seed,
+            canvas,
+            self.transforms[index],
+        )
+    }
+
     fn transform_fill_scope_indices(
         &mut self,
         scopes: &[usize],
@@ -301,11 +376,37 @@ impl Execution<'_> {
         }
         let target = relation
             .target_instruction_index
-            .filter(|&target| Some(target) == source.checked_sub(1))
+            .filter(|&target| {
+                if relation.target_path_position.is_some() {
+                    target < self.performed.len()
+                } else {
+                    Some(target) == source.checked_sub(1)
+                }
+            })
             .ok_or(ScoreExecutionReason::MissingConnectedReference)?;
-        let prior = self
-            .prior(target)
+        let prior = self.performed[target]
+            .last()
             .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+        if let Some(position) = relation.target_path_position {
+            if prior.instruction.primitive != Primitive::Line {
+                return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+            }
+            if let Some(centerline) = prior.line_centerline.as_deref() {
+                return centerline_point(centerline, position)
+                    .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+            }
+            let (start, end, _, _) = crate::affine_geometry::endpoints(
+                &prior.instruction,
+                self.request.canvas,
+                self.transforms[target],
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?;
+            return finite_point(Point::new(
+                start.x + (end.x - start.x) * position,
+                start.y + (end.y - start.y) * position,
+            ));
+        }
+        let prior = &prior.instruction;
         if !supports_connected(prior) {
             return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
         }
@@ -336,7 +437,8 @@ impl Execution<'_> {
                 return Err(ScoreExecutionReason::MissingConnectedReference);
             }
         } else if relation.target_instruction_index.is_none()
-            || relation.target_instruction_index != index.checked_sub(1)
+            || (relation.target_path_position.is_none()
+                && relation.target_instruction_index != index.checked_sub(1))
         {
             return Err(ScoreExecutionReason::MissingConnectedReference);
         }
@@ -429,8 +531,7 @@ impl Execution<'_> {
                 }
                 constraint.preferred
             };
-            self.transforms[index] =
-                AffineTransform::translation(delta).compose(self.transforms[index]);
+            self.apply_instruction_transform(index, AffineTransform::translation(delta))?;
             instruction.relation = None;
             return Ok(instruction);
         }
@@ -854,7 +955,7 @@ impl Execution<'_> {
     }
 
     fn correct_external_relations(&mut self, index: usize) -> Result<(), ScoreExecutionReason> {
-        let group = &self.request.score.transform_groups[index];
+        let group = self.request.score.transform_groups[index].clone();
         let mut constraints = Vec::new();
         for source in group.start..group.end {
             if self.schedule.external_groups[source] != Some(index)
@@ -917,11 +1018,7 @@ impl Execution<'_> {
         // leave behind a partial translation or change any member's geometry.
         let translation = AffineTransform::translation(delta);
         for member in group.start..group.end {
-            let composed = translation.compose(self.transforms[member]);
-            if !composed.is_finite() {
-                return Err(ScoreExecutionReason::InvalidTransformGroup);
-            }
-            self.transforms[member] = composed;
+            self.apply_instruction_transform(member, translation)?;
             if self.schedule.external_groups[member] == Some(index) {
                 for value in &mut self.performed[member] {
                     value.instruction.relation = None;
@@ -941,7 +1038,7 @@ impl Execution<'_> {
         if let Some(placement_index) = self.placement_indices[index] {
             return self.perform_placement(index, placement_index);
         }
-        let group = &self.request.score.transform_groups[index];
+        let group = self.request.score.transform_groups[index].clone();
         if (group.start..group.end)
             .any(|member| self.omitted[member] || self.performed[member].is_empty())
             || group
@@ -996,11 +1093,7 @@ impl Execution<'_> {
             return Err(ScoreExecutionReason::InvalidTransformGroup);
         }
         for member in group.start..group.end {
-            let composed = transform.compose(self.transforms[member]);
-            if !composed.is_finite() {
-                return Err(ScoreExecutionReason::InvalidTransformGroup);
-            }
-            self.transforms[member] = composed;
+            self.apply_instruction_transform(member, transform)?;
         }
         for &anchor in &group.anchor_indices {
             self.anchors[anchor] = self.anchors[anchor]
@@ -1011,7 +1104,7 @@ impl Execution<'_> {
         self.correct_external_relations(index)?;
         let has_outer = self.request.score.transform_groups[index + 1..]
             .iter()
-            .any(|outer| group_contains(outer, group));
+            .any(|outer| group_contains(outer, &group));
         if !has_outer {
             let extent = crate::geometry::short_side_scales(self.request.canvas);
             let inside = |point: Point| {
@@ -1059,7 +1152,7 @@ impl Execution<'_> {
         {
             return self.perform_typed_placement(scope_index, index);
         }
-        let group = &self.request.score.placement_groups[index];
+        let group = self.request.score.placement_groups[index].clone();
         let members = if group.members.is_empty() {
             (group.start..group.end)
                 .map(|start| inku_score::PlacementMember {
@@ -1154,8 +1247,7 @@ impl Execution<'_> {
             };
             let delta = Point::new(target.x - center.x, target.y - center.y);
             for instruction in member.start..member.end {
-                self.transforms[instruction] =
-                    AffineTransform::translation(delta).compose(self.transforms[instruction]);
+                self.apply_instruction_transform(instruction, AffineTransform::translation(delta))?;
             }
             for &anchor in &member.anchor_indices {
                 self.anchors[anchor] = self.anchors[anchor]
@@ -1193,7 +1285,7 @@ impl Execution<'_> {
         let translation =
             AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
         for member in group.start..group.end {
-            self.transforms[member] = translation.compose(self.transforms[member]);
+            self.apply_instruction_transform(member, translation)?;
         }
         for member in &members {
             for &anchor in &member.anchor_indices {
@@ -1279,7 +1371,7 @@ impl Execution<'_> {
             let translation =
                 AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
             for instruction in member.start..member.end {
-                self.transforms[instruction] = translation.compose(self.transforms[instruction]);
+                self.apply_instruction_transform(instruction, translation)?;
             }
             for &anchor in &member.anchor_indices {
                 self.anchors[anchor] = self.anchors[anchor].map(|point| translation.apply(point));
@@ -1452,6 +1544,18 @@ fn resolve_impl(
         })
         .collect();
     let mut omitted_relations = vec![false; request.score.instructions.len()];
+    let mut path_hosts = vec![false; request.score.instructions.len()];
+    for instruction in &request.score.instructions {
+        let Some(relation) = instruction.relation.as_ref() else {
+            continue;
+        };
+        if relation.target_path_position.is_some()
+            && let Some(host) = relation.target_instruction_index
+            && let Some(targeted) = path_hosts.get_mut(host)
+        {
+            *targeted = true;
+        }
+    }
     let mut diagnostics = typed
         .as_ref()
         .map_or_else(Vec::new, |typed| typed.diagnostics.clone());
@@ -1474,6 +1578,7 @@ fn resolve_impl(
             .map(|_| Vec::new())
             .collect(),
         transforms: vec![AffineTransform::identity(); request.score.instructions.len()],
+        path_hosts,
         anchors,
         omitted: vec![false; request.score.instructions.len()],
         omitted_groups: vec![false; request.score.transform_groups.len()],
@@ -1521,10 +1626,13 @@ fn resolve_impl(
                                 },
                             )
                         });
+                    let line_centerline =
+                        execution.connected_line_centerline(index, &instruction, seed_override);
                     execution.performed[index].push(Performed {
                         instruction,
                         ordinal,
                         seed_override,
+                        line_centerline,
                     });
                 }
                 None
@@ -1582,6 +1690,10 @@ fn resolve_impl(
     let instruction_transforms = rendered
         .iter()
         .map(|(owner, _)| execution.transforms[*owner])
+        .collect();
+    let line_centerlines = rendered
+        .iter()
+        .map(|(_, value)| value.line_centerline.clone())
         .collect();
     let mut score = request.score.clone();
     score.instructions = rendered
@@ -1680,6 +1792,7 @@ fn resolve_impl(
         original_instruction_indices,
         instruction_seed_overrides,
         instruction_transforms,
+        line_centerlines,
         fill_scopes,
         instruction_fill_scope_indices,
         resource_demand: None,

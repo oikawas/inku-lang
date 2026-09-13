@@ -509,6 +509,7 @@ fn checked_object_relation(
         gap: RelationGap::Medium,
         target_instruction_index: Some(target_instruction_index),
         target_anchor_index: None,
+        target_path_position: None,
         position_authority: Some(input.position_authority()),
         touching_constraints: touching.then_some(TouchingConstraints {
             dimensions_fixed: input.exact_geometry().is_some()
@@ -524,6 +525,7 @@ fn checked_macro_relation(
     input: ScoreLoweringInput<'_>,
     target_instruction_index: Option<usize>,
     prior: Option<(Primitive, Option<inku_score::ArcForm>)>,
+    target_path_position: Option<f64>,
 ) -> Result<Relation, ScoreFieldGap> {
     let target =
         target_instruction_index.ok_or(ScoreFieldGap::UnavailableMacroRelationReference)?;
@@ -536,8 +538,18 @@ fn checked_macro_relation(
         "between" => RelationType::Between,
         _ => return Err(ScoreFieldGap::UnsupportedMacroRelation),
     };
-    checked_object_relation(kind, input, target, prior)
-        .ok_or(ScoreFieldGap::UnsupportedMacroRelation)
+    if target_path_position.is_some_and(|position| {
+        kind != RelationType::Connected
+            || !position.is_finite()
+            || !(0.0..=1.0).contains(&position)
+            || !prior.is_some_and(|(primitive, _)| primitive == Primitive::Line)
+    }) {
+        return Err(ScoreFieldGap::UnsupportedMacroRelation);
+    }
+    let mut relation = checked_object_relation(kind, input, target, prior)
+        .ok_or(ScoreFieldGap::UnsupportedMacroRelation)?;
+    relation.target_path_position = target_path_position;
+    Ok(relation)
 }
 
 fn checked_macro_anchor_relation(
@@ -558,6 +570,7 @@ fn checked_macro_anchor_relation(
         gap: RelationGap::Medium,
         target_instruction_index: None,
         target_anchor_index: Some(target_anchor_index),
+        target_path_position: None,
         position_authority: Some(input.position_authority()),
         touching_constraints: None,
     })
@@ -569,6 +582,7 @@ fn plan_relation(relation: Relation) -> PlanRelation {
         gap: relation.gap,
         target_object_index: relation.target_instruction_index,
         target_anchor_index: relation.target_anchor_index,
+        target_path_position: relation.target_path_position,
         position_authority: relation.position_authority,
         touching_constraints: relation.touching_constraints,
     }
@@ -772,6 +786,7 @@ fn lower_macro_instruction(
             kind,
             from,
             to,
+            target_path_position,
             provenance,
         } = node
         else {
@@ -789,6 +804,7 @@ fn lower_macro_instruction(
                 .position(|(binding, _, _)| binding.is_some_and(|binding| binding == to));
             if to_position.is_some()
                 && kind == "connected"
+                && target_path_position.is_none()
                 && anchor_relation_by_to
                     .insert(to.clone(), (*anchor_index, kind.as_str()))
                     .is_none()
@@ -809,19 +825,30 @@ fn lower_macro_instruction(
                     .map(|position| emit_nodes[position].1.generated_ordinal)
             })
             .flatten();
+        let path_connected = kind == "connected" && target_path_position.is_some();
         if from_position.zip(to_position).is_some_and(|(from, to)| {
-            to == from + 1
-                && (kind != "between" || secondary.is_some())
-                && delivery_nodes[emit_nodes[if kind == "between" {
-                    from.saturating_sub(1)
-                } else {
-                    from
-                }]
-                .2 + 1..emit_nodes[to].2]
-                    .iter()
-                    .all(|node| !matches!(node.node, ExpandedMacroNode::Anchor { .. }))
+            from < to
+                && (path_connected
+                    || (to == from + 1
+                        && (kind != "between" || secondary.is_some())
+                        && delivery_nodes[emit_nodes[if kind == "between" {
+                            from.saturating_sub(1)
+                        } else {
+                            from
+                        }]
+                        .2 + 1..emit_nodes[to].2]
+                            .iter()
+                            .all(|node| !matches!(node.node, ExpandedMacroNode::Anchor { .. }))))
         }) && relation_by_to
-            .insert(to.clone(), (from.clone(), kind.as_str(), secondary))
+            .insert(
+                to.clone(),
+                (
+                    from.clone(),
+                    kind.as_str(),
+                    secondary,
+                    *target_path_position,
+                ),
+            )
             .is_none()
         {
             continue;
@@ -898,7 +925,7 @@ fn lower_macro_instruction(
         let anchor_relation_dependency = binding
             .as_ref()
             .and_then(|binding| anchor_relation_by_to.get(binding));
-        if let Some((dependency, _, secondary)) = relation_dependency
+        if let Some((dependency, _, secondary, _)) = relation_dependency
             && (!successful_bindings.contains_key(dependency)
                 || secondary.is_some_and(|ordinal| !successful_emits.contains_key(&ordinal)))
         {
@@ -1036,7 +1063,7 @@ fn lower_macro_instruction(
             let Some(object_index) = object_index else {
                 continue;
             };
-            if let Some((dependency, kind, _)) = relation_dependency {
+            if let Some((dependency, kind, _, target_path_position)) = relation_dependency {
                 let target_object_index = successful_bindings[dependency];
                 let prior = &objects[target_object_index];
                 let relation = checked_macro_relation(
@@ -1044,6 +1071,7 @@ fn lower_macro_instruction(
                     input,
                     Some(target_object_index),
                     Some((prior.primitive(), prior.arc_form())),
+                    *target_path_position,
                 );
                 match relation {
                     Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
@@ -1122,7 +1150,7 @@ fn lower_macro_instruction(
             });
         }
         if let Some(mut score_instruction) = attempt.instruction {
-            if let Some((dependency, kind, _)) = relation_dependency {
+            if let Some((dependency, kind, _, target_path_position)) = relation_dependency {
                 let target_instruction_index = successful_bindings.get(dependency).copied();
                 let prior = target_instruction_index.and_then(|index| instructions.get(index));
                 match checked_macro_relation(
@@ -1130,6 +1158,7 @@ fn lower_macro_instruction(
                     input,
                     target_instruction_index,
                     prior.map(|instruction| (instruction.primitive, instruction.arc_form)),
+                    *target_path_position,
                 ) {
                     Ok(relation) => score_instruction.relation = Some(relation),
                     Err(reason) => {
@@ -2787,7 +2816,16 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: score_wire_version(),
+        version: if instructions.iter().any(|instruction| {
+            instruction
+                .relation
+                .as_ref()
+                .is_some_and(|relation| relation.target_path_position.is_some())
+        }) {
+            "0.11.0".to_owned()
+        } else {
+            score_wire_version()
+        },
         canvas: ground.clone().map_or_else(
             || Canvas::Id(context.canvas_format.id.to_owned()),
             |ground| {

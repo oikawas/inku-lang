@@ -10,6 +10,224 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_total_nodes: 64,
 };
 
+fn selected_score(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> MaterializedComposition {
+    use inku_score::{
+        HardResourcePolicy, OperationalResourceBudget, ResourceBudget, ResourceDemand,
+    };
+    let transformed = stage(source, language, definitions);
+    let plan = plan_verified_stage15(transformed.verified_effective_view(), context("square"));
+    // Explicit fixture budgets; this does not introduce installation defaults.
+    let budget = ResourceBudget {
+        maximum: ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 512,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let selected = select_composition_plan_resources(
+        &plan,
+        HardResourcePolicy {
+            identity: "materialization-test.v1".to_owned(),
+            budget,
+        },
+        OperationalResourceBudget(budget),
+    )
+    .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    materialize_selected_composition(&selected)
+        .unwrap_or_else(|error| panic!("{source}: {error:?}"))
+}
+
+#[test]
+fn selected_score_preserves_fill_recipes_and_continues_after_resource_omission() {
+    use inku_score::{CountOrigin, FillBoundary, FillTargetGeometry, ResolvedPlacementRecipe};
+    let delivered = selected_score(
+        "fill red point. place blue circle.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    assert_eq!(delivered.resource_omissions.len(), 1);
+    assert_eq!(delivered.score.instructions.len(), 1);
+    assert_eq!(delivered.score.instructions[0].primitive, Primitive::Circle);
+    assert!(delivered.score.fill_groups.is_empty());
+    assert_eq!(
+        delivered.instruction_origins,
+        vec![ScoreInstructionOrigin::SourceInstruction {
+            instruction_index: 1
+        }]
+    );
+    let empty = selected_score("fill red point.", ResolvedInstructionLanguage::En, &[]);
+    assert_eq!(empty.resource_omissions.len(), 1);
+    assert!(empty.score.instructions.is_empty());
+    assert_eq!(empty.score.background, Color::White);
+
+    let single = selected_score("fill 1 red point.", ResolvedInstructionLanguage::En, &[]);
+    assert!(single.resource_omissions.is_empty());
+    assert_eq!(single.score.instructions.len(), 1);
+    let group = &single.score.fill_groups[0];
+    assert_eq!(group.logical_count, 1);
+    assert_eq!(group.boundary, FillBoundary::ClipToTarget);
+    assert_eq!(
+        group.members[0].symbolic.as_ref().unwrap().count_origin,
+        CountOrigin::Explicit
+    );
+    assert_eq!(
+        single.score.instructions[0]
+            .arrangement
+            .as_ref()
+            .unwrap()
+            .count,
+        1
+    );
+
+    let mixed = selected_score(
+        "三つの赤い円と四つの青い点で埋める。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+    );
+    assert_eq!(mixed.score.instructions.len(), 2);
+    assert_eq!(mixed.score.fill_groups[0].logical_count, 7);
+    assert_eq!(
+        mixed.score.fill_groups[0]
+            .members
+            .iter()
+            .map(|m| m.symbolic.as_ref().unwrap().instance_count)
+            .collect::<Vec<_>>(),
+        vec![3, 4]
+    );
+    assert!(
+        mixed
+            .score
+            .instructions
+            .iter()
+            .all(|i| i.arrangement.as_ref().unwrap().count == 1)
+    );
+
+    let shaped = selected_score(
+        "fill a circle diameter 0.5 at horizontal 0.5 vertical 0.5 with 3 red points.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    assert!(matches!(
+        shaped.score.fill_groups[0].target.geometry,
+        FillTargetGeometry::Shape {
+            primitive: Primitive::Circle,
+            ..
+        }
+    ));
+    assert_eq!(shaped.score.fill_groups[0].logical_count, 3);
+    let bytes = inku_score::canonical_json_bytes(&shaped.score).unwrap();
+    assert_eq!(
+        inku_score::read_saved_score_json(&bytes).unwrap(),
+        shaped.score
+    );
+
+    let repeated = selected_score(
+        "scatter 3 red circles.",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    let arrangement = repeated.score.instructions[0].arrangement.as_ref().unwrap();
+    assert_eq!(arrangement.count, 3);
+    assert_eq!(
+        arrangement.resolved.as_ref().unwrap().recipe,
+        ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation
+    );
+}
+
+#[test]
+fn selected_score_keeps_macro_outer_envelope_and_inner_count() {
+    let emit = |shape| {
+        json!({"op":"emit","binding":null,"fields":{
+            "shape":{"expr":"semantic_ref","category":"shape","id":shape},
+            "movement":{"expr":"semantic_ref","category":"movement","id":"scatter"},
+            "color":{"expr":"semantic_ref","category":"color","id":"red"},
+            "count":{"expr":"integer","value":2}
+        }})
+    };
+    let definition = MacroDefinition::from_json(&json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Delivery", "heading":"Pair", "version":"1.0.0",
+        "parameters":{}, "components":{}, "body":[emit("circle"),emit("point")]
+    }).to_string()).unwrap();
+    for (source, count, omitted) in [("Delivery.Pair", 1, true), ("3 Delivery.Pair", 3, false)] {
+        let delivered = selected_score(
+            source,
+            ResolvedInstructionLanguage::En,
+            std::slice::from_ref(&definition),
+        );
+        assert_eq!(delivered.score.instructions.len(), 2);
+        assert_eq!(delivered.score.repetition_groups.len(), 1);
+        let symbolic = delivered.score.repetition_groups[0]
+            .member
+            .symbolic
+            .as_ref()
+            .unwrap();
+        assert_eq!(symbolic.instance_count, count);
+        assert_eq!(
+            symbolic.count_origin,
+            if omitted {
+                inku_score::CountOrigin::OmittedDefault
+            } else {
+                inku_score::CountOrigin::Explicit
+            }
+        );
+        assert!(
+            delivered
+                .score
+                .instructions
+                .iter()
+                .all(|i| i.arrangement.as_ref().unwrap().count == 2)
+        );
+        assert!(
+            delivered
+                .instruction_origins
+                .iter()
+                .all(|origin| matches!(origin, ScoreInstructionOrigin::MacroEmit { .. }))
+        );
+    }
+}
+
+#[test]
+fn selected_score_preserves_primitive_group_and_anchor_owner() {
+    let group = selected_score(
+        "赤い円と青い点を置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+    );
+    assert_eq!(group.score.instructions.len(), 2);
+    assert_eq!(group.score.placement_groups.len(), 1);
+    assert_eq!(group.score.placement_groups[0].members.len(), 2);
+    let definition = MacroDefinition::from_json(&json!({
+        "schema":"inku.macro-definition.v1", "namespace":"Delivery", "heading":"Anchor", "version":"1.0.0",
+        "parameters":{}, "components":{}, "body":[{"op":"anchor","name":"pivot","fields":{
+            "position_x":{"expr":"exact_decimal","value":"0.2"},
+            "position_y":{"expr":"exact_decimal","value":"0.5"}
+        }}]
+    }).to_string()).unwrap();
+    let anchor = selected_score(
+        "Delivery.Anchor",
+        ResolvedInstructionLanguage::En,
+        &[definition],
+    );
+    assert!(anchor.score.instructions.is_empty());
+    assert_eq!(anchor.score.anchors.len(), 1);
+    assert_eq!(anchor.anchor_origins.len(), 1);
+    let member = &anchor.score.repetition_groups[0].member;
+    assert_eq!(member.start, member.end);
+    assert_eq!(member.anchor_indices, vec![0]);
+    assert_eq!(member.symbolic.as_ref().unwrap().instance_count, 1);
+}
+
 fn stage(
     source: &str,
     language: ResolvedInstructionLanguage,

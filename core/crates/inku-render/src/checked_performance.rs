@@ -18,7 +18,7 @@ use crate::planning::{
 };
 
 #[path = "anchor_execution.rs"]
-mod anchor_execution;
+pub(crate) mod anchor_execution;
 
 const GEOMETRY_EPSILON: f64 = 1.0e-9;
 
@@ -98,6 +98,24 @@ fn checked_touching_candidate(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckedPerformanceError {
     pub diagnostics: Vec<ScoreExecutionDiagnostic>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CheckedPerformanceWithResourcesError {
+    Resources(inku_score::SavedScoreResourceError),
+    Performance(CheckedPerformanceError),
+}
+
+impl From<inku_score::SavedScoreResourceError> for CheckedPerformanceWithResourcesError {
+    fn from(value: inku_score::SavedScoreResourceError) -> Self {
+        Self::Resources(value)
+    }
+}
+
+impl From<CheckedPerformanceError> for CheckedPerformanceWithResourcesError {
+    fn from(value: CheckedPerformanceError) -> Self {
+        Self::Performance(value)
+    }
 }
 
 fn supports_connected(instruction: &Instruction) -> bool {
@@ -549,6 +567,17 @@ pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
+    if request.score.version == "0.10.0" {
+        return Err(CheckedPerformanceError {
+            diagnostics: vec![ScoreExecutionDiagnostic {
+                instruction_index: 0,
+                anchor_index: None,
+                dependency_instruction_index: None,
+                reason: ScoreExecutionReason::InvalidCompactPerformance,
+                disposition: ScoreExecutionDisposition::Stopped,
+            }],
+        });
+    }
     let needs_checked_execution = !request.score.anchors.is_empty()
         || !request.score.placement_groups.is_empty()
         || !request.score.transform_groups.is_empty()
@@ -567,4 +596,105 @@ pub fn resolve_checked_performance(
     } else {
         Ok(resolve_performance(request))
     }
+}
+
+/// Perform compact Score 0.10 only after caller-owned hard and operational authority.
+/// Legacy editions retain their established checked-performance path.
+pub fn resolve_checked_performance_with_resources(
+    request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
+    resolve_checked_performance_with_resources_and_omissions(
+        request,
+        policy,
+        hard_policy,
+        operational_budget,
+        &[],
+    )
+}
+
+fn remap_finalized_diagnostics(
+    diagnostics: &mut [ScoreExecutionDiagnostic],
+    finalized_to_original_instructions: &[usize],
+    finalized_to_original_anchors: &[usize],
+) {
+    for diagnostic in diagnostics {
+        if let Some(&original) =
+            finalized_to_original_instructions.get(diagnostic.instruction_index)
+        {
+            diagnostic.instruction_index = original;
+        }
+        if let Some(finalized) = diagnostic.dependency_instruction_index
+            && let Some(&original) = finalized_to_original_instructions.get(finalized)
+        {
+            diagnostic.dependency_instruction_index = Some(original);
+        }
+        if let Some(finalized) = diagnostic.anchor_index
+            && let Some(&original) = finalized_to_original_anchors.get(finalized)
+        {
+            diagnostic.anchor_index = Some(original);
+        }
+    }
+}
+
+pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
+    request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+    omitted_original_instruction_indices: &[usize],
+) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
+    if request.score.version != "0.10.0" {
+        return resolve_checked_performance(request, policy).map_err(Into::into);
+    }
+    let finalized = inku_score::finalize_saved_score_with_omitted_instructions(
+        request.score,
+        hard_policy,
+        operational_budget,
+        omitted_original_instruction_indices,
+    )?;
+    let input_digest =
+        canonical_score_digest(request.score).map_err(|_| inku_score::SavedScoreResourceError {
+            owner: inku_score::SavedScoreResourceOwner::Score,
+            reason: inku_score::SavedScoreResourceFailure::InvalidContract("non-canonical Score"),
+        })?;
+    let mut new_to_old = vec![0; finalized.score.instructions.len()];
+    for (old, new) in finalized.index_maps.instructions.iter().enumerate() {
+        if let Some(new) = new {
+            new_to_old[*new] = old;
+        }
+    }
+    let mut new_anchor_to_old = vec![0; finalized.score.anchors.len()];
+    for (old, new) in finalized.index_maps.anchors.iter().enumerate() {
+        if let Some(new) = new {
+            new_anchor_to_old[*new] = old;
+        }
+    }
+    let finalized_request = PerformanceRequest {
+        score: &finalized.score,
+        ..request
+    };
+    let mut performance = match crate::typed_performance::resolve(finalized_request, policy) {
+        Ok(performance) => performance,
+        Err(mut error) => {
+            remap_finalized_diagnostics(&mut error.diagnostics, &new_to_old, &new_anchor_to_old);
+            return Err(error.into());
+        }
+    };
+    for owner in &mut performance.original_instruction_indices {
+        *owner = new_to_old[*owner];
+    }
+    if let Some(execution) = &mut performance.execution {
+        execution.input_score_digest = input_digest;
+        execution.rendered_instruction_indices = performance.original_instruction_indices.clone();
+        execution.rendered_instruction_indices.sort_unstable();
+        execution.rendered_instruction_indices.dedup();
+        remap_finalized_diagnostics(&mut execution.diagnostics, &new_to_old, &new_anchor_to_old);
+    }
+    performance.resource_demand = Some(finalized.demand);
+    performance.resource_diagnostics = finalized.resource_diagnostics;
+    performance.relation_diagnostics = finalized.relation_diagnostics;
+    Ok(performance)
 }

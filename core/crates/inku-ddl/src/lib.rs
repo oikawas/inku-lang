@@ -30,6 +30,12 @@ pub mod parser;
 pub mod phrase;
 pub mod phrase_topology;
 mod plan_reference_extent;
+pub mod plan_resources;
+pub use plan_resources::{
+    AdmittedCompositionPlan, CompositionPlanSelection, PlanResourceError, PlanResourceFailure,
+    PlanResourceOmission, PlanResourceOwner, SelectedCompositionPlan, preflight_composition_plan,
+    select_composition_plan_resources,
+};
 pub mod prompt;
 pub mod relation_reference;
 pub mod render_execution;
@@ -37,6 +43,7 @@ pub mod saijiki;
 mod score_angle;
 pub mod score_diagnostics;
 pub mod score_lowering;
+pub mod score_materialization;
 pub use composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,
     FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor, ObjectPlacementPlan,
@@ -44,6 +51,10 @@ pub use composition_plan::{
     PlanRelation, Rational, ResolvedFillRegion, ResolvedGeometryDimensions,
     ResolvedLayoutDirection, ResolvedObjectAppearance, TransformGroupPlan, plan_verified_stage15,
     plan_verified_stage15_with_policy,
+};
+pub use score_materialization::{
+    MaterializedComposition, MaterializedRelationOmission, ScoreMaterializationError,
+    materialize_selected_composition,
 };
 pub mod semantic_association;
 pub mod semantic_document;
@@ -63,7 +74,9 @@ pub use clause::{
 };
 
 pub use compiler_execution::{
-    COMPILER_EXECUTION_SCHEMA_ID, CompilerExecutionResult, compile_ddl_to_score,
+    COMPILER_EXECUTION_SCHEMA_ID, CompilerExecutionResult, CompilerResourceExecutionFailure,
+    CompilerResourceExecutionResult, RESOURCE_COMPILER_EXECUTION_SCHEMA_ID, compile_ddl_to_score,
+    compile_ddl_to_score_with_resources,
 };
 pub use compiler_lock::{
     CANONICAL_SEMANTIC_DDL_SCHEMA_ID, COMPILER_LOCK_DIGEST_DOMAIN, CompilerBlockingDiagnostic,

@@ -3,6 +3,7 @@
 use super::*;
 use crate::anchor_schedule::{AnchorSchedule, ScheduleNode, group_contains, schedule};
 use crate::planning::{Bounds, PlanningWarning};
+use crate::typed_performance::TypedExecutionPlan;
 use crate::types::Point;
 
 struct Performed {
@@ -24,6 +25,9 @@ struct Execution<'a> {
     omitted_relations: Vec<bool>,
     diagnostics: Vec<ScoreExecutionDiagnostic>,
     placement_indices: Vec<Option<usize>>,
+    group_fill_scope_indices: Vec<Vec<usize>>,
+    omitted_fill_scopes: Vec<bool>,
+    typed: Option<TypedExecutionPlan>,
 }
 
 fn relation_inside_member(
@@ -205,6 +209,35 @@ fn merge_bounds(bounds: &mut Option<Bounds>, next: Bounds) {
 }
 
 impl Execution<'_> {
+    fn transform_fill_scope_indices(
+        &mut self,
+        scopes: &[usize],
+        transform: AffineTransform,
+    ) -> Result<(), ScoreExecutionReason> {
+        let Some(typed) = self.typed.as_mut() else {
+            return Ok(());
+        };
+        for &scope in scopes {
+            if self.omitted_fill_scopes[scope] {
+                continue;
+            }
+            typed.fill_scopes[scope].prepared_region = typed.fill_scopes[scope]
+                .prepared_region
+                .transformed(transform)
+                .map_err(|_| ScoreExecutionReason::InvalidFillTarget)?;
+        }
+        Ok(())
+    }
+
+    fn transform_fill_scopes(
+        &mut self,
+        group_index: usize,
+        transform: AffineTransform,
+    ) -> Result<(), ScoreExecutionReason> {
+        let scopes = self.group_fill_scope_indices[group_index].clone();
+        self.transform_fill_scope_indices(&scopes, transform)
+    }
+
     fn drop_relation(&mut self, index: usize, reason: ScoreExecutionReason) {
         if !self.omitted_relations[index] {
             self.diagnostics
@@ -249,6 +282,9 @@ impl Execution<'_> {
             if child == outermost || group_contains(group, candidate) {
                 self.omitted_groups[child] = true;
             }
+        }
+        for &scope in &self.group_fill_scope_indices[outermost] {
+            self.omitted_fill_scopes[scope] = true;
         }
     }
 
@@ -897,6 +933,7 @@ impl Execution<'_> {
                 .map(|point| finite_point(translation.apply(point)))
                 .transpose()?;
         }
+        self.transform_fill_scopes(index, translation)?;
         Ok(())
     }
 
@@ -970,6 +1007,7 @@ impl Execution<'_> {
                 .map(|point| finite_point(transform.apply(point)))
                 .transpose()?;
         }
+        self.transform_fill_scopes(index, transform)?;
         self.correct_external_relations(index)?;
         let has_outer = self.request.score.transform_groups[index + 1..]
             .iter()
@@ -1014,6 +1052,13 @@ impl Execution<'_> {
         scope_index: usize,
         index: usize,
     ) -> Result<(), ScoreExecutionReason> {
+        if self
+            .typed
+            .as_ref()
+            .is_some_and(|typed| index < typed.placement_scopes.len())
+        {
+            return self.perform_typed_placement(scope_index, index);
+        }
         let group = &self.request.score.placement_groups[index];
         let members = if group.members.is_empty() {
             (group.start..group.end)
@@ -1022,6 +1067,7 @@ impl Execution<'_> {
                     end: start + 1,
                     anchor_indices: vec![],
                     transform_group_indices: vec![],
+                    symbolic: None,
                 })
                 .collect::<Vec<_>>()
         } else {
@@ -1175,14 +1221,114 @@ impl Execution<'_> {
         }
         self.correct_external_relations(scope_index)
     }
+
+    fn perform_typed_placement(
+        &mut self,
+        scope_index: usize,
+        index: usize,
+    ) -> Result<(), ScoreExecutionReason> {
+        let group = self.request.score.placement_groups[index].clone();
+        let placement = self
+            .typed
+            .as_ref()
+            .and_then(|typed| typed.placement_scopes.get(index))
+            .ok_or(ScoreExecutionReason::InvalidCompactPerformance)?
+            .clone();
+        if group.members.len() != placement.member_centers.len()
+            || group.members.len() != placement.member_fill_scope_indices.len()
+        {
+            return Err(ScoreExecutionReason::InvalidCompactPerformance);
+        }
+        for ((member, target), fill_scopes) in group
+            .members
+            .iter()
+            .zip(placement.member_centers)
+            .zip(placement.member_fill_scope_indices)
+        {
+            let mut bounds = None;
+            for instruction in member.start..member.end {
+                for value in &self.performed[instruction] {
+                    merge_bounds(
+                        &mut bounds,
+                        crate::affine_geometry::bounds(
+                            &value.instruction,
+                            self.request.performance_seed,
+                            value.ordinal,
+                            self.request.canvas,
+                            value.seed_override,
+                            self.transforms[instruction],
+                        )
+                        .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
+                    );
+                }
+            }
+            for &anchor in &member.anchor_indices {
+                let point =
+                    self.anchors[anchor].ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+                merge_bounds(
+                    &mut bounds,
+                    Bounds {
+                        min: point,
+                        max: point,
+                    },
+                );
+            }
+            let center = bounds
+                .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?
+                .center();
+            let translation =
+                AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
+            for instruction in member.start..member.end {
+                self.transforms[instruction] = translation.compose(self.transforms[instruction]);
+            }
+            for &anchor in &member.anchor_indices {
+                self.anchors[anchor] = self.anchors[anchor].map(|point| translation.apply(point));
+            }
+            self.transform_fill_scope_indices(&fill_scopes, translation)?;
+        }
+        for member in group.start..group.end {
+            if self.schedule.external_groups[member].is_none()
+                && self
+                    .prior(member)
+                    .is_some_and(|instruction| instruction.relation.is_some())
+            {
+                match self.external_constraint(member) {
+                    Ok(constraint) if constraint.accepts(Point::new(0.0, 0.0)) => {}
+                    Ok(_) => self.drop_relation(
+                        member,
+                        ScoreExecutionReason::ConflictingRelationConstraints,
+                    ),
+                    Err(reason) => self.drop_relation(member, reason),
+                }
+                for value in &mut self.performed[member] {
+                    value.instruction.relation = None;
+                }
+            }
+        }
+        self.correct_external_relations(scope_index)
+    }
 }
 
-pub(super) fn resolve(
+fn resolve_impl(
     request: PerformanceRequest<'_>,
     _policy: ScoreErrorPolicy,
+    typed: Option<TypedExecutionPlan>,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
     let policy = ScoreErrorPolicy::OmitAndContinue;
-    if request.score.validate_transform_groups().is_err() {
+    let transform_groups_valid = if typed.is_some() {
+        let mut executable = request.score.clone();
+        // The compact 0.10 contract has already been validated and consumed.
+        // Dense synthetic placement members intentionally use the 0.9 executed
+        // representation: concrete ranges without symbolic/resolved metadata.
+        executable.version = "0.9.0".into();
+        // Typed placement scopes are validated by the compact source contract
+        // and may be properly nested; legacy placement groups are disjoint.
+        executable.placement_groups.clear();
+        executable.validate_transform_groups().is_ok()
+    } else {
+        request.score.validate_transform_groups().is_ok()
+    };
+    if !transform_groups_valid {
         return Err(CheckedPerformanceError {
             diagnostics: vec![connected_failure(
                 0,
@@ -1196,8 +1342,13 @@ pub(super) fn resolve(
     // dependency scopes share the existing scheduler and relation recovery.
     let original_score = request.score;
     let mut placement_indices = Vec::new();
+    let mut group_fill_scope_indices = Vec::new();
     let scoped_score = if original_score.placement_groups.is_empty() {
         placement_indices.resize(original_score.transform_groups.len(), None);
+        group_fill_scope_indices = typed.as_ref().map_or_else(
+            || vec![Vec::new(); original_score.transform_groups.len()],
+            |typed| typed.transform_fill_scope_indices.clone(),
+        );
         std::borrow::Cow::Borrowed(original_score)
     } else {
         let mut scoped_score = original_score.clone();
@@ -1241,10 +1392,24 @@ pub(super) fn resolve(
                         .collect(),
                 });
                 placement_indices.push(Some(index));
+                group_fill_scope_indices.push(
+                    typed
+                        .as_ref()
+                        .and_then(|typed| typed.placement_fill_scope_indices.get(index))
+                        .cloned()
+                        .unwrap_or_default(),
+                );
             }
             if let Some(affine) = original_score.transform_groups.get(slot) {
                 scopes.push(affine.clone());
                 placement_indices.push(None);
+                group_fill_scope_indices.push(
+                    typed
+                        .as_ref()
+                        .and_then(|typed| typed.transform_fill_scope_indices.get(slot))
+                        .cloned()
+                        .unwrap_or_default(),
+                );
             }
         }
         scoped_score.transform_groups = scopes;
@@ -1287,7 +1452,9 @@ pub(super) fn resolve(
         })
         .collect();
     let mut omitted_relations = vec![false; request.score.instructions.len()];
-    let mut diagnostics = Vec::new();
+    let mut diagnostics = typed
+        .as_ref()
+        .map_or_else(Vec::new, |typed| typed.diagnostics.clone());
     let mut dependency_schedule = schedule(request.score, &omitted_relations);
     while !dependency_schedule.cyclic_relations.is_empty() {
         for &source in &dependency_schedule.cyclic_relations {
@@ -1315,6 +1482,9 @@ pub(super) fn resolve(
         omitted_relations,
         diagnostics,
         placement_indices,
+        group_fill_scope_indices,
+        omitted_fill_scopes: vec![false; typed.as_ref().map_or(0, |typed| typed.fill_scopes.len())],
+        typed,
     };
     for node in execution.schedule.order.clone() {
         let failure = match node {
@@ -1337,11 +1507,18 @@ pub(super) fn resolve(
                             instruction
                         }
                     };
-                    let seed_override =
-                        in_any_transform_group(&request.score.transform_groups, index).then(|| {
-                            crate::determinism::instruction_seed(
-                                &instruction,
-                                request.performance_seed,
+                    let seed_override = execution
+                        .typed
+                        .as_ref()
+                        .and_then(|typed| typed.instruction_seed_overrides[index])
+                        .or_else(|| {
+                            in_any_transform_group(&request.score.transform_groups, index).then(
+                                || {
+                                    crate::determinism::instruction_seed(
+                                        &instruction,
+                                        request.performance_seed,
+                                    )
+                                },
                             )
                         });
                     execution.performed[index].push(Performed {
@@ -1379,6 +1556,7 @@ pub(super) fn resolve(
     }
     rendered.sort_by_key(|(_, value)| value.ordinal);
     if rendered.is_empty()
+        && execution.typed.is_none()
         && !matches!(&request.score.canvas, Canvas::Spec(spec) if spec.ground.is_some())
     {
         let mut diagnostic = connected_failure(
@@ -1412,12 +1590,89 @@ pub(super) fn resolve(
         .collect();
     score.transform_groups.clear();
     score.placement_groups.clear();
+    score.repetition_groups.clear();
+    score.fill_groups.clear();
+    for instruction in &mut score.instructions {
+        instruction.arrangement = None;
+    }
     let summary = (!execution.diagnostics.is_empty()).then(|| ScoreExecutionSummary {
-        input_score_digest: canonical_score_digest(original_score)
-            .expect("typed Score canonicalization"),
+        input_score_digest: execution.typed.as_ref().map_or_else(
+            || canonical_score_digest(original_score).expect("validated Score canonicalization"),
+            |typed| typed.input_score_digest.clone(),
+        ),
         diagnostics: execution.diagnostics,
         rendered_instruction_indices: original_instruction_indices.clone(),
     });
+    let (fill_scopes, instruction_fill_scope_indices) = if let Some(mut typed) = execution.typed {
+        let mut used = vec![false; typed.fill_scopes.len()];
+        let mut dense_scopes = Vec::with_capacity(original_instruction_indices.len());
+        let mut dense_to_performed = vec![Vec::new(); request.score.instructions.len()];
+        for (performed, &owner) in original_instruction_indices.iter().enumerate() {
+            dense_to_performed[owner].push(performed);
+            let scope = typed.instruction_fill_scope_indices[owner];
+            dense_scopes.push(scope);
+            let mut current = scope;
+            while let Some(index) = current {
+                if execution.omitted_fill_scopes[index] {
+                    break;
+                }
+                used[index] = true;
+                typed.fill_scopes[index].instruction_indices.push(performed);
+                current = typed.fill_scopes[index].parent_scope_index;
+            }
+        }
+        let mut scope_map = vec![None; typed.fill_scopes.len()];
+        let unit = request.canvas.map_or(1.0, crate::types::CanvasSize::unit);
+        let pixel_scale = AffineTransform {
+            a: unit,
+            b: 0.0,
+            c: 0.0,
+            d: unit,
+            e: 0.0,
+            f: 0.0,
+        };
+        let mut scopes = Vec::new();
+        for (old, mut scope) in typed.fill_scopes.into_iter().enumerate() {
+            if !used[old] {
+                continue;
+            }
+            scope.prepared_region =
+                scope
+                    .prepared_region
+                    .transformed(pixel_scale)
+                    .map_err(|_| CheckedPerformanceError {
+                        diagnostics: vec![connected_failure(
+                            0,
+                            None,
+                            ScoreExecutionReason::InvalidFillTarget,
+                            ScoreErrorPolicy::Stop,
+                        )],
+                    })?;
+            scope.atomic_instruction_groups = scope
+                .atomic_instruction_groups
+                .into_iter()
+                .map(|dense| {
+                    dense
+                        .into_iter()
+                        .flat_map(|index| dense_to_performed[index].iter().copied())
+                        .collect::<Vec<_>>()
+                })
+                .filter(|group| !group.is_empty())
+                .collect();
+            scope_map[old] = Some(scopes.len());
+            scopes.push(scope);
+        }
+        for scope in &mut scopes {
+            scope.parent_scope_index = scope.parent_scope_index.and_then(|old| scope_map[old]);
+        }
+        let instruction_scopes = dense_scopes
+            .into_iter()
+            .map(|scope| scope.and_then(|old| scope_map[old]))
+            .collect();
+        (scopes, instruction_scopes)
+    } else {
+        (Vec::new(), vec![None; score.instructions.len()])
+    };
     Ok(PerformancePlan {
         score,
         warnings: execution.warnings,
@@ -1425,6 +1680,26 @@ pub(super) fn resolve(
         original_instruction_indices,
         instruction_seed_overrides,
         instruction_transforms,
+        fill_scopes,
+        instruction_fill_scope_indices,
+        resource_demand: None,
+        resource_diagnostics: Vec::new(),
+        relation_diagnostics: Vec::new(),
         execution: summary,
     })
+}
+
+pub(super) fn resolve(
+    request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+) -> Result<PerformancePlan, CheckedPerformanceError> {
+    resolve_impl(request, policy, None)
+}
+
+pub(crate) fn resolve_typed(
+    request: PerformanceRequest<'_>,
+    policy: ScoreErrorPolicy,
+    typed: TypedExecutionPlan,
+) -> Result<PerformancePlan, CheckedPerformanceError> {
+    resolve_impl(request, policy, Some(typed))
 }

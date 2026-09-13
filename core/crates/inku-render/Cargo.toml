@@ -12,6 +12,8 @@ path = "src/lib.rs"
 
 [dependencies]
 inku-score.workspace = true
+kurbo = "=0.13.1"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+svgtypes = "=0.16.1"

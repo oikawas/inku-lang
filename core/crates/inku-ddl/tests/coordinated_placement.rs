@@ -321,19 +321,34 @@ fn coordinated_actions_plan_preserves_quantities_and_one_named_target() {
     assert!(plan.diagnostics().is_empty(), "{:?}", plan.diagnostics());
     let objects = plan.objects().unwrap();
     assert_eq!(
-        objects.iter().map(|object| object.count()).collect::<Vec<_>>(),
+        objects
+            .iter()
+            .map(|object| object.count())
+            .collect::<Vec<_>>(),
         [3, 5, 1]
     );
     assert_eq!(
-        objects.iter().map(|object| object.appearance().color).collect::<Vec<_>>(),
+        objects
+            .iter()
+            .map(|object| object.appearance().color)
+            .collect::<Vec<_>>(),
         [Color::Red, Color::Blue, Color::Green]
     );
     assert_eq!(
-        objects.iter().map(|object| object.origin()).collect::<Vec<_>>(),
+        objects
+            .iter()
+            .map(|object| object.origin())
+            .collect::<Vec<_>>(),
         [
-            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 0 },
-            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 1 },
-            &ScoreInstructionOrigin::SourceInstruction { instruction_index: 2 },
+            &ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            },
+            &ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 1
+            },
+            &ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
         ]
     );
     assert_eq!(

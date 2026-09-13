@@ -2567,6 +2567,7 @@ fn lower_verified_stage15_shared<'a>(
                         end: body_end,
                         anchor_indices: (anchor_start..anchors.len()).collect(),
                         transform_group_indices: (transform_start..transform_end).collect(),
+                        symbolic: None,
                     },
                     kind: match instruction.entity.head {
                         SemanticHead::Primitive(_) => PlacementMemberKind::Primitive,
@@ -2579,10 +2580,11 @@ fn lower_verified_stage15_shared<'a>(
             );
         } else if objects.is_some()
             && matches!(instruction.entity.head, SemanticHead::MacroInvocation(_))
-            && let Some(quantity) = instruction.entity.quantity.as_ref()
-            && quantity.value > 1
             && (body_start < body_end || anchor_start < anchors.len())
         {
+            // Count one still owns a complete body, including Anchor-only macros.
+            // Preserve that envelope for saved-Score resource accounting and replay.
+            let quantity = instruction.entity.quantity.as_ref();
             standalone_macro_repetitions.push(PlacementMemberPlan {
                 source_instruction_index: instruction_index,
                 member: inku_score::PlacementMember {
@@ -2590,11 +2592,12 @@ fn lower_verified_stage15_shared<'a>(
                     end: body_end,
                     anchor_indices: (anchor_start..anchors.len()).collect(),
                     transform_group_indices: (transform_start..transform_end).collect(),
+                    symbolic: None,
                 },
                 kind: PlacementMemberKind::Macro,
-                source_count: u32::try_from(quantity.value)
+                source_count: u32::try_from(quantity.map_or(1, |value| value.value))
                     .expect("successful source count was validated"),
-                count_was_omitted: false,
+                count_was_omitted: quantity.is_none(),
             });
         }
         if let Some(group_slot) = supported_fill_groups
@@ -2751,6 +2754,7 @@ fn lower_verified_stage15_shared<'a>(
                 layout,
                 at: AtRegion { region },
                 members: score_members,
+                resolved: None,
             },
         });
     }
@@ -2798,6 +2802,9 @@ fn lower_verified_stage15_shared<'a>(
             .iter()
             .map(|group| group.placement.clone())
             .collect(),
+        repetition_groups: Vec::new(),
+        fill_groups: Vec::new(),
+        resource_policy: None,
     });
     if score.is_none() {
         instruction_origins.clear();
@@ -3544,16 +3551,76 @@ fn lower_complete_instruction(
         }
     }
     .map_err(|gap| vec![gap])?;
-    let appearance = resolved.appearance;
-    Ok(Instruction {
-        arc_form: resolved.arc_form,
-        primitive: resolved.primitive,
+    Ok(instruction_from_resolved_geometry(
+        resolved.primitive,
+        resolved.dimensions,
+        resolved.arc_form,
+        resolved.rotation,
+        resolved.appearance,
+        geometric,
+    ))
+}
+
+/// Lower one already-resolved body template without reading or resolving source again.
+/// A fill's region owns its placement; the neutral local anchor is translated by
+/// the performer, and is never promoted to an explicit source position.
+pub(crate) fn lower_resolved_object_template(
+    object: &ObjectPlacementPlan,
+    context: ScoreLoweringContext,
+) -> Result<Instruction, ScoreFieldGap> {
+    let geometric = if matches!(
+        object.recipe,
+        PlacementRecipe::FillUniformInRegionAndClip { .. }
+    ) {
+        lower_named_geometry(object.dimensions, [0.5; 4], context.canvas_format)?
+    } else {
+        match &object.anchor {
+            ObjectAnchor::Numeric(position) => lower_numeric_geometry(
+                object.primitive,
+                object.dimensions,
+                position.into(),
+                context.canvas_format,
+                object.angle,
+            )?,
+            ObjectAnchor::GeneratedNumeric(position) => lower_numeric_geometry(
+                object.primitive,
+                object.dimensions,
+                *position,
+                context.canvas_format,
+                object.angle,
+            )?,
+            ObjectAnchor::Named(region) => {
+                lower_named_geometry(object.dimensions, *region, context.canvas_format)?
+            }
+        }
+    };
+    Ok(instruction_from_resolved_geometry(
+        object.primitive,
+        object.dimensions,
+        object.arc_form,
+        object.angle,
+        object.appearance.clone(),
+        geometric,
+    ))
+}
+
+fn instruction_from_resolved_geometry(
+    primitive: Primitive,
+    dimensions: ResolvedGeometryDimensions,
+    arc_form: Option<inku_score::ArcForm>,
+    rotation: Option<f64>,
+    appearance: ResolvedObjectAppearance,
+    geometric: LoweredGeometry,
+) -> Instruction {
+    Instruction {
+        arc_form,
+        primitive,
         note: None,
         from_: geometric.from,
         to: geometric.to,
         center: geometric.center,
         radius: geometric.radius,
-        sides: match resolved.dimensions {
+        sides: match dimensions {
             ResolvedGeometryDimensions::Polygon { sides, .. } => Some(sides),
             _ => None,
         },
@@ -3561,7 +3628,7 @@ fn lower_complete_instruction(
         size: geometric.size,
         angle_start: geometric.angle_start,
         angle_end: geometric.angle_end,
-        rotation: resolved.rotation,
+        rotation,
         filled: appearance.filled,
         style: appearance.continuity,
         weight: appearance.touch,
@@ -3576,7 +3643,7 @@ fn lower_complete_instruction(
         surface_intensity: appearance.surface_intensity,
         thinness: appearance.thinness,
         surface: appearance.surface,
-    })
+    }
 }
 
 struct ResolvedObject {

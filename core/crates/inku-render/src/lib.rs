@@ -13,8 +13,10 @@ pub mod arc;
 pub mod arrangement;
 pub mod checked_performance;
 pub mod cloudform;
+pub mod compat_clip;
 pub mod contact;
 pub mod determinism;
+pub mod fill_geometry;
 pub mod fills;
 pub mod geometry;
 pub mod ground;
@@ -30,11 +32,13 @@ pub mod placement;
 pub mod planning;
 pub mod reference;
 pub mod render;
+mod render_fill_scopes;
 pub mod stroke;
 pub mod support;
 mod surface_geometry;
 pub mod surfaces;
 pub mod svg;
+mod typed_performance;
 pub mod types;
 
 /// Version of the Rust host boundary, independent from the Render Engine version.
@@ -42,7 +46,7 @@ pub const CORE_API_VERSION: &str = "0.1.0";
 
 /// Canonical engine identity owned by the portable core and exposed by every host binding.
 pub const RENDER_ENGINE_ID: &str = "default";
-pub const RENDER_ENGINE_VERSION: &str = "58";
+pub const RENDER_ENGINE_VERSION: &str = "59";
 
 /// Report the host-boundary version for binding and packaging smoke tests.
 #[must_use]
@@ -67,6 +71,6 @@ mod tests {
 
     #[test]
     fn engine_identity_is_owned_by_the_core() {
-        assert_eq!(render_engine_identity(), ("default", "57"));
+        assert_eq!(render_engine_identity(), ("default", "59"));
     }
 }

@@ -1,0 +1,1535 @@
+//! Bounded Score 0.10 template performance.
+
+use std::collections::{BTreeMap, HashSet};
+
+use inku_score::{
+    FillGroup, FillTargetAnchor, FillTargetGeometry, PlacementMember, ResolvedPlacementAnchor,
+    ResolvedPlacementRecipe, ScoreExecutionDiagnostic, ScoreExecutionDisposition,
+    ScoreExecutionReason, SymbolicMemberKind, TransformGroup,
+};
+use sha2::{Digest, Sha256};
+
+use crate::fill_geometry::{PreparedRegion, RegionError};
+use crate::performance::{PerformancePlan, PerformanceRequest, PerformedFillScope};
+use crate::types::{ArcForm, Point, Primitive, Score, Seed};
+
+#[derive(Clone, Debug)]
+pub(crate) struct TypedPlacementScope {
+    /// Exact final center for each dense member, in canvas-short-edge units.
+    pub member_centers: Vec<Point>,
+    /// Nested fill targets translated with each complete member body.
+    pub member_fill_scope_indices: Vec<Vec<usize>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TypedExecutionPlan {
+    /// Canonical digest of the validated compact Score before materialization.
+    pub input_score_digest: String,
+    /// Parallel to the dense Score's placement groups.
+    pub placement_scopes: Vec<TypedPlacementScope>,
+    /// Fill targets translated by a placement scope's external relation only.
+    pub placement_fill_scope_indices: Vec<Vec<usize>>,
+    /// Fill targets transformed by each dense affine group.
+    pub transform_fill_scope_indices: Vec<Vec<usize>>,
+    /// Stable brush seeds parallel to dense instructions.
+    pub instruction_seed_overrides: Vec<Option<crate::types::Seed>>,
+    /// Innermost fill scope parallel to dense instructions.
+    pub instruction_fill_scope_indices: Vec<Option<usize>>,
+    /// Prepared contours in canvas-short-edge units until execution completes.
+    pub fill_scopes: Vec<PerformedFillScope>,
+    /// Recoverable contour omissions discovered before dependency execution.
+    pub diagnostics: Vec<ScoreExecutionDiagnostic>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum GroupId {
+    Placement(usize),
+    Fill(usize),
+    Repetition(usize),
+}
+
+#[derive(Default)]
+struct ContextMap {
+    instructions: BTreeMap<usize, Vec<usize>>,
+    anchors: BTreeMap<usize, usize>,
+    path: Vec<u64>,
+}
+
+#[derive(Default)]
+struct Fragment {
+    start: usize,
+    end: usize,
+    scopes: Vec<usize>,
+}
+
+struct PendingRelation {
+    output: usize,
+    context: usize,
+    instruction_target: Option<usize>,
+    anchor_target: Option<usize>,
+}
+
+struct DensePlacement {
+    group: inku_score::PlacementGroup,
+    execution: TypedPlacementScope,
+    fill_scopes: Vec<usize>,
+}
+
+struct Builder<'a> {
+    request: PerformanceRequest<'a>,
+    output: Score,
+    original_instruction_indices: Vec<usize>,
+    original_anchor_indices: Vec<usize>,
+    instruction_seed_overrides: Vec<Option<Seed>>,
+    instruction_fill_scope_indices: Vec<Option<usize>>,
+    contexts: Vec<ContextMap>,
+    global_instructions: BTreeMap<usize, Vec<usize>>,
+    global_anchors: BTreeMap<usize, Vec<usize>>,
+    pending_relations: Vec<PendingRelation>,
+    placements: Vec<DensePlacement>,
+    transform_fill_scope_indices: Vec<Vec<usize>>,
+    fill_scopes: Vec<PerformedFillScope>,
+    scope_sources: Vec<(usize, usize)>,
+    diagnostics: Vec<ScoreExecutionDiagnostic>,
+    cloned_top_transforms: HashSet<usize>,
+}
+
+impl<'a> Builder<'a> {
+    fn new(request: PerformanceRequest<'a>) -> Self {
+        let mut output = request.score.clone();
+        output.instructions.clear();
+        output.anchors.clear();
+        output.transform_groups.clear();
+        output.placement_groups.clear();
+        output.repetition_groups.clear();
+        output.fill_groups.clear();
+        output.resource_policy = None;
+        Self {
+            request,
+            output,
+            original_instruction_indices: Vec::new(),
+            original_anchor_indices: Vec::new(),
+            instruction_seed_overrides: Vec::new(),
+            instruction_fill_scope_indices: Vec::new(),
+            contexts: vec![ContextMap::default()],
+            global_instructions: BTreeMap::new(),
+            global_anchors: BTreeMap::new(),
+            pending_relations: Vec::new(),
+            placements: Vec::new(),
+            transform_fill_scope_indices: Vec::new(),
+            fill_scopes: Vec::new(),
+            scope_sources: Vec::new(),
+            diagnostics: Vec::new(),
+            cloned_top_transforms: HashSet::new(),
+        }
+    }
+
+    fn seed(&self) -> Seed {
+        self.request.performance_seed.unwrap_or_default()
+    }
+
+    fn new_context(&mut self, parent: usize, ordinal: u64) -> usize {
+        let mut path = self.contexts[parent].path.clone();
+        path.push(ordinal);
+        let index = self.contexts.len();
+        self.contexts.push(ContextMap {
+            path,
+            ..ContextMap::default()
+        });
+        index
+    }
+
+    fn clone_anchor(&mut self, context: usize, old: usize) -> usize {
+        if let Some(&existing) = self.contexts[context].anchors.get(&old) {
+            return existing;
+        }
+        let new = self.output.anchors.len();
+        self.output
+            .anchors
+            .push(self.request.score.anchors[old].clone());
+        self.original_anchor_indices.push(old);
+        self.contexts[context].anchors.insert(old, new);
+        self.global_anchors.entry(old).or_default().push(new);
+        new
+    }
+
+    fn clone_instruction(
+        &mut self,
+        context: usize,
+        old: usize,
+        instance_ordinal: u64,
+        target: Option<Point>,
+        innermost_fill: Option<usize>,
+    ) {
+        let original = &self.request.score.instructions[old];
+        let resolved = original
+            .arrangement
+            .as_ref()
+            .and_then(|arrangement| arrangement.resolved.as_ref())
+            .expect("validated Score 0.10 arrangement");
+        let mut instruction = crate::planning::ensure_line_coordinates(original);
+        instruction.arrangement = None;
+        if let Some(target) = target {
+            instruction = translate_instruction_to(&instruction, target, self.request.canvas);
+        } else {
+            instruction.at = None;
+        }
+        let output = self.output.instructions.len();
+        let relation = instruction.relation.as_ref();
+        self.pending_relations.push(PendingRelation {
+            output,
+            context,
+            instruction_target: relation.and_then(|value| value.target_instruction_index),
+            anchor_target: relation.and_then(|value| value.target_anchor_index),
+        });
+        self.output.instructions.push(instruction);
+        self.original_instruction_indices.push(old);
+        self.instruction_seed_overrides.push(Some(instance_seed(
+            &resolved.owner,
+            &self.contexts[context].path,
+            instance_ordinal,
+            self.request.performance_seed,
+        )));
+        self.instruction_fill_scope_indices.push(innermost_fill);
+        self.contexts[context]
+            .instructions
+            .entry(old)
+            .or_default()
+            .push(output);
+        self.global_instructions
+            .entry(old)
+            .or_default()
+            .push(output);
+    }
+
+    fn expand_instruction(
+        &mut self,
+        context: usize,
+        old: usize,
+        innermost_fill: Option<usize>,
+    ) -> Fragment {
+        let arrangement = self.request.score.instructions[old]
+            .arrangement
+            .as_ref()
+            .expect("validated Score 0.10 arrangement");
+        let resolved = arrangement
+            .resolved
+            .as_ref()
+            .expect("validated Score 0.10 resolved arrangement");
+        let count = usize::try_from(arrangement.count).expect("u32 fits usize");
+        let placement_seed = scoped_seed(
+            self.seed(),
+            "arrangement",
+            &resolved.owner,
+            &self.contexts[context].path,
+        );
+        let centers = recipe_centers(
+            &resolved.recipe,
+            &resolved.anchor,
+            resolved.domain,
+            count,
+            resolved.first_instance_ordinal,
+            placement_seed,
+            0,
+            self.request.canvas,
+        );
+        let start = self.output.instructions.len();
+        for instance in 0..count {
+            let target = (!matches!(resolved.anchor, ResolvedPlacementAnchor::EnclosingGroup))
+                .then(|| centers[instance]);
+            self.clone_instruction(
+                context,
+                old,
+                resolved.first_instance_ordinal + instance as u64,
+                target,
+                innermost_fill,
+            );
+        }
+        Fragment {
+            start,
+            end: self.output.instructions.len(),
+            ..Fragment::default()
+        }
+    }
+
+    fn group_range(&self, id: GroupId) -> (usize, usize) {
+        match id {
+            GroupId::Placement(index) => {
+                let group = &self.request.score.placement_groups[index];
+                (group.start, group.end)
+            }
+            GroupId::Fill(index) => {
+                let group = &self.request.score.fill_groups[index];
+                (group.start, group.end)
+            }
+            GroupId::Repetition(index) => {
+                let member = &self.request.score.repetition_groups[index].member;
+                (member.start, member.end)
+            }
+        }
+    }
+
+    fn group_is_macro(&self, id: GroupId) -> bool {
+        match id {
+            GroupId::Placement(index) => &self.request.score.placement_groups[index].members,
+            GroupId::Fill(index) => &self.request.score.fill_groups[index].members,
+            GroupId::Repetition(index) => {
+                return self.request.score.repetition_groups[index]
+                    .member
+                    .symbolic
+                    .as_ref()
+                    .is_some_and(|value| value.kind == SymbolicMemberKind::Macro);
+            }
+        }
+        .iter()
+        .any(|member| {
+            member
+                .symbolic
+                .as_ref()
+                .is_some_and(|value| value.kind == SymbolicMemberKind::Macro)
+        })
+    }
+
+    fn group_at(&self, start: usize, end: usize, skipped: &[GroupId]) -> Option<GroupId> {
+        let candidates = self
+            .request
+            .score
+            .placement_groups
+            .iter()
+            .enumerate()
+            .map(|(index, _)| GroupId::Placement(index))
+            .chain(
+                self.request
+                    .score
+                    .fill_groups
+                    .iter()
+                    .enumerate()
+                    .map(|(index, _)| GroupId::Fill(index)),
+            )
+            .chain(
+                self.request
+                    .score
+                    .repetition_groups
+                    .iter()
+                    .enumerate()
+                    .map(|(index, _)| GroupId::Repetition(index)),
+            );
+        candidates
+            .filter(|id| !skipped.contains(id))
+            .filter(|&id| {
+                let range = self.group_range(id);
+                range.0 == start && range.1 <= end
+            })
+            .max_by_key(|&id| {
+                let range = self.group_range(id);
+                (
+                    range.1 - range.0,
+                    self.group_is_macro(id),
+                    matches!(id, GroupId::Fill(_)),
+                )
+            })
+    }
+
+    fn expand_range(
+        &mut self,
+        context: usize,
+        start: usize,
+        end: usize,
+        skipped: &[GroupId],
+        innermost_fill: Option<usize>,
+    ) -> Fragment {
+        let output_start = self.output.instructions.len();
+        let scope_start = self.fill_scopes.len();
+        let mut cursor = start;
+        while cursor < end {
+            if let Some(group) = self.group_at(cursor, end, skipped) {
+                let group_end = self.group_range(group).1;
+                self.expand_group(context, group, skipped, innermost_fill);
+                cursor = group_end;
+            } else {
+                self.expand_instruction(context, cursor, innermost_fill);
+                cursor += 1;
+            }
+        }
+        Fragment {
+            start: output_start,
+            end: self.output.instructions.len(),
+            scopes: (scope_start..self.fill_scopes.len()).collect(),
+        }
+    }
+
+    fn expand_group(
+        &mut self,
+        parent_context: usize,
+        id: GroupId,
+        skipped: &[GroupId],
+        parent_fill: Option<usize>,
+    ) {
+        let mut next_skipped = skipped.to_vec();
+        next_skipped.push(id);
+        match id {
+            GroupId::Placement(index) => {
+                let group = self.request.score.placement_groups[index].clone();
+                let resolved = group
+                    .resolved
+                    .as_ref()
+                    .expect("validated placement metadata");
+                let placement_seed = scoped_seed(
+                    self.seed(),
+                    "placement-group",
+                    &resolved.owner,
+                    &self.contexts[parent_context].path,
+                );
+                let centers = recipe_centers(
+                    &resolved.recipe,
+                    &resolved.anchor,
+                    resolved.domain,
+                    usize::try_from(resolved.logical_count).expect("admitted count fits usize"),
+                    0,
+                    placement_seed,
+                    0,
+                    self.request.canvas,
+                );
+                let (members, fragment, member_fill_scope_indices) =
+                    self.expand_members(parent_context, &group.members, &next_skipped, parent_fill);
+                let dense = inku_score::PlacementGroup {
+                    start: fragment.start,
+                    end: fragment.end,
+                    members,
+                    ..group
+                };
+                self.placements.push(DensePlacement {
+                    group: dense,
+                    execution: TypedPlacementScope {
+                        member_centers: centers,
+                        member_fill_scope_indices,
+                    },
+                    fill_scopes: fragment.scopes,
+                });
+                let scopes = self
+                    .placements
+                    .last()
+                    .expect("just pushed placement")
+                    .fill_scopes
+                    .clone();
+                self.assign_atomic_unit(&scopes, fragment.start, fragment.end);
+            }
+            GroupId::Fill(index) => {
+                let group = self.request.score.fill_groups[index].clone();
+                let fill_seed = scoped_seed(
+                    self.seed(),
+                    "fill-group",
+                    &group.owner,
+                    &self.contexts[parent_context].path,
+                );
+                let region = match prepare_fill_target(&group, fill_seed, 0, self.request.canvas) {
+                    Ok(region) => region,
+                    Err(_) => {
+                        self.diagnostics.push(ScoreExecutionDiagnostic {
+                            instruction_index: group.start,
+                            anchor_index: None,
+                            dependency_instruction_index: None,
+                            reason: ScoreExecutionReason::InvalidFillTarget,
+                            disposition: ScoreExecutionDisposition::Omitted,
+                        });
+                        return;
+                    }
+                };
+                let scope = self.fill_scopes.len();
+                self.fill_scopes.push(PerformedFillScope {
+                    owner: group.owner.clone(),
+                    prepared_region: region.clone(),
+                    parent_scope_index: parent_fill,
+                    instruction_indices: Vec::new(),
+                    atomic_instruction_groups: Vec::new(),
+                });
+                self.scope_sources.push((group.start, group.end));
+                let mut centers = Vec::with_capacity(
+                    usize::try_from(group.logical_count).expect("admitted count fits usize"),
+                );
+                for member in &group.members {
+                    let symbolic = member.symbolic.as_ref().expect("validated fill member");
+                    let count = usize::try_from(symbolic.instance_count)
+                        .expect("admitted count fits usize");
+                    for instance in 0..count {
+                        centers.push(region.sample(
+                            fill_seed,
+                            0,
+                            usize::try_from(symbolic.member_ordinal).unwrap_or(usize::MAX),
+                            instance,
+                        ));
+                    }
+                }
+                let (members, mut fragment, member_fill_scope_indices) =
+                    self.expand_members(parent_context, &group.members, &next_skipped, Some(scope));
+                fragment.scopes.push(scope);
+                let dense = inku_score::PlacementGroup {
+                    start: fragment.start,
+                    end: fragment.end,
+                    layout: inku_score::GroupLayout::Scatter,
+                    at: inku_score::AtRegion {
+                        region: [0.0, 0.0, 1.0, 1.0],
+                    },
+                    members,
+                    resolved: None,
+                };
+                self.placements.push(DensePlacement {
+                    group: dense,
+                    execution: TypedPlacementScope {
+                        member_centers: centers,
+                        member_fill_scope_indices,
+                    },
+                    fill_scopes: fragment.scopes,
+                });
+                let scopes = self
+                    .placements
+                    .last()
+                    .expect("just pushed fill placement")
+                    .fill_scopes
+                    .clone();
+                self.assign_atomic_unit(&scopes, fragment.start, fragment.end);
+            }
+            GroupId::Repetition(index) => {
+                let member = self.request.score.repetition_groups[index].member.clone();
+                let (_, fragment, _) = self.expand_members(
+                    parent_context,
+                    std::slice::from_ref(&member),
+                    &next_skipped,
+                    parent_fill,
+                );
+                self.assign_atomic_unit(&fragment.scopes, fragment.start, fragment.end);
+            }
+        }
+    }
+
+    fn assign_atomic_unit(&mut self, scopes: &[usize], start: usize, end: usize) {
+        let instructions = (start..end).collect::<Vec<_>>();
+        for &scope in scopes {
+            if self.fill_scopes[scope].atomic_instruction_groups.last() != Some(&instructions) {
+                self.fill_scopes[scope]
+                    .atomic_instruction_groups
+                    .push(instructions.clone());
+            }
+        }
+    }
+
+    fn expand_members(
+        &mut self,
+        parent_context: usize,
+        members: &[PlacementMember],
+        skipped: &[GroupId],
+        innermost_fill: Option<usize>,
+    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>) {
+        let output_start = self.output.instructions.len();
+        let scope_start = self.fill_scopes.len();
+        let mut dense_members = Vec::new();
+        let mut member_fill_scope_indices = Vec::new();
+        for member in members {
+            let symbolic = member.symbolic.as_ref().expect("validated symbolic member");
+            for instance in 0..symbolic.instance_count {
+                let context =
+                    self.new_context(parent_context, symbolic.first_instance_ordinal + instance);
+                let anchors = member
+                    .anchor_indices
+                    .iter()
+                    .map(|&old| self.clone_anchor(context, old))
+                    .collect::<Vec<_>>();
+                let fragment =
+                    self.expand_range(context, member.start, member.end, skipped, innermost_fill);
+                let transforms = self.clone_transforms(
+                    context,
+                    &member.transform_group_indices,
+                    &fragment.scopes,
+                );
+                member_fill_scope_indices.push(fragment.scopes.clone());
+                dense_members.push(PlacementMember {
+                    start: fragment.start,
+                    end: fragment.end,
+                    anchor_indices: anchors,
+                    transform_group_indices: transforms,
+                    symbolic: None,
+                });
+            }
+        }
+        (
+            dense_members,
+            Fragment {
+                start: output_start,
+                end: self.output.instructions.len(),
+                scopes: (scope_start..self.fill_scopes.len()).collect(),
+            },
+            member_fill_scope_indices,
+        )
+    }
+
+    fn clone_transforms(
+        &mut self,
+        context: usize,
+        transforms: &[usize],
+        candidate_scopes: &[usize],
+    ) -> Vec<usize> {
+        let mut result = Vec::new();
+        for &old in transforms {
+            let source = &self.request.score.transform_groups[old];
+            let Some(start) = self.contexts[context]
+                .instructions
+                .get(&source.start)
+                .and_then(|values| values.first())
+                .copied()
+            else {
+                continue;
+            };
+            let Some(end) = source
+                .end
+                .checked_sub(1)
+                .and_then(|last| self.contexts[context].instructions.get(&last))
+                .and_then(|values| values.last())
+                .map(|value| value + 1)
+            else {
+                continue;
+            };
+            let fixed_position_indices = source
+                .fixed_position_indices
+                .iter()
+                .flat_map(|old| {
+                    self.contexts[context]
+                        .instructions
+                        .get(old)
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                })
+                .collect();
+            let anchor_indices = source
+                .anchor_indices
+                .iter()
+                .map(|&anchor| self.clone_anchor(context, anchor))
+                .collect();
+            let dense = TransformGroup {
+                start,
+                end,
+                fixed_position_indices,
+                anchor_indices,
+                ..source.clone()
+            };
+            let fill_scopes = candidate_scopes
+                .iter()
+                .copied()
+                .filter(|&scope| {
+                    let (fill_start, fill_end) = self.scope_sources[scope];
+                    source.start <= fill_start && fill_end <= source.end
+                })
+                .collect();
+            result.push(self.output.transform_groups.len());
+            self.output.transform_groups.push(dense);
+            self.transform_fill_scope_indices.push(fill_scopes);
+        }
+        result
+    }
+
+    fn clone_top_level_state(&mut self) {
+        let owned_anchors = self
+            .request
+            .score
+            .placement_groups
+            .iter()
+            .flat_map(|group| &group.members)
+            .chain(
+                self.request
+                    .score
+                    .fill_groups
+                    .iter()
+                    .flat_map(|group| &group.members),
+            )
+            .chain(
+                self.request
+                    .score
+                    .repetition_groups
+                    .iter()
+                    .map(|group| &group.member),
+            )
+            .flat_map(|member| member.anchor_indices.iter().copied())
+            .collect::<HashSet<_>>();
+        for old in 0..self.request.score.anchors.len() {
+            if !owned_anchors.contains(&old) {
+                self.clone_anchor(0, old);
+            }
+        }
+        let owned_transforms = self
+            .request
+            .score
+            .placement_groups
+            .iter()
+            .flat_map(|group| &group.members)
+            .chain(
+                self.request
+                    .score
+                    .fill_groups
+                    .iter()
+                    .flat_map(|group| &group.members),
+            )
+            .chain(
+                self.request
+                    .score
+                    .repetition_groups
+                    .iter()
+                    .map(|group| &group.member),
+            )
+            .flat_map(|member| member.transform_group_indices.iter().copied())
+            .collect::<HashSet<_>>();
+        for old in 0..self.request.score.transform_groups.len() {
+            if owned_transforms.contains(&old) || !self.cloned_top_transforms.insert(old) {
+                continue;
+            }
+            let source = &self.request.score.transform_groups[old];
+            let Some(start) = self
+                .global_instructions
+                .get(&source.start)
+                .and_then(|values| values.first())
+                .copied()
+            else {
+                continue;
+            };
+            let Some(end) = source
+                .end
+                .checked_sub(1)
+                .and_then(|last| self.global_instructions.get(&last))
+                .and_then(|values| values.last())
+                .map(|value| value + 1)
+            else {
+                continue;
+            };
+            let fixed_position_indices = source
+                .fixed_position_indices
+                .iter()
+                .flat_map(|old| {
+                    self.global_instructions
+                        .get(old)
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                })
+                .collect();
+            let anchor_indices = source
+                .anchor_indices
+                .iter()
+                .filter_map(|old| {
+                    self.global_anchors
+                        .get(old)
+                        .and_then(|values| values.first())
+                })
+                .copied()
+                .collect();
+            let fill_scopes = (0..self.fill_scopes.len())
+                .filter(|&scope| {
+                    let (fill_start, fill_end) = self.scope_sources[scope];
+                    source.start <= fill_start && fill_end <= source.end
+                })
+                .collect();
+            self.output.transform_groups.push(TransformGroup {
+                start,
+                end,
+                fixed_position_indices,
+                anchor_indices,
+                ..source.clone()
+            });
+            self.transform_fill_scope_indices.push(fill_scopes);
+        }
+    }
+
+    fn remap_relations(&mut self) {
+        for pending in &self.pending_relations {
+            let relation = self.output.instructions[pending.output].relation.as_mut();
+            let Some(relation) = relation else {
+                continue;
+            };
+            if let Some(old) = pending.instruction_target {
+                relation.target_instruction_index = self.contexts[pending.context]
+                    .instructions
+                    .get(&old)
+                    .and_then(|values| values.iter().rev().find(|&&value| value < pending.output))
+                    .copied()
+                    .or_else(|| {
+                        self.global_instructions
+                            .get(&old)
+                            .and_then(|values| {
+                                values.iter().rev().find(|&&value| value < pending.output)
+                            })
+                            .copied()
+                    });
+                if relation.target_instruction_index.is_none() {
+                    self.output.instructions[pending.output].relation = None;
+                    continue;
+                }
+            }
+            if let Some(old) = pending.anchor_target {
+                relation.target_anchor_index = self.contexts[pending.context]
+                    .anchors
+                    .get(&old)
+                    .copied()
+                    .or_else(|| {
+                        self.global_anchors
+                            .get(&old)
+                            .and_then(|values| values.first())
+                            .copied()
+                    });
+                if relation.target_anchor_index.is_none() {
+                    self.output.instructions[pending.output].relation = None;
+                }
+            }
+        }
+    }
+
+    fn finish(mut self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
+        self.expand_range(0, 0, self.request.score.instructions.len(), &[], None);
+        self.clone_top_level_state();
+        self.remap_relations();
+        self.placements.sort_by_key(|placement| {
+            (
+                placement.group.end - placement.group.start,
+                placement.group.start,
+            )
+        });
+        let mut placement_scopes = Vec::with_capacity(self.placements.len());
+        let mut placement_fill_scope_indices = Vec::with_capacity(self.placements.len());
+        for placement in self.placements {
+            self.output.placement_groups.push(placement.group);
+            placement_scopes.push(placement.execution);
+            placement_fill_scope_indices.push(placement.fill_scopes);
+        }
+        (
+            self.output,
+            TypedExecutionPlan {
+                input_score_digest: inku_score::canonical_score_digest(self.request.score)
+                    .expect("finalized compact Score is canonical"),
+                placement_scopes,
+                placement_fill_scope_indices,
+                transform_fill_scope_indices: self.transform_fill_scope_indices,
+                instruction_seed_overrides: self.instruction_seed_overrides,
+                instruction_fill_scope_indices: self.instruction_fill_scope_indices,
+                fill_scopes: self.fill_scopes,
+                diagnostics: self.diagnostics,
+            },
+            self.original_instruction_indices,
+            self.original_anchor_indices,
+        )
+    }
+}
+
+fn mean(points: &[Point]) -> Point {
+    let total = points.iter().fold(Point::new(0.0, 0.0), |sum, point| {
+        Point::new(sum.x + point.x, sum.y + point.y)
+    });
+    Point::new(total.x / points.len() as f64, total.y / points.len() as f64)
+}
+
+fn named_anchor(
+    region: [f64; 4],
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Point {
+    let [x0, y0, x1, y1] = crate::placement::region_in_short_side_units(region, canvas);
+    Point::new(
+        x0 + (x1 - x0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-x"),
+        y0 + (y1 - y0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-y"),
+    )
+}
+
+fn resolved_anchor(
+    anchor: &ResolvedPlacementAnchor,
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Option<Point> {
+    match anchor {
+        ResolvedPlacementAnchor::Numeric { point }
+        | ResolvedPlacementAnchor::GeneratedNumeric { point } => {
+            Some(crate::geometry::point_to_short_side_units(*point, canvas))
+        }
+        ResolvedPlacementAnchor::Named { region } => {
+            Some(named_anchor(*region, seed, owner, canvas))
+        }
+        ResolvedPlacementAnchor::EnclosingGroup => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn recipe_centers(
+    recipe: &ResolvedPlacementRecipe,
+    anchor: &ResolvedPlacementAnchor,
+    domain: Point,
+    count: usize,
+    first_ordinal: u64,
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Vec<Point> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let target = resolved_anchor(anchor, seed, owner, canvas);
+    let mut centers = match recipe {
+        ResolvedPlacementRecipe::Place => vec![Point::new(0.0, 0.0); count],
+        ResolvedPlacementRecipe::HorizontalLine { cell_width } => (0..count)
+            .map(|index| Point::new((index as f64 + 0.5) * cell_width, domain.y / 2.0))
+            .collect(),
+        ResolvedPlacementRecipe::VerticalLine { cell_height } => (0..count)
+            .map(|index| Point::new(domain.x / 2.0, (index as f64 + 0.5) * cell_height))
+            .collect(),
+        ResolvedPlacementRecipe::DiagonalLine { step } => (0..count)
+            .map(|index| Point::new(index as f64 * step.x, index as f64 * step.y))
+            .collect(),
+        ResolvedPlacementRecipe::Grid {
+            columns,
+            cell_width,
+            cell_height,
+            ..
+        } => (0..count)
+            .map(|index| {
+                let index = index as u64;
+                Point::new(
+                    (index % columns) as f64 * cell_width + cell_width / 2.0,
+                    (index / columns) as f64 * cell_height + cell_height / 2.0,
+                )
+            })
+            .collect(),
+        ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => (0..count)
+            .map(|index| {
+                let ordinal = usize::try_from(first_ordinal + index as u64).unwrap_or(usize::MAX);
+                let sampled = crate::placement::scatter_position(ordinal, seed, 0.0);
+                Point::new(sampled.x * domain.x, sampled.y * domain.y)
+            })
+            .collect(),
+    };
+    match (recipe, anchor, target) {
+        (
+            ResolvedPlacementRecipe::Grid {
+                centroid,
+                translate_to_numeric_anchor: true,
+                ..
+            },
+            ResolvedPlacementAnchor::Numeric { .. }
+            | ResolvedPlacementAnchor::GeneratedNumeric { .. },
+            Some(target),
+        ) => {
+            for point in &mut centers {
+                point.x += target.x - centroid.x;
+                point.y += target.y - centroid.y;
+            }
+        }
+        (
+            ResolvedPlacementRecipe::Grid {
+                translate_to_numeric_anchor: false,
+                ..
+            },
+            ResolvedPlacementAnchor::Named { region },
+            _,
+        ) => {
+            let [x0, y0, _, _] = crate::placement::region_in_short_side_units(*region, canvas);
+            for center in &mut centers {
+                center.x += x0;
+                center.y += y0;
+            }
+        }
+        (_, ResolvedPlacementAnchor::EnclosingGroup, _) => {}
+        (_, _, Some(target)) => {
+            let center = mean(&centers);
+            for point in &mut centers {
+                point.x += target.x - center.x;
+                point.y += target.y - center.y;
+            }
+        }
+        _ => {}
+    }
+    centers
+}
+
+fn translate_instruction_to(
+    instruction: &inku_score::Instruction,
+    target: Point,
+    canvas: Option<crate::types::CanvasSize>,
+) -> inku_score::Instruction {
+    let anchor = crate::geometry::point_to_short_side_units(
+        crate::planning::instruction_anchor_on_canvas(instruction, canvas),
+        canvas,
+    );
+    let delta = Point::new(target.x - anchor.x, target.y - anchor.y);
+    let normalized = crate::geometry::point_from_short_side_units(delta, canvas);
+    let moved = |point: Point| Point::new(point.x + normalized.x, point.y + normalized.y);
+    let mut result = instruction.clone();
+    result.at = None;
+    result.from_ = result.from_.map(moved);
+    result.to = result.to.map(moved);
+    result.center = result.center.map(moved);
+    result.position = result.position.map(moved);
+    result
+}
+
+fn instance_seed(
+    owner: &inku_score::ScoreSourceOwner,
+    context: &[u64],
+    ordinal: u64,
+    performance_seed: Option<Seed>,
+) -> Seed {
+    let mut payload = serde_json::to_vec(&(owner, context, ordinal))
+        .expect("typed instance seed payload is serializable");
+    if let Some(seed) = performance_seed {
+        payload.extend_from_slice(format!(":render:{seed}").as_bytes());
+    }
+    let digest = Sha256::digest(payload);
+    i128::from(u64::from_le_bytes(
+        digest[..8].try_into().expect("eight digest bytes"),
+    ))
+}
+
+fn scoped_seed<T: serde::Serialize>(seed: Seed, purpose: &str, owner: &T, context: &[u64]) -> Seed {
+    let payload = serde_json::to_vec(&(purpose, owner, context, seed))
+        .expect("typed scoped seed payload is serializable");
+    let digest = Sha256::digest(payload);
+    i128::from(u64::from_le_bytes(
+        digest[..8].try_into().expect("eight digest bytes"),
+    ))
+}
+
+fn fill_anchor(
+    anchor: &FillTargetAnchor,
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Point {
+    match anchor {
+        FillTargetAnchor::Numeric { point } | FillTargetAnchor::GeneratedNumeric { point } => {
+            crate::geometry::point_to_short_side_units(*point, canvas)
+        }
+        FillTargetAnchor::Named { region } => named_anchor(*region, seed, owner, canvas),
+    }
+}
+
+fn rotate_contour(points: &mut [Point], center: Point, degrees: Option<f64>) {
+    let Some(degrees) = degrees.filter(|value| *value != 0.0) else {
+        return;
+    };
+    for point in points {
+        *point = crate::planning::rotate_point(*point, center, degrees);
+    }
+}
+
+fn target_contour(
+    target: &inku_score::FillTarget,
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Result<Vec<Point>, RegionError> {
+    match &target.geometry {
+        FillTargetGeometry::Rectangle { bounds } => {
+            let [x0, y0, x1, y1] = *bounds;
+            Ok([
+                Point::new(x0, y0),
+                Point::new(x1, y0),
+                Point::new(x1, y1),
+                Point::new(x0, y1),
+            ]
+            .map(|point| crate::geometry::point_to_short_side_units(point, canvas))
+            .to_vec())
+        }
+        FillTargetGeometry::Shape {
+            primitive,
+            dimensions,
+            arc_form,
+            anchor,
+            rotation_degrees,
+            contour_variation,
+        } => {
+            let center = fill_anchor(anchor, seed, owner, canvas);
+            let (mut contour, extent) = match dimensions {
+                inku_score::ResolvedShapeDimensions::Circle { radius }
+                | inku_score::ResolvedShapeDimensions::Point { radius } => (
+                    crate::geometry::circle_points(center, *radius, *radius, 96),
+                    radius * 2.0,
+                ),
+                inku_score::ResolvedShapeDimensions::Polygon { radius, sides } => (
+                    crate::geometry::polygon_points(center, *radius, usize::from(*sides), 0.0),
+                    radius * 2.0,
+                ),
+                inku_score::ResolvedShapeDimensions::Square { side } => (
+                    vec![
+                        Point::new(center.x - side / 2.0, center.y - side / 2.0),
+                        Point::new(center.x + side / 2.0, center.y - side / 2.0),
+                        Point::new(center.x + side / 2.0, center.y + side / 2.0),
+                        Point::new(center.x - side / 2.0, center.y + side / 2.0),
+                    ],
+                    *side,
+                ),
+                inku_score::ResolvedShapeDimensions::RegularTriangle { side } => {
+                    let height = side * 3.0_f64.sqrt() / 2.0;
+                    (
+                        vec![
+                            Point::new(center.x, center.y - height / 2.0),
+                            Point::new(center.x + side / 2.0, center.y + height / 2.0),
+                            Point::new(center.x - side / 2.0, center.y + height / 2.0),
+                        ],
+                        *side,
+                    )
+                }
+                inku_score::ResolvedShapeDimensions::Bbox { width, height }
+                | inku_score::ResolvedShapeDimensions::CenteredSize { width, height } => {
+                    let contour = match primitive {
+                        Primitive::Ellipse => {
+                            crate::geometry::circle_points(center, width / 2.0, height / 2.0, 96)
+                        }
+                        Primitive::Triangle => vec![
+                            Point::new(center.x, center.y - height / 2.0),
+                            Point::new(center.x + width / 2.0, center.y + height / 2.0),
+                            Point::new(center.x - width / 2.0, center.y + height / 2.0),
+                        ],
+                        Primitive::Arc if *arc_form == Some(ArcForm::Crescent) => {
+                            crate::geometry::crescent_contour_points(
+                                center,
+                                Point::new(*width, *height),
+                                24,
+                            )
+                        }
+                        Primitive::Cloudform => crate::cloudform::generate_cloudform_contour(
+                            crate::cloudform::CloudformRequest {
+                                center,
+                                size: Point::new(*width, *height),
+                                performance_seed: Some(seed),
+                                instruction_index: owner,
+                                mark_index: 0,
+                                variation: contour_variation.as_ref(),
+                                weight: inku_score::Weight::Pen,
+                                point_count: 97,
+                            },
+                        ),
+                        Primitive::Square => vec![
+                            Point::new(center.x - width / 2.0, center.y - height / 2.0),
+                            Point::new(center.x + width / 2.0, center.y - height / 2.0),
+                            Point::new(center.x + width / 2.0, center.y + height / 2.0),
+                            Point::new(center.x - width / 2.0, center.y + height / 2.0),
+                        ],
+                        _ => return Err(RegionError::Degenerate),
+                    };
+                    (contour, width.min(*height))
+                }
+                _ => return Err(RegionError::Degenerate),
+            };
+            if *primitive != Primitive::Cloudform
+                && let Some(variation) = contour_variation
+                    .as_ref()
+                    .filter(|value| crate::determinism::needs_contour_variation(value))
+            {
+                let amplitude =
+                    crate::mark_paths::amplitude_width(variation.amplitude) * extent * 0.02;
+                contour = crate::geometry::closed_contour_with_variation(
+                    &contour, center, variation, seed, amplitude,
+                );
+            }
+            rotate_contour(&mut contour, center, *rotation_degrees);
+            Ok(contour)
+        }
+    }
+}
+
+fn prepare_fill_target(
+    group: &FillGroup,
+    seed: Seed,
+    owner: usize,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Result<PreparedRegion, RegionError> {
+    PreparedRegion::new(&target_contour(&group.target, seed, owner, canvas)?)
+}
+
+fn remap_dense_diagnostics(
+    diagnostics: &mut [ScoreExecutionDiagnostic],
+    source_prefix: &[ScoreExecutionDiagnostic],
+    dense_to_original: &[usize],
+    dense_anchor_to_original: &[usize],
+) {
+    let dense_start = diagnostics
+        .starts_with(source_prefix)
+        .then_some(source_prefix.len())
+        .unwrap_or(0);
+    for diagnostic in &mut diagnostics[dense_start..] {
+        if let Some(&original) = dense_to_original.get(diagnostic.instruction_index) {
+            diagnostic.instruction_index = original;
+        }
+        if let Some(dense) = diagnostic.dependency_instruction_index
+            && let Some(&original) = dense_to_original.get(dense)
+        {
+            diagnostic.dependency_instruction_index = Some(original);
+        }
+        if let Some(dense) = diagnostic.anchor_index
+            && let Some(&original) = dense_anchor_to_original.get(dense)
+        {
+            diagnostic.anchor_index = Some(original);
+        }
+    }
+}
+
+pub(crate) fn resolve(
+    request: PerformanceRequest<'_>,
+    policy: inku_score::ScoreErrorPolicy,
+) -> Result<PerformancePlan, crate::checked_performance::CheckedPerformanceError> {
+    let performance_seed = request.performance_seed;
+    let composition_seed = request.composition_seed;
+    let canvas = request.canvas;
+    let (dense, typed, dense_to_original, dense_anchor_to_original) =
+        Builder::new(request).finish();
+    let source_diagnostics = typed.diagnostics.clone();
+    let dense_request = PerformanceRequest {
+        score: &dense,
+        performance_seed,
+        composition_seed,
+        canvas,
+    };
+    let mut performance = match crate::checked_performance::anchor_execution::resolve_typed(
+        dense_request,
+        policy,
+        typed,
+    ) {
+        Ok(performance) => performance,
+        Err(mut error) => {
+            remap_dense_diagnostics(
+                &mut error.diagnostics,
+                &source_diagnostics,
+                &dense_to_original,
+                &dense_anchor_to_original,
+            );
+            return Err(error);
+        }
+    };
+    if let Some(execution) = &mut performance.execution {
+        remap_dense_diagnostics(
+            &mut execution.diagnostics,
+            &source_diagnostics,
+            &dense_to_original,
+            &dense_anchor_to_original,
+        );
+    }
+    for owner in &mut performance.original_instruction_indices {
+        *owner = dense_to_original[*owner];
+    }
+    if let Some(execution) = &mut performance.execution {
+        execution.rendered_instruction_indices = performance.original_instruction_indices.clone();
+        execution.rendered_instruction_indices.sort_unstable();
+        execution.rendered_instruction_indices.dedup();
+    }
+    Ok(performance)
+}
+
+#[cfg(test)]
+mod tests {
+    use inku_score::{
+        HardResourcePolicy, OperationalResourceBudget, ResourceBudget, ResourceDemand,
+        ScoreErrorPolicy, ScoreResourcePolicy,
+    };
+    use serde_json::json;
+
+    use super::*;
+
+    fn budget(maximum: u64) -> ResourceBudget {
+        ResourceBudget {
+            maximum: ResourceDemand {
+                logical_objects: maximum,
+                primitive_marks: maximum,
+                object_templates: maximum,
+                maximum_per_template_primitive_marks: maximum,
+                maximum_resolved_count: maximum,
+                template_nodes: maximum,
+                anchor_instances: maximum,
+                transform_instances: maximum,
+                placement_instances: maximum,
+                fill_instances: maximum,
+            },
+        }
+    }
+
+    fn hard(maximum: u64) -> HardResourcePolicy {
+        HardResourcePolicy {
+            identity: "test.typed-performance-policy.v1".into(),
+            budget: budget(maximum),
+        }
+    }
+
+    fn instruction(owner: serde_json::Value, enclosing: bool) -> inku_score::Instruction {
+        serde_json::from_value(json!({
+            "primitive": "circle",
+            "center": [0.5, 0.5],
+            "radius": 0.05,
+            "arrangement": {
+                "count": 1,
+                "resolved": {
+                    "owner": owner,
+                    "first_instance_ordinal": 0,
+                    "count_origin": {"kind": if enclosing {"template_single"} else {"explicit"}},
+                    "domain": [1.0, 1.0],
+                    "anchor": if enclosing {
+                        json!({"kind": "enclosing_group"})
+                    } else {
+                        json!({"kind": "numeric", "point": [0.8, 0.8]})
+                    },
+                    "recipe": {"kind": "place"},
+                    "ordinal_scheme": "source_member_then_instance_v1"
+                }
+            }
+        }))
+        .unwrap()
+    }
+
+    fn symbolic_member(
+        start: usize,
+        end: usize,
+        owner: serde_json::Value,
+        kind: &str,
+        count: u64,
+    ) -> inku_score::PlacementMember {
+        serde_json::from_value(json!({
+            "start": start,
+            "end": end,
+            "symbolic": {
+                "owner": owner,
+                "kind": kind,
+                "member_ordinal": 0,
+                "first_instance_ordinal": 0,
+                "instance_count": count,
+                "count_origin": {"kind": "explicit"}
+            }
+        }))
+        .unwrap()
+    }
+
+    fn representative_score(policy: HardResourcePolicy) -> Score {
+        let inner_owner = json!({
+            "kind": "macro_emit",
+            "source_instruction_index": 0,
+            "invocation_ordinal": 0,
+            "generated_ordinal": 0
+        });
+        let outer_fill_member = symbolic_member(
+            0,
+            2,
+            json!({"kind": "source_instruction", "instruction_index": 0}),
+            "macro",
+            2,
+        );
+        let inner_fill_member = symbolic_member(0, 1, inner_owner.clone(), "primitive", 2);
+        let mut instructions = vec![
+            instruction(inner_owner, true),
+            instruction(
+                json!({
+                    "kind": "macro_emit",
+                    "source_instruction_index": 0,
+                    "invocation_ordinal": 0,
+                    "generated_ordinal": 1
+                }),
+                true,
+            ),
+            instruction(
+                json!({
+                    "kind": "macro_emit",
+                    "source_instruction_index": 2,
+                    "invocation_ordinal": 0,
+                    "generated_ordinal": 0
+                }),
+                true,
+            ),
+            instruction(
+                json!({
+                    "kind": "macro_emit",
+                    "source_instruction_index": 2,
+                    "invocation_ordinal": 0,
+                    "generated_ordinal": 1
+                }),
+                true,
+            ),
+            instruction(
+                json!({"kind": "source_instruction", "instruction_index": 4}),
+                false,
+            ),
+        ];
+        instructions[4].relation = serde_json::from_value(json!({
+            "type": "connected",
+            "target_instruction_index": 0
+        }))
+        .unwrap();
+        Score {
+            version: "0.10.0".into(),
+            canvas: inku_score::Canvas::Id("square".into()),
+            background: inku_score::Color::Black,
+            presence: None,
+            instructions,
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: vec![inku_score::RepetitionGroup {
+                member: symbolic_member(
+                    2,
+                    4,
+                    json!({"kind": "source_instruction", "instruction_index": 2}),
+                    "macro",
+                    2,
+                ),
+                ordinal_scheme: inku_score::InstanceOrdinalScheme::SourceMemberThenInstanceV1,
+            }],
+            fill_groups: vec![
+                serde_json::from_value(json!({
+                    "start": 0,
+                    "end": 2,
+                    "owner": {"kind": "instruction", "source_instruction_index": 0},
+                    "logical_count": 2,
+                    "recipe": "uniform_in_region",
+                    "target": {
+                        "owner": {"kind": "omitted_canvas"},
+                        "geometry": {"kind": "rectangle", "bounds": [0.0, 0.0, 1.0, 1.0]},
+                        "reference_area": 1.0
+                    },
+                    "boundary": "clip_to_target",
+                    "ordinal_scheme": "source_member_then_instance_v1",
+                    "members": [outer_fill_member]
+                }))
+                .unwrap(),
+                serde_json::from_value(json!({
+                    "start": 0,
+                    "end": 1,
+                    "owner": {"kind": "instruction", "source_instruction_index": 0},
+                    "logical_count": 2,
+                    "recipe": "uniform_in_region",
+                    "target": {
+                        "owner": {"kind": "omitted_canvas"},
+                        "geometry": {"kind": "rectangle", "bounds": [0.2, 0.2, 0.4, 0.4]},
+                        "reference_area": 0.04
+                    },
+                    "boundary": "clip_to_target",
+                    "ordinal_scheme": "source_member_then_instance_v1",
+                    "members": [inner_fill_member]
+                }))
+                .unwrap(),
+            ],
+            resource_policy: Some(ScoreResourcePolicy {
+                accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                hard_policy: policy,
+                operational_budget: OperationalResourceBudget(budget(100)),
+            }),
+        }
+    }
+
+    #[test]
+    fn compact_fill_repeat_and_later_source_materialize_deterministically() {
+        let policy = hard(100);
+        let score = representative_score(policy.clone());
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let request = PerformanceRequest {
+            score: &score,
+            performance_seed: Some(7),
+            composition_seed: Some(11),
+            canvas: None,
+        };
+        let operational = OperationalResourceBudget(budget(100));
+        let first = crate::checked_performance::resolve_checked_performance_with_resources(
+            request,
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            operational,
+        )
+        .unwrap();
+        let second = crate::checked_performance::resolve_checked_performance_with_resources(
+            request,
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            operational,
+        )
+        .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.score.instructions.len(), 11);
+        assert_eq!(
+            first.original_instruction_indices,
+            vec![0, 0, 1, 0, 0, 1, 2, 3, 2, 3, 4]
+        );
+        assert!(
+            first
+                .score
+                .instructions
+                .iter()
+                .all(|value| value.arrangement.is_none())
+        );
+        assert!(first.score.placement_groups.is_empty());
+        assert!(first.score.repetition_groups.is_empty());
+        assert!(first.score.fill_groups.is_empty());
+        assert_eq!(first.fill_scopes.len(), 3);
+        assert_eq!(
+            first.fill_scopes[0].instruction_indices,
+            vec![0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(first.fill_scopes[1].instruction_indices, vec![0, 1]);
+        assert_eq!(first.fill_scopes[2].instruction_indices, vec![3, 4]);
+        assert_eq!(first.fill_scopes[1].parent_scope_index, Some(0));
+        assert_eq!(first.fill_scopes[2].parent_scope_index, Some(0));
+        assert_eq!(
+            first.fill_scopes[1].atomic_instruction_groups.last(),
+            Some(&vec![0, 1, 2, 3, 4, 5])
+        );
+        assert_eq!(
+            first.instruction_fill_scope_indices,
+            vec![
+                Some(1),
+                Some(1),
+                Some(0),
+                Some(2),
+                Some(2),
+                Some(0),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ]
+        );
+        for index in [0, 1, 3, 4] {
+            let center = crate::geometry::point_to_short_side_units(
+                crate::planning::instruction_anchor_on_canvas(
+                    &first.score.instructions[index],
+                    None,
+                ),
+                None,
+            );
+            assert!(
+                first.fill_scopes[first.instruction_fill_scope_indices[index].unwrap()]
+                    .prepared_region
+                    .contains(first.instruction_transforms[index].apply(center))
+            );
+        }
+
+        let omitted =
+            crate::checked_performance::resolve_checked_performance_with_resources_and_omissions(
+                request,
+                ScoreErrorPolicy::OmitAndContinue,
+                &policy,
+                operational,
+                &[2],
+            )
+            .unwrap();
+        assert_eq!(
+            omitted.original_instruction_indices,
+            vec![0, 0, 1, 0, 0, 1, 4]
+        );
+        let execution = omitted.execution.unwrap();
+        assert_eq!(execution.rendered_instruction_indices, vec![0, 1, 4]);
+        assert!(execution.diagnostics.iter().any(|diagnostic| {
+            diagnostic.instruction_index == 4 && diagnostic.dependency_instruction_index == Some(0)
+        }));
+
+        let empty =
+            crate::checked_performance::resolve_checked_performance_with_resources_and_omissions(
+                request,
+                ScoreErrorPolicy::OmitAndContinue,
+                &policy,
+                operational,
+                &[0, 2, 4],
+            )
+            .unwrap();
+        assert!(empty.score.instructions.is_empty());
+        assert!(empty.original_instruction_indices.is_empty());
+    }
+}

@@ -41,9 +41,11 @@ Variation belongs to renderer performance and explicit user operations.
 
 A short description becomes a typed semantic document retaining shared meaning;
 the lock-verified lowerer resolves it once to a Score, and SVG is one
-performance of that same Score. The current product runtime still uses the
-legacy path below; the accepted typed compiler foundation is not connected to
-it. SPEC defines the implemented subset and the remaining boundary.
+performance of that same Score. The shared core now has resource-aware entry
+points for compact Score 0.10 compilation and performance. The current product
+host still uses the legacy path below; its UI, API, and persistence cutover and
+native acceptance remain later work. SPEC defines the implemented core subset
+and that delivery boundary.
 
 ## Current Architecture
 
@@ -68,13 +70,13 @@ instruction
 - `SPEC.md`: maintained public English adaptation.
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: chronological design and implementation history.
 
-### Accepted typed DDL foundation (not connected to runtime)
+### Accepted typed DDL foundation and compact performance core
 
 The shared Rust compiler interprets normalized Japanese and English DDL as a typed semantic document, retaining source provenance, canonical meaning, and finite Macro expansion. The compiler lock attests source and provenance; only lock-verified meaning reaches the shared lowerer. The lowerer resolves once to an actual Score or a symbolic plan for repetition. A recoverable failure receives a typed diagnostic and local omission while independent drawing continues. [SPEC.ja.md](SPEC.ja.md) is authoritative for the types, lock, recovery, geometry, relations, and Macro contracts.
 
-The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. Score 0.9 retains Macro-body boundaries and Anchor ownership, leaving repetition in a symbolic plan rather than materializing instances. Fill resolves target, count, and Macro footprint into a symbolic FillGroupPlan; sampling, clipping, and actual-Score region materialization remain disconnected Step11 work.
+The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. The legacy/default wire remains Score 0.9. The explicit resource-aware path emits compact Score 0.10 recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work.
 
-Step11 instance materialization, connecting the typed compiler to product runtime / UI / API / persistence paths, and remaining delivery extensions are unfinished. The Current Architecture above remains the active runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
+`compile_ddl_to_score_with_resources` and `render_with_resources` form the new shared-core boundary. Connecting them to product runtime / UI / API / persistence paths remains unfinished, and focused native acceptance is still pending. The Current Architecture above remains the active product-host runtime, and its legacy coerce / LLM fallback has not yet been replaced. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
 
 ## Contracts That Must Remain Intact
 
@@ -127,8 +129,8 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 58 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 35 | `server/src/inku_server/layer_versions.py` |
+| Render Engine | 59 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 37 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 

@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "8463c17d2d26e8b6eeac020b5c6581ad3afbdee4e139f19dd48830c0266b2198";
+    "3102f4caefb6c12e61025b49b38f0551f218aed8af8c0b08b329ce7b596db1bb";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -24,6 +24,9 @@ fn canonical_score_schema_identity_is_stable() {
         "instructions",
         "transform_groups",
         "placement_groups",
+        "repetition_groups",
+        "fill_groups",
+        "resource_policy",
     ] {
         assert!(
             properties.contains_key(required),
@@ -34,7 +37,7 @@ fn canonical_score_schema_identity_is_stable() {
     let placement_group = schema["$defs"]["PlacementGroup"]["properties"]
         .as_object()
         .expect("PlacementGroup properties must be an object");
-    for required in ["start", "end", "layout", "at", "members"] {
+    for required in ["start", "end", "layout", "at", "members", "resolved"] {
         assert!(
             placement_group.contains_key(required),
             "missing PlacementGroup property {required}"
@@ -47,12 +50,43 @@ fn canonical_score_schema_identity_is_stable() {
     let placement_member = schema["$defs"]["PlacementMember"]["properties"]
         .as_object()
         .expect("PlacementMember properties must be an object");
-    for required in ["start", "end", "anchor_indices", "transform_group_indices"] {
+    for required in [
+        "start",
+        "end",
+        "anchor_indices",
+        "transform_group_indices",
+        "symbolic",
+    ] {
         assert!(
             placement_member.contains_key(required),
             "missing PlacementMember property {required}"
         );
     }
+    let fill_group = schema["$defs"]["FillGroup"]["properties"]
+        .as_object()
+        .expect("FillGroup properties must be an object");
+    for required in [
+        "start",
+        "end",
+        "owner",
+        "logical_count",
+        "recipe",
+        "target",
+        "boundary",
+        "ordinal_scheme",
+        "members",
+    ] {
+        assert!(
+            fill_group.contains_key(required),
+            "missing FillGroup property {required}"
+        );
+    }
+    let resource_policy = schema["$defs"]["ScoreResourcePolicy"]["properties"]
+        .as_object()
+        .expect("ScoreResourcePolicy properties must be an object");
+    assert!(resource_policy.contains_key("accounting_id"));
+    assert!(resource_policy.contains_key("hard_policy"));
+    assert!(resource_policy.contains_key("operational_budget"));
 
     let instruction = schema["$defs"]["Instruction"]["properties"]
         .as_object()

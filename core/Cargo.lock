@@ -196,9 +196,11 @@ name = "inku-render"
 version = "0.1.0"
 dependencies = [
  "inku-score",
+ "kurbo",
  "serde",
  "serde_json",
  "sha2",
+ "svgtypes",
 ]
 
 [[package]]

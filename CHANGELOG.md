@@ -4,7 +4,15 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 30 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 31 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-13 — Add the resource-aware compact Score 0.10 performance core
+
+`compile_ddl_to_score_with_resources` materializes placement, repetition, and fill recipes without storing instance coordinates; `render_with_resources` replays exact counts and shapes from the same owners, ordinals, and performance seed. Fill retains its target and boundary. Display and Editable clip after appearance; Compat applies whole-group bounded-geometry clipping without filters or `clip-path`. Macro internal counts and outer repetition use separate namespaces. Procedural filter / pattern count approximation is rejected; filters remain available only for material appearance.
+
+Resource admission runs before instance allocation and preserves the current shipping limits of 400 total primitive marks, 240 marks per expanded Score template, resolved count 2000, and 64 drawable templates, without clamping. Budget excess or clip failure omits the complete affected source or coordinated placement, records diagnostics, and continues independent later work. Six additional structural dimensions introduce no new shipping defaults. A saved Score retains caller-authorized policy authorities; replay recomputes demand from its recipes. Render metadata `resource_execution` records recomputed demand, resource omissions, and relation omissions.
+
+This delivery advances DDL engine 36→37 and render engine 58→59 and adds Score 0.10 as a core candidate. Default / legacy Score 0.9, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 remain unchanged. Product-host runtime / UI / API / persistence cutover, native acceptance, deployment, and release are not included.
 
 ### 2026-09-13 — Share omitted placement and ground-only readiness
 

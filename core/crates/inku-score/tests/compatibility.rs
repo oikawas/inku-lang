@@ -184,3 +184,64 @@ fn old_and_transform_group_scores_roundtrip_through_saved_compatibility() {
         );
     }
 }
+
+#[test]
+fn compact_fill_score_roundtrips_without_sampled_positions_or_stored_demand() {
+    let source = br#"{
+        "version":"0.10.0","instructions":[{
+            "primitive":"point","center":[0.5,0.5],"radius":0.006,"filled":true,
+            "arrangement":{"count":1,"resolved":{
+                "owner":{"kind":"source_instruction","instruction_index":0},
+                "first_instance_ordinal":0,"count_origin":{"kind":"omitted_default"},
+                "domain":[1.0,1.0],"anchor":{"kind":"numeric","point":[0.5,0.5]},
+                "recipe":{"kind":"place"},
+                "ordinal_scheme":"source_member_then_instance_v1"
+            }}
+        }],
+        "fill_groups":[{
+            "start":0,"end":1,
+            "owner":{"kind":"instruction","source_instruction_index":0},
+            "logical_count":2,"recipe":"uniform_in_region",
+            "target":{"owner":{"kind":"omitted_canvas"},
+                "geometry":{"kind":"rectangle","bounds":[0.0,0.0,1.0,1.0]},
+                "reference_area":1.0},
+            "boundary":"clip_to_target",
+            "ordinal_scheme":"source_member_then_instance_v1",
+            "members":[{"start":0,"end":1,"symbolic":{
+                "owner":{"kind":"source_instruction","instruction_index":0},
+                "kind":"primitive","member_ordinal":0,"first_instance_ordinal":0,
+                "instance_count":2,"count_origin":{"kind":"explicit"}
+            }}]
+        }],
+        "resource_policy":{
+            "accounting_id":"inku.resource-accounting.v1",
+            "hard_policy":{"identity":"shipping-v1","budget":{"maximum":{
+                "logical_objects":400,"primitive_marks":400,"object_templates":64,
+                "maximum_per_template_primitive_marks":240,"maximum_resolved_count":2000,
+                "template_nodes":400,"anchor_instances":400,"transform_instances":400,
+                "placement_instances":400,"fill_instances":400
+            }}},
+            "operational_budget":{"maximum":{
+                "logical_objects":400,"primitive_marks":400,"object_templates":64,
+                "maximum_per_template_primitive_marks":240,"maximum_resolved_count":2000,
+                "template_nodes":400,"anchor_instances":400,"transform_instances":400,
+                "placement_instances":400,"fill_instances":400
+            }}
+        }
+    }"#;
+
+    let score = read_saved_score_json(source).expect("compact Score must parse");
+    assert_eq!(score.fill_groups[0].logical_count, 2);
+    let canonical = canonical_json_bytes(&score).expect("compact Score must canonicalize");
+    let text = std::str::from_utf8(&canonical).unwrap();
+    assert!(!text.contains("sampled"));
+    assert!(!text.contains("demand"));
+    assert_eq!(
+        read_saved_score_json(&canonical).expect("compact Score must reread"),
+        score
+    );
+
+    let mut old_edition: Value = serde_json::from_slice(source).unwrap();
+    old_edition["version"] = Value::String("0.9.0".to_owned());
+    assert!(read_saved_score_json(&serde_json::to_vec(&old_edition).unwrap()).is_err());
+}

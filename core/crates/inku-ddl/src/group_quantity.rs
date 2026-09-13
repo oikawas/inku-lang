@@ -19,9 +19,10 @@ pub(crate) fn coordinated_counts(action: &str, counts: &[Option<u64>]) -> Option
             if omitted_count == 0 {
                 return Some(counts.iter().map(|count| count.unwrap()).collect());
             }
-            let remaining_after_explicit = counts.iter().fold(GROUP_TOTAL_DEFAULT, |remaining, count| {
-                count.map_or(remaining, |explicit| remaining.saturating_sub(explicit))
-            });
+            let remaining_after_explicit =
+                counts.iter().fold(GROUP_TOTAL_DEFAULT, |remaining, count| {
+                    count.map_or(remaining, |explicit| remaining.saturating_sub(explicit))
+                });
             let distributable = remaining_after_explicit.saturating_sub(omitted_count);
             let base = distributable / omitted_count;
             let remainder = distributable % omitted_count;

@@ -4,7 +4,10 @@ use std::fmt;
 
 use crate::accepted_fills;
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
-use crate::checked_performance::{CheckedPerformanceError, resolve_checked_performance};
+use crate::checked_performance::{
+    CheckedPerformanceError, CheckedPerformanceWithResourcesError, resolve_checked_performance,
+    resolve_checked_performance_with_resources_and_omissions,
+};
 use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
@@ -13,6 +16,8 @@ use crate::marks::{MarkContext, MarkError, render_instruction};
 use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::PerformanceRequest;
+pub use crate::render_fill_scopes::CompatFillClipPolicy;
+use crate::render_fill_scopes::FillPaintForest;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
@@ -37,6 +42,7 @@ fn canvas_ground(score: &Score) -> Option<CanvasGroundSpec> {
 pub enum RenderError {
     Mark(MarkError),
     CheckedPerformance(CheckedPerformanceError),
+    ResourceAuthority(inku_score::SavedScoreResourceError),
     NonFiniteSvg,
 }
 
@@ -50,6 +56,9 @@ impl fmt::Display for RenderError {
                     "checked performance stopped: {:?}",
                     error.diagnostics
                 )
+            }
+            Self::ResourceAuthority(error) => {
+                write!(formatter, "invalid Score resource authority: {error:?}")
             }
             Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
         }
@@ -107,6 +116,7 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         render_canvas_ground: canvas_ground(score),
         render_surface_textures,
         execution: None,
+        resource_execution: None,
     }
 }
 
@@ -215,6 +225,63 @@ fn document_metadata(profile: SvgProfile) -> (String, String) {
 
 /// Render a canonical Score through the complete portable request boundary.
 pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
+    render_impl(request, None, &[])
+}
+
+/// Render a typed Score with independently authorized resource policies.
+/// The saved snapshot is checked against these authorities before expansion.
+pub fn render_with_resources(
+    request: RenderRequest,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+    clip_policy: CompatFillClipPolicy,
+) -> Result<RenderOutput, RenderError> {
+    let mut omitted = std::collections::BTreeMap::new();
+    loop {
+        let excluded = omitted.keys().copied().collect::<Vec<_>>();
+        let mut output = render_impl(
+            request.clone(),
+            Some((hard_policy, operational_budget, clip_policy)),
+            &excluded,
+        )?;
+        let mut changed = false;
+        if let Some(execution) = &mut output.metadata.execution {
+            for diagnostic in &execution.diagnostics {
+                if matches!(
+                    diagnostic.reason,
+                    inku_score::ScoreExecutionReason::FillClipUnsupported
+                        | inku_score::ScoreExecutionReason::FillClipLimitExceeded
+                ) {
+                    if let std::collections::btree_map::Entry::Vacant(entry) =
+                        omitted.entry(diagnostic.instruction_index)
+                    {
+                        entry.insert(diagnostic.clone());
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                execution.diagnostics.extend(omitted.into_values());
+                return Ok(output);
+            }
+        } else {
+            return Ok(output);
+        }
+        // Each retry removes at least one complete atomic source/group. Reuse
+        // the saved recipes and owner seeds to resolve relations without that
+        // target, rather than leaving a prior translation toward missing paint.
+    }
+}
+
+fn render_impl(
+    request: RenderRequest,
+    resources: Option<(
+        &inku_score::HardResourcePolicy,
+        inku_score::OperationalResourceBudget,
+        CompatFillClipPolicy,
+    )>,
+    omitted_instructions: &[usize],
+) -> Result<RenderOutput, RenderError> {
     let source_score = request.score.clone();
     let profile = request.options.svg_profile;
     let assignment = work_color_assignment(
@@ -223,16 +290,31 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         request.options.catalog_id.as_deref(),
     );
     let background = background_color(&request, &assignment);
-    let performance = resolve_checked_performance(
-        PerformanceRequest {
-            score: &request.score,
-            performance_seed: request.options.render_seed,
-            composition_seed: request.options.composition_seed,
-            canvas: Some(request.options.canvas),
-        },
-        request.options.error_policy,
-    )
-    .map_err(RenderError::CheckedPerformance)?;
+    let performance_request = PerformanceRequest {
+        score: &request.score,
+        performance_seed: request.options.render_seed,
+        composition_seed: request.options.composition_seed,
+        canvas: Some(request.options.canvas),
+    };
+    let mut performance = match resources {
+        Some((hard, operational, _)) => resolve_checked_performance_with_resources_and_omissions(
+            performance_request,
+            request.options.error_policy,
+            hard,
+            operational,
+            omitted_instructions,
+        )
+        .map_err(|error| match error {
+            CheckedPerformanceWithResourcesError::Resources(error) => {
+                RenderError::ResourceAuthority(error)
+            }
+            CheckedPerformanceWithResourcesError::Performance(error) => {
+                RenderError::CheckedPerformance(error)
+            }
+        }),
+        None => resolve_checked_performance(performance_request, request.options.error_policy)
+            .map_err(RenderError::CheckedPerformance),
+    }?;
     let ground = canvas_ground(&performance.score);
     let support = ground.as_ref().map_or(DEFAULT_SUPPORT, |ground| {
         support_for_ground(ground.material)
@@ -244,27 +326,40 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         .zip(performance.score.instructions.iter())
         .zip(performance.instruction_seed_overrides.iter().copied())
         .zip(performance.instruction_transforms.iter().copied())
+        .zip(performance.instruction_fill_scope_indices.iter().copied())
+        .enumerate()
         .map(
             |(
-                ((instruction_index, instruction), instruction_seed_override),
-                instruction_transform,
+                performed_index,
+                (
+                    (
+                        ((instruction_index, instruction), instruction_seed_override),
+                        instruction_transform,
+                    ),
+                    fill_scope,
+                ),
             )| {
                 (
                     instruction_index,
                     instruction,
                     instruction_seed_override,
                     instruction_transform,
+                    fill_scope,
+                    performed_index,
                 )
             },
         )
         .collect::<Vec<_>>();
-    ordered.sort_by_key(|(_, instruction, _, _)| instruction.mode_ == InstructionMode::Carve);
+    ordered.sort_by_key(|(_, instruction, _, _, _, _)| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
         .options
         .composition_seed
         .or(request.options.render_seed);
     let structured = profile != SvgProfile::Display;
     let mut content = Element::new("g").attr("id", "layer_10_content");
+    let has_fill_scopes = !performance.fill_scopes.is_empty();
+    let mut fill_forest = FillPaintForest::new(performance.fill_scopes.len());
+    let mut scoped_touch_filter = None;
     let use_filters = profile == SvgProfile::Display;
     let mut material_definitions = Vec::new();
     if use_filters {
@@ -287,13 +382,23 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         }
         if let Some(seed) = request.options.render_seed {
             let (filter_id, filter) = performance_touch_filter(seed, request.options.canvas);
-            content.set_attr("filter", format!("url(#{filter_id})"));
+            if has_fill_scopes {
+                scoped_touch_filter = Some(filter_id.clone());
+            } else {
+                content.set_attr("filter", format!("url(#{filter_id})"));
+            }
             material_definitions.push(filter);
         }
     }
     let mut surface_definitions = Vec::new();
-    for (instruction_index, instruction, instruction_seed_override, instruction_transform) in
-        ordered
+    for (
+        instruction_index,
+        instruction,
+        instruction_seed_override,
+        instruction_transform,
+        fill_scope,
+        performed_index,
+    ) in ordered
     {
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
@@ -344,15 +449,51 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
             } else {
                 base_mark
             };
-            if structured {
-                mark.set_attr("id", mark_id(single, instruction_index, mark_index));
+            if structured || has_fill_scopes {
+                if structured {
+                    mark.set_attr("id", mark_id(single, instruction_index, mark_index));
+                }
                 instruction_group.push(mark);
             } else {
                 content.push(mark);
             }
         }
-        if structured {
+        if has_fill_scopes {
+            if let Some(filter_id) = &scoped_touch_filter {
+                instruction_group.set_attr("filter", format!("url(#{filter_id})"));
+            }
+            fill_forest.push(
+                instruction_group,
+                performed_index,
+                fill_scope,
+                &performance.fill_scopes,
+            );
+        } else if structured {
             content.push(instruction_group);
+        }
+    }
+    if has_fill_scopes {
+        let (_, _, clip_policy) =
+            resources.expect("typed fill requires explicit resource authority");
+        let mut definitions = material_definitions.clone();
+        definitions.extend(surface_definitions.iter().cloned());
+        let before = definitions.len();
+        let (paint, diagnostics, omitted) = fill_forest.finish(
+            &performance.fill_scopes,
+            profile,
+            &mut definitions,
+            clip_policy,
+            &performance.original_instruction_indices,
+        );
+        material_definitions.extend(definitions.into_iter().skip(before));
+        for element in paint {
+            content.push(element);
+        }
+        if let Some(execution) = &mut performance.execution {
+            execution.diagnostics.extend(diagnostics);
+            execution
+                .rendered_instruction_indices
+                .retain(|index| !omitted.contains(index));
         }
     }
     let is_print = ground
@@ -447,6 +588,46 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         return Err(RenderError::NonFiniteSvg);
     }
     let mut metadata = build_render_metadata(&source_score, profile);
+    if let Some(demand) = performance.resource_demand {
+        use crate::types::{
+            RenderResourceExecution, RenderResourceFailure, RenderResourceOmission,
+        };
+        use inku_score::SavedScoreResourceFailure;
+        let omissions = performance
+            .resource_diagnostics
+            .into_iter()
+            .map(|diagnostic| {
+                let failure = match diagnostic.failure {
+                    SavedScoreResourceFailure::BudgetExceeded(exceeded) => {
+                        RenderResourceFailure::BudgetExceeded { exceeded }
+                    }
+                    SavedScoreResourceFailure::ArithmeticOverflow(dimension) => {
+                        RenderResourceFailure::ArithmeticOverflow { dimension }
+                    }
+                    reason => {
+                        return Err(RenderError::ResourceAuthority(
+                            inku_score::SavedScoreResourceError {
+                                owner: diagnostic.cause_owner,
+                                reason,
+                            },
+                        ));
+                    }
+                };
+                Ok(RenderResourceOmission {
+                    owner: diagnostic.owner,
+                    cause_owner: diagnostic.cause_owner,
+                    failure,
+                    disposition: diagnostic.disposition,
+                })
+            })
+            .collect::<Result<Vec<_>, RenderError>>()?;
+        metadata.resource_execution = Some(RenderResourceExecution {
+            accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.to_owned(),
+            demand,
+            omissions,
+            relation_omissions: performance.relation_diagnostics,
+        });
+    }
     metadata.execution = performance.execution;
     Ok(RenderOutput { svg, metadata })
 }

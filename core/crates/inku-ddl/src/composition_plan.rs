@@ -286,7 +286,7 @@ pub struct FillGroupPlan {
     pub recipe: PlacementRecipe,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FillPlanOwner {
     CoordinatedGroup { group_index: usize },
     Instruction { source_instruction_index: usize },

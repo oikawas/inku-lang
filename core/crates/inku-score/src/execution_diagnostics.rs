@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScoreExecutionReason {
+    InvalidCompactPerformance,
+    InvalidFillTarget,
     MissingNotTouchingReference,
     NotTouchingReferenceOmitted,
     UnsupportedNotTouchingGeometry,
@@ -51,6 +53,8 @@ pub enum ScoreExecutionReason {
     NumericCuttingPositionConflict,
     CuttingDirectionConflict,
     NoDrawableInstructions,
+    FillClipUnsupported,
+    FillClipLimitExceeded,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

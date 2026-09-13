@@ -18,6 +18,21 @@ pub struct PerformanceRequest<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct PerformedFillScope {
+    /// Stable saved-Score owner of the target and all performed contents.
+    pub owner: inku_score::FillGroupOwner,
+    /// Final target contour in SVG pixel coordinates (`unit == 1` without a canvas).
+    pub prepared_region: crate::fill_geometry::PreparedRegion,
+    /// Enclosing fill scope, when a filled Macro contains another fill.
+    pub parent_scope_index: Option<usize>,
+    /// Final performed instruction indices belonging to this target.
+    pub instruction_indices: Vec<usize>,
+    /// Complete performed units from the nearest owner through the outer source unit.
+    /// The last entry preserves the accepted exact count if any member cannot clip.
+    pub atomic_instruction_groups: Vec<Vec<usize>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct PerformancePlan {
     pub score: Score,
     pub warnings: Vec<PlanningWarning>,
@@ -30,6 +45,14 @@ pub struct PerformancePlan {
     pub instruction_seed_overrides: Vec<Option<Seed>>,
     /// Geometry-only transforms in physical short-side units, parallel to instructions.
     pub instruction_transforms: Vec<crate::affine::AffineTransform>,
+    /// Prepared fill targets after their enclosing placement/relation/affine transforms.
+    pub fill_scopes: Vec<PerformedFillScope>,
+    /// Fill scope index parallel to `score.instructions`.
+    pub instruction_fill_scope_indices: Vec<Option<usize>>,
+    /// Recomputed admitted saved-Score demand when explicit authority was supplied.
+    pub resource_demand: Option<inku_score::ResourceDemand>,
+    pub resource_diagnostics: Vec<inku_score::SavedScoreResourceDiagnostic>,
+    pub relation_diagnostics: Vec<inku_score::SavedScoreRelationDiagnostic>,
     pub execution: Option<inku_score::ScoreExecutionSummary>,
 }
 
@@ -166,6 +189,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
         request.canvas,
     );
     let Some(seed) = request.performance_seed else {
+        let expanded_len = expanded.instructions.len();
         let instruction_seed_overrides = vec![None; original_instruction_indices.len()];
         return PerformancePlan {
             instruction_indices: (0..expanded.instructions.len()).collect(),
@@ -177,6 +201,11 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
                 instruction_seed_overrides.len()
             ],
             instruction_seed_overrides,
+            fill_scopes: Vec::new(),
+            instruction_fill_scope_indices: vec![None; expanded_len],
+            resource_demand: None,
+            resource_diagnostics: Vec::new(),
+            relation_diagnostics: Vec::new(),
             execution: None,
         };
     };
@@ -211,6 +240,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     score.instructions = resolved;
     let instruction_indices = (0..score.instructions.len()).collect();
     let instruction_seed_overrides = vec![None; score.instructions.len()];
+    let score_len = score.instructions.len();
     PerformancePlan {
         score,
         warnings,
@@ -221,6 +251,11 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
             instruction_seed_overrides.len()
         ],
         instruction_seed_overrides,
+        fill_scopes: Vec::new(),
+        instruction_fill_scope_indices: vec![None; score_len],
+        resource_demand: None,
+        resource_diagnostics: Vec::new(),
+        relation_diagnostics: Vec::new(),
         execution: None,
     }
 }

@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -414,6 +414,153 @@ class Variation(BaseModel):
         return v
 
 
+class SourceInstructionOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["source_instruction"]
+    instruction_index: int = Field(ge=0)
+
+
+class MacroEmitOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["macro_emit"]
+    source_instruction_index: int = Field(ge=0)
+    invocation_ordinal: int = Field(ge=0)
+    generated_ordinal: int = Field(ge=0)
+
+
+ScoreSourceOwner = SourceInstructionOwner | MacroEmitOwner
+
+
+class ExplicitCountOrigin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["explicit"]
+
+
+class OmittedDefaultCountOrigin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["omitted_default"]
+
+
+class TemplateSingleCountOrigin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["template_single"]
+
+
+class OmittedRegionExtentCountOrigin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["omitted_region_extent"]
+    reference_extent: float = Field(gt=0.0)
+
+
+class OmittedBalancedGroupCountOrigin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["omitted_balanced_group"]
+    reference_extents: list[Annotated[float, Field(gt=0.0)]]
+    explicit_counts: list[Optional[Annotated[int, Field(gt=0)]]]
+
+
+CountOrigin = (
+    ExplicitCountOrigin
+    | OmittedDefaultCountOrigin
+    | TemplateSingleCountOrigin
+    | OmittedRegionExtentCountOrigin
+    | OmittedBalancedGroupCountOrigin
+)
+InstanceOrdinalScheme = Literal["source_member_then_instance_v1"]
+
+
+class PlaceRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["place"]
+
+
+class HorizontalLineRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["horizontal_line"]
+    cell_width: float = Field(gt=0.0)
+
+
+class VerticalLineRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["vertical_line"]
+    cell_height: float = Field(gt=0.0)
+
+
+class DiagonalLineRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["diagonal_line"]
+    step: Coord
+
+
+class GridRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["grid"]
+    columns: int = Field(gt=0)
+    rows: int = Field(gt=0)
+    filled_count: int = Field(gt=0)
+    cell_width: float = Field(gt=0.0)
+    cell_height: float = Field(gt=0.0)
+    centroid: Coord
+    translate_to_numeric_anchor: bool
+
+
+class ScatterUniformRecipe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["scatter_uniform_with_centroid_translation"]
+
+
+ResolvedPlacementRecipe = (
+    PlaceRecipe
+    | HorizontalLineRecipe
+    | VerticalLineRecipe
+    | DiagonalLineRecipe
+    | GridRecipe
+    | ScatterUniformRecipe
+)
+
+
+class NumericPlacementAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["numeric"]
+    point: Coord
+
+
+class GeneratedNumericPlacementAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["generated_numeric"]
+    point: Coord
+
+
+class NamedPlacementAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["named"]
+    region: tuple[float, float, float, float]
+
+
+class EnclosingGroupPlacementAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["enclosing_group"]
+
+
+ResolvedPlacementAnchor = (
+    NumericPlacementAnchor
+    | GeneratedNumericPlacementAnchor
+    | NamedPlacementAnchor
+    | EnclosingGroupPlacementAnchor
+)
+
+
+class ResolvedArrangement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    owner: ScoreSourceOwner
+    first_instance_ordinal: int = Field(ge=0)
+    count_origin: CountOrigin
+    domain: Coord
+    anchor: ResolvedPlacementAnchor
+    recipe: ResolvedPlacementRecipe
+    ordinal_scheme: InstanceOrdinalScheme
+
+
 class Arrangement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -565,6 +712,7 @@ class Arrangement(BaseModel):
             " / accelerando=後半へ向けて間隔を詰める / loose=ゆるい不均等間隔"
         ),
     )
+    resolved: Optional[ResolvedArrangement] = None
 
 
 class Instruction(BaseModel):
@@ -882,6 +1030,35 @@ class PlacementMember(BaseModel):
         default_factory=list,
         exclude_if=lambda value: not value,
     )
+    symbolic: Optional["SymbolicMember"] = None
+
+
+class SymbolicMember(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner: ScoreSourceOwner
+    kind: Literal["primitive", "macro"]
+    member_ordinal: int = Field(ge=0)
+    first_instance_ordinal: int = Field(ge=0)
+    instance_count: int = Field(gt=0)
+    count_origin: CountOrigin
+
+
+class CoordinatedPlacementGroupOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["coordinated_group"]
+    group_index: int = Field(ge=0)
+
+
+class ResolvedPlacementGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    owner: CoordinatedPlacementGroupOwner
+    logical_count: int = Field(gt=0)
+    domain: Coord
+    anchor: ResolvedPlacementAnchor
+    recipe: ResolvedPlacementRecipe
+    ordinal_scheme: InstanceOrdinalScheme
 
 
 class PlacementGroup(BaseModel):
@@ -898,6 +1075,7 @@ class PlacementGroup(BaseModel):
         exclude_if=lambda value: not value,
         description="Score 0.9 Macro body boundaries; absent retains the legacy drawable span",
     )
+    resolved: Optional[ResolvedPlacementGroup] = None
 
     @model_validator(mode="after")
     def _require_finite_ordered_region(self) -> "PlacementGroup":
@@ -905,6 +1083,233 @@ class PlacementGroup(BaseModel):
         if not all(math.isfinite(value) for value in self.at.region) or x0 > x1 or y0 > y1:
             raise ValueError("placement group at region must be finite and ordered")
         return self
+
+
+class RepetitionGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    member: PlacementMember
+    ordinal_scheme: InstanceOrdinalScheme
+
+
+class CoordinatedFillGroupOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["coordinated_group"]
+    group_index: int = Field(ge=0)
+
+
+class InstructionFillGroupOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["instruction"]
+    source_instruction_index: int = Field(ge=0)
+
+
+FillGroupOwner = CoordinatedFillGroupOwner | InstructionFillGroupOwner
+
+
+class ScoreSourceSite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    region_index: int = Field(ge=0)
+    clause_index: int = Field(ge=0)
+
+
+class OmittedCanvasTargetOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["omitted_canvas"]
+
+
+class ExplicitCanvasTargetOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["explicit_canvas"]
+    source: ScoreSourceSite
+
+
+class NamedTargetOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["named"]
+    category: str
+    id: str
+
+
+class InlineShapeTargetOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["inline_shape"]
+    source_instruction_index: int = Field(ge=0)
+    source: ScoreSourceSite
+
+
+FillTargetOwner = (
+    OmittedCanvasTargetOwner
+    | ExplicitCanvasTargetOwner
+    | NamedTargetOwner
+    | InlineShapeTargetOwner
+)
+
+
+class BboxDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["bbox"]
+    width: float = Field(gt=0.0)
+    height: float = Field(gt=0.0)
+
+
+class RegularTriangleDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["regular_triangle"]
+    side: float = Field(gt=0.0)
+
+
+class PolygonDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["polygon"]
+    radius: float = Field(gt=0.0)
+    sides: int = Field(ge=5, le=8)
+
+
+class LineDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["line"]
+    length: float = Field(gt=0.0)
+
+
+class CircleDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["circle"]
+    radius: float = Field(gt=0.0)
+
+
+class ArcDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["arc"]
+    chord: float = Field(gt=0.0)
+    sagitta: float = Field(gt=0.0)
+
+
+class PointDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["point"]
+    radius: float = Field(gt=0.0)
+
+
+class CenteredSizeDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["centered_size"]
+    width: float = Field(gt=0.0)
+    height: float = Field(gt=0.0)
+
+
+class SquareDimensions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["square"]
+    side: float = Field(gt=0.0)
+
+
+ResolvedShapeDimensions = (
+    BboxDimensions
+    | RegularTriangleDimensions
+    | PolygonDimensions
+    | LineDimensions
+    | CircleDimensions
+    | ArcDimensions
+    | PointDimensions
+    | CenteredSizeDimensions
+    | SquareDimensions
+)
+
+
+class NumericFillTargetAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["numeric"]
+    point: Coord
+
+
+class GeneratedNumericFillTargetAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["generated_numeric"]
+    point: Coord
+
+
+class NamedFillTargetAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["named"]
+    region: tuple[float, float, float, float]
+
+
+FillTargetAnchor = (
+    NumericFillTargetAnchor | GeneratedNumericFillTargetAnchor | NamedFillTargetAnchor
+)
+
+
+class RectangleFillTargetGeometry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["rectangle"]
+    bounds: tuple[float, float, float, float]
+
+
+class ShapeFillTargetGeometry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["shape"]
+    primitive: Primitive
+    dimensions: ResolvedShapeDimensions
+    arc_form: Optional[ArcForm] = None
+    anchor: FillTargetAnchor
+    rotation_degrees: Optional[float] = None
+    contour_variation: Optional[Variation] = None
+
+
+FillTargetGeometry = RectangleFillTargetGeometry | ShapeFillTargetGeometry
+
+
+class FillTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    owner: FillTargetOwner
+    geometry: FillTargetGeometry
+    reference_area: float = Field(gt=0.0)
+
+
+class FillGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    owner: FillGroupOwner
+    logical_count: int = Field(gt=0)
+    recipe: Literal["uniform_in_region"]
+    target: FillTarget
+    boundary: Literal["clip_to_target"]
+    ordinal_scheme: InstanceOrdinalScheme
+    members: list[PlacementMember]
+
+
+class ResourceDemand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    logical_objects: int = Field(ge=0)
+    primitive_marks: int = Field(ge=0)
+    object_templates: int = Field(ge=0)
+    maximum_per_template_primitive_marks: int = Field(ge=0)
+    maximum_resolved_count: int = Field(ge=0)
+    template_nodes: int = Field(ge=0)
+    anchor_instances: int = Field(ge=0)
+    transform_instances: int = Field(ge=0)
+    placement_instances: int = Field(ge=0)
+    fill_instances: int = Field(ge=0)
+
+
+class ResourceBudget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    maximum: ResourceDemand
+
+
+class HardResourcePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    identity: str
+    budget: ResourceBudget
+
+
+class ScoreResourcePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    accounting_id: Literal["inku.resource-accounting.v1"]
+    hard_policy: HardResourcePolicy
+    operational_budget: ResourceBudget
 
 
 class Score(BaseModel):
@@ -954,6 +1359,20 @@ class Score(BaseModel):
             "通常DDLのdirect coordinated group配置。source順の連続 Score instruction 範囲を "
             "overlap、horizontal_source_order、scatter、tile と named 配置領域で一度だけ配置する"
         ),
+    )
+    repetition_groups: list[RepetitionGroup] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="Score 0.10 standalone Macro whole-body repetition recipes",
+    )
+    fill_groups: list[FillGroup] = Field(
+        default_factory=list,
+        exclude_if=lambda value: not value,
+        description="Score 0.10 compact fill recipes; sampled positions are absent",
+    )
+    resource_policy: Optional[ScoreResourcePolicy] = Field(
+        default=None,
+        description="Resource authorities captured for saved-Score replay; demand is recomputed",
     )
 
     @model_validator(mode="before")
@@ -1010,9 +1429,9 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
             raise ValueError("anchors requires Score version 0.6.0")
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start > group.end or (
@@ -1021,7 +1440,7 @@ class Score(BaseModel):
                 raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"} and (
+            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
@@ -1040,7 +1459,7 @@ class Score(BaseModel):
                 raise ValueError("transform group anchor_indices must be unique")
             if any(index >= len(self.anchors) for index in anchor_indices):
                 raise ValueError("transform group anchor_indices exceeds anchors")
-            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
                 raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
                 current_contains_prior = (
@@ -1066,15 +1485,15 @@ class Score(BaseModel):
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
                 if not set(prior.anchor_indices) <= anchor_indices:
                     raise ValueError("outer transform groups must include descendant anchor_indices")
-        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0"}:
+        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
             raise ValueError("placement_groups requires Score version 0.7.0")
         placement_end = 0
         placement_anchor_indices: set[int] = set()
         placement_transform_indices: set[int] = set()
         for group in self.placement_groups:
-            if group.layout in {"scatter", "tile"} and self.version != "0.8.0":
+            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0"}:
                 raise ValueError("scatter and tile placement_groups require Score version 0.8.0")
-            if group.members and self.version != "0.9.0":
+            if group.members and self.version not in {"0.9.0", "0.10.0"}:
                 raise ValueError("placement group members require Score version 0.9.0")
             if not group.members and group.start >= group.end:
                 raise ValueError("placement group range must be nonempty")
@@ -1135,8 +1554,57 @@ class Score(BaseModel):
         for instruction in self.instructions:
             relation = instruction.relation
             if relation is not None and relation.target_anchor_index is not None:
-                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
                     raise ValueError("relation target_anchor_index requires Score version 0.6.0")
                 if relation.target_anchor_index >= len(self.anchors):
                     raise ValueError("relation target_anchor_index exceeds anchors")
+        has_compact_fields = bool(
+            self.repetition_groups
+            or self.fill_groups
+            or self.resource_policy is not None
+            or any(group.resolved is not None for group in self.placement_groups)
+            or any(member.symbolic is not None for group in self.placement_groups for member in group.members)
+            or any(
+                instruction.arrangement is not None
+                and instruction.arrangement.resolved is not None
+                for instruction in self.instructions
+            )
+        )
+        if has_compact_fields and self.version != "0.10.0":
+            raise ValueError("compact symbolic fields require Score version 0.10.0")
+        if self.version == "0.10.0":
+            if self.resource_policy is None:
+                raise ValueError("Score 0.10 requires a resource_policy snapshot")
+            if not self.resource_policy.hard_policy.identity:
+                raise ValueError("Score 0.10 resource policy identity is invalid")
+            if any(
+                instruction.arrangement is None
+                or instruction.arrangement.resolved is None
+                for instruction in self.instructions
+            ):
+                raise ValueError("Score 0.10 instruction templates require resolved arrangements")
+            for group in self.placement_groups:
+                if group.resolved is None or not group.members:
+                    raise ValueError("Score 0.10 placement groups require resolved members")
+                expected = 0
+                for ordinal, member in enumerate(group.members):
+                    symbolic = member.symbolic
+                    if symbolic is None or symbolic.member_ordinal != ordinal or symbolic.first_instance_ordinal != expected:
+                        raise ValueError("placement symbolic member ordinals must form a source-order prefix")
+                    expected += symbolic.instance_count
+                if expected != group.resolved.logical_count:
+                    raise ValueError("placement member counts must equal the resolved logical count")
+            for group in self.repetition_groups:
+                symbolic = group.member.symbolic
+                if symbolic is None or symbolic.kind != "macro" or symbolic.member_ordinal != 0 or symbolic.first_instance_ordinal != 0:
+                    raise ValueError("repetition group requires one whole Macro symbolic member")
+            for group in self.fill_groups:
+                expected = 0
+                for ordinal, member in enumerate(group.members):
+                    symbolic = member.symbolic
+                    if symbolic is None or symbolic.member_ordinal != ordinal or symbolic.first_instance_ordinal != expected:
+                        raise ValueError("fill symbolic member ordinals must form a source-order prefix")
+                    expected += symbolic.instance_count
+                if expected != group.logical_count:
+                    raise ValueError("fill member counts must equal the logical count")
         return self

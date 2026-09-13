@@ -276,7 +276,9 @@
 # and resolve fill target/count/Macro footprint into symbolic plans.
 # 36: Omitted placement is shared by tile and coordinated groups; resolved
 # ground alone remains drawable in both Score and composition plans.
-DDL_ENGINE_VERSION = "36"
+# 37: Resource-aware compilation materializes compact Score 0.10 placement,
+# repetition, and fill recipes while preserving exact counts and atomic omission.
+DDL_ENGINE_VERSION = "37"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

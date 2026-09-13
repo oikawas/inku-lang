@@ -7,7 +7,9 @@ pub mod canvas_format;
 pub mod compatibility;
 pub mod error_policy;
 pub mod execution_diagnostics;
+pub mod resource;
 pub mod schema;
+pub mod score_resources;
 pub mod types;
 
 pub use canonical::{CANONICAL_SCORE_DIGEST_DOMAIN, canonical_json_bytes, canonical_score_digest};
@@ -24,5 +26,16 @@ pub use execution_diagnostics::{
     ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason,
     ScoreExecutionSummary,
 };
+pub use resource::{
+    HardResourcePolicy, OperationalResourceBudget, RESOURCE_ACCOUNTING_ID, ResourceAuthority,
+    ResourceBudget, ResourceBudgetExceeded, ResourceDemand, ResourceDimension,
+};
 pub use schema::{SCORE_SCHEMA_DIGEST_DOMAIN, score_schema_bytes, score_schema_digest};
+pub use score_resources::{
+    AdditionalResourceLimits, FinalizedScore, LegacyFourResourceLimits, SavedScoreIndexMaps,
+    SavedScoreRelationDiagnostic, SavedScoreRelationDisposition, SavedScoreResourceDiagnostic,
+    SavedScoreResourceDisposition, SavedScoreResourceError, SavedScoreResourceFailure,
+    SavedScoreResourceOwner, finalize_saved_score, finalize_saved_score_with_omitted_instructions,
+    resource_budget_from_legacy_four_limits,
+};
 pub use types::*;

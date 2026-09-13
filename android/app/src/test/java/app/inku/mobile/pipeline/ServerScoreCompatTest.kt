@@ -6,6 +6,22 @@ import org.junit.Test
 
 class ServerScoreCompatTest {
     @Test
+    fun score010CompactRecipesSurviveTheThinCompatibilityReader() {
+        val score = JSONObject(
+            """{"version":"0.10.0","instructions":[],"repetition_groups":[],"fill_groups":[{"logical_count":2}],"resource_policy":{"accounting_id":"inku.resource-accounting.v1"}}""",
+        )
+
+        val migrated = ServerScoreCompat.migrateScore(score)
+
+        assertEquals("0.10.0", migrated.getString("version"))
+        assertEquals(2, migrated.getJSONArray("fill_groups").getJSONObject(0).getInt("logical_count"))
+        assertEquals(
+            "inku.resource-accounting.v1",
+            migrated.getJSONObject("resource_policy").getString("accounting_id"),
+        )
+    }
+
+    @Test
     fun legacyHairMigratesToSilverpoint() {
         assertEquals("silverpoint", ServerScoreCompat.migrateWeight("hair"))
         assertEquals("pencil", ServerScoreCompat.migrateWeight("pencil"))

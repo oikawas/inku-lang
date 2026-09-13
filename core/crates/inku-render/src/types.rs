@@ -73,6 +73,33 @@ pub struct SurfaceTextureMetadata {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RenderResourceFailure {
+    BudgetExceeded {
+        exceeded: inku_score::ResourceBudgetExceeded,
+    },
+    ArithmeticOverflow {
+        dimension: inku_score::ResourceDimension,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RenderResourceOmission {
+    pub owner: inku_score::SavedScoreResourceOwner,
+    pub cause_owner: inku_score::SavedScoreResourceOwner,
+    pub failure: RenderResourceFailure,
+    pub disposition: inku_score::SavedScoreResourceDisposition,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RenderResourceExecution {
+    pub accounting_id: String,
+    pub demand: inku_score::ResourceDemand,
+    pub omissions: Vec<RenderResourceOmission>,
+    pub relation_omissions: Vec<inku_score::SavedScoreRelationDiagnostic>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderMetadata {
     pub render_engine_id: String,
     pub render_engine_version: String,
@@ -85,6 +112,8 @@ pub struct RenderMetadata {
     pub render_surface_textures: Vec<SurfaceTextureMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution: Option<ScoreExecutionSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_execution: Option<RenderResourceExecution>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

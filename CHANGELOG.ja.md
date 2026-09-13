@@ -4,7 +4,15 @@
 
 この文書は時系列の実装・設計記録である。仕様との不一致がある場合は、現行契約を記す `SPEC.ja.md` を優先する。
 
-**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 30 版である。それより前は書庫にある。
+**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 31 版である。それより前は書庫にある。
+
+### 2026-09-13 — compact Score 0.10のresource-aware演奏coreを追加
+
+`compile_ddl_to_score_with_resources`はtyped planから個体座標を焼き込まないScore 0.10のplacement／repetition／fill recipeを作り、`render_with_resources`は同じowner・ordinal・performance seedからexactな個数と図形を再演する。Fillはtargetと境界を保持し、Display／Editableではappearance後にclip、Compatではfilterも`clip-path`も使わずgroup全体をbounded geometryへclipする。Macroの内部countと外側反復は別のnamespaceで保持する。procedural filter／patternによる個数近似は採用せず、filterは画材表現だけに使える。
+
+resource検査は個体化前に行い、現行出荷値400 total primitive marks／240 per expanded Score template／2000 resolved count／64 drawable templatesをclampなしで維持する。超過やclip不能は当該sourceまたはcoordinated placement全体を省略して診断し、独立した後続を続ける。追加6構造次元に新しい出荷既定値は設けない。保存Scoreはcallerが許可したpolicyを保持し、需要は再演時にrecipeから再計算する。描画metadataの`resource_execution`は再計算需要、resource省略、relation省略を記録する。
+
+この新deliveryによりDDL engineを36→37、render engineを58→59へ進め、Score 0.10をcore候補として追加する。既定／legacy Score 0.9、APP_VERSION 2.14.2、BUILD_NUMBER 1073は維持する。製品host runtime／UI／API／保存への切替、native受入、配備、releaseは含めない。
 
 ### 2026-09-13 — 位置省略と地だけの作品の共通配送を修正
 

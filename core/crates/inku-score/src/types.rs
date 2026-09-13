@@ -722,6 +722,102 @@ pub struct Variation {
     pub dimensions: Vec<Dimension>,
 }
 
+/// Compact identity of the source object that owns one saved template.
+///
+/// Macro source text and expansion paths stay in the compiler. The two stable
+/// ordinals are sufficient to distinguish emitted object templates in a Score.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ScoreSourceOwner {
+    SourceInstruction {
+        instruction_index: usize,
+    },
+    MacroEmit {
+        source_instruction_index: usize,
+        invocation_ordinal: u64,
+        generated_ordinal: u64,
+    },
+}
+
+/// Why the compiler selected the saved logical instance count.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CountOrigin {
+    Explicit,
+    OmittedDefault,
+    /// One stored template instance; the owning group retains the author count.
+    TemplateSingle,
+    OmittedRegionExtent {
+        reference_extent: f64,
+    },
+    OmittedBalancedGroup {
+        reference_extents: Vec<f64>,
+        explicit_counts: Vec<Option<u32>>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InstanceOrdinalScheme {
+    SourceMemberThenInstanceV1,
+}
+
+/// Resolved placement math retained without materializing performance positions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ResolvedPlacementRecipe {
+    Place,
+    HorizontalLine {
+        cell_width: f64,
+    },
+    VerticalLine {
+        cell_height: f64,
+    },
+    DiagonalLine {
+        step: Point,
+    },
+    Grid {
+        columns: u64,
+        rows: u64,
+        filled_count: u64,
+        cell_width: f64,
+        cell_height: f64,
+        centroid: Point,
+        translate_to_numeric_anchor: bool,
+    },
+    ScatterUniformWithCentroidTranslation,
+}
+
+/// Placement authority retained independently from sampled performance points.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ResolvedPlacementAnchor {
+    Numeric {
+        point: Point,
+    },
+    GeneratedNumeric {
+        point: Point,
+    },
+    Named {
+        region: [f64; 4],
+    },
+    /// The enclosing placement or fill group owns the actual target.
+    EnclosingGroup,
+}
+
+/// Score 0.10 symbolic contract for one standalone arrangement.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ResolvedArrangement {
+    pub owner: ScoreSourceOwner,
+    pub first_instance_ordinal: u64,
+    pub count_origin: CountOrigin,
+    /// Physical domain in canvas-short-edge units.
+    pub domain: Point,
+    pub anchor: ResolvedPlacementAnchor,
+    pub recipe: ResolvedPlacementRecipe,
+    pub ordinal_scheme: InstanceOrdinalScheme,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Arrangement {
     #[serde(default = "default_count")]
@@ -756,6 +852,8 @@ pub struct Arrangement {
     pub preserve_space: bool,
     #[serde(default = "default_rhythm_spacing")]
     pub rhythm_spacing: RhythmSpacing,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved: Option<ResolvedArrangement>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -970,6 +1068,50 @@ pub struct PlacementMember {
     pub anchor_indices: Vec<usize>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transform_group_indices: Vec<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbolic: Option<SymbolicMember>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SymbolicMemberKind {
+    Primitive,
+    Macro,
+}
+
+/// Logical instances of one complete primitive or Macro body template.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SymbolicMember {
+    pub owner: ScoreSourceOwner,
+    pub kind: SymbolicMemberKind,
+    pub member_ordinal: u64,
+    pub first_instance_ordinal: u64,
+    pub instance_count: u64,
+    pub count_origin: CountOrigin,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PlacementGroupOwner {
+    CoordinatedGroup { group_index: usize },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ResolvedPlacementGroup {
+    pub owner: PlacementGroupOwner,
+    pub logical_count: u64,
+    /// Physical domain in canvas-short-edge units.
+    pub domain: Point,
+    pub anchor: ResolvedPlacementAnchor,
+    pub recipe: ResolvedPlacementRecipe,
+    pub ordinal_scheme: InstanceOrdinalScheme,
+}
+
+/// Repeats one complete Macro body without replacing arrangements inside it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RepetitionGroup {
+    pub member: PlacementMember,
+    pub ordinal_scheme: InstanceOrdinalScheme,
 }
 
 /// One coordinated arrangement and named placement, distinct from affine transforms.
@@ -981,6 +1123,122 @@ pub struct PlacementGroup {
     pub at: AtRegion,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub members: Vec<PlacementMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved: Option<ResolvedPlacementGroup>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FillGroupOwner {
+    CoordinatedGroup { group_index: usize },
+    Instruction { source_instruction_index: usize },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ScoreSourceSite {
+    pub region_index: usize,
+    pub clause_index: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FillTargetOwner {
+    OmittedCanvas,
+    ExplicitCanvas {
+        source: ScoreSourceSite,
+    },
+    Named {
+        category: String,
+        id: String,
+    },
+    InlineShape {
+        source_instruction_index: usize,
+        source: ScoreSourceSite,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ResolvedShapeDimensions {
+    Bbox { width: f64, height: f64 },
+    RegularTriangle { side: f64 },
+    Polygon { radius: f64, sides: u8 },
+    Line { length: f64 },
+    Circle { radius: f64 },
+    Arc { chord: f64, sagitta: f64 },
+    Point { radius: f64 },
+    CenteredSize { width: f64, height: f64 },
+    Square { side: f64 },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FillTargetAnchor {
+    Numeric { point: Point },
+    GeneratedNumeric { point: Point },
+    Named { region: [f64; 4] },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FillTargetGeometry {
+    Rectangle {
+        bounds: [f64; 4],
+    },
+    Shape {
+        primitive: Primitive,
+        dimensions: ResolvedShapeDimensions,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arc_form: Option<ArcForm>,
+        anchor: FillTargetAnchor,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rotation_degrees: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        contour_variation: Option<Variation>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FillTarget {
+    pub owner: FillTargetOwner,
+    pub geometry: FillTargetGeometry,
+    /// Stable geometry reference area in canvas-short-edge units squared.
+    pub reference_area: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FillRecipe {
+    UniformInRegion,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FillBoundary {
+    ClipToTarget,
+}
+
+/// Score 0.10 compact fill: templates and counts, never sampled positions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FillGroup {
+    pub start: usize,
+    pub end: usize,
+    pub owner: FillGroupOwner,
+    pub logical_count: u64,
+    pub recipe: FillRecipe,
+    pub target: FillTarget,
+    pub boundary: FillBoundary,
+    pub ordinal_scheme: InstanceOrdinalScheme,
+    pub members: Vec<PlacementMember>,
+}
+
+/// Resource authorities captured with a Score for deterministic replay.
+/// Demand is deliberately absent and must be recomputed from the Score.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ScoreResourcePolicy {
+    pub accounting_id: String,
+    pub hard_policy: crate::resource::HardResourcePolicy,
+    pub operational_budget: crate::resource::OperationalResourceBudget,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1000,20 +1258,425 @@ pub struct Score {
     pub transform_groups: Vec<TransformGroup>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub placement_groups: Vec<PlacementGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repetition_groups: Vec<RepetitionGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fill_groups: Vec<FillGroup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_policy: Option<ScoreResourcePolicy>,
 }
 
 impl Score {
+    fn validate_count_origin(origin: &CountOrigin) -> Result<(), &'static str> {
+        match origin {
+            CountOrigin::Explicit | CountOrigin::OmittedDefault | CountOrigin::TemplateSingle => {
+                Ok(())
+            }
+            CountOrigin::OmittedRegionExtent { reference_extent }
+                if reference_extent.is_finite() && *reference_extent > 0.0 =>
+            {
+                Ok(())
+            }
+            CountOrigin::OmittedBalancedGroup {
+                reference_extents,
+                explicit_counts,
+            } if !reference_extents.is_empty()
+                && reference_extents.len() == explicit_counts.len()
+                && reference_extents
+                    .iter()
+                    .all(|extent| extent.is_finite() && *extent > 0.0)
+                && explicit_counts
+                    .iter()
+                    .all(|count| count.is_none_or(|count| count > 0)) =>
+            {
+                Ok(())
+            }
+            _ => Err("count origin requires finite positive and aligned inputs"),
+        }
+    }
+
+    fn validate_resolved_recipe(
+        recipe: &ResolvedPlacementRecipe,
+        logical_count: u64,
+    ) -> Result<(), &'static str> {
+        let positive = |value: f64| value.is_finite() && value > 0.0;
+        match recipe {
+            ResolvedPlacementRecipe::Place
+            | ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => Ok(()),
+            ResolvedPlacementRecipe::HorizontalLine { cell_width } if positive(*cell_width) => {
+                Ok(())
+            }
+            ResolvedPlacementRecipe::VerticalLine { cell_height } if positive(*cell_height) => {
+                Ok(())
+            }
+            ResolvedPlacementRecipe::DiagonalLine { step }
+                if step.x.is_finite() && step.y.is_finite() && (step.x != 0.0 || step.y != 0.0) =>
+            {
+                Ok(())
+            }
+            ResolvedPlacementRecipe::Grid {
+                columns,
+                rows,
+                filled_count,
+                cell_width,
+                cell_height,
+                centroid,
+                ..
+            } if *columns > 0
+                && *rows > 0
+                && *filled_count == logical_count
+                && columns
+                    .checked_mul(*rows)
+                    .is_some_and(|capacity| capacity >= *filled_count)
+                && positive(*cell_width)
+                && positive(*cell_height)
+                && centroid.x.is_finite()
+                && centroid.y.is_finite() =>
+            {
+                Ok(())
+            }
+            _ => Err("resolved placement recipe is inconsistent or non-finite"),
+        }
+    }
+
+    fn validate_symbolic_member(
+        member: &PlacementMember,
+        expected_member_ordinal: u64,
+        expected_first_instance_ordinal: u64,
+    ) -> Result<u64, &'static str> {
+        let Some(symbolic) = &member.symbolic else {
+            return Err("Score 0.10 symbolic member metadata is required");
+        };
+        if symbolic.member_ordinal != expected_member_ordinal
+            || symbolic.first_instance_ordinal != expected_first_instance_ordinal
+            || symbolic.instance_count == 0
+            || matches!(symbolic.count_origin, CountOrigin::TemplateSingle)
+        {
+            return Err(
+                "symbolic member ordinals and count must form a nonempty source-order prefix",
+            );
+        }
+        Self::validate_count_origin(&symbolic.count_origin)?;
+        expected_first_instance_ordinal
+            .checked_add(symbolic.instance_count)
+            .ok_or("symbolic member instance ordinal overflows")
+    }
+
+    fn validate_placement_anchor(anchor: &ResolvedPlacementAnchor) -> Result<(), &'static str> {
+        match anchor {
+            ResolvedPlacementAnchor::Numeric { point }
+            | ResolvedPlacementAnchor::GeneratedNumeric { point }
+                if point.x.is_finite() && point.y.is_finite() =>
+            {
+                Ok(())
+            }
+            ResolvedPlacementAnchor::Named { region }
+                if region.iter().all(|value| value.is_finite())
+                    && region[0] <= region[2]
+                    && region[1] <= region[3] =>
+            {
+                Ok(())
+            }
+            ResolvedPlacementAnchor::EnclosingGroup => Ok(()),
+            _ => Err("resolved placement anchor must be finite and ordered"),
+        }
+    }
+
+    fn validate_fill_target(target: &FillTarget) -> Result<(), &'static str> {
+        if !target.reference_area.is_finite() || target.reference_area <= 0.0 {
+            return Err("fill target reference_area must be finite and positive");
+        }
+        let ordered_region = |region: [f64; 4]| {
+            region.into_iter().all(f64::is_finite)
+                && region[0] <= region[2]
+                && region[1] <= region[3]
+        };
+        match &target.geometry {
+            FillTargetGeometry::Rectangle { bounds }
+                if ordered_region(*bounds) && bounds[0] < bounds[2] && bounds[1] < bounds[3] =>
+            {
+                Ok(())
+            }
+            FillTargetGeometry::Shape {
+                primitive,
+                dimensions,
+                arc_form,
+                anchor,
+                rotation_degrees,
+                ..
+            } => {
+                let closed = matches!(
+                    primitive,
+                    Primitive::Circle
+                        | Primitive::Ellipse
+                        | Primitive::Square
+                        | Primitive::Triangle
+                        | Primitive::Polygon
+                        | Primitive::Cloudform
+                ) || (*primitive == Primitive::Arc
+                    && *arc_form == Some(ArcForm::Crescent));
+                if !closed || rotation_degrees.is_some_and(|value| !value.is_finite()) {
+                    return Err("fill target shape requires closed finite geometry");
+                }
+                let positive = |value: f64| value.is_finite() && value > 0.0;
+                let dimensions_valid = match dimensions {
+                    ResolvedShapeDimensions::Bbox { width, height }
+                    | ResolvedShapeDimensions::CenteredSize { width, height } => {
+                        positive(*width) && positive(*height)
+                    }
+                    ResolvedShapeDimensions::RegularTriangle { side }
+                    | ResolvedShapeDimensions::Square { side } => positive(*side),
+                    ResolvedShapeDimensions::Polygon { radius, sides } => {
+                        positive(*radius) && (5..=8).contains(sides)
+                    }
+                    ResolvedShapeDimensions::Circle { radius }
+                    | ResolvedShapeDimensions::Point { radius } => positive(*radius),
+                    ResolvedShapeDimensions::Line { length } => positive(*length),
+                    ResolvedShapeDimensions::Arc { chord, sagitta } => {
+                        positive(*chord) && positive(*sagitta)
+                    }
+                };
+                let anchor_valid = match anchor {
+                    FillTargetAnchor::Numeric { point }
+                    | FillTargetAnchor::GeneratedNumeric { point } => {
+                        point.x.is_finite() && point.y.is_finite()
+                    }
+                    FillTargetAnchor::Named { region } => ordered_region(*region),
+                };
+                if !dimensions_valid || !anchor_valid {
+                    return Err("fill target dimensions and anchor must be finite and positive");
+                }
+                Ok(())
+            }
+            _ => Err("fill target rectangle must have finite positive area"),
+        }
+    }
+
+    fn source_owner_index(owner: &ScoreSourceOwner) -> usize {
+        match owner {
+            ScoreSourceOwner::SourceInstruction { instruction_index } => *instruction_index,
+            ScoreSourceOwner::MacroEmit {
+                source_instruction_index,
+                ..
+            } => *source_instruction_index,
+        }
+    }
+
+    fn synthetic_fill_source(&self, group: &FillGroup) -> Option<usize> {
+        let FillGroupOwner::Instruction {
+            source_instruction_index,
+        } = group.owner
+        else {
+            return None;
+        };
+        let [member] = group.members.as_slice() else {
+            return None;
+        };
+        let symbolic = member.symbolic.as_ref()?;
+        let instruction_owner = &self
+            .instructions
+            .get(member.start)?
+            .arrangement
+            .as_ref()?
+            .resolved
+            .as_ref()?
+            .owner;
+        (symbolic.kind == SymbolicMemberKind::Primitive
+            && member.start == group.start
+            && member.end == group.end
+            && group.end - group.start == 1
+            && member.anchor_indices.is_empty()
+            && member.transform_group_indices.is_empty()
+            && Self::source_owner_index(&symbolic.owner) == source_instruction_index
+            && instruction_owner == &symbolic.owner)
+            .then_some(source_instruction_index)
+    }
+
+    fn fill_parent_contains_source(
+        parent: &FillGroup,
+        child: &FillGroup,
+        child_source: usize,
+    ) -> bool {
+        let owner_allows_nesting = match parent.owner {
+            FillGroupOwner::Instruction {
+                source_instruction_index,
+            } => {
+                source_instruction_index == child_source
+                    && matches!(
+                        parent.members.as_slice(),
+                        [PlacementMember {
+                            symbolic: Some(SymbolicMember {
+                                kind: SymbolicMemberKind::Macro,
+                                ..
+                            }),
+                            ..
+                        }]
+                    )
+            }
+            FillGroupOwner::CoordinatedGroup { .. } => true,
+        };
+        owner_allows_nesting
+            && parent.members.iter().any(|member| {
+                member.start <= child.start
+                    && child.end <= member.end
+                    && member.symbolic.as_ref().is_some_and(|symbolic| {
+                        Self::source_owner_index(&symbolic.owner) == child_source
+                    })
+            })
+    }
+
+    fn validate_compact_score_0_10(&self) -> Result<(), &'static str> {
+        let is_0_10 = self.version == "0.10.0";
+        let has_0_10_fields = !self.fill_groups.is_empty()
+            || !self.repetition_groups.is_empty()
+            || self.resource_policy.is_some()
+            || self.placement_groups.iter().any(|group| {
+                group.resolved.is_some()
+                    || group.members.iter().any(|member| member.symbolic.is_some())
+            })
+            || self.instructions.iter().any(|instruction| {
+                instruction
+                    .arrangement
+                    .as_ref()
+                    .is_some_and(|arrangement| arrangement.resolved.is_some())
+            });
+        if has_0_10_fields && !is_0_10 {
+            return Err("compact symbolic fields require Score version 0.10.0");
+        }
+        if !is_0_10 {
+            return Ok(());
+        }
+
+        let Some(policy) = &self.resource_policy else {
+            return Err("Score 0.10 requires a resource_policy snapshot");
+        };
+        if policy.accounting_id != crate::resource::RESOURCE_ACCOUNTING_ID
+            || policy.hard_policy.identity.is_empty()
+        {
+            return Err("Score 0.10 resource policy identity is invalid");
+        }
+
+        for instruction in &self.instructions {
+            let Some(arrangement) = instruction.arrangement.as_ref() else {
+                return Err("Score 0.10 instruction templates require an arrangement");
+            };
+            let Some(resolved) = arrangement.resolved.as_ref() else {
+                return Err("Score 0.10 arrangements require resolved metadata");
+            };
+            if arrangement.count == 0 || arrangement.group_size == 0 {
+                return Err("Score 0.10 arrangements require nonzero count and group_size");
+            }
+            if resolved.first_instance_ordinal != 0 {
+                return Err("standalone arrangement instance ordinals must start at zero");
+            }
+            if !resolved.domain.x.is_finite()
+                || !resolved.domain.y.is_finite()
+                || resolved.domain.x <= 0.0
+                || resolved.domain.y <= 0.0
+            {
+                return Err("resolved arrangement domain must be finite and positive");
+            }
+            Self::validate_count_origin(&resolved.count_origin)?;
+            Self::validate_placement_anchor(&resolved.anchor)?;
+            if matches!(resolved.count_origin, CountOrigin::TemplateSingle)
+                != (arrangement.count == 1
+                    && matches!(resolved.anchor, ResolvedPlacementAnchor::EnclosingGroup))
+            {
+                return Err("template_single requires one enclosing-group-owned template");
+            }
+            Self::validate_resolved_recipe(&resolved.recipe, u64::from(arrangement.count))?;
+        }
+
+        let mut repetition_end = 0;
+        for group in &self.repetition_groups {
+            let member = &group.member;
+            if member.start < repetition_end
+                || member.start > member.end
+                || (member.start == member.end && member.anchor_indices.is_empty())
+                || member.end > self.instructions.len()
+            {
+                return Err("repetition groups must be nonempty, disjoint and in source order");
+            }
+            let Some(symbolic) = &member.symbolic else {
+                return Err("repetition group requires symbolic member metadata");
+            };
+            if symbolic.kind != SymbolicMemberKind::Macro {
+                return Err("repetition group must own one complete Macro body");
+            }
+            Self::validate_symbolic_member(member, 0, 0)?;
+            repetition_end = member.end;
+        }
+
+        let mut previous_fill_start = 0;
+        let mut fill_ancestors = Vec::<usize>::new();
+        for (group_index, group) in self.fill_groups.iter().enumerate() {
+            if (group_index > 0 && group.start < previous_fill_start)
+                || group.start >= group.end
+                || group.end > self.instructions.len()
+                || group.members.is_empty()
+            {
+                return Err("fill groups must be nonempty and in source order");
+            }
+            while fill_ancestors
+                .last()
+                .is_some_and(|&parent_index| group.start >= self.fill_groups[parent_index].end)
+            {
+                fill_ancestors.pop();
+            }
+            if let Some(&parent_index) = fill_ancestors.last() {
+                let parent = &self.fill_groups[parent_index];
+                let Some(child_source) = self.synthetic_fill_source(group) else {
+                    return Err(
+                        "nested fill must be a singleton primitive descriptor inside its owner",
+                    );
+                };
+                if group.end > parent.end
+                    || !Self::fill_parent_contains_source(parent, group, child_source)
+                {
+                    return Err("fill group ranges cannot cross or cross source ownership");
+                }
+            }
+            let mut member_end = group.start;
+            let mut first_instance = 0;
+            for (ordinal, member) in group.members.iter().enumerate() {
+                if member.start != member_end
+                    || member.start > member.end
+                    || member.end > group.end
+                    || (member.start == member.end && member.anchor_indices.is_empty())
+                {
+                    return Err("fill members must partition the group in source order");
+                }
+                first_instance = Self::validate_symbolic_member(
+                    member,
+                    u64::try_from(ordinal).map_err(|_| "fill member ordinal overflows")?,
+                    first_instance,
+                )?;
+                member_end = member.end;
+            }
+            if member_end != group.end || first_instance != group.logical_count {
+                return Err("fill members must cover the group and its logical count");
+            }
+            Self::validate_fill_target(&group.target)?;
+            previous_fill_start = group.start;
+            fill_ancestors.push(group_index);
+        }
+        Ok(())
+    }
+
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
         let mut previous_end = 0;
         for group in &self.placement_groups {
             match group.layout {
                 GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
-                    if !matches!(self.version.as_str(), "0.7.0" | "0.8.0" | "0.9.0") =>
+                    if !matches!(
+                        self.version.as_str(),
+                        "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0"
+                    ) =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
                 }
                 GroupLayout::Scatter | GroupLayout::Tile
-                    if !matches!(self.version.as_str(), "0.8.0" | "0.9.0") =>
+                    if !matches!(self.version.as_str(), "0.8.0" | "0.9.0" | "0.10.0") =>
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
                 }
@@ -1029,19 +1692,42 @@ impl Score {
                 );
             }
             previous_end = group.end;
-            if !group.members.is_empty() && self.version != "0.9.0" {
+            if !group.members.is_empty() && !matches!(self.version.as_str(), "0.9.0" | "0.10.0") {
                 return Err("placement members require Score version 0.9.0");
+            }
+            if self.version == "0.10.0" {
+                let Some(resolved) = &group.resolved else {
+                    return Err("Score 0.10 placement groups require resolved metadata");
+                };
+                if group.members.is_empty()
+                    || !resolved.domain.x.is_finite()
+                    || !resolved.domain.y.is_finite()
+                    || resolved.domain.x <= 0.0
+                    || resolved.domain.y <= 0.0
+                {
+                    return Err("resolved placement group requires members and a positive domain");
+                }
+                Self::validate_resolved_recipe(&resolved.recipe, resolved.logical_count)?;
+                Self::validate_placement_anchor(&resolved.anchor)?;
             }
             let mut member_end = group.start;
             let mut anchors = HashSet::new();
             let mut owned_transforms = HashSet::new();
-            for member in &group.members {
+            let mut first_instance = 0;
+            for (ordinal, member) in group.members.iter().enumerate() {
                 if member.start != member_end
                     || member.start > member.end
                     || member.end > group.end
                     || (member.start == member.end && member.anchor_indices.is_empty())
                 {
                     return Err("placement members must partition the group in source order");
+                }
+                if self.version == "0.10.0" {
+                    first_instance = Self::validate_symbolic_member(
+                        member,
+                        u64::try_from(ordinal).map_err(|_| "placement member ordinal overflows")?,
+                        first_instance,
+                    )?;
                 }
                 member_end = member.end;
                 for &anchor in &member.anchor_indices {
@@ -1070,6 +1756,11 @@ impl Score {
             if !group.members.is_empty() && member_end != group.end {
                 return Err("placement members must cover the group");
             }
+            if let Some(resolved) = &group.resolved
+                && first_instance != resolved.logical_count
+            {
+                return Err("placement member counts must equal the resolved logical count");
+            }
             for prior in &self.placement_groups {
                 if std::ptr::eq(prior, group) {
                     break;
@@ -1097,7 +1788,12 @@ impl Score {
             }
             if self.instructions[group.start..group.end]
                 .iter()
-                .any(|instruction| instruction.arrangement.is_some())
+                .any(|instruction| {
+                    instruction
+                        .arrangement
+                        .as_ref()
+                        .is_some_and(|arrangement| arrangement.resolved.is_none())
+                })
             {
                 return Err("placement group members cannot carry arrangements");
             }
@@ -1126,8 +1822,12 @@ impl Score {
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
+        self.validate_compact_score_0_10()?;
         if !self.anchors.is_empty()
-            && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0")
+            && !matches!(
+                self.version.as_str(),
+                "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0"
+            )
         {
             return Err("anchors requires Score version 0.6.0");
         }
@@ -1159,7 +1859,10 @@ impl Score {
                     return Err("relation target instruction and anchor are exclusive");
                 }
                 if let Some(anchor_index) = relation.target_anchor_index {
-                    if !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0") {
+                    if !matches!(
+                        self.version.as_str(),
+                        "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0"
+                    ) {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
                     if anchor_index >= self.anchors.len() {
@@ -1175,6 +1878,7 @@ impl Score {
                     && self.version != "0.7.0"
                     && self.version != "0.8.0"
                     && self.version != "0.9.0"
+                    && self.version != "0.10.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -1214,6 +1918,7 @@ impl Score {
                 && self.version != "0.7.0"
                 && self.version != "0.8.0"
                 && self.version != "0.9.0"
+                && self.version != "0.10.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -1253,7 +1958,7 @@ impl Score {
         }
         if !matches!(
             self.version.as_str(),
-            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0"
+            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0"
         ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
@@ -1281,6 +1986,7 @@ impl Score {
                 && self.version != "0.7.0"
                 && self.version != "0.8.0"
                 && self.version != "0.9.0"
+                && self.version != "0.10.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -1290,7 +1996,12 @@ impl Score {
             }
             if self.instructions[group.start..group.end]
                 .iter()
-                .any(|instruction| instruction.arrangement.is_some())
+                .any(|instruction| {
+                    instruction
+                        .arrangement
+                        .as_ref()
+                        .is_some_and(|arrangement| arrangement.resolved.is_none())
+                })
             {
                 return Err("transform group members cannot carry arrangements");
             }
@@ -1315,7 +2026,10 @@ impl Score {
                 }
             }
             if !group.anchor_indices.is_empty()
-                && !matches!(self.version.as_str(), "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0")
+                && !matches!(
+                    self.version.as_str(),
+                    "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0"
+                )
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }

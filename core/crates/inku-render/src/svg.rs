@@ -22,6 +22,30 @@ pub struct Element {
 }
 
 impl Element {
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn attributes(&self) -> &[(String, String)] {
+        &self.attributes
+    }
+
+    pub(crate) fn attribute(&self, name: &str) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    pub(crate) fn children(&self) -> &[Node] {
+        &self.children
+    }
+
+    pub(crate) fn with_children(mut self, children: Vec<Node>) -> Self {
+        self.children = children;
+        self
+    }
+
     #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
         Self {

@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 32 版である。それより前は書庫にある。
 
+### 2026-09-13 — Python候補hostと原子的なvariation保存を追加
+
+選択したUniFFI libraryからPython binding bundleを生成する入口と、共通Rustへauthor action／effect resultを渡す候補専用hostを追加した。候補の保存adapterはsource・authority・decimal revisionとaction acknowledgmentを一つのtransactionで確定し、古いrevisionの上書きを拒み、同じactionの再送では元の保存結果を返す。実bindingと一時SQLiteを通す限定確認で、保存応答後のScore、最初のDDL編集での記述lock、known holeの追加操作なしの候補要求を確認した。
+
+旧historyのauthorityは推測せず、aggregate inventoryだけを提供する。既存作品の移行方針は作者裁定待ちで、canonical DB migration、provider transport、API／Web接続と通常route切替は未実施である。既存作品と版番号を変更せず、今回の接続確認に描画やlive LLM呼出しは含めない。
+
 ### 2026-09-13 — host-neutralな共有authoring pipeline候補を追加
 
 Version付きsnapshotを進める共有Rust state machineを追加した。Coreは進行eventと最大1個のtyped effect actionを返し、hostからaction identityをechoした最終resultを受け取る。Coreが再試行とcatalog選択の進行を決め、LLM transportとvisible normalized DDLのatomic保存をhost effectとして分離する。Stale sequence／digest／resultを拒む。Commandと最終effect resultだけを記録したtranscriptは、host effectを再実行せずに同じsnapshotと出力を決定的にreplayできる。

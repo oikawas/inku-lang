@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 32 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-13 — Add a Python candidate host and atomic variation storage
+
+A generator bundles the selected UniFFI library with its Python binding. A candidate-only host forwards author actions and effect results to shared Rust. Its storage adapter commits source, authority, decimal revision, and action acknowledgment in one transaction, rejects stale revisions, and returns the original result when an action is repeated. A focused connection check using the actual binding and temporary SQLite confirmed Score delivery after the save acknowledgment, description locking on the first DDL edit, and known-hole requests without an additional user operation.
+
+Legacy history authority is not inferred; only an aggregate inventory is provided. Legacy migration awaits an author decision. Canonical DB migration, provider transport, API/Web integration, and ordinary-route cutover are not implemented by this slice. Existing works and versions remain unchanged; validation included no rendering or live LLM calls.
+
 ### 2026-09-13 — Add the host-neutral shared authoring-pipeline candidate
 
 A shared Rust state machine now advances a versioned snapshot. Core returns progress events and at most one typed effect action, then accepts a final result that echoes the action identity. Core decides retries and catalog selection progress; hosts perform LLM transport and atomic persistence of visible normalized DDL. Stale sequences, digests, and results are rejected. A transcript containing only commands and final effect results deterministically replays the same snapshots and outputs without re-running host effects.

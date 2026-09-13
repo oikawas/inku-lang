@@ -86,15 +86,21 @@ separate immutable sidecar field. `legacy_unknown` requires a compatibility
 decision; neither origin nor authority is inferred from old text. Starting from
 a description after a lock requires a new variation owned by the host.
 
-## Explicit completion and rendering
+## Known-hole completion and rendering
 
 Description generation must finish as visible DDL without deferred holes.
-Direct DDL does not invoke an LLM implicitly. Only `complete_holes` selects
-compiler-reported holes and emits their exact source ranges and locks. The
-provider returns a constrained source patch, never a Score. A valid proposal
+After a visible commit is acknowledged, an `IncompleteKnownHole` parse starts
+a bounded completion request automatically, without a separate user operation.
+No hole means no Stage 2 LLM call; unknowns, conflicts, and integrity failures
+are not sent for completion. `complete_holes` remains an optional retry command.
+The request carries compiler-reported source ranges and locks. The provider
+returns a constrained source patch, never a Score. A valid proposal
 emits its visible base and candidate, then waits for `approve_patch`. Approval
 revalidates the base revision and patch before requesting the same atomic
-commit. Declining the proposal leaves committed DDL unchanged.
+commit. Declining the proposal leaves committed DDL unchanged. Declines and
+exhausted failures do not automatically repeat the request on that revision.
+A newly committed source is parsed again; an approved subset patch may leave
+other known holes that enter the same bounded completion path.
 
 Stage 1 receives bounded macro signatures, parameter schemas, and localized
 summaries. It receives no definition bodies or expanded DDL. The typed prompt

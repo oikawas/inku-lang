@@ -264,9 +264,14 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         state.authority.authority(),
         AuthoringAuthority::DdlAuthoritative
     );
+    assert_eq!(
+        state.action.as_ref().unwrap().tag,
+        "complete_visible_ddl_holes",
+        "committed known holes request completion without another user operation"
+    );
     assert!(
-        state.action.is_none(),
-        "holes never call an LLM by themselves"
+        state.delivery.is_none(),
+        "an unapproved patch is not a Score"
     );
     let base = inku_ddl::compile_typed_ddl(
         state.document.as_ref().unwrap().document().unwrap(),
@@ -284,16 +289,6 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         base.blocking_diagnostics
     );
     let hole = base.holes.first().expect("known quantity hole").clone();
-    let complete = envelope(
-        Some(&state),
-        PipelineInput::CompleteHoles {
-            expected_revision: DecimalU64::new(state.authority.revision()),
-            hole_ids: vec![hole.id.clone()],
-        },
-    );
-    outputs.push(run(Some(&state), &complete));
-    transcript.push(complete);
-    state = outputs.last().unwrap().snapshot.clone();
     let patch = HolePatchResponse {
         schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
         base_source_digest: lock.visible_source_digest.clone(),

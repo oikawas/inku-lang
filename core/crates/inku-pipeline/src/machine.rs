@@ -1321,6 +1321,37 @@ impl PipelineSnapshot {
                     "typed_ddl_parsed",
                     json!({"source_digest": document.source_digest(), "revision": revision}),
                 )?;
+                if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
+                    lock.get("state").and_then(serde_json::Value::as_str)
+                        == Some("incomplete_known_hole")
+                }) {
+                    let hole_ids = lock
+                        .get("hole_identities")
+                        .cloned()
+                        .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
+                        .unwrap_or_default();
+                    // Known holes enter the shared completion policy without a
+                    // separate user command. Declines and failures do not re-enter
+                    // this commit-only branch; any retry is bounded by its action.
+                    self.delivery = None;
+                    if let Err(error) = self.complete_holes(hole_ids, events) {
+                        // This revision is already committed. Preserve it even if
+                        // a completion prompt cannot be constructed within policy.
+                        self.action = None;
+                        self.phase = PipelinePhase::NeedsUserEdit {
+                            reason: "hole_request_unavailable".into(),
+                        };
+                        return self.event(
+                            events,
+                            "needs_user_edit",
+                            json!({
+                                "reason": "hole_request_unavailable", "error": error,
+                                "revision": revision,
+                            }),
+                        );
+                    }
+                    return Ok(());
+                }
                 let has_score = delivery.score.is_some();
                 self.phase = if has_score {
                     PipelinePhase::ScoreReady

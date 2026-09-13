@@ -224,9 +224,14 @@ delivers line and arc through the shared geometry, count, and place resolvers
 exactly once. An omitted source position remains None; the shared resolver
 chooses a performance-time position from the existing-sway central region
 `[0.39, 0.39, 0.61, 0.61]`. Explicit positions and explicit-center Stage 1.5
-focus take priority. `inku.geometry-resolution-policy.v1` records this omitted-
-position payload; its current digest is
-`0cdcd857f546084c64b64a44b68068dfbfcfb879d50d385db4c4adecbe3fb62b`.
+focus take priority. `inku.geometry-resolution-policy.v1` records omitted
+placement and fill meaning; its current digest is
+`5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56`.
+Single objects, Macros, and coordinated groups share the omitted central
+region, including the exact domain used for tiling. Fill's omitted target
+remains the whole canvas under its separate rule. A valid ground alone is
+drawable content in both Score and Plan; omitting another invalid drawing
+instruction preserves that ground and its diagnostics.
 
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing

@@ -1,12 +1,12 @@
 use inku_ddl::{
-    CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, FocusRegion,
-    GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits, MacroLock,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
-    ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
-    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin,
-    ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit,
-    SemanticHead, SemanticIdentity, SemanticPreviousReference, SemanticRelationKind,
-    Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
+    CompositionPlanOutcome, CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID,
+    ExactCountFieldCandidate, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition,
+    MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
+    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreAppearanceField, ScoreAppearanceResolution,
+    ScoreDiagnosticDisposition, ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap,
+    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome,
+    ScoreOmissionUnit, SemanticHead, SemanticIdentity, SemanticPreviousReference,
+    SemanticRelationKind, Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
     VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
     lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
     lower_verified_stage15_view, plan_verified_stage15, plan_verified_stage15_with_policy,
@@ -4344,9 +4344,10 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
 #[test]
 fn ground_only_is_a_complete_canvas_score() {
     let result = stage15("paper.", ResolvedInstructionLanguage::En);
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let lowered = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
-        ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        context,
         ScoreErrorPolicy::OmitAndContinue,
     );
 
@@ -4354,6 +4355,28 @@ fn ground_only_is_a_complete_canvas_score() {
     assert!(lowered.score().is_some());
     assert!(lowered.instruction_origins().is_empty());
     assert!(lowered.diagnostics().is_empty());
+
+    let plan = plan_verified_stage15_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(plan.outcome(), CompositionPlanOutcome::Ready);
+    assert!(matches!(plan.ground(), Some(ground) if ground.material == GroundMaterial::Paper));
+
+    let omitted = stage15(
+        "paper. scatter four red wide equilateral triangle at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let plan = plan_verified_stage15_with_policy(
+        omitted.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(plan.outcome(), CompositionPlanOutcome::ReadyWithOmissions);
+    assert!(plan.objects().unwrap().is_empty());
+    assert!(matches!(plan.ground(), Some(ground) if ground.material == GroundMaterial::Paper));
+    assert!(!plan.diagnostics().is_empty());
 }
 
 fn resolved_palette(

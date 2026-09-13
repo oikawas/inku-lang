@@ -62,7 +62,7 @@ const FOCUS_REGION_BOUNDS_HUNDREDTHS: [(FocusRegion, [u8; 4]); 6] = [
 const OMITTED_POSITION_BOUNDS_HUNDREDTHS: [u8; 4] = [39, 39, 61, 61];
 
 pub(crate) fn omitted_position_bounds() -> [f64; 4] {
-    OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| f64::from(value) / 100.0)
+    rational_bounds_as_f64(OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| (value, 100)))
 }
 
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
@@ -119,6 +119,32 @@ pub(crate) fn named_region_rational_bounds(
         NAMED_REGIONS.iter().find(|(name, _)| *name == id)?.1
     };
     Some(bounds)
+}
+
+/// Resolve a named source position when present, or the adopted execution
+/// region when position is absent. The caller retains source authority; this
+/// helper only supplies the exact region used by every consumer.
+pub(crate) fn resolved_position_rational_bounds(
+    named_position: Option<&str>,
+    focus: Option<FocusRegion>,
+    context: crate::score_angle::ScoreAngleContext<'_>,
+) -> Option<[(u8, u8); 4]> {
+    match named_position {
+        Some(id) => named_region_rational_bounds(id, focus, context),
+        None => Some(OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| (value, 100))),
+    }
+}
+
+pub(crate) fn resolved_position_bounds(
+    named_position: Option<&str>,
+    focus: Option<FocusRegion>,
+    context: crate::score_angle::ScoreAngleContext<'_>,
+) -> Option<[f64; 4]> {
+    resolved_position_rational_bounds(named_position, focus, context).map(rational_bounds_as_f64)
+}
+
+fn rational_bounds_as_f64(bounds: [(u8, u8); 4]) -> [f64; 4] {
+    bounds.map(|(n, d)| f64::from(n) / f64::from(d))
 }
 
 // Reuses the already-attested occurrence value, never the angle resolver or its bytes.

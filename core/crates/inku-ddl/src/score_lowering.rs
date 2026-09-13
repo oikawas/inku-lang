@@ -2004,9 +2004,11 @@ pub(crate) fn resolve_composition_plan<'a>(
     );
     let outcome = match result.outcome {
         ScoreLoweringOutcome::Stopped => CompositionPlanOutcome::Stopped,
-        _ if objects.is_empty()
-            && result.anchors.is_empty()
-            && view.original_semantic_document().background.is_none() =>
+        _ if !has_resolved_drawable_content(
+            objects.len() + result.anchors.len(),
+            result.resolved_ground.as_ref(),
+            view.original_semantic_document().background.is_some(),
+        ) =>
         {
             CompositionPlanOutcome::Stopped
         }
@@ -2033,6 +2035,14 @@ pub(crate) fn resolve_composition_plan<'a>(
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
     }
+}
+
+fn has_resolved_drawable_content(
+    drawable_count: usize,
+    resolved_ground: Option<&CanvasGroundSpec>,
+    has_background: bool,
+) -> bool {
+    drawable_count != 0 || resolved_ground.is_some() || has_background
 }
 
 fn lower_verified_stage15_shared<'a>(
@@ -2192,20 +2202,21 @@ fn lower_verified_stage15_shared<'a>(
                         .collect::<Vec<_>>(),
                 )
             });
-            let bounds = predicate.position.as_ref().and_then(|position| {
-                crate::geometry::named_region_rational_bounds(
-                    &position.identity.id,
-                    focus,
-                    ScoreAngleContext {
-                        composition_seed: view.composition_seed(),
-                        original_pre_expansion_digest: view.original_pre_expansion_digest(),
-                        original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
-                        occurrence: ScoreAngleOccurrence::Direct {
-                            logical_ordinal: source_member_instruction_indices[0] as u64,
-                        },
+            let bounds = crate::geometry::resolved_position_rational_bounds(
+                predicate
+                    .position
+                    .as_ref()
+                    .map(|position| position.identity.id.as_str()),
+                focus,
+                ScoreAngleContext {
+                    composition_seed: view.composition_seed(),
+                    original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                    original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                    occurrence: ScoreAngleOccurrence::Direct {
+                        logical_ordinal: source_member_instruction_indices[0] as u64,
                     },
-                )
-            });
+                },
+            );
             if let (Some(counts), Some(bounds)) = (counts, bounds) {
                 let region = bounds.map(|(n, d)| n as f64 / d as f64);
                 let layout = match action.expect("allocated known action") {
@@ -2753,9 +2764,12 @@ fn lower_verified_stage15_shared<'a>(
                 | ScoreDiagnosticDisposition::RelationOmitted
         )
     });
-    let has_drawable_content = objects.as_ref().map_or_else(
-        || !instructions.is_empty() || ground.is_some() || document.background.is_some(),
-        |objects| !objects.is_empty() || document.background.is_some(),
+    let has_drawable_content = has_resolved_drawable_content(
+        objects
+            .as_ref()
+            .map_or(instructions.len(), |objects| objects.len()),
+        ground.as_ref(),
+        document.background.is_some(),
     );
     let outcome = if stopped || (omitted && !has_drawable_content) {
         ScoreLoweringOutcome::Stopped
@@ -3597,8 +3611,8 @@ fn resolve_object_plan(
                 .unwrap_or(ObjectAnchor::GeneratedNumeric(position)),
             ScorePlacement::Named(region) => {
                 if resolved.action == PlacementAction::Tile {
-                    let bounds = crate::geometry::named_region_rational_bounds(
-                        input.named_position.expect("resolved named position").id,
+                    let bounds = crate::geometry::resolved_position_rational_bounds(
+                        input.named_position.map(|position| position.id),
                         input.effective_focus,
                         input.angle_context.expect("verified occurrence"),
                     )
@@ -4667,8 +4681,8 @@ fn resolve_complete_object<'a>(
             .named_position
             .filter(|place| place.category == "place")
             .and_then(|place| {
-                named_region_bounds(
-                    place.id,
+                crate::geometry::resolved_position_bounds(
+                    Some(place.id),
                     input.effective_focus,
                     input.angle_context.expect("verified occurrence"),
                 )
@@ -4682,7 +4696,11 @@ fn resolve_complete_object<'a>(
     } else if input.exact_position().is_none() && action == PlacementAction::Fill {
         Some([0.0, 0.0, 1.0, 1.0])
     } else if input.exact_position().is_none() {
-        Some(crate::geometry::omitted_position_bounds())
+        crate::geometry::resolved_position_bounds(
+            None,
+            input.effective_focus,
+            input.angle_context.expect("verified occurrence"),
+        )
     } else {
         None
     };

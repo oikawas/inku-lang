@@ -274,7 +274,9 @@
 # 35: Typed documents retain source-owned background, deliver draw through the shared
 # geometry/count/place resolver, preserve omitted position for central performance-time resolution,
 # and resolve fill target/count/Macro footprint into symbolic plans.
-DDL_ENGINE_VERSION = "35"
+# 36: Omitted placement is shared by tile and coordinated groups; resolved
+# ground alone remains drawable in both Score and composition plans.
+DDL_ENGINE_VERSION = "36"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

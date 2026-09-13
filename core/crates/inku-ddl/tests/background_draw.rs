@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
-    MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
+    MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument, PlacementMemberKind,
     ResolvedInstructionLanguage as Language, ScoreErrorPolicy, ScoreFieldGap, ScoreLoweringContext,
     ScoreLoweringOutcome, SemanticDeliveryOwner, compile_ddl_to_score, compile_typed_ddl,
     plan_verified_stage15, stage15_transformation_input, transform_stage15,
@@ -567,7 +567,12 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
         "color":{"expr":"semantic_ref","category":"color","id":"red"}
     }}]}).to_string()).unwrap();
-    let macro_result = execute("Default.Circle", Language::En, &[definition], context());
+    let macro_result = execute(
+        "Default.Circle",
+        Language::En,
+        std::slice::from_ref(&definition),
+        context(),
+    );
     assert_eq!(result.score(), macro_result.score());
     let explicit = execute(
         "place a red circle at horizontal 0.3 vertical 0.6.",
@@ -601,4 +606,75 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         policy["author_resolved_omission"]["position"]["region"],
         json!([0.39, 0.39, 0.61, 0.61])
     );
+
+    let stage = |source, definitions: &[MacroDefinition]| {
+        let compilation = compile_typed_ddl(
+            document(source, Language::En, definitions),
+            definitions,
+            Some(23),
+            LIMITS,
+        );
+        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap()
+    };
+    let direct_stage = stage("tile three red circles.", &[]);
+    let direct_tile = plan_verified_stage15(direct_stage.verified_effective_view(), context());
+    assert!(
+        direct_tile.diagnostics().is_empty(),
+        "{:?}",
+        direct_tile.diagnostics()
+    );
+    let direct_object = &direct_tile.objects().unwrap()[0];
+    assert_eq!(direct_object.count(), 3);
+    assert_eq!(
+        direct_object.anchor(),
+        &inku_ddl::ObjectAnchor::Named([0.39, 0.39, 0.61, 0.61])
+    );
+    let tile_definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Default","heading":"Tile","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
+        "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
+        "movement":{"expr":"semantic_ref","category":"movement","id":"tile"},
+        "color":{"expr":"semantic_ref","category":"color","id":"red"},
+        "count":{"expr":"integer","value":3}
+    }}]}).to_string()).unwrap();
+    let macro_stage = stage("Default.Tile", std::slice::from_ref(&tile_definition));
+    let macro_tile = plan_verified_stage15(macro_stage.verified_effective_view(), context());
+    assert!(
+        macro_tile.diagnostics().is_empty(),
+        "{:?}",
+        macro_tile.diagnostics()
+    );
+    assert_eq!(
+        macro_tile.objects().unwrap()[0].anchor(),
+        direct_object.anchor()
+    );
+    assert_eq!(
+        macro_tile.objects().unwrap()[0].recipe(),
+        direct_object.recipe()
+    );
+
+    let coordinated = execute(
+        "place one red circle and one blue square.",
+        Language::En,
+        &[],
+        context(),
+    );
+    assert_eq!(
+        coordinated.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        coordinated.downstream_diagnostics()
+    );
+    assert_eq!(
+        coordinated.score().unwrap().placement_groups[0].at.region,
+        [0.39, 0.39, 0.61, 0.61]
+    );
+    let mixed_stage = stage(
+        "scatter three Default.Circle and one blue square.",
+        std::slice::from_ref(&definition),
+    );
+    let mixed = plan_verified_stage15(mixed_stage.verified_effective_view(), context());
+    assert!(mixed.diagnostics().is_empty(), "{:?}", mixed.diagnostics());
+    let group = &mixed.placement_groups()[0];
+    assert_eq!(group.placement().at.region, [0.39, 0.39, 0.61, 0.61]);
+    assert_eq!(group.members()[0].kind(), PlacementMemberKind::Macro);
+    assert_eq!(group.members()[0].body_repeat_count(), 3);
 }

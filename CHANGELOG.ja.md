@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 30 版である。それより前は書庫にある。
 
+### 2026-09-13 — 位置省略と地だけの作品の共通配送を修正
+
+位置を省略したtileが旧named位置必須の前提で停止する経路と、位置省略群が拒否される経路を、共通の厳密な領域解決へ揃える。原文のNone、明示位置の優先、fillの省略領域=全画面を保つ。地だけの作品をScoreとPlanの両方で有効とし、別の描画指示を省略した場合も地と診断を保持する。
+
+DDL engineを35→36へ更新する。既決の意味を配送する修正であり、geometry policy値・schema、Score 0.9.0、render engine 58、APP_VERSION 2.14.2／BUILD_NUMBER 1073は維持する。
+
 ### 2026-09-13 — typed fill planを解決
 
 通常fill、coordinated group、declared Emit、単独Macro呼出は、全画面・既存named area・inline閉primitiveのtarget、明示／省略／混在count、source ownerとMacro footprintを共通のsymbolic FillGroupPlanへ解決する。省略countは面積とreference diameterから決め、混在群は残りareaを省略種へ配り、all-explicitは数をそのまま保つ。Macroはbody・内部count・内側Transformを一つのmotifとして保ち、個体化しない。無面積/open target、numeric motif area、overflowは局所diagnosticである。sampling、clip、actual Scoreへのregion materializationはCount1を含めStep11のままである。

@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 30 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-13 — Share omitted placement and ground-only readiness
+
+Tile and coordinated groups now resolve omitted placement through the common exact region instead of requiring an explicit named position. Source None, explicit-position priority, and fill's separate whole-canvas default remain intact. A valid ground alone is drawable in both Score and Plan, including when another drawing instruction is omitted with diagnostics.
+
+DDL engine advances from 35 to 36. The adopted geometry policy values and schemas, Score 0.9.0, render engine 58, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 remain unchanged.
+
 ### 2026-09-13 — Resolve typed fill plans
 
 Ordinary fill, coordinated groups, declared Emits, and standalone Macro invocations now resolve whole-canvas, existing named-area, or inline closed-primitive targets, explicit / omitted / mixed counts, source ownership, and Macro footprints through one symbolic FillGroupPlan. Omitted count derives from area and reference diameter; mixed groups distribute remaining area across omitted kinds, while all-explicit groups retain their counts. A Macro remains one motif with its body, internal counts, and inner Transform, without instance materialization. Invalid targets receive local diagnostics. Sampling, clipping, and actual-Score region materialization, including Count1, remain Step11 work.

@@ -106,7 +106,11 @@ fn resource_fill_reaches_svg_and_local_clip_refusal_preserves_later_drawing() {
     };
     let display =
         render_with_resources(request(SvgProfile::Display), &hard, operational, clip).unwrap();
-    assert!(display.svg.contains("clip-path="));
+    assert!(
+        display.svg.contains("clip-path="),
+        "missing fill clip: {:?}",
+        display.metadata
+    );
     assert_eq!(
         display
             .metadata

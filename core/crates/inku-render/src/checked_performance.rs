@@ -686,13 +686,20 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     for owner in &mut performance.original_instruction_indices {
         *owner = new_to_old[*owner];
     }
-    if let Some(execution) = &mut performance.execution {
-        execution.input_score_digest = input_digest;
-        execution.rendered_instruction_indices = performance.original_instruction_indices.clone();
-        execution.rendered_instruction_indices.sort_unstable();
-        execution.rendered_instruction_indices.dedup();
-        remap_finalized_diagnostics(&mut execution.diagnostics, &new_to_old, &new_anchor_to_old);
-    }
+    // The later paint/clip stage must be able to append a local failure even
+    // when geometry execution itself produced no diagnostics.
+    let execution = performance
+        .execution
+        .get_or_insert_with(|| ScoreExecutionSummary {
+            input_score_digest: input_digest.clone(),
+            diagnostics: Vec::new(),
+            rendered_instruction_indices: Vec::new(),
+        });
+    execution.input_score_digest = input_digest;
+    execution.rendered_instruction_indices = performance.original_instruction_indices.clone();
+    execution.rendered_instruction_indices.sort_unstable();
+    execution.rendered_instruction_indices.dedup();
+    remap_finalized_diagnostics(&mut execution.diagnostics, &new_to_old, &new_anchor_to_old);
     performance.resource_demand = Some(finalized.demand);
     performance.resource_diagnostics = finalized.resource_diagnostics;
     performance.relation_diagnostics = finalized.relation_diagnostics;

@@ -53,6 +53,7 @@ struct ContextMap {
     instructions: BTreeMap<usize, Vec<usize>>,
     anchors: BTreeMap<usize, usize>,
     path: Vec<u64>,
+    parent: Option<usize>,
 }
 
 #[derive(Default)]
@@ -134,6 +135,7 @@ impl<'a> Builder<'a> {
         let index = self.contexts.len();
         self.contexts.push(ContextMap {
             path,
+            parent: Some(parent),
             ..ContextMap::default()
         });
         index
@@ -172,7 +174,12 @@ impl<'a> Builder<'a> {
         if let Some(target) = target {
             instruction = translate_instruction_to(&instruction, target, self.request.canvas);
         } else {
-            instruction.at = None;
+            let neutral_anchor = crate::geometry::point_to_short_side_units(
+                crate::planning::instruction_anchor_on_canvas(&instruction, self.request.canvas),
+                self.request.canvas,
+            );
+            instruction =
+                translate_instruction_to(&instruction, neutral_anchor, self.request.canvas);
         }
         let output = self.output.instructions.len();
         let relation = instruction.relation.as_ref();
@@ -191,11 +198,17 @@ impl<'a> Builder<'a> {
             self.request.performance_seed,
         )));
         self.instruction_fill_scope_indices.push(innermost_fill);
-        self.contexts[context]
-            .instructions
-            .entry(old)
-            .or_default()
-            .push(output);
+        // Enclosing Macro transforms also own instructions expanded in an
+        // inner fill's child context. Retain their full descendant span.
+        let mut enclosing = Some(context);
+        while let Some(index) = enclosing {
+            self.contexts[index]
+                .instructions
+                .entry(old)
+                .or_default()
+                .push(output);
+            enclosing = self.contexts[index].parent;
+        }
         self.global_instructions
             .entry(old)
             .or_default()
@@ -571,21 +584,26 @@ impl<'a> Builder<'a> {
         let mut result = Vec::new();
         for &old in transforms {
             let source = &self.request.score.transform_groups[old];
-            let Some(start) = self.contexts[context]
-                .instructions
-                .get(&source.start)
-                .and_then(|values| values.first())
-                .copied()
-            else {
-                continue;
-            };
-            let Some(end) = source
-                .end
-                .checked_sub(1)
-                .and_then(|last| self.contexts[context].instructions.get(&last))
-                .and_then(|values| values.last())
-                .map(|value| value + 1)
-            else {
+            let instructions = &self.contexts[context].instructions;
+            let mut contained = instructions
+                .range(source.start..source.end)
+                .flat_map(|(_, values)| values.iter().copied());
+            let (start, end) = if let Some(first) = contained.next() {
+                (first, contained.last().unwrap_or(first) + 1)
+            } else if source.start == source.end && !source.anchor_indices.is_empty() {
+                let boundary = instructions
+                    .range(..source.start)
+                    .next_back()
+                    .and_then(|(_, values)| values.last().map(|value| value + 1))
+                    .or_else(|| {
+                        instructions
+                            .range(source.start..)
+                            .next()
+                            .and_then(|(_, values)| values.first().copied())
+                    })
+                    .unwrap_or(self.output.instructions.len());
+                (boundary, boundary)
+            } else {
                 continue;
             };
             let fixed_position_indices = source
@@ -767,6 +785,16 @@ impl<'a> Builder<'a> {
                     .anchors
                     .get(&old)
                     .copied()
+                    .or_else(|| {
+                        let mut parent = self.contexts[pending.context].parent;
+                        while let Some(index) = parent {
+                            if let Some(&anchor) = self.contexts[index].anchors.get(&old) {
+                                return Some(anchor);
+                            }
+                            parent = self.contexts[index].parent;
+                        }
+                        None
+                    })
                     .or_else(|| {
                         self.global_anchors
                             .get(&old)
@@ -963,6 +991,22 @@ fn translate_instruction_to(
     result.to = result.to.map(moved);
     result.center = result.center.map(moved);
     result.position = result.position.map(moved);
+    let target = crate::geometry::point_from_short_side_units(target, canvas);
+    match result.primitive {
+        Primitive::Line => {}
+        Primitive::Square | Primitive::Triangle => {
+            if result.position.is_none()
+                && let Some(size) = result.size
+            {
+                let size = crate::geometry::size_in_normalized_axes(size, canvas);
+                result.position =
+                    Some(Point::new(target.x - size.x / 2.0, target.y - size.y / 2.0));
+            }
+        }
+        _ => {
+            result.center.get_or_insert(target);
+        }
+    }
     result
 }
 
@@ -1306,13 +1350,14 @@ mod tests {
             "invocation_ordinal": 0,
             "generated_ordinal": 0
         });
-        let outer_fill_member = symbolic_member(
+        let mut outer_fill_member = symbolic_member(
             0,
             2,
             json!({"kind": "source_instruction", "instruction_index": 0}),
             "macro",
             2,
         );
+        outer_fill_member.transform_group_indices = vec![0];
         let inner_fill_member = symbolic_member(0, 1, inner_owner.clone(), "primitive", 2);
         let mut instructions = vec![
             instruction(inner_owner, true),
@@ -1348,6 +1393,8 @@ mod tests {
                 false,
             ),
         ];
+        // Real named/EnclosingGroup compiler templates have no center yet.
+        instructions[0].center = None;
         instructions[4].relation = serde_json::from_value(json!({
             "type": "connected",
             "target_instruction_index": 0
@@ -1360,7 +1407,17 @@ mod tests {
             presence: None,
             instructions,
             anchors: Vec::new(),
-            transform_groups: Vec::new(),
+            transform_groups: vec![TransformGroup {
+                start: 0,
+                end: 2,
+                rotation_degrees: 30.0,
+                scale_x: 1.2,
+                scale_y: 0.8,
+                translate_x: 0.1,
+                translate_y: 0.0,
+                fixed_position_indices: vec![],
+                anchor_indices: vec![],
+            }],
             placement_groups: Vec::new(),
             repetition_groups: vec![inku_score::RepetitionGroup {
                 member: symbolic_member(
@@ -1458,6 +1515,7 @@ mod tests {
         assert!(first.score.repetition_groups.is_empty());
         assert!(first.score.fill_groups.is_empty());
         assert_eq!(first.fill_scopes.len(), 3);
+        assert!(first.instruction_transforms[0].b.abs() > 0.1);
         assert_eq!(
             first.fill_scopes[0].instruction_indices,
             vec![0, 1, 2, 3, 4, 5]

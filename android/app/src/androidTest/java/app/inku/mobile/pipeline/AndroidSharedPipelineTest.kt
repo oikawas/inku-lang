@@ -46,7 +46,7 @@ class AndroidSharedPipelineTest {
         val first = repo.paint(
             description = "One quiet black circle",
             catalogId = "default",
-            canvasAspect = "square",
+            canvasAspect = "pixel9_landscape_safe",
             stage1ModelId = MODEL,
             stage2ModelId = MODEL,
             seeds = seeds,
@@ -55,6 +55,7 @@ class AndroidSharedPipelineTest {
         )
 
         assertEquals(1, provider.requests.size)
+        assertEquals("new paper after a legacy selection uses the canonical default", "square", first.canvasAspect)
         assertTrue(first.displaySvg.startsWith("<svg"))
         assertTrue(JSONObject(first.scoreJson).getJSONArray("instructions").length() > 0)
         val firstMetadata = JSONObject(first.renderMetadataJson)

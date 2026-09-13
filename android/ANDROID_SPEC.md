@@ -49,8 +49,10 @@ When updating Android specifications:
 - The local model provider is the default provider.
 - External providers remain available for compatibility with the web reference:
   OpenAI, Claude, Gemini, NVIDIA NIM, Ollama, and Intel OVMS.
-- The Android pipeline keeps the reference flow:
-  description -> Stage 1 -> Stage 1.5 -> Stage 2 -> JSON Score -> SVG.
+- The normal Android pipeline uses the shared Rust authoring state machine:
+  description -> Stage 1 -> visible DDL -> typed meaning / Stage 1.5 -> Score -> SVG.
+  Shared Rust decides stage transitions, finite vocabulary, parsing and meaning,
+  known-hole completion, and Score compilation, coercion, and repair.
 - JSON Score, render metadata, history import/export, color catalogs, canvas
   aspects, SVG profiles, and render hashes must remain compatible with the web
   implementation.
@@ -62,9 +64,9 @@ When updating Android specifications:
   but it does not mint a separate engine version or render identity.
 - Saved SVGs are not rewritten during the cutover. Existing editions display their saved SVG;
   an explicit replay uses the latest Rust engine available at that time.
-- The Rust engine cutover does not by itself expand into Room schema, persistence format,
-  LLM providers, Stage 1 / 1.5 / 2, or coerce. Expanding the shared-core boundary requires a
-  separate decision and contract.
+- The Kotlin host performs provider transport, camera image preparation and on-device Vision,
+  atomic Room persistence, approval UI, and presentation. Shared Rust owns retry and timeout
+  decisions for each provider action and selects the next stage.
 - Gemma 4 E2B is the default local model. Gemma 4 E4B is a high-quality option.
 - First launch downloads the selected local model after a license confirmation.
 - Target device class is Pixel 9 or newer.
@@ -74,8 +76,8 @@ When updating Android specifications:
 The Android workspace currently contains a buildable standalone application
 package with namespace `app.inku.mobile`.
 
-As of 2026-08-24, Android includes the Rust binding, Cargo/Gradle packaging, arm64 native library,
-and Rust raster presentation. The list below records the post-cutover state.
+As of 2026-09-13, Android includes the Rust binding, Cargo/Gradle packaging, arm64 native library,
+shared Rust authoring pipeline, and Rust raster presentation. The list below records the post-cutover state.
 
 Implemented:
 
@@ -106,11 +108,11 @@ Implemented:
   - free-space reservation subtracts only the current download's retained `.part` bytes, not unrelated model files
   - cancellation retains job ownership and rejects a new download until cancellation cleanup completes
   - app-sandbox final storage and native model loading are restricted to canonical paths under `files/models/`
-- Deterministic local fallback pipeline for:
-  - natural language description to normalized DDL
-  - DDL to JSON Score
-  - JSON Score to SVG
-  - render hash and render metadata generation
+- Standalone host connection to the shared Rust authoring pipeline:
+  - description, direct DDL, batch, demo, refinement, and camera output enter the same versioned snapshot
+  - the Kotlin host transports each provider action once and returns control to shared Rust
+  - visible DDL and authority revision are atomically saved in Room; known-hole patches commit only after author approval
+  - raw Score, render metadata, opaque execution, and context for the selected history revision are retained
 - `AndroidRenderHost` serializes the coerced Score, resolved canvas and color map, catalog,
   profile, seeds, and `wild` into one canonical JSON request and calls shared Rust Engine 41
   through `NativeRenderBridge`.
@@ -122,10 +124,9 @@ Implemented:
   options so ordinary recomposition does not rerasterize an unchanged work.
 - Rust render and raster work runs on background coroutine dispatchers. There is no runtime
   renderer or rasterizer fallback.
-- Android rendering follows the same logical stages as the web `/api/paint`
-  flow: Stage 1 interpretation, intermediate DDL expansion, Stage 2 Score
-  composition, Score repair/coercion, SVG rendering, render-hash generation,
-  and Room history persistence.
+- Normal Android rendering consumes visible DDL, typed meaning, Score, and diagnostics returned by
+  shared Rust. The Kotlin host performs provider transport, requests SVG performance, generates the
+  render hash, persists Room history, and applies UI side effects.
 - Headless render execution for web/server comparison:
   - exported `HeadlessRenderActivity`
   - adb-startable run IDs and prompt/model/catalog/canvas extras
@@ -149,33 +150,21 @@ Implemented:
     `inku-cli paint --save-history` and can be reviewed later in normal server
     history. `summary.json` and the batch aggregate summary include the
     server-side `history_id`.
-- LiteRT-LM is wired as the default local model provider for Stage 1 and Stage
-  2. The provider reads the selected Gemma 4 E2B/E4B `.litertlm` file path from
+- LiteRT-LM is wired as the default local provider for shared-pipeline model
+  effects. The provider reads the selected Gemma 4 E2B/E4B `.litertlm` file path from
   Room, verifies that the model is in the `ready` state, initializes a cached
-  LiteRT-LM `Engine`, sends each stage prompt through a `Conversation`, and
-  renders the returned `Message` into text. Requests use a bounded async flow
-  with cancellation so the UI can return to the deterministic local fallback if
-  device-side inference fails or exceeds the current timeout.
-- Stage 1 now uses the web reference `SYSTEM_PROMPT_PREFIX` and dynamic
-  `EXAMPLE_POOL` selection algorithm instead of the earlier Android summary
-  prompt. The Android implementation selects the top five matching examples
-  using the same keyword-count rule as `server/src/inku_server/interpreter.py`.
-- Stage 1.5 now ports the web `expand_intermediate_ddl` path for Japanese DDL:
-  placement-word sanitization, gray-background avoidance, static-center
-  reframing, profile/tag selection, deterministic SHA-256 salted picks,
-  structural/music/painting candidate selection, and centered-layer limiting.
-- Stage 2 now uses the web reference `composer.py` Japanese system prompt
-  verbatim, including the full conversion rules and key examples.
-- If the LiteRT-LM provider cannot run for a stage, the local path falls back to
-  the deterministic Kotlin port of the web fallback/coerce rules. Natural-
-  language input is preserved into normalized DDL with explicit placement
-  augmentation, so the Compose `指示` field, `解釈（正規化DDL）` field, rendered
-  Score, and saved history remain aligned in the same user-visible flow.
-- LiteRT-LM text responses are sanitized before entering the DDL path. Gemma
-  chat control tokens and clearly non-DDL outputs such as SQL-like text are
-  rejected and routed to the deterministic fallback.
-- Android continues to own Kotlin Stage 1 / 1.5 / 2, Score coerce/repair, Room, and history.
-  Shared Rust alone owns drawing geometry, materials, surfaces, strokes, and SVG serialization.
+  LiteRT-LM `Engine`, sends the core-provided bounded prompt once through a
+  `Conversation`, and renders the returned `Message` into text. Shared Rust
+  decides timeout, retry, and subsequent actions; the Kotlin provider does not branch to its own fallback.
+- Shared Rust constructs the Stage 1 finite vocabulary and provenance, catalog selection,
+  and visible-normalized-DDL schema.
+- Shared Rust is authoritative for DDL parsing, typed meaning / Stage 1.5, known-hole detection
+  and patch constraints, Stage 2 Score compilation, coercion and repair, diagnostics, and resource policy.
+- The former Kotlin Stage 1 / 1.5 / 2, Score coerce/repair, and deterministic fallback
+  implementations remain for comparison but are unreachable from normal description, direct-DDL,
+  batch, demo, refinement, and camera paths.
+- Kotlin owns provider and camera operations, Room and history, approval, and presentation host
+  side effects. Shared Rust alone owns drawing geometry, materials, surfaces, strokes, and SVG serialization.
 - Dark Compose UI in transition from the web-style workbench to a Pixel 9
   mobile-first layout based on the Claude Design prototype:
   - top application header

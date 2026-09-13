@@ -532,6 +532,7 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(
             pipelineView = null,
             descriptionForkRequested = true,
+            selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(localState.value.selectedCanvasAspect),
             message = strings().pipelineNewDescriptionNotice,
         )
     }
@@ -594,19 +595,17 @@ class InkuViewModel @JvmOverloads constructor(
                     if (approve) repository.approvePipelinePatch(view.executionId) else repository.resumePipeline(view.executionId)
                 }
             }.onSuccess { item ->
-                val next = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
-                localState.value = localState.value.copy(
-                    prompt = item.originalInput,
-                    ddl = item.normalizedDdl,
-                    selectedHistory = item,
-                    pipelineView = next,
-                    historyAuthority = next?.authority,
-                    descriptionForkRequested = false,
-                    lineageDetached = false,
-                    isDrawing = false,
-                    message = "Rendered ${item.renderHashShort}",
-                )
+                adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { current ->
+                    current.copy(
+                        prompt = item.originalInput,
+                        ddl = item.normalizedDdl,
+                        descriptionForkRequested = false,
+                        lineageDetached = false,
+                        isDrawing = false,
+                        message = "Rendered ${item.renderHashShort}",
+                    )
+                }
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
                 if (!presentPipelineInteraction(error)) {
@@ -701,6 +700,11 @@ class InkuViewModel @JvmOverloads constructor(
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
         pendingCameraFile = null
+        localState.value = localState.value.copy(
+            pipelineView = null,
+            historyAuthority = null,
+            historyAuthorityLoading = false,
+        )
         cameraJob = viewModelScope.launch {
             try {
                 if (!repository.isLocalVisionModelReady()) {
@@ -1021,6 +1025,9 @@ class InkuViewModel @JvmOverloads constructor(
             cameraCaptureState = captureState,
             isDrawing = phase >= CameraInstantPrintPhase.InterpretingWithNim,
             selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.selectedHistory,
+            pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.pipelineView,
+            historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.historyAuthority,
+            historyAuthorityLoading = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) false else current.historyAuthorityLoading,
             message = presentation?.message,
         )
     }
@@ -1085,21 +1092,22 @@ class InkuViewModel @JvmOverloads constructor(
         promptEditedByUser = false
         cameraRetryInput = null
         cameraComposeSnapshot = null
-        localState.value = localState.value.copy(
-            prompt = item.originalInput,
-            ddl = item.normalizedDdl,
-            ddlEditedAfterGeneration = false,
-            confirmDdlOverwrite = false,
-            selectedHistory = item,
-            lineageDetached = false,
-            cameraCaptureState = CameraCaptureState.Completed(item.id),
-            isDrawing = false,
-            message = cameraDevelopmentPresentation(
-                CameraCaptureState.Completed(item.id),
-                isJapanese = !localState.value.uiLanguage.isEnglish,
-                animationsEnabled = false,
-            )?.message,
-        )
+        adoptSavedHistory(item, activeExecution = true, isCurrent = { serial == cameraRunSerial }) { current ->
+            current.copy(
+                prompt = item.originalInput,
+                ddl = item.normalizedDdl,
+                ddlEditedAfterGeneration = false,
+                confirmDdlOverwrite = false,
+                lineageDetached = false,
+                cameraCaptureState = CameraCaptureState.Completed(item.id),
+                isDrawing = false,
+                message = cameraDevelopmentPresentation(
+                    CameraCaptureState.Completed(item.id),
+                    isJapanese = !current.uiLanguage.isEnglish,
+                    animationsEnabled = false,
+                )?.message,
+            )
+        }
     }
 
     private fun failCameraRun(serial: Long, failure: CameraFailure, canRetryNim: Boolean) {
@@ -1171,6 +1179,7 @@ class InkuViewModel @JvmOverloads constructor(
             lineageDetached = true,
             ddlEditedAfterGeneration = false,
             cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
+            selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(localState.value.selectedCanvasAspect),
             message = null,
         )
     }
@@ -1566,37 +1575,85 @@ class InkuViewModel @JvmOverloads constructor(
         if (localState.value.isDrawing) stopDrawing()
         restoredInitialHistory = true
         promptEditedByUser = false
-        localState.value = localState.value.copy(
+        adoptSavedHistory(item) { current ->
+            current.copy(
+                descriptionForkRequested = false,
+                // An explicit pick is what makes a work the parent of the next save
+                // (web's `loadIterationItem`, +page.svelte:4600).
+                lineageDetached = false,
+                prompt = item.originalInput,
+                ddl = item.normalizedDdl,
+                ddlEditedAfterGeneration = false,
+                confirmDdlOverwrite = false,
+                cameraCaptureState = current.cameraCaptureState.clearCameraOrigin(),
+                selectedCatalogId = item.colorCatalogId,
+                selectedCanvasAspect = item.canvasAspect,
+                tab = tab,
+                composeMode = ComposeMode.Write,
+            )
+        }
+    }
+
+    private fun adoptSavedHistory(
+        item: HistoryItemEntity,
+        activeExecution: Boolean = false,
+        isCurrent: () -> Boolean = { true },
+        update: (InkuUiState) -> InkuUiState,
+    ) {
+        localState.value = update(localState.value).copy(
             selectedHistory = item,
             pipelineView = null,
             historyAuthority = null,
             historyAuthorityLoading = true,
-            descriptionForkRequested = false,
-            // An explicit pick is what makes a work the parent of the next save
-            // (web's `loadIterationItem`, +page.svelte:4600).
-            lineageDetached = false,
-            prompt = item.originalInput,
-            ddl = item.normalizedDdl,
-            ddlEditedAfterGeneration = false,
-            confirmDdlOverwrite = false,
-            cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
-            selectedCatalogId = item.colorCatalogId,
-            selectedCanvasAspect = item.canvasAspect,
-            tab = tab,
-            composeMode = ComposeMode.Write,
         )
         viewModelScope.launch {
-            val loaded = runCatching {
+            val managed = runCatching {
                 withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
             }
-            if (localState.value.selectedHistory?.id != item.id || !localState.value.historyAuthorityLoading) return@launch
-            localState.value = localState.value.copy(
-                historyAuthority = loaded.getOrNull()?.authority,
+            val pipelineView = if (activeExecution) {
+                runCatching {
+                    withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
+                }
+            } else {
+                Result.success(null)
+            }
+            val current = localState.value
+            if (!isCurrent() || current.selectedHistory?.id != item.id || !current.historyAuthorityLoading) return@launch
+            val history = managed.getOrNull()
+            val view = pipelineView.getOrNull()?.takeIf { candidate ->
+                pipelineIdentity(item)?.let { (executionId, revision) ->
+                    candidate.executionId == executionId && candidate.revision == revision
+                } == true
+            }
+            localState.value = current.copy(
+                pipelineView = view,
+                historyAuthority = history?.authority ?: view?.authority,
                 historyAuthorityLoading = false,
-                message = loaded.getOrNull()?.warning ?: loaded.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") },
+                message = history?.warning
+                    ?: pipelineView.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
+                    ?: managed.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
+                    ?: current.message,
             )
         }
     }
+
+    private fun matchingPipelineExecutionId(current: InkuUiState): String? {
+        val view = current.pipelineView ?: return null
+        val selected = current.selectedHistory ?: return view.executionId
+        val recorded = pipelineIdentity(selected) ?: return null
+        return view.executionId.takeIf {
+            it == recorded.first && view.revision == recorded.second
+        }
+    }
+
+    private fun pipelineIdentity(item: HistoryItemEntity): Pair<String, String>? = runCatching {
+        val metadata = JSONObject(item.renderMetadataJson)
+        val executionId = metadata.optString("pipeline_execution_id").takeIf { it.isNotBlank() }
+            ?: return@runCatching null
+        val revision = metadata.optString("pipeline_revision").takeIf { it.isNotBlank() }
+            ?: return@runCatching null
+        executionId to revision
+    }.getOrNull()
 
     fun selectHistory(item: HistoryListItem) {
         viewModelScope.launch {
@@ -1937,25 +1994,22 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
-                val view = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
-                if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
-                localState.value = localState.value.copy(
-                    prompt = item.originalInput,
-                    ddl = item.normalizedDdl,
-                    ddlEditedAfterGeneration = false,
-                    confirmDdlOverwrite = false,
-                    selectedHistory = item,
-                    pipelineView = view,
-                    historyAuthority = view?.authority,
-                    descriptionForkRequested = false,
-                    // A saved work is what the next one comes from (web lowers
-                    // the same flag on every save, +page.svelte:2883, :3304).
-                    lineageDetached = false,
-                    cameraCaptureState = if (route != null) CameraCaptureState.Idle else localState.value.cameraCaptureState,
-                    isDrawing = false,
-                    message = "Rendered ${item.renderHashShort}",
-                )
+                adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
+                    latest.copy(
+                        prompt = item.originalInput,
+                        ddl = item.normalizedDdl,
+                        ddlEditedAfterGeneration = false,
+                        confirmDdlOverwrite = false,
+                        descriptionForkRequested = false,
+                        // A saved work is what the next one comes from (web lowers
+                        // the same flag on every save, +page.svelte:2883, :3304).
+                        lineageDetached = false,
+                        cameraCaptureState = if (route != null) CameraCaptureState.Idle else latest.cameraCaptureState,
+                        isDrawing = false,
+                        message = "Rendered ${item.renderHashShort}",
+                    )
+                }
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
                 if (presentPipelineInteraction(error)) return@onFailure
@@ -1980,26 +2034,23 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = current.pipelineView?.executionId)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = matchingPipelineExecutionId(current))
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
-                val view = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
-                if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
-                localState.value = localState.value.copy(
-                    prompt = item.originalInput,
-                    ddl = item.normalizedDdl,
-                    ddlEditedAfterGeneration = false,
-                    confirmDdlOverwrite = false,
-                    selectedHistory = item,
-                    pipelineView = view,
-                    historyAuthority = view?.authority,
-                    descriptionForkRequested = false,
-                    lineageDetached = false,
-                    isDrawing = false,
-                    message = "Composed ${item.renderHashShort}",
-                )
+                adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
+                    latest.copy(
+                        prompt = item.originalInput,
+                        ddl = item.normalizedDdl,
+                        ddlEditedAfterGeneration = false,
+                        confirmDdlOverwrite = false,
+                        descriptionForkRequested = false,
+                        lineageDetached = false,
+                        isDrawing = false,
+                        message = "Composed ${item.renderHashShort}",
+                    )
+                }
                 if (returnToLineage) refreshLineage()
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
@@ -2086,23 +2137,24 @@ class InkuViewModel @JvmOverloads constructor(
                     if (!isCurrentDrawingRun(runId)) return@onSuccess
                     success += 1
                     last = item
-                    localState.value = localState.value.copy(
-                        selectedHistory = item,
-                        // The line itself declared no parent -- every batch line
-                        // is a root of its own, as web's does (+page.svelte:3327-3345)
-                        // -- but the work now on screen is one, and web lowers
-                        // this flag on every saved paint (:2883).
-                        lineageDetached = false,
-                        ddl = item.normalizedDdl,
-                        ddlEditedAfterGeneration = false,
-                        batchSuccess = success,
-                        batchFailures = failures,
-                        batchActiveDdl = item.normalizedDdl,
-                        batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
-                        batchElapsedMs = System.currentTimeMillis() - startedAt,
-                        batchLatestHashShort = item.renderHashShort,
-                        message = strings().batchRunning(index + 1, lines.size),
-                    )
+                    adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
+                        latest.copy(
+                            // The line itself declared no parent -- every batch line
+                            // is a root of its own, as web's does (+page.svelte:3327-3345)
+                            // -- but the work now on screen is one, and web lowers
+                            // this flag on every saved paint (:2883).
+                            lineageDetached = false,
+                            ddl = item.normalizedDdl,
+                            ddlEditedAfterGeneration = false,
+                            batchSuccess = success,
+                            batchFailures = failures,
+                            batchActiveDdl = item.normalizedDdl,
+                            batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
+                            batchElapsedMs = System.currentTimeMillis() - startedAt,
+                            batchLatestHashShort = item.renderHashShort,
+                            message = strings().batchRunning(index + 1, lines.size),
+                        )
+                    }
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
@@ -2215,19 +2267,19 @@ class InkuViewModel @JvmOverloads constructor(
                     }.onSuccess { item ->
                         if (!isCurrentDrawingRun(runId)) return@onSuccess
                         val elapsed = System.currentTimeMillis() - startedAt
-                        val latest = localState.value
-                        localState.value = latest.copy(
-                            selectedHistory = item,
-                            lineageDetached = false,
-                            prompt = item.originalInput.removePrefix(DemoHistoryInputPrefix),
-                            ddl = item.normalizedDdl,
-                            ddlEditedAfterGeneration = false,
-                            demoGeneratedDdl = item.normalizedDdl,
-                            demoCurrentElapsedMs = elapsed,
-                            demoTotalElapsedMs = latest.demoTotalElapsedMs + elapsed,
-                            demoRenderCount = latest.demoRenderCount + 1,
-                            message = strings().demoDrawn(item.renderHashShort),
-                        )
+                        adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
+                            latest.copy(
+                                lineageDetached = false,
+                                prompt = item.originalInput.removePrefix(DemoHistoryInputPrefix),
+                                ddl = item.normalizedDdl,
+                                ddlEditedAfterGeneration = false,
+                                demoGeneratedDdl = item.normalizedDdl,
+                                demoCurrentElapsedMs = elapsed,
+                                demoTotalElapsedMs = latest.demoTotalElapsedMs + elapsed,
+                                demoRenderCount = latest.demoRenderCount + 1,
+                                message = strings().demoDrawn(item.renderHashShort),
+                            )
+                        }
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         if (!isCurrentDrawingRun(runId)) return@onFailure

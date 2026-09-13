@@ -3,7 +3,6 @@ package app.inku.mobile.pipeline
 import java.math.BigInteger
 import java.util.Base64
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -22,7 +21,8 @@ class SharedPipelineHost(
     private val maxEffectSteps: Int = 32,
     private val newId: () -> String = { UUID.randomUUID().toString().replace("-", "") },
 ) {
-    private val sessions = ConcurrentHashMap<String, Session>()
+    private val sessions = mutableMapOf<String, Session>()
+    private val sessionsMutex = Mutex()
 
     init {
         require(maxEffectSteps > 0) { "positive effect limit required" }
@@ -96,10 +96,13 @@ class SharedPipelineHost(
             stateBytes = persistedState(session),
         )
         val key = key(request.ownerId, snapshot.requiredString("execution_id"))
-        if (sessions.putIfAbsent(key, session) != null) {
-            throw PipelineHostException("execution_already_started")
+        sessionsMutex.withLock {
+            if (sessions.putIfAbsent(key, session) != null) {
+                throw PipelineHostException("execution_already_started")
+            }
+            session.users = 1
         }
-        return driveWithCancellation(session)
+        return useSession(session) { driveWithCancellation(it) }
     }
 
     suspend fun command(
@@ -109,44 +112,41 @@ class SharedPipelineHost(
         hostContextJson: String? = null,
     ): PipelineView {
         val updatedHostContextJson = hostContextJson?.let { JSONObject(it).toString() }
-        val session = session(ownerId, executionId)
-        session.mutex.withLock {
-            val previousContext = session.context
-            val previousHostContextJson = session.hostContextJson
-            if (command is PipelineCommand.GenerateFromDescription) {
-                session.context = session.context.copy(description = command.description)
+        return withSession(ownerId, executionId) { session ->
+            session.mutex.withLock {
+                val previousContext = session.context
+                val previousHostContextJson = session.hostContextJson
+                if (command is PipelineCommand.GenerateFromDescription) {
+                    session.context = session.context.copy(description = command.description)
+                }
+                if (updatedHostContextJson != null) {
+                    session.hostContextJson = updatedHostContextJson
+                }
+                try {
+                    advanceLocked(session, commandPayload(command))
+                } catch (error: Throwable) {
+                    session.context = previousContext
+                    session.hostContextJson = previousHostContextJson
+                    throw error
+                }
             }
-            if (updatedHostContextJson != null) {
-                session.hostContextJson = updatedHostContextJson
-            }
-            try {
-                advanceLocked(session, commandPayload(command))
-            } catch (error: Throwable) {
-                session.context = previousContext
-                session.hostContextJson = previousHostContextJson
-                throw error
-            }
+            if (command is PipelineCommand.Cancel) view(session) else driveWithCancellation(session)
         }
-        return if (command is PipelineCommand.Cancel) view(session) else driveWithCancellation(session)
     }
 
-    suspend fun cancel(ownerId: String, executionId: String): PipelineView {
-        val session = session(ownerId, executionId)
+    suspend fun cancel(ownerId: String, executionId: String): PipelineView = withSession(ownerId, executionId) { session ->
         session.mutex.withLock {
             if (session.snapshot().requiredObject("phase").requiredString("tag") !in TERMINAL_PHASES) {
                 advanceLocked(session, JSONObject().put("tag", "cancel"))
             }
         }
-        return view(session)
+        view(session)
     }
 
-    suspend fun restore(ownerId: String, executionId: String): PipelineView {
-        val session = loadSession(ownerId, executionId)
-        return driveWithCancellation(session)
-    }
+    suspend fun restore(ownerId: String, executionId: String): PipelineView =
+        withSession(ownerId, executionId) { driveWithCancellation(it) }
 
     private suspend fun loadSession(ownerId: String, executionId: String): Session {
-        sessions[key(ownerId, executionId)]?.let { return it }
         val stateBytes = executionStore.load(ownerId, executionId)
             ?: throw PipelineHostException("execution_not_found")
         val state = JSONObject(stateBytes.toString(Charsets.UTF_8))
@@ -181,21 +181,17 @@ class SharedPipelineHost(
         if (snapshot.requiredString("execution_id") != executionId) {
             throw PipelineHostException("stored_execution_invalid")
         }
-        sessions.putIfAbsent(key(ownerId, executionId), session)
-        return sessions.getValue(key(ownerId, executionId))
+        return session
     }
 
     suspend fun view(ownerId: String, executionId: String): PipelineView =
-        view(session(ownerId, executionId))
+        withSession(ownerId, executionId) { view(it) }
 
-    suspend fun snapshotJson(ownerId: String, executionId: String): String {
-        val session = session(ownerId, executionId)
-        return session.mutex.withLock { session.snapshot().toString() }
-    }
+    suspend fun snapshotJson(ownerId: String, executionId: String): String =
+        withSession(ownerId, executionId) { session -> session.mutex.withLock { session.snapshot().toString() } }
 
-    suspend fun executionContext(ownerId: String, executionId: String): PipelineExecutionContext {
-        val session = session(ownerId, executionId)
-        return session.mutex.withLock {
+    suspend fun executionContext(ownerId: String, executionId: String): PipelineExecutionContext = withSession(ownerId, executionId) { session ->
+        session.mutex.withLock {
             val snapshot = session.snapshot()
             PipelineExecutionContext(
                 snapshotJson = snapshot.toString(),
@@ -491,8 +487,28 @@ class SharedPipelineHost(
     private fun sameAction(current: JSONObject?, expected: JSONObject): Boolean =
         current?.toString() == expected.toString()
 
-    private suspend fun session(ownerId: String, executionId: String): Session =
-        sessions[key(ownerId, executionId)] ?: loadSession(ownerId, executionId)
+    private suspend fun <T> withSession(ownerId: String, executionId: String, block: suspend (Session) -> T): T {
+        val session = sessionsMutex.withLock {
+            // Loading under the cache lock prevents an older durable snapshot
+            // from being inserted after the last active user releases a newer one.
+            sessions.getOrPut(key(ownerId, executionId)) { loadSession(ownerId, executionId) }
+                .also { it.users += 1 }
+        }
+        return useSession(session, block)
+    }
+
+    private suspend fun <T> useSession(session: Session, block: suspend (Session) -> T): T = try {
+        block(session)
+    } finally {
+        withContext(NonCancellable) {
+            sessionsMutex.withLock {
+                session.users -= 1
+                if (session.users == 0) {
+                    sessions.remove(key(session.ownerId, session.snapshot().requiredString("execution_id")), session)
+                }
+            }
+        }
+    }
 
     private fun key(ownerId: String, executionId: String) = "$ownerId\u0000$executionId"
 
@@ -518,6 +534,7 @@ class SharedPipelineHost(
         var hostContextJson: String,
         var fresh: Boolean,
         var renderedJson: String?,
+        var users: Int = 0,
         var eventsJson: String,
         var providerActionInFlight: String? = null,
         val mutex: Mutex = Mutex(),

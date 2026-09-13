@@ -39,8 +39,9 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - デフォルト provider はローカルモデル provider とする。
 - Web 参照実装との互換性のため、外部 provider も維持する:
   OpenAI、Claude、Gemini、NVIDIA NIM、Ollama、Intel OVMS。
-- Android パイプラインは参照フローを維持する:
-  description -> Stage 1 -> Stage 1.5 -> Stage 2 -> JSON Score -> SVG。
+- Android の通常パイプラインは共有Rustのauthoring state machineを使い、
+  description -> Stage 1 -> visible DDL -> typed meaning / Stage 1.5 -> Score -> SVGを辿る。
+  Stage遷移、有限語彙、parse／meaning、known-hole補完判断、Score compile／coerce／repairは共有Rustが決める。
 - JSON Score、render metadata、履歴 import/export、色カタログ、canvas aspect、SVG profile、
   render hash は Web 実装と互換にする。
 - production の Score -> SVG と演奏metadataは、serverとAndroidが同じ
@@ -50,8 +51,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
   Compose CanvasはUI表示の補助になれても、別のengine versionやrender identityを生成しない。
 - 保存済み作品のSVGは切替時に書き換えない。過去作品の表示は保存済みSVG、明示的なreplayは
   その時点の最新Rust engineで担保する。
-- Rust engine切替だけを理由に、Room schema、保存形式、LLM provider、Stage 1 / 1.5 / 2、
-  coerceを同じ契約へ広げない。共有coreの境界を追加で広げる場合は別の裁定と契約を要する。
+- Kotlin hostはprovider transport、カメラ画像前処理と端末内Vision、Roomの原子保存、
+  承認UIと表示を担当する。Provider actionごとのretry／timeout判断と次のStageは共有Rustが所有する。
 - Gemma 4 E2B を標準ローカルモデル、Gemma 4 E4B を高品質オプションとする。
 - 初回起動時は、ライセンス同意後に選択されたローカルモデルをダウンロードする。
 - 対象端末クラスは Pixel 9 以降とする。
@@ -60,8 +61,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 Android ワークスペースには、namespace `app.inku.mobile` の build 可能な単体アプリがある。
 
-2026-08-24時点でAndroid用Rust binding、Cargo/Gradle packaging、arm64 native library、
-Rust raster presentationを導入済みである。以下は切替後の現行状態を記す。
+2026-09-13時点でAndroid用Rust binding、Cargo/Gradle packaging、arm64 native library、
+Rust authoring pipelineとraster presentationを導入済みである。以下は切替後の現行状態を記す。
 
 実装済み:
 
@@ -91,11 +92,11 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   - 空き容量予約では同一downloadの保持済み`.part`だけを控除し、512 MiBの安全余白を維持
   - download cancel中はjob ownershipを解放せず、cancel cleanup完了前の再downloadを拒否
   - app sandbox final storageとnative model loadをcanonical `files/models/`配下に限定
-- 決定的ローカル fallback pipeline:
-  - natural language description -> normalized DDL
-  - DDL -> JSON Score
-  - JSON Score -> SVG
-  - render hash / render metadata generation
+- 共有Rust authoring pipelineへのstandalone host接続:
+  - 記述と直接DDL、batch／demo、推敲、カメラ出力を同じversion付きsnapshotへ送る
+  - provider actionはKotlin hostが一回だけtransportし、継続判断は共有Rustへ返す
+  - visible DDLとauthority revisionをRoomへ原子保存し、known-hole patchは作者承認後だけ確定する
+  - raw Score、render metadata、opaque execution、当該履歴revisionのcontextを保持する
 - `AndroidRenderHost`が、coerce済みScore、解決済みcanvas／色map、catalog、profile、seed、`wild`を
   1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust Engine 41を呼ぶ。
 - `inku-svg-raster`は`resvg 0.48.0`を使い、保存済み／現行SVGを明示的な
@@ -103,9 +104,8 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
 - main preview、履歴thumbnail、refinement preview、PNG exportは`RustArtworkRasterizer`を使う。
   raster cache keyはSVG identity、target size、raster API/optionsを含み、通常recompositionで再rasterしない。
 - Rust render/raster native処理はcoroutineのbackground dispatcherで実行し、runtime renderer/raster fallbackを持たない。
-- Android rendering は Web `/api/paint` と同じ論理 stage を辿る:
-  Stage 1 interpretation、intermediate DDL expansion、Stage 2 Score composition、
-  Score repair/coercion、SVG rendering、render hash generation、Room history persistence。
+- Androidの通常描画は共有Rustが返すvisible DDL、typed meaning、Score、診断を使用し、
+  Kotlin hostがprovider transport、SVG演奏要求、render hash生成、Room履歴保存とUI副作用を実行する。
 - Web/server 比較用 headless render execution:
   - exported `HeadlessRenderActivity`
   - adb から起動可能な run ID と prompt/model/catalog/canvas extras
@@ -123,26 +123,18 @@ Rust raster presentationを導入済みである。以下は切替後の現行�
   - `android/scripts/headless_render_compare.sh` は server-side CLI 描画結果を後から通常履歴で参照できるよう、
     `CLI_SAVE_HISTORY=true` をデフォルトとし、`inku-cli paint --save-history` を付与する。
     `summary.json` と batch aggregate summary には server-side `history_id` を含める。
-- LiteRT-LM は Stage 1 / Stage 2 のデフォルト local model provider として接続済み。
+- LiteRT-LM は共有pipelineのmodel effectを実行するデフォルトlocal providerとして接続済み。
   provider は Room から選択済み Gemma 4 E2B/E4B `.litertlm` path を読み、
   model state が `ready` であることを確認し、cached LiteRT-LM `Engine` を初期化し、
-  各 stage prompt を `Conversation` に送って返却 `Message` を text 化する。
-  UI が device-side inference failure や timeout から復帰できるよう、request は bounded async flow と cancellation を使う。
-- Stage 1 は、以前の Android summary prompt ではなく、Web 参照実装の
-  `SYSTEM_PROMPT_PREFIX` と dynamic `EXAMPLE_POOL` selection algorithm を使う。
-  Android 実装は `server/src/inku_server/interpreter.py` と同じ keyword-count rule で top 5 examples を選ぶ。
-- Stage 1.5 は、日本語 DDL の Web `expand_intermediate_ddl` 経路を移植済み:
-  placement-word sanitization、gray-background avoidance、static-center reframing、
-  profile/tag selection、deterministic SHA-256 salted picks、
-  structural/music/painting candidate selection、centered-layer limiting。
-- Stage 2 は、Web 参照 `composer.py` の日本語 system prompt を、full conversion rules と key examples を含めて使う。
-- LiteRT-LM provider が stage 実行できない場合、local path は Web fallback/coerce rules の Kotlin port に fallback する。
-  Natural-language input は明示的な placement augmentation を含む normalized DDL へ保存されるため、
-  Compose の `指示` field、`解釈（正規化DDL）` field、rendered Score、saved history が同じ user-visible flow で整合する。
-- LiteRT-LM text response は DDL path に入る前に sanitize する。
-  Gemma chat control token や、SQL-like text など明らかな non-DDL output は reject し、deterministic fallback に回す。
-- KotlinのStage 1 / 1.5 / 2、Score coerce／repair、Room／historyは引き続きAndroidが所有する。
-  描画geometry/material/surface/stroke/SVG serializerは共有Rustだけが所有する。
+  coreが作ったbounded promptを `Conversation` に一度送って返却 `Message` をtext化する。
+  Timeout、再試行、別actionの要否は共有Rustが決定し、Kotlin providerは独自fallbackへ分岐しない。
+- Stage 1の有限語彙と出典、catalog選択、visible normalized DDL schemaは共有Rustが構成する。
+- DDL parse、typed meaning／Stage 1.5、known-hole検出とpatch制約、Stage 2 Score compile、
+  coerce／repair、診断と資源policyは共有Rustを正本とする。
+- 旧Kotlin Stage 1／1.5／2、Score coerce／repair、deterministic fallbackの実装は比較用に残るが、
+  通常の記述、直接DDL、batch／demo、推敲、カメラ経路からは到達しない。
+- Kotlinはprovider／camera、Room／history、承認と表示のhost副作用を所有し、
+  描画geometry／material／surface／stroke／SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
   - top application header
   - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは撮影またはPhoto Pickerの1枚を選び、端末内Gemmaで既定の記述または明示選択した上級DDLへ変換し、固定NIM／`vivid_material`描画・保存までone-touchで進める

@@ -12,7 +12,7 @@ AndroidのKotlin hostをinku serverを介さずproviderと共有Rust JNIへ接�
 
 Roomは既存作品を消さずv10からv11へ移行し、origin／authority／sourceの原子CAS、action ACK、opaque execution、当該history revisionの不変contextを保存する。保存済みScoreの再演奏は再compileせず元のDDL・authority revision・資源上限を保ち、色やタッチを変えた新しい演奏だけを履歴・系譜・linkと一つのtransactionで保存する。旧作品のauthorityは本文から推測せず、表示と保存済み再演奏を維持し、DDL変更と記述再生成は元作品を残す新variationへforkする。
 
-新作用紙は共有Rust registryの11形式を正本とする。旧`pixel9_landscape_safe`は端末表示余白として扱い、既存作品の9:5比率と保存画像を保つ。旧設定からの新作用紙は`square`を既定とし、9:5を16:9へ別名化しない。これはsource接続の記録であり、実機acceptanceとStep 14の完了判定は保留中である。iOSは今回の範囲に含めず、別のStep 15として保留する。版番号と配備状態は変更しない。
+新作用紙は共有Rust registryの11形式を正本とする。旧`pixel9_landscape_safe`は端末表示余白として扱い、既存作品の9:5比率と保存画像を保つ。旧設定からの新作用紙は`square`を既定とし、9:5を16:9へ別名化しない。Androidのstandalone共有Rust接続は実装済みであり、作品受入と配備は後続する。iOSは今回の範囲に含めず、別途保留する。APP_VERSIONと非Android版番号、配備状態は変更せず、Android BUILD_NUMBERは通常buildの自動採番だけを行う。
 
 ### 2026-09-13 — 履歴の判別完了を待って描画する
 

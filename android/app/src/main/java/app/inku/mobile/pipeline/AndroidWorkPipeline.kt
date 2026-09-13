@@ -5,6 +5,7 @@ import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ManagedHistoryReplayInput
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.cameraInputProvenance
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
@@ -69,9 +70,10 @@ class AndroidWorkPipeline(
 
     suspend fun composeFromDdl(
         ddl: String,
-        request: PaintRequest,
+        rawRequest: PaintRequest,
         onProgress: suspend (ComposeFromDdlProgress) -> Unit = {},
     ): PaintResult {
+        val request = authoringRequest(rawRequest)
         onProgress(ComposeFromDdlProgress.Rendering)
         val existingId = request.executionId
         if (existingId == null) {
@@ -207,8 +209,8 @@ class AndroidWorkPipeline(
             .put("canvas", JSONObject().put("width", canvas.width).put("height", canvas.height))
             .put("canvas_aspect_id", request.canvasAspect)
             .put("svg_profile", "display")
-            .put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
-            .put("composition_seed", request.compositionSeed?.let(java.lang.Long::toUnsignedString))
+            .put("render_seed", BigInteger(java.lang.Long.toUnsignedString(renderSeed)))
+            .put("composition_seed", request.compositionSeed?.let { BigInteger(java.lang.Long.toUnsignedString(it)) })
             .put("wild", request.renderWild == true)
             .put("error_policy", compiler.requiredString("error_policy"))
         val input = JSONObject()
@@ -419,14 +421,24 @@ class AndroidWorkPipeline(
         )
     }
 
+    private fun authoringRequest(request: PaintRequest): PaintRequest =
+        if (request.canvasAspect == PIXEL9_HOST_ONLY_FORMAT) {
+            request.copy(canvasAspect = CanvasAspects.DEFAULT_ID)
+        } else {
+            request
+        }
+
     private suspend fun prepare(
-        request: PaintRequest,
+        rawRequest: PaintRequest,
         descriptionFlow: Boolean,
-        text: String = request.description,
+        text: String = rawRequest.description,
         parentVariationId: String? = null,
         configOverride: PreparedPipelineConfig? = null,
         renderSeedOverride: Long? = null,
     ): PreparedRun {
+        // Legacy paper remains valid for display/replay; new works use the
+        // canonical default even when started from a legacy history selection.
+        val request = authoringRequest(rawRequest)
         val history = request.parentHistoryId?.let { historyId ->
             readHistory(historyId) ?: throw PipelineHostException("parent_history_not_found")
         }

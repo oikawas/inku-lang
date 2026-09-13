@@ -42,7 +42,7 @@ pub const CORE_API_VERSION: &str = "0.1.0";
 
 /// Canonical engine identity owned by the portable core and exposed by every host binding.
 pub const RENDER_ENGINE_ID: &str = "default";
-pub const RENDER_ENGINE_VERSION: &str = "57";
+pub const RENDER_ENGINE_VERSION: &str = "58";
 
 /// Report the host-boundary version for binding and packaging smoke tests.
 #[must_use]

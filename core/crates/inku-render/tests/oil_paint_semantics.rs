@@ -42,7 +42,7 @@ fn oil_retains_loaded_ends_and_a_seeded_body_distinct_from_ink_brush() {
 }
 
 #[test]
-fn oil_accepted_intensities_preserve_pigment_and_shape_with_clipped_wider_passes() {
+fn oil_accepted_intensities_preserve_pigment_and_shape_without_compat_clipping() {
     let score = serde_json::from_str(
         r#"{"instructions":[
           {"primitive":"line","from":[0.1,0.1],"to":[0.9,0.1],"weight":"oil_paint","color":"blue"},
@@ -78,37 +78,11 @@ fn oil_accepted_intensities_preserve_pigment_and_shape_with_clipped_wider_passes
         let svg = render(current).unwrap().svg;
         let bases = elements(&svg, "path", "oil-paint-fill-body-v1");
         assert_eq!(bases.len(), 2);
-        let clips = tags(&svg, "clipPath");
-        assert_eq!(clips.len(), 2);
-        for (base, clip) in bases.iter().zip(clips) {
-            let clipped_path = svg
-                .split_once(clip)
-                .unwrap()
-                .1
-                .split_once("<path")
-                .unwrap()
-                .1;
-            assert_eq!(attr(base, "d"), attr(clipped_path, "d"));
+        assert!(!svg.contains("<clipPath"));
+        assert!(!svg.contains("clip-path="));
+        assert!(!svg.contains("oil-intensity-width-field-v1"));
+        for base in &bases {
             assert_eq!(attr(base, "fill"), "#2468ac");
-        }
-        let fields = elements(&svg, "g", "oil-intensity-width-field-v1");
-        assert_eq!(fields.len(), 2);
-        for (field, (x, y)) in fields.iter().zip([(360.0, 560.0), (960.0, 560.0)]) {
-            let values = attr(field, "transform")
-                .strip_prefix("matrix(")
-                .unwrap()
-                .trim_end_matches(')')
-                .split_whitespace()
-                .map(|value| value.parse::<f64>().unwrap())
-                .collect::<Vec<_>>();
-            let [a, b, c, d, e, f] = values[..] else {
-                panic!("six matrix coefficients")
-            };
-            assert!((a + d - 4.0).abs() < 0.00001);
-            assert!((a * d - b * c - 3.0).abs() < 0.00001);
-            assert!((b - c).abs() < 0.00001);
-            assert!((a * x + c * y + e - x).abs() < 0.002);
-            assert!((b * x + d * y + f - y).abs() < 0.002);
         }
         let groups = svg
             .split("<g class=\"oil-paint-stroke-v1\"")

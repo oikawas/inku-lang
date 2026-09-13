@@ -112,6 +112,24 @@ pub(crate) fn interior(
                 "opacity",
                 format_number(style.fill_opacity.unwrap_or(style.stroke_opacity)),
             );
+        if context.profile == SvgProfile::Compat {
+            fill.push(
+                Element::new("path")
+                    .attr("d", &path)
+                    .attr("fill", format!("url(#{id}-field)"))
+                    .attr("stroke", "none"),
+            );
+            for (pattern, alpha) in [("grille", 0.28), ("scanlines", 1.0)] {
+                fill.push(
+                    Element::new("path")
+                        .attr("d", &path)
+                        .attr("fill", format!("url(#{id}-{pattern})"))
+                        .attr("opacity", format_number(alpha))
+                        .attr("stroke", "none"),
+                );
+            }
+            return Some(fill);
+        }
         let mut clip = Element::new("clipPath")
             .attr("id", format!("{id}-clip"))
             .attr("clipPathUnits", "userSpaceOnUse");

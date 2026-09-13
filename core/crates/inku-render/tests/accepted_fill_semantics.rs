@@ -59,8 +59,13 @@ fn representative_mask_crt_shapes_and_compat_preserve_geometry_and_local_definit
     let compat_faint = render(request).unwrap().svg;
     assert!(!compat_dense.contains("<filter"));
     assert!(!compat_dense.contains("<mask"));
+    assert!(!compat_dense.contains("<clipPath"));
+    assert!(!compat_dense.contains("clip-path="));
     assert!(compat_dense.contains("tool-fill-compat-v1"));
+    assert!(compat_dense.contains("computer-crt-fill-v1"));
     assert!(compat_dense.contains("<pattern"));
+    assert!(compat_dense.contains("tool-fill-2-0-grille"));
+    assert!(compat_dense.contains("tool-fill-2-0-scanlines"));
     assert!(compat_faint.contains("opacity=\"0.35\""));
     assert_eq!(values(&compat_dense, "d"), values(&compat_faint, "d"));
     assert_ne!(compat_dense, compat_faint);

@@ -396,7 +396,8 @@ fn oil_paint_fill(
     }
     // A single bank-derived field widens passes and their spacing together.
     // Degenerate marks retain their native passes and solid underlay.
-    if accepted
+    if context.profile != SvgProfile::Compat
+        && accepted
         && !passes.is_empty()
         && xx + yy > 0.0
         && (xx - yy).hypot(2.0 * xy) >= 0.9 * (xx + yy)
